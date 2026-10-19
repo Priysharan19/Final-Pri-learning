@@ -8,6 +8,7 @@ import { prerequisitesOf, mapStrandOf, MAP_STRANDS } from '../engine/prerequisit
 import { IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
+import TermGloss from '../components/TermGloss.jsx';
 
 // The syllabus map (v1.1 instrument): the student's chapters as a graph laid
 // out by strand (rows) and syllabus order (columns), joined by Pri's authored
@@ -148,7 +149,7 @@ export default function MapPage() {
                   aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
                   aria-label={`${STRAND_KEY[node.strand] ? t(STRAND_KEY[node.strand]) + ' · ' : ''}${node.row.name}${isRecommended(node) ? ` · ${t('inst.mapNext')}` : ''}`}
                   onClick={() => setPick(node.row.id)} onFocus={() => setPick(node.row.id)}>
-                  <span className="in-map-hit-name" aria-hidden="true"><b>{String(node.index + 1).padStart(2, '0')}</b>{node.row.name}{STRAND_KEY[node.strand] && <small>{t(STRAND_KEY[node.strand])}</small>}</span>
+                  <span className="in-map-hit-name" aria-hidden="true"><b>{String(node.index + 1).padStart(2, '0')}</b><span lang="en">{node.row.name}</span>{STRAND_KEY[node.strand] && <small>{t(STRAND_KEY[node.strand])}</small>}</span>
                 </button>
               </li>
             ))}
@@ -158,7 +159,7 @@ export default function MapPage() {
         {current && (
           <aside className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
-            <h2>{current.row.name}</h2>
+            <h2 lang="en"><TermGloss text={current.row.name} /></h2>
             <dl className="in-map-facts">
               <div><dt>{t('inst.mapMarks')}</dt><dd>{current.marks ? `${current.marks.earned} / ${current.marks.possible}` : '—'}</dd></div>
               <div><dt>{t('inst.kpiAnswered')}</dt><dd>{current.evidence.attempts}</dd></div>
@@ -167,7 +168,7 @@ export default function MapPage() {
             {prerequisitesOf(current.row.id).length > 0 && (
               <div className="in-map-pre">
                 <span>{t('inst.mapBuildsOn')}</span>
-                <ul>{prerequisitesOf(current.row.id).map(p => <li key={p.id}>{layout.byId.get(p.id)?.row.name || layout.foundationById.get(p.id)?.name || p.id} <em>· {p.skill}</em></li>)}</ul>
+                <ul>{prerequisitesOf(current.row.id).map(p => <li key={p.id} lang="en"><TermGloss text={layout.byId.get(p.id)?.row.name || layout.foundationById.get(p.id)?.name || p.id} /> <em>· {p.skill}</em></li>)}</ul>
               </div>
             )}
             <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{t('inst.practise')}</Link>

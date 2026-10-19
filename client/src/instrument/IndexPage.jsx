@@ -6,6 +6,7 @@ import { useT, tLater } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
+import TermGloss from '../components/TermGloss.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
@@ -79,7 +80,7 @@ export default function IndexPage() {
         {recent && (
           <div className="in-resume" data-instrument-resume>
             <div>
-              <b>{t('inst.resumeLabel', { name: recent.subtopicName || '' })}</b>
+              <b>{t('inst.resumeLabel', { name: '' })}<span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{t('inst.resumeSub')}</small>
             </div>
             <Link className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')}</Link>
@@ -99,7 +100,7 @@ export default function IndexPage() {
                       aria-pressed={on} data-current={on ? 'true' : undefined} data-chapter={c.row.id}
                       onClick={() => setPick(c.row.id)} onFocus={() => setPick(c.row.id)}>
                       <span className="in-ch-n">{String(c.index + 1).padStart(2, '0')}</span>
-                      <span className="in-ch-t">{c.row.name}
+                      <span className="in-ch-t"><span lang="en"><TermGloss text={c.row.name} /></span>
                         <small>{c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted')}</small>
                       </span>
                       <Ring value={c.evidence.mastery} colourVar={c.colour} />
@@ -125,7 +126,7 @@ export default function IndexPage() {
           <div className="in-plate-head">
             <div>
               <small>{t('inst.chapterN', { n: current.index + 1 })}</small>
-              <h2 id="in-plate-title">{current.row.name}</h2>
+              <h2 id="in-plate-title" lang="en"><TermGloss text={current.row.name} /></h2>
             </div>
             <div className="in-kpis">
               <div><b>{current.evidence.attempts}</b><small>{t('inst.kpiAnswered')}</small></div>
