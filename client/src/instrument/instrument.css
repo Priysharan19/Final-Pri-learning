@@ -374,3 +374,52 @@ html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
    confidence: that keeps its indigo "unsure" edge whatever the verdict. */
 html.ui-instrument .ink-line:not(.ink-line-low):has(.ink-line-verdict.bad) .ink-line-math { box-shadow: 0 0 0 1px var(--in-slip); }
 html.ui-instrument .ink-line:not(.ink-line-low):has(.ink-line-verdict.good) .ink-line-math { box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 55%, transparent); }
+
+/* ── Review and the hint ladder (step 4) ────────────────────────────────────
+   Help is a ladder climbed one rung at a time: each rung a numbered card, the
+   marks still available stated as a figure. The worked solution is a path of
+   numbered steps on one line. History reads as a ledger. */
+html.ui-instrument .hint-bulb { border-radius: 4px; box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l2); gap: 8px; padding: 0 10px; }
+html.ui-instrument .hint-bulb:hover:not(:disabled) { background: var(--in-l4); }
+html.ui-instrument .hint-bulb .hint-left { font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
+
+html.ui-instrument .hints-block { counter-reset: in-rung; border-left: 0; padding-left: 0; display: grid; gap: 6px; }
+html.ui-instrument .hints-block-title { font: 500 11px var(--in-mono); letter-spacing: 0.08em; color: var(--in-tx-3); }
+html.ui-instrument .hintbox {
+  counter-increment: in-rung; position: relative; padding: 10px 12px 10px 44px; border-radius: 6px;
+  background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge);
+}
+html.ui-instrument .hintbox::before {
+  content: counter(in-rung); position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 4px;
+  display: grid; place-items: center; font: 600 11px var(--in-mono); background: var(--in-action); color: var(--in-on-action);
+}
+html.ui-instrument .hintbox .h-n { font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
+html.ui-instrument .hints-block-title:last-child { margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+/* The worked solution: numbered steps joined by a rule, read top to bottom. */
+html.ui-instrument .steps { gap: 0; }
+html.ui-instrument .step { position: relative; padding-bottom: 14px; }
+html.ui-instrument .step:not(:last-child)::before { content: ""; position: absolute; left: 11px; top: 26px; bottom: 2px; width: 1px; background: var(--in-edge-2); }
+html.ui-instrument .step-n {
+  position: relative; z-index: 1; width: 23px; height: 23px; border-radius: 4px; border: 0; flex: none;
+  box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l2); font: 500 11.5px var(--in-mono); color: var(--in-tx-2);
+}
+html.ui-instrument .step-h { font: 600 14px var(--in-ui); letter-spacing: -0.005em; }
+
+/* Review: segmented filters, ledger rows, the error notebook as a panel. */
+html.ui-instrument .pill-opt {
+  border-radius: 4px; border: 0; box-shadow: 0 0 0 1px var(--in-edge-2); background: transparent;
+  font: 500 13px var(--in-ui); color: var(--in-tx-2);
+}
+html.ui-instrument .pill-opt:hover { background: var(--in-l2); color: var(--in-tx); }
+html.ui-instrument .pill-opt.on, html.ui-instrument .pill-opt[aria-pressed="true"] { background: var(--in-l4); color: var(--in-tx); box-shadow: 0 0 0 1px var(--in-edge-3); }
+html.ui-instrument .card { border-radius: 6px; border-color: var(--in-edge); background: var(--in-l1); box-shadow: none; }
+html.ui-instrument .hist-row { padding: 12px 14px; border-bottom-color: var(--in-edge); transition: background 140ms cubic-bezier(.2, 0, 0, 1); }
+html.ui-instrument .hist-row:hover { background: var(--in-l2); }
+html.ui-instrument .hist-name { font: 500 14.5px var(--in-ui); }
+html.ui-instrument .hist-prompt { color: var(--in-tx-2); }
+html.ui-instrument .hist-verdict.good { color: var(--in-good); }
+html.ui-instrument .hist-verdict.bad { color: var(--in-slip); }
+html.ui-instrument .hist-detail { border-radius: 6px; background: var(--in-l2); border-color: var(--in-edge); }
+html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument .hist-row { transition: none; } }
