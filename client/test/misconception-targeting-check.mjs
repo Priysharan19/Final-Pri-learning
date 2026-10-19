@@ -122,7 +122,9 @@ const choice = pick(liveTraps);
 ok('the pick names the slip for when the question carries it', /Same slip keeps coming back/.test(choice.why));
 ok('NSW serve swaps in the untargeted reason unless the server attested the trap',
   backend.includes("return choice.reason === 'misconception' && !trapKey ? why.replace(choice.whyPlain, MISCONCEPTION_UNTARGETED_WHY) : why;"));
-ok('India serve does the same', backend.includes('why: trapKey ? pick.why : pick.whyUntargeted'));
+// Train 10: the India reason also describes the cell that served (retargetOnRepeat.js),
+// so the untargeted wording is chosen for the picked cell and for a retargeted one alike.
+ok('India serve does the same', backend.includes('why: served === pick.target ? (trapKey ? pick.why : pick.whyUntargeted) : pick.whyFor(served, { untargeted: !trapKey })'));
 ok('the India untargeted reason does not say it keeps coming back', /misconception: \(c, trap\) => \(trap \? `Same slip keeps coming back in \$\{c\.name\}: \$\{trap\.label\}` : `Practising \$\{c\.name\}, where the same mistake has come up before\.`\)/.test(backend));
 
 if (fails.length) {
