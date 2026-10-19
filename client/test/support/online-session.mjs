@@ -221,7 +221,11 @@ export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
       : h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-recognition' AND key=?").get(String(receipt || ''));
     return row ? JSON.parse(row.response_json) : null;
   };
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, close };
+  // Test desk only: the reads this account has kept (what /recognize answers
+  // from, and what a Submit that carries its picture reuses), newest first.
+  const keptReadResults = accountId => h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>? ORDER BY created_at DESC")
+    .all(accountId, Date.now()).map(r => { try { return JSON.parse(r.response_json).result || null; } catch { return null; } }).filter(Boolean);
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, keptReadResults, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
@@ -497,7 +501,9 @@ function onlineSession(platform, ctx, page) {
     forgetKeptReads: () => platform.forgetKeptReads(session.account?.id),
     keptReads: () => platform.keptReads(session.account?.id),
     /** Test desk only: a stored reading receipt of this account, or null. */
-    recognitionProof: receipt => platform.recognitionProof(session.account?.id, receipt)
+    recognitionProof: receipt => platform.recognitionProof(session.account?.id, receipt),
+    /** Test desk only: this account's kept reads (the provider's own result), newest first. */
+    keptReadResults: () => platform.keptReadResults(session.account?.id)
   };
   return session;
 }
