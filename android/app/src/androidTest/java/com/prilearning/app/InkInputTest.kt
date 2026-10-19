@@ -259,6 +259,14 @@ class InkInputTest {
             // hop is a scripted stand-in answering "7"), the strokes are read by
             // the server and never on the device: the reading the card shows is
             // the server's, labelled as such, and carries the stand-in's text.
+            // Read on request (#440): nothing is read until the student presses
+            // Read my answer — writing, erasing and rotating send nothing.
+            waitFor(s, "!!document.querySelector('[data-ink-read]')", 30_000)
+            Thread.sleep(2000)
+            assertEquals("nothing is read before the student presses Read my answer", "false",
+                eval(s, "!!document.querySelector('.ink-preview .ink-line[data-text]')"))
+            assertEquals("the press reaches the Read my answer button", "true",
+                eval(s, "(function(){var b=document.querySelector('[data-ink-read]');if(!b)return false;b.click();return true;})()"))
             val read = waitFor(s, "(function(){var p=document.querySelector('.ink-preview');if(!p)return false;var n=p.querySelector('.ink-status');var l=p.querySelector('.ink-line[data-text]');return n&&l?(n.innerText.trim()+'|'+l.getAttribute('data-text')):false;})()", 30_000).trim('"')
             assertTrue("the card shows a reading made on Pri's server: $read", read.startsWith("Read on the server"))
             assertEquals("the reading is the server reader's (synthetic stand-in), not the device's: $read", "7", read.substringAfter('|'))
