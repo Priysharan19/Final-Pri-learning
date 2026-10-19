@@ -27,7 +27,14 @@
 //    system scope or their own account (supabase/migrations/
 //    20261016000000_rls_fail_closed.sql). The store declares the scope for every
 //    statement; no SQLite structural change.
-export const SCHEMA_VERSION = 12;
+// 13: account RLS covers every account-bearing table — accounts, the class and
+//    teacher tables, issue reports, the nullable-account billing ledgers, OTP
+//    challenges, the audit trail, content authorship, teacher invites and
+//    feature-flag provenance get a RESTRICTIVE pri_account_scope policy
+//    (supabase/migrations/20261019000000_rls_account_coverage.sql). No SQLite
+//    structural change; the version moves so a server refuses to boot on a
+//    database without these policies (fail closed).
+export const SCHEMA_VERSION = 13;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

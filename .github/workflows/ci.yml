@@ -488,6 +488,17 @@ jobs:
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs
+      - name: Security P2s (admin MFA on class routes, export completeness, RLS account coverage, OTP delete asymmetry)
+        run: |
+          set -o pipefail
+          node server/test/admin-mfa-class-routes-check.mjs 2>&1 | tee security-p2.log
+          node server/test/account-export-completeness-check.mjs 2>&1 | tee -a security-p2.log
+          node server/test/rls-account-coverage-check.mjs 2>&1 | tee -a security-p2.log
+          node server/test/otp-delete-asymmetry-check.mjs 2>&1 | tee -a security-p2.log
+          grep -Fq 'admin-mfa-class-routes-check: 77/77 checks passed (sqlite)' security-p2.log
+          grep -Fq 'account-export-completeness-check (sqlite): 71 checks passed' security-p2.log
+          grep -Fq 'RLS ACCOUNT COVERAGE: PASS — 20/20 checks' security-p2.log
+          grep -Fq 'OTP DELETE ASYMMETRY: PASS — 15/15 checks' security-p2.log
       - name: Server-authoritative examination papers (SQLite)
         run: |
           set -o pipefail
@@ -514,7 +525,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 52 → 53 (#430): the owner AP first-mistake contract also runs on real Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 54/54 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 57/57 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -527,6 +538,9 @@ jobs:
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
+          grep -Fq '✓ admin-mfa-class-routes-check.mjs' platform-postgres.log
+          grep -Fq '✓ account-export-completeness-check.mjs' platform-postgres.log
+          grep -Fq '✓ rls-account-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-session-binding-check.mjs' platform-postgres.log
           grep -Fq '✓ export-reauth-check.mjs' platform-postgres.log
           grep -Fq '✓ session-alerts-check.mjs' platform-postgres.log

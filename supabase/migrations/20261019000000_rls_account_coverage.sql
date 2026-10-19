@@ -41,8 +41,10 @@
 -- and written inside account scope by practice issuing.
 --
 -- Additive and Postgres-only: RLS has no SQLite counterpart and the store's
--- statements are unchanged, so there is no SQLite structural change and no
--- schema_version move (a schema-12 build runs unchanged against it).
+-- statements are unchanged, so there is no SQLite structural change.
+-- schema_version moves to 13 so a server build that expects these policies
+-- refuses to boot on a database without them (PLATFORM_DB_SCHEMA_MISMATCH):
+-- fail closed. Rollback: 20261019000000_rls_account_coverage.rollback.sql.
 -- Same access model as 20261001000000_platform_schema.sql.
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,5 +79,7 @@ begin
       t.tablename, scoped, scoped);
   end loop;
 end $$;
+
+update pri.platform_meta set value = '13' where key = 'schema_version';
 
 commit;

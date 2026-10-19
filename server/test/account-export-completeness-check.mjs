@@ -193,6 +193,7 @@ try {
   const counts = JSON.parse(audit.metadata_json).counts;
   c.deq([counts.receipts, counts.phones], [9, 1], 'the audit receipt counts receipts and phones');
 
+  console.log(`engine: ${h.engine}`);
   console.log(`account-export-completeness-check (${h.engine}): ${c.count()} checks passed`);
 } finally {
   await h.close();

@@ -105,4 +105,5 @@ for (const path of [`/v1/classes/${classId}`, `/v1/classes/${classId}/students`,
 }
 
 await h.close();
+console.log(`engine: ${h.engine}`);
 console.log(`admin-mfa-class-routes-check: ${c.count()}/${c.count()} checks passed (${h.engine})`);

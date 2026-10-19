@@ -31,6 +31,7 @@
 // teacher/guardian flows, deletion and export are unchanged; that is asserted
 // here too (system scope sees and updates every seeded row).
 // ─────────────────────────────────────────────────────────────────────────────
+import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -71,7 +72,10 @@ if (existsSync(FILE)) {
   ok(/as restrictive for all to pri_server/.test(sql), 'its policies are RESTRICTIVE, FOR ALL, to pri_server only');
   ok(!/\bselect\b/i.test(sql.replace(/for t in select \* from \(values/i, '')), 'no policy sub-selects another table (no recursive RLS)');
   for (const t of Object.keys(COVERED)) ok(new RegExp(`\\('${t}',`).test(sql), `the migration covers ${t}`);
-  ok(!/schema_version/.test(sql), 'no schema_version move: a schema-12 build runs unchanged (statements and scope declaration are the same)');
+  // Train 10 decision: the version moves so a server expecting these policies
+  // refuses to boot on a database without them (fail closed).
+  ok(/update pri\.platform_meta set value = '13' where key = 'schema_version';/.test(sql) && SCHEMA_VERSION === 13,
+    'schema_version moves to 13 with the build: a schema-13 server refuses a database without these policies');
 }
 
 // ── 2–3 · Live Postgres ────────────────────────────────────────────────────
