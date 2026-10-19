@@ -87,6 +87,7 @@ jobs:
           # value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a
           # listed line on a gradient plan (y11-diff) is not a derivative mistake.
           grep -Fq 'AP FIRST ERROR + ECF: PASS — 4885/4885 checks' suites.log
+          grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           grep -Fq 'WORKING EVIDENCE: PASS — 25/25 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
