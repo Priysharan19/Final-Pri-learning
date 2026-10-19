@@ -5899,7 +5899,7 @@ const SINGLE_REQUEST_BODY_CHARS = 960_000;
 // The server's answers that mean "the picture was not read, so nothing was
 // marked" when a submission carries its picture (server/platform/practice.js).
 const READING_REFUSALS = new Set(['RATE_LIMITED', 'AI_ALLOWANCE_EXHAUSTED', 'PAID_CAPACITY_REACHED', 'PAID_CAPACITY_NOT_CONFIGURED',
-  'RECOGNITION_FAILED', 'RECOGNITION_EMPTY', 'RECOGNITION_CORRECTION_INVALID', 'RECOGNITION_IMAGE_INVALID']);
+  'RECOGNITION_FAILED', 'RECOGNITION_EMPTY', 'RECOGNITION_CORRECTION_INVALID', 'RECOGNITION_IMAGE_INVALID', 'RECOGNITION_READ_EXPIRED']);
 const readingRefused = cause => READING_REFUSALS.has(String(cause?.code || '')) || /^HANDWRITING_/.test(String(cause?.code || ''));
 
 /** A reading that failed, as the reason the answer was not checked — with the reader's own refusal kept beside it. */
@@ -5934,10 +5934,15 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   // The request bytes of an earlier send under this key, when there was one.
   const resend = earlier?.submissionId === submissionId && earlier.payload ? earlier.payload : null;
   // A handwritten or photographed answer was read when the student asked
-  // (Read my answer / Read my photo, #440), so Submit sends the confirmed
-  // answer with the server's reading receipt and never a picture to read.
-  // `picture` stays null; the server's picture-in-Submit path (#441) is not
-  // used by this client.
+  // (Read my answer / Read my photo, #440). Submit goes to the server in ONE
+  // request (#506): the picture travels with the submission and the server
+  // replays the reading the student asked for (paid: false — Submit never
+  // buys a read; a picture never read is RECOGNITION_READ_EXPIRED, nothing
+  // marked), writes the receipt (and the student's correction) with the mark
+  // in one transaction. The reader still sees the picture alone. The receipt
+  // sequence below is kept for a server that does not take a picture here,
+  // a picture too large to share a request body, and a kept read that has
+  // expired while the draft still holds its signed read receipt.
   let picture = null;
   // Reading the handwriting or photo comes before marking and is not marking:
   // a failure anywhere in it means the answer was not sent to be marked. (It
@@ -5958,6 +5963,10 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     // signed read receipt proves it), and a correction is sent explicitly.
     // The picture never travels with the marking request.
     const attested = mode === 'ink' ? body.ink?.attested : body.photoAttested;
+    const workingChars = Array.isArray(body.steps) ? body.steps.join('\n').length : String(body.steps || '').length;
+    if (receiptFlow !== true && image.length + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
+      picture = image;
+    } else {
     const read = await cloud.recognizePractice(row.serverQuestionId, mode, image, attested && typeof attested === 'object' ? attested : null).catch(cause => {
       throw readerRefusal(cause);
     });
@@ -5973,6 +5982,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
       if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
       receipt = corrected.receipt;
+    }
     }
   } catch (cause) { throw notMarked(cause); }
   // Preserve the complete request bytes across uncertain acknowledgements.
@@ -5996,6 +6006,16 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       // its shape, before reading or marking anything: use the receipt
       // sequence for this same press, under the same key.
       if (cause.status === 400 && cause.code === 'PRACTICE_SUBMISSION_INVALID' && receiptFlow !== true) {
+        row.pendingGrade = null;
+        await put('questions', row).catch(() => {});
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+      }
+      // The server no longer keeps the read the student asked for, but the
+      // draft holds its signed read receipt: prove the read with it (no new
+      // provider read), under the same key. Nothing was marked (409 comes
+      // before marking). Without a receipt the student presses Read again.
+      const attestedRead = mode === 'ink' ? body.ink?.attested : body.photoAttested;
+      if (cause.status === 409 && cause.code === 'RECOGNITION_READ_EXPIRED' && receiptFlow !== true && attestedRead && typeof attestedRead === 'object') {
         row.pendingGrade = null;
         await put('questions', row).catch(() => {});
         return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });

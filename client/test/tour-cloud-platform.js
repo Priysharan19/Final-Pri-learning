@@ -221,13 +221,21 @@ export const flow = {
       await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
     await check('nothing was sent to the reader while gated', reader.requests.length === 0, JSON.stringify(handwritingRequests().map(r => `${r.method} ${r.path}`)));
 
-    // ── 2 · approval arrives elsewhere; the kept ink is read, no reload ─────
+    // ── 2 · approval arrives elsewhere; the kept ink is read on request ────
+    // Read on request (#440): the gate lifting reads nothing by itself. The
+    // kept ink waits beside the server's refusal, whose own read request is
+    // its "Try again" (a refusal has no "Read my answer" beside it); one
+    // press reads it — once.
     guardianPending = false;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.waitForTimeout(1500);
+    await check('the gate lifting reads nothing by itself: the kept ink waits for the student\'s press',
+      reader.requests.length === 0, `${reader.requests.length} transcribe requests before the press`);
+    await page.locator('[data-ink-retry-reading]').first().click();
     await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
     const readBack = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
-    await check('once the gate lifts, the kept ink is read by itself — no retyping, no reload',
-      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length >= 1,
+    await check('once the gate lifts, one press reads the kept ink, exactly once — no retyping, no reload',
+      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length === 1,
       `read ${JSON.stringify(readBack)}; ${reader.requests.length} transcribe requests`);
     await check('the same question is still on screen', (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt);
     await check('the ink that was sent is the picture and nothing else — answer-blind',

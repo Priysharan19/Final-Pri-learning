@@ -19,39 +19,13 @@
 //
 // Run on its own:  node client/test/tour-truthful-ink.js
 //
-// ── DEFERRED TO THE READ-MY-ANSWER PR (#440) ─────────────────────────────────
-// This file is the `main` edition: on main the page is read automatically a
-// moment after the pen lifts, so the flow scripts the reader BEFORE it writes
-// and waits for the reading. Nothing this lane guarantees is weakened by that
-// (verdict text from server evidence only; "Your answer" = the confirmed,
-// submitted value; annotations withdrawn on new ink, edit, clear, mode change;
-// late results not pinned on newer work; History and reload truthful). The
-// following, which exist only with "Read my answer", were asserted on the
-// stacked branch (task/truthful-ink-feedback @ cf8503a2) and must be restored
-// verbatim when #440 lands:
-//
-//   1. In writeAndRead(), the read is the student's own press:
-//        await handwrite(page, box, glyphs, { x });
-//        await pressRead(page);
-//      and the reading is current, not of earlier writing:
-//        return JSON.stringify(got) === want && !document.querySelector('[data-ink-stale]');
-//   2. The slow read of the rewritten page is held at the provider hop and
-//      started by the press:
-//        let openRead; reader.gate = new Promise(done => { openRead = done; });
-//        await pressRead(page);
-//        ...
-//        openRead(); reader.gate = null;
-//        await page.waitForFunction(want => document.querySelector('.ink-line')?.getAttribute('data-text') === want && !document.querySelector('[data-ink-stale]'), String(right.text), { timeout: 20000 }).catch(() => {});
-//   3. "rewrite: ONE new stroke withdraws every annotation of the previous
-//      submission" ran with NO read in flight at all (nothing is read until the
-//      press); here the automatic read of the new stroke is held instead.
-//   4. The unit rule 'a reading gone stale: the previous submission's
-//      annotations are withdrawn' (truthful-feedback-check.mjs) is kept here,
-//      but only #440 produces a stale reading in the app.
-// ─────────────────────────────────────────────────────────────────────────────
+// ── READ ON REQUEST (#440) ──────────────────────────────────────────────────
+// Nothing is read until the student presses Read my answer: writeAndRead()
+// presses it, and the rewrite step proves one new stroke sends nothing to be
+// read or marked before the press, then holds the read the press starts.
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { handwrite, pressRead, readLines, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 import { inkLineVerdicts, workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import EN from '../src/i18n/strings.en.js';
@@ -163,10 +137,11 @@ export const flow = {
     /** Write, ask for the read, and wait for the scripted lines. */
     const writeAndRead = async (box, glyphs, lines, { x = 40 } = {}) => {
       online.forgetKeptReads();           // re-scripted stand-in: a different reader now (desk only)
-      // On main the page is read by itself once the pen rests: the stand-in is
-      // scripted before the writing, and the flow waits for that reading.
+      // Read on request (#440): the stand-in is scripted, the student writes,
+      // and the read is the student's own press of Read my answer.
       reader.lines = lines.map(text => ({ text }));
       await handwrite(page, box, glyphs, { x });
+      await pressRead(page);
       await page.waitForFunction(want => {
         const got = [...document.querySelectorAll('.ink-line')].map(n => n.getAttribute('data-text') || '');
         return JSON.stringify(got) === want && !document.querySelector('[data-ink-stale]');
@@ -329,8 +304,8 @@ export const flow = {
             await lookHere() === 1 && await crossesOnInk() === 1 && await page.locator('.editor-shell[data-marked="yes"]').count() === 1,
           `${await lookHere()} "Look here", ${await crossesOnInk()} cross(es)`);
 
-        // One new stroke. Its (automatic) read is held: nothing has been read
-        // back, and nothing is submitted.
+        // One new stroke. Nothing reads it until the student asks (#440); the
+        // read the press starts is held: nothing read back, nothing submitted.
         const callsBefore = (await gradesOf(right.serverQuestionId)).length;
         online.forgetKeptReads();
         reader.lines = [{ text: String(right.text) }];
@@ -348,7 +323,10 @@ export const flow = {
           after.previous.includes('Your previous attempt was not correct.') && after.previous.includes('What is on the page now has not been checked yet.') &&
             after.pinned === 0 && !/Not quite/.test(after.previous) && after.speech.includes('Your previous attempt was not correct.') && !/Not quite/.test(after.speech),
           JSON.stringify({ previous: after.previous, speech: after.speech, pinned: after.pinned }));
-        await check('rewrite: the new ink was not sent anywhere by being written', (await gradesOf(right.serverQuestionId)).length === callsBefore);
+        await check('rewrite: the new ink was not sent anywhere by being written — not to be marked, not to be read',
+          (await gradesOf(right.serverQuestionId)).length === callsBefore && await heldGrades() === 0 && reader.requests.length === readsHeldFrom,
+          `${await heldGrades()} read request(s) before any press`);
+        await pressRead(page);
 
         // A SLOW read of the rewritten page: still nothing judged while it flies…
         await page.waitForTimeout(2200);
