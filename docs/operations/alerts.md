@@ -14,7 +14,9 @@ stays open. Do not mark it done because this file exists.
 | Signal | Where | Who can read it |
 |---|---|---|
 | One JSON line per request: `requestId`, `method`, `route` (template, never the raw path), `status`, `ms`, `code` (the coded error, when there was one), `release` (SHA), `db` (`sqlite`/`postgres`) | stdout (`level: info`), stderr for 5xx (`level: error`) | Railway log explorer |
-| Operational events: `platform_error`, `server_error`, `provider_call_failed`, `auth_email_failed`, `auth_delivery_worker_error`, `platform_db_pool_error`, `housekeeping_error` | stderr (`warn`/`error`) | Railway log explorer |
+| Operational events: `platform_error`, `server_error`, `provider_call_failed`, `auth_email_failed`, `auth_delivery_worker_error`, `platform_db_pool_error`, `housekeeping_error`, `client_error` (a crash report a client sent: `platform`, `surface`, `code`, `fingerprint`), `error_sink_failed` | stderr (`warn`/`error`) | Railway log explorer |
+| **Error tracking** (`server/platform/errorSink.js`): every 5xx the server composes (`platform_error` / `server_error` with status ≥ 500) and every accepted crash report is captured once as an event of the same allowlisted fields — `requestId`, `release` (server SHA), `route` (template), `method`, `status`, `code`, `source` (`platform` / `app` / `client`), `platform`, `surface`, `fingerprint` — and delivered to the sink named by `PRI_SENTRY_DSN` (a Sentry-compatible envelope endpoint). With the DSN unset the sink is a counted no-op (`error_sink_total{outcome=noop}`). There is no field for a message, stack, body, cookie, email or account id, so none can reach the sink | `PRI_SENTRY_DSN` (Railway variable only) | the owner's Sentry project |
+| Crash reports from the web app: `POST /v1/telemetry/error` — session, guardian consent (router gate) and the device's crash-report preference (Settings, on by default for a signed-in account) required; 20 per 10 minutes per account; a closed code, platform, surface slug, scope and fingerprint, never free text | stored as `client-error` operational events (90-day retention); `client_errors_total{platform,code}`; `server_errors_total{code}` for server-composed 5xx | an admin (account export), the sink |
 | `GET /v1/health` — **liveness**. 200 while the process answers; reports `database.reachable` (its database reads are bounded to 1.5 s so a silent partition cannot outlast the 5 s container healthcheck) but never fails because the database did | public | uptime checker, Docker `HEALTHCHECK` |
 | `GET /v1/ready` — **readiness**. 200 `ready`/`degraded`, 503 `not_ready` + `Retry-After: 5`; every dependency as one state and one code | public by design (an uptime checker and the Railway deploy healthcheck need it without a credential), so it carries no counts, no failure rates, no which-provider/which-product detail and no configuration values — that detail is only on `/v1/metrics` | uptime checker, Railway deploy healthcheck |
 | `GET /v1/metrics` — counters since boot and over the last 5/15 minutes, latency summaries, and every rule below evaluated as `alerts[].firing` plus a `firing` list | `Authorization: Bearer $PRI_METRICS_TOKEN` only; **closed (503 `METRICS_NOT_CONFIGURED`) in production while `PRI_METRICS_TOKEN` is unset or shorter than 32 characters** | an operator, a monitor holding the token |
@@ -53,6 +55,8 @@ states every one of its numbers (`≥ N`, `≥ P%`, `N minutes`).
 | `PROVIDER_FAILURE_SPIKE` | handwriting or working provider: ≥ 5 failed calls **and** ≥ 25% of that provider's calls in 5 minutes | warn | `provider_calls_total{provider,outcome}`, `provider_failures_total{provider,code}`, `provider_latency_ms`; `provider_call_failed` lines; `/v1/ready` `checks.handwriting` | Railway log alert on `"event":"provider_call_failed"`; OpenAI usage/billing alert on the project key. The on-device reader keeps working, so this never takes the service down |
 | `HANDWRITING_LATENCY_P95` | the handwriting provider's read latency is p95 ≥ 4 s over ≥ 5 reads in the last 5 minutes | warn | `provider_latency_ms{provider=handwriting}` (`latency[].last5m.p95Ms` on `/v1/metrics`); `provider_call_failed` lines with `code: HANDWRITING_TIMEOUT` | A monitor polling `/v1/metrics` for `HANDWRITING_LATENCY_P95` in `firing`; OpenAI status page. See §2a for the budget and what the student sees meanwhile |
 | `WEBHOOK_FAILURES` | ≥ 1 billing webhook failed to apply (5xx) in 15 minutes. Rejections (4xx: bad signature, malformed, a provider this deployment does not use) are counted as `webhook_total{outcome=rejected}` but never page — anyone can send one | page | `webhook_total{provider,outcome}`, `webhook_failures_total{provider,code}`; `platform_error` lines on `/v1/billing/webhook/:provider` | Railway log alert on `"route":"/v1/billing/webhook/:provider"` with status ≥ 500; Razorpay dashboard webhook failure notifications; App Store Server Notifications retry visibility |
+| `CLIENT_ERROR_SPIKE` | ≥ 20 crash reports accepted on `POST /v1/telemetry/error` in 15 minutes, across every platform | warn | `client_errors_total{platform,code}`; `client_error` lines; the sink's `source=client` events grouped by `code` + `surface` + `fingerprint` | Railway log alert on `"event":"client_error"` ≥ 20 in 15 min; or a monitor polling `/v1/metrics` for `CLIENT_ERROR_SPIKE` in `firing`; the Sentry project's own issue alert on new `source:client` groups. Response: read `platform`, `surface` and `code` from the lines; the stored row carries the client `build`. A spike right after a deploy is a rollback candidate (`runbook.md` §3) |
+| `ERROR_SINK_FAILURES` | ≥ 5 deliveries to the error sink refused or unreachable in 15 minutes | warn | `error_sink_total{outcome=failed}`; `error_sink_failed` lines (`ERROR_SINK_REFUSED` with the HTTP status, `ERROR_SINK_TIMEOUT`, `ERROR_SINK_UNREACHABLE`) | Railway log alert on `"event":"error_sink_failed"`; Sentry's quota/rate-limit notifications. Errors are still logged while the sink is down; `error_sink_total{outcome=noop}` rising instead means `PRI_SENTRY_DSN` is unset on this replica |
 
 ### 2a. Handwriting latency budget
 
@@ -84,7 +88,9 @@ and the rule fires at its threshold, and the client's slow-read and timed-out st
 to the strings above in English and Hindi.
 
 Every alert's first diagnostic step is the same: take a `requestId` from the alert's log
-lines, search Railway logs for it, and read the `route`, `code` and `release` it carries.
+lines, search Railway logs for it, and read the `route`, `code` and `release` it carries. The
+same `requestId` is a tag on the sink event, so a Sentry issue and a Railway log line meet on
+it. What to do next, per failure, is `docs/operations/runbook.md`.
 
 ## 3. Railway configuration (owner action)
 
@@ -103,6 +109,11 @@ lines, search Railway logs for it, and read the `route`, `code` and `release` it
    email notifications on for the owner's account.
 4. Alternatively/additionally create the log alerts in §2 (Railway → Observability → Alerts, or a log drain to the
    monitoring tool the owner chooses) and route them to the owner's on-call channel.
+4. Create the Sentry project (or any sink that accepts the envelope endpoint) and set
+   `PRI_SENTRY_DSN` on the production and staging services. It is a Railway variable only; a
+   DSN in the repository, a chat or a ticket is a leak — treat it with the same care as a
+   provider key. Unset, the sink is a no-op and `error_sink_total{outcome=noop}` says so; a
+   malformed value makes production refuse to boot (`platformConfigStatus`).
 
 ## 4. Supabase configuration (owner action)
 
@@ -123,6 +134,8 @@ lines, search Railway logs for it, and read the `route`, `code` and `release` it
 | `PROVIDER_FAILURE_SPIKE` | — | — | — | — |
 | `HANDWRITING_LATENCY_P95` | — | — | — | — |
 | `WEBHOOK_FAILURES` | — | — | — | — |
+| `CLIENT_ERROR_SPIKE` | — | — | — | — |
+| `ERROR_SINK_FAILURES` | — | — | — | — |
 
 An alert counts as configured only when this row is filled **and** the alert has been seen to
 fire during a staging drill.

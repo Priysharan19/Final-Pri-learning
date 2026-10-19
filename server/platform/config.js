@@ -1,6 +1,7 @@
 import { isAbsolute } from 'node:path';
 import { compatibilityConfigProblems } from './clientCompatibility.js';
 import { aiAllowanceConfigProblems } from './aiAllowance.js';
+import { errorSinkConfigProblems } from './errorSink.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { mfaKeyConfigured, mfaKeyMalformed } from './mfa.js';
@@ -416,6 +417,7 @@ export function platformConfigStatus() {
 
   if (production) missing.push(...compatibilityConfigProblems());
   if (production) missing.push(...aiAllowanceConfigProblems());
+  if (production) missing.push(...errorSinkConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({

@@ -27,7 +27,8 @@ import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
 import { readinessReport } from './readiness.js';
 import { tagPolicy } from './routePolicy.js';
-import { metrics, metricsAccess, recordDatabaseError } from './metrics.js';
+import { metrics, metricsAccess, recordDatabaseError, recordServerError } from './metrics.js';
+import { captureError } from './errorSink.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
 
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
@@ -236,7 +237,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     const loggedCode = err?.code === undefined || err?.code === null ? 'INTERNAL' : safeCode(err.code, 'UNSAFE_CODE');
     res.locals.errorCode = safeCode(code);
     recordDatabaseError(code);
-    logEvent(status >= 500 ? 'error' : 'warn', 'platform_error', {
+    const line = logEvent(status >= 500 ? 'error' : 'warn', 'platform_error', {
       requestId: requestId || undefined,
       method: req.method,
       route: routeTemplate(req),
@@ -244,6 +245,13 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       dbCode: err?.dbCode ? safeCode(err.dbCode) : undefined,
       status
     });
+    // Every 5xx this server composes reaches the error sink (errorSink.js) as
+    // the same allowlisted fields plus the release: request id, route
+    // template, code, status. Never the error message or anything it held.
+    if (status >= 500) {
+      recordServerError(loggedCode);
+      captureError({ ...line, release: releaseShaForLogs(), source: 'platform' });
+    }
     if (res.headersSent) return next(err);
     // Database overload (store.js databaseOverload) is the one 5xx the client
     // should simply resend: say so, and say when.

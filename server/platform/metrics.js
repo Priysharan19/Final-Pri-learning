@@ -216,6 +216,21 @@ export const ALERT_RULES = Object.freeze([
     id: 'WEBHOOK_FAILURES',
     thresholds: { count: 1, minutes: 15 },
     evaluate: ({ sum }, t) => sum('webhook_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
+  },
+  {
+    // Crash reports the error boundaries sent through POST /v1/telemetry/error
+    // (one per boundary catch, consent-gated and rate-limited per account),
+    // across every platform.
+    id: 'CLIENT_ERROR_SPIKE',
+    thresholds: { count: 20, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('client_errors_total', { minutes: t.minutes }) >= t.count
+  },
+  {
+    // The error sink (PRI_SENTRY_DSN) is not accepting what the server sends:
+    // errors are still logged, but nobody is being told about them.
+    id: 'ERROR_SINK_FAILURES',
+    thresholds: { count: 5, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('error_sink_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
   }
 ]);
 
@@ -272,6 +287,22 @@ export function recordProviderUsage(provider, { calls = 0, model = null, inputTo
 /** How a picture was read: by the provider (paid), from memory, or by joining a read in flight. */
 export function recordRecognitionRead(source) {
   metrics.inc('recognition_reads_total', { source: ['provider', 'cache', 'inflight'].includes(source) ? source : 'other' });
+}
+
+const CLIENT_PLATFORMS = new Set(['web', 'ios-shell', 'android-shell']);
+/** A crash report accepted on POST /v1/telemetry/error. */
+export function recordClientError(platform, code) {
+  metrics.inc('client_errors_total', { platform: CLIENT_PLATFORMS.has(platform) ? platform : 'other', code: safeCode(code, 'CLIENT_ERROR') });
+}
+
+/** A 5xx the server composed itself (router.js / app.js error handlers). */
+export function recordServerError(code) {
+  metrics.inc('server_errors_total', { code: safeCode(code, 'INTERNAL') });
+}
+
+/** One attempt to hand an error to the configured sink (errorSink.js). */
+export function recordErrorSink(outcome) {
+  metrics.inc('error_sink_total', { outcome: ['sent', 'failed', 'dropped', 'noop'].includes(outcome) ? outcome : 'other' });
 }
 
 export function recordAuthEmail({ ok, code = null }) {
