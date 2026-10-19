@@ -3,7 +3,7 @@
 // a fully cleared escrow entry yields a server question the deterministic
 // engine marks. Synthetic escrow only; no real answer is written anywhere here.
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, symlinkSync, unlinkSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,7 +28,12 @@ const none = loadEscrow({});
 ok(issuable(pack.questions, none).every(r => r.reason === 'escrow-not-configured'), 'no escrow → all unavailable');
 
 // 3. An escrow file inside the repository is refused outright.
-ok(loadEscrow({ PRI_JEE_ESCROW_PATH: path.join(ROOT, 'escrow.json') }).reason === 'escrow-inside-repository', 'in-repo escrow refused');
+{ const inRepo = path.join(ROOT, 'server/test/support/.escrow-probe.json'); writeFileSync(inRepo, '{"entries":[]}');
+  try {
+    ok(loadEscrow({ PRI_JEE_ESCROW_PATH: inRepo }).reason === 'escrow-inside-repository', 'in-repo escrow refused');
+    const link = path.join(mkdtempSync(path.join(tmpdir(), 'pri-escrow-link-')), 'escrow.json'); symlinkSync(inRepo, link);
+    ok(loadEscrow({ PRI_JEE_ESCROW_PATH: link }).reason === 'escrow-inside-repository', 'symlink into the repo refused');
+  } finally { unlinkSync(inRepo); } }
 ok(loadEscrow({ PRI_JEE_ESCROW_PATH: path.join(tmpdir(), 'pri-no-such-escrow.json') }).reason === 'escrow-unreadable', 'missing file');
 
 // 4. Synthetic question + escrow outside the repo; each gate fails closed.

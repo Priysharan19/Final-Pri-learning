@@ -63,7 +63,7 @@ for (const r of rows) {
 L.push('', `**Result:** ${missing.length ? 'FAIL — ' + missing.length + ' advertised level(s) missing' : 'every advertised level exists in every track and class view'}.`, '');
 if (missing.length) L.push(...missing.map(m => '- ' + m), '');
 L.push('## Content held back from the picker', '');
-L.push(`- JEE Advanced Complex Numbers: ${cert.forms.length} original forms meet the automated D4 structural rubric (#408). Human maths review: ${cert.humanMathsReview}. Rights review: ${cert.rightsReview}. Live graded: ${cert.liveGraded ? 'yes' : 'no'} — they are proof/description items and their answers stay in the server escrow lane (#395).`);
+L.push(`- JEE Advanced Complex Numbers: ${cert.forms.length} original forms rated by an automated structural rubric (#408): ${cert.forms.filter(f => f.rubricDifficulty === 'D4').length} at D4, ${cert.forms.filter(f => f.rubricDifficulty === 'D3').length} routine loci at D3. Human maths review: ${cert.humanMathsReview}. Rights review: ${cert.rightsReview}. Live graded: ${cert.liveGraded ? 'yes' : 'no'} — they are proof/description items and their answers stay in the server escrow lane (#395).`);
 L.push('- CBSE Class IX 2026–27 study packs (#472): 105 original items plus 10 corrections, draft-only and not wired into the app.', '');
 const text = L.join('\n');
 

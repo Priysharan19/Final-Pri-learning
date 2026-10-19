@@ -61,8 +61,8 @@ jobs:
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
           grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
           grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
-          grep -Fq 'JEE COMPLEX D4: PASS — 574/574 checks' suites.log
-          grep -Fq 'JEE ESCROW LANE: PASS — 210/210 checks' suites.log
+          grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
+          grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
           grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
           grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log

@@ -16,11 +16,11 @@
 // question object, which the existing marker pool marks like any other issued
 // question. A model never sets a mark.
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const REPO_ROOT = realpathSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'));
 
 // The only fields a student device ever receives from this lane.
 export const ESCROW_PUBLIC_FIELDS = Object.freeze(['id', 'archetypeId', 'track', 'syllabusTopic', 'question', 'firstHint', 'version', 'contentHash']);
@@ -42,7 +42,8 @@ export function publicQuestion(q) {
 export function loadEscrow(env = process.env) {
   const file = env.PRI_JEE_ESCROW_PATH;
   if (!file) return { entries: new Map(), reason: 'escrow-not-configured' };
-  const abs = path.resolve(file);
+  let abs;
+  try { abs = realpathSync(path.resolve(file)); } catch { return { entries: new Map(), reason: 'escrow-unreadable' }; }
   const rel = path.relative(REPO_ROOT, abs);
   if (!rel.startsWith('..') && !path.isAbsolute(rel)) return { entries: new Map(), reason: 'escrow-inside-repository' };
   let doc;
