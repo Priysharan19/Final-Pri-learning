@@ -63,13 +63,15 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
 
 // ── 3 · Percent policy ───────────────────────────────────────────────────────
 {
-  // The prompt asks for a percentage: the % sign is read, but a bare 0.25 is
-  // only a second writing of 25 where the author set percent: true.
+  // The prompt asks for a percentage: the % sign is read, and a bare 0.25 is
+  // never 25 % — not even where the author set percent: true. Accepting it was
+  // a false-correct (the P0 false-positive sweep, m-fp-sweep: "bare 0.6
+  // accepted as 60%"), so this policy follows the sweep's stricter rule.
   const pct = { answerType: 'numeric', prompt: 'What percentage of the class passed?', answer: { value: 25 } };
   accept(pct, '25'); accept(pct, '25%');
   reject(pct, '0.25'); reject(pct, '0.25%'); reject(pct, '2.5'); reject(pct, '26'); reject(pct, '25.1');
   const pctFlag = { answerType: 'numeric', prompt: 'What percentage of the class passed?', answer: { value: 25, percent: true } };
-  accept(pctFlag, '25'); accept(pctFlag, '25%'); accept(pctFlag, '0.25');
+  accept(pctFlag, '25'); accept(pctFlag, '25%'); reject(pctFlag, '0.25');
   reject(pctFlag, '0.25%'); reject(pctFlag, '2.5'); reject(pctFlag, '26');
   const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
   accept(prob, '0.44'); accept(prob, '11/25'); accept(prob, '44%');
