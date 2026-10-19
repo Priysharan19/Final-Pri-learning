@@ -54,14 +54,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1880000/1880000 self-checks passed across 235 subtopics' suites.log
+          grep -Fq '2064000/2064000 self-checks passed across 258 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1964/1964 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2102/2102 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 35978/35978 checks' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 49637/49637 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 112804 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '46200 questions from 462 declared (generator, difficulty) pairs × 100 draws — 46200 marked correct by their own marker, 46200 well formed' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 185231/185231 checks — 45 hardest-level forms (D3 CBSE Class X/XII, D4 JEE Class 11/12) for 45 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 123844 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '48500 questions from 485 declared (generator, difficulty) pairs × 100 draws — 48500 marked correct by their own marker, 48500 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
