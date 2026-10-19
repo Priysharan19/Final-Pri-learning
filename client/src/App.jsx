@@ -9,7 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
-import Home from './pages/Home.jsx';
+import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
@@ -25,7 +25,7 @@ import { BrandWordmark } from './components/BrandMark.jsx';
 // on a link that delivers about 90 kB a second. They are behind a boundary now.
 // The service worker still holds every one of them for offline use; the change
 // is only about what has to arrive before a student can do anything.
-const Progress = React.lazy(() => import('./pages/Progress.jsx'));
+const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
@@ -55,6 +55,10 @@ const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/Inst
 const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
 const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.jsx')) : null;
 const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportHead.jsx')) : null;
+// The routes name `Home` and `Progress`; in the instrument build those are the
+// Index and the Report (the Report's summary above the same Progress page).
+const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
+const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   import('./instrument/instrument.css');
@@ -581,10 +585,10 @@ export default function App() {
                     reported as a broken route rather than blanking the shell. */}
                 <React.Suspense fallback={<RouteLoading />}>
                   <Routes>
-                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : (INSTRUMENT_ON ? <IndexPage /> : <Home />)} />
+                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
-                    <Route path="/progress" element={studentOnly(INSTRUMENT_ON ? <><ReportHead /><Progress /></> : <Progress />, '/teach#teacher-analytics')} />
+                    <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
