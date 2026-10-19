@@ -57,6 +57,8 @@ export const flow = {
 
     // A new profile has no saved theme: the instrument follows the device.
     await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+    await goto('/');
+    await settle();
     await createProfile({ name: 'Aarav Instrument', year: 10, course: 'in' });
     await online.signIn({ name: 'Aarav Instrument' });
     await settle();
