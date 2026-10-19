@@ -12,7 +12,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
-import { THEME_PREFS, cleanThemePref } from '../lib/theme.js';
+import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -2112,6 +2112,20 @@ function certifiedPracticeMarks(receipt) {
   return { marksEarned: earned, marksPossible: possible, ...(receipt.repeat === true ? { repeat: true } : {}) };
 }
 
+/**
+ * The server-certified mark of an answered question, or null. Read from the
+ * receipt the server sent (never inferred on the device), through the same
+ * consistency rules the card uses; anything uncertified counts for nothing.
+ */
+function certifiedMarksOfRow(row) {
+  const receipt = row?.serverReceipt;
+  if (!receipt) return null;
+  try {
+    const marks = certifiedPracticeMarks(receipt);
+    return { earned: marks.marksEarned, possible: marks.marksPossible, repeat: marks.repeat === true, markRows: receipt.markRows || null };
+  } catch { return null; }
+}
+
 async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
   const recorded = row.answered ? row.resolution : null;
   // A question skipped after its first try has no try left to report: the
@@ -3058,7 +3072,7 @@ const routes = {
       year: requestedYear,
       course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
-      avatar: body.avatar || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
+      avatar: body.avatar || '🙂', theme: DEFAULT_THEME_PREF, dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose
       // Hindi and then filled this form in Hindi has already told us what they
       // read; making them find the setting afterwards to say it a second time
@@ -3961,6 +3975,9 @@ const routes = {
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: authoritative.solution || null,
+      // The server's mark as CBSE-style step rows (server/platform/markRows.js):
+      // display only, passed through as the server sent them.
+      markRows: authoritative.markRows || null,
       ...meta,
       ...certified,
       syncQueued: true,
@@ -4577,7 +4594,7 @@ const routes = {
         const course = COURSES[raw?.course] ? raw.course : rowTrack ? 'in' : defaultCourse;
         prof = {
           id: uuid(), name, year, course, role: 'student',
-          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
+          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: DEFAULT_THEME_PREF, dailyGoal: 10, xp: 0,
           pathway: course === 'nsw' ? (year >= 11 ? 'advanced' : null) : null,
           indiaTrack: course === 'in' ? cleanIndiaTrack(raw?.track ?? raw?.indiaTrack, year) : null,
           rosteredBy: teacher.id, createdAt: now, lastActiveAt: now
@@ -4709,7 +4726,9 @@ const routes = {
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
         canRetry: !q.custom && !q.multipart,
-        answeredAt: a?.createdAt || r.createdAt
+        answeredAt: a?.createdAt || r.createdAt,
+        // The server-certified mark and its step rows, when the server sent one.
+        ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
       };
     }).sort((a, b) => b.answeredAt - a.answeredAt);
 
@@ -4720,6 +4739,29 @@ const routes = {
 
     const start = page * pageSize;
     return { total: list.length, page, pageSize, items: list.slice(start, start + pageSize) };
+  },
+
+  // Marks per chapter, from server-certified receipts only (read-only; nothing
+  // is stored or inferred). A repeat (a question whose solution the student
+  // had already seen) is left out entirely — it earns nothing, and counting
+  // its possible marks would read as marks lost; `repeats` says how many.
+  'GET /marks/by-chapter': async () => {
+    const p = await requireProfile();
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const chapters = {};
+    for (const r of rows) {
+      const m = certifiedMarksOfRow(r);
+      if (!m) continue;
+      const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
+      const id = inChapter ? inChapter.id : r.subtopic;
+      if (!id) continue;
+      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+      if (m.repeat || r.repeatOf) { c.repeats += 1; continue; }
+      c.earned += m.earned;
+      c.possible += m.possible;
+      c.questions += 1;
+    }
+    return { chapters, source: 'server-certified-receipts' };
   },
 
   'POST /history/:id/bookmark': async (body, params) => {

@@ -12,6 +12,8 @@
 // before any profile is open: a night-mode student never sees a white flash.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { featureEnabled } from '../platform/features.js';
+
 export const THEME_PREFS = ['light', 'dark', 'system'];
 export const THEME_STORAGE_KEY = 'pri.theme';
 // The desk colour of each theme (--page in theme.css). The browser and the
@@ -20,8 +22,13 @@ export const THEME_CHROME = { light: '#f2f0ea', dark: '#121210' };
 
 let switchTimer = null;
 
-/** Anything that is not a known preference is paper, the product default. */
-export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : 'light');
+/**
+ * Anything that is not a known preference is the product default: paper, or —
+ * in the v1.1 instrument interface — the device's own setting (owner decision
+ * 2026-10-20).
+ */
+export const DEFAULT_THEME_PREF = featureEnabled('instrument') ? 'system' : 'light';
+export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : DEFAULT_THEME_PREF);
 
 const systemQuery = () => (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
   ? window.matchMedia('(prefers-color-scheme: dark)')

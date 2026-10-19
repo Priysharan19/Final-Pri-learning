@@ -20,6 +20,12 @@
 //                             Profiles that already hold one of these keep
 //                             working whatever the flag says — it gates new
 //                             selection only.
+//   PRI_FEATURE_INSTRUMENT=1  the v1.1 "instrument" interface
+//                             (docs/design/PRI-V1.1-INSTRUMENT.md): the
+//                             graphite/paper token set, the tab shell, the
+//                             chapter Index and the command bar. ON in staging,
+//                             OFF in production until the owner flips it
+//                             after the v1.0 App Store review.
 //   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
 //                             (V1 is India-only; existing Australian profiles
 //                             keep working either way)
@@ -38,14 +44,18 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
   australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null,
   // PRI_FEATURE_EXAM_HANDWRITING=1 — handwriting input in timed exams. OFF by
   // default in a production build: a paper then offers Type only.
-  examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null
+  examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null,
+  // PRI_FEATURE_INSTRUMENT=1 — the v1.1 interface. Unlike the others it is OFF
+  // in the Node suites (no build constant), so they keep testing the interface
+  // production ships; the instrument tours build with it on.
+  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : false
 };
 
 const productionBuild = () => {

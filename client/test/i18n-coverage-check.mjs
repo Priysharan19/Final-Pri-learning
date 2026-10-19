@@ -357,12 +357,14 @@ for (const lang of LANGUAGES) {
 // ─────────────────────────────────────────────────────────────────────────────
 const exams = await import('../src/engine/indiaExams.js');
 const examsPage = read('src/pages/Exams.jsx');
-const blueprintKeys = Object.fromEntries([...examsPage.matchAll(/'([a-z0-9-]+)': \['(exams\.bp\.\w+)', '(exams\.bp\.\w+)'\]/g)].map(m => [m[1], [m[2], m[3]]]));
+// The keys live in lib/blueprintKeys.js, shared by Exams and Progress.
+const blueprintKeySource = read('src/lib/blueprintKeys.js');
+const blueprintKeys = Object.fromEntries([...blueprintKeySource.matchAll(/'([a-z0-9-]+)': \['(exams\.bp\.\w+)', '(exams\.bp\.\w+)'\]/g)].map(m => [m[1], [m[2], m[3]]]));
 const blueprints = Object.values(exams).filter(v => v && typeof v === 'object' && typeof v.id === 'string' && typeof v.label === 'string' && 'releaseNote' in v);
 ok(blueprints.length >= 8, `the engine's exam blueprints were found (${blueprints.length})`);
 for (const bp of blueprints) {
   const keys = blueprintKeys[bp.id];
-  ok(Boolean(keys), `Exams.jsx has catalogue keys for blueprint ${bp.id}`);
+  ok(Boolean(keys), `lib/blueprintKeys.js has catalogue keys for blueprint ${bp.id}`);
   if (!keys) continue;
   eq(en[keys[0]], bp.label, `the English label of ${bp.id} matches the engine`);
   eq(en[keys[1]], bp.releaseNote, `the English release note of ${bp.id} matches the engine`);
