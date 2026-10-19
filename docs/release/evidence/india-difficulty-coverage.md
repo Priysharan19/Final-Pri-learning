@@ -21,12 +21,12 @@ levels that do exist, and serves a question only after the student chooses one.
 | Track | Window | Chapters | Chapters with no form at the hardest level | Dot points | Dot points with no form at the hardest level | Dot points with no form anywhere in the window |
 |---|---|---:|---:|---:|---:|---:|
 | CBSE / NCERT | D1–D3 | 77 | 0 | 237 | 81 | 20 |
-| JEE Main | D2–D4 | 27 | 0 | 81 | 23 | 2 |
-| JEE Advanced | D3–D4 | 27 | 0 | 81 | 23 | 9 |
+| JEE Main | D2–D4 | 27 | 0 | 81 | 0 | 0 |
+| JEE Advanced | D3–D4 | 27 | 0 | 81 | 0 | 0 |
 | Olympiad (PRMO → RMO → INMO) | D1–D4 | 7 | 0 | 21 | 0 | 0 |
-| **All** | | **138** | **0** | **420** | **127** | **31** |
+| **All** | | **138** | **0** | **420** | **81** | **20** |
 
-Chapter × track cells where the hardest level rests on a **single** authored form: 100 of 138.
+Chapter × track cells where the hardest level rests on a **single** authored form: 82 of 138.
 
 ## Chapter × track cells with no authored form at the hardest level
 
@@ -76,43 +76,13 @@ None.
 | 11 | Statistics (`c11-statistics`) | D1 D2 D3 | 1 | 1. Find the mean deviation about the mean and median (D1)<br>3. Compare two data sets by the coefficient of variation (—) |
 | 11 | Probability (`c11-probability`) | D1 D2 D3 | 1 | 1. Describe a sample space and events for a random experiment (D1 D2)<br>3. Find probabilities of compound events (—) |
 
-### JEE Main — 14 of 27 chapters
+### JEE Main — 0 of 27 chapters
 
-| Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
-|---:|---|---|---:|---|
-| 11 | Relations and Functions (`c11-relations-functions`) | D2 D3 D4 | 1 | 2. Determine the domain and range of a function (D2 D3)<br>3. Recognise and sketch the standard real functions (D3) |
-| 11 | Trigonometric Functions (`c11-trig-functions`) | D2 D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (D2)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
-| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D2 D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D2)<br>2. Write a complex number in polar form and use the argument (D3) |
-| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D2 D3 D4 | 1 | 1. Apply the fundamental principle of counting (—)<br>2. Count arrangements with and without repetition and with restrictions (D2) |
-| 11 | Sequences and Series (`c11-sequences-series`) | D2 D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (D2) |
-| 11 | Straight Lines (`c11-straight-lines`) | D2 D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (D2)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
-| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D2 D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D2)<br>2. Find a derivative from first principles (D3) |
-| 11 | Statistics (`c11-statistics`) | D2 D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D2 D3) |
-| 11 | Probability (`c11-probability`) | D2 D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (D2) |
-| 12 | Relations and Functions (`c12-relations-functions`) | D2 D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
-| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D2 D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D2 D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D2 D3) |
-| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D2 D3 D4 | 2 | 1. Test continuity and differentiability at a point (D2 D3) |
-| 12 | Application of Derivatives (`c12-applications-derivatives`) | D2 D3 D4 | 1 | 1. Find rates of change and approximations (D3)<br>2. Find intervals of increase and decrease, and tangents and normals (D2 D3) |
-| 12 | Vector Algebra (`c12-vector-algebra`) | D2 D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D2 D3) |
+None.
 
-### JEE Advanced — 14 of 27 chapters
+### JEE Advanced — 0 of 27 chapters
 
-| Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
-|---:|---|---|---:|---|
-| 11 | Relations and Functions (`c11-relations-functions`) | D3 D4 | 1 | 2. Determine the domain and range of a function (D3)<br>3. Recognise and sketch the standard real functions (D3) |
-| 11 | Trigonometric Functions (`c11-trig-functions`) | D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (—)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
-| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (—)<br>2. Write a complex number in polar form and use the argument (D3) |
-| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D3 D4 | 1 | 1. Apply the fundamental principle of counting (—)<br>2. Count arrangements with and without repetition and with restrictions (—) |
-| 11 | Sequences and Series (`c11-sequences-series`) | D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (—) |
-| 11 | Straight Lines (`c11-straight-lines`) | D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (—)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
-| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (—)<br>2. Find a derivative from first principles (D3) |
-| 11 | Statistics (`c11-statistics`) | D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D3) |
-| 11 | Probability (`c11-probability`) | D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (—) |
-| 12 | Relations and Functions (`c12-relations-functions`) | D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
-| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D3) |
-| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D3 D4 | 2 | 1. Test continuity and differentiability at a point (D3) |
-| 12 | Application of Derivatives (`c12-applications-derivatives`) | D3 D4 | 1 | 1. Find rates of change and approximations (D3)<br>2. Find intervals of increase and decrease, and tangents and normals (D3) |
-| 12 | Vector Algebra (`c12-vector-algebra`) | D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D3) |
+None.
 
 ### Olympiad (PRMO → RMO → INMO) — 0 of 7 chapters
 

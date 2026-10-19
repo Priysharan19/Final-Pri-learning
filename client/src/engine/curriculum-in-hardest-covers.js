@@ -56,7 +56,42 @@ export const INDIA_HARDEST_COVERS = Object.freeze({
   'c12-vector-algebra': [d3('c12-vector-magnitude-reasoning', 0)]
 });
 
+// ── Tranche 2 · JEE Main / JEE Advanced, Class 11 and Class 12 ─────────────
+// Both JEE tracks top out at D4 on these chapters, and twenty-three dot points
+// had no authored form at D4 (nine of them had no form in the JEE Advanced
+// D3–D4 window at all). Each entry adds ONE original generator for ONE such
+// dot point, claimed at D4 and at no other rung. The same provenance applies:
+// original, computed, independently re-derived, human maths review pending,
+// no board or examiner approval claimed.
+export const INDIA_JEE_HARDEST_PROVENANCE = Object.freeze({
+  ...INDIA_HARDEST_PROVENANCE,
+  tranche: 'phase-4-tranche-2',
+  scope: 'JEE Main / JEE Advanced Class 11 and Class 12 dot points without a D4 form'
+});
+
+const d4 = (gen, dp) => Object.freeze({ gen, dp: Object.freeze([dp]), diff: Object.freeze([4]) });
+
+/** chapterId → covers APPENDED to the chapter, one per dot point, at D4 only. */
+export const INDIA_JEE_HARDEST_COVERS = Object.freeze({
+  // ── Class 11 ───────────────────────────────────────────────────────────────
+  'c11-relations-functions': [d4('c11-domain-range-reasoning', 1), d4('c11-real-function-reasoning', 2)],
+  'c11-trig-functions': [d4('c11-radian-circle-reasoning', 0), d4('c11-trig-identity-reasoning', 1)],
+  'c11-complex-numbers': [d4('c11-complex-algebra-reasoning', 0), d4('c11-complex-polar-reasoning', 1)],
+  'c11-permutations-combinations': [d4('c11-counting-principle-reasoning', 0), d4('c11-arrangement-reasoning', 1)],
+  'c11-sequences-series': [d4('c11-ap-reasoning', 0)],
+  'c11-straight-lines': [d4('c11-line-equation-reasoning', 0), d4('c11-line-angle-reasoning', 1)],
+  'c11-limits-derivatives': [d4('c11-limit-reasoning', 0), d4('c11-first-principles-reasoning', 1)],
+  'c11-statistics': [d4('c11-mean-deviation-reasoning', 0), d4('c11-variance-reasoning', 1)],
+  'c11-probability': [d4('c11-sample-space-reasoning', 0)],
+  // ── Class 12 ───────────────────────────────────────────────────────────────
+  'c12-relations-functions': [d4('c12-composite-inverse-reasoning', 2)],
+  'c12-inverse-trigonometric': [d4('c12-inverse-trig-branch-reasoning', 0), d4('c12-inverse-trig-evaluate-reasoning', 1)],
+  'c12-continuity-differentiability': [d4('c12-continuity-test-reasoning', 0)],
+  'c12-applications-derivatives': [d4('c12-rate-approximation-reasoning', 0), d4('c12-monotonic-tangent-reasoning', 1)],
+  'c12-vector-algebra': [d4('c12-vector-direction-reasoning', 0)]
+});
+
 /** The generators this table introduces, in table order. */
 export const INDIA_HARDEST_GENERATORS = Object.freeze(
-  Object.values(INDIA_HARDEST_COVERS).flatMap(list => list.map(entry => entry.gen))
+  [INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS].flatMap(table => Object.values(table).flatMap(list => list.map(entry => entry.gen)))
 );

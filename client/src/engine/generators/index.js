@@ -40,11 +40,15 @@ const BANKS = {
   // or Extension generator for their central dot points. They are their own
   // banks rather than an overlay on india-senior, because india-senior is the
   // "corners nothing else covered" bank and these are whole chapters.
-  'india-class11': () => import('./india-class11.js').then(m => m.indiaClass11),
-  'india-class12': () => Promise.all([import('./india-class12.js'), import('./india-class12-hardest.js')])
-    // The hardest-level (D3) forms of tranche 1 (curriculum-in-hardest-covers.js)
+  'india-class11': () => Promise.all([import('./india-class11.js'), import('./india-class11-jee-hardest.js')])
+    // The JEE hardest-level (D4) forms of tranche 2 (curriculum-in-hardest-covers.js)
     // ride in the same bank: they serve the same chapters.
-    .then(([base, hardest]) => ({ ...base.indiaClass12, ...hardest.class12HardestForms }))
+    .then(([base, jee]) => ({ ...base.indiaClass11, ...jee.class11JeeHardestForms })),
+  'india-class12': () => Promise.all([import('./india-class12.js'), import('./india-class12-hardest.js'), import('./india-class12-jee-hardest.js')])
+    // The hardest-level forms — CBSE D3 (tranche 1) and JEE D4 (tranche 2),
+    // curriculum-in-hardest-covers.js — ride in the same bank: they serve the
+    // same chapters.
+    .then(([base, hardest, jee]) => ({ ...base.indiaClass12, ...hardest.class12HardestForms, ...jee.class12JeeHardestForms }))
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -207,6 +211,30 @@ const INDIA_BANK_OF = {
   'c12-related-rates-reasoning': 'india-class12',
   'c12-optimisation-reasoning': 'india-class12',
   'c12-vector-magnitude-reasoning': 'india-class12',
+  // JEE hardest-level (D4) forms, tranche 2.
+  'c11-domain-range-reasoning': 'india-class11',
+  'c11-real-function-reasoning': 'india-class11',
+  'c11-radian-circle-reasoning': 'india-class11',
+  'c11-trig-identity-reasoning': 'india-class11',
+  'c11-complex-algebra-reasoning': 'india-class11',
+  'c11-complex-polar-reasoning': 'india-class11',
+  'c11-counting-principle-reasoning': 'india-class11',
+  'c11-arrangement-reasoning': 'india-class11',
+  'c11-ap-reasoning': 'india-class11',
+  'c11-line-equation-reasoning': 'india-class11',
+  'c11-line-angle-reasoning': 'india-class11',
+  'c11-limit-reasoning': 'india-class11',
+  'c11-first-principles-reasoning': 'india-class11',
+  'c11-mean-deviation-reasoning': 'india-class11',
+  'c11-variance-reasoning': 'india-class11',
+  'c11-sample-space-reasoning': 'india-class11',
+  'c12-composite-inverse-reasoning': 'india-class12',
+  'c12-inverse-trig-branch-reasoning': 'india-class12',
+  'c12-inverse-trig-evaluate-reasoning': 'india-class12',
+  'c12-continuity-test-reasoning': 'india-class12',
+  'c12-rate-approximation-reasoning': 'india-class12',
+  'c12-monotonic-tangent-reasoning': 'india-class12',
+  'c12-vector-direction-reasoning': 'india-class12',
   'c11-sequence-means': 'india-senior',
   'c11-statistics': 'india-senior',
   'c12-relations-equivalence': 'india-senior',
