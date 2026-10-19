@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
@@ -26,7 +26,13 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   const t = useT();
   const loc = useLocation();
   const nav = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const returnFocus = useRef(null);
+  const setOpen = next => setOpenState(was => {
+    const value = typeof next === 'function' ? next(was) : next;
+    if (value && !was) returnFocus.current = document.activeElement;
+    return value;
+  });
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   useEffect(() => { setOpen(false); }, [loc.pathname]);
 
@@ -74,7 +80,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" />{online ? t('inst.online') : t('inst.offline')}</span>
         {accountMenu}
       </header>
-      <CommandBar open={open} onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} />
+      <CommandBar open={open} onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />
     </>
   );
 }
