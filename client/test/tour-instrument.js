@@ -116,6 +116,7 @@ export const flow = {
     await check('esc closes the command bar', await page.locator('[data-instrument-command]').count() === 0);
     await check('focus returns to what opened it', await page.evaluate(() => document.activeElement?.classList.contains('in-cmd')));
     await opener.click();
+    await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'combobox', null, { timeout: 5000 });
     await page.keyboard.type(name.slice(0, 5));
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');

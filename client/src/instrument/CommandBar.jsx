@@ -69,7 +69,8 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
     <div className="in-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} data-instrument-command>
       <div className="in-pal" role="dialog" aria-modal="true" aria-label={t('inst.cmdLabel')} onKeyDown={onKey}>
         <div className="in-pal-q">
-          <input ref={input} value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
+          {/* autoFocus: keys typed the moment the bar opens land in the field. */}
+          <input ref={input} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
             placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
             role="combobox" aria-expanded="true" aria-controls="in-pal-list"
             aria-activedescendant={flat[sel] ? `in-pal-${flat[sel].id}` : undefined} />
