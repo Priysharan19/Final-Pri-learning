@@ -2365,3 +2365,12 @@ html { background-color: var(--page); }
 @media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 1024px) {
   .sidebar:focus-within .sidebar-inner { width: 178px; box-shadow: none; }
 }
+
+/* The first screen never rises under the status bar (App Review sees it
+   first). A grid that centres its column lets a column taller than the screen
+   overflow equally above and below, past the top safe-area padding and under
+   the Dynamic Island (iPhone 6.9", native shell). Start-aligned with auto
+   block margins, the column is still centred when it fits and starts at the
+   padding — which carries --pri-inset-top on phones — when it does not. */
+.auth-wrap { place-items: start center; }
+.auth-wrap > * { margin-block: auto; }

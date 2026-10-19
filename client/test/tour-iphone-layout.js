@@ -132,7 +132,7 @@ export const flow = {
     // the status bar / Dynamic Island on every iPhone size, the tallest
     // included (iPhone 17 Pro Max, 440 × 956, top inset 62). A centred column
     // taller than the screen must not overflow upwards past the inset.
-    for (const d of [{ id: 'iPhone 17 Pro Max', width: 440, height: 956, insets: { top: 62, bottom: 34 } }, ...DEVICES.filter(x => x.insets)]) {
+    for (const d of [{ id: 'iPhone 17 Pro Max', width: 440, height: 956, insets: { top: 62, bottom: 34 } }, ...OTHER_PHONES]) {
       await page.setViewportSize({ width: d.width, height: d.height });
       await setInsets(page, d.insets);
       await page.evaluate(() => window.scrollTo(0, 0));
