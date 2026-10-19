@@ -204,7 +204,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
-          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 44/44 checks' suites.log
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -218,7 +218,7 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
           grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
@@ -241,7 +241,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'ACCOUNT DELETION LINK: PASS — 111/111 checks' suites.log
