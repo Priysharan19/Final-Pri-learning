@@ -72,6 +72,10 @@ def compact_official(row):
 
 
 def compact_record(row):
+    # A server-escrow row's answer and steps are server-owned (#395). The packer
+    # writes downloadable client shards, so it must never see one.
+    if row.get("answerPrivate") or row.get("delivery") == "server-escrow":
+        raise SystemExit(f"{row.get('id')}: answer-private row cannot be packed into a client shard; use the server escrow lane")
     if (row.get("source") or {}).get("kind") == "official":
         return compact_official(row)
     src, routing, exam = row["source"], row["routing"], row["exam"]
