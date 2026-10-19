@@ -5,3 +5,8 @@ local.properties
 *.iml
 .idea/
 captures/
+# Signing material never enters the repository.
+*.jks
+*.keystore
+*.p12
+*signing*.properties

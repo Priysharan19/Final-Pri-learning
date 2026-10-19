@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -49,6 +50,35 @@ require(!releaseRequested || (versionCodeProperty != null && versionCodeProperty
     "release builds need -Ppri.versionCode=<positive integer> (Play rejects reused version codes)"
 }
 
+// Upload-key signing (Play App Signing holds the app signing key; we sign the
+// AAB with the UPLOAD key only). The key and its passwords live outside the
+// repository, by default in ~/.pri-secrets/android/upload-signing.properties
+// (android/scripts/create-upload-key.sh writes it); -Ppri.uploadSigning=<file>
+// or PRI_UPLOAD_SIGNING overrides the path. A release bundle without it fails
+// closed, unless -Ppri.unsignedRelease=true is passed (CI compile checks only;
+// Play rejects an unsigned upload).
+val uploadSigningFile = ((project.findProperty("pri.uploadSigning") as String?)
+    ?: System.getenv("PRI_UPLOAD_SIGNING")
+    ?: "${System.getProperty("user.home")}/.pri-secrets/android/upload-signing.properties").let(::file)
+val uploadSigning = Properties().apply {
+    if (uploadSigningFile.isFile) uploadSigningFile.inputStream().use { load(it) }
+}
+val unsignedRelease = (project.findProperty("pri.unsignedRelease") as String?) == "true"
+val bundleRequested = gradle.startParameter.taskNames.any { t -> t.substringAfterLast(":").let { it.startsWith("bundle") && it.contains("Release", ignoreCase = true) } }
+if (uploadSigning.isEmpty && !uploadSigningFile.isFile) {
+    require(!bundleRequested || unsignedRelease) {
+        "release bundles are signed with the upload key: $uploadSigningFile is missing — run android/scripts/create-upload-key.sh (or pass -Ppri.unsignedRelease=true for a compile-only check)"
+    }
+} else {
+    for (key in listOf("storeFile", "storePassword", "keyAlias", "keyPassword")) {
+        require(!uploadSigning.getProperty(key).isNullOrBlank()) { "$uploadSigningFile has no $key" }
+    }
+    require(file(uploadSigning.getProperty("storeFile")).isFile) { "upload keystore ${uploadSigning.getProperty("storeFile")} is missing" }
+    require(!file(uploadSigning.getProperty("storeFile")).canonicalPath.startsWith(rootProject.projectDir.parentFile.canonicalPath + File.separator)) {
+        "the upload keystore must live outside the repository"
+    }
+}
+
 android {
     namespace = "com.prilearning.app"
     compileSdk = 36
@@ -76,10 +106,21 @@ android {
 
     sourceSets["main"].assets.srcDir(generatedWeb)
 
+    signingConfigs {
+        if (!uploadSigning.isEmpty) create("upload") {
+            storeFile = file(uploadSigning.getProperty("storeFile"))
+            storePassword = uploadSigning.getProperty("storePassword")
+            keyAlias = uploadSigning.getProperty("keyAlias")
+            keyPassword = uploadSigning.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signing comes from CI secrets / Play App Signing, never the repo.
+            // Signed with the upload key from outside the repo (see above);
+            // Play App Signing re-signs for distribution.
+            signingConfig = signingConfigs.findByName("upload")
         }
     }
 

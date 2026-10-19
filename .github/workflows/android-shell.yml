@@ -69,6 +69,21 @@ jobs:
       - name: Gradle build, lint and JVM unit tests
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
+      - name: Release bundle compiles, and refuses to bundle without the upload key
+        working-directory: android
+        run: |
+          set -o pipefail
+          # No upload key on CI: bundleRelease must fail closed, naming the key.
+          if ./gradlew --no-daemon -Ppri.versionCode=1 bundleRelease > release-guard.log 2>&1; then
+            echo "bundleRelease succeeded without an upload key"; exit 1
+          fi
+          grep -Fq 'release bundles are signed with the upload key' release-guard.log
+          # Compile-only release bundle, release lint and release unit tests.
+          ./gradlew --no-daemon -Ppri.versionCode=1 -Ppri.unsignedRelease=true bundleRelease lintRelease testReleaseUnitTest
+      - name: Play listing and Data safety match the code
+        run: |
+          node tools/play-listing-check.mjs
+          node tools/play-data-safety-check.mjs
       - name: Embedded web is exactly the shared build
         run: node scripts/sync-android.mjs --check
       - name: Cross-platform release matrix (CP-11)
