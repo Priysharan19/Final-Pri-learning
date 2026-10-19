@@ -92,7 +92,7 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
+          grep -Fq 'INDIA ADAPTIVE: PASS — 307/307 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
@@ -116,6 +116,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
+          grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -303,6 +304,7 @@ jobs:
           node server/test/owner-ap-first-mistake-contract-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/ap-term-firstbreak-regression-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
@@ -312,6 +314,7 @@ jobs:
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
+          grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)

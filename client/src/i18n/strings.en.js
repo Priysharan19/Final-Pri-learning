@@ -1635,7 +1635,7 @@ export default {
   'progressAu.examsSat': { one: '{n} exam sat', other: '{n} exams sat' },
   'progressAu.noExams': 'No exams yet',
   'progressAu.accuracyByDifficulty': 'Accuracy by difficulty',
-  'progressAu.engineNear70': 'The engine keeps you near 70% — the zone where learning is fastest.',
+  'progressAu.engineNear70': 'The engine aims to keep your success rate near 70%.',
   'progressAu.practiceCalendar': 'Practice calendar',
   'progressAu.achievements': 'Achievements',
   'progressAu.dotPoints': 'Dot points',

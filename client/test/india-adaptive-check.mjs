@@ -129,7 +129,7 @@ async function run() {
     indiaPracticeScope, indiaDifficultyWindow, indiaDotpointKey, parseIndiaDotpointKey, indiaChapterGrade, indiaAheadUnlocked,
     indiaDotpointsInWindow, indiaRequestableDifficulties
   } = await import(`${SRC}engine/indiaProduct.js`);
-  const { misconceptionKey, TRAP_ACTIVE_AT, INTERLEAVE } = await import(`${SRC}engine/adaptive.js`);
+  const { misconceptionKey, TRAP_ACTIVE_AT, TRAP_SITTING_GAP_MS, INTERLEAVE } = await import(`${SRC}engine/adaptive.js`);
   const { INDIA_REASON_TAGS } = await import(`${SRC}engine/indiaProgress.js`);
 
   const GET = (path, body) => dispatch('GET', path, body);
@@ -362,7 +362,9 @@ async function run() {
       } else {
         await POST(`/practice/${current.question.id}/reveal`, { ms: 1000 });
       }
-      tick(45000);
+      // Each slip in its own sitting: two slips seconds apart are one bad
+      // minute, not a pattern (adaptive.js TRAP_SITTING_GAP_MS).
+      tick(TRAP_SITTING_GAP_MS + 45000);
       // Same dot point *and* same rung. Springing a trap drops the rating, so
       // leaving the rung to the picker walked this probe down to a difficulty
       // where the dot point has no authored trap at all and the loop could
@@ -401,7 +403,11 @@ async function run() {
     }
     ok('smart practice steers back to the misconception', !!steered, 'no misconception-reason serve within six picks');
     if (steered) {
-      ok('the why names the slip', /Same slip keeps coming back/.test(steered.why), steered.why);
+      // "Same slip keeps coming back" is said only of a question the server
+      // attested can spring it; otherwise the reason is about the record.
+      const springsForWhy = typeof steered.misconception === 'string' && steered.misconception.length > 0;
+      ok('the why names the slip exactly when the question is attested to carry it', /Same slip keeps coming back/.test(steered.why) === springsForWhy, steered.why);
+      ok('…and otherwise still says why the topic came up', springsForWhy || /same mistake has come up before/.test(steered.why), steered.why);
       ok('the question is served on the dot point the slip lives on', indiaDotpointKey(chapter.id, steered.dotpoint) === ledger?.dotpoint, `${steered.dotpoint} vs ${ledger?.dotpoint}`);
       // What the engine can promise, and what it cannot.
       //
