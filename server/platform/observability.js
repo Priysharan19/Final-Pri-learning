@@ -98,7 +98,12 @@ const FIELD_SHAPES = Object.freeze({
   surface: value => typeof value === 'string' && SURFACE.test(value),
   fingerprint: value => typeof value === 'string' && FINGERPRINT.test(value),
   // Where an error was captured: the /v1 handler, the app handler or a client report.
-  source: value => ['platform', 'app', 'client'].includes(value)
+  source: value => ['platform', 'app', 'client'].includes(value),
+  // Where one request's time went (requestTiming.js). Bounded numbers only.
+  ...Object.fromEntries(['dbStatements', 'dbRoundTrips', 'dbTransactions']
+    .map(name => [name, value => Number.isInteger(value) && value >= 0 && value <= 1_000_000])),
+  ...Object.fromEntries(['dbMs', 'dbAcquireMs', 'authMs', 'eligibilityMs', 'limitMs', 'providerMs', 'markerMs', 'commitMs', 'serializeMs']
+    .map(name => [name, value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 3_600_000]))
 });
 
 export const LOG_FIELDS = Object.freeze(Object.keys(FIELD_SHAPES));

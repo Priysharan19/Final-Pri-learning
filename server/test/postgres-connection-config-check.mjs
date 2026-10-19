@@ -99,20 +99,23 @@ eq(postgresConnectionSettings('postgres://pri_app_test@127.0.0.1:5432/pri', {}).
 eq(postgresConnectionSettings(`${BASE}?sslmode=verify-full`, dev()).ssl, { rejectUnauthorized: true }, 'and TLS stated outside production is honoured');
 
 // ── Per-connection limits and pool size ─────────────────────────────────────
-eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10, lockWaitMs: 5000 },
-  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10, lock wait 5 s');
-eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20', PRI_DATABASE_LOCK_WAIT_MS: '2500' }) },
-  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20, lockWaitMs: 2500 }, 'each is configurable');
+eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10, poolIdleMs: 300000, lockWaitMs: 5000 },
+  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10 kept 5 minutes idle, lock wait 5 s');
+eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20', PRI_DATABASE_POOL_IDLE_MS: '60000', PRI_DATABASE_LOCK_WAIT_MS: '2500' }) },
+  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20, poolIdleMs: 60000, lockWaitMs: 2500 }, 'each is configurable');
 for (const [name, value] of [
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', 'abc'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '0'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '1.5'],
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '999999999'], ['PRI_DATABASE_IDLE_TX_TIMEOUT_MS', '-1'], ['PRI_DATABASE_POOL_MAX', '0'],
-  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP'], ['PRI_DATABASE_LOCK_WAIT_MS', '50'], ['PRI_DATABASE_LOCK_WAIT_MS', '600000']
+  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP'], ['PRI_DATABASE_LOCK_WAIT_MS', '50'], ['PRI_DATABASE_LOCK_WAIT_MS', '600000'],
+  ['PRI_DATABASE_POOL_IDLE_MS', '999'], ['PRI_DATABASE_POOL_IDLE_MS', '3600001']
 ]) {
   throwsCode(() => postgresSessionLimits({ [name]: value }), 'PLATFORM_DB_CONFIG_INVALID', `${name}=${value} stops the boot instead of being guessed at`);
 }
 {
   const { options, settings } = postgresPoolOptions(`${BASE}?sslmode=verify-full`, { env: prod({ PRI_DATABASE_POOL_MAX: '7', PRI_DATABASE_SSL_ROOT_CERT: CA }) });
   eq([options.max, options.ssl, settings.statementTimeoutMs], [7, { rejectUnauthorized: true, ca: CA }, 15000], 'the pg Pool receives exactly these settings');
+  eq([options.idleTimeoutMillis, options.keepAlive, options.keepAliveInitialDelayMillis], [300000, true, 30000],
+    'an idle pooled connection is kept 5 minutes, with TCP keep-alive so a silently dropped one is noticed');
   ok(!options.connectionString.includes('sslmode'), 'and a connection string pg cannot reinterpret');
 }
 

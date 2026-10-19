@@ -96,7 +96,10 @@ export const ENGINE_SUITES = [
   'rls-fail-closed-check.mjs',
   // Round trips per hot request (practice issue/submit, sync push/pull): a
   // statement outside a transaction is one round trip (#524 item 3).
-  'db-round-trips-check.mjs'
+  'db-round-trips-check.mjs',
+  // Round trips pinned per hot request on Postgres, the one-request ink Submit,
+  // and no account scope leaking back to the pool (#441 port, #524 item 3).
+  'hot-path-budget-check.mjs'
 ];
 
 let failed = 0;

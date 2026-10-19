@@ -439,13 +439,13 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
 
   router.get('/guardian/state', requireSession(db), async (req, res) => {
     const state = await consentState(db, req.platformSession.account_id);
-    const account = await db.get('SELECT email_verified_at FROM accounts WHERE id = ?', [req.platformSession.account_id]);
     res.json({
       required: state.required,
       state: state.state,
       ageBasis: state.ageBasis,
       blockerCode: consentBlockerCode(state),
-      emailVerified: !!account?.email_verified_at,
+      // Read with the session a moment ago, in this request, from the same row.
+      emailVerified: !!req.platformSession.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
       method: state.row?.method || null

@@ -60,6 +60,7 @@ import { platformDatabaseUrl, postgresConnectionSettings, validPostgresUrl } fro
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from './schemaVersions.js';
 import { logEvent, safeCode } from './observability.js';
 import { recordDatabasePoolError } from './metrics.js';
+import { noteAcquire, noteRoundTrip, noteTransaction, timingNow } from './requestTiming.js';
 
 const txContext = new AsyncLocalStorage();
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -315,16 +316,16 @@ class SqliteTx {
     this.#check();
     const name = `pri_sp_${this.depth + 1}`;
     const raw = this.store.raw;
-    raw.exec(`SAVEPOINT ${name}`);
+    this.store._control(`SAVEPOINT ${name}`);
     const nested = new SqliteTx(this.store, this.depth + 1, this.lock, this.accountScope);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
-      raw.exec(`RELEASE ${name}`);
+      this.store._control(`RELEASE ${name}`);
       return result;
     } catch (error) {
       if (raw.inTransaction) {
-        raw.exec(`ROLLBACK TO ${name}`);
-        raw.exec(`RELEASE ${name}`);
+        this.store._control(`ROLLBACK TO ${name}`);
+        this.store._control(`RELEASE ${name}`);
       }
       throw error;
     } finally {
@@ -358,7 +359,19 @@ export class SqliteStore {
     return statement;
   }
 
+  /** One statement, metered for the request it serves (requestTiming.js: a count and a duration, never the SQL or its values). */
   _exec(kind, sql, params) {
+    const started = timingNow();
+    try { return this._run(kind, sql, params); } finally { noteRoundTrip(timingNow() - started, { statement: true }); }
+  }
+
+  /** A transaction-control statement (BEGIN, COMMIT, SAVEPOINT …), metered like the Postgres ones. */
+  _control(sql) {
+    const started = timingNow();
+    try { return this.raw.exec(sql); } finally { noteRoundTrip(timingNow() - started); }
+  }
+
+  _run(kind, sql, params) {
     const values = asParams(params);
     const statement = this._statement(sql);
     if (kind === 'get') return statement.reader ? statement.get(...values) : (statement.run(...values), undefined);
@@ -441,22 +454,27 @@ export class SqliteStore {
     // One connection: take the in-process lock so no other request's
     // statement can land inside this transaction. That already serialises
     // every transaction, so a named lock needs nothing more than recording.
-    while (this.active) await this.active.done;
+    if (this.active) {
+      const waited = timingNow();
+      while (this.active) await this.active.done;
+      noteAcquire(timingNow() - waited);
+    }
     let release;
     this.active = { done: new Promise(resolve => { release = resolve; }) };
     this.stats.transactions++;
+    noteTransaction();
     const tx = new SqliteTx(this, 0, lock, accountScope);
     try {
-      this.raw.exec('BEGIN');
+      this._control('BEGIN');
       let result;
       try {
         result = await txContext.run({ store: this, tx }, () => fn(tx));
       } catch (error) {
-        if (this.raw.inTransaction) this.raw.exec('ROLLBACK');
+        if (this.raw.inTransaction) this._control('ROLLBACK');
         throw error;
       }
       try {
-        this.raw.exec('COMMIT');
+        this._control('COMMIT');
       } catch (error) {
         // A COMMIT that fails (SQLITE_BUSY, SQLITE_FULL, an I/O error) can leave
         // the transaction open. Released like that, the next request's BEGIN
@@ -587,27 +605,27 @@ class PostgresTx {
   #check() { if (this.closed) throw storeError('STORE_TX_FINISHED', 'This transaction has already finished.'); }
   async #query(sql, params) {
     this.#check();
-    return this.client.query(toPostgresPlaceholders(sql), asParams(params));
+    return this.store._send(this.client, toPostgresPlaceholders(sql), asParams(params), true);
   }
   async get(sql, params) { return (await this.#query(sql, params)).rows[0]; }
   async all(sql, params) { return (await this.#query(sql, params)).rows; }
   async run(sql, params) { return runResult(await this.#query(sql, params)); }
-  async exec(sql) { this.#check(); await this.client.query(sql); }
+  async exec(sql) { this.#check(); await this.store._send(this.client, sql, undefined, true); }
   async transaction(fn) {
     this.#check();
     const name = `pri_sp_${this.depth + 1}`;
-    await this.client.query(`SAVEPOINT ${name}`);
+    await this.store._send(this.client, `SAVEPOINT ${name}`);
     const nested = new PostgresTx(this.store, this.client, this.depth + 1, this.readOnly, this.lock, this.accountScope);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
-      await this.client.query(`RELEASE SAVEPOINT ${name}`);
+      await this.store._send(this.client, `RELEASE SAVEPOINT ${name}`);
       return result;
     } catch (error) {
       // A serialization failure dooms the whole transaction; let the outer
       // level roll back and retry rather than pretending a savepoint fixed it.
       if (!RETRYABLE.has(String(error?.code || ''))) {
-        await this.client.query(`ROLLBACK TO SAVEPOINT ${name}`);
-        await this.client.query(`RELEASE SAVEPOINT ${name}`);
+        await this.store._send(this.client, `ROLLBACK TO SAVEPOINT ${name}`);
+        await this.store._send(this.client, `RELEASE SAVEPOINT ${name}`);
       }
       throw error;
     } finally {
@@ -697,6 +715,21 @@ export class PostgresStore {
     this.closed = false;
   }
 
+  /**
+   * One wire round trip on `client`, metered for the request it serves
+   * (requestTiming.js: a count and a duration, never the SQL or its values).
+   * `statement` marks a handler's own statement; transaction control, locks
+   * and the scope-declaring BEGIN are round trips but not statements.
+   */
+  async _send(client, sql, params, statement = false) {
+    const started = timingNow();
+    try {
+      return params === undefined ? await client.query(sql) : await client.query(sql, params);
+    } finally {
+      noteRoundTrip(timingNow() - started, { statement });
+    }
+  }
+
   get open() { return !this.closed; }
 
   #joined() {
@@ -732,10 +765,13 @@ export class PostgresStore {
    */
   async _client() {
     let client;
+    const waited = timingNow();
     try {
       client = await this.pool.connect();
     } catch (error) {
       throw databaseOverload(error);
+    } finally {
+      noteAcquire(timingNow() - waited);
     }
     if (!client.__priErrorListener && typeof client.on === 'function') {
       // The server can end a checked-out session on its own — most often
@@ -747,11 +783,17 @@ export class PostgresStore {
       client.on('error', client.__priErrorListener);
     }
     if (!client.__priSchema) {
+      // Part of opening a connection, not of the request that happened to be
+      // first on it: metered as connection wait, so a request's round-trip
+      // count does not depend on whether its connection was new.
+      const setup = timingNow();
       try {
         await client.query(this.sessionSetup());
       } catch (error) {
         client.release(error);
         throw databaseOverload(error);
+      } finally {
+        noteAcquire(timingNow() - setup);
       }
       client.__priSchema = this.schema;
     }
@@ -768,7 +810,7 @@ export class PostgresStore {
     const client = await this._client();
     let broken;
     try {
-      return await client.query(toPostgresPlaceholders(sql), values);
+      return await this._send(client, toPostgresPlaceholders(sql), values, true);
     } catch (error) {
       // A statement error leaves the session usable; a lost connection does not.
       if (client.__priLost) { broken = client.__priLost; throw databaseOverload(client.__priLost); }
@@ -810,7 +852,7 @@ export class PostgresStore {
     const client = await this._client();
     let broken;
     try {
-      await client.query(sql);
+      await this._send(client, sql, undefined, true);
     } finally {
       try {
         await client.query(RESET_SESSION);
@@ -836,9 +878,12 @@ export class PostgresStore {
     for (let attempt = 1; ; attempt++) {
       if (attempt > 1) this.stats.retries++;
       this.stats.transactions++;
+      noteTransaction();
       // Queue for the lock in this process BEFORE taking a pooled connection.
       const deadline = Date.now() + this.lockWaitMs;
+      const queued = timingNow();
       const releaseLocal = lock ? await this.localLocks.acquire(lock, this.lockWaitMs) : null;
+      if (lock) noteAcquire(timingNow() - queued);
       let client;
       try {
         client = await this._client();
@@ -873,10 +918,10 @@ export class PostgresStore {
           : isolation === 'repeatable read' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ' : 'BEGIN ISOLATION LEVEL SERIALIZABLE';
         const scope = scopeStatement(accountScope);
         begun = true; // a failure part-way through the BEGIN query still gets its ROLLBACK
-        await client.query(`${begin}; ${scope}`);
+        await this._send(client, `${begin}; ${scope}`);
         const result = await txContext.run({ store: this, tx }, () => fn(tx));
         tx.closed = true;
-        await client.query('COMMIT');
+        await this._send(client, 'COMMIT');
         return result;
       } catch (thrown) {
         tx.closed = true;
@@ -887,7 +932,7 @@ export class PostgresStore {
         // A client whose ROLLBACK fails is in an unknown state: destroy it
         // rather than hand it to the next request.
         if (begun && !broken) {
-          try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
+          try { await this._send(client, 'ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
         }
         if (String(error?.code || '') === '25P03' || String(error?.code || '').startsWith('08')) broken = broken || error;
         if (!RETRYABLE.has(String(error?.code || '')) || attempt >= this.maxAttempts) throw databaseOverload(error);
@@ -897,7 +942,7 @@ export class PostgresStore {
         // released the lock is destroyed: ending the session releases it.
         if (locked && !broken) {
           try {
-            const unlocked = await client.query(ADVISORY_UNLOCK, [lock]);
+            const unlocked = await this._send(client, ADVISORY_UNLOCK, [lock]);
             if (unlocked?.rows?.[0]?.released !== true) broken = storeError('STORE_LOCK_LOST', 'The transaction lock was not held at release.');
           } catch (unlockError) {
             broken = unlockError;
@@ -913,7 +958,7 @@ export class PostgresStore {
   /** pg_try_advisory_lock until acquired or the deadline; true when held. */
   async #tryLock(client, lock, deadline) {
     for (let round = 0; ; round++) {
-      const result = await client.query(ADVISORY_TRY_LOCK, [lock]);
+      const result = await this._send(client, ADVISORY_TRY_LOCK, [lock]);
       if (result?.rows?.[0]?.acquired === true) return true;
       const left = deadline - Date.now();
       if (left <= 0) return false;
@@ -948,7 +993,12 @@ export function postgresPoolOptions(connectionString, { max, env = process.env }
       connectionString: settings.connectionString,
       ssl: settings.ssl,
       max: poolMax,
-      idleTimeoutMillis: 30_000,
+      idleTimeoutMillis: settings.poolIdleMs,
+      // An idle connection kept for minutes must not be dropped silently by a
+      // NAT or pooler in between: TCP keep-alive notices, and the pool then
+      // discards the dead client instead of handing it to a request.
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       application_name: 'pri-learning-v1'
     }

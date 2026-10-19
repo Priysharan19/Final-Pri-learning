@@ -21,7 +21,8 @@ import { securityHeaders } from './platform/headers.js';
 import { rateLimit } from './platform/security.js';
 import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
-import { recordHttpResponse, recordServerError } from './platform/metrics.js';
+import { requestTiming, timingLogFields } from './platform/requestTiming.js';
+import { recordHttpResponse, recordRouteTiming, recordServerError } from './platform/metrics.js';
 import { captureError } from './platform/errorSink.js';
 import { staticCacheHeaders } from './platform/staticCache.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
@@ -60,16 +61,22 @@ export function requestLogger(log = null, { engine = null } = {}) {
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - started) / 1e6;
       recordHttpResponse(res.statusCode, ms);
+      const route = res.locals.route || routeTemplate(req);
+      // Per route template: the request's latency and its database numbers
+      // (requestTiming.js) — counts and milliseconds only.
+      if (req.priTiming) recordRouteTiming(req.method, route, ms, req.priTiming);
       if (log === false) return;
       const fields = {
         requestId: req.requestId,
         method: req.method,
-        route: res.locals.route || routeTemplate(req),
+        route,
         status: res.statusCode,
         ms,
         code: res.locals.errorCode || undefined,
         release: releaseShaForLogs(),
-        db
+        db,
+        // Where the time went (requestTiming.js): counts and milliseconds only.
+        ...timingLogFields(req.priTiming)
       };
       const level = res.statusCode >= 500 ? 'error' : 'info';
       if (typeof log === 'function') log(safeLogFields({ ts: new Date().toISOString(), level, event: 'http_request', ...fields }));
@@ -116,6 +123,9 @@ export async function createServerApp(db, {
   // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
   // a customer-controlled field (subscription notes) would make the provider
   // retry until it gives up, losing the entitlement change.
+  // After the body parsers: the timing context must be entered on the path
+  // that actually reaches the handlers (requestTiming.js).
+  app.use('/v1', requestTiming());
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);

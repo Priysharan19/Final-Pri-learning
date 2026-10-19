@@ -254,6 +254,26 @@ export function recordHttpResponse(status, ms) {
   metrics.observe('http_request_ms', null, ms);
 }
 
+/**
+ * One /v1 request's latency and database numbers, by route TEMPLATE (never a
+ * raw path): `POST:.v1.practice.:id.submit`. The template set is closed (the
+ * routes this server defines; anything else is already `/v1/<unmatched>`), so
+ * the label set is bounded. Numbers only (requestTiming.js).
+ */
+export function routeLabel(method, route) {
+  const label = `${String(method || '').toUpperCase()}:${String(route || '').replace(/\//g, '.')}`;
+  return LABEL.test(label) ? label : 'other';
+}
+export function recordRouteTiming(method, route, ms, timing) {
+  const labels = { route: routeLabel(method, route) };
+  metrics.observe('http_route_ms', labels, ms);
+  if (!timing?.db) return;
+  metrics.observe('http_route_db_ms', labels, timing.db.ms);
+  metrics.inc('http_route_requests_total', labels);
+  metrics.inc('http_route_db_statements_total', labels, timing.db.statements);
+  metrics.inc('http_route_db_round_trips_total', labels, timing.db.roundTrips);
+}
+
 const DB_CODES = new Set(['PLATFORM_DB_BUSY', 'PLATFORM_DB_TIMEOUT', 'PLATFORM_DB_UNAVAILABLE']);
 export function recordDatabaseError(code) {
   const safe = safeCode(code);
