@@ -819,7 +819,11 @@ jobs:
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
-          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
+          # The iPhone layout tour in both engines (65: the welcome wordmark at or
+          # below the status-bar inset on 17 Pro Max, 16 Pro Max and SE sizes),
+          # and the gate journey in WebKit (62).
+          test "$(grep -Ec 'E2E SUITE PASSED.*65/65.*1 flows' browser.log)" -ge 2
+          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 1
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           test "$(grep -Ec 'E2E SUITE PASSED.*21/21.*1 flows' browser.log)" -ge 2
