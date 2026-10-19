@@ -145,7 +145,7 @@ export const flow = {
     // Phones are touch screens: the product sizes targets for (pointer: coarse).
     // Chromium emulates that over CDP; WebKit cannot, so it skips the 44px rule.
     const cdp = chromium ? await page.context().newCDPSession(page) : null;
-    const touch = async on => { if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: on, maxTouchPoints: on ? 5 : 0 }); };
+    const touch = async on => { if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', on ? { enabled: true, maxTouchPoints: 5 } : { enabled: false }); };
     if (!chromium) note('44px hit areas are checked in Chromium only (WebKit cannot emulate a coarse pointer here)');
 
     for (const size of SIZES) {
