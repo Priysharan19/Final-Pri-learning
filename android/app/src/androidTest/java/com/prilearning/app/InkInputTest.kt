@@ -266,15 +266,28 @@ class InkInputTest {
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
             val strokes: JSONArray = m.getJSONArray("strokes")
             for (i in 0 until strokes.length()) assertEquals("no stroke was cancelled", false, strokes.getJSONObject(i).getBoolean("cancelled"))
+        }
+    }
 
-            // Store listing only (priShots): the same question answered by a photo.
-            if (InstrumentationRegistry.getArguments().getString("priShots", "") == "1" &&
-                eval(s, "!!($byLabel)('Photo: answer with a photo of your working')") == "true") {
-                eval(s, "($byLabel)('Photo: answer with a photo of your working').click()")
-                Thread.sleep(800)
-                eval(s, "(function(){window.scrollTo(0,0);var q=document.querySelector('.q-prompt');if(q)q.scrollIntoView({block:'start'});return true;})()")
-                StoreShots.shot("04-photo")
+    /** Store listing only (-e priShots 1): a question answered by a photo. Skipped otherwise. */
+    @Test
+    fun storeShotPhoto() {
+        assumeTrue("store screenshots only", InstrumentationRegistry.getArguments().getString("priShots", "") == "1")
+        AccountFirst.useFixtureServer()
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
+            eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt')")
+            val label = "Photo: answer with a photo of your working"
+            for (i in 0 until 14) {
+                if (eval(s, "!!($byLabel)('$label')") == "true") break
+                eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
+                Thread.sleep(1100)
             }
+            assertEquals("a question offering Photo was found", "true", eval(s, "!!($byLabel)('$label')"))
+            eval(s, "($byLabel)('$label').click()")
+            Thread.sleep(1000)
+            StoreShots.shot("04-photo")
         }
     }
 }

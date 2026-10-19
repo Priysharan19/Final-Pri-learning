@@ -21,8 +21,8 @@ object StoreShots {
         if (!enabled) return
         Thread.sleep(800) // let transitions and fonts settle
         val i = InstrumentationRegistry.getInstrumentation()
-        val bmp = i.uiAutomation.takeScreenshot() ?: return
+        val shot = i.uiAutomation.takeScreenshot() ?: return
         val dir = File(i.targetContext.getExternalFilesDir(null), "store-shots").apply { mkdirs() }
-        File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(dir, "$name.png").outputStream().use { shot.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }
