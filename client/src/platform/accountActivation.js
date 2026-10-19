@@ -67,6 +67,13 @@ export const isActivationDenied = (error) => ACTIVATION_DENIED_CODES.includes(er
  */
 export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
 
+/** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
+export function offlineGraceExpired(verifiedAt, now = Date.now()) {
+  const at = Number(verifiedAt);
+  if (verifiedAt == null || !Number.isFinite(at) || at <= 0) return true;
+  return !(now - at >= 0 && now - at < OFFLINE_GRACE_MS);
+}
+
 /** The server could not be reached at all (no HTTP answer) — the only case the grace covers. */
 function serverUnreachable(error) {
   if (error?.code === 'CLOUD_UNAVAILABLE') return error.cause?.probeAnswered === false;
@@ -138,7 +145,7 @@ async function activateOnline(pid, { expectedAccountId = null, sync = true } = {
       // stranger's page is a server that is there, not an offline device; a
       // probe that never ran (no web origin to ask) is not "nothing answered".
       const probeAnswered = lastCloudProbe().answered;
-      if (globalThis.navigator?.onLine === false && probeAnswered !== true) throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: new TypeError('offline'), retryable: true });
+      if (globalThis.navigator?.onLine === false && probeAnswered === false) throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: new TypeError('offline'), retryable: true });
       throw new ActivationBlocked('CLOUD_UNAVAILABLE', { cause: { probeAnswered }, retryable: true });
     }
   }

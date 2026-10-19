@@ -64,7 +64,7 @@ const { put } = await import('../src/local/idb.js');
 const { loginCloudAccount, cloudAccountLink, recordCloudActivation } = await import('../src/platform/cloudAccount.js');
 const { profileOutboxStats } = await import('../src/platform/profileOutbox.js');
 const {
-  ensureAccountActivated, ActivationBlocked, isActivationDenied, OFFLINE_GRACE_MS, offlineGraceFor,
+  ensureAccountActivated, ActivationBlocked, isActivationDenied, OFFLINE_GRACE_MS, offlineGraceFor, offlineGraceExpired,
   ACTIVATION_DENIED_CODES, ACTIVATION_SIGN_IN_CODES, ACTIVATION_GUARDIAN_CODES, ACTIVATION_BLOCKED_CODES
 } = await import('../src/platform/accountActivation.js');
 
@@ -258,7 +258,14 @@ server.push = null;
   // connection, not the build — said as "can't be reached", retryable.
   const hadNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true, writable: true });
+  // A browser that is offline still runs the probe, and nothing answers it.
+  const hadLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://pri.example.test', protocol: 'https:' }, configurable: true, writable: true });
+  const onlineFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
   const offline = await gate('p1');
+  globalThis.fetch = onlineFetch;
+  if (hadLocation) Object.defineProperty(globalThis, 'location', hadLocation); else delete globalThis.location;
   eq('with no origin found and the device OFFLINE, it is SESSION_UNAVAILABLE', offline.code, 'SESSION_UNAVAILABLE');
   ok('retryable, with a network cause (the gate then says "can’t be reached", not "no server configured")', offline.retryable && !offline.denied && offline.cause === null);
   if (hadNavigator) Object.defineProperty(globalThis, 'navigator', hadNavigator); else delete globalThis.navigator;
@@ -378,6 +385,11 @@ reset();
     globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
     const none = await gate('p6', { offlineGrace: true });
     ok('nothing answering /v1/health at all is the offline case: the grace applies', none.ready?.offline === true, JSON.stringify(none));
+    // The probe's time limit is "no answer": the grace applies.
+    globalThis.fetch = (url, options) => new Promise((_, reject) => options?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    const timedOut = await gate('p6', { offlineGrace: true });
+    ok('a probe that times out with no answer is the offline case: the grace applies', timedOut.ready?.offline === true, JSON.stringify(timedOut));
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
     // A clock moved backwards since the device last looked is refused.
     const seen = (await cloudAccountLink('p6')).clockSeenAt;
     ok('a grace raises the clock high-water mark', Number(seen) > 0);
@@ -392,6 +404,26 @@ reset();
     if (hadLocation) Object.defineProperty(globalThis, 'location', hadLocation); else delete globalThis.location;
     globalThis.__PRI_CLOUD_ORIGIN__ = origin;
   }
+}
+
+// ── 11 · a probe that never ran is not "nothing answered" ─────────────────────
+{
+  const origin = globalThis.__PRI_CLOUD_ORIGIN__;
+  const hadNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  delete globalThis.__PRI_CLOUD_ORIGIN__;   // and no web origin: the probe cannot run
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true, writable: true });
+  try {
+    const r = await gate('p6', { offlineGrace: true });
+    ok('offline with a probe that never ran (no origin to ask), there is no grace', !r.ready && r.code === 'CLOUD_UNAVAILABLE' && r.retryable, JSON.stringify(r));
+  } finally {
+    if (hadNavigator) Object.defineProperty(globalThis, 'navigator', hadNavigator); else delete globalThis.navigator;
+    globalThis.__PRI_CLOUD_ORIGIN__ = origin;
+  }
+  // The shell's expiry rule (App.jsx calls this while an offline entry is open).
+  const now = Date.now();
+  ok('an offline entry with no verification time is expired', offlineGraceExpired(null, now) && offlineGraceExpired(undefined, now) && offlineGraceExpired(0, now) && offlineGraceExpired('x', now));
+  ok('one verified an hour ago is not', !offlineGraceExpired(now - 60 * 60 * 1000, now));
+  ok('one verified 72 hours ago, or in the future, is', offlineGraceExpired(now - OFFLINE_GRACE_MS, now) && offlineGraceExpired(now + 1000, now));
 }
 
 if (failures.length) {

@@ -59,7 +59,7 @@ assert.match(app, /useEffect\(\(\) => \{ setActivated\(a => \(a && user\?\.id &&
   'a different profile is a different question: its activation starts over');
 assert.match(app, /if \(!sameIdentity\) setActivated\(null\);/,
   'a sign-out, or another account or profile signing in (this tab or another), relocks the gate');
-assert.match(app, /if \(!live\) return;\s*if \(activation\.isActivationDenied\(error\)\) setActivated\(null\);\s*else if \(offlineEntry && \(offlineVerifiedAt == null \|\| !\(Date\.now\(\) - offlineVerifiedAt < activation\.OFFLINE_GRACE_MS\)\)\) setActivated\(null\);/,
+assert.match(app, /if \(!live\) return;\s*if \(activation\.isActivationDenied\(error\)\) setActivated\(null\);\s*else if \(offlineEntry && activation\.offlineGraceExpired\(offlineVerifiedAt\)\) setActivated\(null\);/,
   'the periodic recheck ejects only on the server\'s own refusal, or when an offline grace has run out');
 assert.match(app, /window\.addEventListener\('online', online\)/, 'and asks the server again the moment the connection returns');
 assert.match(gate, /ensureAccountActivated\(user\.id, \{ offlineGrace: true \}\)/,

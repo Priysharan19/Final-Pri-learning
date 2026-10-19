@@ -82,6 +82,9 @@ export const lastCloudProbe = () => ({ ...lastProbe });
 export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   if (discovery) return discovery;
   discovery = (async () => {
+    // Each attempt says only what IT heard: a probe that never runs (an
+    // injected origin, a native shell, no web origin) leaves "unknown".
+    lastProbe = { answered: null, at: 0 };
     const injected = String(globalThis.__PRI_CLOUD_ORIGIN__ || '').trim();
     if (injected) return injected;
     if (nativeCloudAvailable()) return null;
