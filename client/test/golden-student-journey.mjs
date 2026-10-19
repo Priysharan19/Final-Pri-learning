@@ -53,12 +53,6 @@ async function createFreshStudent(page, origin) {
   await createVerifiedProfile(page, platform, { name: 'PRI-02 Golden Student', year: 7, course: 'nsw' });
 }
 
-/** The activation gate's retry screen: the server could not be reached. */
-async function gateRetry(page) {
-  const gate = page.locator('[data-testid="account-activation-gate"][data-activation-status="retry"]');
-  await gate.waitFor({ timeout: 30000 });
-  return clean(await gate.innerText());
-}
 
 async function gotoPractice(page, origin) {
   await page.goto(origin + '/practice?subtopic=' + TOPIC, { waitUntil: 'domcontentloaded' });
@@ -284,13 +278,22 @@ try {
     'nothing may claim a mark made on this device');
   await page.waitForTimeout(600);
 
-  // ── reopened offline: the gate, not the app — the server cannot confirm ────
+  // ── reopened offline: the 72-hour grace (#477) ─────────────────────────────
+  // The server let this account in on this device minutes ago, so an offline
+  // open is inside the grace: the app opens on the device's own work, with
+  // the one quiet line saying nothing is checked until it reconnects — and
+  // nothing is marked.
+  const OFFLINE_LINE = '[data-testid="offline-entry"]';
   await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-  const reopened = await gateRetry(page);
-  assert.ok(/nothing is lost|work is safe|saved on this device/i.test(reopened) && !/sign in/i.test(reopened.replace(/Use another profile|Sign in again/g, '')),
-    'reopened offline, the gate must say the server cannot be reached and that nothing is lost — never a sign-out: ' + reopened);
-  assert.equal(await page.locator('.shell, .q-prompt, .verdict-bad, .eval-card').count(), 0,
-    'reopened offline, nothing of the app opens and nothing is marked');
+  await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 });
+  const reopened = clean(await page.locator(OFFLINE_LINE).innerText());
+  assert.equal(await page.locator('.shell').count(), 1, 'reopened offline inside the grace, the app opens on the device');
+  assert.equal(await page.locator('[data-testid="account-activation-gate"]').count(), 0,
+    'reopened offline inside the grace, no gate and never a sign-out');
+  assert.ok(reopened.length > 0, 'reopened offline, the offline line says why nothing is checked: ' + reopened);
+  assert.equal(await page.locator('.verdict-bad, .eval-card, .eval-marks, .solution-block').count(), 0,
+    'reopened offline, nothing is marked');
+  assert.equal(platform.ledger(account.id).completions, 3, 'reopened offline, the server marked nothing');
 
   // ── a complete restart, still offline: nothing lost, nothing invented ──────
   await ctx.close();
@@ -303,9 +306,12 @@ try {
   await ctx.setOffline(true);
 
   await page.goto(server.origin + '/history', { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await gateRetry(page);
-  assert.equal(await page.locator('.shell, .hist-row, .verdict-bad, .eval-card').count(), 0,
-    'an offline restart must open the gate, not History, and mark nothing');
+  await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('[data-testid="account-activation-gate"]').count(), 0,
+    'an offline restart inside the grace opens the app, not the gate');
+  assert.equal(await historyCount(page), 3,
+    'an offline restart shows the three server-marked attempts from the device — none lost, none invented');
+  assert.equal(await page.locator('.verdict-bad, .eval-card').count(), 0, 'an offline restart marks nothing');
   assert.equal(platform.ledger(account.id).completions, 3, 'an offline restart must not mark the submission that was refused');
 
   // Back online: the gate notices the connection by itself and lets the same
