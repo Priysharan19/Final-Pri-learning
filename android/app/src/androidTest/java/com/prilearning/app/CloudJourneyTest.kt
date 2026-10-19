@@ -147,8 +147,16 @@ class CloudJourneyTest {
             eval(s, "(function(){var a=document.querySelector('[data-testid=signup-agree]');if(!a.checked)a.click();return true;})()"); Thread.sleep(150)
             click(s, "signup-age-next")
         }
-        waitFor(s, "$cardStep === 'class' || (!!document.querySelector('.home-greet') && !$GATE)", 30_000)
+        val inside = "(!!document.querySelector('.home-greet') || !!document.querySelector('.q-prompt')) && !$GATE"
+        waitFor(s, "$cardStep === 'class' || ($inside)", 30_000)
         if (eval(s, cardStep) == "\"class\"") { click(s, "signup-class-10"); Thread.sleep(150); click(s, "signup-class-next") }
+        // A finished card opens where the student was going — from the landing
+        // page that is the first practice question (Login.jsx `intended`,
+        // tour-otp-onboarding) — and only once the gate has let the account in.
+        waitFor(s, inside, 90_000)
+        if (eval(s, "!!document.querySelector('.home-greet')") != "true") {
+            eval(s, "(function(){history.pushState({}, '', '/');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+        }
         waitFor(s, "!!document.querySelector('.home-greet') && !$GATE", 90_000)
     }
 

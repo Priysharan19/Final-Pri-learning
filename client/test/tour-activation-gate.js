@@ -316,7 +316,9 @@ export const flow = {
     await page.locator(GATE).waitFor({ timeout: 20000 });
     // The device's live session is the child's. Asha's profile is linked to
     // HER account, so the server's answer is a mismatch: nothing of hers opens
-    // on another account's session — she signs in as herself.
+    // on another account's session — she signs in as herself. The gate is up
+    // before the server's answer is; give the answer time to arrive.
+    await page.waitForFunction(sel => /not this profile’s/.test(document.querySelector(sel)?.innerText || ''), GATE, { timeout: 15000 }).catch(() => {});
     await check('choosing the adult\'s saved profile while another account\'s session is live is refused as a mismatch: the gate, not her Home',
       await gateStatus(page) === 'signin' && /not this profile’s/.test(await page.locator(GATE).innerText()) && await page.locator('.shell').count() === 0,
       (await page.locator(GATE).innerText()).slice(0, 160));
