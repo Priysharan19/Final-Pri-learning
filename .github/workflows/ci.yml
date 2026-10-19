@@ -701,6 +701,8 @@ jobs:
             node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-write-sign-in.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
+            # Task 02: mounted server-authoritative method credit and stale receipt rejection.
+            node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-ai-tutor.js 2>&1 | tee -a browser.log
             node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log

@@ -30,7 +30,7 @@ export const flow = {
   online: true,
   async run({ page, base, goto, createProfile, online, check, note, settle }) {
     await goto('/');
-    await createProfile({ name: 'Verified Step Marks Student', year: 10 });
+    await createProfile({ name: 'Verified Step Marks Student', year: 10, course: 'in' });
     await online.signIn({ name: 'Verified Step Marks Student' });
 
     // A fixed test seed yields the exact question already independently
@@ -151,6 +151,9 @@ export const flow = {
 };
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const { onlinePlatform } = await import('./support/online-session.mjs');
+  // The preselected seed is accepted ONLY by the test server, never deployed.
+  await onlinePlatform({ env: { NODE_ENV: 'test' } });
   const { runOne } = await import('./e2e.mjs');
   process.exit(await runOne(flow) ? 1 : 0);
 }
