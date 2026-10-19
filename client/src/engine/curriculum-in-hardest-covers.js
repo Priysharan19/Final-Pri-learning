@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Hardest-level coverage, tranche 1 (CBSE Class X and Class XII)
+// Pri Learning · Hardest-level coverage — tranche 1 (CBSE Class X and Class XII)
+// and tranche 3 (CBSE Class VII, VIII and XI: the remaining 81 dot points)
 //
 // The CBSE track serves D1–D3. Before this table, twenty-two dot points of the
 // two board-exam years had no authored form at D3, so the picker could not
@@ -22,8 +23,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const INDIA_HARDEST_PROVENANCE = Object.freeze({
-  tranche: 'phase-4-tranche-1',
-  scope: 'CBSE Class X and Class XII dot points without a D3 form',
+  tranche: 'phase-4-tranches-1-and-3',
+  scope: 'every CBSE Class VII, VIII, X, XI and XII dot point that had no D3 form',
   authored: 'original-parameterised',
   answers: 'computed-from-parameters',
   verification: 'client/test/india-hardest-forms-check.mjs re-derives every answer from the prompt text by an independent route',

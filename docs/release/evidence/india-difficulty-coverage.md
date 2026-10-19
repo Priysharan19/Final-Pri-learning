@@ -20,13 +20,13 @@ levels that do exist, and serves a question only after the student chooses one.
 
 | Track | Window | Chapters | Chapters with no form at the hardest level | Dot points | Dot points with no form at the hardest level | Dot points with no form anywhere in the window |
 |---|---|---:|---:|---:|---:|---:|
-| CBSE / NCERT | D1–D3 | 77 | 0 | 237 | 81 | 20 |
-| JEE Main | D2–D4 | 27 | 0 | 81 | 23 | 2 |
-| JEE Advanced | D3–D4 | 27 | 0 | 81 | 23 | 9 |
+| CBSE / NCERT | D1–D3 | 77 | 0 | 237 | 0 | 0 |
+| JEE Main | D2–D4 | 27 | 0 | 81 | 23 | 0 |
+| JEE Advanced | D3–D4 | 27 | 0 | 81 | 23 | 0 |
 | Olympiad (PRMO → RMO → INMO) | D1–D4 | 7 | 0 | 21 | 0 | 0 |
-| **All** | | **138** | **0** | **420** | **127** | **31** |
+| **All** | | **138** | **0** | **420** | **46** | **0** |
 
-Chapter × track cells where the hardest level rests on a **single** authored form: 100 of 138.
+Chapter × track cells where the hardest level rests on a **single** authored form: 67 of 138.
 
 ## Chapter × track cells with no authored form at the hardest level
 
@@ -36,59 +36,23 @@ None.
 
 `Forms at hardest` counts the distinct authored (generator, dot-point) forms at the hardest level for the chapter.
 
-### CBSE / NCERT — 35 of 77 chapters
+### CBSE / NCERT — 0 of 77 chapters
 
-| Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
-|---:|---|---|---:|---|
-| 7 | Large Numbers Around Us (`c7-large-numbers-current`) | D1 D2 D3 | 1 | 1. Read and interpret large numbers in Indian and international place-value systems (D1)<br>2. Round large numbers to useful levels of accuracy (D2)<br>4. Factor and regroup whole numbers to simplify multiplication (—) |
-| 7 | Arithmetic Expressions (`c7-arithmetic-expressions-current`) | D1 D2 D3 | 1 | 1. Evaluate and compare arithmetic expressions (D1)<br>2. Use terms and brackets to make the intended order of operations unambiguous (D2)<br>4. Use commutative, associative and distributive properties to rewrite expressions (—) |
-| 7 | A Peek Beyond the Point (`c7-decimals-current`) | D1 D2 D3 | 1 | 1. Interpret tenths, hundredths and thousandths using decimal place value (D1)<br>2. Compare decimals and locate them by magnitude (D2) |
-| 7 | Expressions using Letter-Numbers (`c7-letter-numbers-current`) | D1 D2 D3 | 1 | 1. Use letter-numbers to represent varying quantities and general relationships (D1)<br>2. Translate between ordinary language and algebraic expressions (D2)<br>4. Evaluate a formula or algebraic expression after values are supplied (—) |
-| 7 | Parallel and Intersecting Lines (`c7-parallel-intersecting-lines-current`) | D1 D2 D3 | 1 | 1. Use linear-pair and vertically-opposite angle relationships (D1)<br>2. Use corresponding and alternate angles formed by a transversal of parallel lines (D2) |
-| 7 | Number Play (`c7-number-play-current`) | D1 D2 D3 | 1 | 1. Reason about parity of numbers, sums and products (D1)<br>2. Use row and column sums to reason about number grids and magic squares (D2)<br>4. Solve elementary cryptarithms in which letters stand for digits (—) |
-| 7 | A Tale of Three Intersecting Lines (`c7-triangles-current`) | D1 D2 D3 | 1 | 1. Use the angle sum of a triangle and classify triangles by their angles (D1)<br>2. Use the triangle inequality to decide whether side lengths can form a triangle (D2)<br>4. Reason about triangle constructions from sufficient side and angle information (—) |
-| 7 | Working with Fractions (`c7-fractions-current`) | D1 D2 D3 | 1 | 1. Multiply fractions and simplify by cancelling common factors (D1)<br>2. Predict how multiplying by a number below or above one changes magnitude (D2)<br>4. Solve contextual problems involving a fraction of a fraction or equal sharing (—) |
-| 7 | Geometric Twins (`c7-geometric-twins-current`) | D1 D2 D3 | 1 | 1. Recognise congruent figures and match corresponding vertices, sides and angles (D1)<br>2. Use SSS and SAS conditions to establish triangle congruence (D2)<br>4. Use congruence and equal-side reasoning to infer unknown sides and angles (—) |
-| 7 | Operations with Integers (`c7-integer-operations-current`) | D1 D2 D3 | 1 | 1. Multiply positive and negative integers using the sign rules (D1)<br>2. Divide positive and negative integers using the sign rules (D2)<br>4. Evaluate multi-operation expressions involving positive and negative integers (—) |
-| 7 | Finding Common Ground (`c7-common-ground-current`) | D1 D2 D3 | 1 | 1. Find common factors and the highest common factor of whole numbers (D1)<br>2. Find common multiples and the least common multiple of whole numbers (D2)<br>4. Choose HCF or LCM appropriately in packaging, tiling and repeating-event contexts (—) |
-| 7 | Another Peek Beyond the Point (`c7-decimal-operations-current`) | D1 D2 D3 | 1 | 1. Multiply decimal numbers using place value (D1)<br>2. Divide decimal numbers using place value and long-division reasoning (D2)<br>4. Solve contextual problems involving decimal multiplication and division (—) |
-| 7 | Connecting the Dots… (`c7-connecting-dots-current`) | D1 D2 D3 | 1 | 1. Distinguish statistical questions from questions expecting a single fixed value (D1)<br>2. Calculate and interpret the arithmetic mean of a data set (D2)<br>4. Use range and simple data displays to compare variability and central tendency (—) |
-| 7 | Constructions and Tilings (`c7-constructions-tilings-current`) | D1 D2 D3 | 1 | 1. Recognise and reason about perpendicular bisectors constructed with ruler and compass (D1)<br>2. Reason about angle bisection and standard ruler-and-compass angle constructions (D2)<br>4. Use colouring and parity invariants to decide whether a region can be tiled (—) |
-| 7 | Finding the Unknown (`c7-finding-unknown-current`) | D1 D2 D3 | 1 | 1. Interpret an equation as equality maintained by performing the same operation on both sides (D1)<br>2. Solve one-step linear equations for an unknown (D2)<br>4. Form and solve equations arising from number patterns and contextual relationships (—) |
-| 8 | Understanding Quadrilaterals (`c8-quadrilaterals`) | D1 D2 D3 | 1 | 1. Classify polygons and use the 360° exterior-angle sum of a polygon, including regular polygons (D1)<br>2. Use and justify the defining properties of trapeziums, kites and parallelograms, including side, angle and diagonal relationships (D2) |
-| 8 | Data Handling (`c8-data-handling`) | D1 D2 D3 | 1 | 1. Interpret and choose appropriate pictographs, bar graphs and double bar graphs for comparing data (D1)<br>2. Read and construct pie charts by converting frequencies or percentages into central angles (D2) |
-| 8 | Squares and Square Roots (`c8-squares-roots`) | D1 D2 D3 | 1 | 1. Recognise and exploit properties and patterns of perfect squares, including units digits, odd-number sums and Pythagorean patterns (D1)<br>2. Find square roots of perfect squares using prime factorisation and the long-division method (D2) |
-| 8 | Cubes and Cube Roots (`c8-cubes-roots`) | D1 D2 D3 | 1 | 1. Recognise perfect cubes and use cube patterns, units digits and prime-factor triplets (D1)<br>2. Determine the smallest multiplier or divisor needed to make a number a perfect cube (D2) |
-| 8 | Comparing Quantities (`c8-comparing-quantities`) | D1 D2 D3 | 1 | 1. Use ratios and percentages to solve comparison, discount and reverse-percentage problems (D1)<br>2. Calculate sales tax/GST and estimate percentage changes using the correct base quantity (D2) |
-| 8 | Algebraic Expressions and Identities (`c8-algebraic-identities`) | D1 D2 D3 | 1 | 1. Add and subtract algebraic expressions by identifying like terms and controlling signs (D1)<br>2. Multiply monomials and multiply a monomial by a polynomial using coefficients, exponent laws and distributivity (D2) |
-| 8 | Mensuration (`c8-mensuration`) | D1 D2 D3 | 1 | 1. Find areas of trapeziums, rhombuses, quadrilaterals and polygons by decomposition (D1)<br>2. Find total/lateral/curved surface areas of cuboids, cubes and right circular cylinders (D2) |
-| 8 | Exponents and Powers (`c8-exponents`) | D1 D2 D3 | 1 | 1. Interpret negative integer exponents and simplify expressions using the laws of exponents (D1 D2)<br>3. Compare and calculate with quantities in standard form while tracking powers of ten (—) |
-| 8 | Direct and Inverse Proportions (`c8-proportions`) | D1 D2 D3 | 1 | 1. Recognise direct proportion by a constant ratio and solve direct-proportion tables and applications (D1)<br>2. Recognise inverse proportion by a constant product and solve inverse-proportion tables and applications (D2) |
-| 8 | Factorisation (`c8-factorisation`) | D1 D2 D3 | 1 | 1. Factorise algebraic expressions by taking common factors and by regrouping terms (D1)<br>2. Factorise using standard algebraic identities and recognise factor patterns such as x²+(a+b)x+ab (D2) |
-| 8 | Introduction to Graphs (`c8-graphs`) | D1 D2 D3 | 1 | 1. Read and interpret line graphs, including scales, trends, intersections and interpolation between plotted observations (D2)<br>2. Plot ordered pairs and draw graphs from tabulated relationships using correctly labelled axes and scales (D1) |
-| 11 | Relations and Functions (`c11-relations-functions`) | D1 D2 D3 | 2 | 1. Find the Cartesian product and represent a relation (D1) |
-| 11 | Trigonometric Functions (`c11-trig-functions`) | D1 D2 D3 | 1 | 1. Convert between degrees and radians and use the unit circle (D1 D2)<br>3. Find the general solution of a trigonometric equation (—) |
-| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D1 D2 D3 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D1 D2)<br>3. Solve quadratic equations with complex roots (—) |
-| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D1 D2 D3 | 1 | 1. Apply the fundamental principle of counting (D1)<br>2. Count arrangements with and without repetition and with restrictions (D2) |
-| 11 | Sequences and Series (`c11-sequences-series`) | D1 D2 D3 | 2 | 1. Find the nth term and sum of an arithmetic progression (D1 D2) |
-| 11 | Straight Lines (`c11-straight-lines`) | D1 D2 D3 | 1 | 1. Find the slope and the equation of a line in every standard form (D1 D2)<br>3. Find the distance from a point to a line and between parallel lines (—) |
-| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D1 D2 D3 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D1 D2)<br>3. Differentiate polynomials, and products and quotients (—) |
-| 11 | Statistics (`c11-statistics`) | D1 D2 D3 | 1 | 1. Find the mean deviation about the mean and median (D1)<br>3. Compare two data sets by the coefficient of variation (—) |
-| 11 | Probability (`c11-probability`) | D1 D2 D3 | 1 | 1. Describe a sample space and events for a random experiment (D1 D2)<br>3. Find probabilities of compound events (—) |
+None.
 
 ### JEE Main — 14 of 27 chapters
 
 | Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
 |---:|---|---|---:|---|
 | 11 | Relations and Functions (`c11-relations-functions`) | D2 D3 D4 | 1 | 2. Determine the domain and range of a function (D2 D3)<br>3. Recognise and sketch the standard real functions (D3) |
-| 11 | Trigonometric Functions (`c11-trig-functions`) | D2 D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (D2)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
-| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D2 D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D2)<br>2. Write a complex number in polar form and use the argument (D3) |
-| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D2 D3 D4 | 1 | 1. Apply the fundamental principle of counting (—)<br>2. Count arrangements with and without repetition and with restrictions (D2) |
-| 11 | Sequences and Series (`c11-sequences-series`) | D2 D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (D2) |
-| 11 | Straight Lines (`c11-straight-lines`) | D2 D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (D2)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
-| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D2 D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D2)<br>2. Find a derivative from first principles (D3) |
-| 11 | Statistics (`c11-statistics`) | D2 D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D2 D3) |
-| 11 | Probability (`c11-probability`) | D2 D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (D2) |
+| 11 | Trigonometric Functions (`c11-trig-functions`) | D2 D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (D2 D3)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
+| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D2 D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D2 D3)<br>2. Write a complex number in polar form and use the argument (D3) |
+| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D2 D3 D4 | 1 | 1. Apply the fundamental principle of counting (D3)<br>2. Count arrangements with and without repetition and with restrictions (D2 D3) |
+| 11 | Sequences and Series (`c11-sequences-series`) | D2 D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (D2 D3) |
+| 11 | Straight Lines (`c11-straight-lines`) | D2 D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (D2 D3)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
+| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D2 D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D2 D3)<br>2. Find a derivative from first principles (D3) |
+| 11 | Statistics (`c11-statistics`) | D2 D3 D4 | 1 | 1. Find the mean deviation about the mean and median (D3)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D2 D3) |
+| 11 | Probability (`c11-probability`) | D2 D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (D2 D3) |
 | 12 | Relations and Functions (`c12-relations-functions`) | D2 D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
 | 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D2 D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D2 D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D2 D3) |
 | 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D2 D3 D4 | 2 | 1. Test continuity and differentiability at a point (D2 D3) |
@@ -100,14 +64,14 @@ None.
 | Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
 |---:|---|---|---:|---|
 | 11 | Relations and Functions (`c11-relations-functions`) | D3 D4 | 1 | 2. Determine the domain and range of a function (D3)<br>3. Recognise and sketch the standard real functions (D3) |
-| 11 | Trigonometric Functions (`c11-trig-functions`) | D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (—)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
-| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (—)<br>2. Write a complex number in polar form and use the argument (D3) |
-| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D3 D4 | 1 | 1. Apply the fundamental principle of counting (—)<br>2. Count arrangements with and without repetition and with restrictions (—) |
-| 11 | Sequences and Series (`c11-sequences-series`) | D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (—) |
-| 11 | Straight Lines (`c11-straight-lines`) | D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (—)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
-| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (—)<br>2. Find a derivative from first principles (D3) |
-| 11 | Statistics (`c11-statistics`) | D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D3) |
-| 11 | Probability (`c11-probability`) | D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (—) |
+| 11 | Trigonometric Functions (`c11-trig-functions`) | D3 D4 | 1 | 1. Convert between degrees and radians and use the unit circle (D3)<br>2. Apply compound-angle, double-angle and product-to-sum identities (D3) |
+| 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D3 D4 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D3)<br>2. Write a complex number in polar form and use the argument (D3) |
+| 11 | Permutations and Combinations (`c11-permutations-combinations`) | D3 D4 | 1 | 1. Apply the fundamental principle of counting (D3)<br>2. Count arrangements with and without repetition and with restrictions (D3) |
+| 11 | Sequences and Series (`c11-sequences-series`) | D3 D4 | 2 | 1. Find the nth term and sum of an arithmetic progression (D3) |
+| 11 | Straight Lines (`c11-straight-lines`) | D3 D4 | 1 | 1. Find the slope and the equation of a line in every standard form (D3)<br>2. Find the angle between two lines and conditions for parallel and perpendicular (D3) |
+| 11 | Limits and Derivatives (`c11-limits-derivatives`) | D3 D4 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D3)<br>2. Find a derivative from first principles (D3) |
+| 11 | Statistics (`c11-statistics`) | D3 D4 | 1 | 1. Find the mean deviation about the mean and median (D3)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D3) |
+| 11 | Probability (`c11-probability`) | D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (D3) |
 | 12 | Relations and Functions (`c12-relations-functions`) | D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
 | 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D3) |
 | 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D3 D4 | 2 | 1. Test continuity and differentiability at a point (D3) |

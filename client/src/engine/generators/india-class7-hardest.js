@@ -78,7 +78,7 @@ function placeValueRegroup(rng) {
     const base = {
       hints: [
         'Work out what each part is worth on its own — how many zeros does each place carry?',
-        'A count of 10 or more in one place spills over into the places to its left, so add the parts rather than writing the counts side by side.',
+        'A count of ten or more in one place spills over into the places to its left, so add the parts rather than writing the counts side by side.',
         ...(ask === 'millions'
           ? ['Write the total with international commas (groups of three digits from the right). One million is ten lakh.']
           : ['Line the parts up by place value and add them.'])
@@ -242,7 +242,9 @@ function twoRoundings(rng) {
   const k = U === 100000 ? ri(rng, 2, 60) : ri(rng, 12, 95);
   const R = k * U;
   const side = rc(rng, ['low', 'high']);
-  const ask = rc(rng, ['smallest', 'largest']);
+  // On the low side the smallest number is the second rounded value itself,
+  // which asks nothing; there only the largest is asked.
+  const ask = side === 'low' ? 'largest' : rc(rng, ['smallest', 'largest']);
   const t = side === 'low' ? R - U / 2 : R + U / 2;
   const range = side === 'low' ? [R - U / 2, t + u / 2 - 1] : [t - u / 2, R + U / 2 - 1];
   const answer = ask === 'smallest' ? range[0] : range[1];
@@ -554,6 +556,7 @@ function placeRegroupDecimal(rng) {
     ],
     steps: [
       { h: 'Each part', d: `$${o}$, $${dec(100 * t, 3)}$, $${dec(10 * h, 3)}$, $${dec(th, 3)}$` },
+      { h: 'Regroup', d: `$${t}$ tenths $= ${dec(100 * t, 3)}$ and $${h}$ hundredths $= ${dec(10 * h, 3)}$ — each count of ten or more spills into the place on its left.` },
       { h: 'Add', d: `$${o} + ${dec(100 * t, 3)} + ${dec(10 * h, 3)} + ${dec(th, 3)} = ${dec(units, 3)}$` }
     ]
   };
@@ -580,6 +583,7 @@ function decimalGap(rng) {
     ],
     steps: [
       { h: 'Difference', d: `$${dec(y, 3)} - ${dec(x, 3)} = ${dec(gap, 3)}$` },
+      { h: 'One unit', d: `One ${unit.slice(0, -1)} is $${dec(PLACE_UNIT[unit], 3)}$.` },
       { h: `Count the ${unit}`, d: `$${dec(gap, 3)} = ${n}$ ${unit}` }
     ]
   };
@@ -880,7 +884,7 @@ function budgetFormula(rng) {
       const F = 100 * ri(rng, 12, 45), r = ri(rng, 12, 35), B = 500 * ri(rng, 10, 40);
       if (B <= F + r) continue;
       const n = Math.floor((B - F) / r);
-      if ((B - F) % r === 0) continue;
+      if ((B - F) % r === 0 || [F, r, B].includes(n)) continue;
       return {
         prompt: `The cost, in rupees, of printing $n$ copies of the school magazine is $C = ${F} + ${r}n$. The school has ₹$${texNum(B)}$ for printing. What is the greatest number of copies it can print?`,
         ...numericAnswer(n),
@@ -903,7 +907,7 @@ function budgetFormula(rng) {
     const base = rc(rng, [25, 30, 35, 40]), free = rc(rng, [1, 2]), r = ri(rng, 11, 19), B = 10 * ri(rng, 12, 40);
     if (B <= base + r) continue;
     const d = free + Math.floor((B - base) / r);
-    if ((B - base) % r === 0) continue;
+    if ((B - base) % r === 0 || [base, r, B].includes(d)) continue;
     return {
       prompt: `An auto-rickshaw in ${rc(rng, IN_CITIES)} charges ₹$${base}$ for the first $${free}$ km and ₹$${r}$ for every further whole kilometre, so the fare for a trip of $d$ whole kilometres ($d \\ge ${free}$) is $F = ${base} + ${r}(d - ${free})$. What is the greatest whole number of kilometres you can travel with ₹$${B}$?`,
       ...numericAnswer(d),
@@ -1166,7 +1170,7 @@ function parityExpressions(rng) {
     hints: [
       'Odd + odd and even + even are even; odd + even is odd.',
       'A product is odd only when every factor is odd; any even factor makes it even.',
-      `Try small numbers to check: for example $a = ${pa ? 3 : 2}$ and $b = ${pb ? 3 : 2}$ — then check your reasoning works for every such $a$ and $b$.`
+      `Try small numbers to check: for example, put ${pa ? 'an odd number such as 3' : 'an even number such as 2'} in place of $a$ and ${pb ? 'an odd number such as 3' : 'an even number such as 2'} in place of $b$ — then check your reasoning works for every such $a$ and $b$.`
     ],
     steps: [
       ...items.map(e => ({ h: `$${e.tex}$`, d: desc(parityOf(e.tex, pa ? 3 : 2, pb ? 3 : 2)) })).slice(0, 6),
@@ -1573,6 +1577,9 @@ const triangleConstruction = rng => (rng() < 0.55 ? compassArcs(rng) : dataSets(
 
 // ══ 8 · Working with Fractions ══════════════════════════════════════════════
 
+/** True when 1/d is a terminating decimal (d has no prime factor but 2 and 5). */
+const terminates = d => { while (d % 2 === 0) d /= 2; while (d % 5 === 0) d /= 5; return d === 1; };
+
 const fractionAnswer = f => ({
   answerType: 'numeric',
   answer: { value: f.n / f.d, simplestFraction: { n: f.n, d: f.d } },
@@ -1585,7 +1592,9 @@ function telescoping(rng) {
     const kind = rc(rng, ['minus', 'plus']);
     const k = ri(rng, 2, 6), n = ri(rng, k + 6, k + 30);
     const f = kind === 'minus' ? frac(k - 1, n) : frac(n + 1, k);
-    if (f.d === 1) continue;
+    // The prompt asks for a fraction, so the answer must be one that has no
+    // exact decimal: a terminating result would have to be accepted as a decimal.
+    if (f.d === 1 || terminates(f.d)) continue;
     const factor = m => `\\left(1 ${kind === 'minus' ? '-' : '+'} \\dfrac{1}{${m}}\\right)`;
     const first = kind === 'minus' ? `\\dfrac{${k - 1}}{${k}}` : `\\dfrac{${k + 1}}{${k}}`;
     return {
@@ -1615,7 +1624,7 @@ function crossCancel(rng) {
     if (fs.some(([n, d]) => gcd(n, d) !== 1 || n === d)) continue;
     const N = fs.reduce((p, [n]) => p * n, 1), D = fs.reduce((p, [, d]) => p * d, 1);
     const f = frac(N, D);
-    if (gcd(N, D) < 24 || f.d === 1 || f.n === 1 && f.d > 60) continue;
+    if (terminates(f.d) || gcd(N, D) < 24 || f.d === 1 || f.n === 1 && f.d > 60) continue;
     const naive = frac(fs[0][0] * fs[1][0], fs[0][1] * fs[1][1]);
     return {
       prompt: `Find $${fs.map(([n, d]) => `\\dfrac{${n}}{${d}}`).join(' \\times ')}$. Cancel common factors before you multiply, and give your answer as a fraction in simplest form.`,
@@ -1752,6 +1761,8 @@ function classTrip(rng) {
     const gGo = (girls * fg[0]) / fg[1], bGo = (boys * fb[0]) / fb[1];
     if (![girls, boys, gGo, bGo].every(Number.isInteger) || N > 240 || N < 20) continue;
     const ask = rng() < 0.5 ? 'boys' : 'total';
+    // The hints quote the girls' count, so it must never equal the answer.
+    if (ask === 'boys' && bGo === gGo) continue;
     const answer = ask === 'boys' ? bGo : gGo + bGo;
     return {
       prompt: `In a school, $\\dfrac{${gb[0]}}{${gb[1]}}$ of the Class VII students are girls and the rest are boys. For a trip to a science museum, $\\dfrac{${fg[0]}}{${fg[1]}}$ of the girls and $\\dfrac{${fb[0]}}{${fb[1]}}$ of the boys signed up. If $${gGo}$ girls signed up, ${ask === 'boys' ? 'how many boys signed up' : 'how many students signed up altogether'}?`,

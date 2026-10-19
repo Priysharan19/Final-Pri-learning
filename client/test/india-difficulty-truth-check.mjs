@@ -200,9 +200,12 @@ async function run() {
       const requestable = dp == null ? chapter.requestable : chapter.dotpoints[dp].requestable;
       await assertRequest(`hardest · ${dp == null ? 'chapter' : `dp${dp}`}`, { mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: dp ?? undefined, difficulty: 4 }, 4, requestable, { chapterId: chapter.id, dp });
     }
-    eq('the modulus dot point (authored D1–D2 only) has no JEE Advanced level', chapter.dotpoints[0].requestable, []);
+    // The modulus dot point was authored D1–D2 only until the tranche-3 CBSE
+    // hardest form (c11-complex-modulus-reasoning, D3) gave it a D3 rung, which
+    // is inside the JEE Advanced window: D3 is now its one JEE Advanced level.
+    eq('the modulus dot point has exactly D3 on JEE Advanced (its tranche-3 hardest form)', chapter.dotpoints[0].requestable, [3]);
     const below = await serve({ mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: 0, difficulty: 2 });
-    ok('asking for its own D2 on JEE Advanced is refused too — D2 is not a level of that track', below.error?.code === 'DIFFICULTY_UNAVAILABLE' && below.error.detail.available.length === 0, show(below.error?.detail || below.res?.question?.difficulty));
+    ok('asking for its own D2 on JEE Advanced is refused — D2 is not a level of that track — and only D3 is offered', below.error?.code === 'DIFFICULTY_UNAVAILABLE' && JSON.stringify(below.error.detail.available) === JSON.stringify([{ difficulty: 3, label: DIFF_LABELS[3] }]), show(below.error?.detail || below.res?.question?.difficulty));
   }
 
   // ── A refusal spends no allowance ─────────────────────────────────────────

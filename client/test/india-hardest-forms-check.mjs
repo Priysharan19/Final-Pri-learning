@@ -45,7 +45,7 @@ let pass = 0;
 const failures = [];
 function ok(name, condition, detail = '') {
   if (condition) { pass++; return true; }
-  if (failures.length < 400) failures.push(`${name}${detail ? ` — ${detail}` : ''}`);
+  if (failures.length < 5000) failures.push(`${name}${detail ? ` — ${detail}` : ''}`);
   return false;
 }
 
