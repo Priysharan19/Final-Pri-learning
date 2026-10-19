@@ -224,10 +224,13 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     // Submit never starts a paid read (review 17, F3): it binds the read the
     // student asked for with "Read my answer". These suites drive the backend
     // below the card, so the student's own Read of the same picture is made
-    // here, as the card makes it, just before the Submit that binds it.
+    // here, as the card makes it, just before the Submit that binds it —
+    // whether that Submit is the one-request /submit carrying the picture
+    // (#506) or the receipt sequence's /recognize. A /submit with no picture
+    // (typed) reads nothing.
     // (`traffic.studentHasRead = false` makes the harness a student who never
     // pressed Read: a suite uses it to prove such a submission is NOT marked.)
-    if (ink && traffic.studentHasRead !== false && /^\/v1\/practice\/[^/]+\/recognize$/.test(path)) {
+    if (ink && traffic.studentHasRead !== false && /^\/v1\/practice\/[^/]+\/(recognize|submit)$/.test(path)) {
       let picture = null;
       try { picture = JSON.parse(String(options.body || '{}')).image; } catch { picture = null; }
       if (typeof picture === 'string') {
