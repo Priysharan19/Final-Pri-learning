@@ -54,14 +54,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '2064000/2064000 self-checks passed across 258 subtopics' suites.log
+          grep -Fq '2712000/2712000 self-checks passed across 339 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 2102/2102 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 35978/35978 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 185231/185231 checks — 45 hardest-level forms (D3 CBSE Class X/XII, D4 JEE Class 11/12) for 45 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 123844 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '48500 questions from 485 declared (generator, difficulty) pairs × 100 draws — 48500 marked correct by their own marker, 48500 well formed' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
@@ -101,7 +101,7 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
@@ -151,7 +151,7 @@ jobs:
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 172/172 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
@@ -419,7 +419,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 52 → 53 (#430): the owner AP first-mistake contract also runs on real Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 53/53 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 54/54 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

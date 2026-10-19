@@ -94,8 +94,13 @@ const pageCopy = englishOf(page);
 ok(/action === 'guardian-consent'/.test(page), 'and the page has a branch for it');
 ok(/guardianConfirm/.test(page) && /guardianWithdraw/.test(page),
   'offering both answers on the one screen, so saying no is as easy as saying yes');
-ok(/works on their device without an account|already works on their device/i.test(pageCopy),
-  'and telling the parent the app works without the account, so consent is not extracted by false urgency');
+// #283/#284: marking is online-only, so the page may no longer say the app
+// works on the device without an account. Consent is still not extracted by
+// false urgency: the parent is told plainly that they may say no, and exactly
+// what follows (nothing is sent, answers are not checked).
+ok(/say no: nothing of theirs will be sent/i.test(pageCopy) && /their answers will not be checked/i.test(pageCopy)
+  && !/already works on their device|works on their device without an account/i.test(pageCopy),
+  'and telling the parent they may say no and what follows, without the old device-only claim, so consent is not extracted by false urgency');
 ok(/href="\/privacy"/.test(page), 'with the notice reachable from the decision');
 
 // ── 7 · The student can see where their account stands ───────────────────────
