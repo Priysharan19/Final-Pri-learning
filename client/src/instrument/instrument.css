@@ -519,7 +519,9 @@ html.ui-instrument .set-menu-item.on { background: var(--in-l3); color: var(--in
 html.ui-instrument .set-row { border-bottom-color: var(--in-edge); }
 html.ui-instrument .set-row .set-k { color: var(--in-tx-2); }
 
-/* Sign-in: one calm card on the base, the primary action filled. */
+/* Sign-in: one calm card on the base, the primary action filled. The ruled
+   notebook backdrop belongs to the paper interface; the instrument has none. */
+html.ui-instrument .mathfield { display: none; }
 html.ui-instrument .auth-wrap { background: var(--in-base); }
 html.ui-instrument .auth-card,
 html.ui-instrument .signin-landing { border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }

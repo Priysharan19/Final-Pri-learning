@@ -2,7 +2,7 @@ import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
-import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
+import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -332,7 +332,7 @@ export default function App() {
   // that (sign-in, onboarding) the screen keeps whatever theme-boot.js painted
   // from the last preference used on this device.
   useEffect(() => {
-    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || 'light');
+    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || DEFAULT_THEME_PREF);
     applyTheme(pref);
     return followSystemTheme(pref, () => applyTheme(pref));
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps

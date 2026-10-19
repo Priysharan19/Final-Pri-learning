@@ -66,6 +66,8 @@ export const flow = {
     await settle();
     writeFileSync(join(outDir, 'signin-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     await check('the signed-out welcome is in the instrument material', await page.evaluate(() => document.documentElement.classList.contains('ui-instrument')));
+    await check('signed out, the welcome follows the device theme too', await page.evaluate(() => document.documentElement.dataset.theme) === 'dark');
+    await check('no ruled-paper backdrop on the instrument welcome', await page.evaluate(() => { const m = document.querySelector('.mathfield'); return !m || getComputedStyle(m).display === 'none'; }));
     await createProfile({ name: 'Aarav Instrument', year: 10, course: 'in' });
     await online.signIn({ name: 'Aarav Instrument' });
     await settle();
