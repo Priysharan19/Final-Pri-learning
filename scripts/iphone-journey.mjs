@@ -80,7 +80,7 @@ const MARKING_SERVER = ['serverAccountFromCard', 'serverGrades', 'serverReaderAn
 const MARKING_RELAUNCH = ['historyAfterRelaunch'];
 // Leg 3 · signed in, then the server goes away.
 const OFFLINE_DRAFT = ['offlineAfterEntry', 'practice', 'nativeInk', 'typedDraft', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'offlineProgress', 'offlinePersistenceMarker'];
-const OFFLINE_RELAUNCH = ['offlineRelaunchHeld', 'offlineDraftOnDisk'];
+const OFFLINE_RELAUNCH = ['offlineRelaunchGrace', 'offlineDraftOnDisk'];
 const TIER = 'SIMULATOR + SYNTHETIC READER';
 const SIGNUP = ['cloudSignUp', 'cloudDeleteAccount'];
 const CLOUD = ['cloudSignIn', 'cloudSync'];
