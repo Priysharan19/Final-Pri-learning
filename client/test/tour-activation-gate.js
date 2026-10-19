@@ -269,6 +269,8 @@ export const flow = {
     await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
     await page.locator('.auth-card .btn-primary').click();
     await page.locator(GATE).waitFor({ timeout: 30000 });
+    // The gate is up while it asks; 'signin' is its answer.
+    await page.locator(`${GATE}[data-activation-status="signin"]`).waitFor({ timeout: 15000 }).catch(() => {});
     await check('a device profile with no account meets the gate\'s sign-in, not Home',
       await gateStatus(page) === 'signin' && await page.locator('.shell, .home-greet').count() === 0);
     const kabirEmail = freshEmail('kabir');
