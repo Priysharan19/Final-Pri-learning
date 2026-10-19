@@ -10,18 +10,16 @@ import { colourFor, practiceTrack, scopeFor } from './chapters.js';
 // focus returns to whatever opened it. A modal dialog, so the page behind is
 // inert to assistive tech while it is open.
 
-export default function CommandBar({ open, onClose, user, pages, actions }) {
+export default function CommandBar({ open, onClose, user, pages, actions, returnFocus }) {
   const t = useT();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const [chapters, setChapters] = useState([]);
   const input = useRef(null);
-  const opener = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
-    opener.current = document.activeElement;
     setQ(''); setSel(0);
     const id = requestAnimationFrame(() => input.current?.focus());
     let live = true;
@@ -30,7 +28,9 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
       const scope = scopeFor(c, user);
       setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, colour: colourFor(i) })));
     }).catch(() => { });
-    return () => { live = false; cancelAnimationFrame(id); opener.current?.focus?.(); };
+    // Focus goes back to whatever opened the bar (recorded by the opener,
+    // since the field has already taken focus by the time this runs).
+    return () => { live = false; cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user?.year, user?.indiaTrack, user?.country, user?.course]);
 
@@ -69,7 +69,8 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
     <div className="in-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} data-instrument-command>
       <div className="in-pal" role="dialog" aria-modal="true" aria-label={t('inst.cmdLabel')} onKeyDown={onKey}>
         <div className="in-pal-q">
-          <input ref={input} value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
+          {/* autoFocus: keys typed the moment the bar opens land in the field. */}
+          <input ref={input} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
             placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
             role="combobox" aria-expanded="true" aria-controls="in-pal-list"
             aria-activedescendant={flat[sel] ? `in-pal-${flat[sel].id}` : undefined} />

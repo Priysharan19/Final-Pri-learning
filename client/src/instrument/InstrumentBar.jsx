@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
@@ -26,7 +26,17 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   const t = useT();
   const loc = useLocation();
   const nav = useNavigate();
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const returnFocus = useRef(null);
+  const openRef = useRef(false);
+  openRef.current = open;
+  // The opener is recorded before the field takes focus, so it can be handed
+  // focus back when the bar closes.
+  const setOpen = next => {
+    const value = typeof next === 'function' ? next(openRef.current) : next;
+    if (value && !openRef.current) returnFocus.current = document.activeElement;
+    setOpenState(value);
+  };
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   useEffect(() => { setOpen(false); }, [loc.pathname]);
 
@@ -74,7 +84,8 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" />{online ? t('inst.online') : t('inst.offline')}</span>
         {accountMenu}
       </header>
-      <CommandBar open={open} onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} />
+      {/* Mounted only while open: every opening starts from an empty query. */}
+      {open && <CommandBar open onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />}
     </>
   );
 }
