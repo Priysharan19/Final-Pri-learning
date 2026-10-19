@@ -386,7 +386,7 @@ jobs:
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
-          grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
+          grep -Fq 'RECOGNITION DEDUPE: PASS — 212/212 checks' recognition-dedupe.log
           # Round trips pinned per hot request; ink Submit is one request with one
           # paid read, answer-blind; the request meter is numbers only and
           # Server-Timing is opt-in for signed-in callers (#441 port).
@@ -515,7 +515,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-handwriting-check.mjs 2>&1 | tee exam-handwriting.log
-          grep -Fq 'EXAM HANDWRITING: PASS — 108/108 checks' exam-handwriting.log
+          grep -Fq 'EXAM HANDWRITING: PASS — 109/109 checks' exam-handwriting.log
           grep -Fq 'SYNTHETIC-READER EVIDENCE' exam-handwriting.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
@@ -894,7 +894,7 @@ jobs:
           grep -Eq 'ACCESSIBILITY SUITE.*50/50.*14 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
-          grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
+          grep -Eq 'E2E SUITE.*41/41.*2 flows' browser.log
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
           grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
           grep -Fq 'Ink · a marked attempt says only what the server established' browser.log
@@ -903,7 +903,10 @@ jobs:
           # Both engines ran the interface-quality tour (pipefail fails the shard on a red check).
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
+          # Preserve evidence that the interface tour ran in both engines.
+          # Their measured coverage counts differ, so verify each separately.
+          grep -Fq 'E2E SUITE PASSED — 196/196 checks across 1 flows' browser.log
+          grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1

@@ -1316,16 +1316,21 @@ const keyOfLine = (sq, d, part = null) => (part
  * just been read put in as its answer. Everything else is the frozen line's.
  */
 function lineResponses(sq, old, key, given, working) {
-  const answers = {}, workings = {}, ink = {};
+  // Exam keys are data, never properties on Object.prototype. A page key
+  // supplied by a client must not invoke a setter or change map behavior.
+  const answers = Object.create(null), workings = Object.create(null), ink = Object.create(null);
+  const putOwn = (map, k, value) => Object.defineProperty(map, k, {
+    value, enumerable: true, writable: true, configurable: true
+  });
   const keep = (k, d) => {
-    if (!blank(d.given)) answers[k] = String(d.given);
-    if (!blank(d.working)) workings[k] = String(d.working);
-    if (d.pending) ink[k] = 'pending';
+    if (!blank(d.given)) putOwn(answers, k, String(d.given));
+    if (!blank(d.working)) putOwn(workings, k, String(d.working));
+    if (d.pending) putOwn(ink, k, 'pending');
   };
   if (old.multipart) for (const part of old.parts) keep(keyOfLine(sq, old, part), part);
   else keep(keyOfLine(sq, old), old);
-  answers[key] = given;
-  if (!blank(working)) workings[key] = working; else delete workings[key];
+  putOwn(answers, key, given);
+  if (!blank(working)) putOwn(workings, key, working); else delete workings[key];
   delete ink[key];
   return { answers, workings, times: old.timed ? { [sq.id]: old.ms } : {}, modes: { [key]: 'ink' }, ink };
 }
@@ -1361,7 +1366,10 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     if (!paperRow) return { status: 404 };
     const result = await readRecord(db, accountId, 'exam-result', id, now);
     if (!result) return { status: 409, code: 'EXAM_NOT_FINALISED', message: 'This paper is still open. Read your handwriting on the paper itself.' };
-    const stored = result.handwriting?.pages?.[key];
+    // Only a page actually frozen into this account's result is addressable.
+    // Inherited names like __proto__, constructor and toString are not pages.
+    const pages = result.handwriting?.pages;
+    const stored = pages && Object.hasOwn(pages, key) ? pages[key] : null;
     if (!stored) return { status: 409, code: 'EXAM_HANDWRITING_NOT_PENDING', message: 'No handwriting is waiting to be read for this answer.' };
     return { paper: JSON.parse(paperRow.response_json), result, stored, page: pageView(stored, result.handwriting, now) };
   };
@@ -1373,7 +1381,11 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     const json = JSON.stringify(result);
     return db.run("UPDATE idempotency_keys SET response_json=?, request_digest=? WHERE account_id=? AND scope='exam-result' AND key=?", [json, digest(json), accountId, id]);
   };
-  const withPage = (result, page) => ({ ...result, handwriting: { ...result.handwriting, pages: { ...result.handwriting.pages, [key]: page } } });
+  const withPage = (result, page) => {
+    const pages = Object.assign(Object.create(null), result.handwriting.pages);
+    Object.defineProperty(pages, key, { value: page, enumerable: true, writable: true, configurable: true });
+    return { ...result, handwriting: { ...result.handwriting, pages } };
+  };
 
   const first = await load();
   if (first.status) return first;

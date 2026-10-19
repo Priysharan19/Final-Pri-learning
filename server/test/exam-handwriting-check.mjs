@@ -68,7 +68,8 @@ const fake = createServer((req, res) => {
     if (behaviour === 'hang' && provider.hanging.has(label)) return; // never answers: the adapter's own timeout ends it
     if (behaviour === 'hold') {
       provider.held.set(label, () => reply(res, sent.model, read));
-      provider.arrivals.get(label)?.();
+      const arrival = provider.arrivals.get(label);
+      if (typeof arrival === 'function') arrival();
       provider.arrivals.delete(label);
       return;
     }
@@ -315,6 +316,10 @@ try {
       'a different picture for the frozen answer — new strokes, an erasure, a replacement photo — is refused and never reaches the reader');
     const elsewhere = await present(s.jar, s.exam.id, q3.id, changed);
     eq([elsewhere.status, elsewhere.data.error.code], [409, 'EXAM_HANDWRITING_NOT_PENDING'], 'and a page cannot be added to an answer that had none when the paper closed');
+    const inheritedNames = await Promise.all(['__proto__', 'constructor', 'toString'].map(k => present(s.jar, s.exam.id, k, image)));
+    eq([inheritedNames.map(r => [r.status, r.data?.error?.code]), provider.total - before],
+      [Array.from({ length: 3 }, () => [409, 'EXAM_HANDWRITING_NOT_PENDING']), 0],
+      'inherited object-property names cannot refer to frozen handwriting pages or spend a recognition request');
     eq((await storedResult(s.exam.id)).handwriting.pages[q2.id].attempts, 0, 'none of that used an attempt');
     const outsider = await student();
     eq([(await present({}, s.exam.id, q2.id, image)).status, (await present(outsider.jar, s.exam.id, q2.id, image)).status], [401, 404],

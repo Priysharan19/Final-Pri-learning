@@ -130,10 +130,26 @@ class InkInputTest {
 
     /** One stroke of real MotionEvents across the canvas at height fraction fy. */
     private fun stroke(s: ActivityScenario<MainActivity>, tool: Int, fy: Float, fx0: Float = 0.2f, fx1: Float = 0.6f, steps: Int = 24) {
+        // After a toolbar mode change the canvas can reflow outside the actual
+        // app window. On API 33 a targeted instrumentation MotionEvent outside
+        // that window throws, rather than reaching the shared canvas at all.
+        // Recenter before the real input and fail with coordinates if the full
+        // stroke would still leave the WebView: never fabricate page events.
+        assertEquals("the ink canvas can be brought into view", "true", eval(s,
+            "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();if(!c)return false;c.scrollIntoView({block:'center',inline:'nearest'});return true;})()"))
+        Thread.sleep(180)
         val rect = waitFor(s, "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();var r=c.getBoundingClientRect();return [r.left,r.top,r.width,r.height,window.devicePixelRatio].join(',');})()")
         val (l, t, w, h, dpr) = rect.trim('"').split(',').map { it.toFloat() }
         val loc = IntArray(2)
-        s.onActivity { it.webView!!.getLocationOnScreen(loc) }
+        val viewSize = IntArray(2)
+        s.onActivity { val web = it.webView!!; web.getLocationOnScreen(loc); viewSize[0] = web.width; viewSize[1] = web.height }
+        val x0 = loc[0] + (l + w * fx0) * dpr
+        val x1 = loc[0] + (l + w * fx1) * dpr
+        val y0 = loc[1] + (t + h * fy - 4f) * dpr
+        val y1 = loc[1] + (t + h * fy + 4f) * dpr
+        assertTrue("canvas input bounds exceed app WebView: x=$x0..$x1, y=$y0..$y1, window=${loc[0]},${loc[1]}+${viewSize[0]}x${viewSize[1]}",
+            minOf(x0, x1) >= loc[0] && maxOf(x0, x1) < loc[0] + viewSize[0] &&
+            y0 >= loc[1] && y1 < loc[1] + viewSize[1])
         val stylus = tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER
         val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = tool })
         val source = if (stylus) InputDevice.SOURCE_STYLUS or InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_TOUCHSCREEN
