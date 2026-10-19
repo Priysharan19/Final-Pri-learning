@@ -2384,8 +2384,8 @@ html { background-color: var(--page); }
    Refines the rail, top bar, tab bar and More sheet on the v1.1 tokens.
    Geometry (rail widths, bar heights, breakpoints) is unchanged on purpose so
    layout tours and hit-target checks keep their meaning; this layer changes
-   type, state and depth only. */
-.topbar { z-index: var(--z-nav); background: var(--page); }
+   type, colour and shadow only; stacking order is left as it was. */
+.topbar { background: var(--page); }
 .nav-item { font: var(--t-control); }
 .nav-item.active {
   background: var(--accent-soft);
@@ -2399,9 +2399,9 @@ html { background-color: var(--page); }
   outline-offset: calc(var(--focus-offset) * -1);
 }
 .nav-section-label { font: var(--t-label); letter-spacing: var(--tracking-label); }
-.nav-badge { font: var(--t-mono); font-size: 11px; }
+.nav-badge { font-family: var(--font-mono); }
 
-.mobilenav { background: var(--surface-default); z-index: var(--z-nav); }
+.mobilenav { background: var(--surface-default); }
 .mnav-item { font: var(--t-label); font-size: 11px; letter-spacing: 0; position: relative; }
 .mnav-item.active { color: var(--accent); }
 .mnav-item.active::before {
@@ -2409,9 +2409,8 @@ html { background-color: var(--page); }
   height: 2px; background: var(--accent); border-radius: 0 0 var(--radius-xs) var(--radius-xs);
 }
 
-.mnav-sheet-scrim { background: var(--scrim); backdrop-filter: none; z-index: calc(var(--z-sheet) - 1); }
+.mnav-sheet-scrim { background: var(--scrim); backdrop-filter: none; }
 .mnav-sheet {
-  z-index: var(--z-sheet);
   background: var(--surface-overlay);
   border-color: var(--hairline);
   border-radius: var(--radius-xl);
