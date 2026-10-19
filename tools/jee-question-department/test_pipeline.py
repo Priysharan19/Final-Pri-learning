@@ -69,6 +69,8 @@ def fixture(answer_type="mcq"):
             "reviewedBy": "ci-fixture",
             "reviewedAt": "2026-08-29T00:00:00Z",
         },
+        "rights": {"status": "cleared", "grantor": "Synthetic Fixture Licensor", "scope": ["redistribute-question", "redistribute-solution"],
+        "evidence": {"kind": "written-licence", "ref": "fixtures/synthetic-licence.txt"}, "recordedBy": "A. Rights Reviewer", "recordedAt": "2026-10-19T00:00:00Z"},
     }
     return row
 
@@ -81,6 +83,22 @@ def main():
     summary, errors, _ = audit_mod.audit([approved], manifest, publish=True)
     assert not errors, errors
     assert summary["approved"] == 1
+
+    unlicensed = fixture()
+    unlicensed.pop("rights")
+    _, errors, _ = audit_mod.audit([unlicensed], manifest, publish=True)
+    assert any("RIGHTS_REVIEW_REQUIRED" in err for err in errors), errors
+
+    escrowed = fixture()
+    escrowed["answerPrivate"] = True
+    import importlib.util as _u
+    _spec = _u.spec_from_file_location("pack_guard", HERE / "pack.py")
+    _pack = _u.module_from_spec(_spec); _spec.loader.exec_module(_pack)
+    try:
+        _pack.compact_record(escrowed)
+        raise AssertionError("answer-private row was packed into a client shard")
+    except SystemExit as exc:
+        assert "server escrow lane" in str(exc)
 
     rejected = fixture()
     rejected["id"] = "fixture-rejected"

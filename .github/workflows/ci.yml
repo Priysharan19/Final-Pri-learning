@@ -58,6 +58,14 @@ jobs:
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
+          # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
+          grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
+          grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
+          grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
+          grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
+          grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
+          grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
