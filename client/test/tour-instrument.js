@@ -91,7 +91,7 @@ export const flow = {
     await check('the plate is titled with that chapter', (await page.locator('#in-plate-title').textContent()).trim() === name, name);
     await check('the chosen chapter is announced as pressed', await second.getAttribute('aria-pressed') === 'true');
     const kpis = await page.locator('.in-kpis b').allTextContents();
-    await check('a new student’s plate states 0 answers and withholds accuracy', kpis[0] === '0' && kpis[2] === '—', JSON.stringify(kpis));
+    await check('a new student’s plate states 0 answers and withholds accuracy', kpis[1] === '0' && kpis[3] === '—', JSON.stringify(kpis));
     const drawn = await page.evaluate(() => {
       const c = document.querySelector('[data-instrument-scope] canvas'); if (!c || !c.width) return 0;
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0;
