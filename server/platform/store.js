@@ -230,12 +230,29 @@ const TIMEOUT_CODES = new Set(['57014', '25P03']);
 // the database is back: the pool discards the dead client and the next request
 // opens a fresh connection.
 const UNAVAILABLE_ERRNO = new Set(['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH', 'EPIPE', 'ECONNABORTED']);
-const UNAVAILABLE_SQLSTATE = new Set(['57P01', '57P02', '57P03', '53300']);
+// 28000 / 28P01: the server refused the login (role disabled, password
+// rotated). Only a new connection can raise them, so they always mean the
+// database is unreachable for this app, never a bug in a request.
+const UNAVAILABLE_SQLSTATE = new Set(['57P01', '57P02', '57P03', '53300', '28000', '28P01']);
 const UNAVAILABLE_MESSAGE = /^(Connection terminated( unexpectedly| due to connection timeout)?|Client has encountered a connection error and is not queryable|Connection ended unexpectedly)$/i;
 
 /** A retryable database overload or outage (503 + Retry-After): handlers pass it on to the /v1 error handler untouched. */
 export function isDatabaseOverload(error) {
   return !!error?.retryable && error.status === 503 && /^PLATFORM_DB_(BUSY|TIMEOUT|UNAVAILABLE)$/.test(String(error.code || ''));
+}
+
+/**
+ * A failure while opening a connection or preparing its session. Whatever code
+ * it carries, no request has run yet: the database cannot be reached, so it is
+ * a retryable 503 PLATFORM_DB_UNAVAILABLE, never a 500. A pooler that cannot
+ * log in upstream answers with a generic code (Supavisor: XX000), which is why
+ * this is decided by where the error happened, not by an allow-list of codes.
+ * A pool wait timeout or a busy code keeps its own, more specific answer.
+ */
+export function connectionFailure(error) {
+  const mapped = databaseOverload(error);
+  if (isDatabaseOverload(mapped) || mapped?.status) return mapped;
+  return overloaded('PLATFORM_DB_UNAVAILABLE', 5, error);
 }
 
 /** Map an overload error from the driver to its retryable 503; anything else is returned as is. */
@@ -769,7 +786,7 @@ export class PostgresStore {
     try {
       client = await this.pool.connect();
     } catch (error) {
-      throw databaseOverload(error);
+      throw connectionFailure(error);
     } finally {
       noteAcquire(timingNow() - waited);
     }
@@ -791,7 +808,7 @@ export class PostgresStore {
         await client.query(this.sessionSetup());
       } catch (error) {
         client.release(error);
-        throw databaseOverload(error);
+        throw connectionFailure(error);
       } finally {
         noteAcquire(timingNow() - setup);
       }
