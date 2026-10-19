@@ -308,7 +308,9 @@ export const flowSubmitStale = {
       await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
       const readOnce = reader.requests.length - before;
       reader.text = '427';
-      await handwrite(page, box, '7', { x: 190 });
+      // The reading and the answer line it fills appear below the page and
+      // can move it; the stroke goes where the page is now.
+      await handwrite(page, (await page.locator('.ink-canvas-live').first().boundingBox()) || box, '7', { x: 190 });
       await page.waitForSelector('[data-ink-stale]', { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(2500);
       const stale = await page.locator('[data-ink-stale]').count();

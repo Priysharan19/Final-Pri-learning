@@ -730,6 +730,11 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
+      // Read on request (#440): the strokes alone send nothing. The control
+      // that asks for the read must be there, then the student presses it.
+      const readButton = page.locator('[data-ink-read]').first();
+      await readButton.waitFor({ state: 'visible', timeout: 20000 });
+      await readButton.click();
       // Server-only reading (owner decision): with no reader in this harness
       // the page shows the reading/waiting status rather than a local reading.
       // Signed out (as this walk is here) the page shows the in-card sign-in
