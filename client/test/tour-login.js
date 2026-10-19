@@ -123,6 +123,8 @@ export const flow = {
     await switchProfile(page);
     await page.locator('.acct-row', { hasText: STUDENT.name }).click();
     await page.locator(GATE).waitFor({ timeout: 30000 });
+    // The gate is up before the server's answer is; give the answer time to arrive.
+    await page.waitForFunction(sel => /not this profile’s/.test(document.querySelector(sel)?.innerText || ''), GATE, { timeout: 15000 }).catch(() => {});
     await check('choosing a profile whose account is not the live session is refused: the gate, with the mismatch said plainly',
       /not this profile’s/.test(await page.locator(GATE).innerText()) && await page.locator('.home-greet').count() === 0);
     await signInOnCard(page.locator(`${GATE} [data-signin-card="inline"]`), platform, { email: STUDENT.email });
