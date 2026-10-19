@@ -460,7 +460,7 @@ export default {
   'verifiedMarks.finalNotAccepted': 'The final answer was not accepted; any method credit is separate.',
   'verifiedMarks.unread': 'The working could not be read or checked, so no claim is made about those lines.',
   'verifiedMarks.hints': 'Marks before hint deductions: {before}. Account credit after hints: {after}.',
-  'verifiedMarks.notOfficial': 'Pri practice feedback, not an official CBSE marking scheme.'
+  'verifiedMarks.notOfficial': 'Pri practice feedback, not an official CBSE marking scheme.',
   'verdict.boardStyleNote': 'Board-style step marking, worked out from this question\'s own solution. It follows the convention CBSE publishes; it is not CBSE\'s official marking scheme for a past paper.',
   'verdict.rowMarks': '{earned} of {total} marks.',
   'verdict.whyItFails': 'Why it fails',
