@@ -80,7 +80,8 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" />{online ? t('inst.online') : t('inst.offline')}</span>
         {accountMenu}
       </header>
-      <CommandBar open={open} onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />
+      {/* Mounted only while open: every opening starts from an empty query. */}
+      {open && <CommandBar open onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />}
     </>
   );
 }
