@@ -262,3 +262,10 @@ html.ui-instrument .mnav-item.active::before { content: none; }
   .in-ghost { font-size: 200px; top: -20px; }
 }
 @media (prefers-reduced-motion: reduce) { .in-thumb, .in-btn { transition: none; } }
+
+/* Touch screens: everything a finger presses is at least 44×44. */
+@media (pointer: coarse), (hover: none) {
+  .in-btn, .in-cmd, .in-tab { min-height: 44px; }
+  .in-mark { min-height: 44px; min-width: 44px; }
+  .in-ch { min-height: 48px; }
+}

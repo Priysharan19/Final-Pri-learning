@@ -27,8 +27,8 @@ let switchTimer = null;
  * in the v1.1 instrument interface — the device's own setting (owner decision
  * 2026-10-20).
  */
-const DEFAULT_PREF = featureEnabled('instrument') ? 'system' : 'light';
-export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : DEFAULT_PREF);
+export const DEFAULT_THEME_PREF = featureEnabled('instrument') ? 'system' : 'light';
+export const cleanThemePref = value => (THEME_PREFS.includes(value) ? value : DEFAULT_THEME_PREF);
 
 const systemQuery = () => (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
   ? window.matchMedia('(prefers-color-scheme: dark)')
