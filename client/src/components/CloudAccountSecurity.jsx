@@ -221,10 +221,10 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     start('delete');
     try {
       const token = await requestIdentityToken(provider, webProviders[provider]);
-      await deleteCloudAccount(pid, { provider, idToken: token.idToken, nonce: token.nonce });
+      const outcome = await deleteCloudAccount(pid, { provider, idToken: token.idToken, nonce: token.nonce });
       setDeletePhrase('');
-      setMessage(tLater('cloudSecurity.deleted'));
-      await onDeleted?.({ cloudDeleted: true });
+      setMessage(tLater(outcome?.confirmedBy === 'probe' ? 'cloudSecurity.deletedUnconfirmed' : 'cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true, confirmedBy: outcome?.confirmedBy || null });
     } catch (err) {
       setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
         : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
@@ -250,12 +250,12 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     if (!canDeleteWithCode || busy) return;
     start('delete');
     try {
-      await deleteCloudAccount(pid, { otpChallengeId: codeChallenge, otpCode: code });
+      const outcome = await deleteCloudAccount(pid, { otpChallengeId: codeChallenge, otpCode: code });
       setCode('');
       setCodeChallenge(null);
       setDeletePhrase('');
-      setMessage(tLater('cloudSecurity.deleted'));
-      await onDeleted?.({ cloudDeleted: true });
+      setMessage(tLater(outcome?.confirmedBy === 'probe' ? 'cloudSecurity.deletedUnconfirmed' : 'cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true, confirmedBy: outcome?.confirmedBy || null });
     } catch (err) {
       const wrongCode = err?.code === 'OTP_REAUTH_FAILED';
       setCodeInvalid(wrongCode);
@@ -269,11 +269,11 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     if (!canDeleteWithPassword) return;
     start('delete');
     try {
-      await deleteCloudAccount(pid, { password: deletePassword });
+      const outcome = await deleteCloudAccount(pid, { password: deletePassword });
       setDeletePassword('');
       setDeletePhrase('');
-      setMessage(tLater('cloudSecurity.deleted'));
-      await onDeleted?.({ cloudDeleted: true });
+      setMessage(tLater(outcome?.confirmedBy === 'probe' ? 'cloudSecurity.deletedUnconfirmed' : 'cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true, confirmedBy: outcome?.confirmedBy || null });
     } catch (err) { setError(cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.deleteFailed'))); }
     finally { setBusy(''); }
   }

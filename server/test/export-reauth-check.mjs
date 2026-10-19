@@ -17,6 +17,7 @@ import './support/hermetic.mjs';
 import { requestedEngine } from './support/engine.mjs';
 import { checks, registerAccount, startApp } from './support/app-harness.mjs';
 import { REAUTH_FRESH_MS, STEP_UP_COOKIE, csrfForSession, issueStepUp, opaqueToken, sha256, stepUpToken } from '../platform/security.js';
+import { LOCKOUT_MAX_FAILURES, loginLockStatus, recordLoginFailure } from '../platform/loginLockout.js';
 
 const c = checks();
 const h = await startApp({ engine: requestedEngine() });
@@ -69,6 +70,17 @@ try {
   c.deq([noCsrf.status, noCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'a cross-site re-auth without the CSRF pair is refused even with the right password');
   c.eq((await h.request('/v1/account/export', { jar: alice.jar })).status, 401, 'the export is still refused after the failed attempts');
   c.deq(await auditRows('account.reauth', alice.account.id), [], 'no account.reauth row for a refusal');
+
+  // ── A refusal spends no export credit: the proof gate runs before the limit ─
+  // (review nit on #521) Ten exports an hour; a stale session asking eleven
+  // times is told REAUTH_REQUIRED eleven times, never RATE_LIMITED, and the
+  // export that follows the re-auth below is still served.
+  const refusals = [];
+  for (let i = 0; i < 11; i += 1) {
+    const r = await h.request('/v1/account/export', { jar: alice.jar });
+    refusals.push(`${r.status} ${r.data?.error?.code}`);
+  }
+  c.deq([...new Set(refusals)], ['401 REAUTH_REQUIRED'], 'eleven refused exports are all 401 REAUTH_REQUIRED (none spent an export credit, so none was rate limited)');
 
   // ── The right proof: a session-bound step-up cookie, then the export ───────
   const before = Date.now();
@@ -150,6 +162,34 @@ try {
   c.deq([limited?.attempt, limited?.code], [11, 'RATE_LIMITED'], 'the eleventh re-auth attempt in the window is rate limited');
   c.ok(Number(limited?.retryAfter) >= 1, 'with a Retry-After');
   c.eq((await h.request('/v1/account/export', { jar: carol.jar })).status, 200, 'Carol\'s fresh sign-in still exports: the limit is on guessing, not on her');
+
+  // ── and counts toward the same lockout /login applies ──────────────────────
+  // (review nit on #521) Ten wrong passwords at /reauth are ten login failures
+  // for the account: /login is locked too, so a stolen session is not a
+  // second, unlocked place to guess the password.
+  c.eq(LOCKOUT_MAX_FAILURES, 10, 'the login lockout is ten failures');
+  const carolLock = await loginLockStatus(db, 'carol.export@example.test');
+  c.ok(carolLock.locked && carolLock.retryAfterMs > 0, `ten wrong passwords at /reauth lock the account (${JSON.stringify(carolLock)})`);
+  const carolLogin = await h.request('/v1/account/login', { method: 'POST', body: { email: 'carol.export@example.test', password: PASSWORD, deviceId: 'ipad-carol-2' } });
+  c.deq([carolLogin.status, carolLogin.data?.error?.code], [429, 'ACCOUNT_LOCKED'], 'and /login with the RIGHT password is ACCOUNT_LOCKED for the lock period');
+  // The other way round: an account /login has locked cannot be proven at /reauth either.
+  const dave = await registerAccount(h, { email: 'dave.export@example.test', password: PASSWORD, deviceId: 'ipad-dave' });
+  c.eq(dave.status, 201, 'Dave registers');
+  for (let i = 0; i < LOCKOUT_MAX_FAILURES; i += 1) await recordLoginFailure(db, 'dave.export@example.test');
+  const daveLocked = await h.request('/v1/account/reauth', { method: 'POST', jar: dave.jar, body: { password: PASSWORD } });
+  c.deq([daveLocked.status, daveLocked.data?.error?.code], [429, 'ACCOUNT_LOCKED'], 'a locked account is refused at /reauth even with the right password');
+  c.ok(Number(daveLocked.headers.get('retry-after')) >= 1, 'with a Retry-After');
+  c.eq(setCookie(daveLocked, STEP_UP_COOKIE), null, 'and no step-up cookie is set');
+  // A proof that is not a password guess (no body) is not a login failure.
+  const erin = await registerAccount(h, { email: 'erin.export@example.test', password: PASSWORD, deviceId: 'ipad-erin' });
+  c.eq(erin.status, 201, 'Erin registers');
+  for (let i = 0; i < 3; i += 1) await h.request('/v1/account/reauth', { method: 'POST', jar: erin.jar, body: {} });
+  c.deq(await loginLockStatus(db, 'erin.export@example.test'), { locked: false, failures: 0, retryAfterMs: 0 }, 'a re-auth with no password at all is not counted as a password failure');
+  const erinRight = await h.request('/v1/account/reauth', { method: 'POST', jar: erin.jar, body: { password: 'wrong-once' } });
+  c.eq(erinRight.status, 401, 'one wrong password');
+  c.eq((await loginLockStatus(db, 'erin.export@example.test')).failures, 1, 'is one failure');
+  c.eq((await h.request('/v1/account/reauth', { method: 'POST', jar: erin.jar, body: { password: PASSWORD } })).status, 200, 'the right password re-authenticates');
+  c.eq((await loginLockStatus(db, 'erin.export@example.test')).failures, 0, 'and clears the failures, as a successful /login does');
 
   // ── Production cookie attributes (the harness itself runs outside production) ─
   {

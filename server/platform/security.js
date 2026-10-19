@@ -92,6 +92,11 @@ export function clearSessionCookies(res) {
 export const STEP_UP_COOKIE = 'pri_step_up';
 /** How recently the credential must have been proven for a sensitive read. */
 export const REAUTH_FRESH_MS = 10 * 60 * 1000;
+// Derived from the CSRF secret, so it shares its constraint: without
+// PRI_CSRF_SECRET the secret is random per process, and a step-up cookie (like
+// a CSRF token) issued by one instance is refused by another. Production
+// requires PRI_CSRF_SECRET (docs/production-deployment.md), so this only
+// affects a multi-instance development run.
 const STEP_UP_KEY = createHash('sha256').update(`pri-step-up:${CSRF_SECRET}`).digest();
 
 function stepUpSignature(sessionId, issuedAt) {
