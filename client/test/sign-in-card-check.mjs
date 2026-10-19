@@ -137,7 +137,7 @@ ok(/<h1 className="hero-title">\{t\('login\.welcomeTitle'\)\}<\/h1>\s*<p classNa
   'the landing screen is the card under "Welcome to Pri Learning"');
 ok(/<SignUpFlow variant="page" onFinish=\{finishAccount\} onStep=\{setCardStep\} \/>/.test(login) && !/stage === 'account'/.test(login), 'mounted on the landing screen itself — there is no separate account screen to navigate to');
 ok(/<SignInCard variant="inline"[\s\S]{0,200}allowCreate=\{user\?\.cloudLinked !== true\}/.test(refusal), 'every in-question sign-in is the same card, inline');
-ok(/<SignUpFlow variant="inline"[\s\S]{0,200}allowCreate=\{!link\?\.accountId\} onFinish=\{finishSignIn\} \/>/.test(gate), 'and so is the activation gate\'s');
+ok(/<SignUpFlow variant="inline"[\s\S]{0,200}allowCreate=\{link !== undefined && !link\?\.accountId\} onFinish=\{finishSignIn\} \/>/.test(gate), 'and so is the activation gate\'s, which creates no account until the profile\'s link row has been read');
 ok(/<SignInChoices user=\{user\} refreshUser=\{refreshUser\} saved=\{saveState === 'saved'\}/.test(question) && !/React\.lazy\(\(\) => import\('\.\/(CloudAccountPanel|SignUpFlow)\.jsx'\)\)/.test(question),
   'the question card only mounts the shared sign-in; it carries no sign-in UI of its own');
 ok(!('settings.accountTypeValue' in en) && !/no sign-in service/i.test(JSON.stringify(en)), 'the "no sign-in service" line is gone from the catalogue');
