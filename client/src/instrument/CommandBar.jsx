@@ -32,7 +32,7 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
     }).catch(() => { });
     return () => { live = false; cancelAnimationFrame(id); opener.current?.focus?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, user?.year, user?.indiaTrack, user?.country]);
+  }, [open, user?.year, user?.indiaTrack, user?.country, user?.course]);
 
   const items = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -48,7 +48,7 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
     ];
     return groups.filter(g => g.rows.length);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, pages, actions, nav, t, user?.indiaTrack, user?.country]);
+  }, [q, chapters, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
