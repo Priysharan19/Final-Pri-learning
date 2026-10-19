@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Hardest-level coverage, tranche 1 (CBSE Class X and Class XII)
+// Pri Learning · Hardest-level coverage — tranche 1 (CBSE Class X and Class XII)
+// and tranche 3 (CBSE Class VII, VIII and XI: the remaining 81 dot points)
 //
 // The CBSE track serves D1–D3. Before this table, twenty-two dot points of the
 // two board-exam years had no authored form at D3, so the picker could not
@@ -22,8 +23,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const INDIA_HARDEST_PROVENANCE = Object.freeze({
-  tranche: 'phase-4-tranche-1',
-  scope: 'CBSE Class X and Class XII dot points without a D3 form',
+  tranche: 'phase-4-tranches-1-and-3',
+  scope: 'every CBSE Class VII, VIII, X, XI and XII dot point that had no D3 form',
   authored: 'original-parameterised',
   answers: 'computed-from-parameters',
   verification: 'client/test/india-hardest-forms-check.mjs re-derives every answer from the prompt text by an independent route',
@@ -53,7 +54,45 @@ export const INDIA_HARDEST_COVERS = Object.freeze({
   'c12-inverse-trigonometric': [d3('c12-principal-value-reasoning', 0)],
   'c12-continuity-differentiability': [d3('c12-differentiability-reasoning', 0)],
   'c12-applications-derivatives': [d3('c12-related-rates-reasoning', 0), d3('c12-optimisation-reasoning', 2)],
-  'c12-vector-algebra': [d3('c12-vector-magnitude-reasoning', 0)]
+  'c12-vector-algebra': [d3('c12-vector-magnitude-reasoning', 0)],
+  // ── Tranche 3: Class VII (Ganita Prakash) ─────────────────────────────────
+  'c7-large-numbers-current': [d3('c7-place-value-systems-reasoning', 0), d3('c7-rounding-bounds-reasoning', 1), d3('c7-factor-regroup-reasoning', 3)],
+  'c7-arithmetic-expressions-current': [d3('c7-expression-comparison-reasoning', 0), d3('c7-bracket-placement-reasoning', 1), d3('c7-property-rewrite-reasoning', 3)],
+  'c7-decimals-current': [d3('c7-decimal-place-value-reasoning', 0), d3('c7-decimal-ordering-reasoning', 1)],
+  'c7-letter-numbers-current': [d3('c7-letter-pattern-reasoning', 0), d3('c7-expression-translation-reasoning', 1), d3('c7-formula-evaluation-reasoning', 3)],
+  'c7-parallel-intersecting-lines-current': [d3('c7-angle-pair-reasoning', 0), d3('c7-transversal-reasoning', 1)],
+  'c7-number-play-current': [d3('c7-parity-reasoning', 0), d3('c7-magic-square-reasoning', 1), d3('c7-cryptarithm-reasoning', 3)],
+  'c7-triangles-current': [d3('c7-angle-sum-reasoning', 0), d3('c7-triangle-inequality-reasoning', 1), d3('c7-triangle-construction-reasoning', 3)],
+  'c7-fractions-current': [d3('c7-fraction-product-reasoning', 0), d3('c7-fraction-magnitude-reasoning', 1), d3('c7-fraction-context-reasoning', 3)],
+  'c7-geometric-twins-current': [d3('c7-congruent-matching-reasoning', 0), d3('c7-sss-sas-reasoning', 1), d3('c7-congruence-inference-reasoning', 3)],
+  'c7-integer-operations-current': [d3('c7-integer-product-sign-reasoning', 0), d3('c7-integer-division-reasoning', 1), d3('c7-integer-expression-reasoning', 3)],
+  'c7-common-ground-current': [d3('c7-hcf-reasoning', 0), d3('c7-lcm-reasoning', 1), d3('c7-hcf-lcm-context-reasoning', 3)],
+  'c7-decimal-operations-current': [d3('c7-decimal-multiplication-reasoning', 0), d3('c7-decimal-division-reasoning', 1), d3('c7-decimal-context-reasoning', 3)],
+  'c7-connecting-dots-current': [d3('c7-statistical-question-reasoning', 0), d3('c7-mean-reasoning', 1), d3('c7-range-display-reasoning', 3)],
+  'c7-constructions-tilings-current': [d3('c7-perpendicular-bisector-reasoning', 0), d3('c7-angle-construction-reasoning', 1), d3('c7-tiling-invariant-reasoning', 3)],
+  'c7-finding-unknown-current': [d3('c7-balance-reasoning', 0), d3('c7-one-step-equation-reasoning', 1), d3('c7-equation-context-reasoning', 3)],
+  // ── Tranche 3: Class VIII ─────────────────────────────────────────────────
+  'c8-quadrilaterals': [d3('c8-exterior-angle-reasoning', 0), d3('c8-quadrilateral-property-reasoning', 1)],
+  'c8-data-handling': [d3('c8-bar-graph-reasoning', 0), d3('c8-pie-chart-reasoning', 1)],
+  'c8-squares-roots': [d3('c8-square-pattern-reasoning', 0), d3('c8-square-root-reasoning', 1)],
+  'c8-cubes-roots': [d3('c8-cube-pattern-reasoning', 0), d3('c8-cube-multiplier-reasoning', 1)],
+  'c8-comparing-quantities': [d3('c8-percentage-reasoning', 0), d3('c8-gst-reasoning', 1)],
+  'c8-algebraic-identities': [d3('c8-like-terms-reasoning', 0), d3('c8-monomial-product-reasoning', 1)],
+  'c8-mensuration': [d3('c8-area-decomposition-reasoning', 0), d3('c8-surface-area-reasoning', 1)],
+  'c8-exponents': [d3('c8-exponent-laws-reasoning', 0), d3('c8-standard-form-reasoning', 2)],
+  'c8-proportions': [d3('c8-direct-proportion-reasoning', 0), d3('c8-inverse-proportion-reasoning', 1)],
+  'c8-factorisation': [d3('c8-common-factor-reasoning', 0), d3('c8-identity-factorisation-reasoning', 1)],
+  'c8-graphs': [d3('c8-line-graph-reasoning', 0), d3('c8-plotting-reasoning', 1)],
+  // ── Tranche 3: Class XI ───────────────────────────────────────────────────
+  'c11-relations-functions': [d3('c11-cartesian-product-reasoning', 0)],
+  'c11-trig-functions': [d3('c11-radian-unit-circle-reasoning', 0), d3('c11-trig-general-solution-reasoning', 2)],
+  'c11-complex-numbers': [d3('c11-complex-modulus-reasoning', 0), d3('c11-complex-quadratic-reasoning', 2)],
+  'c11-permutations-combinations': [d3('c11-counting-principle-reasoning', 0), d3('c11-arrangement-reasoning', 1)],
+  'c11-sequences-series': [d3('c11-ap-reasoning', 0)],
+  'c11-straight-lines': [d3('c11-line-equation-reasoning', 0), d3('c11-line-distance-reasoning', 2)],
+  'c11-limits-derivatives': [d3('c11-limit-reasoning', 0), d3('c11-derivative-rules-reasoning', 2)],
+  'c11-statistics': [d3('c11-mean-deviation-reasoning', 0), d3('c11-coefficient-variation-reasoning', 2)],
+  'c11-probability': [d3('c11-sample-space-reasoning', 0), d3('c11-compound-event-reasoning', 2)]
 });
 
 // ── Tranche 2 · JEE Main / JEE Advanced, Class 11 and Class 12 ─────────────
@@ -77,12 +116,12 @@ export const INDIA_JEE_HARDEST_COVERS = Object.freeze({
   'c11-relations-functions': [d4('c11-domain-range-reasoning', 1), d4('c11-real-function-reasoning', 2)],
   'c11-trig-functions': [d4('c11-radian-circle-reasoning', 0), d4('c11-trig-identity-reasoning', 1)],
   'c11-complex-numbers': [d4('c11-complex-algebra-reasoning', 0), d4('c11-complex-polar-reasoning', 1)],
-  'c11-permutations-combinations': [d4('c11-counting-principle-reasoning', 0), d4('c11-arrangement-reasoning', 1)],
-  'c11-sequences-series': [d4('c11-ap-reasoning', 0)],
-  'c11-straight-lines': [d4('c11-line-equation-reasoning', 0), d4('c11-line-angle-reasoning', 1)],
-  'c11-limits-derivatives': [d4('c11-limit-reasoning', 0), d4('c11-first-principles-reasoning', 1)],
-  'c11-statistics': [d4('c11-mean-deviation-reasoning', 0), d4('c11-variance-reasoning', 1)],
-  'c11-probability': [d4('c11-sample-space-reasoning', 0)],
+  'c11-permutations-combinations': [d4('c11-counting-principle-jee-reasoning', 0), d4('c11-arrangement-jee-reasoning', 1)],
+  'c11-sequences-series': [d4('c11-ap-jee-reasoning', 0)],
+  'c11-straight-lines': [d4('c11-line-equation-jee-reasoning', 0), d4('c11-line-angle-reasoning', 1)],
+  'c11-limits-derivatives': [d4('c11-limit-jee-reasoning', 0), d4('c11-first-principles-reasoning', 1)],
+  'c11-statistics': [d4('c11-mean-deviation-jee-reasoning', 0), d4('c11-variance-reasoning', 1)],
+  'c11-probability': [d4('c11-sample-space-jee-reasoning', 0)],
   // ── Class 12 ───────────────────────────────────────────────────────────────
   'c12-relations-functions': [d4('c12-composite-inverse-reasoning', 2)],
   'c12-inverse-trigonometric': [d4('c12-inverse-trig-branch-reasoning', 0), d4('c12-inverse-trig-evaluate-reasoning', 1)],

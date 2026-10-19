@@ -1430,6 +1430,9 @@ function limitReasoning(rng) {
           { h: 'Answer', d: `$${rTex(value)}$` }
         ];
       }
+      // The hints quote the standard limits 1/2 and 1: a draw whose answer is
+      // one of them would have a hint state the result, so it is redrawn.
+      if (value.value === 0.5 || value.value === 1) continue;
       return {
         prompt: `Evaluate $${LIM0} ${tex}$.`,
         answerType: 'numeric', ...exact(value),
@@ -2053,16 +2056,16 @@ export const class11JeeHardestForms = Object.freeze({
   'c11-trig-identity-reasoning': d4(trigIdentityReasoning),
   'c11-complex-algebra-reasoning': d4(complexAlgebraReasoning),
   'c11-complex-polar-reasoning': d4(complexPolarReasoning),
-  'c11-counting-principle-reasoning': d4(countingPrincipleReasoning),
-  'c11-arrangement-reasoning': d4(arrangementReasoning),
-  'c11-ap-reasoning': d4(apReasoning),
-  'c11-line-equation-reasoning': d4(lineEquationReasoning),
+  'c11-counting-principle-jee-reasoning': d4(countingPrincipleReasoning),
+  'c11-arrangement-jee-reasoning': d4(arrangementReasoning),
+  'c11-ap-jee-reasoning': d4(apReasoning),
+  'c11-line-equation-jee-reasoning': d4(lineEquationReasoning),
   'c11-line-angle-reasoning': d4(lineAngleReasoning),
-  'c11-limit-reasoning': d4(limitReasoning),
+  'c11-limit-jee-reasoning': d4(limitReasoning),
   'c11-first-principles-reasoning': d4(firstPrinciplesReasoning),
-  'c11-mean-deviation-reasoning': d4(meanDeviationReasoning),
+  'c11-mean-deviation-jee-reasoning': d4(meanDeviationReasoning),
   'c11-variance-reasoning': d4(varianceReasoning),
-  'c11-sample-space-reasoning': d4(sampleSpaceReasoning)
+  'c11-sample-space-jee-reasoning': d4(sampleSpaceReasoning)
 });
 
 // Exposed for the independent check, which asserts the tables are non-empty.

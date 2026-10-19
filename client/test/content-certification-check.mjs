@@ -187,8 +187,14 @@ for (const gen of ['c8-algebraic-identities-ncert-mastery', 'c8-exponents-ncert-
     });
   }
   eq(deadEnds.length, 0, `every advertised CBSE dot point resolves to a servable target (dead ends: ${deadEnds.slice(0, 5).join(', ')})`);
+  // Tranche 3 (curriculum-in-hardest-covers.js) gave every CBSE dot point a D3
+  // form, so no live dot point is D4-only any more. The disclosure path is still
+  // exercised on the live chapter with its tranche-3 cover taken away.
   const c7 = IN_CHAPTER_BY_ID['c7-connecting-dots-current'];
-  const t = resolveIndiaTarget(c7, { dotpoint: 3, difficulty: 2, track: 'cbse', grade: 7, random: () => 0 });
+  const live = resolveIndiaTarget(c7, { dotpoint: 3, difficulty: 3, track: 'cbse', grade: 7, random: () => 0 });
+  ok(live && live.windowed !== false && live.difficulty === 3, 'the formerly D4-only c7 dot point now resolves inside the CBSE window at D3');
+  const d4Only = { ...c7, covers: c7.covers.filter(c => c.gen !== 'c7-range-display-reasoning') };
+  const t = resolveIndiaTarget(d4Only, { dotpoint: 3, difficulty: 2, track: 'cbse', grade: 7, random: () => 0 });
   ok(t && t.windowed === false && t.difficulty === 4, 'a D4-only CBSE dot point is served at D4 and disclosed as outside the window');
 }
 

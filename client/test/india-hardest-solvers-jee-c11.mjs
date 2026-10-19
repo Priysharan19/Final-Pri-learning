@@ -413,7 +413,7 @@ export const SOLVE_JEE_C11 = {
     return keyNear(q, z[0], 1e-9, 'complex multiplication');
   },
 
-  'c11-counting-principle-reasoning'(q) {
+  'c11-counting-principle-jee-reasoning'(q) {
     const p = q.prompt;
     let m = p.match(/^How many ([34])-digit numbers greater than \$(\d+)\$ can be formed from the digits \$([\d,\\ ]+)\$ \((a digit may be used more than once|no digit may be used more than once)\) that are (even|odd|divisible by \$5\$)\?$/);
     if (m) {
@@ -469,7 +469,7 @@ export const SOLVE_JEE_C11 = {
     return keyInt(q, count, 'enumeration of functions');
   },
 
-  'c11-arrangement-reasoning'(q) {
+  'c11-arrangement-jee-reasoning'(q) {
     const p = q.prompt;
     const V = new Set(['A', 'E', 'I', 'O', 'U']);
     let m = p.match(/^All the arrangements of the letters of the word ([A-Z]+), with or without meaning, are written in dictionary order\. What is the rank of \1 in that list\?$/);
@@ -487,7 +487,7 @@ export const SOLVE_JEE_C11 = {
     return keyInt(q, all.filter(test).length, 'enumeration of arrangements');
   },
 
-  'c11-ap-reasoning'(q) {
+  'c11-ap-jee-reasoning'(q) {
     const p = q.prompt;
     let m = p.match(/^The sums of the first \$n\$ terms of two arithmetic progressions are in the ratio \$\(([^)]+)\) : \(([^)]+)\)\$ for every \$n\$\. If \$t_\{(\d+)\}\$ and \$t'_\{\3\}\$ are their (\d+)(st|nd|rd|th) terms, find \$\\dfrac\{t_\{\3\}\}\{t'_\{\3\}\}\$\.$/);
     if (m) {
@@ -516,7 +516,7 @@ export const SOLVE_JEE_C11 = {
     return keyInt(q, m[9].startsWith('Find') ? common.reduce((s, x) => s + x, 0) : common.length, 'listed terms');
   },
 
-  'c11-line-equation-reasoning'(q) {
+  'c11-line-equation-jee-reasoning'(q) {
     const p = q.prompt;
     let m = p.match(/^A straight line through \$P\((-?\d+), (-?\d+)\)\$ meets the \$x\$-axis at \$A\$ and the \$y\$-axis at \$B\$, and \$P\$ divides \$AB\$ internally in the ratio \$AP : PB = (\d+) : (\d+)\$\. Find (the slope of the line|the sum of the intercepts the line makes on the two axes)\.$/);
     if (m) {
@@ -620,7 +620,7 @@ export const SOLVE_JEE_C11 = {
     return close(I[0], q.answer.x, 1e-9) && close(I[1], q.answer.y, 1e-9) ? [] : [`image ${I} vs keyed (${q.answer.x}, ${q.answer.y})`];
   },
 
-  'c11-limit-reasoning'(q) {
+  'c11-limit-jee-reasoning'(q) {
     const p = q.prompt;
     const kOf = s => (s === '' ? 1 : Number(s));
     let m = p.match(/^Evaluate \$\\displaystyle\\lim_\{x \\to (-?\d+)\} \\dfrac\{\\sqrt\{([^{}]+)\} - (\d+)\}\{\\sqrt\{([^{}]+)\} - (\d+)\}\$\.$/);
@@ -723,7 +723,7 @@ export const SOLVE_JEE_C11 = {
     return keyNear(q, D, 1e-6, 'numeric derivative');
   },
 
-  'c11-mean-deviation-reasoning'(q) {
+  'c11-mean-deviation-jee-reasoning'(q) {
     const p = q.prompt;
     let m = p.match(/^The mean deviation about the (mean|median) of the (\d+) observations \$a,\\ a \+ d,\\ a \+ 2d,\\ \\ldots,\\ a \+ (\d+)d\$, where \$d > 0\$, is \$([\d.]+)\$\. Find \$d\$\.$/);
     if (m) {
@@ -803,7 +803,7 @@ export const SOLVE_JEE_C11 = {
     return keyIs(q, qdiv(total, Q(N)), 'within + between');
   },
 
-  'c11-sample-space-reasoning'(q) {
+  'c11-sample-space-jee-reasoning'(q) {
     const p = q.prompt;
     let m = p.match(/^Three dice are thrown, and an outcome is the ordered triple of numbers shown\. Let \$E\$ be the event that (.+)\. How many outcomes does \$E\$ contain\?$/);
     if (m) {
