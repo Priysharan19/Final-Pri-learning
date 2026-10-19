@@ -2275,7 +2275,7 @@ html { background-color: var(--page); }
   /* First entry: clear of the status bar and the home indicator. Ruled paper
      keeps its feint lines; the margin rule, at 8vw, ran through centred text
      on a phone, so it is drawn only where there is a margin to rule. */
-  .auth-wrap { padding: calc(18px + var(--pri-inset-top)) 18px calc(18px + var(--pri-inset-bottom)); }
+  .auth-wrap { padding: calc(18px + var(--pri-inset-top)) calc(18px + var(--pri-inset-right)) calc(18px + var(--pri-inset-bottom)) calc(18px + var(--pri-inset-left)); }
   .mathfield { background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--paper-rule) 31px 32px); }
   .hero-demo-detail { display: none; }
   .hero-demo-note { display: block; }
