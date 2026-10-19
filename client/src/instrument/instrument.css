@@ -509,3 +509,43 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-reading-plot figcaption { margin-bottom: 8px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
 .in-reading-plot .in-note { margin-top: 8px; font-size: 12px; }
 html.ui-instrument { --plot-a: var(--in-c1); --plot-b: var(--in-c3); --plot-c: var(--in-c2); --plot-grid: var(--in-edge); --plot-axis: var(--in-tx-3); }
+
+/* ── Settings, sign-in and states (step 8) ─────────────────────────────────── */
+/* Settings: the open section carries the same signal tick as the rail. */
+html.ui-instrument .set-menu { border-radius: 6px; border-color: var(--in-edge); background: var(--in-l1); }
+html.ui-instrument .set-menu-item { font: 500 14px var(--in-ui); color: var(--in-tx-2); border-bottom-color: var(--in-edge); }
+html.ui-instrument .set-menu-item.on { background: var(--in-l3); color: var(--in-tx); box-shadow: inset 2px 0 0 var(--in-signal); }
+@media (hover: hover) { html.ui-instrument .set-menu-item:hover { background: var(--in-l2); color: var(--in-tx); } }
+html.ui-instrument .set-row { border-bottom-color: var(--in-edge); }
+html.ui-instrument .set-row .set-k { color: var(--in-tx-2); }
+
+/* Sign-in: one calm card on the base, the primary action filled. */
+html.ui-instrument .auth-wrap { background: var(--in-base); }
+html.ui-instrument .auth-card,
+html.ui-instrument .signin-landing { border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }
+html.ui-instrument .signup-title { font: 500 26px/1.15 var(--in-ui); letter-spacing: -0.035em; }
+html.ui-instrument .signup-choice, html.ui-instrument .signup-back, html.ui-instrument .signup-cc { border-radius: 4px; border-color: var(--control-border); }
+html.ui-instrument .signup-choice.is-selected { border-color: var(--in-tx); background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-tx); }
+html.ui-instrument .otp-box { border-radius: 4px; font-family: var(--in-mono); }
+html.ui-instrument .input:focus, html.ui-instrument .otp-box:focus { border-color: var(--in-tx-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--in-signal) 22%, transparent); }
+
+/* States. Loading keeps the final geometry and breathes instead of sweeping a
+   gradient; offline says plainly what still works; empty points to a start. */
+html.ui-instrument .skeleton { background: var(--in-l2); animation: in-breathe 1.6s ease-in-out infinite; }
+@keyframes in-breathe { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument .skeleton { animation: none; } }
+html.ui-instrument .offline-entry {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px;
+  background: var(--in-l2); box-shadow: inset 2px 0 0 var(--in-c7), 0 0 0 1px var(--in-edge); color: var(--in-tx-2);
+}
+html.ui-instrument .empty-state { border: 1px dashed var(--in-edge-3); border-radius: 8px; background: var(--in-l1); color: var(--in-tx-2); }
+html.ui-instrument .toast { border-radius: 6px; background: var(--in-l3); color: var(--in-tx); box-shadow: 0 0 0 1px var(--in-edge-2), 0 16px 40px -18px rgba(0, 0, 0, 0.6); border: 0; }
+html.ui-instrument .error-box { border-radius: 6px; }
+
+/* iPad: the rail-less bar keeps the tabs; the Index plate and Practice use the
+   width, and the writing area never shrinks (form-factor-check). */
+@media (min-width: 761px) and (max-width: 1180px) {
+  .in-index { grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); }
+  .in-plate { padding: 22px 22px 20px; }
+  .in-cmd { width: min(260px, 28vw); }
+}

@@ -23,6 +23,9 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
+import en from '../src/i18n/strings.en.js';
+import hi from '../src/i18n/strings.hi.js';
+import { englishInterfaceForms, leaksOnPage } from './support/hindi-fallback.mjs';
 
 const SIZES = [
   { id: 'phone', width: 390, height: 844, phone: true },
@@ -61,6 +64,8 @@ export const flow = {
     await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
     await goto('/');
     await settle();
+    writeFileSync(join(outDir, 'signin-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    await check('the signed-out welcome is in the instrument material', await page.evaluate(() => document.documentElement.classList.contains('ui-instrument')));
     await createProfile({ name: 'Aarav Instrument', year: 10, course: 'in' });
     await online.signIn({ name: 'Aarav Instrument' });
     await settle();
@@ -326,8 +331,45 @@ export const writeFlow = {
   }
 };
 
+// Hindi parity: every instrument screen is written in Devanagari, declared
+// Hindi, and has no English interface string or raw key on it.
+const ENGLISH = englishInterfaceForms(en, hi);
+const KEYS = Object.keys(en);
+export const hindiFlow = {
+  id: 'instrument-hindi',
+  name: 'Instrument · Hindi parity — Index, Map, Report, Scripts, command bar',
+  online: true,
+  async run({ page, check, goto, settle, createProfile, browserName = 'chromium' }) {
+    const outDir = join(process.env.PRI_VISUAL_OUT || mkdtempSync(join(tmpdir(), 'pri-instrument-')), `instrument-${browserName}`);
+    mkdirSync(outDir, { recursive: true });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await goto('/');
+    await createProfile({ name: 'Ananya Instrument', year: 10, course: 'in', language: 'hi' });
+    await page.waitForFunction(() => document.documentElement.lang === 'hi', null, { timeout: 15000 });
+    const audit = async (screen, ready) => {
+      await settle();
+      if (ready) await page.waitForSelector(ready, { timeout: 15000 }).catch(() => {});
+      await check(`${screen}: the document is declared Hindi`, await page.evaluate(() => document.documentElement.lang) === 'hi');
+      const words = await page.evaluate(() => ((document.querySelector('.shell') || document.body).innerText.match(/[ऀ-ॿ]+/g) || []).length);
+      await check(`${screen}: the screen is written in Devanagari`, words >= 8, `${words} Devanagari words`);
+      const leaks = await page.evaluate(leaksOnPage, { english: ENGLISH, keys: KEYS });
+      await check(`${screen}: no English interface string or raw key falls back onto the screen`, leaks.length === 0, leaks.slice(0, 8).join(' · '));
+    };
+    await goto('/'); await audit('Index', '.in-ch');
+    writeFileSync(join(outDir, 'index-web-light-hi.png'), await page.screenshot({ animations: 'disabled' }));
+    await goto('/map'); await audit('Map', '[data-map-chapter]');
+    await goto('/progress'); await audit('Report', '[data-instrument-report]');
+    await goto('/review'); await audit('Scripts', '.ws-page, .card');
+    await goto('/');
+    await page.locator('.in-cmd').click();
+    await audit('Command bar', '[data-instrument-command]');
+    await page.keyboard.press('Escape');
+  }
+};
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   process.env.PRI_FEATURE_INSTRUMENT = '1';
   const { runFlows } = await import('./e2e.mjs');
-  process.exit(await runFlows([flow, writeFlow]) ? 1 : 0);
+  process.exit(await runFlows([flow, writeFlow, hindiFlow]) ? 1 : 0);
 }
