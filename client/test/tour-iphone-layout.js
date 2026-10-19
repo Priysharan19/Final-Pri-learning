@@ -128,6 +128,24 @@ export const flow = {
     await check('welcome: no margin rule runs through the centred text', !hero.marginRule, JSON.stringify(hero));
     await check('welcome: the content starts below the status bar', hero.logoTop >= INSETS.top, JSON.stringify(hero));
     await check('welcome: no horizontal overflow', await overflowOf(page) <= 1);
+    // App Review's first screen: at scroll top the wordmark sits at or below
+    // the status bar / Dynamic Island on every iPhone size, the tallest
+    // included (iPhone 17 Pro Max, 440 × 956, top inset 62). A centred column
+    // taller than the screen must not overflow upwards past the inset.
+    for (const d of [{ id: 'iPhone 17 Pro Max', width: 440, height: 956, insets: { top: 62, bottom: 34 } }, ...DEVICES.filter(x => x.insets)]) {
+      await page.setViewportSize({ width: d.width, height: d.height });
+      await setInsets(page, d.insets);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await settle();
+      const at = await page.evaluate(() => {
+        const logo = document.querySelector('.auth-wrap .logo');
+        const r = logo?.getBoundingClientRect();
+        return { logoTop: r ? Math.round(r.top) : null, scrollY: Math.round(window.scrollY), wrapScroll: document.querySelector('.auth-wrap')?.scrollTop ?? null };
+      });
+      await check(`welcome@${d.id}: the wordmark is at or below the status-bar inset at scroll top`, at.logoTop !== null && at.logoTop >= d.insets.top, JSON.stringify({ ...at, inset: d.insets.top }));
+    }
+    await page.setViewportSize(PHONE);
+    await setInsets(page, INSETS);
     await clearInsets(page);
 
     await createProfile({ name: 'Layout Student', year: 10, course: 'in' });
