@@ -211,6 +211,7 @@
   --t-label: 600 12px/16px var(--font);
   --t-caption: 400 12px/16px var(--font);
   --t-mono: 400 13px/20px var(--font-mono);
+  --t-math: 400 var(--text-math)/1.5 var(--font-math);
   --space-0_5: 2px;
   --space-16: 64px;
   --gutter: 16px;

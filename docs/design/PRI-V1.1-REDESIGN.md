@@ -1,8 +1,8 @@
 # Pri Learning v1.1 — interface redesign spec
 
-Status: accepted direction for v1.1 (ships after the v1.0 App Store build, through normal merge trains).
+Status: proposed direction for v1.1, pending owner sign-off (ships after the v1.0 App Store build, through normal merge trains).
 Authority: this file refines `PRI-DREAM-INTERFACE.md`; where they disagree, this file wins for v1.1.
-Design artifact (owner review): see the PR body / orchestrator report for the link.
+Design artifact (owner review): https://claude.ai/artifact/384dhfdNimKnakAe5aw9AW
 
 ## 1. Direction
 
@@ -51,7 +51,7 @@ additive; existing names stay as aliases so no screen breaks during the migratio
 | `--t-mono` | 13/20 | 400 | ui-monospace, tabular | counts, timers, IDs |
 
 Hindi (Devanagari) uses the same steps with line-height +4px (`:lang(hi)` override), so the
-two languages wrap to the same rhythm. Nothing heavier than 600.
+two languages wrap to the same rhythm. Display and title steps keep their leading: they are set in the maths serif, which carries no Devanagari, so Hindi headings fall back to the UI face at the same size. Nothing heavier than 600.
 
 ### 2.2 Spacing
 
