@@ -1,13 +1,13 @@
 # Privacy notice
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
 This notice explains what Pri Learning collects, why, and what you can ask us to
 do about it. It is written for students, parents and teachers in India, and
 follows the Digital Personal Data Protection Act 2023.
 
 The person responsible for your data (the "data fiduciary") is
-{{OWNER_LEGAL_NAME}}, {{OWNER_ADDRESS}}.
+Priysharan Tripathi, 5 Juniper Pl, Oakville NSW 2765, Australia.
 
 ## The short version
 
@@ -215,7 +215,7 @@ You can ask us to:
 - **Withdraw consent**, after which we stop processing and delete.
 - **Nominate** someone to exercise these rights if you cannot.
 
-Write to {{GRIEVANCE_OFFICER_EMAIL}}. See [Grievances](/grievance) for how
+Write to impriysharan@icloud.com. See [Grievances](/grievance) for how
 complaints are handled and how to escalate to the Data Protection Board of
 India.
 
@@ -234,4 +234,4 @@ will tell you and the Data Protection Board as the DPDP Act requires.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: {{SUPPORT_EMAIL}}.
+Questions: impriysharan@icloud.com.

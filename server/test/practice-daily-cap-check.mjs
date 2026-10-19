@@ -21,7 +21,6 @@
 //   · the day turns over at midnight Asia/Kolkata and the count starts afresh;
 //   · the issue reply itself is unchanged: the question and the account id.
 import './support/hermetic.mjs';
-import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -34,6 +34,17 @@ function LazyPlanCard(props) {
   return Card ? <Card {...props} /> : null;
 }
 
+// The per-dot-point review card, lazily like the plan card.
+function LazyReviewQueueCard(props) {
+  const [Card, setCard] = useState(null);
+  useEffect(() => {
+    let live = true;
+    import('../home/ReviewQueueCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
+    return () => { live = false; };
+  }, []);
+  return Card ? <Card {...props} /> : null;
+}
+
 export default function Home() {
   const { user, dueCount } = useApp();
   const nav = useNavigate();
@@ -278,6 +289,7 @@ export default function Home() {
         <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
         <PlacementCard placement={placement} onGo={path => nav(path)}
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
+        <LazyReviewQueueCard user={user} />
         <LazyPlanCard user={user} stats={stats} />
         {alternatives.length > 0 && (
           <ul className="home-alts">

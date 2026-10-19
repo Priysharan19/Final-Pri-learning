@@ -222,7 +222,7 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
 // ── 2 · The migration's policies (static) ──────────────────────────────────
 const MIGRATION = readFileSync(join(ROOT, 'supabase', 'migrations', '20261016000000_rls_fail_closed.sql'), 'utf8');
 {
-  ok(SCHEMA_VERSION === 12 && /update pri\.platform_meta set value = '12' where key = 'schema_version';/.test(MIGRATION), 'the migration moves schema_version to 12, matching the build');
+  ok(SCHEMA_VERSION >= 12 && /update pri\.platform_meta set value = '12' where key = 'schema_version';/.test(MIGRATION), 'the migration moves schema_version to 12; later migrations move it on (13: 20261019000000_rls_account_coverage.sql)');
   ok(/for t in select tablename from pg_tables where schemaname = 'pri'/.test(MIGRATION) && /create policy pri_scope_required on pri\.%I as restrictive for all to pri_server/.test(MIGRATION),
     'every pri table gets a restrictive pri_scope_required policy');
   ok(/current_setting\(''pri\.scope'', true\) in \(''system'', ''account''\)/.test(MIGRATION), 'which admits only a declared system or account scope');
@@ -298,7 +298,9 @@ if (engine === 'postgres') {
       accounts: Number((await store.get('SELECT COUNT(*)::int AS n FROM accounts')).n)
     }), { accountScope: 'acct-a' });
     eq([scoped.own, scoped.other, scoped.all, scoped.entities], [1, 0, 1, 1], 'account scope: only the account\'s own owned rows are visible, even to a query that asks for another\'s');
-    eq(scoped.accounts, 2, 'account scope: shared tables (accounts) stay readable, for the handlers\' own joins');
+    // 20261019000000_rls_account_coverage.sql: accounts is account-scoped too —
+    // account scope sees only its own account row (rls-account-coverage-check).
+    eq(scoped.accounts, 1, 'account scope: accounts shows only the account\'s own row (20261019000000_rls_account_coverage.sql)');
     await rejects(() => store.transaction(tx => tx.run("INSERT INTO operational_events(id,account_id,event_type,metadata_json,created_at) VALUES ('op-smuggle-2','acct-b','smuggle','{}',1)"), { accountScope: 'acct-a' }),
       error => String(error.dbCode || error.code) === '42501', 'account scope: inserting another account\'s row is refused');
     const moved = await store.transaction(tx => tx.run("UPDATE operational_events SET account_id = 'acct-b' WHERE account_id = 'acct-a'"), { accountScope: 'acct-a' }).catch(error => error);
@@ -424,7 +426,12 @@ if (engine === 'postgres') {
   const FORWARD = '20261016000000_rls_fail_closed.sql';
   const all = migrationFiles();
   const forward = all.find(m => m.name === FORWARD);
-  ok(!!forward && all.at(-1).name === FORWARD, `${FORWARD} is the last migration, after every existing one`);
+  // Part 4 applies this migration alone on a schema-11 database, so the shared-table
+  // pins below describe exactly 20261016000000; the one later migration
+  // (account RLS for the shared account-bearing tables) is proven by
+  // rls-account-coverage-check.mjs. A further migration must be added here deliberately.
+  ok(!!forward && all.at(-1).name === '20261019000000_rls_account_coverage.sql' && all.findIndex(m => m.name === FORWARD) === all.length - 2,
+    `${FORWARD} runs after every earlier migration; only 20261019000000_rls_account_coverage.sql follows it`);
   const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });
   const su = scratch.client;
   const url = await serverRoleUrl(scratch.name);
@@ -499,7 +506,12 @@ if (engine === 'postgres') {
     for (const t of OWNED) if ((await raw.query(`UPDATE ${t} SET account_id = account_id`)).rowCount) touched.push(t);
     eq(touched, [], 'upgrade: an unscoped update reaches no row of any owned table');
 
-    // System scope (the store) sees the data exactly as before.
+    // System scope (the store) sees the data exactly as before. This build's
+    // store boots only at SCHEMA_VERSION (13 since 20261019000000, which adds
+    // policies to other tables and is proven by rls-account-coverage-check);
+    // only the version marker is moved, so the policies under test here stay
+    // exactly 20261016000000's.
+    await su.query("UPDATE pri.platform_meta SET value = $1 WHERE key = 'schema_version'", [String(SCHEMA_VERSION)]);
     store = await createPostgresStore(url, { max: 2 });
     const systemCounts = {};
     for (const t of tables) systemCounts[t] = Number((await store.get(`SELECT count(*)::int AS n FROM ${t}`)).n);
@@ -578,7 +590,10 @@ if (engine === 'postgres') {
     // A scope that names no existing account, or another one, sees nothing of acct-a.
     const stranger = await store.transaction(async tx => Number((await tx.get("SELECT count(*)::int AS n FROM account_sessions WHERE account_id = 'acct-a'")).n), { accountScope: 'acct-zzz' });
     eq(stranger, 0, 'an account scope for another account sees none of acct-a\'s rows');
-    eq(JSON.stringify(await snapshot()) === JSON.stringify(after), true, 'the cross-account attempts changed no row');
+    // platform_meta is left out: only its schema_version marker was moved, by
+    // this test, so this build's store could boot (see above).
+    const settled = await snapshot();
+    eq(tables.filter(t => t !== 'platform_meta' && JSON.stringify(settled[t]) !== JSON.stringify(after[t])), [], 'the cross-account attempts changed no row');
     await store.close();
     store = null;
 

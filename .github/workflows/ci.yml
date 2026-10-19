@@ -14,8 +14,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  suites:
-    name: Suites, coverage and accuracy gates
+  # "Every deterministic suite" (the root npm test chain) fans out across
+  # SUITE_SHARDS runners; tools/ci-suite-shard.mjs assigns every suite of
+  # package.json "test" to exactly one shard and writes a manifest. The job
+  # named "Suites, coverage and accuracy gates" (the required check) runs
+  # always(), fails unless every shard succeeded, proves from the manifests that
+  # every suite completed exactly once, and runs the unchanged invariant block
+  # against the concatenated shard logs.
+  suites-shard:
+    name: Suites shard ${{ matrix.shard }}/4
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      # Grading is online-only and server-authoritative, so the suites that
+      # check an answer or start an exam through the local backend boot the
+      # real platform server in-process (client/test/support/online-authority.mjs).
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Deterministic suites, shard ${{ matrix.shard }} of 4
+        run: |
+          set -o pipefail
+          node tools/ci-suite-shard.mjs --of=4 --shard=${{ matrix.shard }} --manifest=suite-shard.json 2>&1 | tee suites.log
+      - name: Shard log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: suites-shard-${{ matrix.shard }}
+          path: |
+            suites.log
+            suite-shard.json
+          if-no-files-found: error
+
+  suites-contracts:
+    name: Suites policy and contracts
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -24,7 +69,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
       - name: Runner budget policy
         run: node tools/ci-runner-policy-check.mjs
       - name: Workflow supply-chain policy (least privilege, pinned actions, no privileged PR-head execution)
@@ -46,10 +93,69 @@ jobs:
         run: npm ci --prefix server
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs client
-      - name: Every deterministic suite
+      - name: Person 2 India + commercial contracts
         run: |
-          set -o pipefail
-          npm test 2>&1 | tee suites.log
+          set -euo pipefail
+          node client/test/india-production-meta-check.mjs
+          node client/test/india-class7-current-source-check.mjs
+          node client/test/india-class10-current-source-check.mjs
+          node client/test/india-class10-production-gap-check.mjs
+          node client/test/ncert-class10-full-book-check.mjs
+          node client/test/class10-ncert-product-check.mjs
+          node client/test/india-practice-availability-check.mjs
+          node client/test/entitlement-check.mjs
+          node client/test/sync-contract-check.mjs
+          # Both of these guard the offline-first backup and cloud-sync paths and
+          # were not being run anywhere in CI.
+          node client/test/restore-durability-check.mjs
+          node client/test/cloud-sync-worker-check.mjs
+          # Cloud sync end to end: restore on a fresh device, automatic
+          # triggers, and 409 entity-conflict recovery.
+          node client/test/cloud-restore-fidelity-check.mjs
+          node client/test/auto-sync-scheduler-check.mjs
+          node client/test/sync-conflict-recovery-check.mjs
+          node client/test/cloud-session-refresh-check.mjs
+          node client/test/account-action-boundary-check.mjs
+          node client/test/india-exam-blueprint-check.mjs
+          node client/test/india-exam-duplicate-check.mjs
+          node client/test/india-progress-product-check.mjs
+          node tools/india-production-census.mjs
+      - name: Real ink diagnostic (advisory in PR CI)
+        if: always()
+        continue-on-error: true
+        run: |
+          echo '::warning title=Real ink is advisory here::test:real is a diagnostic in PR CI (|| true). The blocking floor (node client/test/inkcheck-real.mjs --strict --gate, handwriting/v17/real-ink-floor.json) runs only in release-candidate.yml.'
+          npm run --silent test:real || true
+
+  suites:
+    name: Suites, coverage and accuracy gates
+    needs: [suites-shard, suites-contracts]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Every shard finished green
+        env:
+          SUITES_SHARD_RESULT: ${{ needs.suites-shard.result }}
+          SUITES_CONTRACTS_RESULT: ${{ needs.suites-contracts.result }}
+        run: |
+          set -euo pipefail
+          echo "suites-shard: $SUITES_SHARD_RESULT"
+          echo "suites-contracts: $SUITES_CONTRACTS_RESULT"
+          test "$SUITES_SHARD_RESULT" = success
+          test "$SUITES_CONTRACTS_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download every shard log
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: suites-shard-*
+          path: suite-shards
+      - name: Every suite of npm test completed exactly once
+        run: |
+          set -euo pipefail
+          test "$(ls -d suite-shards/suites-shard-* | wc -l)" -eq 4
+          node tools/ci-suite-shard.mjs --verify --of=4 suite-shards/suites-shard-*/suite-shard.json
+          for shard in 1 2 3 4; do cat "suite-shards/suites-shard-$shard/suites.log"; done > suites.log
       - name: Exact coverage invariants
         run: |
           set -euo pipefail
@@ -58,13 +164,23 @@ jobs:
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
+          # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
+          grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
+          grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
+          grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
+          grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
+          grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
+          grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133330 wrong answers marked correct across 17304 questions' suites.log
+          grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
+          grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
@@ -92,8 +208,8 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          # 306: one check added — every typed answer was marked, none stopped at the marker deadline after retries (#544 hardening).
-          grep -Fq 'INDIA ADAPTIVE: PASS — 306/306 checks' suites.log
+          # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
+          grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
@@ -101,7 +217,7 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
@@ -113,7 +229,11 @@ jobs:
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 66 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 68 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
+          # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
+          grep -Fq 'LOST MARKS: PASS — 170/170 checks' suites.log
+          grep -Fq 'TOLERANCE POLICY: PASS — 178/178 checks' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -160,39 +280,6 @@ jobs:
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
           fi
-      - name: Person 2 India + commercial contracts
-        run: |
-          set -euo pipefail
-          node client/test/india-production-meta-check.mjs
-          node client/test/india-class7-current-source-check.mjs
-          node client/test/india-class10-current-source-check.mjs
-          node client/test/india-class10-production-gap-check.mjs
-          node client/test/ncert-class10-full-book-check.mjs
-          node client/test/class10-ncert-product-check.mjs
-          node client/test/india-practice-availability-check.mjs
-          node client/test/entitlement-check.mjs
-          node client/test/sync-contract-check.mjs
-          # Both of these guard the offline-first backup and cloud-sync paths and
-          # were not being run anywhere in CI.
-          node client/test/restore-durability-check.mjs
-          node client/test/cloud-sync-worker-check.mjs
-          # Cloud sync end to end: restore on a fresh device, automatic
-          # triggers, and 409 entity-conflict recovery.
-          node client/test/cloud-restore-fidelity-check.mjs
-          node client/test/auto-sync-scheduler-check.mjs
-          node client/test/sync-conflict-recovery-check.mjs
-          node client/test/cloud-session-refresh-check.mjs
-          node client/test/account-action-boundary-check.mjs
-          node client/test/india-exam-blueprint-check.mjs
-          node client/test/india-exam-duplicate-check.mjs
-          node client/test/india-progress-product-check.mjs
-          node tools/india-production-census.mjs
-      - name: Real ink diagnostic (advisory in PR CI)
-        if: always()
-        continue-on-error: true
-        run: |
-          echo '::warning title=Real ink is advisory here::test:real is a diagnostic in PR CI (|| true). The blocking floor (node client/test/inkcheck-real.mjs --strict --gate, handwriting/v17/real-ink-floor.json) runs only in release-candidate.yml.'
-          npm run --silent test:real || true
       - name: Suite log
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -324,6 +411,10 @@ jobs:
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-hints-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
@@ -333,6 +424,10 @@ jobs:
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
+          grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
+          grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
+          grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
+          grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
@@ -393,6 +488,17 @@ jobs:
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs
+      - name: Security P2s (admin MFA on class routes, export completeness, RLS account coverage, OTP delete asymmetry)
+        run: |
+          set -o pipefail
+          node server/test/admin-mfa-class-routes-check.mjs 2>&1 | tee security-p2.log
+          node server/test/account-export-completeness-check.mjs 2>&1 | tee -a security-p2.log
+          node server/test/rls-account-coverage-check.mjs 2>&1 | tee -a security-p2.log
+          node server/test/otp-delete-asymmetry-check.mjs 2>&1 | tee -a security-p2.log
+          grep -Fq 'admin-mfa-class-routes-check: 77/77 checks passed (sqlite)' security-p2.log
+          grep -Fq 'account-export-completeness-check (sqlite): 71 checks passed' security-p2.log
+          grep -Fq 'RLS ACCOUNT COVERAGE: PASS — 20/20 checks' security-p2.log
+          grep -Fq 'OTP DELETE ASYMMETRY: PASS — 15/15 checks' security-p2.log
       - name: Server-authoritative examination papers (SQLite)
         run: |
           set -o pipefail
@@ -419,7 +525,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 52 → 53 (#430): the owner AP first-mistake contract also runs on real Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 54/54 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 57/57 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -432,6 +538,9 @@ jobs:
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
+          grep -Fq '✓ admin-mfa-class-routes-check.mjs' platform-postgres.log
+          grep -Fq '✓ account-export-completeness-check.mjs' platform-postgres.log
+          grep -Fq '✓ rls-account-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-session-binding-check.mjs' platform-postgres.log
           grep -Fq '✓ export-reauth-check.mjs' platform-postgres.log
           grep -Fq '✓ session-alerts-check.mjs' platform-postgres.log
@@ -489,8 +598,15 @@ jobs:
           node server/test/storekit-entitlement-state-machine-check.mjs 2>&1 | tee storekit.log
           grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks' storekit.log
 
-  browser:
-    name: Browser suites (end-to-end and accessibility)
+  # The browser suites fan out by flow group and engine (WebKit alone in
+  # webkit-layout). Each group runs its commands exactly as the single job
+  # did, in the same order, and uploads its log. The job named "Browser suites
+  # (end-to-end and accessibility)" (the required check) runs always(), fails
+  # unless every group succeeded, and runs the unchanged invariant block
+  # against the concatenated group logs. tools/ci-runner-policy-check.mjs
+  # proves every command of npm run test:e2e is in exactly one group.
+  browser-shard:
+    name: Browser shard (${{ matrix.group }})
     runs-on: ubuntu-latest
     # The accessibility gate builds the client itself; give it the same flags
     # client/test/e2e.mjs uses for its build so both walk the same app (the
@@ -501,13 +617,35 @@ jobs:
       PRI_FEATURE_EXTENDED_TRACKS: '1'
       PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [e2e-core, e2e-accounts, chromium-layout, webkit-layout, a11y-boot]
+        include:
+          - group: e2e-core
+            browsers: chromium webkit
+            prebuild: false
+          - group: e2e-accounts
+            browsers: chromium webkit
+            prebuild: true
+          - group: chromium-layout
+            browsers: chromium webkit
+            prebuild: true
+          - group: webkit-layout
+            browsers: webkit
+            prebuild: true
+          - group: a11y-boot
+            browsers: chromium webkit
+            prebuild: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
       # The marking flows, tour-otp-onboarding.js and the accessibility walk
@@ -517,48 +655,136 @@ jobs:
       # dependencies. No server environment or secret is required.
       - name: Install server dependencies
         run: npm ci --prefix server
-      - name: Install Chromium and WebKit
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+      - name: Install ${{ matrix.browsers }}
         working-directory: client
-        run: npx playwright install --with-deps chromium webkit
-      - name: End-to-end suite
+        run: npx playwright install --with-deps ${{ matrix.browsers }}
+      # The single job's later tours ran --no-build against the build
+      # tour-ai-tutor.js leaves behind: the job's feature flags, tutor off.
+      # A group that starts with --no-build tours makes that same build first.
+      - name: Test build (the build tour-ai-tutor.js leaves in client/dist)
+        if: matrix.prebuild
+        env:
+          PRI_FEATURE_TUTOR: '0'
+        run: node --input-type=module -e "const { ensureBuild } = await import('./client/test/e2e.mjs'); ensureBuild(true);"
+      - name: Browser suites (${{ matrix.group }})
         run: |
           set -o pipefail
-          npm run test:e2e 2>&1 | tee browser.log
-          node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
-          node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
-          node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
-          # CP-03: the responsive product matrix in both engines (WebKit is the
-          # engine behind every Apple web view).
-          node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
-          node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
-          # iPhone portrait (393 × 852): safe areas, the sticky action bar as
-          # its own spacer, the full-width mode switch, Write and Photo space,
-          # and iPad/desktop composition unchanged. Both engines.
-          node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
-          node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
-          # Account first (issue #477): the one sign-in card and the activation
-          # gate on every route — adult, minor and guardian, sign-out, deep
-          # links, reload, opened offline. Chromium runs it in test:e2e; WebKit
-          # here (WebKit cannot reload a page offline under Playwright, so the
-          # opened-offline checks are Chromium-only and the run says so).
-          node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
-          # The owner's photographed page (scripted reader): transcript, unrelated lines,
-          # corrected line, proposed answer, durable draft; and the usage-limit state.
-          node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
-          # #449/#550: handwriting never vanishes under the pen — same-size
-          # resize callbacks, re-subscribe mid-stroke, cancelled strokes, theme
-          # flips and the default-bitmap first mount, with real bitmaps and
-          # pointer input. Chromium + WebKit × dpr 1.25/1.5 × mouse/pen, dark.
-          # Emulated scale factors, not Windows 11 hardware evidence.
-          node client/test/ink-canvas-loss-browser-check.mjs 2>&1 | tee -a browser.log
-      - name: Accessibility suite
+          : > browser.log
+          case "${{ matrix.group }}" in
+            e2e-core)
+            # npm run test:e2e, part 1: the canonical suite (it builds the
+            # client), then the focused flows that run on the dist it built.
+            node client/test/e2e.mjs 2>&1 | tee -a browser.log
+            node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
+            node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-explain-v2.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-hindi.js --no-build 2>&1 | tee -a browser.log
+              ;;
+            e2e-accounts)
+            # npm run test:e2e, part 2, in order, ending with tour-ai-tutor.js
+            # (which leaves the flag-off build in client/dist), then the platform
+            # tours CI repeats against that build.
+            node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-social-sign-in.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-otp-onboarding.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-account-deletion.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-write-sign-in.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-ai-tutor.js 2>&1 | tee -a browser.log
+            node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
+              ;;
+            chromium-layout)
+            # CP-03: the responsive product matrix in both engines (WebKit is the
+            # engine behind every Apple web view).
+            node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
+            # iPhone portrait (393 × 852): safe areas, the sticky action bar as
+            # its own spacer, the full-width mode switch, Write and Photo space,
+            # and iPad/desktop composition unchanged. Both engines.
+            node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
+            # Phase 3: every student screen at phone and tablet, paper and dark —
+            # accessible names, keyboard focus, 44px touch targets, 200% text,
+            # layout shift, input timing and visual snapshots (compared only
+            # against baselines committed for this platform and engine).
+            node client/test/tour-interface-quality.js --no-build 2>&1 | tee -a browser.log
+            # The owner's photographed page (scripted reader): transcript, unrelated lines,
+            # corrected line, proposed answer, durable draft; and the usage-limit state.
+            node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
+            # #449/#550: handwriting never vanishes under the pen — same-size
+            # resize callbacks, re-subscribe mid-stroke, cancelled strokes, theme
+            # flips and the default-bitmap first mount, with real bitmaps and
+            # pointer input. Chromium + WebKit × dpr 1.25/1.5 × mouse/pen, dark.
+            # Emulated scale factors, not Windows 11 hardware evidence.
+            node client/test/ink-canvas-loss-browser-check.mjs 2>&1 | tee -a browser.log
+              ;;
+            webkit-layout)
+            node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            # Account first (issue #477): the one sign-in card and the activation
+            # gate on every route — adult, minor and guardian, sign-out, deep
+            # links, reload, opened offline. Chromium runs it in test:e2e; WebKit
+            # here (WebKit cannot reload a page offline under Playwright, so the
+            # opened-offline checks are Chromium-only and the run says so).
+            node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+              ;;
+            a11y-boot)
+            npm run test:a11y 2>&1 | tee -a browser.log
+            # A failed chunk, a refused cache write or a probe that never settles must
+            # end in the app or in a visible notice with Reload, never a silent splash.
+            npm run test:boot 2>&1 | tee -a browser.log
+              ;;
+            *)
+              echo "unknown browser group" >&2
+              exit 1
+              ;;
+          esac
+      - name: Shard log
         if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-shard-${{ matrix.group }}
+          path: browser.log
+          if-no-files-found: error
+
+  browser:
+    name: Browser suites (end-to-end and accessibility)
+    needs: [browser-shard]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Every shard finished green
+        env:
+          BROWSER_SHARD_RESULT: ${{ needs.browser-shard.result }}
         run: |
-          set -o pipefail
-          npm run test:a11y 2>&1 | tee -a browser.log
-          # A failed chunk, a refused cache write or a probe that never settles must
-          # end in the app or in a visible notice with Reload, never a silent splash.
-          npm run test:boot 2>&1 | tee -a browser.log
+          set -euo pipefail
+          echo "browser-shard: $BROWSER_SHARD_RESULT"
+          test "$BROWSER_SHARD_RESULT" = success
+      - name: Download every shard log
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: browser-shard-*
+          path: browser-shards
+      - name: Combine the shard logs
+        run: |
+          set -euo pipefail
+          for group in e2e-core e2e-accounts chromium-layout webkit-layout a11y-boot; do
+            test -s "browser-shards/browser-shard-$group/browser.log"
+            cat "browser-shards/browser-shard-$group/browser.log"
+          done > browser.log
+          test "$(ls -d browser-shards/browser-shard-* | wc -l)" -eq 5
       - name: Browser coverage invariants
         if: always()
         run: |
@@ -572,7 +798,11 @@ jobs:
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
-          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
+          # The iPhone layout tour in both engines (65: the welcome wordmark at or
+          # below the status-bar inset on 17 Pro Max, 16 Pro Max and SE sizes),
+          # and the gate journey in WebKit (62).
+          test "$(grep -Ec 'E2E SUITE PASSED.*65/65.*1 flows' browser.log)" -ge 2
+          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 1
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           test "$(grep -Ec 'E2E SUITE PASSED.*20/20.*1 flows' browser.log)" -ge 2
@@ -644,6 +874,8 @@ jobs:
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
           grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
+          # Both engines ran the interface-quality tour (pipefail fails the shard on a red check).
+          test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
@@ -730,3 +962,37 @@ jobs:
               exit 1
             fi
           done
+
+  engine-benchmark:
+    # Ledger 3.8: the deterministic marker's confusion table, regenerated on
+    # every merge to main and kept as a run artifact. Synthetic evidence only
+    # (the report's header says so); --strict fails on any accepted wrong
+    # answer. The release gates for marking live in the suites job above.
+    name: Engine benchmark report (main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Regenerate the confusion table
+        run: |
+          set -o pipefail
+          npm run engine:benchmark -- --strict 2>&1 | tee engine-benchmark.log
+          test -s docs/evidence/engine-benchmark.md
+          grep -Fq 'Synthetic self-consistency evidence. Not an accuracy claim.' docs/evidence/engine-benchmark.md
+      - name: Engine benchmark report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: engine-benchmark
+          path: |
+            docs/evidence/engine-benchmark.md
+            engine-benchmark.log
+          retention-days: 90

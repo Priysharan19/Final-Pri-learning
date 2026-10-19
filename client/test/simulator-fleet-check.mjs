@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import {
-  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, installApp, keepOnlySimulator, otherBooted, parseDevices,
+  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
 } from '../../scripts/simulator-fleet.mjs';
 
 let pass = 0;
@@ -45,6 +45,31 @@ ok(rows.find(r => r.udid === IPAD)?.name === 'iPad Pro 13-inch (M5)' && rows.fin
 ok(rows.find(r => r.udid === OLD)?.state === 'Shutdown', 'an unavailable device still reports its state');
 ok(rows.find(r => r.udid === BOOTING)?.state === 'Booting', 'a device still booting is seen as booting');
 ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty output parses to no devices');
+
+// ── which simulator a harness runs on: booted first, else the newest runtime ──
+// `simctl list` prints runtimes oldest first; taking the first iPad row ran the
+// App Health native self-check on the runner's oldest iOS runtime, where it
+// never reported (run 39227834970).
+{
+  const A = '11111111-1111-4111-8111-111111111111', B = '22222222-2222-4222-8222-222222222222', C = '33333333-3333-4333-8333-333333333333';
+  const multi = `== Devices ==
+-- iOS 18.0 --
+    iPad Pro 11-inch (M4) (${A}) (Shutdown)
+-- iOS 18.6 --
+    iPad Pro 11-inch (M4) (${B}) (Shutdown)
+-- iOS 26.1 --
+    iPad Pro 11-inch (M4) (${C}) (Shutdown)
+    iPhone 17 (44444444-4444-4444-8444-444444444444) (Shutdown)
+`;
+  ok(pickSimulator(multi)?.udid === C, 'with nothing booted the iPad on the newest runtime is picked, not the first listed');
+  ok(pickSimulator(multi, { named: 'iPad Pro 11-inch (M4)' })?.udid === C, 'a named device resolves to its newest runtime');
+  ok(pickSimulator(multi.replace(`${B}) (Shutdown)`, `${B}) (Booted)`))?.udid === B, 'an already booted match wins over a newer runtime');
+  ok(pickSimulator(multi.replace('-- iOS 18.6 --', '-- iOS 18.10 --'))?.udid === C && pickSimulator(multi.replace('-- iOS 26.1 --', '-- iOS 18.10 --'))?.udid === C,
+    'runtime versions compare numerically (18.10 > 18.6)');
+  ok(pickSimulator(multi, { family: 'iPhone' })?.name === 'iPhone 17', 'the family filter applies');
+  ok(pickSimulator(multi, { named: 'iPad Air' }) === null && pickSimulator('') === null, 'no match is null, not a guess');
+  ok(pickSimulator(LISTING)?.udid === IPAD, 'the fixture listing picks its booted iPad');
+}
 
 // ── which simulators are in the way ──────────────────────────────────────────
 ok(JSON.stringify(otherBooted(LISTING, IPHONE)) === JSON.stringify([IPAD, BOOTING]),

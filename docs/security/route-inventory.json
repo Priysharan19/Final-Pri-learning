@@ -2147,6 +2147,98 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/practice/review-queue",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the spaced review queue derived from this account's own server-graded attempts by the shared pure engine; no-store; nothing stored or written",
+      "rateLimits": [
+        {
+          "key": "practice-review-queue",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/notebook/:attemptId/twin",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "the attempt must be one of this account's own filed server-graded attempts (else 404) whose original question is still held in this account's escrow (else 410); issues a new server-chosen question escrowed to this account, marked like any other; takes no parameters",
+      "rateLimits": [
+        {
+          "key": "practice-twin",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/practice/notebook",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account) and this account's escrowed prompts; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "practice-notebook",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/hint",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question (escrow row keyed by this account; another account's id is 404); rungs served strictly in order from the server's escrowed question and charged in the account's transaction under its sync lock; a completed question is 409; the solution rung commits a zero-credit reveal",
+      "rateLimits": [
+        {
+          "key": "practice-hint",
+          "limit": 400,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/practice/:id/repeat",
       "auth": "session",

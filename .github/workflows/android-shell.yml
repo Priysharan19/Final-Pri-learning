@@ -27,6 +27,7 @@ on:
       - 'client/src/components/GooglePlayBilling.jsx'
       - 'client/src/ink/**'
       - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/journey-oracle.mjs'
       - 'scripts/release-matrix.mjs'
       - 'release/metadata.json'
@@ -69,6 +70,21 @@ jobs:
       - name: Gradle build, lint and JVM unit tests
         working-directory: android
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
+      - name: Release bundle compiles, and refuses to bundle without the upload key
+        working-directory: android
+        run: |
+          set -o pipefail
+          # No upload key on CI: bundleRelease must fail closed, naming the key.
+          if ./gradlew --no-daemon -Ppri.versionCode=1 bundleRelease > "$RUNNER_TEMP/release-guard.log" 2>&1; then
+            echo "bundleRelease succeeded without an upload key"; exit 1
+          fi
+          grep -Fq 'release bundles are signed with the upload key' "$RUNNER_TEMP/release-guard.log"
+          # Compile-only release bundle, release lint and release unit tests.
+          ./gradlew --no-daemon -Ppri.versionCode=1 -Ppri.unsignedRelease=true bundleRelease lintRelease testReleaseUnitTest
+      - name: Play listing and Data safety match the code
+        run: |
+          node tools/play-listing-check.mjs
+          PRI_REQUIRE_MERGED_MANIFEST=1 node tools/play-data-safety-check.mjs
       - name: Embedded web is exactly the shared build
         run: node scripts/sync-android.mjs --check
       - name: Cross-platform release matrix (CP-11)
@@ -173,7 +189,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && rc=0; ./scripts/run-instrumented.sh ${{ matrix.expect }} || rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true; exit "$rc"
+          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --synthetic-reader --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && rc=0; ./scripts/run-instrumented.sh ${{ matrix.expect }} || rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true; exit "$rc"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

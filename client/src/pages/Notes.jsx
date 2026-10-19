@@ -276,7 +276,7 @@ function ChapterMap({ group, notes }) {
         <ul className="nt-map-strands" aria-hidden="true">
           {strands.map((s, i) => <li key={s} style={{ top: `${((top + i * rowH) / H) * 100}%` }}>{s}</li>)}
         </ul>
-        <div className="nt-map-canvas" style={{ aspectRatio: `${W} / ${H}` }}>
+        <div className="nt-map-canvas" style={{ aspectRatio: `${W} / ${H}`, '--n': group.chapters.length }}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
             {strands.map((s, i) => <line key={s} className="nt-map-row" x1="0" x2={W} y1={top + i * rowH} y2={top + i * rowH} />)}
             <polyline className="nt-map-thread" points={thread} pathLength="1" />

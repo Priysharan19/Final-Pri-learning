@@ -14,7 +14,6 @@ const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b,
 const close = (x, y, tol = 1e-9) => Math.abs(x - y) <= tol * Math.max(1, Math.abs(x), Math.abs(y));
 /** "12{,}34{,}567" or "1,234" → 1234567. */
 const num = s => Number(String(s).replace(/\{,\}|,/g, ''));
-const N = '(-?\\d[\\d{},]*(?:\\.\\d+)?)';
 const nums = (s, re) => [...s.matchAll(re)].map(m => num(m[1]));
 const keyIs = (q, v) => (close(q.answer.value, v) ? [] : [`solver ${v} vs keyed ${q.answer.value}`]);
 const unique = (sols, q, what = 'solutions') => (sols.length !== 1 ? [`${sols.length} ${what}: ${sols.slice(0, 5)}`] : keyIs(q, sols[0]));

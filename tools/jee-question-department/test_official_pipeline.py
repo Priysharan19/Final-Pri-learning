@@ -156,6 +156,8 @@ def approved_official(row, *, tier="automated"):
         "mcqOptions": ["1", "2", "3", "4"], "answerType": "mcq", "answer": {"correctIndex": r["officialKey"].get("index")},
         "routing": {"part": "algebra", "targetChapter": "c11-complex-numbers"},
         "steps": [{"h": "Isolate", "d": "Subtract 1 from both sides to get $x = 2$."}],
+        "rights": {"status": "cleared", "grantor": "Synthetic Fixture Licensor", "scope": ["redistribute-question", "redistribute-solution"],
+        "evidence": {"kind": "official-terms", "ref": "fixtures/synthetic-licence.txt"}, "recordedBy": "A. Rights Reviewer", "recordedAt": "2026-10-19T00:00:00Z"},
     })
     r["review"].update({"tier": tier, "reviewedAt": "2026-10-02T00:00:00Z", "transcriptionPassId": "t-1", "flags": []})
     r["transcription"] = {"prompt": r["prompt"], "mcqOptions": r["mcqOptions"], "targetChapter": "c11-complex-numbers",
@@ -226,10 +228,24 @@ def test_audit_gates(rows, manifest):
     assert any("re-solve" in e for e in audit_mod.audit([num], BOOK, publish=True, official=manifest)[1])
     num["engine"] = {**num["engine"], "engineSolve": {"expression": "7*13", "value": 91, "agrees": True}}
     assert not audit_mod.audit([num], BOOK, publish=True, official=manifest)[1]
+    # rights evidence (#395): source metadata and owner confirmation are not a licence
+    broken(lambda r: r.pop("rights"), "no rights evidence")
+    broken(lambda r: r["rights"].update(status="owner-confirmed"), "RIGHTS_REVIEW_REQUIRED")
+    broken(lambda r: r["rights"]["evidence"].update(kind="source-metadata"), "not accepted")
+    broken(lambda r: r["rights"]["evidence"].update(ref=""), "no reference")
+    broken(lambda r: r["rights"].update(grantor=""), "no grantor")
+    broken(lambda r: r["rights"].update(scope=["redistribute-question"]), "worked solution")
+    broken(lambda r: r["rights"].update(translation="hi"), "outside the rights grant")
+    broken(lambda r: r["rights"].update(recordedBy="automated:rights-bot"), "recorded by a person")
+    broken(lambda r: r["rights"].update(recordedAt="yesterday"), "recordedAt")
     # the commercial-book path can never use the automated tier
     book = json.loads(json.dumps(__import__("test_pipeline").fixture()))
     book["review"]["reviewedBy"] = "automated:key+engine+ai-review/x/2026-10-02"
     assert any("automated review tier is not allowed" in e for e in audit_mod.audit([book], BOOK, publish=True, official=manifest)[1])
+    # a book row cannot rest on "official terms"; it needs a written licence or publisher grant
+    book = json.loads(json.dumps(__import__("test_pipeline").fixture()))
+    book["rights"]["evidence"]["kind"] = "official-terms"
+    assert any("not accepted for a book source" in e for e in audit_mod.audit([book], BOOK, publish=True, official=manifest)[1])
     return good
 
 
@@ -272,6 +288,11 @@ def test_pack_official(approved, manifest, tmp: Path):
     mpath = tmp / "official.json"
     mpath.write_text(json.dumps(manifest), encoding="utf-8")
     # pack.py reads the default official manifest; run audit via module instead with the temp manifest
+    # The automated review never records rights; without a person's rights record nothing publishes.
+    _, errors, _ = audit_mod.audit(approved, BOOK, publish=True, official=manifest)
+    assert errors and all("rights" in e for e in errors), errors
+    for r in approved:
+        r["rights"] = copy.deepcopy(approved_official(r)["rights"])
     _, errors, _ = audit_mod.audit(approved, BOOK, publish=True, official=manifest)
     assert not errors, errors
     spec = importlib.util.spec_from_file_location("pack_mod", HERE / "pack.py")

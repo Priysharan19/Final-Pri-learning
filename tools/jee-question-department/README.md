@@ -84,3 +84,15 @@ Do not hand-edit generated `<part>-NN.js` shards or generated catalog metadata. 
 ## Official exam-authority sources
 
 Official JEE Main / JEE Advanced / CBSE / NCERT intake (manifest, hash-verified fetch, key pairing, engine re-check, human and automated review tiers) is documented in `docs/content/official-pyq-intake.md`.
+
+## Rights evidence (#395)
+
+`audit.py --publish` now requires every publish row to carry a `rights` record:
+`status: "cleared"`, `grantor`, `scope` (`redistribute-question`, plus
+`redistribute-solution` when steps are shown, plus `translate` for a translated
+row), `evidence: {kind, ref}` and the person who recorded it (`recordedBy`,
+`recordedAt`). A book row needs a `written-licence` or `publisher-grant`; an
+official row may also rest on `official-terms`. Source metadata and the
+official manifest's `owner-confirmed` flag are not rights evidence. Rows with
+`answerPrivate: true` or `delivery: "server-escrow"` are refused by `pack.py`;
+their answers live only in the server escrow lane (`server/platform/jeeEscrow.js`).

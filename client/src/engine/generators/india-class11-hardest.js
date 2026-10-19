@@ -103,7 +103,6 @@ function cTex(a, b) {
   if (b === 0) return String(a);
   return `${a} ${b < 0 ? '-' : '+'} ${im}`;
 }
-const list = items => `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 const d3 = form => (rng, _diff) => form(rng);
 
 // ══ 1 · Relations and Functions — dp 0: a relation counted from its rule ════
@@ -596,7 +595,7 @@ function factorialRatio(letters) {
 // ══ 8 · Sequences and Series — dp 0: arithmetic progressions ════════════════
 function apReasoning(rng) {
   const kind = rc(rng, ['two-terms', 'sum-formula', 'multiples', 'savings']);
-  for (let guard = 0; guard < 400; guard++) {
+  { // one draw: every branch returns (the old 400-step guard was never reached)
     if (kind === 'two-terms') {
       const a = ri(rng, -20, 40), d = nz(rng, -6, 9);
       const p = ri(rng, 2, 9), q = ri(rng, p + 3, 20), n = ri(rng, 10, 30);

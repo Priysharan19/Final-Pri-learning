@@ -6,7 +6,7 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -19,6 +19,7 @@ import {
   parseComplexInput, sameComplex
 } from './answer-forms.js';
 import { unitContradicts, withoutUnit, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
+import { acceptsNumeric } from './tolerance.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -139,6 +140,34 @@ function paiseAsked(question) {
   if (/paise/i.test(suffix)) return true;
   if (RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix)) return false;
   return /\bpaise\b/i.test(String(question?.prompt ?? ''));
+}
+
+// ── A precision the question names ─────────────────────────────────────────
+// "Correct to 4 decimal places" is a contract with the student: the answer is
+// the value rounded to that digit, and the digit next to it is wrong. A band
+// authored wider than half a unit of that place (tol 0.0006 on a 4 d.p.
+// answer) marked the wrong last digit right — 0.2368 for 0.2367. The band a
+// named precision allows is therefore never wider than half a unit of the
+// named place, whatever the generator authored; when the prompt names two
+// precisions the coarser one bounds it, so a correct answer is never refused.
+const PLACE_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
+const NAMED_PLACES = /\b(one|two|three|four|five|[1-5])\s*(?:decimal\s+places?|d\.\s?p\.?)/gi;
+const NAMED_NEAREST = /\bnearest\s+(whole(?:\s+number)?|integer|tenth|hundredth|thousandth)\b/gi;
+const NEAREST_PLACES = { whole: 0, 'whole number': 0, integer: 0, tenth: 1, hundredth: 2, thousandth: 3 };
+export function namedDecimalPlaces(question) {
+  const text = `${question?.prompt ?? ''} ${question?.answerSuffix ?? ''}`;
+  const found = [];
+  // A precision that describes the GIVEN data ("measured as 17.3 s, to the
+  // nearest tenth of a second") is not the precision the answer is asked to.
+  const aboutData = index => /\b(?:measured|recorded|rounded off|known)\b(?:[^.?!]|\.\d)*$/i.test(text.slice(Math.max(0, index - 60), index))
+    && !/\b(?:correct|answer|give|round)\w*\b[^.?!]*$/i.test(text.slice(Math.max(0, index - 30), index));
+  for (const m of text.matchAll(NAMED_PLACES)) if (!aboutData(m.index)) found.push(PLACE_WORDS[m[1].toLowerCase()]);
+  for (const m of text.matchAll(NAMED_NEAREST)) if (!aboutData(m.index)) found.push(NEAREST_PLACES[m[1].toLowerCase().replace(/\s+/g, ' ')]);
+  return found.length ? Math.min(...found) : null;
+}
+function namedPrecisionBand(question) {
+  const places = namedDecimalPlaces(question);
+  return places == null ? null : 0.5 * 10 ** -places * (1 + 1e-9);
 }
 
 function percentAnswerWanted(question, ans) {
@@ -449,8 +478,14 @@ function checkAnswerWithinBudget(question, rawInput) {
         // for 60°), so an exact whole-number band would refuse it: a converted
         // value is compared in the relative band a non-integer target gets.
         const converted = Boolean(angleUnit && angleRead && angleRead !== angleUnit);
-        const tolUsed = ans.tol ?? (converted ? Math.max(1e-6, Math.abs(target) * 1e-4) : undefined);
-        let ok = numsClose(value, target, tolUsed);
+        let tolUsed = ans.tol ?? (converted ? Math.max(1e-6, Math.abs(target) * 1e-4) : undefined);
+        // A precision the question names ("to 2 d.p.") narrows the band: a
+        // wrong last digit is wrong (false-positive sweep, m-fp-sweep).
+        const named = namedPrecisionBand(question);
+        if (named != null) tolUsed = Math.min(tolUsed ?? numericBand(target), named);
+        // A declared JEE rounding rule (engine/tolerance.js) is read only when the
+        // reviewed key itself declares it; nothing is inferred.
+        let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
         let matched = ok ? value : null;
         let wantsExactValue = false;
         // Fraction questions that demand simplest form (e.g. simplify 12/18 → 2/3)
@@ -496,9 +531,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         // for a percentage has answered it, whether or not the author thought
         // to set ans.percent — but the sign alone earns nothing: the value is
         // still compared, and a bare 0.25 is not a second chance at 25.
-        if (!ok && (ans.percent || (meta.isPercent && percentAnswerWanted(question, ans)))) {
-          if (numsClose(value * 100, target, ans.tol)) { ok = true; matched = value * 100; }
-          if (ans.percent && meta.isPercent && numsClose(value / 100, target, ans.tol)) { ok = false; matched = null; }
+        // Only the sign earns the second reading: the box shows "%", so a bare
+        // 0.6 on a question asking for a percentage is 0.6%, not 60%.
+        if (!ok && meta.isPercent && percentAnswerWanted(question, ans)) {
+          if (numsClose(value * 100, target, tolUsed)) { ok = true; matched = value * 100; }
         }
         const exactTol = Math.max(1e-9, Math.abs(target) * 1e-9);
         if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
