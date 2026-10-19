@@ -79,10 +79,10 @@ ok('no hint charge, nothing stated', !('creditedAfterHints' in markRowsFor(q(['S
 const { marksPossibleFor } = await import('../platform/markerOps.js');
 const gen = await import('../../client/src/engine/generators/index.js');
 await gen.loadAllBanks?.();
-let real = 0;
+let real = 0; const threw = [];
 for (const id of Object.keys(gen.GENERATORS).slice(0, 400)) {
   for (const d of [1, 4]) {
-    let question; try { question = gen.generateQuestion(id, d, 7919 * d + 3); } catch { continue; }
+    let question; try { question = gen.generateQuestion(id, d, 7919 * d + 3); } catch (err) { threw.push(`${id} D${d}: ${err?.message || err}`); continue; }
     if (!question) continue;
     real += 1;
     const possible = marksPossibleFor(question);
@@ -93,6 +93,7 @@ for (const id of Object.keys(gen.GENERATORS).slice(0, 400)) {
   }
 }
 ok('real questions were exercised', real >= 200, `${real}`);
+ok('no generator threw while the rows were checked', threw.length === 0, threw.slice(0, 3).join(' | '));
 
 if (fails.length) {
   console.log(`MARK ROWS: FAIL — ${fails.length} of ${pass + fails.length} checks failed`);
