@@ -2438,6 +2438,6 @@ html { background-color: var(--page); }
    and squares it to the card radius. Wording still comes only from the
    engine's step evidence. */
 .verdict { border-radius: var(--radius); font: var(--t-body); }
-.verdict-title { font: var(--t-heading); }
+.verdict-title { font: var(--t-heading); font-size: 15px; }
 .verdict-body { font: var(--t-body); }
 .verdict-next { font: var(--t-compact); font-size: 14px; }
