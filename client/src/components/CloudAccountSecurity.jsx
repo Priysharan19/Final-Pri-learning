@@ -178,7 +178,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setFirstCode('');
       setFirstCodeInvalid(false);
       setMessage(tLater('cloudSecurity.codeSent'));
-    } catch (err) { setError(err.message || tLater('cloudSecurity.setPasswordFailed')); }
+    } catch (err) { setError(cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.setPasswordFailed'))); }
     finally { setBusy(''); }
   }
 

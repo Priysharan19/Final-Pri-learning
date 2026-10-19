@@ -435,6 +435,7 @@ jobs:
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-session-binding-check.mjs' platform-postgres.log
           grep -Fq '✓ export-reauth-check.mjs' platform-postgres.log
+          grep -Fq '✓ password-set-check.mjs' platform-postgres.log
           grep -Fq '✓ session-alerts-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
