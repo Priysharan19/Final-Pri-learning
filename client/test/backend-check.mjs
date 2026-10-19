@@ -1220,8 +1220,13 @@ async function run() {
         POST(`/practice/${offlineQ.question.id}/reveal`, { ms: 1000 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
       await rejects('offline, an exam does not start', POST('/exams', { length: 10, minutes: 30 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
       ok('offline, a question can still be read', !!(await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true })).question.prompt);
-      ok('offline, a hint the question already carries can still be read',
-        typeof (await POST(`/practice/${offlineQ.question.id}/hint`, {})).level === 'number');
+      // The hint ladder is the server's (PR #584): each rung is served and
+      // charged there, so offline a hint is refused like a check, and the
+      // device records no rung of its own.
+      const hintBefore = (await idb.get('questions', offlineQ.question.id)).hintLevel ?? null;
+      await rejects('offline, a hint is not served from the device',
+        POST(`/practice/${offlineQ.question.id}/hint`, {}), { status: 503, code: 'RECONNECT_TO_CHECK' });
+      eq('offline, no hint rung is recorded', (await idb.get('questions', offlineQ.question.id)).hintLevel ?? null, hintBefore);
     });
     eq('offline, the server graded nothing', online.traffic.grade, gradedBefore);
     {
@@ -2570,6 +2575,25 @@ async function run() {
 
     await rejects('a stranger cannot read a teacher’s class analytics',
       GET(`/classes/${theirs.class.id}/analytics`), { status: 404 });
+  } catch (err) { crashed(err); }
+
+  // ── The error notebook ─────────────────────────────────────────────────────
+  // Filing and twin selection are the server's (server/test/practice-hints-
+  // notebook-check.mjs); here both device routes are driven so the coverage
+  // figure stays whole, and their boundaries are re-asserted.
+  section('error notebook');
+  try {
+    await POST('/profiles/select', { id: ada.id });
+    const book = await GET('/notebook');
+    eq('a signed-in profile reads its notebook from the server', [book.available, Array.isArray(book.entries)], [true, true]);
+    const twinsBefore = (await idb.byIndex('questions', 'pid', ada.id)).length;
+    await rejects('a twin of an entry this account does not own is refused',
+      POST('/notebook/00000000-0000-4000-8000-000000000000/twin', {}), { status: 404, code: 'NOTEBOOK_ENTRY_NOT_FOUND' });
+    eq('the refused twin wrote no question row', (await idb.byIndex('questions', 'pid', ada.id)).length, twinsBefore);
+    // dispatch, not POST: this profile is never linked to an account.
+    await dispatch('POST', '/profiles', { name: 'Notebook Guest', year: 10 });
+    eq('a profile with no account reads no notebook and is told to sign in', [(await GET('/notebook')).available, (await GET('/notebook')).reason], [false, 'sign-in']);
+    await POST('/profiles/select', { id: ada.id });
   } catch (err) { crashed(err); }
 
   // ── Coverage of the dispatcher's own route table ───────────────────────────

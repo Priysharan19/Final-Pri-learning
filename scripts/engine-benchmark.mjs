@@ -33,7 +33,7 @@ const OUT = resolve(ROOT, typeof args.out === 'string' ? args.out : 'docs/eviden
 
 const { generateQuestion, loadAllBanks, GENERATORS } = await import(join(ROOT, 'client/src/engine/generators/index.js'));
 const { checkAnswer } = await import(join(ROOT, 'client/src/engine/checker.js'));
-const { formatRegion, formatMatrix, formatVector, formatComplex, transposeMatrix, authoredRegion } = await import(join(ROOT, 'client/src/engine/answer-forms.js'));
+const { formatRegion, formatMatrix, formatVector, formatComplex, authoredRegion } = await import(join(ROOT, 'client/src/engine/answer-forms.js'));
 
 await loadAllBanks();
 
@@ -145,7 +145,7 @@ if (!falsePositives.length) lines.push('None in this draw.');
 else {
   lines.push('| Generator | d | seed | type | wrong input accepted | derivation |');
   lines.push('|---|---:|---:|---|---|---|');
-  for (const f of falsePositives) lines.push(`| ${f.id} | ${f.d} | ${f.seed} | ${f.type} | \`${String(f.input).replace(/\|/g, '\\|').replace(/\n/g, ' / ')}\` | ${f.rule} |`);
+  for (const f of falsePositives) lines.push(`| ${f.id} | ${f.d} | ${f.seed} | ${f.type} | \`${String(f.input).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' / ')}\` | ${f.rule} |`);
 }
 lines.push('');
 lines.push('## False negatives (right answers refused)');
@@ -154,7 +154,7 @@ if (!falseNegatives.length) lines.push('None in this draw.');
 else {
   lines.push('| Generator | d | seed | type | canonical input refused | marker said |');
   lines.push('|---|---:|---:|---|---|---|');
-  for (const f of falseNegatives) lines.push(`| ${f.id} | ${f.d} | ${f.seed} | ${f.type} | \`${String(f.input).replace(/\|/g, '\\|').replace(/\n/g, ' / ')}\` | ${String(f.feedback || '').replace(/\|/g, '\\|').slice(0, 120)} |`);
+  for (const f of falseNegatives) lines.push(`| ${f.id} | ${f.d} | ${f.seed} | ${f.type} | \`${String(f.input).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' / ')}\` | ${String(f.feedback || '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').slice(0, 120)} |`);
 }
 lines.push('');
 lines.push('## How to read this');

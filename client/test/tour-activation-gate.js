@@ -38,6 +38,7 @@ import { createVerifiedProfile, freshEmail, lastEmailCode, resetOtpLimits, signI
 const GATE = '[data-testid="account-activation-gate"]';
 const CARD = '[data-signin-card="page"]';
 const INLINE = '[data-signin-card="inline"]';
+const SETTLED = `${GATE}:not([data-activation-status="checking"])`;
 const DEEP_LINKS = ['/practice?subtopic=c10-polynomials', '/progress', '/exams', '/settings', '/notes', '/history'];
 
 const accountRow = (platform, email) => platform.h.db.prepare('SELECT id, age_basis FROM accounts WHERE email=? AND deleted_at IS NULL').get(email);
@@ -151,12 +152,15 @@ export const flow = {
     await goto('/settings');
     await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
     await page.locator(GATE).waitFor({ timeout: 20000 });
+    // The gate is up while it asks the server ('checking'); judge its answer, not the question.
+    await page.locator(SETTLED).waitFor({ timeout: 20000 }).catch(() => {});
     await check('signing out relocks at once: the shell is gone and the gate shows the sign-in card',
       await page.locator('.shell').count() === 0 && await gateStatus(page) === 'signin' && await page.locator(`${GATE} ${INLINE}`).count() === 1);
     let lastLink = '/';
     for (const link of DEEP_LINKS.slice(0, 3)) {
       await page.goto(`${base}${link}`, { waitUntil: 'domcontentloaded' });
       await page.locator(GATE).waitFor({ timeout: 20000 });
+      await page.locator(SETTLED).waitFor({ timeout: 20000 }).catch(() => {});
       await check(`signed out, a deep link to ${link.split('?')[0]} is the gate, not the page`, await page.locator('.shell').count() === 0 && await gateStatus(page) === 'signin');
       lastLink = link.split('?')[0];
     }

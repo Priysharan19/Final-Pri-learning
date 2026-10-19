@@ -48,6 +48,27 @@ export function parseDevices(listText) {
   return rows;
 }
 
+/** "iOS 26.1" → [26, 1]; anything else → [] (sorts oldest). */
+const runtimeVersion = runtime => (String(runtime || '').match(/^iOS (\d+(?:\.\d+)*)$/)?.[1] || '').split('.').filter(Boolean).map(Number);
+const compareVersions = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
+
+/**
+ * The simulator a harness script runs on: the exact name when one is given,
+ * otherwise any device whose name contains `family`. A booted match wins;
+ * otherwise the match on the NEWEST iOS runtime — the same choice the CI
+ * provisioner and `xcodebuild -destination name=…` make. `simctl list` prints
+ * runtimes oldest first, so taking the first row picked the oldest runtime on
+ * a runner image that carries several (App Health native lane, run 39227834970).
+ */
+export function pickSimulator(listText, { family = 'iPad', named = null } = {}) {
+  const matching = parseDevices(listText)
+    .filter(d => (named ? d.name === named : d.name.includes(family)))
+    .filter(d => runtimeVersion(d.runtime).length);
+  const booted = matching.find(d => /^Booted$/i.test(d.state));
+  if (booted) return booted;
+  return matching.slice().sort((a, b) => compareVersions(runtimeVersion(b.runtime), runtimeVersion(a.runtime)))[0] || null;
+}
+
 /** UDIDs of simulators that are booted or still booting, other than `udid`. */
 export function otherBooted(listText, udid) {
   const keep = String(udid || '').toUpperCase();
