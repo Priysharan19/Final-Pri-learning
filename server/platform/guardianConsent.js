@@ -24,11 +24,12 @@
 // Withdrawal is as easy as giving it: the same email carries a withdraw link,
 // and withdrawing stops sync at once.
 // ─────────────────────────────────────────────────────────────────────────────
-import { sessionFromRequest, sha256 } from './security.js';
+import { resolveSessionOnce, sha256 } from './security.js';
 import { asyncHandler } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { tagPolicy } from './routePolicy.js';
 import { clipText } from './text.js';
+import { timedMiddleware } from './requestTiming.js';
 
 /**
  * The version of the notice a guardian agreed to. Bump it whenever the privacy
@@ -37,7 +38,9 @@ import { clipText } from './text.js';
  */
 // 2026-10-02: the notice's Children section now describes this flow (it said
 // no consent was recorded), and its retention section changed.
-export const CONSENT_NOTICE_VERSION = '2026-10-02';
+// 2026-10-19 (#284): the notice now says answers are marked online by the
+// server, handwriting and photos are read by OpenAI, and where data is stored.
+export const CONSENT_NOTICE_VERSION = '2026-10-19';
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
@@ -145,16 +148,37 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
   return { accountId, tokenHash };
 }
 
+// consentState's one statement, without and with the consent row's lock.
+const CONSENT_STATE_SQL = `WITH consent AS (SELECT * FROM guardian_consents WHERE account_id = ?)
+    SELECT consent.*, (SELECT age_basis FROM accounts WHERE id = ?) AS pri_account_age_basis
+    FROM (SELECT 1 AS pri_anchor) anchor LEFT JOIN consent ON 1 = 1`;
+const CONSENT_STATE_LOCKED_SQL = `WITH consent AS (SELECT * FROM guardian_consents WHERE account_id = ? FOR UPDATE)
+    SELECT consent.*, (SELECT age_basis FROM accounts WHERE id = ?) AS pri_account_age_basis
+    FROM (SELECT 1 AS pri_anchor) anchor LEFT JOIN consent ON 1 = 1`;
+
 /** The consent state of one account. */
-export async function consentState(db, accountId) {
+export async function consentState(db, accountId, { lock = false } = {}) {
   db = asStore(db);
   // Age basis is the current authority for WHETHER consent is required except
   // for an explicit guardian withdrawal, which is permission-reducing and wins.
   // A historical pending/given row remains evidence of an earlier ceremony, not
   // authority to keep an explicitly-adult account blocked forever.
-  const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
-  const basis = account?.age_basis ?? null;
-  const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
+  //
+  // One statement for both facts (they were two): the account's age basis and
+  // its consent row, if it has one — each read exactly as before, neither
+  // depending on the other (a one-row anchor, a scalar subquery and a LEFT
+  // JOIN). With `lock` — asked for where a mark or a receipt commits — the
+  // consent row is also locked on Postgres (FOR UPDATE in the CTE: a row lock
+  // cannot sit on the nullable side of a join), so a guardian's concurrent
+  // withdrawal cannot commit between this check and the write it guards. That
+  // was a separate locking SELECT before this one. SQLite serialises writers.
+  const found = await db.get(lock && db.dialect === 'postgres' ? CONSENT_STATE_LOCKED_SQL : CONSENT_STATE_SQL, [accountId, accountId]);
+  const basis = found?.pri_account_age_basis ?? null;
+  let row = null;
+  if (found && found.account_id != null) {
+    const { pri_account_age_basis: _basis, pri_anchor: _anchor, ...consent } = found;
+    row = consent;
+  }
 
   // Withdrawal is permission-reducing authority and always wins, even if the
   // learner corrected their age basis after the guardian ceremony began. This
@@ -218,7 +242,7 @@ export async function withdrawConsent(db, accountId, now = Date.now()) {
  */
 export function requireGuardianConsent(db) {
   db = asStore(db);
-  return tagPolicy(asyncHandler(async (req, res, next) => {
+  return tagPolicy(timedMiddleware('eligibility', asyncHandler(async (req, res, next) => {
     // The session is resolved here rather than read off the request, because
     // each sub-router establishes its own session INSIDE itself — so a gate
     // mounted in front of one runs before req.platformSession exists, and
@@ -231,7 +255,9 @@ export function requireGuardianConsent(db) {
     // It now propagates: a database outage is the coded, retryable 503, and
     // anything else is a 500. Neither ever passes through.
     let accountId = req.platformSession?.account_id;
-    if (!accountId) accountId = (await sessionFromRequest(db, req))?.account_id;
+    // (resolveSessionOnce leaves a session it found for the sub-router's own
+    // requireSession, so the cookie is looked up once per request, not twice.)
+    if (!accountId) accountId = (await resolveSessionOnce(db, req))?.account_id;
     // No session at all: the sub-router's own requireSession will answer 401.
     // This gate is about consent, not authentication.
     if (!accountId) return next();
@@ -259,7 +285,7 @@ export function requireGuardianConsent(db) {
         'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
     }
     return refuse(res, blocker, 'This account cannot sync right now.');
-  }), { guardianConsent: true });
+  })), { guardianConsent: true });
 }
 
 function refuse(res, code, message) {

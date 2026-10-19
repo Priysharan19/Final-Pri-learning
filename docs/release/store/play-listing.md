@@ -54,7 +54,9 @@ production-ready claims.
 > parent or guardian to confirm their account before Pri can check their answers.
 >
 > PRIVACY
-> No ads. No tracking. We do not sell your data. To read your handwriting or photo, Pri's server
+> No ads. No tracking. We do not sell your data. Your account data is stored on Pri's servers, which
+> today run on Railway in the Netherlands (Amsterdam); a move to Supabase in Mumbai is planned.
+> To read your handwriting or photo, Pri's server
 > sends the image to an outside AI reading service (OpenAI); it is never sent with the question,
 > the answer or your name, and Pri keeps no copy of the image. If you turn on the optional
 > working check, the lines of your working and the text of the question are also sent to the

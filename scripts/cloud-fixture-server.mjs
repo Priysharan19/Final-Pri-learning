@@ -18,13 +18,20 @@
 // scripts/synthetic-reader-server.mjs: the handwriting reader (the one hop to
 // the model) is a scripted stand-in, every other outbound request is refused.
 // Evidence from such a run is SYNTHETIC-READER evidence, never real-provider.
+// Email codes: the server runs its TEST email adapter (NODE_ENV=development,
+// PRI_AUTH_EMAIL_PROVIDER unset — nothing is ever sent). That adapter keeps
+// what it "sent" in the server process's memory; a harness-only preload
+// (--import, below) copies each message to <dir>/test-outbox.jsonl (0600) so
+// the journey's test desk (scripts/journey-oracle.mjs emailCode) can read the
+// code the server really issued — the way the browser suites read
+// platform.sms.readTestOutbox. Never part of the server or a deployment.
 // The server keeps running (detached); its log is written next to the DB.
 // ─────────────────────────────────────────────────────────────────────────────
 import { spawn } from 'node:child_process';
 import { mkdtempSync, openSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,11 +59,30 @@ const readerEnv = syntheticReader ? {
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000',
   PRI_SYNTHETIC_READER_LOG: readerLog, PRI_SYNTHETIC_READER_SCRIPT: readerScript
 } : {};
+const outboxFile = join(dir, 'test-outbox.jsonl');
+// Copies the test adapter's in-memory outbox to outboxFile, polling the same
+// module instance the server imports (one ESM instance per URL).
+const outboxTap = `data:text/javascript,${encodeURIComponent(`
+import { readTestOutbox } from ${JSON.stringify(pathToFileURL(join(ROOT, 'server/platform/smsProvider.js')).href)};
+import { appendFileSync, chmodSync, writeFileSync } from 'node:fs';
+const file = ${JSON.stringify(outboxFile)};
+if (process.env.NODE_ENV === 'production') throw new Error('test outbox tap refused under NODE_ENV=production');
+writeFileSync(file, '', { flag: 'a', mode: 0o600 }); chmodSync(file, 0o600);
+const seen = new Set();
+setInterval(() => {
+  for (const m of readTestOutbox()) {
+    const key = [m.at, m.channel, m.to, m.purpose, m.code].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    appendFileSync(file, JSON.stringify({ at: m.at, channel: m.channel, to: m.to, purpose: m.purpose, code: m.code }) + '\\n');
+  }
+}, 150).unref();
+`)}`;
 const entry = syntheticReader ? join(ROOT, 'scripts/synthetic-reader-server.mjs') : join(ROOT, 'server/index.js');
 
-const child = spawn(process.execPath, [entry], {
+const child = spawn(process.execPath, ['--import', outboxTap, entry], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', ...readerEnv },
+  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', PRI_AUTH_EMAIL_PROVIDER: '', ...readerEnv },
   detached: true,
   stdio: ['ignore', log, log],
 });
@@ -98,7 +124,7 @@ if (changed !== 1) { console.error('could not mark the fixture account verified'
 // A second, never-registered credential for sign-up journeys.
 const newEmail = `native-new-${Date.now()}@example.test`;
 const newPassword = `Fixture-${randomBytes(9).toString('base64url')}`;
-const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n${syntheticReader ? `PRI_CLOUD_READER=synthetic\nPRI_CLOUD_READER_LOG=${readerLog}\nPRI_CLOUD_READER_SCRIPT=${readerScript}\n` : ''}`;
+const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\nPRI_CLOUD_OUTBOX=${outboxFile}\n${syntheticReader ? `PRI_CLOUD_READER=synthetic\nPRI_CLOUD_READER_LOG=${readerLog}\nPRI_CLOUD_READER_SCRIPT=${readerScript}\n` : ''}`;
 const out = arg('out');
 if (out) writeFileSync(out, env);
 console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.${syntheticReader ? ' Handwriting reader: SYNTHETIC stand-in (no provider is reached).' : ''}`);

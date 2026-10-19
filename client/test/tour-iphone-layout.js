@@ -115,7 +115,7 @@ export const flow = {
     await page.waitForSelector('.auth-wrap .hero-title', { timeout: 30000 });
     await setInsets(page, INSETS);
     const hero = await page.evaluate(() => {
-      const demo = document.querySelector('[data-testid="hero-try-demo"]');
+      const demo = document.querySelector('[data-testid="signup-send-code"]');
       const lh = parseFloat(getComputedStyle(demo).lineHeight) || parseFloat(getComputedStyle(demo).fontSize) * 1.5;
       const logo = document.querySelector('.auth-wrap .auth-col')?.getBoundingClientRect();
       const field = getComputedStyle(document.querySelector('.mathfield')).backgroundImage;
@@ -123,8 +123,8 @@ export const flow = {
       const lines = new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top))).size;
       return { demoH: demo.getBoundingClientRect().height, lines, lh, logoTop: logo?.top, marginRule: /90deg/.test(field) };
     });
-    await check('welcome: "Try the demo" is one line, its description beneath it', hero.lines === 1, JSON.stringify(hero));
-    await check('welcome: the text links are finger-sized (≥ 44px)', hero.demoH >= 44, JSON.stringify(hero));
+    await check('welcome: the card\'s "Continue with email" is one line', hero.lines === 1, JSON.stringify(hero));
+    await check('welcome: the primary action is finger-sized (≥ 44px)', hero.demoH >= 44, JSON.stringify(hero));
     await check('welcome: no margin rule runs through the centred text', !hero.marginRule, JSON.stringify(hero));
     await check('welcome: the content starts below the status bar', hero.logoTop >= INSETS.top, JSON.stringify(hero));
     await check('welcome: no horizontal overflow', await overflowOf(page) <= 1);

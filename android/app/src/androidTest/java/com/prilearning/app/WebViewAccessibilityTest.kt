@@ -7,7 +7,10 @@
 // targets at least 44 CSS px — on Home, Practice, Progress and Settings, at the
 // device's own size, each audited once its own landmark has rendered. And the
 // system font size reaches the page: text is measurably larger at 1.3×.
-// TalkBack itself stays a physical/manual gate.
+// Nothing clips horizontally: phone portrait and tablet landscape, at 1.0× and
+// 1.3× font scale, no screen scrolls sideways and no visible control or heading
+// is cut by the viewport edge (content inside its own horizontal scroller is
+// exempt). TalkBack itself stays a physical/manual gate.
 // SYNTHETIC / EMULATOR evidence.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app
@@ -68,14 +71,12 @@ class WebViewAccessibilityTest {
     @Test
     fun theProductPassesTheAccessibilitySmokeInTheShell() {
         var supported = false
+        AccountFirst.useFixtureServer()
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             s.onActivity { supported = it.webView != null }
             assumeTrue("the WebView is below the floor on this image", supported)
-            val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                if(b){b.click();return 'picker';}return false;})()""")
-            assertTrue(state, state == "\"home\"" || state == "\"picker\"")
-            waitFor(s, "document.querySelector('.home-greet')")
+            // Account-first (#477): Home only once the gate has let the signed-in student in.
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
             // Each screen is audited only once its own landmark has rendered.
             for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/settings" to "#cloud-account-title")) {
                 eval(s, "(function(){history.pushState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
@@ -93,14 +94,13 @@ class WebViewAccessibilityTest {
         fun fontScale(v: String) { ui.executeShellCommand("settings put system font_scale $v").close(); Thread.sleep(1500) }
         fun greetHeight(): Float {
             var h = -1f
+            AccountFirst.useFixtureServer()
             ActivityScenario.launch(MainActivity::class.java).use { s ->
                 var ok = false
                 s.onActivity { ok = it.webView != null }
                 assumeTrue("the WebView is below the floor on this image", ok)
-                val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                    var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                    if(b){b.click();return 'picker';}return false;})()""")
-                assertTrue(state, state == "\"home\"" || state == "\"picker\"")
+                // Account-first (#477): Home only once the gate has let the signed-in student in.
+                waitFor(s, AccountFirst.HOME_OPEN, 90_000)
                 // A paragraph of fixed text, measured in CSS px.
                 h = waitFor(s, "(function(){var p=document.createElement('p');p.id='pri-fs';p.style.cssText='position:absolute;left:0;top:0;width:200px;margin:0';p.textContent='Pri Learning measures the system font size here.';document.body.appendChild(p);var r=p.getBoundingClientRect().height;p.remove();return String(r);})()").trim('"').toFloat()
             }
@@ -114,6 +114,53 @@ class WebViewAccessibilityTest {
             assertTrue("text at system font scale 1.3 is larger than at 1.0 ($large vs $base CSS px)", large > base * 1.15)
         } finally {
             fontScale("1.0")
+        }
+    }
+
+    private val clipAudit = """(function(where){
+      var p=[],w=window.innerWidth;
+      if(document.documentElement.scrollWidth>w+1)p.push(where+': page is '+document.documentElement.scrollWidth+'px wide in a '+w+'px viewport');
+      var scroller=function(el){for(var a=el.parentElement;a&&a!==document.body;a=a.parentElement){var o=getComputedStyle(a).overflowX;if(o==='auto'||o==='scroll')return true;}return false;};
+      [].slice.call(document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, h1, h2, h3, [role=button], [role=heading]')).forEach(function(el){
+        if(!(el.offsetParent||el.getClientRects().length)||getComputedStyle(el).visibility==='hidden')return;
+        var r=el.getBoundingClientRect();if(r.width===0||r.height===0||scroller(el))return;
+        if(r.left<-1||r.right>w+1)p.push(where+': '+el.tagName.toLowerCase()+' '+(el.textContent||el.getAttribute('aria-label')||'').trim().slice(0,24)+' spans '+Math.round(r.left)+'..'+Math.round(r.right));});
+      return p.join(' | ')||'clean';})"""
+
+    /** Phone portrait / tablet landscape, at 1.0× and 1.3× font scale: no screen clips sideways. */
+    @Test
+    fun noScreenClipsHorizontally() {
+        val ui = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        fun sh(c: String) = ui.executeShellCommand(c).close()
+        val tablet = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.smallestScreenWidthDp >= 600
+        fun get(k: String): String = ui.executeShellCommand("settings get system $k").let { fd ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText().trim() }
+        val saved = listOf("font_scale", "accelerometer_rotation", "user_rotation").associateWith { get(it) }
+        // Natural orientation: portrait on a phone, landscape on pixel_tablet.
+        sh("settings put system accelerometer_rotation 0"); sh("settings put system user_rotation 0")
+        try {
+            for (scale in listOf("1.0", "1.3")) {
+                sh("settings put system font_scale $scale"); Thread.sleep(1500)
+                AccountFirst.useFixtureServer()
+                ActivityScenario.launch(MainActivity::class.java).use { s ->
+                    var ok = false
+                    s.onActivity { ok = it.webView != null }
+                    assumeTrue("the WebView is below the floor on this image", ok)
+                    // Account-first (#477): enter only once the gate has let the
+                    // student CloudJourneyTest signed in on the card through to Home.
+                    waitFor(s, AccountFirst.HOME_OPEN, 90_000)
+                    val landscape = eval(s, "window.innerWidth > window.innerHeight")
+                    assertEquals(if (tablet) "the tablet runs landscape" else "the phone runs portrait", if (tablet) "true" else "false", landscape)
+                    for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/review" to "h1, h2", "/settings" to "#cloud-account-title")) {
+                        eval(s, "(function(){history.pushState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+                        waitFor(s, "location.pathname === '$path' && !!document.querySelector('$landmark')")
+                        Thread.sleep(400)
+                        assertEquals("horizontal clipping on $path at font scale $scale (${if (tablet) "tablet landscape" else "phone portrait"})", "\"clean\"", eval(s, "$clipAudit('$path')"))
+                    }
+                }
+            }
+        } finally {
+            for ((k, v) in saved) if (v.isNotEmpty() && v != "null") sh("settings put system $k $v") else sh("settings delete system $k")
         }
     }
 }

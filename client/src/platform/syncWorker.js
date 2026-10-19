@@ -612,7 +612,22 @@ async function pushFullRescan(pid, deviceId, marker, state, coveredBelow, recove
   return { pushedEvents, pushedEntities, acknowledged: 1 + leftover.length, blocked: [] };
 }
 
-export async function syncNow(pid) {
+// One sync per profile at a time. The activation gate, the sign-in card and
+// the scheduler can all ask at once (a first sign-in mounts the gate while the
+// card is still finishing); two runs would each load and save the cursor and
+// entity versions, and the slower would overwrite the faster. A caller that
+// arrives while a sync is running shares its result.
+const inFlightSync = new Map();
+export function syncNow(pid) {
+  const key = String(pid);
+  const running = inFlightSync.get(key);
+  if (running) return running;
+  const run = syncNowOnce(pid).finally(() => { if (inFlightSync.get(key) === run) inFlightSync.delete(key); });
+  inFlightSync.set(key, run);
+  return run;
+}
+
+async function syncNowOnce(pid) {
   const link = await cloudAccountLink(pid);
   if (!link?.accountId) throw Object.assign(new Error('Connect this local profile to a cloud account before syncing.'), { code: 'CLOUD_ACCOUNT_NOT_LINKED' });
   const session = await verifyCloudSession(pid);

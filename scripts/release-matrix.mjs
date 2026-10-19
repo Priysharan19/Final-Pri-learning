@@ -64,7 +64,8 @@ for (const pkg of ['ios/PriLearning.swiftpm', 'ios/PriLearning 2.swiftpm']) {
   const swift = read(`${pkg}/Package.swift`);
   const display = swift.match(/displayVersion:\s*"([^"]+)"/)?.[1];
   const build = swift.match(/bundleVersion:\s*"([^"]+)"/)?.[1];
-  row('apple', `${pkg} version`, `${display} (${build})`, display === meta.productVersion && /^\d+$/.test(build || ''), `metadata ${meta.productVersion}`);
+  const store = json('ios/app-store-version.json').marketingVersion;
+  row('apple', `${pkg} version`, `${display} (${build})`, display === store && /^\d+$/.test(build || ''), `ios/app-store-version.json ${store}`);
 }
 
 {

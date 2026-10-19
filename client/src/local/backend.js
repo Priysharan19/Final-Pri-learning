@@ -63,6 +63,7 @@ import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
 import { withMutationLock } from './mutationLock.js';
+import { serveAvoidingRepeat, chapterRetarget } from './retargetOnRepeat.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
@@ -1035,12 +1036,20 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
     draftTarget = targetOf.get(picked.q) || target;
     return { q: picked.q, repeat: picked.repeat };
   };
-  const out = await serveQuestion(pid, {
-    generator: target.generator, difficulty: target.difficulty, mode,
+  // The server draws inside the one cell it is given. When it flags a repeat
+  // and the request can be re-resolved to another cell on the same terms, ask
+  // again there rather than hand a student a repeat on a chapter that still
+  // has fresh questions (retargetOnRepeat.js; issue #540). Not while a
+  // misconception is being worked on: the slip lives on this dot point, and a
+  // repeat that can spring it outranks a fresh question that cannot — the
+  // same order drawDistinct keeps for a draft, whose re-resolutions the
+  // picker keeps on the hunted dot point (chapterRetarget).
+  const { out, target: issued } = await serveAvoidingRepeat(t => serveQuestion(pid, {
+    generator: t.generator, difficulty: t.difficulty, mode,
     trap: trapKey ? { owner: chapter.id, key: trapKey } : null
-  }, localDraft);
+  }, localDraft), target, trapKey ? null : retarget);
   const q = out.q;
-  const served = out.fields.draftOnly ? draftTarget : target;
+  const served = out.fields.draftOnly ? draftTarget : issued;
   const delivered = trapKey && out.trapDelivered ? trapKey : null;
   const picked = { repeat: out.repeat };
   const row = {
@@ -1215,8 +1224,9 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // chapter has it (issue #408).
   const namedDifficulty = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
   const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
+  let dpPool = [];
   if (asked == null && !pyqOnly) {
-    let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
     // With a named difficulty, the dot point is chosen among those authored at
     // that rung, so "this chapter at D3" is not answered with a D1 question
     // because the picker landed on a dot point that has no D3 form.
@@ -1272,20 +1282,45 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (!target) {
     throw Object.assign(new Error(`That India ${ordinal != null ? 'dot point' : 'chapter'} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
   }
-  let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
-  if (target.pyq) why += ' This one is a real previous-year question.';
-  if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
-  if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  // What is said about a question describes the cell that answers it — which
+  // may not be `target` when that cell is spent (retargetOnRepeat.js).
+  const whyFor = t => {
+    let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
+    if (t.pyq) why += ' This one is a real previous-year question.';
+    if (t.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[t.dotpointIndex]}`;
+    if (t.windowed === false) why += ` (Served at D${t.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+    if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
+    return why;
+  };
   // Last line of defence: whatever chose the target, a named level is served
   // at exactly that level inside the track's window or not at all.
   if (askedLevel != null && (target.difficulty !== askedLevel || target.windowed === false)) {
     throw difficultyUnavailable(askedLevel, levelsOf(c, asked), { subtopic: c.id, dotpoint: asked, track: trackId });
   }
-  if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
+  // Where a request goes when the cell it landed on has nothing fresh left: a
+  // re-resolution on the same terms (difficulty, archive status, inside the
+  // window), each call naming the next place to try (chapterRetarget). A dot
+  // point the student named has only its own cells to offer. A chapter — the
+  // student's by name, or the optimiser's — was narrowed to one dot point by
+  // the picker above, so after that dot point's own cells the chapter's other
+  // dot points follow, next-best first: Class X Quadratic Equations has three
+  // cells at D2 and the one behind its fourth dot point holds twelve items,
+  // fewer than the repeat window, so a chapter request that landed there was
+  // served a flagged repeat while the chapter had 1,400 fresh questions (issue
+  // #540). A misconception hunt stays on its dot point, online and in the
+  // device's offline draft alike: the slip lives there.
+  const onTerms = t => (t && t.difficulty === target.difficulty && !!t.pyq === !!target.pyq && (t.windowed !== false) === (target.windowed !== false) ? t : null);
+  const retarget = chapterRetarget({
+    sameDotpoint: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
+    others: dp && asked == null ? dpPool.filter(d => d !== dp && d.index !== dp.index) : null,
+    pickNext: remaining => pickDotpoint(remaining, { rand, nowMs: now, recent: recentlyServedDotpoints(p.id) }),
+    resolveAt: next => onTerms(resolveIndiaTarget(c, { dotpoint: next.index, difficulty: want, track: trackId, grade, pyqOnly })),
+    hunting: !!choice.trap?.key
+  });
   return {
-    chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
-    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
-    reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
+    chapter: c, target,
+    retarget, whyFor,
+    reason: choice.reason, reasonTag: choice.reasonTag, why: whyFor(target), nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };
 }
@@ -3360,18 +3395,25 @@ const routes = {
         chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null,
         pyqOnly: !!pyqOnly, rand: Math.random()
       });
-      const { row, payload, trapKey, repeat } = await createIndiaQuestion(
+      const made = await createIndiaQuestion(
         p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null, pick.retarget
       );
+      const { row, payload, trapKey, repeat } = made;
+      // The cell that answered: the one the picker chose, unless that one was
+      // spent and the request was answered from another on the same terms
+      // (retargetOnRepeat.js), or the device drew its own draft elsewhere.
+      // Everything said about the question describes the cell that served it.
+      const served = made.target || pick.target;
+      const dotpointKey = served.dotpointIndex != null ? indiaDotpointKey(pick.chapter.id, served.dotpointIndex) : null;
       // Only what the optimiser chose feeds the interleaving memory: a chapter
       // the student asked for by name is their sitting, not the picker's.
-      if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, pick.dotpointKey); }
+      if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, dotpointKey); }
       return {
-        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: pick.why, nextUp: pick.nextUp,
-        dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
+        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: served === pick.target ? pick.why : pick.whyFor(served), nextUp: pick.nextUp,
+        dotpoint: served.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
-        windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq, repeat: !!repeat,
+        windowed: served.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
+        pyq: !!served.pyq, repeat: !!repeat,
         ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
       };
     }
@@ -3777,6 +3819,15 @@ const routes = {
         correct: false, resolved: false,
         triesLeft: authoritative.triesLeft,
         invalid: true, feedback, stepReport,
+        // An entry the marker could not read, and an entry the marker was
+        // stopped on at its deadline (server markerPool.js), come back in the
+        // same shape — nothing spent, nothing recorded — but they are not the
+        // same thing to the student or to a suite: the second is worth sending
+        // again as it is. The server says which, and the device now passes it
+        // on. Today only the suites read it; the card still shows both as an
+        // unreadable entry, and its own "send it again as it is" wording is a
+        // separate change.
+        ...(authoritative.tooComplex === true ? { tooComplex: true, code: authoritative.code || 'MARKING_TOO_COMPLEX' } : {}),
         // The card matches a server receipt to the submission it sent. Without
         // this an unreadable answer on a server-issued question was shown as
         // "the server response did not match this submission".
@@ -5641,7 +5692,27 @@ async function revealOnServer(row) {
   return receipt;
 }
 
-async function gradeOnServer(row, body, submissionId, requestDigest) {
+// The /v1 JSON body limit is 1 MB (server/app.js). A picture shares the
+// submission's body only when the two fit with room to spare; otherwise the
+// picture is read by its own request, as before.
+const SINGLE_REQUEST_BODY_CHARS = 960_000;
+
+// The server's answers that mean "the picture was not read, so nothing was
+// marked" when a submission carries its picture (server/platform/practice.js).
+const READING_REFUSALS = new Set(['RATE_LIMITED', 'AI_ALLOWANCE_EXHAUSTED', 'PAID_CAPACITY_REACHED', 'PAID_CAPACITY_NOT_CONFIGURED',
+  'RECOGNITION_FAILED', 'RECOGNITION_EMPTY', 'RECOGNITION_CORRECTION_INVALID', 'RECOGNITION_IMAGE_INVALID']);
+const readingRefused = cause => READING_REFUSALS.has(String(cause?.code || '')) || /^HANDWRITING_/.test(String(cause?.code || ''));
+
+/** A reading that failed, as the reason the answer was not checked — with the reader's own refusal kept beside it. */
+function readerRefusal(cause) {
+  const refusal = unreachable(cause);
+  if (refusal && typeof refusal === 'object') {
+    refusal.readerFailure = { code: cause?.code || null, status: cause?.status || null, resetAt: cause?.resetAt || null };
+  }
+  return refusal;
+}
+
+async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow = false } = {}) {
   if (!row.serverQuestionId || !submissionId) {
     throw notMarked(Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
       status: 503, code: 'ONLINE_GRADE_REQUIRED'
@@ -5661,11 +5732,24 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   const mode = earlier?.submissionId === submissionId ? earlier.mode
     : body.viaInk === true ? 'ink' : body.photo ? 'photo' : 'typed';
   let receipt = earlier?.submissionId === submissionId ? earlier.receipt : null;
+  // The request bytes of an earlier send under this key, when there was one.
+  const resend = earlier?.submissionId === submissionId && earlier.payload ? earlier.payload : null;
+  // A handwritten or photographed answer goes to the server in ONE request:
+  // the picture travels with the submission, and the server reads it (reusing
+  // the transcript it has just shown, so Submit never pays for a second read
+  // of an unchanged picture), writes the reading receipt — and the student's
+  // correction when the answer is not the whole transcript — and marks, in
+  // one transaction. The reader is sent the picture alone (answer-blind), and
+  // the mark is the deterministic engine's verdict on the answer text. That
+  // was three requests (/recognize, /recognition/…/confirm, /submit). The
+  // three-request sequence below is kept for a server that does not accept a
+  // picture here yet, and for a picture too large to share a request body.
+  let picture = null;
   // Reading the handwriting or photo comes before marking and is not marking:
   // a failure anywhere in it means the answer was not sent to be marked. (It
   // runs only while no marking request under this key has been sent: after
   // one, the reading receipt is the one stored with it.)
-  if (mode !== 'typed' && !receipt) try {
+  if (mode !== 'typed' && !receipt && !resend) try {
     const image = mode === 'ink'
       ? rasterizeInk(body.ink?.strokes)?.dataUrl
       : (await preparePhoto(body.photo))?.dataUrl;
@@ -5674,38 +5758,38 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
         status: 422, code: 'RECOGNITION_IMAGE_REQUIRED'
       });
     }
-    // The reader's own refusal (the service's reading limit, this account's
-    // allowance or rate limit, a reader that did not answer) is kept beside
-    // the "not checked" error, so the card can name it instead of saying
-    // "reconnect" for a limit that reconnecting does not lift.
-    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image).catch(cause => {
-      const refusal = unreachable(cause);
-      if (refusal && typeof refusal === 'object') {
-        refusal.readerFailure = { code: cause?.code || null, status: cause?.status || null, resetAt: cause?.resetAt || null };
-      }
-      throw refusal;
-    });
-    receipt = read?.receipt;
-    if (!receipt || typeof read?.transcription?.text !== 'string') {
-      throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
-        status: 503, code: 'RECOGNITION_ACK_MISSING'
+    const workingChars = Array.isArray(body.steps) ? body.steps.join('\n').length : String(body.steps || '').length;
+    if (receiptFlow !== true && image.length + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
+      picture = image;
+    } else {
+      // The reader's own refusal (the service's reading limit, this account's
+      // allowance or rate limit, a reader that did not answer) is kept beside
+      // the "not checked" error, so the card can name it instead of saying
+      // "reconnect" for a limit that reconnecting does not lift.
+      const read = await cloud.recognizePractice(row.serverQuestionId, mode, image).catch(cause => {
+        throw readerRefusal(cause);
       });
-    }
-    // Student corrections cannot forge a provider receipt. The server saves
-    // the original reading and the explicit correction under a second token.
-    if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
-      const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
-      if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
-      receipt = corrected.receipt;
+      receipt = read?.receipt;
+      if (!receipt || typeof read?.transcription?.text !== 'string') {
+        throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
+          status: 503, code: 'RECOGNITION_ACK_MISSING'
+        });
+      }
+      // Student corrections cannot forge a provider receipt. The server saves
+      // the original reading and the explicit correction under a second token.
+      if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
+        const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
+        if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
+        receipt = corrected.receipt;
+      }
     }
   } catch (cause) { throw notMarked(cause); }
   // Preserve the complete request bytes across uncertain acknowledgements.
   // A later UI timer value must not silently change a committed idempotency key.
-  const payload = earlier?.submissionId === submissionId && earlier.payload
-    ? earlier.payload
-    : {
+  const payload = resend
+    || {
         submissionId, answer: String(body.answer), mode, steps: body.steps,
-        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : {})
+        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : picture ? { image: picture } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).
@@ -5716,6 +5800,25 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   await put('questions', row);
   let acknowledged;
   try { acknowledged = await cloud.gradePractice(row.serverQuestionId, payload); } catch (cause) {
+    if (typeof payload.image === 'string' && !sentBefore && Number(cause?.status) >= 400) {
+      // A server that does not take a picture here yet refuses the request by
+      // its shape, before reading or marking anything: use the receipt
+      // sequence for this same press, under the same key.
+      if (cause.status === 400 && cause.code === 'PRACTICE_SUBMISSION_INVALID' && receiptFlow !== true) {
+        row.pendingGrade = null;
+        await put('questions', row).catch(() => {});
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+      }
+      // The reading failed or was refused (a limit, an allowance, a reader
+      // that did not answer, nothing legible). The server answers these
+      // before it marks, so the answer was not marked — exactly as when the
+      // separate reading request failed — and the card can name the reason.
+      if (readingRefused(cause)) {
+        row.pendingGrade = { ...row.pendingGrade, notSent: true };
+        await put('questions', row).catch(() => {});
+        throw notMarked(readerRefusal(cause));
+      }
+    }
     // The server's own refusal to mark (no session, account not eligible) is
     // stamped by checkUnavailable. Beyond that, only a web build with no
     // server origin is known not to have sent anything: the transport refuses

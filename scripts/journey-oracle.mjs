@@ -22,14 +22,21 @@
 //     the instrumentation TEST PROCESS, never the page:
 //       GET /answer  the sealed answer of the question the account was issued last
 //       GET /marked  every question the server completed, with its grades
+//       GET /email-code?to=<address>[&purpose=reauth]  the last code the server's TEST
+//                    email adapter issued to that @example.test address
+//                    (read from --outbox, written by cloud-fixture-server.mjs)
 //     Both need the X-Pri-Oracle token printed to --out.
 //
 // It refuses NODE_ENV=production and any database that is not a fixture
-// (the account must be an @example.test fixture address).
+// (the account must be an @example.test fixture address). The account may
+// not exist yet when the desk opens (account-first, issue #477: the journey
+// makes it on the sign-in card); it is looked up when first needed.
+// A sign-in code is only ever one the server itself issued (its test outbox);
+// none is invented, and none is logged.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -42,14 +49,33 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
  * wrong answer, the stand-in reader's text): a sealed answer equal to one of
  * them cannot tell a hit from a miss, so it is reported as unsupported.
  */
-export function openServerDesk({ dbPath, email, avoid = [] }) {
+export function openServerDesk({ dbPath, email, avoid = [], outboxPath = null }) {
   if (process.env.NODE_ENV === 'production') throw new Error('journey-oracle: refused under NODE_ENV=production');
   if (!/@example\.test$/.test(String(email || ''))) throw new Error('journey-oracle: only a fixture account (@example.test) can be read');
   const Database = createRequire(join(ROOT, 'server/package.json'))('better-sqlite3');
   const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-  const account = db.prepare('SELECT id FROM accounts WHERE email=?').get(email);
-  if (!account) { db.close(); throw new Error('the fixture account is missing from the local server'); }
-  const rows = (scope, extra = '', ...args) => db.prepare(`SELECT key,response_json,created_at FROM idempotency_keys WHERE account_id=? AND scope=? ${extra} ORDER BY created_at, rowid`).all(account.id, scope, ...args);
+  // cloud-fixture-server.mjs writes the test outbox next to its database.
+  if (!outboxPath) outboxPath = join(dirname(dbPath), 'test-outbox.jsonl');
+  let account = null;
+  const accountId = () => {
+    if (!account) account = db.prepare('SELECT id FROM accounts WHERE email=? AND deleted_at IS NULL').get(String(email).toLowerCase()) || null;
+    if (!account) throw new Error('the journey account is not on the local server (yet)');
+    return account.id;
+  };
+  const rows = (scope, extra = '', ...args) => db.prepare(`SELECT key,response_json,created_at FROM idempotency_keys WHERE account_id=? AND scope=? ${extra} ORDER BY created_at, rowid`).all(accountId(), scope, ...args);
+
+  /** Every message the server's TEST email adapter issued to `to` (oldest first). */
+  const sentTo = (to, purpose = 'sign-in') => {
+    if (!/@example\.test$/.test(String(to || ''))) throw new Error('journey-oracle: only a fixture address (@example.test) can be read');
+    if (!outboxPath || !existsSync(outboxPath)) return [];
+    return readFileSync(outboxPath, 'utf8').split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(m => m && m.channel === 'email' && m.to === String(to).toLowerCase() && (!purpose || m.purpose === purpose));
+  };
+  /** The last six-digit sign-in code the server issued to `to`, or null. Never invented. */
+  const emailCode = (to, purpose = 'sign-in') => {
+    const code = sentTo(to, purpose).at(-1)?.code;
+    return /^\d{6}$/.test(code || '') ? code : null;
+  };
 
   /** The sealed answer of the question this account was issued last. */
   const sealedAnswer = () => {
@@ -73,25 +99,25 @@ export function openServerDesk({ dbPath, email, avoid = [] }) {
   const completed = () => rows('practice-completion').map(c => {
     const question = JSON.parse(rows('practice-question', 'AND key=?', c.key)[0].response_json);
     const grades = rows('practice-grade', "AND key LIKE ? || ':%'", c.key).map(g => JSON.parse(g.response_json));
-    const event = db.prepare("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' AND entity_id=?").get(account.id, c.key);
+    const event = db.prepare("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' AND entity_id=?").get(accountId(), c.key);
     return { id: c.key, prompt: String(question.prompt || ''), grades, inputMode: event ? JSON.parse(event.payload_json).inputMode : null };
   });
 
-  return { db, account, rows, sealedAnswer, completed, close: () => db.close() };
+  return { db, accountId, rows, sealedAnswer, completed, sentTo, emailCode, close: () => db.close() };
 }
 
 // ── The loopback relay (Android emulator) ────────────────────────────────────
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
   if (!process.argv.includes('--serve') || !arg('db') || !arg('email')) {
-    console.error('usage: node scripts/journey-oracle.mjs --serve --db <fixture.db> --email <fixture account> [--port 4311] [--token <secret>] [--avoid a,b] [--out oracle.env]');
+    console.error('usage: node scripts/journey-oracle.mjs --serve --db <fixture.db> --email <fixture account> [--outbox test-outbox.jsonl] [--port 4311] [--token <secret>] [--avoid a,b] [--out oracle.env]');
     process.exit(2);
   }
   const port = Number(arg('port') || 4311);
   const token = arg('token') || randomBytes(18).toString('base64url');
   const avoid = (arg('avoid') || '').split(',').filter(Boolean);
   let desk;
-  try { desk = openServerDesk({ dbPath: arg('db'), email: arg('email'), avoid }); }
+  try { desk = openServerDesk({ dbPath: arg('db'), email: arg('email'), avoid, outboxPath: arg('outbox') }); }
   catch (error) { console.error(String(error?.message || error)); process.exit(1); }
   const authorised = given => {
     const a = Buffer.from(String(given || '')), b = Buffer.from(token);
@@ -106,8 +132,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     const send = (status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
     if (req.method !== 'GET') return send(405, { error: 'GET only' });
     if (!authorised(req.headers['x-pri-oracle'])) return send(401, { error: 'oracle token required' });
-    const path = new URL(req.url, 'http://oracle').pathname;
+    const url = new URL(req.url, 'http://oracle');
+    const path = url.pathname;
     try {
+      if (path === '/email-code') {
+        const code = desk.emailCode(url.searchParams.get('to'), url.searchParams.get('purpose') || 'sign-in');
+        return code ? send(200, { code }) : send(404, { error: 'the server has sent no sign-in code to that address' });
+      }
       if (path === '/answer') return send(200, desk.sealedAnswer());
       if (path === '/marked') {
         return send(200, { completed: desk.completed().map(q => ({ serverQuestionId: q.id, inputMode: q.inputMode, grades: q.grades.map(gradeFacts) })), prepared: desk.rows('practice-prepared').length, issued: desk.rows('practice-question').length });

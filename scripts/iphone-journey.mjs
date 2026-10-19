@@ -5,27 +5,40 @@
 // Builds the canonical Apple package, installs it fresh on an iPhone (default)
 // or iPad simulator and runs JourneySelfCheck.swift.
 //
-// Grading is online-only and server-authoritative (owner decision 2026-10-10,
-// ADR-0001). Nothing is checked, marked or revealed signed out or offline, so
-// the journey has two legs and BOTH are required for a PASS:
+// The app is account-first (issue #477): the landing screen is one sign-in
+// card and an activation gate stands in front of every route until the
+// server confirms the session, the age/guardian decision and a first sync.
+// Grading is online-only and server-authoritative (owner decision
+// 2026-10-10, ADR-0001). The journey has these legs and ALL are required for
+// a PASS:
 //
-//   1. no server (--journey-selfcheck, --journey-relaunch): onboarding →
-//      practice → typed answer and working → strokes on the native PencilKit
-//      surface, sealed in IndexedDB with one truthful save status → a photo
-//      attached and not read on the device → the question is an offline
-//      draft: the card says so before any work and offers no Submit and no
-//      Show solution; "Try for a markable question" asks first and, with no
-//      server, changes nothing; nothing marked, nothing in History → relaunch
-//      keeps the profile, the question, the typed work and the strokes;
+//   1. no server, a fresh install (--journey-selfcheck, --journey-relaunch):
+//      the app opens to the card (or the gate) and nothing opens without an
+//      account — no shell, no Practice behind a deep link, nothing drafted,
+//      nothing marked; the same after a relaunch;
 //   2. a real local Pri server on SQLite with a SYNTHETIC handwriting reader
-//      (--journey-marking, --journey-marking-relaunch; a fresh install): a
-//      server-prepared question signed out → in-card sign-in → the server
-//      binds and marks it (wrong: 0 with a try left; right: full marks) → a
-//      handwritten page read by the server, corrected, marked → History after
-//      relaunch. The right answer comes from this process reading the server's
-//      sealed copy of the issued question, never from the page.
-//      If that server cannot be started the leg's steps are reported as
-//      "not measured" and the journey FAILS.
+//      (--journey-marking, --journey-marking-relaunch; a fresh install): a new
+//      student enters through the card — email, the six-digit code the
+//      server's TEST email adapter issued (read by this process from the
+//      server's outbox, scripts/journey-oracle.mjs emailCode; never
+//      invented), name, age, class — then the server marks the work (wrong:
+//      0 with a try left; right: full marks) → a handwritten page read by the
+//      server, corrected, marked → History after relaunch. The right answer
+//      comes from this process reading the server's sealed copy of the
+//      issued question, never from the page;
+//   3. offline after entry (--journey-offline-draft, --journey-offline-
+//      relaunch; a fresh install, a second new address entered through the
+//      card, a question opened online): the page asks, this process
+//      stops the server, and the question is an offline draft — typed work,
+//      strokes on the native PencilKit surface (sealed in IndexedDB with one
+//      truthful save status) and a photo kept, not read on the device; the
+//      card says so before any work and offers no Submit and no Show
+//      solution; "Try for a markable question" asks first and changes
+//      nothing; relaunched with the server still down the gate says "retry",
+//      the shell does not open, and the draft is still on the device.
+//   If the server cannot be started, legs 2–3 are reported "not measured"
+//   and the journey FAILS. --lifecycle, --a11y and --dynamic-type run on the
+//   leg-2 install while the server is up (Home needs an account).
 //
 // Writes a machine-readable evidence record (exact SHA, simulator, OS, steps)
 // with --evidence <file>. Evidence tier: SIMULATOR + SYNTHETIC READER, with
@@ -33,8 +46,12 @@
 // or real-provider evidence.
 // CP-05 adds, on the first install:
 //   --cloud         a real Pri server (scripts/cloud-fixture-server.mjs, or the
-//                   PRI_CLOUD_* environment) — sign in through Settings, Sync
-//                   now, relaunch keeps the session, Disconnect;
+//                   PRI_CLOUD_* environment including PRI_CLOUD_DB), on a fresh
+//                   install: a new address enters through the card with the
+//                   server's emailed code and deletes the account with another;
+//                   the fixture address enters the same way, Sync now; opened
+//                   offline the gate says "retry"; relaunch keeps the session;
+//                   Disconnect. No password, no device-only profile;
 //   --dynamic-type  the largest accessibility text size: the page is scaled
 //                   and no screen scrolls sideways (the setting is restored).
 //
@@ -45,7 +62,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
 import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
@@ -53,17 +70,21 @@ import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
-const FIRST = ['launch', 'onboarding', 'practice', 'typedDraft', 'nativeInk', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'progress', 'persistenceMarker'];
-const RELAUNCH = ['relaunchProfile', 'relaunchMarker', 'relaunchDraftKept'];
+// Leg 1 · no server: nothing opens without an account.
+const FIRST = ['launch', 'noEntryWithoutAccount', 'deepLinkHeld', 'nothingMarked', 'persistenceMarker'];
+const RELAUNCH = ['relaunchStillHeld', 'relaunchMarker'];
 // The signed-in leg. The server* steps are read by this process from the
 // server's own database, request log and the stand-in reader's request log.
-const MARKING = ['onlineOnboarding', 'preparedQuestion', 'signedOutRefusal', 'signInOnCard', 'typedWrongZero', 'typedCorrectFull', 'inkServerReading', 'inkCorrectedMarked', 'historyRecorded'];
-const MARKING_SERVER = ['serverPreparedThenBound', 'serverGrades', 'serverReaderAnswerBlind'];
+const MARKING = ['cardOnboarding', 'firstQuestion', 'typedWrongZero', 'typedCorrectFull', 'inkServerReading', 'inkCorrectedMarked', 'historyRecorded'];
+const MARKING_SERVER = ['serverAccountFromCard', 'serverGrades', 'serverReaderAnswerBlind'];
 const MARKING_RELAUNCH = ['historyAfterRelaunch'];
+// Leg 3 · signed in, then the server goes away.
+const OFFLINE_DRAFT = ['offlineAfterEntry', 'practice', 'nativeInk', 'typedDraft', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'offlineProgress', 'offlinePersistenceMarker'];
+const OFFLINE_RELAUNCH = ['offlineRelaunchGrace', 'offlineDraftOnDisk'];
 const TIER = 'SIMULATOR + SYNTHETIC READER';
-const SIGNUP = ['cloudSignUp', 'cloudLogin', 'cloudDeleteAccount'];
+const SIGNUP = ['cloudSignUp', 'cloudDeleteAccount'];
 const CLOUD = ['cloudSignIn', 'cloudSync'];
-const OFFLINE = ['offlinePractice', 'offlineSyncSafe'];
+const OFFLINE = ['offlineGraceOpens'];
 const CLOUD_RELAUNCH = ['cloudSessionKept', 'cloudReconnectSync', 'cloudDisconnect'];
 const DYNAMIC = ['dynamicTypeZoom', 'dynamicTypeNoOverflow'];
 const BACKGROUND = ['backgroundDraftKept'];
@@ -211,7 +232,7 @@ try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not ru
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
 installApp(udid, app);
 
-console.log('Leg 1 · no server: drafts are kept, nothing is checked, marked or revealed …');
+console.log('Leg 1 · no server: the app opens to the sign-in card and nothing opens without an account …');
 const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, { loops: 110 });
 for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
@@ -231,17 +252,12 @@ let cloudLines = [];
 let offlineLines = [];
 let cloudRelaunchLines = [];
 let cloudServer = null;
-const localPost = (port, path, body) => new Promise(resolve => {
-  // Raw node:http: a native-shaped request (no Origin / Fetch Metadata).
-  import('node:http').then(({ request }) => {
-    const req = request({ host: '127.0.0.1', port, path, method: 'POST', headers: { 'content-type': 'application/json', 'x-pri-client': 'ios-native-v1' } },
-      res => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
-    req.on('error', () => resolve(0)); req.end(JSON.stringify(body));
-  });
-});
 if (WANT_CLOUD) try {
-  let fixture = process.env.PRI_CLOUD_ORIGIN ? {
-    PRI_CLOUD_ORIGIN: process.env.PRI_CLOUD_ORIGIN, PRI_CLOUD_EMAIL: process.env.PRI_CLOUD_EMAIL, PRI_CLOUD_PASSWORD: process.env.PRI_CLOUD_PASSWORD,
+  // The codes the card needs come from the server's own test outbox, so a
+  // given server must also name its database (and outbox) on this machine.
+  let fixture = process.env.PRI_CLOUD_ORIGIN && process.env.PRI_CLOUD_DB ? {
+    PRI_CLOUD_ORIGIN: process.env.PRI_CLOUD_ORIGIN, PRI_CLOUD_EMAIL: process.env.PRI_CLOUD_EMAIL, PRI_CLOUD_NEW_EMAIL: process.env.PRI_CLOUD_NEW_EMAIL,
+    PRI_CLOUD_DB: process.env.PRI_CLOUD_DB, PRI_CLOUD_OUTBOX: process.env.PRI_CLOUD_OUTBOX,
   } : null;
   if (!fixture) {
     const out = join(mkdtempSync(join(tmpdir(), 'pri-fixture-')), 'fixture.env');
@@ -250,18 +266,48 @@ if (WANT_CLOUD) try {
     cloudServer = fixture;
   }
   if (!cloudServer && process.env.PRI_CLOUD_SERVER_LOG) fixture.PRI_CLOUD_SERVER_LOG = process.env.PRI_CLOUD_SERVER_LOG;
-  const childEnv = {
-    PRI_CLOUD_ORIGIN: fixture.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: fixture.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: fixture.PRI_CLOUD_PASSWORD,
-    PRI_JOURNEY_NEW_EMAIL: fixture.PRI_CLOUD_NEW_EMAIL || '', PRI_JOURNEY_NEW_PASSWORD: fixture.PRI_CLOUD_NEW_PASSWORD || '',
+  // The codes: only those the server's TEST email adapter issued, from its
+  // outbox, and only to the two fixture addresses of this leg.
+  const addresses = [fixture.PRI_CLOUD_EMAIL, fixture.PRI_CLOUD_NEW_EMAIL].filter(Boolean).map(a => a.toLowerCase());
+  const codeDesk = openServerDesk({ dbPath: fixture.PRI_CLOUD_DB, email: addresses[0], outboxPath: fixture.PRI_CLOUD_OUTBOX });
+  const codeDir = mkdtempSync(join(tmpdir(), 'pri-cloud-oracle-'));
+  const served = new Set();
+  const codeTick = () => {
+    for (const name of readdirSync(codeDir)) {
+      const n = name.match(/^ask-(\d+)\.json$/)?.[1];
+      if (!n || served.has(n)) continue;
+      let ask = null;
+      try { ask = JSON.parse(readFileSync(join(codeDir, name), 'utf8')); } catch { continue; }
+      const to = String(ask.to || '').toLowerCase();
+      if (ask.kind !== 'emailCode' || !addresses.includes(to)) {
+        writeFileSync(join(codeDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), reason: 'not a code this leg can read' }));
+        served.add(n); continue;
+      }
+      const code = codeDesk.emailCode(to, ask.purpose || 'sign-in');
+      if (!code) continue;   // not sent yet: ask again on the next tick
+      writeFileSync(join(codeDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), code }));
+      served.add(n);
+    }
   };
+  const childEnv = {
+    PRI_CLOUD_ORIGIN: fixture.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: addresses[0] || '', PRI_JOURNEY_NEW_EMAIL: (fixture.PRI_CLOUD_NEW_EMAIL || '').toLowerCase(),
+    PRI_JOURNEY_ORACLE_DIR: codeDir,
+  };
+  // A fresh install: nothing on the device has an account yet.
+  try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+  try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
+  installApp(udid, app);
   const show = lines => { for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`); };
   const port = Number(fixture.PRI_CLOUD_PORT || new URL(fixture.PRI_CLOUD_ORIGIN).port);
   console.log(`\nCloud journey against ${fixture.PRI_CLOUD_ORIGIN} (real Pri server, fixture accounts) …`);
   if (childEnv.PRI_JOURNEY_NEW_EMAIL) {
-    signupLines = launchAndRead(udid, bundleId, '--journey-cloud-signup', 'cloudSignUp', childEnv);
+    signupLines = launchAndRead(udid, bundleId, '--journey-cloud-signup', 'cloudSignUp', childEnv, { tick: codeTick });
     show(signupLines);
   }
-  cloudLines = launchAndRead(udid, bundleId, '--journey-cloud', 'cloud', childEnv);
+  // A new launch numbers its asks from 1 again: start the relay empty.
+  for (const name of readdirSync(codeDir)) rmSync(join(codeDir, name), { force: true });
+  served.clear();
+  cloudLines = launchAndRead(udid, bundleId, '--journey-cloud', 'cloud', childEnv, { tick: codeTick });
   show(cloudLines);
   if (cloudServer?.PRI_CLOUD_SERVER_PID && fixture.PRI_CLOUD_DB) {
     // Offline: the cloud server goes away (the device cannot reach it).
@@ -284,11 +330,13 @@ if (WANT_CLOUD) try {
       ? `PRIJOURNEY ok serverLogoutRecorded ${logoutsAfter - logoutsBefore} logout(s) answered 200`
       : `PRIJOURNEY FAIL serverLogoutRecorded no successful logout reached the server`);
   }
-  // Server-side proof: the deleted account can no longer sign in.
+  // Server-side proof: the account the card made is deleted in the server's own database.
   if (childEnv.PRI_JOURNEY_NEW_EMAIL) {
-    const status = await localPost(port, '/v1/account/login', { email: childEnv.PRI_JOURNEY_NEW_EMAIL, password: childEnv.PRI_JOURNEY_NEW_PASSWORD });
-    signupLines.push(status === 401 ? `PRIJOURNEY ok serverDeletedAccountRefused login ${status}` : `PRIJOURNEY FAIL serverDeletedAccountRefused login ${status}`);
+    const live = codeDesk.db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE email=? AND deleted_at IS NULL').get(childEnv.PRI_JOURNEY_NEW_EMAIL).n;
+    const made = codeDesk.db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE email=?').get(childEnv.PRI_JOURNEY_NEW_EMAIL).n;
+    signupLines.push(live === 0 && made <= 1 ? `PRIJOURNEY ok serverDeletedAccountRefused no live account for the address (${made} row(s) kept as deleted)` : `PRIJOURNEY FAIL serverDeletedAccountRefused ${live} live account(s) for the deleted address`);
   }
+  codeDesk.close();
 } finally {
   // Never leave a fixture server behind, whatever failed.
   if (cloudServer?.PRI_CLOUD_SERVER_PID) { try { process.kill(Number(cloudServer.PRI_CLOUD_SERVER_PID)); } catch { /* already gone */ } }
@@ -296,13 +344,17 @@ if (WANT_CLOUD) try {
 
 let backgroundLines = [];
 let a11yLines = [];
+let dynamicLines = [];
+// --lifecycle, --a11y and --dynamic-type run inside leg 2 (they need a signed-in student).
+// `cloudEnv` points the app at the running server, so the gate can let the student in.
+function optionalLegs(cloudEnv) {
 if (WANT_LIFECYCLE) {
   console.log('\nBackground → foreground …');
   // The page types an unsent answer and then asks (ask-1.json through the
   // journey relay) to be backgrounded; the switch follows that request, not a
   // fixed delay, and the reply tells the page whether it happened.
   const relay = mkdtempSync(join(tmpdir(), 'pri-background-'));
-  backgroundLines = launchAndRead(udid, bundleId, '--journey-background', 'background', { PRI_JOURNEY_ORACLE_DIR: relay }, {
+  backgroundLines = launchAndRead(udid, bundleId, '--journey-background', 'background', { PRI_CLOUD_ORIGIN: cloudEnv.PRI_CLOUD_ORIGIN, PRI_JOURNEY_ORACLE_DIR: relay }, {
     duringWhen: () => existsSync(join(relay, 'ask-1.json')),
     during: () => {
       const t = Date.now();
@@ -318,21 +370,23 @@ if (WANT_LIFECYCLE) {
 }
 if (WANT_A11Y) {
   console.log('\nAccessibility smoke in the real web view …');
-  a11yLines = launchAndRead(udid, bundleId, '--journey-a11y', 'a11y');
+  a11yLines = launchAndRead(udid, bundleId, '--journey-a11y', 'a11y', { PRI_CLOUD_ORIGIN: cloudEnv.PRI_CLOUD_ORIGIN });
   for (const line of a11yLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 }
 
-let dynamicLines = [];
 if (WANT_DYNAMIC) {
   console.log('\nLargest accessibility text size …');
   run('xcrun', ['simctl', 'ui', udid, 'content_size', 'accessibility-extra-extra-extra-large']);
-  try { dynamicLines = launchAndRead(udid, bundleId, '--journey-dynamic-type', 'dynamicType'); }
+  try { dynamicLines = launchAndRead(udid, bundleId, '--journey-dynamic-type', 'dynamicType', { PRI_CLOUD_ORIGIN: cloudEnv.PRI_CLOUD_ORIGIN }); }
   finally { try { run('xcrun', ['simctl', 'ui', udid, 'content_size', 'large']); } catch { /* best effort */ } }
   for (const line of dynamicLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 }
 
+}
+
 // ── Leg 2 · a real local server marks the work ───────────────────────────────
-// A fresh install, so the student starts signed out with the server reachable.
+// A fresh install: the student makes an account on the card with the server
+// reachable. The address is the fixture server's never-registered one.
 // DEBUG builds read PRI_CLOUD_ORIGIN from the launch environment (and accept
 // http only for loopback); a Release build has neither (NativeCloudBridge.swift).
 const READER_TEXT = '7';
@@ -340,6 +394,8 @@ const WRONG = '-987654';
 let markingLines = [];
 let markingRelaunchLines = [];
 let markingNotMeasured = null;
+let offlineDraftLines = [];
+let offlineRelaunchLines = [];
 {
   let server = null;
   try {
@@ -353,7 +409,10 @@ let markingNotMeasured = null;
     writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
     // The server's own database, read-only: the "teacher's desk" (shared with
     // the Android journey's relay, scripts/journey-oracle.mjs).
-    const desk = openServerDesk({ dbPath: server.PRI_CLOUD_DB, email: server.PRI_CLOUD_EMAIL, avoid: [READER_TEXT, WRONG] });
+    const student = String(server.PRI_CLOUD_NEW_EMAIL || '').toLowerCase();
+    if (!/@example\.test$/.test(student)) throw new Error('the local server named no fresh fixture address for the student');
+    const offlineStudent = `journey-offline-${Date.now()}@example.test`;
+    const desk = openServerDesk({ dbPath: server.PRI_CLOUD_DB, email: student, avoid: [READER_TEXT, WRONG], outboxPath: server.PRI_CLOUD_OUTBOX });
     const { db, rows, completed } = desk;
     /** The sealed answer of the question this account was issued last. */
     const sealedAnswer = () => ({ ...desk.sealedAnswer(), readerText: READER_TEXT });
@@ -366,6 +425,23 @@ let markingNotMeasured = null;
         let ask = null;
         try { ask = JSON.parse(readFileSync(join(oracleDir, name), 'utf8')); } catch { continue; }
         let reply;
+        if (ask.kind === 'emailCode') {
+          // Only the code the server issued to the student's address, from its
+          // test outbox; until it is there, ask again on the next tick.
+          const code = [student, offlineStudent].includes(ask.to) ? desk.emailCode(ask.to) : null;
+          if (!code) continue;
+          writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), code }));
+          answered.add(n);
+          continue;
+        }
+        if (ask.kind === 'goOffline') {
+          let offline = false, reason = '';
+          try { process.kill(Number(server.PRI_CLOUD_SERVER_PID)); offline = true; } catch (error) { reason = String(error?.message || error).slice(0, 80); }
+          if (offline) execSync('sleep 1');
+          writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), offline, reason }));
+          answered.add(n);
+          continue;
+        }
         try { reply = ask.kind === 'answer' ? sealedAnswer() : { supported: false, reason: 'unknown question' }; }
         catch (error) { reply = { supported: false, reason: String(error?.message || error).slice(0, 120) }; }
         writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), ...reply }));
@@ -376,7 +452,7 @@ let markingNotMeasured = null;
     try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
     installApp(udid, app);
-    const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: server.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: server.PRI_CLOUD_PASSWORD, PRI_JOURNEY_ORACLE_DIR: oracleDir };
+    const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: student, PRI_JOURNEY_ORACLE_DIR: oracleDir };
     markingLines = launchAndRead(udid, bundleId, '--journey-marking', 'marking', childEnv, { tick, loops: 130 });
     for (const line of markingLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 
@@ -388,13 +464,14 @@ let markingNotMeasured = null;
       console.log(`  ${markingLines.at(-1).replace(/^PRIJOURNEY\s*/, '')}`);
     };
     const requests = () => readFileSync(server.PRI_CLOUD_SERVER_LOG, 'utf8').split('\n').filter(l => l.includes('"http_request"')).map(l => { try { return JSON.parse(l); } catch { return {}; } });
-    verdict('serverPreparedThenBound', () => {
-      const log = requests();
-      const prepared = log.filter(r => r.method === 'POST' && r.route === '/v1/practice/prepare' && r.status === 200).length;
-      const bound = rows('practice-prepared').length;
-      if (!prepared) throw new Error('the server prepared no question for the signed-out student');
-      if (bound !== 1) throw new Error(`${bound} prepared question(s) bound to the account, expected 1`);
-      return `${prepared} question(s) prepared signed out, 1 bound to the account at check time, ${rows('practice-question').length} issued in all`;
+    verdict('serverAccountFromCard', () => {
+      // The account the card made, as the server holds it, and the code it sent.
+      const rowsFor = db.prepare('SELECT id, email_verified_at FROM accounts WHERE email=? AND deleted_at IS NULL').all(student);
+      if (rowsFor.length !== 1) throw new Error(`${rowsFor.length} account(s) for the student's address, expected 1`);
+      const sent = desk.sentTo(student);
+      if (!sent.length) throw new Error('the server sent the student no sign-in code');
+      const signIns = requests().filter(r => r.method === 'POST' && r.route === '/v1/account/otp/verify' && r.status === 200).length;
+      return `1 account made through the card (${rowsFor[0].email_verified_at ? 'email verified' : 'email not marked verified'}); ${sent.length} sign-in code(s) sent by the TEST email adapter; ${signIns} code verification(s) answered 200`;
     });
     verdict('serverGrades', () => {
       const done = completed();
@@ -423,10 +500,30 @@ let markingNotMeasured = null;
       if (leaked.length) throw new Error(`${leaked.length} reader request(s) carried more than one picture or question text`);
       return `${reads.length} request(s) to the SYNTHETIC reader: one picture each, no question text; no other outbound request`;
     });
-    db.close();
 
     markingRelaunchLines = launchAndRead(udid, bundleId, '--journey-marking-relaunch', 'markingRelaunch', childEnv);
     for (const line of markingRelaunchLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+
+    // The optional native legs, on this signed-in install while the server is up.
+    optionalLegs(childEnv);
+
+    // Leg 3 · the page asks, this process stops the server (goOffline above).
+    console.log('\nLeg 3 · offline after entry: the work is an unmarkable draft and stays on the device …');
+    // Each launch numbers its asks from 1 again: start the relay empty, so an
+    // old reply is never read as this launch's answer.
+    for (const name of readdirSync(oracleDir)) rmSync(join(oracleDir, name), { force: true });
+    answered.clear();
+    // Its own fresh install and address: the daily free-question cap is real
+    // product behaviour, and the marking profile has used much of it.
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
+    installApp(udid, app);
+    const offlineEnv = { ...childEnv, PRI_JOURNEY_NEW_EMAIL: offlineStudent };
+    offlineDraftLines = launchAndRead(udid, bundleId, '--journey-offline-draft', 'offlineDraft', offlineEnv, { tick, loops: 120 });
+    for (const line of offlineDraftLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+    offlineRelaunchLines = launchAndRead(udid, bundleId, '--journey-offline-relaunch', 'offlineRelaunch', offlineEnv);
+    for (const line of offlineRelaunchLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+    db.close();
   } catch (error) {
     markingNotMeasured = String(error?.message || error).split('\n')[0].slice(0, 200);
     console.log(`  NOT MEASURED — ${markingNotMeasured}`);
@@ -457,6 +554,8 @@ const steps = Object.fromEntries([
   ...(WANT_A11Y ? A11Y.map(n => [n, result(a11yLines, n)]) : []),
   ...[...MARKING, ...MARKING_SERVER].map(n => [n, marked(markingLines, n)]),
   ...MARKING_RELAUNCH.map(n => [n, marked(markingRelaunchLines, n)]),
+  ...OFFLINE_DRAFT.map(n => [n, marked(offlineDraftLines, n)]),
+  ...OFFLINE_RELAUNCH.map(n => [n, marked(offlineRelaunchLines, n)]),
 ]);
 // The ink facts must match the hardware: iPhone writes with a finger by default
 // and has no stylus; iPad is stylus-first. (Finger *touch* input itself remains
@@ -488,7 +587,7 @@ const evidence = {
   real: ['the built client in the shipped WKWebView shell', 'the native PencilKit surface and priInk bridge', 'IndexedDB / localStorage persistence across a relaunch',
     'the Pri /v1 server (accounts, sessions, prepare / issue / recognise / confirm / grade) on a local SQLite file'],
   synthetic: ['an iOS simulator, not a device', 'strokes placed on the surface programmatically, not written with a Pencil or finger',
-    'the handwriting reader: a scripted stand-in at the provider hop that never looks at the picture', 'a fixture account verified in the local database'],
+    'the handwriting reader: a scripted stand-in at the provider hop that never looks at the picture', 'a fixture account verified in the local database', 'email delivery: the server\'s TEST email adapter (the code is read from its outbox, nothing is sent)'],
   notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment'],
   sha,
   dirtyWorkingTree: dirty,

@@ -49,8 +49,9 @@ function expectHardened(headers, label, { hsts = true } = {}) {
   c.ok(csp, `${label}: Content-Security-Policy present`);
   const d = directives(csp);
   c.deq(d['frame-ancestors'], ["'none'"], `${label}: frame-ancestors 'none'`);
-  // #260: no nested browsing context, so no same-origin child frame can reach
-  // the parent's native bridge handlers through parent.webkit.*.
+  // #260: no URL-loaded nested browsing context. Defence in depth, not the
+  // mitigation for a child reaching parent.webkit.*: threat-model T19 records
+  // that WebKit does not apply it to a srcdoc child (BridgeSelfCheck.swift).
   c.deq(d['frame-src'], ["'none'"], `${label}: frame-src 'none'`);
   c.eq(headers.get('x-content-type-options'), 'nosniff', `${label}: nosniff`);
   c.eq(headers.get('referrer-policy'), 'no-referrer', `${label}: Referrer-Policy`);
@@ -157,8 +158,11 @@ try {
   c.ok(logLines.every(line => line.event === 'http_request' && typeof line.method === 'string' && typeof line.route === 'string' && Number.isInteger(line.status) && typeof line.ms === 'number' && line.ms >= 0 && !Number.isNaN(Date.parse(line.ts))), 'every log line is {ts, event, method, route, status, ms}');
   c.ok(logLines.every(line => typeof line.requestId === 'string' && line.requestId.length > 0), 'every log line carries a request id (minted when the client sent none)');
   c.ok(logLines.every(line => /^[0-9a-f]{40}$|^development-unknown$|^unknown$/.test(line.release) && line.db === 'sqlite'), 'every log line names the release SHA and the database engine');
-  const allowedKeys = new Set(['ts', 'level', 'event', 'requestId', 'method', 'route', 'status', 'ms', 'code', 'release', 'db']);
+  // The request's own meter (requestTiming.js): counts and milliseconds only.
+  const timingKeys = ['dbStatements', 'dbRoundTrips', 'dbTransactions', 'dbMs', 'dbAcquireMs', 'authMs', 'eligibilityMs', 'limitMs', 'providerMs', 'markerMs', 'commitMs', 'serializeMs'];
+  const allowedKeys = new Set(['ts', 'level', 'event', 'requestId', 'method', 'route', 'status', 'ms', 'code', 'release', 'db', ...timingKeys]);
   c.ok(logLines.every(line => Object.keys(line).every(key => allowedKeys.has(key))), 'log lines carry no other fields');
+  c.ok(logLines.every(line => timingKeys.every(key => line[key] === undefined || (typeof line[key] === 'number' && line[key] >= 0))), 'the timing fields are non-negative numbers');
   c.ok(!serialized.includes('someone@example.test') && !serialized.includes('token=abc') && !serialized.includes('?'), 'query strings never reach the log');
   c.ok(!serialized.includes('headers.student@example.test') && !serialized.includes('correct-horse-battery') && !/pri_cloud_session/.test(serialized), 'bodies and cookies never reach the log');
   c.ok(logLines.some(line => line.requestId === 'req-abc.1'), 'a well-formed X-Pri-Request-Id is echoed for correlation');

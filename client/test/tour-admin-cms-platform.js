@@ -6,6 +6,7 @@
 // review rules; this flow proves the product UI can drive those contracts.
 
 import { pathToFileURL } from 'node:url';
+import { enterThroughCard, mockAccountServer } from './support/mock-account.mjs';
 import { createMfaMock } from './support/totp.mjs';
 import { answerStepUpPrompt, enrolStaffMfaThroughPanel, mfaPanelOf } from './support/staff-mfa-tour.mjs';
 
@@ -29,8 +30,10 @@ export const flow = {
   id: 'admin-cms',
   name: 'Cloud admin · CMS lifecycle and role management',
 
-  async run({ page, ctx, base, check, goto, createProfile }) {
-    let authenticated = false;
+  async run({ page, ctx, base, check, goto }) {
+    // The admin's account, session and the activation handshake (card, gate,
+    // first sync) are answered by the shared stand-in; the console routes below.
+    const mock = mockAccountServer({ account: ADMIN, csrf: 'e2e-admin-csrf' });
     let managedRole = 'teacher';
     let revision = null;
     let audit = [];
@@ -75,6 +78,8 @@ export const flow = {
       const bodyText = request.postData() || '';
       const headers = request.headers();
       requests.push({ path, method, body: bodyText, headers });
+      if (await mock.handle(route)) return;
+      const authenticated = mock.state.authenticated;
 
       if (path === '/v1/billing/config' && method === 'GET') {
         return respond(route, 200, {
@@ -83,18 +88,7 @@ export const flow = {
         });
       }
 
-      if (path === '/v1/account/login' && method === 'POST') {
-        authenticated = true;
-        return respond(route, 200, { account: ADMIN }, {
-          'set-cookie': 'pri_csrf=e2e-admin-csrf; Path=/; SameSite=Lax'
-        });
-      }
 
-      if (path === '/v1/account/me' && method === 'GET') {
-        return authenticated
-          ? respond(route, 200, { account: ADMIN })
-          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
 
       if (path.startsWith('/v1/account/mfa/')) {
         if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
@@ -209,10 +203,6 @@ export const flow = {
         return respond(route, 200, { account: { ...MANAGED, role: managedRole } });
       }
 
-      if (path === '/v1/account/logout' && method === 'POST') {
-        authenticated = false;
-        return respond(route, 200, { ok: true });
-      }
 
       return respond(route, authenticated ? 404 : 401, {
         error: {
@@ -222,15 +212,11 @@ export const flow = {
       });
     });
 
+    // The admin enters as every account does: the landing card, then the
+    // gate; Settings is reached signed in.
     await goto('/');
-    await createProfile({ name: 'Admin Device Profile', year: 10 });
+    await enterThroughCard(page, { email: ADMIN.email, year: 10 });
     await goto('/settings');
-
-    const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
-    await accountPanel.getByLabel('Email').fill(ADMIN.email);
-    await accountPanel.getByLabel('Password').fill('admin-e2e-password-42');
-    await accountPanel.getByRole('button', { name: 'Connect account' }).click();
-    await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15000 });
 
     // The authenticator gate comes first: enrol through the real panel.
     const { secret } = await enrolStaffMfaThroughPanel({ page, check });
@@ -246,13 +232,13 @@ export const flow = {
     await check('admin operations appear immediately after cloud sign-in without reloading Settings',
       new URL(page.url()).pathname === '/settings' && await staff.isVisible());
 
-    const loginCall = requests.find(row => row.path === '/v1/account/login' && row.method === 'POST');
-    const loginBody = loginCall ? JSON.parse(loginCall.body || '{}') : {};
-    await check('admin sign-in uses the audited transport and keeps the local profile id out of the account request',
-      !!loginCall && loginCall.headers['x-pri-client'] === 'web-v1' &&
-        typeof loginBody.deviceId === 'string' && loginBody.deviceId.startsWith('device-') &&
-        !('localProfileId' in loginBody),
-      loginCall ? `${JSON.stringify(loginCall.headers)} ${JSON.stringify(loginBody)}` : 'no login request captured');
+    const verifyCall = requests.find(row => row.path === '/v1/account/otp/verify' && row.method === 'POST');
+    const verifyBody = verifyCall ? JSON.parse(verifyCall.body || '{}') : {};
+    await check('admin sign-in (the card\'s code) uses the audited transport and keeps the local profile id out of the account request',
+      !!verifyCall && verifyCall.headers['x-pri-client'] === 'web-v1' &&
+        typeof verifyBody.deviceId === 'string' && verifyBody.deviceId.startsWith('device-') &&
+        !('localProfileId' in verifyBody),
+      verifyCall ? `${JSON.stringify(verifyCall.headers)} ${JSON.stringify(verifyBody)}` : 'no verify request captured');
 
     const healthText = await staff.innerText();
     await check('admin health is rendered from the authenticated management API',

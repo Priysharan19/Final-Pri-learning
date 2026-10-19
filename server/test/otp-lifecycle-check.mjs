@@ -117,8 +117,8 @@ try {
   r = await h.request('/v1/sync/pull', { jar: studentJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'sync is refused while consent is pending');
 
-  // Recovery for a wrong age capture: the signed-in learner explicitly says
-  // 18+, using the same authenticated/rate-limited guardian action surface.
+  // A learner recorded as a child cannot reclassify themselves as an adult
+  // from their own session (issue #477): guardian approval cannot be skipped.
   const studentAccountId = raw.prepare("SELECT id FROM accounts WHERE email='new.student@example.test'").get().id;
   const historyBeforeCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   r = await h.request('/v1/account/guardian/state', { jar: studentJar });
@@ -128,23 +128,21 @@ try {
     'guardian state safely names the exact live blocker'
   );
   r = await post('/guardian/request', { isAdult: true }, studentJar);
-  c.eq(r.status, 200, 'a pending learner can explicitly correct a wrongly captured age to adult');
-  c.deq(
-    [r.data?.ageCorrected, r.data?.ageBasis, r.data?.guardianConsent?.required, r.data?.guardianConsent?.blockerCode],
-    [true, 'adult', false, null],
-    'the correction returns the new server-authoritative eligibility'
-  );
-  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'adult', 'the server records the corrected age basis');
+  c.deq([r.status, r.data?.error?.code], [409, 'AGE_CORRECTION_REQUIRES_SUPPORT'],
+    'a pending child cannot redeclare themselves adult from their own session');
+  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'child', 'the account stays recorded as a child');
   const historyAfterCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   c.deq(
-    [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at],
-    [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at],
-    'adult correction preserves the guardian-history row'
+    [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at, historyAfterCorrection.confirmed_at],
+    [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at, historyBeforeCorrection.confirmed_at],
+    'the guardian row is untouched'
   );
-  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n >= 1,
-    'and records the correction in the audit log');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n, 0,
+    'and no age change is recorded');
+  r = await h.request('/v1/account/guardian/state', { jar: studentJar });
+  c.deq([r.data?.required, r.data?.state, r.data?.eligible], [true, 'pending', false], 'guardian/state still says approval is required');
   r = await h.request('/v1/sync/pull', { jar: studentJar });
-  c.ok(r.status !== 403, 'the corrected adult account passes the cloud gate immediately');
+  c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'and the cloud gate still refuses the pending child');
 
   // ── no enumeration: same answer for a known and an unknown address ──────
   resetLimits();
@@ -335,6 +333,12 @@ try {
   resetLimits();
   r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
+  // The right code proves the mailbox; a profile that is not complete creates
+  // nothing and earns the sign-up ticket (the profile is judged only after the
+  // code, so the answer never depends on whether the address had an account).
+  c.eq(r.data?.status, 'profile-required', 'a right code with no age declaration creates no account: the profile is asked for');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
+  r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', signupTicket: r.data.signupTicket, profile: { name: 'Claim', role: 'parent' } });
   c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
   c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
 

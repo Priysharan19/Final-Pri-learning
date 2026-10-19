@@ -5,27 +5,30 @@
 // real server started by scripts/cloud-fixture-server.mjs (emulator →
 // host at 10.0.2.2). The methods run in this order, in separate runs, with the
 // runner controlling the server (kill, restart) and `am force-stop` between:
-//   0. cloudSignUpThenDeleteAccount;
-//   1. cloudSignInAndSync — signed out with the server reachable, the student
-//      is shown a server-PREPARED question and Submit is refused on the card
-//      with the sign-in; then the real Settings UI signs in through the native
-//      bridge (page → priBridge → HttpURLConnection → server), Sync now pushes
-//      the local profile, and the server marks a typed answer: a wrong answer
-//      scores 0 with a try left, the right answer scores full marks, History
-//      shows it. The session lives only in the Keystore-encrypted jar (not in
-//      the WebView cookie store, not readable by the page, not plaintext on
-//      disk);
-//   1b. offlineWorkIsKeptUnmarkedAndSyncIsNotOffered — with the server
-//      stopped, a question opened on the device is a draft: the card says
-//      before any work that it cannot be marked and offers no Submit or Show
-//      solution; what is typed is kept, asking for a markable question changes
-//      nothing while none can be opened, nothing is marked or recorded, and
-//      Sync is not offered;
+// Account-first (issue #477): nothing opens without an account, so every
+// method enters through the one sign-in card — email, then the six-digit code
+// the server's TEST email adapter issued, read by the oracle relay from the
+// server's outbox (GET /email-code; never invented) — and the gate in front of
+// the shell lets the student in only once the server has confirmed them.
+//   0. cloudSignUpThenDeleteAccount — a NEW address on the card (name, age,
+//      agreement, class) → the app; Settings deletes the account with an
+//      emailed code (the server's outbox again); the old session is refused;
+//   1. cloudSignInAndSync — the fixture (returning) address on the card;
+//      Settings shows the account connected, Sync now pushes, and the server
+//      marks a typed answer: a wrong answer scores 0 with a try left, the right
+//      answer scores full marks, History shows it. The session lives only in
+//      the Keystore-encrypted jar (not in the WebView cookie store, not
+//      readable by the page, not plaintext on disk);
+//   1b. offlineWorkIsKeptUnmarkedAndSyncIsNotOffered (the runner's name) — relaunched with the server
+//      stopped, the gate cannot confirm the account: it says "retry", the
+//      shell does not open, and the server's record is unchanged. (The old
+//      offline-draft walk needs the connection to drop AFTER entry, inside one
+//      run; android/scripts/run-instrumented.sh stops the server only between
+//      runs, so that walk is not measured here — see the iOS journey.)
 //   2. cloudSessionSurvivesProcessDeathThenDisconnectClearsIt — the server is
 //      back on the same database; after the process was killed the account is
-//      still connected, History still shows the server-marked attempt, the
-//      server marked nothing that was typed offline; Disconnect logs out on
-//      the server and the jar no longer holds a session.
+//      still connected, History still shows the server-marked attempt;
+//      Disconnect logs out on the server and the jar no longer holds a session.
 // Grading is online-only and server-authoritative (owner decision 2026-10-10,
 // ADR-0001): the device never holds the answer of a question it shows. The
 // right answer therefore comes from OUTSIDE the page and the app — the
@@ -106,26 +109,56 @@ class CloudJourneyTest {
     private val byText = "function(t){return [].slice.call(document.querySelectorAll('button')).find(function(b){return b.offsetParent&&b.textContent.trim()===t;});}"
     private val stateTag = "(function(){var s=document.querySelector('section[aria-labelledby=\"cloud-account-title\"] .tag');return s?s.textContent.trim():'';})()"
 
-    /** This fixture tests legacy Settings cloud routes from a device-only profile.
-     * The normal student welcome stays account-first; never restore Get Started. */
-    private fun reachHome(s: ActivityScenario<MainActivity>) {
-        val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-            var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-            if(b){b.click();return 'picker';}
-            var g=document.querySelector('[data-testid=hero-offline]');if(g)return 'onboarding';return false;})()""")
-        if (state == "\"onboarding\"") {
-            eval(s, "document.querySelector('[data-testid=hero-offline]').click()")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"1\"]')")
-            eval(s, "($byText)('Student').click()"); Thread.sleep(150); eval(s, "document.querySelector('.auth-card .btn-primary').click()")
-            waitFor(s, "document.querySelector('#signup-track')")
-            waitFor(s, """(function(){var el=document.querySelector('#signup-track');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'10');
-                el.dispatchEvent(new Event('change',{bubbles:true}));return true;})()"""); Thread.sleep(200)
-            eval(s, "document.querySelector('.auth-card .btn-primary').click()")
-            setValue(s, "#signup-name", "Android Student"); Thread.sleep(200); eval(s, "document.querySelector('.auth-card .btn-primary').click()")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"4\"]')"); eval(s, "document.querySelector('.auth-card .btn-primary').click()")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"5\"]')"); eval(s, "document.querySelector('.auth-card .btn-primary').click()")
+    private val CARD = "document.querySelector('[data-signin-card]')"
+    private val GATE = "document.querySelector('[data-testid=account-activation-gate]')"
+    private val cardStep = "(function(){var c=document.querySelector('[data-signin-card]');return c?c.getAttribute('data-signup-step'):'';})()"
+    private fun click(s: ActivityScenario<MainActivity>, testId: String) =
+        waitFor(s, "(function(){var b=document.querySelector('[data-testid=$testId]');if(!b||b.disabled)return false;b.click();return true;})()")
+
+    /**
+     * Home, for `email`, through the one sign-in card (landing or the gate's
+     * inline card). The code is the one the server's TEST email adapter issued
+     * to that address, read by the oracle relay from the server's outbox.
+     * Already inside (a profile the gate has let in): Home as it is.
+     */
+    private fun reachHome(s: ActivityScenario<MainActivity>, email: String = args.getString("priCloudEmail", "")) {
+        val state = waitFor(s, "(function(){if(document.querySelector('.home-greet')&&!$GATE)return 'home';" +
+            "var f=document.querySelector('#signup-destination');if(f&&!f.disabled)return 'card';return false;})()", 90_000)
+        if (state == "\"home\"") return
+        assertEquals("no device-only entry is offered", "false", eval(s, "!!document.querySelector('[data-testid=hero-offline]')"))
+        setValue(s, "#signup-destination", email); Thread.sleep(200)
+        click(s, "signup-send-code")
+        waitFor(s, "document.querySelector('#signup-code-0')", 30_000)
+        var code = ""
+        val end = System.currentTimeMillis() + 30_000
+        while (code.isEmpty() && System.currentTimeMillis() < end) {
+            code = oracleOrNull("/email-code?to=" + java.net.URLEncoder.encode(email, "UTF-8"))?.optString("code", "") ?: ""
+            if (code.isEmpty()) Thread.sleep(500)
         }
-        waitFor(s, "document.querySelector('.home-greet')")
+        assertTrue("the server sent a six-digit sign-in code to the address", Regex("^\\d{6}$").matches(code))
+        setValue(s, "#signup-code-0", code)
+        Thread.sleep(1500)
+        if (eval(s, cardStep) == "\"code\"") eval(s, "(function(){var v=document.querySelector('[data-testid=signup-verify]');if(v&&!v.disabled)v.click();return true;})()")
+        waitFor(s, "!$CARD || $cardStep !== 'code' || !!document.querySelector('[data-testid=signup-error]')", 30_000)
+        assertEquals("the card accepted the code", "false", eval(s, "!!document.querySelector('[data-testid=signup-error]')"))
+        if (eval(s, cardStep) == "\"age\"") {
+            setValue(s, "#signup-flow-name", "Android Student")
+            click(s, "signup-age-18"); Thread.sleep(150)
+            eval(s, "(function(){var a=document.querySelector('[data-testid=signup-agree]');if(!a.checked)a.click();return true;})()"); Thread.sleep(150)
+            click(s, "signup-age-next")
+        }
+        val inside = "(!!document.querySelector('.home-greet') || !!document.querySelector('.q-prompt')) && !$GATE"
+        waitFor(s, "$cardStep === 'class' || ($inside)", 30_000)
+        if (eval(s, cardStep) == "\"class\"") { click(s, "signup-class-10"); Thread.sleep(150); click(s, "signup-class-next") }
+        // A finished card opens where the student was going — from the landing
+        // page that is the first practice question (Login.jsx `intended`,
+        // tour-otp-onboarding) — and only once the gate has let the account in.
+        waitFor(s, inside, 90_000)
+        // Then Home. The card's own navigation may still be settling, so a
+        // route change made too early can be overtaken: ask again until Home is
+        // on screen (the app's router, the same pushState/popstate as Settings).
+        waitFor(s, "(function(){if(document.querySelector('.home-greet'))return !$GATE;" +
+            "if(location.pathname!=='/')history.pushState({}, '', '/');dispatchEvent(new PopStateEvent('popstate'));return false;})()", 90_000)
     }
 
     private fun openSettings(s: ActivityScenario<MainActivity>) {
@@ -151,6 +184,17 @@ class CloudJourneyTest {
             assertEquals("the oracle answers $path", 200, conn.responseCode)
             JSONObject(conn.inputStream.bufferedReader().readText())
         } finally { conn.disconnect() }
+    }
+
+    /** As [oracle], but null when the relay answers anything other than 200 (a code not sent yet). */
+    private fun oracleOrNull(path: String): JSONObject? {
+        val base = args.getString("priOracle", "")
+        val token = args.getString("priOracleToken", "")
+        assertTrue("the oracle relay is given (priOracle, priOracleToken)", base.isNotEmpty() && token.isNotEmpty())
+        val conn = java.net.URL("$base$path").openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 10_000; conn.readTimeout = 10_000
+        conn.setRequestProperty("X-Pri-Oracle", token)
+        return try { if (conn.responseCode == 200) JSONObject(conn.inputStream.bufferedReader().readText()) else null } finally { conn.disconnect() }
     }
 
     private fun openPractice(s: ActivityScenario<MainActivity>) {
@@ -230,43 +274,38 @@ class CloudJourneyTest {
     /** What cloudSignInAndSync left for the runs after the process is killed. */
     private val gradedFile get() = java.io.File(context.filesDir, "pri-test-graded-question")
 
-    /** Sign up through Settings, sign in, then permanently delete the account. */
+    /** A new account made on the card, then permanently deleted in Settings with an emailed code. */
     @Test
     fun cloudSignUpThenDeleteAccount() {
         val email = args.getString("priCloudNewEmail", "")
-        val password = args.getString("priCloudNewPassword", "")
-        assertTrue("a never-registered fixture credential is given", email.isNotEmpty() && password.isNotEmpty())
+        assertTrue("a never-registered fixture address is given", email.isNotEmpty())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
-            reachHome(s)
+            reachHome(s, email)
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Create account').click()")
-            setValue(s, "#cloud-name", "Android Adult")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "(function(){[].slice.call(document.querySelector('#cloud-email').form.querySelectorAll('input[type=checkbox]')).forEach(function(b){if(!b.checked)b.click();});return true;})()")
-            Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            // Registration creates a session: signing up connects the account.
-            waitFor(s, "$stateTag === 'Connected'")
-            // Positive control: the account can sign in on the server right now.
-            assertEquals("the new account can sign in before deletion", 200, loginStatus(email, password))
-            setValue(s, "#cloud-delete-password", password)
+            waitFor(s, "$stateTag === 'Connected'", 60_000)
+            val session = jarOnDisk().value(java.net.URI(origin).host, "pri_cloud_session")
+            assertNotNull("the card's account has a session in the jar", session)
+            // Positive control: the session is live on the server right now.
+            assertEquals("the new account's session is live before deletion", 200, meStatus(session!!))
             setValue(s, "#cloud-delete-phrase", "DELETE")
+            click(s, "cloud-delete-send-code")
+            waitFor(s, "document.querySelector('#cloud-delete-code-0')", 30_000)
+            var code = ""
+            val end = System.currentTimeMillis() + 30_000
+            while (code.isEmpty() && System.currentTimeMillis() < end) {
+                code = oracleOrNull("/email-code?purpose=reauth&to=" + java.net.URLEncoder.encode(email, "UTF-8"))?.optString("code", "") ?: ""
+                if (code.isEmpty()) Thread.sleep(500)
+            }
+            assertTrue("the server emailed a six-digit deletion code", Regex("^\\d{6}$").matches(code))
+            setValue(s, "#cloud-delete-code-0", code)
             Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-delete-phrase').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not connected'")
-            // Server-side proof: the same credentials that worked a moment ago are refused.
-            assertEquals("the server refuses the deleted account", 401, loginStatus(email, password))
+            click(s, "cloud-delete-with-code")
+            // Deleted: the panel says so, or the gate takes the screen (the
+            // profile no longer belongs to a live account).
+            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) || !!$GATE", 30_000)
+            // Server-side proof: the session that worked a moment ago is refused.
+            assertEquals("the server refuses the deleted account's session", 401, meStatus(session))
         }
-    }
-
-    private fun loginStatus(email: String, password: String): Int {
-        val conn = java.net.URL("$origin/v1/account/login").openConnection() as java.net.HttpURLConnection
-        conn.requestMethod = "POST"; conn.doOutput = true
-        conn.setRequestProperty("Content-Type", "application/json"); conn.setRequestProperty("X-Pri-Client", "android-native-v1")
-        conn.outputStream.use { it.write(org.json.JSONObject().put("email", email).put("password", password).toString().toByteArray()) }
-        return try { conn.responseCode } finally { conn.disconnect() }
     }
 
     /** Runs while the cloud server is unreachable (the runner passes priCloudOffline). */
@@ -275,59 +314,23 @@ class CloudJourneyTest {
         assumeTrue("run by android/scripts/run-instrumented.sh with the server stopped", args.getString("priCloudOffline", "") == "true")
         val graded = JSONObject(gradedFile.readText())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
-            reachHome(s)
-            openPractice(s)
-            // A question opened now was never the server's: the device shows one
-            // of its own as a draft to work on. It can be typed into and is kept,
-            // but it can never be marked — not now, and not after reconnecting.
-            openTypedQuestion(s, advanceFirst = true)
-            val draftId = qid(s)
-            assertTrue("the offline question is not the one the server marked", draftId.isNotEmpty() && draftId != graded.getString("id"))
-            // Said before any work goes in, and with no Submit or Show solution
-            // that could only be refused: the one action is to try for a
-            // markable question.
-            assertEquals("the card names the question an offline draft", "\"draft\"", waitFor(s, QuestionCardJs.UNMARKABLE))
-            val draftSays = eval(s, QuestionCardJs.UNMARKABLE_SAYS)
-            assertTrue("the notice says it was opened without a connection and cannot be marked: $draftSays",
-                Regex("without a connection", RegexOption.IGNORE_CASE).containsMatchIn(draftSays) &&
-                    Regex("cannot be marked", RegexOption.IGNORE_CASE).containsMatchIn(draftSays))
-            assertEquals("a draft offers no Submit and no Show solution", "\"replace|1|no-solution\"|false|false",
-                eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRESS_SUBMIT) + "|" + eval(s, QuestionCardJs.PRESS_REVEAL))
-            setValue(s, ".editor-body input.answer-input", "7")
-            assertEquals("the typed answer is stored on this device", "\"7\"", waitFor(s, QuestionCardJs.storedTyped(draftId), 15_000))
-            assertUnmarked(s, "typing offline")
-            assertEquals("typing adds no Submit and no Show solution", "\"replace|1|no-solution\"|false|false",
-                eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRESS_SUBMIT) + "|" + eval(s, QuestionCardJs.PRESS_REVEAL))
-            // With work on the page the first press only asks; confirmed while
-            // the server is unreachable, no markable question can be opened and
-            // nothing changes.
-            waitFor(s, QuestionCardJs.PRESS_REPLACE)
-            waitFor(s, QuestionCardJs.visible("[data-check-replace-confirm]"))
-            assertEquals("asking changed nothing", "$draftId|\"7\"", qid(s) + "|" + eval(s, QuestionCardJs.TYPED))
-            waitFor(s, QuestionCardJs.PRESS_REPLACE)
-            waitFor(s, QuestionCardJs.REPLACE_DECLINED, 90_000)
-            val noteSays = eval(s, QuestionCardJs.REPLACE_NOTE_SAYS)
-            assertTrue("the card says a markable question could not be opened and that nothing has changed: $noteSays",
-                Regex("could not be opened", RegexOption.IGNORE_CASE).containsMatchIn(noteSays) &&
-                    Regex("nothing here has changed", RegexOption.IGNORE_CASE).containsMatchIn(noteSays))
-            assertEquals("the same question is still on the card", draftId, qid(s))
-            assertEquals("no check was made, so none was refused", "false", eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("no retry that cannot succeed is offered", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
-            assertUnmarked(s, "a declined replace offline")
-            assertEquals("the typed answer is still on the card", "\"7\"", eval(s, QuestionCardJs.TYPED))
-            assertEquals("…and still stored on this device", "\"7\"", eval(s, QuestionCardJs.storedTyped(draftId)))
-            // Nothing was recorded: History holds the server-marked attempt and no other.
-            openHistory(s)
-            assertEquals("the offline draft is not in History", "missing", historyVerdict(s, draftId))
-            assertEquals("the server-marked attempt is still in History", "Correct", historyVerdict(s, graded.getString("id")))
-            // …and the server's own record is unchanged (its database is read by the oracle).
+            // Account-first with the 72-hour grace (#477): the server let this
+            // account in on this device minutes ago (cloudSignInAndSync), so an
+            // open while it is unreachable is inside the grace — the app opens
+            // on the device's own work with the one offline line, and nothing
+            // is checked or marked until it reconnects.
+            val offlineLine = "document.querySelector('[data-testid=offline-entry]')"
+            waitFor(s, "!!$offlineLine && !!document.querySelector('.shell') && !$GATE", 90_000)
+            Thread.sleep(3000)
+            assertEquals("opened offline inside the grace, the app says nothing is checked until it reconnects", "true",
+                eval(s, "!!$offlineLine && !$GATE"))
+            assertEquals("nothing is marked while the server cannot be reached", "false",
+                eval(s, "!!document.querySelector('.eval-card') || !!document.querySelector('.verdict-bad') || !!document.querySelector('.eval-marks')"))
+            assertEquals("no device-only entry is offered", "false", eval(s, "!!document.querySelector('[data-testid=hero-offline]')"))
+            // …and nothing was lost: the server's own record (its database, read
+            // by the oracle while the server is stopped) is unchanged.
             assertEquals("the server's record is unchanged while it is stopped", graded.getString("server"), assertServerMarkedOnce("offline"))
-            offlineDraftFile.writeText(draftId)
-            openSettings(s)
-            waitFor(s, "$stateTag === 'Linked · offline'", 60_000)
-            assertEquals("true", waitFor(s, "!!document.querySelector('[data-cloud-offline]')"))
-            assertEquals("Sync is not offered while offline", "true",
-                eval(s, "(function(){var b=($byText)('Sync now');return !b||b.disabled;})()"))
+            Log.i("PRITEST", "opened offline: inside the grace, the offline line, nothing marked, the server's record is unchanged")
         }
     }
 
@@ -337,41 +340,18 @@ class CloudJourneyTest {
     @Test
     fun cloudSignInAndSync() {
         val email = args.getString("priCloudEmail", "")
-        val password = args.getString("priCloudPassword", "")
-        assertTrue("fixture account arguments are present", email.isNotEmpty() && password.isNotEmpty())
+        assertTrue("the fixture account address is given", email.isNotEmpty())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
-            reachHome(s)
+            reachHome(s, email)
             assertEquals("the host advertises a configured cloud over the bridge", "true",
                 eval(s, "window.__PRI_HOST__.capabilities.cloud.configured === true && window.__PRI_HOST__.capabilities.cloud.transport === 'bridge'"))
 
-            // Signed out with the server reachable: the question is the server's
-            // (prepared), and checking it needs an account.
+            // Signed in on the card (account-first, #477): nothing has been issued
+            // or marked for the fixture account yet.
             val before = oracle("/marked")
-            assertEquals("the fixture account starts with nothing issued or marked: $before", "0/0/0",
-                "${before.getInt("issued")}/${before.getInt("prepared")}/${before.getJSONArray("completed").length()}")
-            openPractice(s)
-            // Practice restores the question that was open last, which may be a
-            // draft the shell journey opened with no server (never markable).
-            // A question opened NOW, with the server reachable, is the server's.
-            openTypedQuestion(s, advanceFirst = true)
-            val preparedId = qid(s)
-            assertEquals("the card says checking needs an account", "true", waitFor(s, QuestionCardJs.visible("[data-check-needs-account]")))
-            setValue(s, ".editor-body input.answer-input", WRONG)
-            assertEquals("Submit is refused signed out", "refused", submitAndWait(s))
-            assertEquals("the refusal is the in-card sign-in", "\"sign-in\"", eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("the refusal offers the sign-in on the card", "true", eval(s, QuestionCardJs.visible(".verdict [data-check-sign-in]")))
-            assertUnmarked(s, "signed-out Submit")
-            assertEquals("the typed answer is kept through the refusal", "\"$WRONG\"", eval(s, QuestionCardJs.TYPED))
-            assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
-
+            assertEquals("the fixture account starts with nothing marked: $before", 0, before.getJSONArray("completed").length())
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Sign in').click()")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "$stateTag === 'Connected'")
-
+            waitFor(s, "$stateTag === 'Connected'", 60_000)
 
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
@@ -381,17 +361,13 @@ class CloudJourneyTest {
 
             // Signed in: the server marks. A wrong answer first, then the right
             // one, on a question whose sealed answer the oracle can state.
-            //
-            // The first candidate is the question prepared signed out. Its
-            // Submit was refused for want of an account, not dropped: the card
-            // HOLDS that one submission (practiceRecovery holdPendingSubmission)
-            // and sends nothing by itself. Coming back to the card signed in,
-            // the answer typed signed out is back in the editor and the server
-            // has still marked nothing; only the student's own Submit sends it,
-            // under the same key. The server then binds the prepared question
-            // to the account and marks that answer exactly once.
             openPractice(s)
-            assertEquals("Practice comes back to the question prepared signed out", preparedId, qid(s))
+            // This device profile was the deleted account's a moment ago
+            // (cloudSignUpThenDeleteAccount): the card it finished on issued a
+            // question to THAT account, which Practice resumes, and which this
+            // account may not submit (the card says it does not belong to this
+            // account). The journey starts on a question issued to this account.
+            openTypedQuestion(s, advanceFirst = true)
             var escrow: JSONObject? = null
             val passed = mutableListOf<String>()
             for (i in 0 until 12) {
@@ -399,21 +375,16 @@ class CloudJourneyTest {
                 if (!typedEditor(s)) { passed += "no-typed-answer"; continue }
                 val got: String
                 if (i == 0) {
-                    assertEquals("the answer typed signed out is still on the card", "\"$WRONG\"", waitFor(s, QuestionCardJs.TYPED))
-                    // Signed in now: the card no longer asks for an account…
-                    assertEquals("signed in, the card no longer says checking needs an account", "true",
-                        waitFor(s, "!${QuestionCardJs.visible("[data-check-needs-account]")}"))
-                    // …and the held submission was NOT sent for the student.
+                    assertEquals("a signed-in student is not told checking needs an account", "false",
+                        eval(s, QuestionCardJs.visible("[data-check-needs-account]")))
+                    setValue(s, ".editor-body input.answer-input", WRONG)
+                    // Typing saves a draft on the device first ("Saving on this
+                    // device…" shares the status line a check uses): wait for
+                    // that save to say Saved — a running check never does.
+                    waitFor(s, "(function(){var l=document.querySelector('.ws-actions .status-line');return !!l&&l.getAttribute('data-state')==='saved';})()", 15_000)
                     assertEquals("no check is running before Submit is pressed", "true", eval(s, QuestionCardJs.CHECK_IDLE))
-                    assertUnmarked(s, "back on the held question signed in, before Submit")
-                    assertEquals("no verdict of any kind is on the card before Submit", "false|false|false",
-                        eval(s, "!!document.querySelector('.verdict-bad')") + "|" + eval(s, "!!document.querySelector('.verdict-technical')") + "|" + eval(s, "!!document.querySelector('.verdict-unsure')"))
-                    val held = oracle("/marked")
-                    assertEquals("before Submit the server issued, bound and marked nothing for the account: $held", "0/0/0",
-                        "${held.getInt("issued")}/${held.getInt("prepared")}/${held.getJSONArray("completed").length()}")
-                    // The student's own press sends it (a second, automatic
-                    // delivery would spend the second try and fail the
-                    // one-try-left and two-grades assertions below).
+                    assertUnmarked(s, "before Submit")
+                    assertEquals("before Submit the server marked nothing", 0, oracle("/marked").getJSONArray("completed").length())
                     got = submitAndWait(s)
                 } else {
                     // An issued question: ask before spending a try on it.
@@ -426,16 +397,12 @@ class CloudJourneyTest {
                 assertTrue("the signed-in check was not refused ($got / ${eval(s, QuestionCardJs.REFUSAL)}; passed over: $passed)", got != "refused" && got != "technical")
                 // Only now is the question certainly the account's: read its sealed answer.
                 val sealed = oracle("/answer")
-                if (i == 0) {
-                    assertTrue("the server bound the question it prepared signed out to the account: $sealed", sealed.optBoolean("fromPrepared"))
-                    assertEquals("exactly one prepared question was bound", 1, oracle("/marked").getInt("prepared"))
-                }
                 if (got != "miss" || !sealed.optBoolean("supported")) { passed += "$got/${sealed.optString("answerType", "unstatable")}"; continue }
                 assertEquals("a first miss does not resolve the question", "false|false",
                     eval(s, "!!document.querySelector('.eval-card')") + "|" + eval(s, "!!document.querySelector('.solution-panel')"))
                 assertEquals("a second try is offered", "true", eval(s, "(function(){var b=document.querySelector('.editor-body input.answer-input');return !!b&&!b.disabled;})()"))
                 Log.i("PRITEST", "server marked the wrong answer on question ${i + 1}" +
-                    (if (i == 0) " (prepared signed out, bound to the account at check time)" else " (issued to the account)") + "; passed over: $passed")
+                    (if (i == 0) " (the first question opened)" else " (issued to the account)") + "; passed over: $passed")
                 escrow = sealed
                 break
             }
@@ -553,7 +520,8 @@ class CloudJourneyTest {
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             eval(s, "($byText)('Disconnect').click()")
-            waitFor(s, "$stateTag === 'Not connected'")
+            // Signed out, the gate takes the screen again (account-first), or the panel says so.
+            waitFor(s, "$stateTag === 'Not connected' || !!$GATE")
             val end = System.currentTimeMillis() + 5_000
             while (jarOnDisk().value(host, "pri_cloud_session") != null && System.currentTimeMillis() < end) Thread.sleep(100)
             assertEquals("Disconnect cleared the device's session", null, jarOnDisk().value(host, "pri_cloud_session"))

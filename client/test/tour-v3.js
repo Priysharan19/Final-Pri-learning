@@ -234,22 +234,24 @@ export const flow = {
     await check('a geometry question draws its own figure', figure,
       'six Pythagoras questions and not one of them rendered an SVG figure');
 
-    // ── 8 · and all of it works with the network gone ───────────────────────
-    // The headline claim on the landing page. It rests on the service worker
-    // having precached the build, which is a thing only a browser can be asked.
-    await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
-    const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
-      .then(() => true).catch(() => false);
-    if (await check('the service worker takes charge of the page', claimed,
-      'no worker claimed the client, so nothing was cached to go offline with')) {
-      await ctx.setOffline(true);
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
-      const up = await page.waitForSelector('.home-greet', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('the app opens again with the network switched off', up,
-        'a reload with the network down did not reach Home');
-      await ctx.setOffline(false);
-    }
+    // ── 8 · a connection lost mid-lesson never erases the open lesson ────────
+    // Only the server lets a profile in (issue #477): an app OPENED offline is
+    // the activation gate's retry screen (tour-activation-gate.js). Inside, a
+    // dropped connection must leave the lesson mounted and never read as a
+    // sign-out — the gate's foreground recheck is provoked with the network down.
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await page.evaluate(() => { window.__lesson = document.querySelector('.qpage'); });
+    await ctx.setOffline(true);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await settle(); await settle();
+    await check('the network gone, the lesson stays mounted and the gate does not relock',
+      await page.evaluate(() => document.querySelector('.qpage') === window.__lesson) && await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      'a dropped connection unmounted the lesson or relocked the gate');
+    await ctx.setOffline(false);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await settle(); await settle();
+    await check('the connection back, the same lesson is still open', await page.evaluate(() => document.querySelector('.qpage') === window.__lesson));
   }
 };
 

@@ -27,7 +27,7 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
-import { INDIA_HARDEST_COVERS } from './curriculum-in-hardest-covers.js';
+import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
   const group = IN_CURRICULUM.find(g => g.grade === 7);
@@ -187,8 +187,8 @@ installNativeCovers();
 // every view of the chapter, exactly like the native covers above. An entry
 // naming a dot point the chapter does not have, or a generator the chapter
 // already lists, is a load-time error rather than a silent no-op.
-function installHardestCovers() {
-  for (const [chapterId, covers] of Object.entries(INDIA_HARDEST_COVERS)) {
+function installHardestCovers(table) {
+  for (const [chapterId, covers] of Object.entries(table)) {
     const views = new Set([
       IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
       IN_CHAPTER_BY_ID[chapterId],
@@ -205,6 +205,8 @@ function installHardestCovers() {
   }
 }
 
-installHardestCovers();
+installHardestCovers(INDIA_HARDEST_COVERS);
+// Tranche 2: one D4 form for each JEE Class 11 / Class 12 dot point that had none.
+installHardestCovers(INDIA_JEE_HARDEST_COVERS);
 
 export * from './curriculum-in-base.js';

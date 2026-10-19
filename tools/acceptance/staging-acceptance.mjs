@@ -67,6 +67,17 @@ const PROMPT = /first term \$(-?\d+)\$ and common difference \$(-?\d+)\$, which 
 
 export const TARGETS = Object.freeze({ staging: STAGING_ORIGIN, production: PRODUCTION_ORIGIN });
 export const STEP_IDS = Object.freeze(['0', 'A', 'B', 'C', 'D', 'E', 'F']);
+/**
+ * GET /v1/account/export needs the credential proven inside this window
+ * (server/platform/security.js REAUTH_FRESH_MS; accounts.js requireRecentAuth):
+ * the sign-in that made the session, or POST /v1/account/reauth. Student A
+ * signs in at step A and reaches the export at the end of step E, after three
+ * human mailbox reads, so A's session is usually older than this by then and
+ * the contract the probe holds is the refusal, not the export.
+ */
+export const EXPORT_FRESH_MS = 10 * 60 * 1000;
+/** Either outcome is accepted this close to the window's edge (clock and request latency). */
+const EXPORT_FRESH_MARGIN_MS = 30 * 1000;
 export const STEPS = Object.freeze({
   0: 'Preflight: health, readiness, release identity, schema versions',
   A: 'One-time-code sign-in with a real mailbox',
@@ -359,7 +370,7 @@ export async function runAcceptance(args, deps = {}) {
   }
 
   // ══ A · one-time-code sign-in, real mailbox ════════════════════════════════
-  const A = { jar: {}, accountId: null, created: false, email: addresses.student, sessionId: null, verified: false, questionIds: new Set(), attemptIds: new Set() };
+  const A = { jar: {}, accountId: null, created: false, email: addresses.student, sessionId: null, signedInAt: null, verified: false, questionIds: new Set(), attemptIds: new Set() };
   if (!want('A') || !addresses.student) {
     skipped('A', want('A') ? 'no --email: a real mailbox is needed for the code' : 'skipped by --skip');
   } else {
@@ -378,6 +389,7 @@ export async function runAcceptance(args, deps = {}) {
         }
         check(a, [200, 201].includes(verified.status) && verified.data?.status === 'signed-in', 'the code signs the mailbox in (otp/verify → signed-in)', `status ${verified.status} ${verified.code || ''}`);
         A.accountId = verified.data?.account?.id || null;
+        if (A.accountId) A.signedInAt = now();
         check(a, !!A.jar.pri_cloud_session && !!A.jar.pri_csrf, 'a session cookie pair was issued');
         const me = await http('/v1/account/me', { jar: A.jar });
         check(a, me.status === 200 && me.data?.account?.id === A.accountId, 'GET /v1/account/me answers for the signed-in account', `status ${me.status}`);
@@ -641,8 +653,23 @@ export async function runAcceptance(args, deps = {}) {
           const foreign = exportedForeignRows(rowsB, A);
           check(e, foreign.length === 0, 'student B2\'s export holds none of student A\'s questions or attempts', `${rowsB.learningEvents.length} event(s), ${rowsB.entities.length} entit(y/ies), ${foreign.length} of A's`);
         }
+        // Student A's session was made at step A. Inside EXPORT_FRESH_MS the
+        // sign-in is fresh proof and the export is A's own; past it, the cookie
+        // alone must be refused 401 REAUTH_REQUIRED naming the one-time code as
+        // the proof a code-only account can offer — that refusal is the security
+        // property (#521), and B2's export above already probed the shape.
         const exportA = await http('/v1/account/export', { jar: A.jar });
-        check(e, exportA.status === 200 && exportA.data?.format === 'pri-account-export-v1' && exportA.data?.account?.id === A.accountId && Array.isArray(exportA.data?.learningEvents), 'student A\'s export is student A\'s', `status ${exportA.status}, ${Array.isArray(exportA.data?.learningEvents) ? exportA.data.learningEvents.length : 'no'} event(s)`);
+        const sessionAgeMs = A.signedInAt ? now() - A.signedInAt : null;
+        const exportServed = exportA.status === 200 && exportA.data?.format === 'pri-account-export-v1' && exportA.data?.account?.id === A.accountId && Array.isArray(exportA.data?.learningEvents);
+        const exportRefused = exportA.status === 401 && exportA.code === 'REAUTH_REQUIRED' && Array.isArray(exportA.data?.error?.proofs) && exportA.data.error.proofs.includes('otp') && !JSON.stringify(exportA.data).includes('pri-account-export-v1');
+        const ageDetail = sessionAgeMs == null ? 'sign-in time unknown' : `session ${Math.round(sessionAgeMs / 1000)} s old`;
+        if (sessionAgeMs != null && sessionAgeMs < EXPORT_FRESH_MS - EXPORT_FRESH_MARGIN_MS) {
+          check(e, exportServed, 'student A\'s export, inside the fresh-proof window, is student A\'s', `${ageDetail}; status ${exportA.status} ${exportA.code || ''}, ${Array.isArray(exportA.data?.learningEvents) ? exportA.data.learningEvents.length : 'no'} event(s)`);
+        } else if (sessionAgeMs != null && sessionAgeMs > EXPORT_FRESH_MS + EXPORT_FRESH_MARGIN_MS) {
+          check(e, exportRefused, 'student A\'s older session is refused the export (401 REAUTH_REQUIRED, proofs name otp): the cookie alone is not enough', `${ageDetail}; status ${exportA.status} ${exportA.code || ''}, proofs ${JSON.stringify(exportA.data?.error?.proofs ?? null)}`);
+        } else {
+          check(e, exportServed || exportRefused, 'student A\'s export at the edge of the fresh-proof window is either A\'s own or refused 401 REAUTH_REQUIRED naming otp', `${ageDetail}; status ${exportA.status} ${exportA.code || ''}`);
+        }
       }
     } catch (error) { check(e, false, 'E ran to completion', error?.message || String(error)); }
     settle(e);

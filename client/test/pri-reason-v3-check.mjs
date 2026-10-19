@@ -48,6 +48,21 @@ a = assessEvaluationLine({
 });
 same('inconsistent authored expected value forces abstention', a.status, 'note');
 
+// #430 review round 1: a list of values is several values, not one number.
+// The expression engine drops commas as thousands separators, so `9, 12, 15`
+// once read as 91215 and was reported as a wrong substituted value.
+const AP_TERM = { kind: 'evaluation', source: 'a + (n-1)*d', substitutions: { a: 9, n: 9, d: 3 }, expected: 33, labels: ['T_9'] };
+a = assessEvaluationLine({ text: '9, 12, 15, 18, 21, 24, 27, 30, 33', meta: AP_TERM });
+same('a list of terms is not judged as one value', a.status, 'note');
+a = assessEvaluationLine({ text: '9, 12', meta: AP_TERM });
+same('two terms listed are not judged as 912', a.status, 'note');
+a = assessEvaluationLine({ text: '9,12', meta: AP_TERM });
+same('a comma that does not group digits lists, even without a space', a.status, 'note');
+a = assessEvaluationLine({ text: 'S = 5,941', meta: { kind: 'evaluation', source: 'n/2*(2*a+(n-1)*d)', substitutions: { n: 13, a: 289, d: 28 }, expected: 5941, labels: ['S'] } });
+same('a comma that groups digits is still one number', a.status, 'ok');
+a = assessEvaluationLine({ text: 'S = 1,00,000', meta: { kind: 'evaluation', source: 'x*1000', substitutions: { x: 100 }, expected: 100000, labels: ['S'] } });
+same('Indian digit grouping is still one number', a.status, 'ok');
+
 // ── Exact point verification ────────────────────────────────────────────────
 let p = assessPointLine({ text: '(2, 7)', meta: { kind: 'point', x: 2, y: 7 } });
 same('correct point is verified', p.status, 'ok');

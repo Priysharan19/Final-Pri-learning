@@ -50,6 +50,15 @@
 .photo-line.is-check .photo-line-text { border-color: var(--hairline-strong); border-style: dashed; }
 .photo-line.is-check .photo-line-note { color: var(--ink); font-weight: 600; }
 .photo-line.is-out .photo-line-text { text-decoration: line-through; color: var(--ink-3); }
+/* The server's verdict on a judged line: a tick, the first mistake, a line carried forward. */
+.photo-line-mark { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12.5px; color: var(--ink-2); }
+.photo-line-mark > span:first-child { font-weight: 600; }
+.photo-line-mark.pm-ok > span:first-child, .photo-line-mark.pm-ecf > span:first-child { color: var(--good); }
+.photo-line-mark.pm-break, .photo-line-mark.pm-also { color: var(--ink); }
+.photo-line-mark.pm-break > span:first-child, .photo-line-mark.pm-also > span:first-child, .photo-line-mark.pm-break b, .photo-line-mark.pm-also b { color: var(--correction); }
+.photo-line-mark b { font-weight: 600; }
+.photo-line-mark.pm-ecf b { color: var(--ink-3); font-weight: 500; }
+.photo-line.pm-break .photo-line-text { box-shadow: inset 2px 0 0 var(--correction); }
 @media (max-width: 520px) {
   .photo-line { grid-template-columns: 20px minmax(0, 1fr); }
   .photo-line-toggle { grid-column: 2; justify-self: start; }

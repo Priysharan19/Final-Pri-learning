@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -54,20 +54,32 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1880000/1880000 self-checks passed across 235 subtopics' suites.log
+          grep -Fq '2712000/2712000 self-checks passed across 339 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1964/1964 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 49637/49637 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 112804 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '46200 questions from 462 declared (generator, difficulty) pairs × 100 draws — 46200 marked correct by their own marker, 46200 well formed' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
+          # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,
+          # the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show.
+          # 2140 → 4396 (review round 1): every reviewer page is now a corpus case (formula lines carrying their
+          # arithmetic, prose and comma-less givens, listed terms, a last term slipped through continuations, n(…)/2),
+          # and each swept seed also checks three prose spellings of its givens, its one-line formula slip and n(…)/2.
+          # 4396 → 4795 (review round 2): D4 carries a slipped last term into the sum as D2 does (four D4 pages),
+          # and each swept sum seed also checks a last term slipped on its formula line and summed correctly.
+          # 4795 → 4885 (review round 2, adversarial): 22 pages where a line Pri may have misread (a part with no
+          # value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a
+          # listed line on a gradient plan (y11-diff) is not a derivative mistake.
+          grep -Fq 'AP FIRST ERROR + ECF: PASS — 4885/4885 checks' suites.log
+          grep -Fq 'WORKING EVIDENCE: PASS — 25/25 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
           grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
@@ -80,7 +92,8 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
+          # 306: one check added — every typed answer was marked, none stopped at the marker deadline after retries (#544 hardening).
+          grep -Fq 'INDIA ADAPTIVE: PASS — 306/306 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
@@ -88,18 +101,19 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 65 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 66 files scanned, 0 hard-coded strings' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -107,7 +121,7 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
-          grep -Fq 'ACCOUNT DELETION LINK: PASS — 102/102 checks' suites.log
+          grep -Fq 'ACCOUNT DELETION LINK: PASS — 111/111 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
@@ -126,13 +140,18 @@ jobs:
           grep -Fq 'BAD INPUT: PASS — 44/44 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 27 groups' suites.log
+          # A marker stopped at its deadline reaches the device as `tooComplex`, never as an unreadable entry (issue #544 hardening).
+          grep -Fq 'MARKER DEADLINE CLIENT: PASS — 14/14 checks' suites.log
           grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 149/149 checks' suites.log
+          # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
+          # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
+          grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
@@ -176,7 +195,7 @@ jobs:
           npm run --silent test:real || true
       - name: Suite log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suites-log
           path: suites.log
@@ -204,8 +223,8 @@ jobs:
     env:
       PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -275,6 +294,11 @@ jobs:
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
           grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
+          # Round trips pinned per hot request; ink Submit is one request with one
+          # paid read, answer-blind; the request meter is numbers only and
+          # Server-Timing is opt-in for signed-in callers (#441 port).
+          node server/test/hot-path-budget-check.mjs 2>&1 | tee hot-path-budget.log
+          grep -Fq 'HOT PATH BUDGET: PASS — 108/108 checks' hot-path-budget.log
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
@@ -293,16 +317,22 @@ jobs:
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
           node server/test/flagship-ap-working-http-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/owner-ap-first-mistake-contract-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/ap-term-firstbreak-regression-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
+          grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
+          grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
+          grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
@@ -335,8 +365,14 @@ jobs:
           set -o pipefail
           node server/test/observability-check.mjs 2>&1 | tee ops.log
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          node server/test/alert-notifier-check.mjs 2>&1 | tee -a ops.log
+          node server/test/error-telemetry-check.mjs 2>&1 | tee -a ops.log
+          node server/test/static-caching-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'ALERT NOTIFIER: PASS — 15/15 checks' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
+          grep -Fq 'ERROR TELEMETRY: PASS — 73/73 checks' ops.log
+          grep -Fq 'STATIC CACHING: PASS — 55/55 checks' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
@@ -346,8 +382,14 @@ jobs:
       # response or a log. The two engine-agnostic suites also run on Postgres below.
       - name: Security acceptance (route inventory, BOLA/authz negatives, abuse limits, production boundary)
         run: |
+          set -o pipefail
           node server/test/route-inventory-check.mjs
           node server/test/sql-parameterisation-check.mjs
+          # What the secret sweep below counts as a leaked key (support/secret-shapes.mjs):
+          # every real key shape is still read, the server's own session/CSRF mints never
+          # are (issue #526). Without this pin a loosened shape would make the sweep vacuous.
+          node server/test/secret-shape-check.mjs 2>&1 | tee secret-shapes.log
+          grep -Fq 'SECRET SHAPES — PASS — 69 checks' secret-shapes.log
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs
@@ -369,13 +411,15 @@ jobs:
           node server/test/platform-sync-burst-check.mjs
           set -o pipefail
           node server/test/postgres-connection-config-check.mjs | tee postgres-connection-config.log
-          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 132/132 checks' postgres-connection-config.log
+          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 230/230 checks' postgres-connection-config.log
           node server/test/platform-startup-check.mjs
       - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 52/52 suites' platform-postgres.log
+          grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
+          # 52 → 53 (#430): the owner AP first-mistake contract also runs on real Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 54/54 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -458,8 +502,8 @@ jobs:
       PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -492,6 +536,12 @@ jobs:
           # and iPad/desktop composition unchanged. Both engines.
           node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+          # Account first (issue #477): the one sign-in card and the activation
+          # gate on every route — adult, minor and guardian, sign-out, deep
+          # links, reload, opened offline. Chromium runs it in test:e2e; WebKit
+          # here (WebKit cannot reload a page offline under Playwright, so the
+          # opened-offline checks are Chromium-only and the run says so).
+          node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
@@ -514,7 +564,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*421/421.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*417/417.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -525,7 +575,7 @@ jobs:
           test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          grep -Eq 'E2E SUITE.*37/37.*1 flows' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED.*20/20.*1 flows' browser.log)" -ge 2
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
@@ -544,36 +594,41 @@ jobs:
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Eq 'E2E SUITE.*36/36.*2 flows' browser.log
+          # Account first (issue #477): a child signs up on the one card and a
+          # parent approves on their own page; the gate journey in both engines.
+          grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log
+          grep -Eq 'E2E SUITE.*35/35.*1 flows' browser.log
+          grep -Fq 'Account first · one card, the gate on every route, guardian approval, sign-out, deep links, reload, offline' browser.log
+          grep -Fq 'E2E SUITE PASSED — 72/72 checks across 1 flows' browser.log
+          test "$(grep -Fc 'Account first · one card, the gate on every route' browser.log)" -ge 2
+          grep -Fq 'Cloud · Continue with Google signs in, and Google confirms deletion' browser.log
           # Online-only, server-authoritative grading (owner decision
-          # 2026-10-10): the marking flows run signed in against the real /v1
-          # server; these journeys assert the refusals. Signed out (Write, Type),
-          # offline at submit (Type, Write), opened offline, a prepared question
-          # taken up elsewhere, exams signed out.
-          grep -Fq 'Write · signed out, sign in on the card, same question server-marked' browser.log
-          grep -Fq 'Type · typed answer and working survive sign-in on the card, server-marked' browser.log
-          grep -Fq 'Write · signed out: one true save state; ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
-          grep -Fq 'Photo · signed out, sign in on the card, same photo read, transcript edited, server-marked on Submit' browser.log
-          grep -Fq 'Write · session ended before reading: "sign in again" beside the work, then read and marked; a real outage still says so, with a retry' browser.log
+          # 2026-10-10) behind the activation gate (issue #477): nobody is
+          # inside the app signed out, so these journeys assert what happens
+          # when the SESSION ENDS mid-work or at a start, offline inside the
+          # app, and a prepared question taken up elsewhere. tour-activation-
+          # gate.js proves the gate itself.
+          grep -Fq 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
+          grep -Fq 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry' browser.log
           grep -Fq 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked' browser.log
           grep -Fq 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once' browser.log
-          grep -Eq 'E2E SUITE.*117/117.*7 flows' browser.log
-          grep -Fq 'Type · signed out: kept, not checked; signed in on the card, server-marked' browser.log
+          grep -Fq 'Type · typed answer and working survive a reload, then the same question is server-marked' browser.log
+          grep -Eq 'E2E SUITE.*57/57.*5 flows' browser.log
           grep -Fq 'Type · offline: reconnect asked, work kept, Retry marked exactly once' browser.log
           grep -Fq 'Write · offline: reconnect asked, ink kept, Retry marked exactly once' browser.log
-          grep -Fq 'Draft · opened offline: never marked, work kept; a new question online is' browser.log
-          grep -Fq 'Exams · signed out: a paper does not start; sign in in place, then it does' browser.log
+          grep -Fq 'Draft · offline inside the app: never marked, work kept; a new question online is server-issued' browser.log
           grep -Fq 'Prepared · taken up by another account: not marked here, work kept, next one is' browser.log
           grep -Fq 'Sync · a pull overlapping a submit never doubles an attempt' browser.log
-          grep -Fq 'Rapid Fire and Match · signed out nothing starts; signed in every answer is server-marked' browser.log
-          grep -Fq 'India exam · signed out: a simulation does not start; sign in in place, then it does' browser.log
+          grep -Fq 'Rapid Fire and Match · signed in, every answer is server-marked' browser.log
+          grep -Fq 'Session ended at a start: a paper, Rapid Fire and Match start nothing; signing in again in place starts them' browser.log
           grep -Fq "Exam · finished offline: submitted, no score; reconnected: the server's result" browser.log
-          grep -Eq 'E2E SUITE.*97/97.*10 flows' browser.log
+          grep -Eq 'E2E SUITE.*72/72.*8 flows' browser.log
           # The free plan's daily cap is the server's (#537): with nineteen of
           # the day's questions used on another device, Next shows the cap
           # screen from the server's 402 and fetches nothing instead; a capped
           # account cannot have a signed-out question bound and marked.
           grep -Fq 'Free cap · nineteen used on another device: the twentieth is issued, Next shows the cap screen from the server, nothing fetched instead' browser.log
-          grep -Fq 'Free cap · a prepared question, signed in on the card to a capped account: Submit refused as the free cap, nothing marked, work kept' browser.log
+          grep -Fq 'Free cap · a prepared question on a signed-in account that reaches its cap elsewhere: Submit refused as the free cap, nothing marked, work kept' browser.log
           grep -Eq 'E2E SUITE.*24/24.*2 flows' browser.log
           grep -Fq 'Pri Explain V8 · adaptive board-style reasoning playback' browser.log
           grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
@@ -581,8 +636,8 @@ jobs:
           # stand-in in these suites; the log must say so.
           grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log
           # The accessibility walk must have reached the refused-check states.
-          grep -Eq 'online-only checking +9/9' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*47/47.*13 groups' browser.log
+          grep -Eq 'online-only checking +8/8' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*46/46.*13 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
@@ -597,7 +652,7 @@ jobs:
           fi
       - name: Browser log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-log
           path: browser.log
@@ -608,8 +663,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm

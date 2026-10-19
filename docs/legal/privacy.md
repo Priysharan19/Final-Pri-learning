@@ -11,22 +11,47 @@ The person responsible for your data (the "data fiduciary") is
 
 ## The short version
 
-Pri Learning is built to work without sending your work anywhere. Questions,
-handwriting recognition, marking and your progress all run on your own device.
-You can use the whole app without an account and without a network. Two
-optional settings send work off the device, and both are described below: reading your
-handwriting and photos on a server, which is on by default once you sign in to
-an account and can be turned off, and checking your working, which is off
-unless you turn it on. Without an account, neither runs.
+**You need a Pri Learning account, and a connection, to have answers checked.**
+Marking is done online by our server: it issues each question, and its marking
+engine — a fixed set of mathematical rules, not an AI model — decides the mark
+for a signed-in account. A copy of that engine runs on your device only to show
+your notation as you write and to display results recorded by earlier versions
+of the app; it never sets the mark for a new answer. Signed out or offline,
+nothing is checked or marked: the work you type or write is kept on your device
+until it can be checked.
 
-A Pri cloud account is optional. It exists so your progress can follow you to a
-second device, so a teacher can set work, and so a subscription can be verified.
-If you never create one, nothing about your learning leaves your device.
+**Your handwriting and photos are read online.** When you write an answer by
+hand or attach a photo, a picture of it is sent to our server, which passes it
+to OpenAI to read. This is on for a signed-in account and can be turned off, in
+which case you type your answers instead. A second setting, off unless you turn
+it on, sends your working to the same service to find where a mistake is. Both
+are described below.
+
+Without an account you can open the app and look around, but nothing about your
+learning is sent anywhere — and nothing is marked.
+
+## Where your data is stored
+
+- **Our server** runs on Railway, a hosting provider. On 4 October 2026 the
+  production service and its database volume were in Railway's `ams` region
+  (Amsterdam, the Netherlands). Until the planned move described next, your
+  account data is stored there, not in India.
+- **Our database is planned to move** to Supabase in its Mumbai region
+  (`ap-south-1`). This notice will be updated when that move has happened; until
+  then, do not read it as saying your data is stored in India.
+- **OpenAI** reads handwriting, photos and (if you turn it on) your working
+  outside India.
+- **Email and SMS delivery and payment providers** process what they need in
+  their own regions.
+
+COUNSEL REVIEW: the cross-border transfer position under the DPDP Act, the
+contracting entities and the regions confirmed by each provider.
 
 ## What stays on your device
 
 - Your profile: the name you typed, your class or track, and your settings.
-- Every question you have answered, your answers, your marks and your history.
+- A copy of every question you have answered, your answers, your marks and your
+  history. The marks themselves are decided by our server.
 - Your handwriting strokes, and the model that adapts to your hand.
 - Your streaks, badges and progress.
 
@@ -41,15 +66,17 @@ device can open a profile that has no password.
   sign in with a code sent by SMS instead; such an account has no email address
   on record.
 - **Your name**, as you typed it.
+- **Your answers, for marking**: the question our server issued, the answer and
+  working you submit, and the mark the server decided; your exam papers and
+  results.
 - **Learning events**: that you answered a question, which chapter it belonged
   to, whether you were right, and how long you took.
 - **A picture of your handwriting, when you are signed in.** Your strokes stay
-  on your device. When you are signed in to a Pri Learning account, a picture of
-  your writing is also read on a server, because the on-device reader knows a
-  fixed set of symbols and some notation is beyond it. This is on by default for
-  a signed-in account and you can turn it off at any time in Settings →
-  Handwriting; it stays off for an account under 18 until a parent or guardian
-  has confirmed it, and it never runs without an account.
+  on your device. Handwriting is read online: a picture of your writing is sent
+  to our server and read there. This is on by default for a signed-in account
+  and you can turn it off at any time in Settings → Handwriting, after which you
+  type your answers; it stays off for an account under 18 until a parent or
+  guardian has confirmed it, and it never runs without an account.
 
   When you write with a pencil or your finger, what is sent is an image drawn
   from your own stroke coordinates and nothing else: not the question, not the
@@ -65,12 +92,14 @@ device can open a profile that has no password.
 
   Either way, our server passes it to an outside reading service — OpenAI, through
   its API — and keeps no copy: it is not written to our database, our storage or
-  our logs. We ask the reading service not to store it. Under its own terms it
+  our logs. What we do keep is the text the reading service returned, for 90
+  days. We ask the reading service not to store it. Under its own terms it
   does not use it to train its models, but it may hold a copy for a limited time
   to watch for abuse; we do not control that. Turning the setting off stops it at
   once, and it stays off. What the reading service returns is a transcription of
-  your writing, nothing more: your mark is always decided by the marking engine
-  on your own device, never by the reading service.
+  your writing, nothing more, and you can correct it before it counts: your mark
+  is always decided by the marking engine on our server, never by the reading
+  service.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and
@@ -78,7 +107,7 @@ device can open a profile that has no password.
   the mistake is. Our server keeps no copy; the checking service handles it as
   the reading service above does. The expected answer is never sent
   with it, and your name and profile are never sent with it. Your mark is
-  decided on your device either way.
+  decided by the marking engine on our server either way.
 - **A parent or guardian's name and email address**, only for an account of
   someone under 18 — or their mobile number in place of the email address — so
   we can send them the confirmation link or code described under Children and
@@ -117,8 +146,9 @@ the DPDP Act will require. Our record of it says which method was used, so
 nobody can mistake it for more than it is.
 
 If you are under 18, please set this up with a parent or guardian and show them
-this notice, particularly the section on what a cloud account sends. Everything
-works without an account, and without an account nothing leaves the device.
+this notice, particularly the section on what a cloud account sends. Answers
+cannot be checked without an account; without one, nothing about your learning
+leaves the device.
 
 The DPDP Act's substantive obligations — including verifiable parental consent
 for anyone under 18 — commence on 14 May 2027. Before then, and before this app
@@ -140,11 +170,10 @@ Only the services needed to run the parts you use:
   service sees an envelope.
 - **Payment providers** if you subscribe. We never see or store your card
   details; the provider tells us only whether a subscription is active.
-- **Your teacher**, if you join their class — and then only aggregate progress
-  on the work they set. A teacher never sees your answers, your working or your
-  handwriting.
-- **A handwriting reader** (OpenAI), only while the optional server-reading
-  setting is on, and only the image of your writing described above.
+- **Our hosting and database providers** (Railway; Supabase after the planned
+  move), which store and process it for us — see "Where your data is stored".
+- **A handwriting reader** (OpenAI), while the handwriting-reading setting is
+  on, and only the image of your writing or the photo described above.
 - **A step checker** (the same provider), only while the optional working-check
   setting is on, and only the working and question described above.
 

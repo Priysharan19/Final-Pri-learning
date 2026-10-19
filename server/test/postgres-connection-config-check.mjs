@@ -99,20 +99,23 @@ eq(postgresConnectionSettings('postgres://pri_app_test@127.0.0.1:5432/pri', {}).
 eq(postgresConnectionSettings(`${BASE}?sslmode=verify-full`, dev()).ssl, { rejectUnauthorized: true }, 'and TLS stated outside production is honoured');
 
 // ── Per-connection limits and pool size ─────────────────────────────────────
-eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10, lockWaitMs: 5000 },
-  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10, lock wait 5 s');
-eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20', PRI_DATABASE_LOCK_WAIT_MS: '2500' }) },
-  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20, lockWaitMs: 2500 }, 'each is configurable');
+eq({ ...postgresSessionLimits({}) }, { statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000, poolMax: 10, poolIdleMs: 300000, lockWaitMs: 5000 },
+  'defaults: statement_timeout 15 s, idle_in_transaction_session_timeout 30 s, pool of 10 kept 5 minutes idle, lock wait 5 s');
+eq({ ...postgresSessionLimits({ PRI_DATABASE_STATEMENT_TIMEOUT_MS: '5000', PRI_DATABASE_IDLE_TX_TIMEOUT_MS: '60000', PRI_DATABASE_POOL_MAX: '20', PRI_DATABASE_POOL_IDLE_MS: '60000', PRI_DATABASE_LOCK_WAIT_MS: '2500' }) },
+  { statementTimeoutMs: 5000, idleInTransactionTimeoutMs: 60000, poolMax: 20, poolIdleMs: 60000, lockWaitMs: 2500 }, 'each is configurable');
 for (const [name, value] of [
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', 'abc'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '0'], ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '1.5'],
   ['PRI_DATABASE_STATEMENT_TIMEOUT_MS', '999999999'], ['PRI_DATABASE_IDLE_TX_TIMEOUT_MS', '-1'], ['PRI_DATABASE_POOL_MAX', '0'],
-  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP'], ['PRI_DATABASE_LOCK_WAIT_MS', '50'], ['PRI_DATABASE_LOCK_WAIT_MS', '600000']
+  ['PRI_DATABASE_POOL_MAX', '51'], ['PRI_DATABASE_POOL_MAX', '10; DROP'], ['PRI_DATABASE_LOCK_WAIT_MS', '50'], ['PRI_DATABASE_LOCK_WAIT_MS', '600000'],
+  ['PRI_DATABASE_POOL_IDLE_MS', '999'], ['PRI_DATABASE_POOL_IDLE_MS', '3600001']
 ]) {
   throwsCode(() => postgresSessionLimits({ [name]: value }), 'PLATFORM_DB_CONFIG_INVALID', `${name}=${value} stops the boot instead of being guessed at`);
 }
 {
   const { options, settings } = postgresPoolOptions(`${BASE}?sslmode=verify-full`, { env: prod({ PRI_DATABASE_POOL_MAX: '7', PRI_DATABASE_SSL_ROOT_CERT: CA }) });
   eq([options.max, options.ssl, settings.statementTimeoutMs], [7, { rejectUnauthorized: true, ca: CA }, 15000], 'the pg Pool receives exactly these settings');
+  eq([options.idleTimeoutMillis, options.keepAlive, options.keepAliveInitialDelayMillis], [300000, true, 30000],
+    'an idle pooled connection is kept 5 minutes, with TCP keep-alive so a silently dropped one is noticed');
   ok(!options.connectionString.includes('sslmode'), 'and a connection string pg cannot reinterpret');
 }
 
@@ -194,6 +197,73 @@ for (const [name, value] of [
   ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full`, prod({ PGPORT: '6543' })).tlsMode === 'verify-full', 'PGPORT=6543 does not matter when the URL names its port (5432), exactly as pg resolves it');
   ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&port=5432`, prod()).tlsMode === 'verify-full', '?port=5432 (session mode) is accepted');
   ok(postgresConnectionSettings(`postgresql://u:${SECRET}@${DB_HOST}/postgres?sslmode=verify-full`, prod({ PGPORT: '5432' })).tlsMode === 'verify-full', 'a portless URL with PGPORT=5432 is accepted');
+}
+
+// ── The port is compared the way node-postgres resolves it (#524 follow-up) ──
+// pg turns the port into a number with parseInt(value, 10), so "6543.0",
+// "+6543", " 6543", "6543abc" and "6543e0" all connect to 6543; and it takes
+// the LAST exact-case `port` parameter, falling back to the authority port and
+// then PGPORT when that is empty — an uppercase `PORT=` or an earlier `port=`
+// does not stop PGPORT from being used. Each case below was accepted before the
+// fix while pg itself resolved it to 6543.
+{
+  const H = `postgresql://u:${SECRET}@${DB_HOST}`;
+  const named = [
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543.0`, '?port=6543.0 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=%2B6543`, '?port=+6543 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543abc`, '?port=6543abc (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543e0`, '?port=6543e0 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543%zz`, '?port=6543%zz (an invalid escape; parseInt → 6543)'],
+    [`${H}/postgres?sslmode=verify-full&PORT=5432`, 'a portless URL with PORT=5432 (not the key pg reads) and PGPORT=6543', { PGPORT: '6543' }],
+    [`${H}/postgres?sslmode=verify-full&port=5432&port=`, 'a portless URL whose last port= is empty and PGPORT=6543', { PGPORT: '6543' }],
+    [`${H}/postgres?sslmode=verify-full`, 'a portless URL with PGPORT=6543.0', { PGPORT: '6543.0' }],
+    [`${H}/postgres?sslmode=verify-full`, 'a portless URL with PGPORT=+6543', { PGPORT: '+6543' }]
+  ];
+  for (const [url, label, extraEnv = {}] of named) {
+    throwsCode(() => postgresConnectionSettings(url, prod(extraEnv)), 'PLATFORM_DB_TRANSACTION_POOLER', `${label} is refused`);
+  }
+
+  // Differential: node-postgres's own ConnectionParameters is the oracle. For
+  // every URL × PGPORT below, either the settings refuse it, or the connection
+  // string the pool receives resolves (in pg, with that PGPORT) to a port other
+  // than 6543.
+  const { default: ConnectionParameters } = await import('pg/lib/connection-parameters.js');
+  const pgPort = (connectionString, pgport) => {
+    const saved = process.env.PGPORT;
+    if (pgport === undefined) delete process.env.PGPORT; else process.env.PGPORT = pgport;
+    try { return new ConnectionParameters({ connectionString }).port; } finally {
+      if (saved === undefined) delete process.env.PGPORT; else process.env.PGPORT = saved;
+    }
+  };
+  const SPELLINGS = ['6543', '06543', '6543.0', '6543.9', '+6543', ' 6543', '6543 ', '6543abc', '6543e0', '6543,5432', '65430', '0x1993', '5432', ''];
+  const enc = value => encodeURIComponent(value);
+  const corpus = [];
+  for (const s of SPELLINGS) {
+    corpus.push([`${H}:5432/postgres?sslmode=verify-full&port=${enc(s)}`]);
+    corpus.push([`${H}/postgres?sslmode=verify-full&port=${enc(s)}`, '6543']);
+    corpus.push([`${H}/postgres?sslmode=verify-full&PORT=${enc(s)}`, '6543']);
+    corpus.push([`${H}/postgres?sslmode=verify-full&port=5432&port=${enc(s)}`, '6543']);
+    corpus.push([`${H}:5432/postgres?sslmode=verify-full&port=${enc(s)}&port=5432`]);
+    corpus.push([`${H}/postgres?sslmode=verify-full`, s]);
+  }
+  corpus.push([`${H}:06543/postgres?sslmode=verify-full`]);
+  let refused = 0;
+  let pgWouldUse6543 = 0;
+  for (const [url, pgport] of corpus) {
+    const env = prod(pgport === undefined ? {} : { PGPORT: pgport });
+    if (pgPort(url, pgport) === 6543) pgWouldUse6543++;
+    let settings = null;
+    let error = null;
+    try { settings = postgresConnectionSettings(url, env); } catch (caught) { error = caught; }
+    if (error) {
+      eq(error.code, 'PLATFORM_DB_TRANSACTION_POOLER', `differential: ${url.slice(url.indexOf('/postgres'))} PGPORT=${JSON.stringify(pgport)} is refused only as a pooler`);
+      refused++;
+      continue;
+    }
+    ok(pgPort(settings.connectionString, pgport) !== 6543,
+      `differential: ${url.slice(url.indexOf('/postgres'))} PGPORT=${JSON.stringify(pgport)} is accepted, so pg must not resolve the pool's connection string to 6543 (it resolves to ${pgPort(settings.connectionString, pgport)})`);
+  }
+  ok(pgWouldUse6543 >= 40 && refused >= pgWouldUse6543, `the differential corpus exercises the refusal (${corpus.length} cases; pg resolves ${pgWouldUse6543} of them to 6543; ${refused} refused)`);
 }
 
 console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, transaction-mode poolers are refused (session mode only), and no error leaks the URL.`);

@@ -7,6 +7,7 @@
 
 import { pathToFileURL } from 'node:url';
 import { handwrite } from './fakeServerReader.js';
+import { enterThroughCard, mockAccountServer } from './support/mock-account.mjs';
 
 const ACCOUNT = {
   id: 'acct_e2e_student',
@@ -34,15 +35,14 @@ export const flow = {
   id: 'cloud',
   name: 'Cloud · account, live Settings refresh, assignment hand-off',
 
-  async run({ page, ctx, base, check, goto, createProfile, settle }) {
-    let authenticated = false;
-    // The account is registered but its email is not yet verified — exactly the
-    // state a student is in the minute after signing up on the device they are
-    // writing on. /v1/handwriting/transcribe sits behind requireVerifiedEmail;
-    // /v1/handwriting/status does not (it is a session-only readiness probe).
-    let emailVerified = false;
-    // Flip the guardian gate independently to reproduce the production 403
-    // before the reader is called, then approve it while the page stays open.
+  async run({ page, ctx, base, check, goto, settle }) {
+    // The account, its session and the activation handshake (the card's code,
+    // the gate's statement, the first sync) are the shared stand-in's; the
+    // reader, the assignment and the classroom routes are scripted below.
+    const mock = mockAccountServer({ account: ACCOUNT });
+    // Flip the guardian gate on the READER's side to reproduce the production
+    // 403 before the reader is called, then approve it while the page stays
+    // open. (The account's own statement stays eligible: the app stays open.)
     let guardianPending = false;
     const requests = [];
     const reader = { text: '7', requests: [] };
@@ -70,6 +70,8 @@ export const flow = {
       const method = request.method();
       const body = request.postData() || '';
       requests.push({ path, method, body, headers: request.headers() });
+      if (await mock.handle(route)) return;
+      const authenticated = mock.state.authenticated;
 
       if (path === '/v1/billing/config' && method === 'GET') {
         return respond(route, 200, {
@@ -78,18 +80,7 @@ export const flow = {
         });
       }
 
-      if (path === '/v1/account/register' && method === 'POST') {
-        authenticated = true;
-        return respond(route, 201, { account: ACCOUNT }, {
-          'set-cookie': 'pri_csrf=e2e-csrf; Path=/; SameSite=Lax'
-        });
-      }
 
-      if (path === '/v1/account/me' && method === 'GET') {
-        return authenticated
-          ? respond(route, 200, { account: { ...ACCOUNT, emailVerified } })
-          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
 
       // The server reader, as the real one answers: a session-only status
       // probe, and a transcribe route that refuses an unverified email.
@@ -101,9 +92,9 @@ export const flow = {
       if (path === '/v1/handwriting/transcribe' && method === 'POST') {
         let parsed = null;
         try { parsed = JSON.parse(body || 'null'); } catch { parsed = null; }
-        reader.requests.push({ parsed, authenticated, emailVerified });
+        reader.requests.push({ parsed, authenticated });
         if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-        if (!emailVerified) return respond(route, 403, { error: { code: 'EMAIL_UNVERIFIED', message: 'Verify your email address before using this feature.' } });
+        if (guardianPending) return respond(route, 403, { error: { code: 'GUARDIAN_CONSENT_PENDING', message: 'A parent or guardian has been emailed to confirm this account.' } });
         const lines = String(reader.text).split('\n').filter(Boolean).map(text => ({ text, confidence: 0.97 }));
         return respond(route, 200, { transcription: { lines, text: lines.map(l => l.text).join('\n'), confidence: 0.97, needsConfirmation: false, engine: 'cloud-e2e-stand-in' } });
       }
@@ -155,32 +146,51 @@ export const flow = {
         } : { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       }
 
-      if (path === '/v1/account/logout' && method === 'POST') {
-        authenticated = false;
-        return respond(route, 200, { ok: true });
-      }
 
       return respond(route, authenticated ? 404 : 401, {
         error: { code: authenticated ? 'NOT_FOUND' : 'AUTH_REQUIRED', message: authenticated ? `Unhandled E2E route ${method} ${path}` : 'Sign in is required.' }
       });
     });
 
+    // ── 0 · in through the card and the gate; Settings already connected ────
     await goto('/');
-    await createProfile({ name: 'Cloud Student', year: 9 });
+    await enterThroughCard(page, { email: ACCOUNT.email, year: 9 });
+    await check('the student enters through the one card and the gate: the code verified once, the statement read, the first sync pushed and pulled',
+      mock.state.verifies === 1 && mock.state.syncPushes >= 1 && mock.state.syncPulls >= 1 && new URL(page.url()).pathname === '/practice',
+      JSON.stringify({ verifies: mock.state.verifies, pushes: mock.state.syncPushes, pulls: mock.state.syncPulls, url: page.url() }));
+    await goto('/settings');
+    await page.locator('#cloud-account-title').waitFor({ state: 'visible', timeout: 30000 });
+    const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
+    // The panel paints before it has asked the server who is signed in.
+    await accountPanel.getByText('Connected', { exact: false }).first().waitFor({ timeout: 15000 }).catch(() => {});
+    await check('Settings opens connected: the account the student entered with, no second sign-in form',
+      /Connected/.test(await accountPanel.innerText()) && await accountPanel.locator('#cloud-password').count() === 0,
+      `account panel reads ${JSON.stringify((await accountPanel.innerText()).slice(0, 180))}`);
+    const inbox = page.locator('section', { has: page.locator('#assignment-inbox-title') });
+    await inbox.waitFor({ state: 'visible', timeout: 15000 });
+    // Settings mounts the staff console (and its authenticator gate) only for
+    // admin/support roles: a student makes no second-factor request at all.
+    await check('a student never meets the staff authenticator gate: no MFA status request, no panel, no console',
+      await page.locator('#mfa-title').count() === 0 && await page.locator('#staff-operations-title').count() === 0 &&
+        !requests.some(row => row.path.startsWith('/v1/account/mfa/')),
+      JSON.stringify(requests.filter(row => row.path.startsWith('/v1/account/mfa/')).map(row => `${row.method} ${row.path}`)));
+    await check('the assignment inbox is live on the same session', await inbox.isVisible() && await inbox.getByText(ASSIGNMENT.title, { exact: true }).isVisible());
+    const classroom = page.locator('section', { has: page.locator('#classroom-title') });
+    await classroom.waitFor({ state: 'visible', timeout: 15000 });
+    await check('and so is the classroom panel, with the class membership from that session',
+      await classroom.isVisible() && (await classroom.innerText()).includes(ASSIGNMENT.className));
 
-    // ── 0 · write by hand, signed out ───────────────────────────────────────
-    // Production 2026-10-05 (iPad): a student opened Practice signed out, wrote,
-    // then registered on the same device and was told the reader "isn't
-    // answering" — nothing was asked of the server after sign-in. This is that
-    // day, with the right ending.
+    // ── 1 · a guardian gate that closes mid-work: refused before the reader ─
+    // Production 2026-10-05 (iPad): the student wrote, and the account's
+    // guardian state blocked the reader; the device said the reader "isn't
+    // answering". The server's refusal must be named as what it is, the ink
+    // must not be sent, and nothing may reload.
     const handwritingRequests = () => requests.filter(row => row.path.startsWith('/v1/handwriting/'));
-    // What the student can actually read about the blocked ink: the generic
-    // reader sentence is display:none while an account action is pending, so
-    // only text that is rendered counts (innerText of a hidden node would
-    // quietly return its textContent and prove nothing).
     const inkNotice = () => page.evaluate(() => [...document.querySelectorAll('.ink-status, [data-ink-account-recovery] p')]
       .filter(el => el.getClientRects().length > 0).map(el => el.innerText).join(' ').replace(/\s+/g, ' ').trim());
-    await goto('/practice');
+    const inkLink = page.locator('.ink-status-link');
+    guardianPending = true;
+    await page.getByRole('link', { name: 'Practice', exact: true }).first().click();
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
     for (let i = 0; i < 6 && !(await writeTab.count()); i++) {
@@ -190,129 +200,13 @@ export const flow = {
     }
     await writeTab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
-    const inkPrompt = (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim();
-    const box = await page.locator('.ink-canvas-live').boundingBox();
-    await handwrite(page, box, reader.text);
-    const inkSignIn = page.locator('[data-ink-account-recovery] [data-ink-sign-in]');
-    await inkSignIn.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-    const signedOutNote = await inkNotice();
-    // The sentence changed with the in-card recovery (it used to read "needs a
-    // Pri account … your working is saved"); what is protected is the same:
-    // the ink is not read, the student is told it is an account matter and is
-    // not told the reader is down.
-    await check('signed out, the kept ink waits for a Pri account — the student is told that, not "the reader is down"',
-      /has not been read or graded/.test(signedOutNote) && /^Sign in to check this answer$/.test((await inkSignIn.innerText().catch(() => '')).trim()) &&
-        !/isn.t answering/.test(signedOutNote) && await page.locator('.ink-preview').count() === 0,
-      `notice ${JSON.stringify(signedOutNote)}`);
-    const signedOutActionStatus = (await page.locator('.status-line').innerText().catch(() => '')) || '';
-    await check('signed out, the action bar does not blame handwriting when recognition was never attempted',
-      !/couldn.?t read|rewrite your last line more clearly/i.test(signedOutActionStatus),
-      `action status ${JSON.stringify(signedOutActionStatus)}`);
-    await check('nothing is sent to the reader while signed out',
-      handwritingRequests().length === 0 && reader.requests.length === 0,
-      JSON.stringify(handwritingRequests().map(r => `${r.method} ${r.path}`)));
-    const inkLink = page.locator('.ink-status-link');
-    // Signed out, the way forward is the sign-in inside the card, enabled once
-    // the ink is proven saved; the old "Account settings" link (a dead end for
-    // a student with ink on the page) is not shown beside it. The in-card
-    // sign-in itself is driven end to end by tour-write-sign-in.js.
-    await page.waitForFunction(() => document.querySelector('[data-ink-sign-in]')?.disabled === false, null, { timeout: 15000 }).catch(() => {});
-    await check('the notice offers sign-in on the card, not a link away to Account settings',
-      await inkSignIn.isEnabled() && !(await inkLink.isVisible().catch(() => false)),
-      `sign-in enabled ${await inkSignIn.isEnabled().catch(() => null)}, settings link visible ${await inkLink.isVisible().catch(() => null)}`);
-    // From here on nothing reloads: a reload would wipe the module-level
-    // readiness cache and hide the very bug this flow exists to catch. This
-    // flow goes on to prove Settings refreshes live when an account connects,
-    // so the student walks there through the app's own navigation.
     await page.evaluate(() => { window.__PRI_E2E_NO_RELOAD__ = 'kept'; });
-    await page.locator('.ws-exit').click();
-    await page.getByRole('link', { name: 'Settings', exact: true }).first().click();
-    await page.waitForURL(url => url.pathname === '/settings', { timeout: 15000 });
-    // Settings is a lazy route: wait for the account panel itself, not the URL.
-    await page.locator('#cloud-account-title').waitFor({ state: 'visible', timeout: 30000 });
-    const registerIndexBefore = requests.length;
-
-    const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
-    await check('cloud account controls render when the deployment origin is configured',
-      await accountPanel.isVisible());
-    await check('the fresh local profile starts disconnected from cloud',
-      /Not connected/.test(await accountPanel.innerText()),
-      `account panel reads ${JSON.stringify((await accountPanel.innerText()).slice(0, 180))}`);
-
-    await accountPanel.getByRole('button', { name: 'Create account' }).click();
-    await accountPanel.getByLabel('Your name').fill(ACCOUNT.name);
-    await accountPanel.getByLabel('Your email').fill(ACCOUNT.email);
-    await accountPanel.getByLabel('Password').fill('cloud-e2e-password-42');
-
-    // The form opens on the under-18 path, because under the DPDP Act that is
-    // most students here. Two things are asserted before ticking past it: the
-    // guardian fields are actually on screen, and the submit stays disabled
-    // until the notice is acknowledged. The second is the whole point of the
-    // consent checkbox — a gate that renders but does not gate is worse than
-    // no gate, because it looks like one.
-    const submit = accountPanel.getByRole('button', { name: 'Create and connect account' });
-    await check('a signup starts on the under-18 path and asks for a guardian',
-      await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible());
-    await check('the notice must be acknowledged before an account can be created',
-      await submit.isDisabled());
-
-    await accountPanel.getByLabel('I am 18 or older').check();
-    await check('declaring 18 or older withdraws the guardian fields',
-      !(await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible()));
-
-    await accountPanel.getByLabel('I have read the').check();
-    await check('acknowledging the notice releases the gate', await submit.isEnabled());
-    await submit.click();
-    await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15000 });
-
-    await check('account creation links the current local profile without leaving Settings',
-      new URL(page.url()).pathname === '/settings' && await accountPanel.getByText('Connected', { exact: true }).isVisible(),
-      `current URL is ${page.url()}`);
-
-    const registerCall = requests.find(row => row.path === '/v1/account/register' && row.method === 'POST');
-    await check('account registration goes through the audited web transport',
-      !!registerCall && registerCall.headers['x-pri-client'] === 'web-v1',
-      registerCall ? JSON.stringify(registerCall.headers) : 'no register request captured');
-
-    const registerBody = registerCall ? JSON.parse(registerCall.body || '{}') : {};
-    await check('the cloud account request carries a device id but no local-profile database payload',
-      typeof registerBody.deviceId === 'string' && registerBody.deviceId.startsWith('device-') &&
-        !('localProfileId' in registerBody) && !('encryptionKey' in registerBody),
-      JSON.stringify(registerBody));
-
-    const inbox = page.locator('section', { has: page.locator('#assignment-inbox-title') });
-    await inbox.waitFor({ state: 'visible', timeout: 15000 });
-    // Settings mounts the staff console (and its authenticator gate) only for
-    // admin/support roles: a student makes no second-factor request at all.
-    await check('a student never meets the staff authenticator gate: no MFA status request, no panel, no console',
-      await page.locator('#mfa-title').count() === 0 && await page.locator('#staff-operations-title').count() === 0 &&
-        !requests.some(row => row.path.startsWith('/v1/account/mfa/')),
-      JSON.stringify(requests.filter(row => row.path.startsWith('/v1/account/mfa/')).map(row => `${row.method} ${row.path}`)));
-    await check('assignment inbox refreshes immediately after connect without a page reload',
-      new URL(page.url()).pathname === '/settings' && await inbox.isVisible());
-    await check('the assigned cloud task is visible immediately',
-      await inbox.getByText(ASSIGNMENT.title, { exact: true }).isVisible());
-
-    const classroom = page.locator('section', { has: page.locator('#classroom-title') });
-    await classroom.waitFor({ state: 'visible', timeout: 15000 });
-    await check('classroom panel also refreshes immediately after connect',
-      await classroom.isVisible());
-    await check('class membership came through the same cloud session',
-      (await classroom.innerText()).includes(ASSIGNMENT.className));
-
-    // ── 1 · back to the page with the kept ink, signed in, no reload ────────
-    // Reproduce the production gate: /handwriting/status is refused before any
-    // transcription request can leave the device.
-    guardianPending = true;
-    await page.getByRole('link', { name: 'Practice', exact: true }).first().click();
-    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
-    await check('the same question and the kept handwriting come back, in writing mode',
-      (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt,
-      `prompt now ${JSON.stringify((await page.locator('.q-prompt').innerText()).slice(0, 120))}`);
-    await check('without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
+    const inkPrompt = (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim();
+    const beforeInk = requests.length;
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), reader.text);
     await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const guardianNote = await inkNotice();
-    const guardianBlockedRequests = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
+    const guardianBlockedRequests = requests.slice(beforeInk).filter(row => row.path.startsWith('/v1/handwriting/'));
     await check('guardian pending is named as an account action, not a handwriting failure',
       /parent or guardian needs to confirm/i.test(guardianNote), `status ${JSON.stringify(guardianNote)}`);
     await check('guardian pending stops before transcription: status is probed but the ink is not sent to the reader',
@@ -323,42 +217,20 @@ export const flow = {
       !/couldn.?t read|rewrite your last line more clearly/i.test(lowerWhileGated), `lower status ${JSON.stringify(lowerWhileGated)}`);
     await check('guardian pending offers Account settings as the relevant action',
       await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
+    await check('nothing was sent to the reader while gated', reader.requests.length === 0, JSON.stringify(handwritingRequests().map(r => `${r.method} ${r.path}`)));
 
-    // Approval can arrive elsewhere while this page stays open. Focus triggers
-    // the bounded fresh readiness probe; no force-quit or reload is required.
+    // ── 2 · approval arrives elsewhere; the kept ink is read, no reload ─────
     guardianPending = false;
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    // The status is now usable, the ink is sent, and the transcribe route names
-    // the next real blocker: the still-unverified email.
-    await page.waitForFunction(() => /Verify your email address/.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
-    const afterSignIn = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
-    await check('after sign-in the device asks the server again: a status probe and the kept ink itself',
-      afterSignIn.some(r => r.path === '/v1/handwriting/status') && afterSignIn.some(r => r.path === '/v1/handwriting/transcribe'),
-      JSON.stringify(afterSignIn.map(r => `${r.method} ${r.path}`)));
-    const verifyNote = await inkNotice();
-    await check('the real blocker is shown — verify the email — not "the reader is not answering"',
-      /Verify your email address/.test(verifyNote) && !/isn’t answering/.test(verifyNote),
-      `status ${JSON.stringify(verifyNote)}`);
-    const verifyActionStatus = (await page.locator('.status-line').innerText().catch(() => '')) || '';
-    await check('email verification pending is not rendered as unreadable handwriting in the action bar',
-      !/couldn.?t read|rewrite your last line more clearly/i.test(verifyActionStatus),
-      `action status ${JSON.stringify(verifyActionStatus)}`);
-    await check('with the way to Account settings, where a fresh verification email is sent from',
-      await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingVerifyEmail');
-    await check('the ink that was sent is the picture and nothing else — answer-blind, before and after sign-in',
-      reader.requests.length >= 1 && reader.requests.every(r => r.parsed && JSON.stringify(Object.keys(r.parsed)) === '["image"]' && /^data:image\//.test(r.parsed.image)),
-      JSON.stringify(reader.requests.map(r => r.parsed && Object.keys(r.parsed))));
-
-    // ── 2 · the email is verified (on another device, say); the student comes
-    // back to the app and the kept ink is read with no further action ───────
-    emailVerified = true;
-    const sentBeforeVerify = reader.requests.length;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
     const readBack = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
-    await check('once verified, the kept ink is read by itself — no retyping, no reload',
-      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length > sentBeforeVerify,
-      `read ${JSON.stringify(readBack)}; ${reader.requests.length - sentBeforeVerify} further transcribe requests`);
+    await check('once the gate lifts, the kept ink is read by itself — no retyping, no reload',
+      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length >= 1,
+      `read ${JSON.stringify(readBack)}; ${reader.requests.length} transcribe requests`);
+    await check('the same question is still on screen', (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt);
+    await check('the ink that was sent is the picture and nothing else — answer-blind',
+      reader.requests.every(r => r.parsed && JSON.stringify(Object.keys(r.parsed)) === '["image"]' && /^data:image\//.test(r.parsed.image)),
+      JSON.stringify(reader.requests.map(r => r.parsed && Object.keys(r.parsed))));
     await check('and the waiting notice is gone',
       await page.locator('.ink-status-line').count() === 0 && await page.locator('[data-ink-account-recovery]').count() === 0);
     await check('still without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');

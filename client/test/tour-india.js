@@ -1,15 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · E2E flow — the app opens as an Indian product.
 //
-// Every other flow in this suite makes an Australian profile, so until this
-// one existed not a single browser check ran as the student the product is
-// now built for. This flow walks the India path the way a Class 10 student
-// meets it: the landing copy, the first control on the sign-up form, the
-// labels on Home and in the profile picker, the account-less demo, the
-// History page, and the way from the landing screen to the cloud account.
+// This flow walks the India path the way a Class 10 student meets it: the
+// landing copy, the first thing the sign-in card asks for, the labels on Home
+// and in the profile picker, the History page, and Settings already connected
+// to the account the student entered with. There is no account-less demo any
+// more (issue #477): nothing opens without a verified account.
 //
-// It asserts behaviour, not pixels: what the picker says a profile is, which
-// chapters the demo has evidence for, where the cloud link actually lands.
+// It asserts behaviour, not pixels: what the picker says a profile is, where
+// the account lives, which class Home targets.
 //
 // Run on its own:  node client/test/tour-india.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,8 +39,8 @@ export const flow = {
     await check('the landing screen names NCERT and JEE', /NCERT/.test(hero) && /JEE/.test(hero),
       `hero reads ${JSON.stringify(hero.slice(0, 160))}`);
     await check('and says nothing about the HSC', !HSC.test(hero), `hero reads ${JSON.stringify(hero.slice(0, 160))}`);
-    // The welcome screen now also carries the legal links in a muted line, so
-    // the privacy copy is named rather than taken as the only muted paragraph.
+    // The welcome screen also carries the legal links in a muted line, so the
+    // privacy copy is named rather than taken as the only muted paragraph.
     const privacy = await page.locator('.auth-col p.muted').first().innerText();
     // Owner decision 2026-10-10: the welcome line may no longer promise an
     // optional account or offline checking. What it must still say honestly is
@@ -55,8 +54,8 @@ export const flow = {
       await check(`the landing screen links to ${label.toLowerCase()}`,
         await page.locator(`.auth-col a[href="${href}"]`).count() === 1, `${label} -> ${href}`);
     }
-    await check('the landing screen offers the real account sign-in',
-      await page.getByRole('button', { name: 'I already have an account' }).count() === 1);
+    await check('the landing screen IS the account sign-in: one card, an email first',
+      await page.locator('[data-signin-card="page"] #signup-destination[type="email"]').count() === 1);
     await check('the tab is titled after the app', (await page.title()) === 'Pri Learning',
       `title reads ${JSON.stringify(await page.title())}`);
     const description = (await page.locator('meta[name="description"]').getAttribute('content')) || '';
@@ -70,39 +69,20 @@ export const flow = {
       manifest.name === 'Pri Learning' && /NCERT/.test(manifest.description || '') && !/HSC|iPad/i.test(manifest.description || ''),
       `manifest reads ${JSON.stringify(manifest)}`);
 
-    // ── 2 · staged onboarding makes India a deliberate curriculum choice ─────
-    await page.getByRole('button', { name: 'Use without an account' }).click();
-    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await page.getByRole('button', { name: 'Student', exact: true }).click();
-    await page.locator('.auth-card .btn-primary').click();
-    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    const first = page.locator('.auth-card select').first();
-    await check('the first curriculum control is the class / track picker', (await first.getAttribute('id')) === 'signup-track',
-      `first select is #${await first.getAttribute('id')}`);
-    const options = await first.locator('option').allInnerTexts();
-    await check('it offers Classes 7–12, JEE Main, JEE Advanced and Olympiad',
-      options.includes('Class 7') && options.includes('Class 12') && options.includes('JEE Main') && options.includes('JEE Advanced') && options.some(o => /^Olympiad/.test(o)),
-      `options are ${JSON.stringify(options)}`);
-    await check('no class or track is silently assumed', (await first.inputValue()) === '',
-      `initial choice is ${JSON.stringify(await first.inputValue())}`);
-    await check('the Australian syllabuses are folded away behind one link',
-      await page.locator('#signup-course').count() === 0 && await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1);
-    const formText = await page.locator('.auth-card').innerText();
-    await check('the India selection step never says Year or HSC', !/\bYear\b/.test(formText) && !HSC.test(formText),
-      `form reads ${JSON.stringify(formText.slice(0, 200))}`);
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await check('Back returns to the role step without creating a partial profile',
-      await page.locator('[data-onboarding-step="1"]').count() === 1 && await page.locator('.acct-list').count() === 0);
+    // ── 2 · account first: the card asks for a verified contact, not a local profile ─
+    await check('no device-only wizard and no demo stand on the welcome screen',
+      await page.locator('[data-onboarding-step="1"], [data-testid="hero-offline"], [data-testid="hero-try-demo"]').count() === 0 &&
+        await page.getByRole('button', { name: 'Use without an account' }).count() === 0);
+    await check('the card is email by default and offers Classes 7–12 only after the mailbox is proved',
+      await page.locator('[data-signin-card="page"]').getAttribute('data-signup-step') === 'method' &&
+        await page.locator('[data-testid="signup-class-10"]').count() === 0);
 
-    // ── 3 · a Class 10 profile lands on Home, labelled by class ──────────────
-    await goto('/');
-    await createProfile(STUDENT);
-    await check('creating the profile lands on Home as Asha',
-      (await page.locator('.home-greet').innerText()).includes('Asha'));
+    // ── 3 · a verified Class 10 student lands on Home, labelled by class ────────
+    const member = await createProfile(STUDENT);
+    await check('the verified account lands on Home as Asha', (await page.locator('.home-greet').innerText()).includes('Asha'));
     await page.waitForSelector('.genbar-chips .chip', { timeout: 15000 });
     const chips = await page.locator('.genbar-chips').innerText();
-    await check('Home targets Class 10, not Year 10', /Class 10/.test(chips) && !/\bYear\b/.test(chips),
-      `chips read ${JSON.stringify(chips)}`);
+    await check('Home targets Class 10, not Year 10', /Class 10/.test(chips) && !/\bYear\b/.test(chips), `chips read ${JSON.stringify(chips)}`);
     await page.locator('.genbar-toggle').click();
     await settle();
     const cats = await page.locator('.gen-cats').innerText();
@@ -113,68 +93,44 @@ export const flow = {
     const nav = await page.locator('.sidebar').innerText();
     await check('the navigation carries no NSW jargon', !HSC.test(nav) && !/\bYear\b/.test(nav), `nav reads ${JSON.stringify(nav)}`);
 
+    await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('main h1', { timeout: 30000 });
+    const progressTitle = await page.locator('main h1').innerText();
+    await check('Progress is the India presentation for Class 10', /Class 10/.test(progressTitle) && !HSC.test(progressTitle),
+      `heading reads ${JSON.stringify(progressTitle)}`);
+    await check('a fresh student is not shown someone else’s past: no demo history', !/\bPri demo\b/i.test(await page.locator('main').innerText()));
+    await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('main', { timeout: 30000 });
+    const sub = await page.locator('main p.sub').first().innerText().catch(() => '');
+    await check('History does not call the device an iPad', !/iPad/.test(sub), `copy reads ${JSON.stringify(sub)}`);
+    note(`the new student opens with ${JSON.stringify(progressTitle)}`);
+
+    // ── 4 · the picker: the saved profile, labelled by class, and no demo ─────
+    await goto('/');
     await switchProfile(page);
     const asha = page.locator('.acct-row', { hasText: STUDENT.name });
     await check('the picker files her under Class 10', /Class 10/.test(await asha.innerText()) && !/\bYear\b/.test(await asha.innerText()),
       `row reads ${JSON.stringify(await asha.innerText())}`);
+    await check('the picker offers no demo and no account-less entry — another Pri account, or a saved profile',
+      await page.getByRole('button', { name: /Try the demo/i }).count() === 0 && await page.getByTestId('picker-create-account').isVisible());
+    await asha.click();
+    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    await check('choosing the saved profile opens Home again on the same live session, with no second sign-in',
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0 && (await page.locator('.home-greet').innerText()).includes('Asha'));
 
-    // ── 4 · the demo is an Indian Class 10 student ───────────────────────────
-    await page.getByRole('button', { name: /Try the demo/ }).click();
-    await page.waitForSelector('.home-greet', { timeout: 120000 });
-    await check('the demo signs in as Pri', (await page.locator('.user-chip').innerText()).includes('Pri'));
-    await page.waitForSelector('.genbar-chips .chip', { timeout: 15000 });
-    await check('the demo practises Class 10', /Class 10/.test(await page.locator('.genbar-chips').innerText()),
-      `chips read ${JSON.stringify(await page.locator('.genbar-chips').innerText())}`);
-    await check('the demo arrives with a streak', /\d+-day streak/.test(await page.locator('.goal-sub').innerText()),
-      `goal card reads ${JSON.stringify(await page.locator('.goal-sub').innerText())}`);
-
-    await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.syl-table', { timeout: 30000 });
-    const progressTitle = await page.locator('main h1').innerText();
-    await check('Progress is the India presentation for Class 10', /Class 10 CBSE \/ NCERT progress/.test(progressTitle),
-      `heading reads ${JSON.stringify(progressTitle)}`);
-    const started = await page.locator('.grid.cols-4 .card').first().innerText();
-    const startedN = Number((/(\d+)\s*\/\s*(\d+)/.exec(started.replace(/\s+/g, ' ')) || [])[1]);
-    await check('the demo has NCERT chapters started', startedN >= 8, `chapters card reads ${JSON.stringify(started)}`);
-    await check('Progress refuses percentile and rank predictions', await page.locator('text=No percentile, no rank').count() === 1);
-    // A mark estimate is allowed, but only alongside how much of the paper it
-    // covers. A number without that context is the dishonest version.
-    const estimate = await page.locator('text=If you sat this paper tomorrow').count();
-    const coverage = await page.locator('text=/marks practised/').count();
-    await check('any mark estimate travels with its coverage', estimate === 0 || coverage >= 1);
-    note(`the demo opens with ${started.replace(/\s+/g, ' ').trim()}`);
-
-    await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.hist-row', { timeout: 30000 });
-    const rows = await page.locator('.hist-row').count();
-    await check('History has the demo’s recent questions', rows > 0, `${rows} rows`);
-    const names = await page.locator('.hist-name').allInnerTexts();
-    await check('every History row is named by its NCERT chapter', names.length > 0 && names.every(n => n && n !== 'Custom question'),
-      `names are ${JSON.stringify(names.slice(0, 6))}`);
-    const stamp = await page.locator('.hist-top .muted').first().innerText();
-    await check('dates are written day-month in the profile’s locale', /^\d{1,2} [A-Z][a-z]{2,4}$/.test(stamp.trim()), `stamp reads ${JSON.stringify(stamp)}`);
-    const sub = await page.locator('main p.sub').first().innerText();
-    await check('History does not call the device an iPad', !/iPad/.test(sub), `copy reads ${JSON.stringify(sub)}`);
-
-    // ── 5 · the way to the cloud account ─────────────────────────────────────
-    await switchProfile(page);
-    await page.getByRole('button', { name: 'Sign in to your Pri cloud account' }).click();
-    await check('choosing the cloud sign-in explains the next step',
-      /cloud account/i.test(await page.locator('.cloud-intent').innerText()));
-    await page.locator('.acct-row', { hasText: 'Pri' }).first().click();
-    await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
+    // ── 5 · Settings is already the account’s ───────────────────────────────
+    await goto('/settings');
+    await page.locator('#cloud-account-title').waitFor({ timeout: 30000 });
     await settle();
-    await check('opening a profile lands in Settings', new URL(page.url()).pathname === '/settings', `landed on ${page.url()}`);
-    // innerText is the RENDERED text, and the card title is uppercased in CSS.
-    const cloudTitle = await page.locator('#cloud-account-title').innerText();
-    await check('at the cloud account panel', /Account & cross-device sync/i.test(cloudTitle), `heading reads ${JSON.stringify(cloudTitle)}`);
-    const inView = await page.evaluate(() => {
-      const el = document.getElementById('cloud-account-title');
-      if (!el) return false;
-      const r = el.getBoundingClientRect();
-      return r.top >= 0 && r.top <= window.innerHeight;
+    const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
+    await check('Settings shows the account connected, with no second email login asked for',
+      /Connected/.test(await panel.innerText()) && await panel.locator('#cloud-password').count() === 0,
+      `panel reads ${JSON.stringify((await panel.innerText()).slice(0, 160))}`);
+    const actual = await page.evaluate(async () => {
+      const r = await fetch('/v1/account/me', { credentials: 'include' });
+      return r.ok ? (await r.json()).account?.id : null;
     });
-    await check('and the panel is scrolled into view', inView, 'the cloud account title is off-screen');
+    await check('the live session is the account the card made', String(actual) === String(member.accountId));
   }
 };
 

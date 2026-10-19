@@ -21,7 +21,8 @@
 //     instead of deleting the session's account;
 //   · every other local profile linked to the same account is unlinked too;
 //   · a deletion with no answer (network) is settled by one /me probe now and
-//     by verifyCloudSession later (a 401 after the request = account gone);
+//     by verifyCloudSession later (a 401 after the request, inside a one-day
+//     TTL = account gone, reported as inferred: confirmedBy 'probe');
 //   · a server refusal (any status, 5xx included) keeps the link and clears the
 //     pending stamp; the native shell is asked to forget the session exactly once.
 //
@@ -254,8 +255,12 @@ for (const [label, pid, accountId, proof] of proofs) {
   meReply = null;
 }
 
-// 5b. The request never arrived: /me still answers 200 for the account, so
-//     nothing was deleted; the link stays and the stamp is cleared.
+// 5b. The request never arrived (or timed out mid-transaction): /me still
+//     answers 200 for the account right now. Nothing is forgotten, and the
+//     stamp is KEPT — on a client timeout the server may still be inside the
+//     deletion transaction, so a session alive this instant can be gone a
+//     moment later; a single 200 proves nothing. verifyCloudSession settles it
+//     (5e: a later 200 clears the stamp; 5c: a later 401 is the deletion).
 {
   const pid = 'p-never-sent';
   await linkedProfile(pid, 'acct-alive');
@@ -266,7 +271,8 @@ for (const [label, pid, accountId, proof] of proofs) {
   try { await deleteCloudAccount?.(pid, { password: 'correct horse' }); } catch (err) { error = err; }
   ok('the network failure reaches the panel', !!error && !error.status, String(error));
   same('the link stays: the account is still there', (await cloudAccountLink(pid))?.accountId, 'acct-alive');
-  same('no pending stamp remains after a 200 probe', (await cloudAccountLink(pid))?.deleteRequestedAt, null);
+  ok('the pending stamp is kept after a single 200 probe (the deletion may still be in flight)', Number((await cloudAccountLink(pid))?.deleteRequestedAt) > 0, deviceRows());
+  same('a later verified 200 is a connected session that clears the stamp', [(await verifyCloudSession(pid)).connected, (await cloudAccountLink(pid))?.deleteRequestedAt], [true, null]);
 }
 
 // 5c. Fully offline: the DELETE and the probe both fail. The intent is kept on
@@ -289,7 +295,7 @@ for (const [label, pid, accountId, proof] of proofs) {
   meReply = { status: 401, body: { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } } };
   announcements.length = 0;
   const verified = await verifyCloudSession(pid);
-  same('verifyCloudSession reads a 401 after a pending deletion as "deleted"', [verified.connected, verified.reason, verified.link], [false, 'deleted', null]);
+  same('verifyCloudSession reads a 401 after a pending deletion as "deleted", and says it was inferred', [verified.connected, verified.reason, verified.confirmedBy, verified.link], [false, 'deleted', 'probe', null]);
   same('the link is gone', await cloudAccountLink(pid), null);
   same('the twin profile linked to the same account is unlinked too', await cloudAccountLink('p-offline-twin'), null);
   ok('the replica state is gone', !deviceRows().includes(`pri-cloud-sync-state-v1:${pid}`), deviceRows());
@@ -320,6 +326,36 @@ for (const [label, pid, accountId, proof] of proofs) {
   const verified = await verifyCloudSession(pid);
   same('a 200 after a stale stamp is a connected session', [verified.connected, verified.link?.accountId], [true, 'acct-stale']);
   same('and the stamp is cleared', (await cloudAccountLink(pid))?.deleteRequestedAt, null);
+}
+
+// 5f. The stamp has a TTL (DELETE_STAMP_TTL_MS). Past it, a 401 is read as the
+//     ordinary end of a session (idle/absolute expiry, "sign out everywhere", a
+//     revocation from the devices list), not as the deletion: the account is
+//     not declared gone, nothing is unlinked, and the stale stamp is dropped so
+//     it cannot fire later either.
+{
+  const { DELETE_STAMP_TTL_MS } = cloudAccount;
+  same('the stamp TTL is one day', DELETE_STAMP_TTL_MS, 24 * 60 * 60 * 1000);
+  const pid = 'p-expired-stamp';
+  await linkedProfile(pid, 'acct-still-there');
+  await linkedProfile('p-expired-twin', 'acct-still-there');
+  const row = await linkRow(pid);
+  await put('device', { ...row, deleteRequestedAt: Date.now() - DELETE_STAMP_TTL_MS - 1000 });
+  meReply = { status: 401, body: { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } } };
+  announcements.length = 0;
+  const verified = await verifyCloudSession(pid);
+  same('a 401 after the TTL is "signed-out", not "deleted"', [verified.connected, verified.reason, verified.link?.accountId], [false, 'signed-out', 'acct-still-there']);
+  same('the link stays', (await cloudAccountLink(pid))?.accountId, 'acct-still-there');
+  same('the twin profile stays linked too', (await cloudAccountLink('p-expired-twin'))?.accountId, 'acct-still-there');
+  ok('the replica state stays', deviceRows().includes(`pri-cloud-sync-state-v1:${pid}`), deviceRows());
+  same('the expired stamp is dropped from the row', (await cloudAccountLink(pid))?.deleteRequestedAt, null);
+  same('no "session ended" announcement is made for a live account', announcements.filter(a => a?.localProfileId === pid).length, 0);
+  // Just inside the TTL the lost reply is still the likelier story: deleted.
+  const fresh = await linkRow(pid);
+  await put('device', { ...fresh, deleteRequestedAt: Date.now() - DELETE_STAMP_TTL_MS + 60_000 });
+  const inside = await verifyCloudSession(pid);
+  same('a 401 inside the TTL is still read as the deletion', [inside.reason, inside.confirmedBy, await cloudAccountLink(pid)], ['deleted', 'probe', null]);
+  meReply = null;
 }
 
 // ── 6 · Inside a native shell the session jar is the shell's: forget it exactly once ──

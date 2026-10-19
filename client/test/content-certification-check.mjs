@@ -17,7 +17,25 @@ installBrowserEnv();
 // run against the real server. Every profile is a real verified account, so
 // its India questions are issued by the server and answered questions are
 // marked by it.
-const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const { startOnlineAuthority, nextSubmissionId, suiteSeed } = await import('./support/online-authority.mjs');
+// Deterministic. The device chooses the cell a chapter-level request lands on
+// from Math.random (indiaProduct.js resolveIndiaTarget) and the server chooses
+// every question's seed; the authority seeds the server's dice from
+// PRI_SUITE_SEED and the device's are seeded from the same number here, so a
+// run repeats exactly and a failing seed is replayed by setting that one
+// variable (issue #540 was a sitting nobody could replay).
+function mulberry32(a) {
+  return () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+{
+  const rng = mulberry32(suiteSeed());
+  Math.random = () => rng();
+}
 const online = await startOnlineAuthority({ label: 'content-certification' });
 
 const cert = await import('./content-certify.mjs');
@@ -169,8 +187,14 @@ for (const gen of ['c8-algebraic-identities-ncert-mastery', 'c8-exponents-ncert-
     });
   }
   eq(deadEnds.length, 0, `every advertised CBSE dot point resolves to a servable target (dead ends: ${deadEnds.slice(0, 5).join(', ')})`);
+  // Tranche 3 (curriculum-in-hardest-covers.js) gave every CBSE dot point a D3
+  // form, so no live dot point is D4-only any more. The disclosure path is still
+  // exercised on the live chapter with its tranche-3 cover taken away.
   const c7 = IN_CHAPTER_BY_ID['c7-connecting-dots-current'];
-  const t = resolveIndiaTarget(c7, { dotpoint: 3, difficulty: 2, track: 'cbse', grade: 7, random: () => 0 });
+  const live = resolveIndiaTarget(c7, { dotpoint: 3, difficulty: 3, track: 'cbse', grade: 7, random: () => 0 });
+  ok(live && live.windowed !== false && live.difficulty === 3, 'the formerly D4-only c7 dot point now resolves inside the CBSE window at D3');
+  const d4Only = { ...c7, covers: c7.covers.filter(c => c.gen !== 'c7-range-display-reasoning') };
+  const t = resolveIndiaTarget(d4Only, { dotpoint: 3, difficulty: 2, track: 'cbse', grade: 7, random: () => 0 });
   ok(t && t.windowed === false && t.difficulty === 4, 'a D4-only CBSE dot point is served at D4 and disclosed as outside the window');
 }
 
@@ -449,6 +473,60 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(!/difficulty/.test(src('../src/pages/IndiaProgress.jsx').match(/indiaProgressPracticeHref\([^)]*\)/)?.[0] || ''), 'India Progress links carry no difficulty');
 }
 
+// A chapter-level request lands on ONE cell, and the server draws inside the
+// cell it is given. Quadratic Equations has three cells at D2 — roots (about
+// 1,200 items), discriminant (144) and context (12) — drawn with equal
+// probability, so a third of the requests went to a cell smaller than the
+// window, and once its twelve items were all in the window the student was
+// handed a flagged repeat on a chapter with 1,400 fresh questions (issue
+// #540: the repeat-window check above got 19 of 20). The device now asks
+// again on another cell of the same terms when the server flags a repeat
+// (local/retargetOnRepeat.js), as its offline draft path always did. Pinned
+// by spending the small cell on purpose, then asking at chapter level while
+// its items are all still inside the window — in three sittings, so that at
+// least one chapter-level request lands on the spent cell whatever the seed
+// (each has a two-in-three chance per request).
+{
+  const CELL = 'c10-quadratic-context', DOTPOINT = 3, D = 2, SITTINGS = 3;
+  // Hashes on a served row are the server's opaque form of the content hash.
+  const { opaqueContentHash } = await import('../../server/platform/contentSeen.js');
+  const pool = new Set();
+  for (let s = 0; s < 4000; s++) pool.add(opaqueContentHash(generateQuestion(CELL, D, s).contentHash));
+  ok(pool.size < REPEAT_WINDOW, `precondition: the cell behind dot point ${DOTPOINT + 1} holds fewer items (${pool.size}) than the window (${REPEAT_WINDOW})`);
+  const ask = async body => {
+    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-quadratic-equations', track: 'cbse', difficulty: D, ...body });
+    const row = await idb.get('questions', r.question.id);
+    await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+    return { hash: row.payload.contentHash, generator: row.generator, repeat: !!r.repeat };
+  };
+  const issuesBefore = online.traffic.issue;
+  let chapterAsked = 0;
+  for (let k = 1; k <= SITTINGS; k++) {
+    await premiumProfile({ name: `Cert Spent Cell ${k}`, course: 'in', indiaTrack: 'cbse', year: 10 });
+    // Spend the cell: its dot point has no other cell at this level.
+    const spent = [];
+    for (let i = 0; i < pool.size; i++) spent.push(await ask({ dotpoint: DOTPOINT }));
+    ok(spent.every(s => s.generator === CELL && pool.has(s.hash)), `sitting ${k}: every dot-point request is served from the dot point's own cell`);
+    eq(new Set(spent.map(s => s.hash)).size, pool.size, `sitting ${k}: the whole cell is served, once each, before anything repeats`);
+    eq(spent.filter(s => s.repeat).length, 0, `sitting ${k}: and none of those is flagged`);
+    const exhausted = await ask({ dotpoint: DOTPOINT });
+    ok(exhausted.repeat === true && exhausted.generator === CELL && pool.has(exhausted.hash),
+      `sitting ${k}: a dot point whose only cell is spent is served a flagged repeat — a pool smaller than the window is exhausted, not broken`);
+    // Now the chapter: the spent cell's items all stay inside the window for
+    // exactly this many more questions, so a request that lands on it has to
+    // be answered from another cell.
+    const chapter = [];
+    for (let i = 0; i < REPEAT_WINDOW - pool.size; i++) chapter.push(await ask({}));
+    chapterAsked += chapter.length;
+    eq(new Set(chapter.map(s => s.hash)).size, chapter.length, `sitting ${k}: the next ${chapter.length} chapter-level questions are all distinct`);
+    ok(chapter.every(s => !pool.has(s.hash) && s.generator !== CELL),
+      `sitting ${k}: none of them is one of the spent cell's items — got ${JSON.stringify(chapter.filter(s => pool.has(s.hash) || s.generator === CELL))}`);
+    eq(chapter.filter(s => s.repeat).length, 0, `sitting ${k}: and none is flagged as a repeat`);
+  }
+  ok(online.traffic.issue - issuesBefore > chapterAsked + SITTINGS * (pool.size + 1),
+    `the device asked the server again on another cell when a chapter-level request landed on the spent one (${online.traffic.issue - issuesBefore} issues for ${chapterAsked + SITTINGS * (pool.size + 1)} questions; seed ${suiteSeed()})`);
+}
+
 // ── 5. Versioning gate ──────────────────────────────────────────────────────
 
 {
@@ -477,7 +555,7 @@ await online.close();
 const total = pass + failures.length;
 if (failures.length) {
   for (const f of failures) console.log(`FAIL ${f}`);
-  console.log(`CONTENT CERTIFICATION REGRESSIONS: FAIL — ${pass}/${total} checks`);
+  console.log(`CONTENT CERTIFICATION REGRESSIONS: FAIL — ${pass}/${total} checks (seed ${suiteSeed()})`);
   process.exit(1);
 }
-console.log(`CONTENT CERTIFICATION REGRESSIONS: PASS — ${pass}/${total} checks`);
+console.log(`CONTENT CERTIFICATION REGRESSIONS: PASS — ${pass}/${total} checks (seed ${suiteSeed()})`);

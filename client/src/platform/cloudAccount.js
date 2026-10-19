@@ -41,8 +41,11 @@ export async function cloudDeviceId() {
   return deviceId;
 }
 
-export async function cloudAccountLink(pid) {
-  const row = await get('device', linkRowId(pid)).catch(() => null);
+// `strict` lets a storage failure surface instead of reading as "no link":
+// the activation gate must not mistake a dropped IndexedDB connection (WebKit,
+// after the app sat in the background) for an account that was unlinked.
+export async function cloudAccountLink(pid, { strict = false } = {}) {
+  const row = await (strict ? get('device', linkRowId(pid)) : get('device', linkRowId(pid)).catch(() => null));
   if (!row) return null;
   return {
     localProfileId: pid,
@@ -56,6 +59,15 @@ export async function cloudAccountLink(pid) {
     // (deleteCloudAccount). Cleared by a reply either way; read by
     // verifyCloudSession to settle a half-done deletion (#521).
     deleteRequestedAt: Number(row.deleteRequestedAt) || null,
+    // When the server last let THIS account in on this device (the activation
+    // gate's full answer), and for which account. Not permission by itself:
+    // only the gate's bounded offline grace reads it, and only when the server
+    // cannot be reached at all.
+    activatedAt: Number(row.activatedAt) || null,
+    activatedAccountId: row.activatedAccountId ? String(row.activatedAccountId) : null,
+    // The latest device time the grace has seen: a clock earlier than this
+    // has moved backwards, and the grace refuses it.
+    clockSeenAt: Number(row.clockSeenAt) || null,
     entitlement: normalizeEntitlementSnapshot(row.entitlement || {})
   };
 }
@@ -86,6 +98,11 @@ async function saveAccount(pid, account, patch = {}) {
     lastVerifiedAt: Date.now(),
     lastSyncAt: prior?.lastSyncAt || null,
     entitlement: prior?.entitlement || null,
+    // Kept across a session refresh of the same account (the conflict check
+    // above guarantees it is the same one); a new link starts without it.
+    activatedAt: prior?.accountId ? prior.activatedAt || null : null,
+    activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
+    clockSeenAt: prior?.clockSeenAt || null,
     ...patch
   };
   // Defense in depth for rows written by an earlier development build.
@@ -176,9 +193,21 @@ export async function verifyCloudSession(pid) {
       // 1): the session that asked has died with the account, so the account is
       // gone. Forget it on every profile here rather than leaving this one
       // "linked · sign-in required" for an account that no longer exists.
+      //
+      // The stamp is honoured for DELETE_STAMP_TTL_MS only. Past that, a 401 is
+      // far more likely to be an ordinary ending of the session (idle or
+      // absolute expiry, "sign out everywhere", a revocation from the devices
+      // list) than the lost reply, and saying "deleted" of a live account is a
+      // false statement about a privacy action; the stamp is dropped and the
+      // 401 reads as it always did. The caller is told the deletion was
+      // inferred (confirmedBy 'probe'), never witnessed, and words it that way.
       if (prior?.accountId && prior.deleteRequestedAt) {
-        await forgetCloudAccountEverywhere(prior.accountId, pid);
-        return { connected: false, reason: 'deleted', link: null };
+        if (Date.now() - prior.deleteRequestedAt <= DELETE_STAMP_TTL_MS) {
+          await forgetCloudAccountEverywhere(prior.accountId, pid);
+          return { connected: false, reason: 'deleted', confirmedBy: 'probe', link: null };
+        }
+        await clearDeleteStamp(pid);
+        return { connected: false, reason: 'signed-out', link: await cloudAccountLink(pid) };
       }
       return { connected: false, reason: 'signed-out', link: prior };
     }
@@ -212,6 +241,29 @@ export async function markCloudSynced(pid, at = Date.now()) {
   const prior = await get('device', id).catch(() => null);
   if (!prior) return;
   await put('device', { ...prior, lastSyncAt: at });
+}
+
+/**
+ * Record (at) or clear (null) the server's last full "this account may enter"
+ * for this profile. Written only by platform/accountActivation.js.
+ */
+export async function recordCloudActivation(pid, accountId, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior) return;
+  if (accountId && String(prior.accountId) !== String(accountId)) return;
+  await put('device', {
+    ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
+    clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
+  });
+}
+
+/** Raise the clock high-water mark the offline grace checks against. */
+export async function noteCloudClock(pid, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior || (Number(prior.clockSeenAt) || 0) >= at) return;
+  await put('device', { ...prior, clockSeenAt: at });
 }
 
 /** The device half of ending a link: native session, replica state, link row. */
@@ -272,38 +324,47 @@ async function forgetCloudAccountEverywhere(accountId, pid) {
  * error (with its server code) reaches the caller. If no answer arrives at all
  * the outcome is unknown, so the intent is kept on the link row
  * (deleteRequestedAt) and settled by one probe now and by verifyCloudSession
- * later: a 401 after the request means the session died with the account
- * (#521 item 1); a 200 means the deletion never happened.
+ * later: a 401 after the request, inside DELETE_STAMP_TTL_MS, means the
+ * session died with the account (#521 item 1); a later 200 means the deletion
+ * never happened. Either way the outcome is inferred (confirmedBy 'probe'), so
+ * the panel says the account appears to have been deleted.
  */
+export const DELETE_STAMP_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Drop a pending-deletion stamp from the link row, leaving the link itself. */
+async function clearDeleteStamp(pid) {
+  const current = await get('device', linkRowId(pid)).catch(() => null);
+  if (!current?.deleteRequestedAt) return;
+  const { deleteRequestedAt, ...rest } = current;
+  await put('device', rest).catch(() => {});
+}
+
 export async function deleteCloudAccount(pid, proof) {
   const rowId = linkRowId(pid); // never delete an account this device could not then forget
   const link = await get('device', rowId).catch(() => null);
   if (!link?.accountId) throw Object.assign(new Error('This local profile is not linked to a cloud account'), { code: 'CLOUD_ACCOUNT_NOT_LINKED' });
   const accountId = String(link.accountId);
   await put('device', { ...link, deleteRequestedAt: Date.now() });
-  const unstamp = async () => {
-    const current = await get('device', rowId).catch(() => null);
-    if (!current?.deleteRequestedAt) return;
-    const { deleteRequestedAt, ...rest } = current;
-    await put('device', rest).catch(() => {});
-  };
   try {
     await cloud.deleteAccount({ ...(proof || {}), accountId });
   } catch (error) {
     if (error?.status) {
       // The server answered and refused: the account is exactly as it was.
-      await unstamp();
+      await clearDeleteStamp(pid);
       throw error;
     }
-    // No answer. One probe tells "never sent" from "sent, answer lost": the
-    // session that asked dies with the account.
+    // No answer. One probe tells "sent, answer lost" (the session that asked
+    // dies with the account → 401) from everything else. A 200 does NOT clear
+    // the stamp: on a client-side timeout the server may still be inside the
+    // deletion transaction, so a session alive this instant can be gone a
+    // moment later. The stamp stays, bounded by DELETE_STAMP_TTL_MS, and
+    // verifyCloudSession settles it: a later 200 clears it (saveAccount writes
+    // the row without it), a later 401 inside the TTL reads as the deletion.
     const probe = await cloud.me().then(() => 'alive', err => (err?.status === 401 ? 'gone' : 'unknown'));
     if (probe === 'gone') {
       await forgetCloudAccountEverywhere(accountId, pid);
       return { deleted: true, connected: false, confirmedBy: 'probe' };
     }
-    if (probe === 'alive') await unstamp();
-    // 'unknown' (still offline): the stamp stays for verifyCloudSession to settle.
     throw error;
   }
   await forgetCloudAccountEverywhere(accountId, pid);

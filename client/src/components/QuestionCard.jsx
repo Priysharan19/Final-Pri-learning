@@ -24,6 +24,7 @@ import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript,
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
+import { everyLineVerified, lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
@@ -37,7 +38,7 @@ import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldChec
 import { misconceptionById } from '../engine/misconceptions.js';
 import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
-import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords, completeInkOtpRecovery } from './signedOutInkRecovery.js';
+import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
@@ -104,10 +105,6 @@ export const SR_ONLY = {
 // In a production build with the tutor off the panel is unreachable
 // (tutorEnabled below is false on every device), so it is not built at all.
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
-// Load account recovery only when a student explicitly asks to sign in.
-// Keeps the selected photo in component memory rather than plaintext storage.
-const PhotoAccountRecovery = React.lazy(() => import('./CloudAccountPanel.jsx'));
-const InkOtpAccountRecovery = React.lazy(() => import('./SignUpFlow.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -314,8 +311,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
   const [inkSignInOpen, setInkSignInOpen] = useState(false);
-  const [inkOtpOpen, setInkOtpOpen] = useState(false);
-  const inkOtpFinishRef = useRef(null);
   const [photoReattachRequired, setPhotoReattachRequired] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
@@ -397,7 +392,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setInkOtpOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
     ++photoSaveRevision.current;
@@ -566,7 +561,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // student presses Submit again, under the same submission key.
       setState(s => (s.phase === 'retry' && s.res?.refusal === 'sign-in' ? { phase: 'answering' } : s));
       setInkSignInOpen(false);
-      setInkOtpOpen(false);
     }
   }), [user?.id]);
   useEffect(() => {
@@ -1508,6 +1502,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const verdictGood = resolved && res.correct;
   const activeReport = state.res?.stepReport;
+  // Photo: the server's verdicts pinned to the transcript lines they judged
+  // (#430, #475). The report indexes the lines that were sent — the included,
+  // non-blank ones in page order — and is used only when its text is exactly
+  // theirs, so a ✗ never lands on a line that was edited or left out since.
+  const photoMarks = useMemo(() => {
+    if (!resolved || mode !== 'photo' || !photoLines?.lines?.length || !res?.stepReport || res?.revealed || res?.invalid) return null;
+    const kept = photoLines.lines.map((l, i) => i).filter(i => !photoLines.lines[i].excluded && String(photoLines.lines[i].text).trim());
+    return lineMarks(res.stepReport, includedLines(photoLines), { count: photoLines.lines.length, indexOf: i => kept[i] });
+  }, [resolved, mode, photoLines, res]);
   // Teacher-style pin: per-line verdicts on the student's own ink. Step Check
   // pinpoints the exact line where the maths breaks; if every line is
   // consistent but the answer is still wrong, the final line gets the ✗ — the
@@ -2146,7 +2149,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
                 <>
-                  <PhotoLines transcript={photoLines} disabled={resolved || busy}
+                  <PhotoLines transcript={photoLines} disabled={resolved || busy} marks={photoMarks}
                     onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
                     onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
                     onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
@@ -2264,40 +2267,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       </button>
                       {!inkSignInReady && <p className="muted" role="status">{inkRecoveryCopy.saveFirst}</p>}
                       {inkSignInOpen && inkSignInReady && (
-                        <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-                          {inkOtpOpen ? (
-                            <InkOtpAccountRecovery initialMode="signin" initialName={user?.name || ''}
-                              onCancel={() => setInkOtpOpen(false)}
-                              onFinish={async ({ account }) => {
-                                // Guardian-approved sign-in may call onFinish
-                                // twice while a slow profile refresh runs. One
-                                // verified account link is enough.
-                                if (!inkOtpFinishRef.current) {
-                                  inkOtpFinishRef.current = (async () => {
-                                    const { cloudAccountLink, linkSignedInAccount } = await import('../platform/cloudAccount.js');
-                                    await completeInkOtpRecovery({
-                                      localProfileId: user?.id,
-                                      currentProfileId: mountedRef.current ? user?.id : null,
-                                      account, verifiedSaved: saveState === 'saved',
-                                      getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
-                                      refreshProfile: refreshUser
-                                    });
-                                    setInkOtpOpen(false);
-                                    setInkSignInOpen(false);
-                                  })().finally(() => { inkOtpFinishRef.current = null; });
-                                }
-                                return inkOtpFinishRef.current;
-                              }}
-                            />
-                          ) : (
-                            <>
-                              <PhotoAccountRecovery />
-                              <p className="muted" style={{ marginTop: 8 }}>{inkRecoveryCopy.otpNotice}</p>
-                              <button type="button" className="btn btn-secondary" data-ink-code-sign-in
-                                onClick={() => setInkOtpOpen(true)}>{inkRecoveryCopy.otpAction}</button>
-                            </>
-                          )}
-                        </React.Suspense>
+                        /* The one sign-in card, in place. The strokes, the
+                           question and the reading stay mounted around it. */
+                        <SignInChoices user={user} refreshUser={refreshUser} saved={saveState === 'saved'}
+                          onDone={() => setInkSignInOpen(false)} />
                       )}
                     </>
                   )}
@@ -2547,8 +2520,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
-                {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
-                  <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
+                {/* Said only when the server's step report is of exactly these
+                    lines and verifies every one of them (#448): a right answer
+                    alone establishes nothing about the working. */}
+                {verdictGood && writeMode && inkResult?.lines?.length > 1 && everyLineVerified(res.stepReport, inkResult.lines) && (
+                  <div data-every-line-verified>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
                 )}
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
@@ -2692,14 +2668,19 @@ function StepReport({ report }) {
   const t = useT();
   if (!report?.lines?.length) return null;
   // The first meaningful break leads, with its diagnosis. Every other line is
-  // one tap away rather than competing with it for attention.
+  // one tap away rather than competing with it for attention. "Look here" is
+  // the FIRST mistake only; a later line that is false on its own is marked as
+  // also wrong, and a line that is right on the student's own earlier value
+  // (error carried forward) keeps its tick and says so.
   const first = report.lines.findIndex(l => l.status === 'break');
   const line = (l, i) => (
     <React.Fragment key={i}>
-      <div className={`stepcheck-line sc-${l.status}`}>
+      <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}
+        data-stepcheck-line={i} data-stepcheck-status={l.status} data-stepcheck-ecf={l.status === 'ok' && l.ecf === true ? 'true' : undefined}>
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
-        {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
+        {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
+        {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}

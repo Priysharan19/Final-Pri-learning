@@ -16,7 +16,9 @@ import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from '@playwright/test';
-import { ensureBuild, serveDist } from './e2e.mjs';
+import { ensureBuild } from './e2e.mjs';
+import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
 const args = process.argv.slice(2);
 const build = !args.includes('--no-build');
@@ -34,22 +36,10 @@ const shot = async (page, name, opts = {}) => { if (SHOTS) await page.screenshot
 
 async function startDemo(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
-  // A fresh local Class 10 CBSE profile, made through the real onboarding.
-  await page.getByRole('button', { name: 'Use without an account' }).click();
-  await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.locator('#signup-track').selectOption('10');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('Notes Student');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('.home-greet', { timeout: 120000 });
+  // A fresh Class 10 CBSE student, made the way every student is since issue
+  // #477: the one sign-in card (the real server's emailed code), then the
+  // activation gate (support/verified-onboarding.mjs).
+  await createVerifiedProfile(page, server, { name: 'Notes Student', year: 10, course: 'in' });
 }
 
 /** Scrolls the whole page through so every scroll-linked reveal has fired. */
@@ -62,7 +52,7 @@ async function readThrough(page) {
 
 const built = ensureBuild(build);
 if (built.built) console.log(`  built client in ${built.ms} ms`);
-const server = await serveDist();
+const server = await startOnlinePlatform();
 const browser = await chromium.launch();
 try {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2 });

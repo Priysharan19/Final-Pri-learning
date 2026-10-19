@@ -582,3 +582,22 @@ version strategy shared across shells (`scripts/release-matrix.mjs`). Store revi
 **Authority.** This scope change is not a writer grant, a PR approval, a release authorization or permission
 to bypass CI (#504). §14 and §21 still govern release: one immutable `main` SHA, required CI, independent
 review, and human-authorized TestFlight / Play internal test.
+
+### 22.5 Android phone and tablet status (Phase 5, 19 October 2026)
+
+All evidence below is **SYNTHETIC / EMULATOR** evidence (CI `android-shell.yml` on Google API images, and
+local `pri-android-36` / `pri-tablet-36` AVDs). None of it is physical-device evidence; no Android phone or
+tablet has run the §22.2 journey yet. The physical check (finger, S Pen including the eraser end, camera,
+TalkBack, font scale) is assigned to Kalp and stays open under §22.4.
+
+| Area | Emulator evidence | Still needed |
+| --- | --- | --- |
+| Shell journeys (#278, #327) | `android-shell.yml` green on `main` (run 39151531722, merge train 2026-10-19-4) for API 26 floor, API 33/36 `pixel_6` phone and API 36 `pixel_tablet` | physical phone and tablet |
+| Layout | `WebViewAccessibilityTest#noScreenClipsHorizontally`: Home, Practice, Progress, Review and Settings do not scroll sideways or cut a control or heading, phone portrait and tablet landscape, at font scale 1.0 and 1.3 | physical devices; Samsung DeX / split screen not covered |
+| Ink | `InkInputTest`: finger arrives as `touch`, stylus as `pen` with pressure, `TOOL_TYPE_ERASER` erases on the shared canvas | a real S Pen (hover, side button, eraser end) |
+| Camera | `FileExchangeTest`: the photo picker offers the camera app's capture activity with a scoped `FileProvider` grant; no camera permission is declared, so there is no runtime permission prompt | a real camera capture on device |
+| Sign-in code | #325 SMS User Consent bridge ported (#506): `SmsCode.kt` + `otp` capability; no SMS permission; the server still verifies every code | real SMS on a device with Play services |
+| CloudJourney | `CloudJourneyTest` passes against `main`'s sign-up flow | must be updated with the #477 sign-in card when #477 lands (owned by the #477 mission) |
+
+Signing, Play Billing licence-tester certification and the Play internal-test track remain under §22.4 and
+need the owner's Play Console authority.

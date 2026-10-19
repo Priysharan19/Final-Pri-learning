@@ -3,21 +3,16 @@
 //
 // Drives the real shell and the real bundled product in two instrumentation
 // runs (android/scripts/run-instrumented.sh), with `am force-stop` between them:
-//   1. journey — boot on the stable origin, the capability handshake,
-//      onboarding into a local profile, SPA routing + history Back, Back
-//      closing an open sheet first, rotation keeping an in-progress typed
-//      answer, the typed answer kept as a draft on the device; an offline
-//      draft says before any work that it cannot be marked and offers neither
-//      Submit nor Show solution — its one action, "Try for a markable
-//      question", asks first when there is work on the page and, with no
-//      server to open one, changes nothing; nothing is marked or recorded
-//      (grading is online-only and server-authoritative: owner decision
-//      2026-10-10, ADR-0001 — this run has no server), blocked schemes,
-//      external links opening only from a real tap, and Back on the landing
-//      entry leaving the app;
-//   2. relaunch — after the process was killed, the profile (IndexedDB),
-//      localStorage and the draft question with its typed answer survived,
-//      still said to be unmarkable.
+//   1. journey — this run has NO server. The app is account-first (issue
+//      #477): boot on the stable origin, the capability handshake, then the
+//      one sign-in card (or the activation gate) and nothing else — no
+//      device-only entry, no shell, no Practice behind a deep link, nothing
+//      drafted or marked; blocked schemes, external links opening only from a
+//      real tap, and Back on the landing entry leaving the app;
+//   2. relaunch — after the process was killed, still only the card or the
+//      gate, and localStorage survived.
+// Everything behind the shell (routing, rotation, drafts, marking) needs a
+// signed-in student and therefore a server: CloudJourneyTest.
 // The `priExpect` argument says which branch the image must take: `floor` (a
 // WebView below the floor must show the fail-closed update screen) or
 // `product` (the full journey). SYNTHETIC / EMULATOR evidence — never a
@@ -191,198 +186,27 @@ class ShellJourneyTest {
 
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             Log.i("PRITEST", "boot on the stable origin with the capability handshake")
-            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "(document.querySelector('[data-testid=\"hero-offline\"]') || document.querySelector('.home-greet')) && location.origin"))
+            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "($HELD_SHOWN) && location.origin"))
             assertEquals("true", eval(s, "!!window.__PRI_HOST__ && Object.isFrozen(window.__PRI_HOST__) && window.__PRI_HOST__.capabilities.lifecycle.backButton === true"))
             assertEquals("false", eval(s, "'platform' in window.__PRI_HOST__ || 'ink' in window.__PRI_HOST__.capabilities"))
             assertEquals("true", eval(s, "/^[0-9a-f]{40}$/.test((window.__PRI_HOST__.release||{}).releaseSha||'')"))
             assertEquals("false", eval(s, "!!navigator.serviceWorker && !!navigator.serviceWorker.controller"))
 
-            Log.i("PRITEST", "onboarding into a local profile")
-            click(s, "document.querySelector('[data-testid=\"hero-offline\"]')")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"1\"]')")
-            click(s, "($byLabel)('Student')"); click(s, "document.querySelector('.auth-card .btn-primary')")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"2\"]')")
-            setValue(s, "#signup-track", "10"); click(s, "document.querySelector('.auth-card .btn-primary')")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"3\"]')")
-            setValue(s, "#signup-name", "Android Student"); click(s, "document.querySelector('.auth-card .btn-primary')")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"4\"]')"); click(s, "document.querySelector('.auth-card .btn-primary')")
-            waitFor(s, "document.querySelector('[data-onboarding-step=\"5\"]')"); click(s, "document.querySelector('.auth-card .btn-primary')")
-            waitFor(s, "document.querySelector('.home-greet')")
+            Log.i("PRITEST", "no server: the sign-in card (or the gate) and nothing opens without an account")
+            Thread.sleep(2500) // the gate's first check settles
+            assertHeld(s, "launch")
             eval(s, "localStorage.setItem('pri-android-marker','kept')")
-            // Progress before any attempt: nothing answered yet.
-            openProgress(s)
-            assertEquals("a new profile has answered nothing", "\"0\"", waitFor(s, ANSWERED))
-            awaitBackWanted(s, true)
-            pressBack()
-            waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
-
-            // Practice is thinking mode (#264): its own top bar, no bottom bar and
-            // no sheet. The sheet that Back must close first lives on Home.
-            Log.i("PRITEST", "Back closes an open sheet before it navigates")
-            if (eval(s, "document.documentElement.dataset.ff === 'compact'") == "true") {
-                click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
-                waitFor(s, "document.querySelector('.mnav-sheet')")
-                awaitBackWanted(s, true)
-                pressBack()
-                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/' && !!document.querySelector('.home-greet')")
+            for (path in listOf("/practice?subtopic=c10-pair-linear-equations", "/progress", "/review", "/settings")) {
+                eval(s, "(function(){history.replaceState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+                Thread.sleep(1200)
+                assertHeld(s, path)
             }
-
-            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
+            eval(s, "(function(){history.replaceState({},'','/');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            Thread.sleep(800)
+            assertEquals("nothing is marked, recorded or drafted without an account", "\"\"|0|0",
+                eval(s, QuestionCardJs.MARKED_TRACES) + "|" + eval(s, "document.querySelectorAll('.hist-row').length") + "|" +
+                    eval(s, "Object.keys(localStorage).filter(function(k){return k.indexOf('pri.draft.')===0;}).length"))
             val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
-            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
-            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
-            assertEquals("Practice shows its own bar, not the bottom navigation", "true",
-                eval(s, "!!document.querySelector('.ws-bar') && !(function(n){return n && n.offsetParent;})(document.querySelector('.mobilenav'))"))
-            awaitBackWanted(s, true)
-            pressBack()
-            // The router must have rendered Home, not just the URL changed: a Link
-            // tapped while React still shows the old page is treated as a same-page
-            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
-            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
-
-            Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
-            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
-            waitFor(s, "document.querySelector('.q-prompt')")
-            assertEquals("Practice is its own history entry after Home (Back returns Home)", "true",
-                eval(s, "!!history.state && history.state.idx > 0"))
-            var typed = false
-            for (i in 0 until 12) {
-                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
-                Thread.sleep(400)
-                if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { typed = true; break }
-                skipToAnotherQuestion(s)
-            }
-            assertTrue("a question with a typed answer was found", typed)
-
-            // Grading is online-only and server-authoritative (owner decision
-            // 2026-10-10, ADR-0001). This build has no server, so the question on
-            // the card is an offline draft, and the card says so BEFORE any work
-            // goes in: it cannot be marked, and it offers no Submit or Show
-            // solution that could only be refused.
-            Log.i("PRITEST", "an offline draft says before any work that it cannot be marked, and offers no Submit or Show solution")
-            val firstId = waitFor(s, QuestionCardJs.QID).trim('"')
-            assertEquals("the card names the question an offline draft", "\"draft\"", waitFor(s, QuestionCardJs.UNMARKABLE))
-            val draftSays = eval(s, QuestionCardJs.UNMARKABLE_SAYS)
-            assertTrue("the notice says why and what follows — opened without a connection, cannot be marked: $draftSays",
-                Regex("without a connection", RegexOption.IGNORE_CASE).containsMatchIn(draftSays) &&
-                    Regex("cannot be marked", RegexOption.IGNORE_CASE).containsMatchIn(draftSays) &&
-                    !Regex("already finished|finished elsewhere|another tab", RegexOption.IGNORE_CASE).containsMatchIn(draftSays))
-            assertEquals("the one action is to try for a markable question: one primary control, no solution control",
-                "\"replace|1|no-solution\"", eval(s, QuestionCardJs.OFFERS))
-            assertEquals("the primary control reads as that action", "\"Try for a markable question\"", eval(s, QuestionCardJs.PRIMARY_LABEL))
-            assertEquals("there is no Submit to press", "false", eval(s, QuestionCardJs.PRESS_SUBMIT))
-            assertEquals("there is no Show solution to press", "false", eval(s, QuestionCardJs.PRESS_REVEAL))
-            // QuestionCard's accountNeeded excludes an unmarkable question: an
-            // account could not make a draft markable, so no sign-in is offered.
-            assertEquals("a draft is not told that checking needs an account", "false", eval(s, QuestionCardJs.visible("[data-check-needs-account]")))
-            assertEquals("a draft offers no sign-in: signing in cannot make it markable", "false", eval(s, QuestionCardJs.visible(".qpage [data-check-sign-in]")))
-            assertEquals("nothing asks to confirm before any work", "false|false",
-                eval(s, QuestionCardJs.visible("[data-check-replace-confirm]")) + "|" + eval(s, QuestionCardJs.visible("[data-check-replace-cancel]")))
-            assertEquals("the draft opens unmarked and unrefused", "\"\"|false", eval(s, QuestionCardJs.MARKED_TRACES) + "|" + eval(s, QuestionCardJs.REFUSAL))
-
-            setValue(s, ".editor-body input.answer-input", "7")
-            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-            Thread.sleep(2500)
-            assertEquals("\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
-            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
-            Thread.sleep(1500)
-
-            Log.i("PRITEST", "a typed answer is kept as a draft on this device")
-            assertEquals("the question did not change under the typing or the rotation", "\"$firstId\"", eval(s, QuestionCardJs.QID))
-            assertEquals("the typed answer is stored on this device under its question", "\"7\"",
-                waitFor(s, QuestionCardJs.storedTyped(firstId), 15_000))
-            assertEquals("nothing is marked by typing", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
-            assertEquals("with work on the page there is still no Submit and no Show solution", "\"replace|1|no-solution\"|false|false",
-                eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRESS_SUBMIT) + "|" + eval(s, QuestionCardJs.PRESS_REVEAL))
-
-            // With work on the page, asking for a markable question takes a
-            // second, deliberate press: the first only asks.
-            Log.i("PRITEST", "the first press of \"Try for a markable question\" asks before it costs the typed work")
-            waitFor(s, QuestionCardJs.PRESS_REPLACE)
-            waitFor(s, QuestionCardJs.visible("[data-check-replace-confirm]"))
-            assertEquals("the primary control now names what a second press does", "\"Leave this one and get a new question\"", eval(s, QuestionCardJs.PRIMARY_LABEL))
-            assertEquals("keeping the work is offered beside it", "true", eval(s, QuestionCardJs.visible(".ws-actions [data-check-replace-cancel]")))
-            assertEquals("asking changed nothing: same question, same answer, nothing marked", "\"$firstId\"|\"7\"|\"\"",
-                eval(s, QuestionCardJs.QID) + "|" + eval(s, QuestionCardJs.TYPED) + "|" + eval(s, QuestionCardJs.MARKED_TRACES))
-            // "Keep working on this one" withdraws the question, not the work.
-            waitFor(s, QuestionCardJs.PRESS_REPLACE_CANCEL)
-            waitFor(s, "(!${QuestionCardJs.visible("[data-check-replace-confirm]")} && !${QuestionCardJs.visible("[data-check-replace-cancel]")})")
-            assertEquals("keeping the work restores the card as it was", "\"Try for a markable question\"|\"$firstId\"|\"7\"",
-                eval(s, QuestionCardJs.PRIMARY_LABEL) + "|" + eval(s, QuestionCardJs.QID) + "|" + eval(s, QuestionCardJs.TYPED))
-
-            // Confirmed, the card asks for a markable question FIRST. This build
-            // has no server, so none can be opened — and then nothing changes.
-            Log.i("PRITEST", "confirmed with no server, nothing changes: same question, typed answer kept, and the card says so")
-            waitFor(s, QuestionCardJs.PRESS_REPLACE)
-            waitFor(s, QuestionCardJs.visible("[data-check-replace-confirm]"))
-            waitFor(s, QuestionCardJs.PRESS_REPLACE)
-            waitFor(s, QuestionCardJs.REPLACE_DECLINED, 60_000)
-            val noteSays = eval(s, QuestionCardJs.REPLACE_NOTE_SAYS)
-            assertTrue("the card says a markable question could not be opened and that nothing has changed: $noteSays",
-                Regex("could not be opened", RegexOption.IGNORE_CASE).containsMatchIn(noteSays) &&
-                    Regex("nothing here has changed", RegexOption.IGNORE_CASE).containsMatchIn(noteSays))
-            assertEquals("the same question is still on the card", "\"$firstId\"", eval(s, QuestionCardJs.QID))
-            assertEquals("the typed answer is still on the card", "\"7\"", eval(s, QuestionCardJs.TYPED))
-            assertEquals("…and still stored on this device", "\"7\"", eval(s, QuestionCardJs.storedTyped(firstId)))
-            assertEquals("a declined replace marks and reveals nothing", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
-            assertEquals("no check was made, so none was refused", "false", eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("no retry that cannot succeed is offered", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
-            assertEquals("no sign-in is offered: signing in cannot make a draft markable", "false", eval(s, QuestionCardJs.visible(".qpage [data-check-sign-in]")))
-            assertEquals("the card still says it is a draft, and its one action is unchanged", "\"draft\"|\"replace|1|no-solution\"|\"Try for a markable question\"",
-                eval(s, QuestionCardJs.UNMARKABLE) + "|" + eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRIMARY_LABEL))
-
-            // Next: the same element is replaced by a new question (by identity of
-            // the rendered node, not prompt text, which can repeat). The bar's Next
-            // control is the one way to another question while no markable one can
-            // be opened; it skips to another draft.
-            Log.i("PRITEST", "the bar's Next opens another question; a draft typed there is kept")
-            assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
-            eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('.ctx-next').click();return true;})()")
-            waitFor(s, "document.querySelector('.q-prompt') && document.querySelector('.q-prompt') !== window.__q && !document.querySelector('.verdict')")
-            waitFor(s, "(function(){var id=${QuestionCardJs.QID};return !!id && id !== '$firstId';})()")
-            assertEquals("the note about the last question does not follow to the new one", "false|false",
-                eval(s, QuestionCardJs.visible("[data-check-replace-note]")) + "|" + eval(s, QuestionCardJs.visible("[data-check-replace-confirm]")))
-            var draftTyped = false
-            for (i in 0 until 12) {
-                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
-                Thread.sleep(400)
-                if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { draftTyped = true; break }
-                skipToAnotherQuestion(s)
-            }
-            assertTrue("a second question with a typed answer was found", draftTyped)
-            val draftId = waitFor(s, QuestionCardJs.QID).trim('"')
-            assertTrue("the draft is a different question from the first one", draftId.isNotEmpty() && draftId != firstId)
-            setValue(s, ".editor-body input.answer-input", "42")
-            assertEquals("the new draft is stored on this device", "\"42\"", waitFor(s, QuestionCardJs.storedTyped(draftId), 15_000))
-            assertEquals("the new question opens unmarked and unrefused", "\"\"|false", eval(s, QuestionCardJs.MARKED_TRACES) + "|" + eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("…and is a draft too, with the same one action", "\"draft\"|\"replace|1|no-solution\"",
-                eval(s, QuestionCardJs.UNMARKABLE) + "|" + eval(s, QuestionCardJs.OFFERS))
-            // Left for relaunchAfterProcessDeath: which question, and what was typed.
-            eval(s, "localStorage.setItem('pri-android-draft', JSON.stringify({id:'$draftId',answer:'42'}))")
-            openProgress(s)
-            // Nothing was marked, so nothing was answered: Progress counts only
-            // what Pri's server has marked.
-            assertEquals("Progress counts no attempt: a draft records nothing", "\"0\"", waitFor(s, ANSWERED))
-            // The real Back key walks the app's own history. Practice has no
-            // Progress link (thinking mode), so openProgress left it through the
-            // bar's exit (a PUSH of Home): Home(0) → Practice(1) → Home(2) →
-            // Progress(3), and Back must walk Progress → Home → Practice → Home.
-            awaitBackWanted(s, true)
-            pressBack()
-            waitFor(s, "location.pathname === '/' && !!history.state && history.state.idx === 2 && !!document.querySelector('.home-greet')")
-            Thread.sleep(400)
-            awaitBackWanted(s, true)
-            pressBack()
-            // Settle on Practice (its own history entry) before the next press, as
-            // a person's next Back comes after the page has appeared.
-            waitFor(s, "location.pathname === '/practice' && !!history.state && history.state.idx === 1 && !!document.querySelector('.q-prompt')")
-            Thread.sleep(400)
-            awaitBackWanted(s, true)
-            pressBack()
-            // The router must have rendered Home, not just the URL changed: a Link
-            // tapped while React still shows the old page is treated as a same-page
-            // REPLACE, which would overwrite the Home entry (Back would then leave the app).
-            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
 
             Log.i("PRITEST", "schemes outside the policy never navigate the app away")
             eval(s, "(function(){var a=document.createElement('a');a.href='intent://evil#Intent;end';document.body.appendChild(a);a.click();return true;})()")
@@ -427,27 +251,88 @@ class ShellJourneyTest {
     fun relaunchAfterProcessDeath() {
         assumeTrue("the journey ran (product branch)", !belowFloor())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
-            val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                if(b){b.click();return 'picker';}return false;})()""")
-            assertTrue(state, state == "\"home\"" || state == "\"picker\"")
-            waitFor(s, "document.querySelector('.home-greet')")
+            waitFor(s, HELD_SHOWN)
+            Thread.sleep(2500)
+            assertHeld(s, "after process death")
             assertEquals("\"kept\"", eval(s, "localStorage.getItem('pri-android-marker')"))
-            Log.i("PRITEST", "after process death the profile and localStorage survived")
-
-            // The draft left on the card before the process was killed: the same
-            // question comes back with what was typed, still unmarked.
-            val draftId = waitFor(s, "(function(){var d=JSON.parse(localStorage.getItem('pri-android-draft')||'null');return d&&d.id;})()").trim('"')
-            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
-            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice' && !!${QuestionCardJs.QID}")
-            assertEquals("the same question came back after process death", "\"$draftId\"", eval(s, QuestionCardJs.QID))
-            waitFor(s, "(function(){if(document.querySelector('.editor-body input.answer-input'))return true;var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Type: answer by typing';});if(t)t.click();return false;})()")
-            assertEquals("the typed draft survived process death", "\"42\"", waitFor(s, QuestionCardJs.TYPED))
-            assertEquals("the restored draft is unmarked", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
-            assertEquals("…and no check was made for it", "false", eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("it is still said to be a draft that cannot be marked, with no Submit or Show solution", "\"draft\"|\"replace|1|no-solution\"",
-                waitFor(s, QuestionCardJs.UNMARKABLE) + "|" + eval(s, QuestionCardJs.OFFERS))
-            Log.i("PRITEST", "after process death the draft question and its typed answer survived, unmarked")
+            Log.i("PRITEST", "after process death still only the card or the gate, and localStorage survived")
         }
+    }
+
+    /**
+     * The shell itself, for a student the gate has let in: Back closes an open
+     * sheet first, SPA routing through the bundled origin with history Back,
+     * and rotation keeping an in-progress typed answer. Account-first (#477):
+     * this needs the fixture server and runs after CloudJourneyTest signed in
+     * on the card (android/scripts/run-instrumented.sh). Not measured here any
+     * more (lost coverage, named on purpose): an offline draft opened after the
+     * connection drops MID-RUN — the runner stops the server only between runs.
+     */
+    @Test
+    fun shellRoutingBackAndRotationSignedIn() {
+        assumeTrue("the journey ran (product branch)", !belowFloor())
+        AccountFirst.useFixtureServer()
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
+
+            // Practice is thinking mode (#264): its own top bar, no bottom bar and
+            // no sheet. The sheet that Back must close first lives on Home.
+            Log.i("PRITEST", "Back closes an open sheet before it navigates")
+            if (eval(s, "document.documentElement.dataset.ff === 'compact'") == "true") {
+                click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
+                waitFor(s, "document.querySelector('.mnav-sheet')")
+                awaitBackWanted(s, true)
+                pressBack()
+                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/' && !!document.querySelector('.home-greet')")
+            }
+
+            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
+            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
+            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
+            assertEquals("Practice shows its own bar, not the bottom navigation", "true",
+                eval(s, "!!document.querySelector('.ws-bar') && !(function(n){return n && n.offsetParent;})(document.querySelector('.mobilenav'))"))
+            awaitBackWanted(s, true)
+            pressBack()
+            // The router must have rendered Home, not just the URL changed.
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet') && !document.querySelector('.q-prompt')")
+
+            Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
+            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
+            waitFor(s, "document.querySelector('.q-prompt')")
+            assertEquals("Practice is its own history entry after Home (Back returns Home)", "true",
+                eval(s, "!!history.state && history.state.idx > 0"))
+            var typed = false
+            for (i in 0 until 12) {
+                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
+                Thread.sleep(400)
+                if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { typed = true; break }
+                skipToAnotherQuestion(s)
+            }
+            assertTrue("a question with a typed answer was found", typed)
+            val id = waitFor(s, QuestionCardJs.QID).trim('"')
+            setValue(s, ".editor-body input.answer-input", "7")
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            Thread.sleep(2500)
+            assertEquals("the typed answer survived the rotation", "\"7\"", eval(s, "(document.querySelector('.editor-body input.answer-input')||{}).value"))
+            s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            Thread.sleep(1500)
+            assertEquals("the question did not change under the typing or the rotation", "\"$id\"", eval(s, QuestionCardJs.QID))
+            assertEquals("nothing is marked by typing", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+            awaitBackWanted(s, true)
+            pressBack()
+            waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet')")
+        }
+    }
+
+    /** The card or the gate is on screen (account-first, #477). */
+    private val HELD_SHOWN = "document.querySelector('[data-signin-card]') || document.querySelector('[data-testid=account-activation-gate]')"
+
+    /** Nothing of the app is open without an account. */
+    private fun assertHeld(s: ActivityScenario<MainActivity>, whenText: String) {
+        assertEquals("$whenText: only the card or the gate is on screen; no shell, no question, no device-only entry", "true|false|false|false",
+            eval(s, "!!($HELD_SHOWN)") + "|" +
+                eval(s, "!!document.querySelector('.shell') || !!document.querySelector('.home-greet')") + "|" +
+                eval(s, "!!document.querySelector('.q-prompt') || !!document.querySelector('.qpage')") + "|" +
+                eval(s, "!!document.querySelector('[data-testid=hero-offline]') || !!document.querySelector('[data-onboarding-step]')"))
     }
 }

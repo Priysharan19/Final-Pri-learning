@@ -131,11 +131,12 @@ for (const file of FILES) {
   }
 
   // ── photoDraft names its sub-step ─────────────────────────────────────────
-  const first = literals.get('firstLaunch')?.text || '';
+  // Account-first (#477): the offline draft, photo included, is reached after sign-in.
+  const first = literals.get('offlineDraft')?.text || '';
   const stepAt = first.indexOf("await step('photoDraft'");
   const stepEnd = first.indexOf("await step('noCheckOffered'", stepAt);
   const photo = stepAt >= 0 && stepEnd > stepAt ? first.slice(stepAt, stepEnd) : '';
-  ok(photo.length > 0, `${label}: the photoDraft step is in the first launch`);
+  ok(photo.length > 0, `${label}: the photoDraft step is in the offline-draft phase`);
   ok(/at = 'blob';[\s\S]*?if \(!blob \|\| !blob\.size\) throw new Error\(/.test(photo),
     `${label}: photoDraft throws when the test canvas encodes no PNG or an empty one, before building a File`);
   ok(/at = 'input';[\s\S]*?isConnected[\s\S]*?input\.dispatchEvent\(new Event\('change'/.test(photo),

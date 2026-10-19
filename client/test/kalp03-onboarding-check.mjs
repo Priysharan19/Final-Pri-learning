@@ -7,14 +7,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const read = rel => readFile(join(ROOT, rel), 'utf8');
 
-const [login, backend, app, cloud, en, hi, e2e] = await Promise.all([
+const [login, backend, app, cloud, en, hi, e2e, verified] = await Promise.all([
   read('src/pages/Login.jsx'),
   read('src/local/backend.js'),
   read('src/App.jsx'),
   read('src/components/CloudAccountPanel.jsx'),
   read('src/i18n/strings.en.js'),
   read('src/i18n/strings.hi.js'),
-  read('test/e2e.mjs')
+  read('test/e2e.mjs'),
+  read('test/support/verified-onboarding.mjs')
 ]);
 
 // The cloud panel's copy lives in the i18n catalogue. Resolve the keys the
@@ -81,11 +82,26 @@ check('English has staged onboarding copy', en.includes("'login.stepRoleTitle'")
 check('Hindi has staged onboarding copy', hi.includes("'login.stepRoleTitle'"));
 check('English has local cloud honesty copy', en.includes("'login.localCloudHonesty'"));
 check('Hindi has local cloud honesty copy', hi.includes("'login.localCloudHonesty'"));
-check('browser helper uses staged first step', e2e.includes('data-onboarding-step="1"'));
-check('browser helper uses staged ready step', e2e.includes('data-onboarding-step="5"'));
-check('browser helper supports teacher role', e2e.includes("role === 'teacher'"));
-check('browser helper supports profile language', e2e.includes("language !== 'en'"));
-check('browser helper supports cloud handoff', e2e.includes('cloud-account-title'));
+// The browser fixture (issue #477): a student is made the way a student makes
+// one — the landing card, the server's emailed code, name, age and agreement,
+// class — never a device-only profile, never an injected cookie or row.
+check('browser suite enters through verified onboarding, not a device-only wizard',
+  e2e.includes("import { createVerifiedProfile } from './support/verified-onboarding.mjs';") &&
+  e2e.includes('createVerifiedProfile(page, await onlinePlatform(), { note, ...options })') &&
+  !e2e.includes('data-onboarding-step="1"'));
+check('browser fixture starts on the landing card and injects nothing',
+  verified.includes("page.locator('[data-signin-card=\"page\"]')") &&
+  !verified.includes('localStorage.setItem') && !verified.includes('addInitScript'));
+check('browser fixture types a server-issued six-digit email code and declares an explicit age',
+  verified.includes("readTestOutbox({ to: address, channel: 'email' })") &&
+  verified.includes('signup-age-${age}') && verified.includes('age = 18'));
+check('browser fixture puts a teacher device profile through the same gate and chooses a syllabus in Settings',
+  verified.includes('createTeacherProfile') && verified.includes('[data-testid="account-activation-gate"]') &&
+  verified.includes('export async function switchSyllabus'));
+check('browser fixture requires a live platform session and the gate gone before Home',
+  verified.includes("fetch('/v1/account/me'") && verified.includes('me.status !== 200') &&
+  verified.includes('account-activation-gate') && verified.includes('.home-greet'));
+check('a second profile on the device also comes through the card', verified.includes("getByTestId('picker-create-account')") && verified.includes('fromPicker'));
 
 const total = passed + failures.length;
 console.log('');

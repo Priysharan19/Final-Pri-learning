@@ -33,10 +33,14 @@ export function contentSecurityPolicy({ connectSources = extraConnectSources() }
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    // No nested browsing context at all (#260): the app creates no frames, and
-    // a same-origin child frame could otherwise reach its parent's bridge
-    // (parent.webkit.messageHandlers.*) and be credited to the main frame by
-    // the native shells' sender gate. 'none' also covers about:blank/srcdoc.
+    // No URL-loaded nested browsing context (#260): the app creates no frames.
+    // This is a defence-in-depth directive, not the mitigation for a child
+    // frame reaching the parent's bridge (parent.webkit.messageHandlers.*):
+    // threat-model T19 records, measured on the iPad simulator
+    // (BridgeSelfCheck.swift), that WKWebView does not apply frame-src 'none'
+    // to an about:srcdoc child and credits such a call to the parent frame.
+    // What holds is that the child inherits this CSP (no inline script) and
+    // the client never creates child frames (sanitize.js strips iframe).
     "frame-src 'none'",
     "frame-ancestors 'none'"
   ].join('; ');

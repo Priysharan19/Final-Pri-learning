@@ -31,21 +31,14 @@ export const flow = {
     const enabled = await page.evaluate(() => window.__PRI_BUILD_FEATURES__?.placement === true);
     if (!enabled) {
       // A production build without PRI_FEATURE_PLACEMENT: outside the frozen
-      // V1 scope, so there must be no placement surface anywhere.
-      await page.getByRole('button', { name: 'Use without an account' }).click();
-      await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-      await page.getByRole('button', { name: 'Student', exact: true }).click();
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('#signup-track').selectOption('11');
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('#signup-name').fill('Nisha Rao');
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('.auth-card .btn-primary').click();
-      await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
-      await check('flag off: onboarding keeps the no-diagnostic copy',
-        /does not currently have a separate placement diagnostic/.test(await page.locator('.auth-card').innerText()));
-      await page.locator('.auth-card .btn-primary').click();
-      await page.waitForSelector('.home-greet', { timeout: 30000 });
+      // V1 scope, so there must be no placement surface anywhere. The student
+      // enters the way every student does (issue #477): the one sign-in card,
+      // the server's emailed code, then the activation gate.
+      const card = page.locator('[data-signin-card="page"]');
+      await card.waitFor({ timeout: 30000 });
+      await check('flag off: the sign-in card promises no placement diagnostic',
+        !/placement|diagnostic/i.test(await page.locator('.auth-col').innerText()));
+      await createProfile({ name: 'Nisha Rao', year: 11, course: 'in' });
       await settle();
       await check('flag off: Home offers no placement check', await page.locator('[data-placement-card]').count() === 0);
       await goto('/placement');
@@ -67,28 +60,18 @@ export const flow = {
     await check('the offer can be declined', await offer.getByRole('button', { name: 'Not now' }).count() === 1);
     await offer.getByRole('button', { name: 'Start the placement check' }).click();
 
-    // ── 1b · signed out, the check does not start: sign in, in place ────────
+    // ── 1b · a verified account: the check starts at once, marked by the server ─
     // The placement check is marked work: every question is the server's and
-    // every answer is marked there. With no account nothing starts.
-    const refused = page.locator('[data-placement-refused]');
-    await refused.waitFor({ state: 'visible', timeout: 30000 }).catch(() => { });
-    await check('signed out, the placement check does not start: the page says why, as an alert, with the sign-in in place',
-      await refused.getAttribute('data-placement-refused').catch(() => null) === 'sign-in' && await refused.getAttribute('role') === 'alert' &&
-        await refused.locator('[data-check-sign-in]').isEnabled() && await page.locator('.q-prompt').count() === 0,
-      (await refused.innerText().catch(() => 'no refusal shown')).replace(/\s+/g, ' ').slice(0, 200));
-    await check('and nothing was asked of the server on a signed-out student\'s behalf: no question issued',
-      (await online.practiceCalls(/^\/v1\/(?:practice\/issue|placement\/)/)).filter(c => c.status < 300).length === 0,
-      JSON.stringify((await online.practiceCalls(/^\/v1\/(?:practice|placement)\//)).map(c => `${c.status} ${c.path}`)));
-    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
-    await refused.locator('[data-check-sign-in]').click();
-    const account = await online.signInHere(refused, { name: 'Nisha Rao' });
-    await check('sign-in completes on the placement page: no navigation, no reload',
-      /\/placement$/.test(new URL(page.url()).pathname) && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept', page.url());
-    if (!(await page.locator('.q-prompt').count())) {
-      const again = page.locator('[data-placement-start], [data-check-retry]').first();
-      await again.waitFor({ state: 'visible', timeout: 15000 }).catch(() => { });
-      if (await again.count()) await again.click();
-    }
+    // every answer is marked there. The student entered through the card and
+    // the gate (issue #477), so there is no signed-out state to refuse here:
+    // the first question is issued by the real server for this account.
+    const account = await online.signIn({ name: 'Nisha Rao' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await check('a verified student starts the placement check at once: no refusal, no sign-in asked for, the gate absent',
+      await page.locator('[data-placement-refused], [data-check-sign-in], [data-testid="account-activation-gate"]').count() === 0 &&
+        /\/placement$/.test(new URL(page.url()).pathname), page.url());
+    const issued = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).filter(c => c.status === 201);
+    await check('the first probe was issued by the real server for this account', issued.length >= 1, JSON.stringify(issued.map(c => `${c.status} ${c.path}`)));
     const eventsOf = kind => Number(online.platform.db.prepare('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND kind=?').get(account.id, kind).n);
 
     // ── 2 · the first question, and it survives a reload ─────────────────────

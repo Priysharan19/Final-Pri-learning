@@ -14,9 +14,12 @@
 //      brings the cap screen — what ran out, when it comes back, what Premium
 //      changes — from the server's answer, with no question on screen, no
 //      prepared question or draft fetched instead, and nothing escrowed.
-//   2. A signed-out student types an answer on a prepared question, then signs
-//      in on the card to an account whose twenty are used up (on another
-//      device). Submit is refused as the free cap: no verdict, no marks, no
+//   2. A signed-in student is shown a PREPARED question (the issue route was
+//      briefly unavailable, so the device fell back to a prepared one — the
+//      app is account-first since #477, so this is how a prepared question
+//      reaches a student now) and types an answer; meanwhile the account's
+//      twenty are used up on another device. Submit — binding the prepared
+//      question — is refused as the free cap: no verdict, no marks, no
 //      solution, the work kept; the server marked nothing.
 //
 // WHAT IS REAL: the built client, the real platform server and its SQLite
@@ -86,8 +89,18 @@ async function pressSubmit(page) {
  */
 async function otherDeviceUses(platform, account, count, generator) {
   const jar = {};
-  const login = await platform.h.request('/v1/account/login', { method: 'POST', jar, body: { email: account.email, password: account.password, deviceId: 'e2e-other-ipad' } });
-  if (login.status !== 200) throw new Error(`tour-free-cap: the other device could not sign in (${login.status} ${login.text})`);
+  if (account.password) {
+    const login = await platform.h.request('/v1/account/login', { method: 'POST', jar, body: { email: account.email, password: account.password, deviceId: 'e2e-other-ipad' } });
+    if (login.status !== 200) throw new Error(`tour-free-cap: the other device could not sign in (${login.status} ${login.text})`);
+  } else {
+    // An account made on the card has no password: the other device signs in
+    // with the emailed code, as a student would (the server's TEST adapter).
+    platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
+    const asked = await platform.h.request('/v1/account/otp/request', { method: 'POST', jar, body: { channel: 'email', destination: account.email } });
+    const code = platform.sms.readTestOutbox({ to: account.email, channel: 'email' }).filter(m => m.purpose === 'sign-in').at(-1)?.code;
+    const verified = await platform.h.request('/v1/account/otp/verify', { method: 'POST', jar, body: { channel: 'email', destination: account.email, challengeId: asked.data?.challengeId, code, deviceId: 'e2e-other-ipad' } });
+    if (verified.status !== 200) throw new Error(`tour-free-cap: the other device could not sign in with a code (${asked.status}/${verified.status} ${verified.text})`);
+  }
   const statuses = [];
   for (let i = 0; i < count; i++) {
     const issued = await platform.h.request('/v1/practice/issue', { method: 'POST', jar, body: { generator, difficulty: 2, curriculum: 'in', mode: 'practice', account: account.id } });
@@ -114,19 +127,23 @@ export const capScreen = {
     await goto('/');
     await createProfile({ name: 'Capped Student', year: 7 });
     const account = await online.signIn({ name: 'Capped Student' });
+    // The card opens on the first practice question (#477), so the account may
+    // already have been issued one before this flow asks for its own.
+    const countBefore = serverCount(platform, account.id);
+    const issuesBefore = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).length;
 
     // One question in the browser first, so the "other device" asks for the
     // same authored question the app does.
     const opened = await openTypedQuestion({ page, base, settle });
     if (!await check('signed in, Practice serves a server-issued question with a box to type in', opened)) return;
-    const issues = await online.practiceCalls(/^\/v1\/practice\/issue$/);
+    const issues = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).slice(issuesBefore);
     const generator = issues.find(c => c.status === 201)?.body?.generator;
     const usedHere = issues.filter(c => c.status === 201).length;
-    if (!await check('the browser\'s questions were issued by the server under this account', !!generator && usedHere >= 1 && serverCount(platform, account.id) === usedHere,
-      `generator ${generator}; ${usedHere} issued here; server count ${serverCount(platform, account.id)}`)) return;
+    if (!await check('the browser\'s questions were issued by the server under this account', !!generator && usedHere >= 1 && serverCount(platform, account.id) === countBefore + usedHere,
+      `generator ${generator}; ${usedHere} issued here; server count ${serverCount(platform, account.id)} (was ${countBefore})`)) return;
 
     // The student's iPad, earlier today: the rest of the twenty.
-    const remaining = FREE_PER_DAY - usedHere;
+    const remaining = FREE_PER_DAY - serverCount(platform, account.id);
     const elsewhere = await otherDeviceUses(platform, account, remaining, generator);
     await check(`the same account is issued the day's remaining ${remaining} questions on another device`,
       elsewhere.every(s => s === 201) && serverCount(platform, account.id) === FREE_PER_DAY, `statuses ${JSON.stringify(elsewhere)}; server count ${serverCount(platform, account.id)}`);
@@ -170,43 +187,49 @@ export const capScreen = {
   }
 };
 
-// ── 2 · a capped account cannot have a signed-out question checked ──────────
+// ── 2 · a capped account cannot have a prepared question checked ────────────
 
 export const capAtCheck = {
   id: 'free-cap-check',
-  name: 'Free cap · a prepared question, signed in on the card to a capped account: Submit refused as the free cap, nothing marked, work kept',
+  name: 'Free cap · a prepared question on a signed-in account that reaches its cap elsewhere: Submit refused as the free cap, nothing marked, work kept',
   online: true,
 
   async run({ page, base, check, goto, createProfile, settle, online }) {
     const platform = await onlinePlatform();
     await goto('/');
     await createProfile({ name: 'Late Typist', year: 7 });
+    const account = await online.signIn({ name: 'Late Typist' });
+    // The issue route is unavailable for a moment (a synthetic 503 at the
+    // browser, nothing at the server): the device falls back to a question
+    // the server PREPARED, which is bound to the account only at Submit.
+    let issueDown = true;
+    const issueRoute = url => new URL(url).pathname === '/v1/practice/issue';
+    await page.route(issueRoute, route => issueDown
+      ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'synthetic: issue briefly unavailable' } }) })
+      : route.continue());
     const opened = await openTypedQuestion({ page, base, settle });
-    if (!await check('signed out, Practice serves a prepared question to read and a box to type in', opened)) return;
+    if (!await check('with the issue route briefly down, Practice serves a prepared question to read and a box to type in', opened)) return;
     const qid = await shownId(page);
     const answerBox = page.locator('.editor-body input.answer-input');
     const prepares = await online.practiceCalls(/^\/v1\/practice\/prepare$/);
     const generator = prepares.find(c => c.status === 200)?.body?.generator;
-    await check('the question on screen was prepared by the server, not issued', !!generator && (await online.practiceCalls(/^\/v1\/practice\/issue$/)).length === 0, `${prepares.length} prepare call(s)`);
+    const preparedRow = await online.shownRow();
+    await check('the question on screen was prepared by the server, not issued', !!generator && preparedRow?.checkState === 'prepared' && preparedRow.serverQuestionId === null,
+      `${prepares.length} prepare call(s); row ${JSON.stringify(preparedRow && { checkState: preparedRow.checkState, serverQuestionId: preparedRow.serverQuestionId })}`);
+    issueDown = false;
 
-    // The account this student will sign in to has used its twenty today, on
-    // its own iPad.
-    const account = await platform.newAccount({ name: 'Late Typist' });
-    const elsewhere = await otherDeviceUses(platform, account, FREE_PER_DAY, generator);
+    // Meanwhile the account uses the rest of today's twenty on its own iPad.
+    const elsewhere = await otherDeviceUses(platform, account, FREE_PER_DAY - serverCount(platform, account.id), generator);
     await check('an account has used all twenty of today\'s questions on another device', elsewhere.every(s => s === 201) && serverCount(platform, account.id) === FREE_PER_DAY, JSON.stringify(elsewhere));
     const escrowedAtCap = platform.ledger(account.id).issued;
+    const completionsAtCap = platform.ledger(account.id).completions;
 
     await answerBox.fill(SURELY_WRONG);
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
-    await pressSubmit(page);
-    await page.locator('[data-check-refusal]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-    await check('signed out, Submit is answered with the sign-in in the card', (await resultOnCard(page)).refusal.join() === 'sign-in');
-    await page.locator('.verdict [data-check-sign-in]').click();
-    await online.signInHere(page.locator('.qpage'), { account });
-    await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => {});
-    await check('signed in on the card without leaving the question; the typed answer is still in the box',
-      new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await answerBox.inputValue() === SURELY_WRONG,
-      `${page.url()} ${await shownId(page)} ${JSON.stringify(await answerBox.inputValue())}`);
+    const bindsBefore = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).length;
+    await check('before Submit nothing is bound or marked: the question is still only prepared and the server holds no new completion',
+      (await online.shownRow())?.serverQuestionId === null && platform.ledger(account.id).completions === completionsAtCap &&
+        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0);
 
     // ── Submit: binding would be a twenty-first question ─────────────────────
     await pressSubmit(page);
@@ -218,14 +241,17 @@ export const capAtCheck = {
         /free plan includes 20 a day/.test(verdict) && /midnight/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 1,
       `${JSON.stringify(shown)} ${JSON.stringify(verdict.slice(0, 240))}`);
     await check('and with NO verdict, marks, XP or solution', nothingMarked(shown), JSON.stringify(shown));
+    await check('the refusal is in the card on the same question, without leaving the page',
+      new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid,
+      `${page.url()} ${await shownId(page)}`);
     await check('the typed answer is still in the box', await answerBox.inputValue() === SURELY_WRONG, JSON.stringify(await answerBox.inputValue()));
-    const binds = (await online.practiceCalls(/^\/v1\/practice\/issue$/));
+    const binds = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).slice(bindsBefore);
     const submits = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
     await check('the server refused the bind with its own code; the answer was never sent to be marked',
       binds.length === 1 && binds[0].status === 402 && binds[0].json?.error?.code === 'FREE_CAP_REACHED' && typeof binds[0].body?.prepared === 'string' && submits.length === 0,
       JSON.stringify({ binds: binds.map(c => ({ status: c.status, code: c.json?.error?.code })), submits: submits.length }));
     await check('the server escrowed nothing, marked nothing and counted nothing for this account',
-      platform.ledger(account.id).issued === escrowedAtCap && platform.ledger(account.id).completions === 0 && serverCount(platform, account.id) === FREE_PER_DAY,
+      platform.ledger(account.id).issued === escrowedAtCap && platform.ledger(account.id).completions === completionsAtCap && serverCount(platform, account.id) === FREE_PER_DAY,
       JSON.stringify(platform.ledger(account.id)));
     const row = await online.shownRow();
     await check('the question on the device is still the prepared one — unbound, so it can be bound and marked tomorrow',

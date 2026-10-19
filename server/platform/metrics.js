@@ -216,6 +216,21 @@ export const ALERT_RULES = Object.freeze([
     id: 'WEBHOOK_FAILURES',
     thresholds: { count: 1, minutes: 15 },
     evaluate: ({ sum }, t) => sum('webhook_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
+  },
+  {
+    // Crash reports the error boundaries sent through POST /v1/telemetry/error
+    // (one per boundary catch, consent-gated and rate-limited per account),
+    // across every platform.
+    id: 'CLIENT_ERROR_SPIKE',
+    thresholds: { count: 20, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('client_errors_total', { minutes: t.minutes }) >= t.count
+  },
+  {
+    // The error sink (PRI_SENTRY_DSN) is not accepting what the server sends:
+    // errors are still logged, but nobody is being told about them.
+    id: 'ERROR_SINK_FAILURES',
+    thresholds: { count: 5, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('error_sink_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
   }
 ]);
 
@@ -237,6 +252,26 @@ function statusClass(status) {
 export function recordHttpResponse(status, ms) {
   metrics.inc('http_responses_total', { class: statusClass(status) });
   metrics.observe('http_request_ms', null, ms);
+}
+
+/**
+ * One /v1 request's latency and database numbers, by route TEMPLATE (never a
+ * raw path): `POST:.v1.practice.:id.submit`. The template set is closed (the
+ * routes this server defines; anything else is already `/v1/<unmatched>`), so
+ * the label set is bounded. Numbers only (requestTiming.js).
+ */
+export function routeLabel(method, route) {
+  const label = `${String(method || '').toUpperCase()}:${String(route || '').replace(/\//g, '.')}`;
+  return LABEL.test(label) ? label : 'other';
+}
+export function recordRouteTiming(method, route, ms, timing) {
+  const labels = { route: routeLabel(method, route) };
+  metrics.observe('http_route_ms', labels, ms);
+  if (!timing?.db) return;
+  metrics.observe('http_route_db_ms', labels, timing.db.ms);
+  metrics.inc('http_route_requests_total', labels);
+  metrics.inc('http_route_db_statements_total', labels, timing.db.statements);
+  metrics.inc('http_route_db_round_trips_total', labels, timing.db.roundTrips);
 }
 
 const DB_CODES = new Set(['PLATFORM_DB_BUSY', 'PLATFORM_DB_TIMEOUT', 'PLATFORM_DB_UNAVAILABLE']);
@@ -272,6 +307,22 @@ export function recordProviderUsage(provider, { calls = 0, model = null, inputTo
 /** How a picture was read: by the provider (paid), from memory, or by joining a read in flight. */
 export function recordRecognitionRead(source) {
   metrics.inc('recognition_reads_total', { source: ['provider', 'cache', 'inflight'].includes(source) ? source : 'other' });
+}
+
+const CLIENT_PLATFORMS = new Set(['web', 'ios-shell', 'android-shell']);
+/** A crash report accepted on POST /v1/telemetry/error. */
+export function recordClientError(platform, code) {
+  metrics.inc('client_errors_total', { platform: CLIENT_PLATFORMS.has(platform) ? platform : 'other', code: safeCode(code, 'CLIENT_ERROR') });
+}
+
+/** A 5xx the server composed itself (router.js / app.js error handlers). */
+export function recordServerError(code) {
+  metrics.inc('server_errors_total', { code: safeCode(code, 'INTERNAL') });
+}
+
+/** One attempt to hand an error to the configured sink (errorSink.js). */
+export function recordErrorSink(outcome) {
+  metrics.inc('error_sink_total', { outcome: ['sent', 'failed', 'dropped', 'noop'].includes(outcome) ? outcome : 'other' });
 }
 
 export function recordAuthEmail({ ok, code = null }) {

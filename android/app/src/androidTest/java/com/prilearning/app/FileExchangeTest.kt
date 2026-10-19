@@ -136,6 +136,7 @@ class FileExchangeTest {
     @Test
     fun shareFilePickerCameraAndPrint() {
         var supported = false
+        AccountFirst.useFixtureServer()
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             s.onActivity { supported = it.webView != null }
             assumeTrue("the WebView is below the floor on this image", supported)

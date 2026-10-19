@@ -159,15 +159,12 @@ class InkInputTest {
     @Test
     fun fingerAndStylusWriteThroughTheSharedCanvas() {
         var supported = false
+        AccountFirst.useFixtureServer()
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             s.onActivity { supported = it.webView != null }
             assumeTrue("the WebView is below the floor on this image", supported)
-            // Home with a local profile (the journey created it), or onboard now.
-            val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                if(b){b.click();return 'picker';}return false;})()""")
-            assertTrue(state, state == "\"home\"" || state == "\"picker\"")
-            waitFor(s, "document.querySelector('.home-greet')")
+            // Account-first (#477): Home only once the gate has let the signed-in student in.
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
             eval(s, "(function(){window.__PRI_INK_METRICS_ENABLED__=true;history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
             waitFor(s, "document.querySelector('.q-prompt')")
 

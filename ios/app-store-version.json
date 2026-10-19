@@ -1,0 +1,4 @@
+{
+  "note": "App Store marketing version, chosen by the owner (LAUNCH-CHECKLIST-OWNER C6, 2026-10-19). It is the first App Store release, so it is independent of release/metadata.json productVersion, which versions the web/server product. Both Package.swift copies must carry this displayVersion.",
+  "marketingVersion": "1.0"
+}

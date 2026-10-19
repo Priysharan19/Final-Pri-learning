@@ -17,6 +17,7 @@ import {
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
+import { assessFormulaLine, bareNumbers, chainDiagnosis, cleanLine, evaluateChain, givensLine, isNumberText, labelKey, listsValues, matchesShape, readChain, sameValue, substitutionShapes, valueUnder } from './reason-chain.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
@@ -909,11 +910,171 @@ function derivativeSourceLine(stage, line) {
   } catch { return false; }
 }
 
-function assessPlanStage(stage, line) {
+// ── Evaluation stages under a carried slip ───────────────────────────────────
+// A stage is judged as authored first. When the working above it has already
+// broken on something the stage depends on — a given copied wrongly (`a = 10`),
+// a stage this one is declared to build on (the last term under the sum), or
+// the formula it substitutes into (`T_n = a + nd`) — the stage is judged again
+// with the student's own value, or own formula, put in. A line that is right
+// in that world is error carried forward: true of the slip, not of the
+// question, and reported `ecf: true`. The report says what is true; the
+// rubric's policy (methodMarks, `meta.ecf`) says what it pays — and a
+// substitution into a wrong formula (`formula: true`) is never a method step.
+function evaluationVariants(stage, ctx, { formulas = true } = {}) {
+  const variants = [{ stage, ecf: false }];
+  const carried = ctx?.carried || {};
+  const subs = stage.substitutions && typeof stage.substitutions === 'object' ? stage.substitutions : {};
+  const overrides = Object.fromEntries(Object.keys(subs).filter(k => Object.hasOwn(carried, k)).map(k => [k, carried[k]]));
+  // `T_8 = …` after `n = 8` was copied for n = 9: the label the student's own n gives.
+  const labels = labelsUnder(stage, overrides);
+  if (Object.keys(overrides).length) {
+    variants.push({ stage: { ...stage, labels, substitutions: { ...subs, ...overrides }, expected: undefined }, ecf: true });
+  }
+  const ecf = stage.ecf;
+  if (ecf && typeof ecf.source === 'string' && Array.isArray(ecf.bind) && ecf.bind.length &&
+      ecf.bind.every(k => Object.hasOwn(carried, k))) {
+    const bound = Object.fromEntries(ecf.bind.map(k => [k, carried[k]]));
+    variants.push({ stage: { ...stage, labels, source: ecf.source, substitutions: { ...subs, ...overrides, ...bound }, expected: undefined }, ecf: true });
+  }
+  // The formula the student wrote in place of one this stage substitutes into.
+  if (formulas && ctx?.forms?.size) {
+    const sources = stageSources(stage);
+    for (const [idx, written] of ctx.forms) {
+      const forms = Array.isArray(ctx.stages?.[idx]?.forms) ? ctx.stages[idx].forms : [];
+      if (!forms.some(form => sources.includes(form?.expr))) continue;
+      variants.push({ stage: { ...stage, labels, source: written, substitutions: { ...subs, ...overrides }, expected: undefined }, ecf: true, formula: true });
+    }
+  }
+  return variants;
+}
+
+/** The authored expressions an evaluation stage substitutes into. */
+function stageSources(stage) {
+  return [stage?.source, ...(Array.isArray(stage?.sources) ? stage.sources : [])].filter(s => typeof s === 'string');
+}
+
+/**
+ * A stage's labels, with those its index letter gives under `values` — the
+ * student's own n, carried from a misread (`indexLabels: { letter: 'n',
+ * stems: ['T_'] }` and n = 8 add `T_8`). Only a whole number of terms indexes.
+ */
+function labelsUnder(stage, values) {
+  const base = Array.isArray(stage?.labels) ? stage.labels : [];
+  const spec = stage?.indexLabels;
+  if (!spec || typeof spec.letter !== 'string' || !Array.isArray(spec.stems) || !Object.hasOwn(values || {}, spec.letter)) return base;
+  const index = Number(values[spec.letter]);
+  if (!Number.isInteger(index) || index < 1) return base;
+  return [...base, ...spec.stems.filter(stem => typeof stem === 'string' && stem).map(stem => `${stem}${index}`)];
+}
+
+/** The value an evaluation stage (as authored or as varied) stands for, or null. */
+function stageValue(stage) {
+  try {
+    const ast = parse(normalize(String(stage.source)));
+    return ast.t === 'equation' ? null : valueUnder(ast, stage.substitutions || {});
+  } catch { return null; }
+}
+
+/** Does a chain show the substitution of this stage (a segment with the authored shape)? */
+function substitutionShown(chain, stage) {
+  if (!chain) return false;
+  return stageSources(stage).some(source => {
+    const shapes = substitutionShapes(source, stage.substitutions || {});
+    return chain.segments.some(seg => matchesShape(seg.ast, shapes));
+  });
+}
+
+/**
+ * A stage whose break has an authored trap — the formula applied wrongly in a
+ * recognisable way (`a + nd` for `a + (n-1)d`) — names the move when the line
+ * shows that shape and reaches that value. Otherwise the verdict stands.
+ */
+function refineWithTraps(verdict, chain, stage, ctx) {
+  if (verdict.status !== 'break' || !chain || !Array.isArray(stage.traps)) return verdict;
+  for (const variant of evaluationVariants(stage, ctx, { formulas: false })) {
+    for (const trap of stage.traps) {
+      if (!trap || typeof trap.source !== 'string') continue;
+      const trapped = { ...variant.stage, source: trap.source };
+      const value = stageValue(trapped);
+      if (value === null || verdict.value === undefined || !sameValue(verdict.value, value)) continue;
+      if (!substitutionShown(chain, trapped)) continue;
+      const diagnosis = {
+        code: 'formula-misapplied',
+        title: 'The formula was applied wrongly',
+        message: typeof trap.why === 'string' && trap.why ? trap.why : 'The numbers were put into the formula in the wrong places.',
+        fix: 'Write the formula out first, then put each given value in its own place.',
+        confidence: 'high'
+      };
+      return { ...verdict, note: diagnosis.message, diagnosis };
+    }
+  }
+  return verdict;
+}
+
+/**
+ * A broken line that is itself a chain (`T_9 = 9 + 8 × 3 = 35`) is named by
+ * the segment that first disagrees with the one before it — the arithmetic
+ * that should have been done — rather than by the value the label expected.
+ */
+function refineWithChain(verdict, chain, ctx) {
+  if (verdict.status !== 'break' || !chain || chain.segments.length < 2) return verdict;
+  const ev = evaluateChain(chain, { ...(ctx?.givens || {}), ...(ctx?.carried || {}) });
+  if (!ev.evaluable || ev.breakAt < 1) return verdict;
+  const from = chain.segments[ev.breakAt - 1], to = chain.segments[ev.breakAt];
+  const diagnosis = chainDiagnosis(from.text, from.ast, ev.values[ev.breakAt - 1], to.text, ev.values[ev.breakAt]);
+  return { ...verdict, note: diagnosis.message, diagnosis };
+}
+
+function assessEvaluationStage(stage, line, ctx) {
+  const raw = planClause(line);
+  const chain = ctx ? readChain(raw, ctx.read) : null;
+  // A line Pri could not read as one chain — a word in it (`12 and d` is not
+  // 12·a·n·d), or, with no label to anchor it, a number and a letter set
+  // apart (`a = 9 d = 3`) — is not judged as a substitution either.
+  if (chain && chain.segments.some(seg => !seg.ast || (chain.label === null && seg.ambiguous))) {
+    return { status: 'note', trusted: false, note: 'Pri could not read every part of this line, so it is not judged.' };
+  }
+  // The line as the assessor reads it: label first, even when the student
+  // wrote it last (`9 + 8 × 3 = T_9`).
+  const clause = chain?.reversed ? chain.clause : ctx ? cleanLine(raw, { letters: ctx.read.letters }) : raw;
+  let verdict = null;
+  for (const variant of evaluationVariants(stage, ctx)) {
+    const v = assessEvaluationLine({ text: clause, meta: variant.stage });
+    if (v.status === 'ok') {
+      // True of the formula the student wrote above — which is not the right
+      // one. Carried forward so it is not blamed twice; never a method step.
+      if (variant.formula) {
+        return { ...v, ecf: true, credit: false, trusted: false,
+          note: 'Follows from the formula written above, which is not the right one.' };
+      }
+      // The value is right. Is the substitution itself on the line? A plan
+      // that asks for substitution evidence gives no stage credit to the
+      // value alone (`T_9 = 33`) or to another computation that happens to
+      // reach it (`T_9 = 9 × 3 + 6`) — the line is still true.
+      if (stage.evidence === 'substitution' && !substitutionShown(chain, variant.stage)) {
+        return { ...v, ecf: variant.ecf, credit: false, trusted: false,
+          note: 'True — but the substitution into the formula is not shown on this line, so it is not the method step.' };
+      }
+      return { ...v, ecf: variant.ecf };
+    }
+    if (!verdict) verdict = v;
+  }
+  const chained = refineWithChain(verdict, chain, ctx);
+  return chained !== verdict ? chained : refineWithTraps(verdict, chain, stage, ctx);
+}
+
+function assessPlanStage(stage, line, ctx = null) {
   if (!stage || typeof stage !== 'object') {
     return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
   }
-  if (stage.kind === 'evaluation') return assessEvaluationLine({ text: line, meta: stage });
+  if (stage.kind === 'evaluation') return assessEvaluationStage(stage, line, ctx);
+  if (stage.kind === 'formula') {
+    return assessFormulaLine({ text: planClause(line), meta: { ...stage, givens: ctx?.givens || stage.givens || null, carried: ctx?.carried || null, aliases: ctx?.read?.aliases || stage.aliases || null } });
+  }
+  if (stage.kind === 'identify') {
+    // Completed by the plan's reading of given values, never by this assessor.
+    return { status: 'note', trusted: false, note: 'State the values the question gives (for example a = …, d = …, n = …).' };
+  }
   if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
   if (stage.kind === 'chained-inequality') return assessRelationChainLine({ text: line, meta: stage });
   if (stage.kind === 'modulus-inequality') return assessModulusInequalityLine({ text: line, meta: stage });
@@ -925,6 +1086,11 @@ function assessPlanStage(stage, line) {
   }
   if (derivativeSourceLine(stage, line)) {
     return { status: 'note', trusted: false, note: 'Starting function recognised — differentiate it on the next line.' };
+  }
+  // `0, 0` lists values; a derivative is one expression. Not judged, never a
+  // mistake — as the evaluation stage abstains on a list (reason-v3.js).
+  if (stage.kind === 'derivative' && listsValues(planClause(line))) {
+    return { status: 'note', trusted: false, note: 'This line lists several values; Pri reads one value at a time, so it is not judged.' };
   }
 
   // For an explicit equation inside a proof plan, prefer the direct exact
@@ -970,6 +1136,41 @@ export function planRequirements(meta) {
   });
 }
 
+/** The letters a stage speaks of: its substitutions, forms, and bound letters. */
+function stageLetters(stage) {
+  const out = [];
+  if (stage?.substitutions && typeof stage.substitutions === 'object') out.push(...Object.keys(stage.substitutions));
+  if (Array.isArray(stage?.forms)) for (const form of stage.forms) out.push(...(form?.letters || []));
+  if (Array.isArray(stage?.letters)) out.push(...stage.letters);
+  if (Array.isArray(stage?.ecf?.bind)) out.push(...stage.ecf.bind);
+  return out;
+}
+
+const FOLLOWS = 'Follows from the earlier slip.';
+
+// ── Plans that read a page of chained equalities (`chain: true`) ─────────────
+// With `chain: true` a plan also reads what a Class 10 page is made of:
+//   · `a = 9, d = 3` — the givens copied from the question (meta.givens), each
+//     right or wrong (also `a = 9 and d = 3`, `Given a = 9 d = 3`, and a
+//     derived letter beside them, `l = 71`). A wrong one is the first break,
+//     and its value is carried into every later judgement (error carried
+//     forward).
+//   · `T_n = a + (n - 1)d = 9 + 8 × 3 = 35` — a formula with its arithmetic on
+//     one line: the formula is judged, and so is every number after it.
+//   · `= 9 + 24` — a continuation of the line above, each segment checked
+//     against what that chain stood at. The first segment that disagrees is
+//     the break, named with the arithmetic that should have been done.
+//   · `8 × 3 = 24` — arithmetic, or algebra in the givens, true or false on
+//     its own. True earns a tick and no credit; false is a break. A line with
+//     a word in it (`9 and d`) or a number and a letter set apart (`9 d`) is
+//     not read as arithmetic: it is a note, never a break.
+//   · `33` — a bare value states, derives nothing: a note; `9, 12, 15` lists.
+// A stage's credit (`stage` on the row) goes to the line that proves it; a
+// substitution stage with `evidence: 'substitution'` is proved only by a line
+// that shows the numbers put into the formula. After a break, lines that are
+// true of the question are still `ok`; lines true only of the student's own
+// slip are `ok` with `ecf: true`; a line true of neither is a second,
+// independent break; a line Pri cannot judge follows from the slip.
 function stepCheckPlan(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(line => line.trim()).filter(Boolean);
   const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
@@ -981,28 +1182,212 @@ function stepCheckPlan(meta, workingText) {
   }
 
   const requires = planRequirements(meta);
+  const chainMode = meta.chain === true;
+  const givens = {};
+  if (chainMode && meta.givens && typeof meta.givens === 'object') {
+    for (const [name, value] of Object.entries(meta.givens)) if (Number.isFinite(Number(value))) givens[name] = Number(value);
+  }
+  // Letters with a value the page may use that the question does not state
+  // (the last term under a sum): evaluable, never a given to copy.
+  const derived = {};
+  if (chainMode && meta.derived && typeof meta.derived === 'object') {
+    for (const [name, value] of Object.entries(meta.derived)) if (Number.isFinite(Number(value))) derived[name] = Number(value);
+  }
+  const carried = {};
+  // The formula a student wrote in place of a formula stage's, by stage index:
+  // the substitution below it is read as true of that formula, not blamed twice.
+  const forms = new Map();
+  const letters = [...new Set([...Object.keys(givens), ...Object.keys(derived), ...stages.flatMap(stageLetters)])];
+  const labels = new Set(stages.flatMap(stage => (stage.labels || []).map(labelKey)));
+  const aliases = chainMode && meta.aliases && typeof meta.aliases === 'object' ? meta.aliases : null;
+  const read = { labels, letters, aliases };
+  const known = { ...givens, ...derived };
+  const ctx = chainMode ? { carried, forms, stages, givens: known, read } : null;
+  const envNow = () => ({ ...known, ...carried });
+  const identified = new Set();
   const out = [];
   const completed = new Set();
   let active = 0;
   let firstBreak = -1;
   let diagnosis = null;
+  // What the previous line's chain stood at: the student's value, the value in
+  // the question's own world, and the segment that said it.
+  let chain = null;
 
   const ready = idx => requires[idx].every(r => completed.has(r));
+  const breakHere = (i, row) => {
+    if (firstBreak === -1) { firstBreak = i; diagnosis = row.diagnosis || null; } else row.independent = true;
+    return row;
+  };
+  // `authored` is what the chain is true of in the question's own world when
+  // the line was judged by an evaluation stage: the stage's value, so that a
+  // continuation of a slipped line is read against the slip AND the truth.
+  // `src` is the last segment that computes something (not a bare number) and
+  // reaches the chain's value: a slip below is measured from it.
+  const settleChain = (ch, env, stageIdx = null, authored = null) => {
+    const segments = ch?.segments || [];
+    const last = segments[segments.length - 1];
+    const value = last ? valueUnder(last.ast, env) : null;
+    if (value === null) { chain = null; return; }
+    const trueValue = authored !== null && authored !== undefined ? authored : valueUnder(last.ast, known);
+    const computed = [...segments].reverse().find(seg => !isNumberText(seg.text) && sameValue(valueUnder(seg.ast, env), value));
+    chain = { value, trueValue: trueValue === null ? value : trueValue, text: last.text, ast: last.ast, stage: stageIdx,
+      src: computed ? { text: computed.text, ast: computed.ast, value } : null };
+  };
+  const authoredValue = idx => (stages[idx]?.kind === 'evaluation' ? stageValue(stages[idx]) : null);
+  /** The evaluation stages that substitute into a formula stage's forms. */
+  const substitutesInto = idx => {
+    const exprs = (stages[idx]?.forms || []).map(form => form?.expr).filter(Boolean);
+    return stages.map((stage, k) => k).filter(k => stages[k].kind === 'evaluation' && stageSources(stages[k]).some(src => exprs.includes(src)));
+  };
+  /**
+   * The letters a stage's value stands for (`yields`), carried when the
+   * student slips on it. A formula stage stands for what its substitution
+   * yields: `l = a + (n-1)d = 20 + 17 × 3 = 72` slips the last term.
+   */
+  const yieldsOf = idx => {
+    const stage = stages[idx];
+    if (!Number.isInteger(idx) || !stage) return [];
+    if (Array.isArray(stage.yields)) return stage.yields;
+    if (stage.kind === 'formula') return [...new Set(substitutesInto(idx).flatMap(k => stages[k].yields || []))];
+    return [];
+  };
+  const carryYields = (idx, value) => {
+    if (!Number.isFinite(value)) return;
+    for (const letter of yieldsOf(idx)) carried[letter] = value;
+  };
+  /** The evaluation stage (ready or done) whose value this chain reaches with the authored shape shown. */
+  const stageShown = (ch, value) => {
+    if (!ch || value === null) return null;
+    for (let idx = 0; idx < stages.length; idx++) {
+      const stage = stages[idx];
+      if (stage.kind !== 'evaluation' || !(ready(idx) || completed.has(idx))) continue;
+      for (const variant of evaluationVariants(stage, ctx, { formulas: false })) {
+        const expected = stageValue(variant.stage);
+        if (expected === null || !sameValue(value, expected)) continue;
+        if (substitutionShown(ch, variant.stage)) return { idx, ecf: variant.ecf };
+      }
+    }
+    return null;
+  };
+  const credit = (row, idx) => {
+    row.stage = idx;
+    if (!completed.has(idx)) { completed.add(idx); active = idx; }
+    return row;
+  };
+  /** A formula stage broken by a formula the student wrote: carried forward for the stages that substitute into it. */
+  const carryFormula = (idx, verdict) => {
+    if (chainMode && stages[idx]?.kind === 'formula' && typeof verdict?.written === 'string' && verdict.written) forms.set(idx, verdict.written);
+  };
+
+  /** One step along a chain: the segment's value, and the last segment that computed it. */
+  const step = (prev, seg, value) => ({ value, trueValue: prev.trueValue, text: seg.text, ast: seg.ast,
+    src: isNumberText(seg.text) ? prev.src : { text: seg.text, ast: seg.ast, value } });
 
   const unread = unreadLines(rawLines);
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
     const skipped = unreadNote(unread[i]);
-    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); continue; }
-    if (firstBreak !== -1) {
-      out.push({ text: line, status: 'note', note: 'Follows from the earlier slip.', stage: active });
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); chain = null; continue; }
+    if (firstBreak !== -1 && !chainMode) {
+      out.push({ text: line, status: 'note', note: FOLLOWS, stage: active });
       continue;
+    }
+    const after = firstBreak !== -1;
+    const env = envNow();
+    let ch = null;
+
+    if (chainMode) {
+      // ── The givens, copied from the question ──────────────────────────────
+      const copied = Object.keys(givens).length ? givensLine(line, givens, { ...read, derived }) : null;
+      if (copied) {
+        const wrong = copied.clauses.find(c => !c.right);
+        if (!wrong) {
+          for (const c of copied.clauses) if (!c.derived) identified.add(c.letter);
+          const idx = stages.findIndex((s, k) => s.kind === 'identify' && !completed.has(k) && ready(k) &&
+            (s.letters || []).length && (s.letters || []).every(l => identified.has(l)));
+          const row = { text: line, status: 'ok', given: true, note: 'The given values, as the question states them.' };
+          out.push(idx >= 0 ? credit(row, idx) : row);
+        } else {
+          const whyMap = wrong.derived ? meta.derivedWhy : meta.givensWhy;
+          const why = whyMap && typeof whyMap === 'object' ? whyMap[wrong.letter] : null;
+          const diag = wrong.derived ? {
+            code: 'value-slip',
+            title: 'This value does not follow from the question',
+            message: typeof why === 'string' && why ? why : `From the question’s values, ${wrong.letter} = ${Number(Number(derived[wrong.letter]).toPrecision(12))}, not ${wrong.text}.`,
+            fix: 'Work this value out from the given values, then carry it through the working.',
+            confidence: 'high'
+          } : {
+            code: 'given-misread',
+            title: 'A given value was copied wrongly',
+            message: typeof why === 'string' && why ? why : `The question gives ${wrong.letter} = ${givens[wrong.letter]}, not ${wrong.text}.`,
+            fix: 'Read the values from the question again, then carry them through the working.',
+            confidence: 'high'
+          };
+          out.push(breakHere(i, { text: line, status: 'break', given: true, note: diag.message, diagnosis: diag }));
+          for (const c of copied.clauses) if (!c.right && c.value !== null) carried[c.letter] = c.value;
+          // The labels the student's own values give (`T_8` after `n = 8`).
+          for (const stage of stages) for (const label of labelsUnder(stage, carried)) labels.add(labelKey(label));
+        }
+        chain = null;
+        continue;
+      }
+
+      ch = readChain(line, read);
+      // ── A line Pri may have misread is judged nowhere ──────────────────────
+      // Two statements run together (`… = 33 d = 3`), a number and a word set
+      // apart (`= 33 an`), or a part with no value (`35/0`, `sqrt(-4)`): a
+      // note — never a tick, never a mistake, never a mark.
+      if (ch && ch.segments.some(seg => seg.ambiguous ||
+          (seg.ast && (seg.letters || []).every(v => Object.hasOwn(env, v)) && valueUnder(seg.ast, env) === null))) {
+        out.push({ text: line, status: 'note', note: 'Pri could not read every part of this line, so it is not judged.' });
+        chain = null;
+        continue;
+      }
+      // ── A continuation of the line above (`= 9 + 24`) ─────────────────────
+      if (ch?.continuation) {
+        if (!chain) { out.push({ text: line, status: 'note', note: 'This continues a line Pri could not read.' }); continue; }
+        const ev = evaluateChain(ch, env);
+        if (!ev.evaluable) { out.push({ text: line, status: 'note', note: 'Skipped — a letter on this line has no value yet.' }); chain = null; continue; }
+        let prev = chain, ecf = false, broke = null;
+        for (let k = 0; k < ch.segments.length; k++) {
+          const seg = ch.segments[k], v = ev.values[k];
+          if (sameValue(v, prev.trueValue)) { prev = step(prev, seg, v); continue; }
+          if (sameValue(v, prev.value)) { ecf = true; prev = step(prev, seg, v); continue; }
+          // Measured from what computed the chain's value (`9 + 24`), not from
+          // a bare restatement of it (`= 33`).
+          const from = prev.src && sameValue(prev.src.value, prev.value) ? prev.src : prev;
+          const diag = chainDiagnosis(from.text, from.ast, prev.value, seg.text, v);
+          broke = breakHere(i, { text: line, status: 'break', note: diag.message, diagnosis: diag });
+          // The slipped value stands in for the stage this chain was proving.
+          carryYields(chain.stage, v);
+          chain = { value: v, trueValue: prev.trueValue, text: seg.text, ast: seg.ast, stage: chain.stage,
+            src: isNumberText(seg.text) ? null : { text: seg.text, ast: seg.ast, value: v } };
+          break;
+        }
+        if (broke) { out.push(broke); continue; }
+        const row = { text: line, status: 'ok' };
+        if (ecf) { row.ecf = true; row.note = 'Correct, carrying the earlier slip forward.'; }
+        const shown = stageShown(ch, prev.value);
+        if (shown) { credit(row, shown.idx); if (shown.ecf && !row.ecf) { row.ecf = true; row.note = 'Correct, carrying the earlier slip forward.'; } }
+        out.push(row);
+        // The chain now proves the stage this line was credited to: a slip
+        // further down it stands in for that stage's value (its `yields`).
+        chain = { value: prev.value, trueValue: prev.trueValue, text: prev.text, ast: prev.ast, stage: shown ? shown.idx : chain.stage, src: prev.src };
+        continue;
+      }
+      // ── A value alone states, it derives nothing ──────────────────────────
+      if (ch && ch.label === null && bareNumbers(ch)) {
+        out.push({ text: line, status: 'note', note: 'A value stated, not derived — Pri checks the steps that reach it.' });
+        chain = null;
+        continue;
+      }
     }
 
     // Every verdict on this line is drawn once and kept.
     const verdicts = new Map();
     const assess = idx => {
-      if (!verdicts.has(idx)) verdicts.set(idx, assessPlanStage(stages[idx], line));
+      if (!verdicts.has(idx)) verdicts.set(idx, assessPlanStage(stages[idx], line, ctx));
       return verdicts.get(idx);
     };
     const open = [];        // not yet verified, prerequisites verified
@@ -1012,13 +1397,34 @@ function stepCheckPlan(meta, workingText) {
       (ready(idx) ? open : blocked).push(idx);
     }
     const done = [...completed].sort((a, b) => b - a);   // most recent first
+    const proves = idx => assess(idx).status === 'ok' && assess(idx).credit !== false;
+    const stamp = (row, verdict) => {
+      if (verdict?.ecf) { row.ecf = true; row.note = row.note || 'Correct, carrying the earlier slip forward.'; }
+      return row;
+    };
+    // What a line judged by stage `idx` is worth on the question itself: the
+    // evaluation stage's value, or the value of the right formula.
+    const truthOf = idx => (Number.isFinite(assess(idx).trueValue) ? assess(idx).trueValue : authoredValue(idx));
 
     // 1. A line that proves an available stage completes it.
-    const proved = open.find(idx => assess(idx).status === 'ok');
+    const proved = open.find(proves);
     if (proved !== undefined) {
-      completed.add(proved);
-      active = proved;
-      out.push({ text: line, status: 'ok', stage: proved });
+      out.push(stamp(credit({ text: line, status: 'ok' }, proved), assess(proved)));
+      if (chainMode) settleChain(ch, env, proved, truthOf(proved));
+      continue;
+    }
+    // 1b. A true statement of a stage's value that does not show the step —
+    //     or a substitution into the student's own wrong formula.
+    const stated = [...open, ...done].find(idx => assess(idx).status === 'ok' && assess(idx).credit === false);
+    if (stated !== undefined) {
+      const verdict = assess(stated);
+      out.push(stamp({ text: line, status: 'ok', note: verdict.note }, verdict));
+      if (chainMode) {
+        // What continues a carried line is read against the slip AND the truth.
+        settleChain(ch, env, null, verdict.ecf ? truthOf(stated) : null);
+        // A value reached through the student's own slip stands in for this stage.
+        if (verdict.ecf) carryYields(stated, verdict.value);
+      }
       continue;
     }
 
@@ -1031,7 +1437,44 @@ function stepCheckPlan(meta, workingText) {
         text: line, status: 'note', stage: active,
         note: 'This matches a later result, but Pri has not yet verified the prerequisite stage, so it cannot receive step credit.'
       });
+      if (chainMode) settleChain(ch, env);
       continue;
+    }
+
+    // 2b. (chain) A line under no stage's label: arithmetic, or algebra in the
+    //     givens, judged on its own truth. `8 × 3 = 24` is true whatever the
+    //     stage expected; `9 + 24 = 35` is false wherever it stands.
+    //     A line Pri may have misread — a number and a letter set apart
+    //     (`a = 9 d = 3`, a lost comma) — is not judged here: never a break.
+    if (chainMode && ch && ch.segments.length >= 2 && (ch.label === null || !labels.has(ch.labelKey)) &&
+        !ch.segments.some(seg => seg.ambiguous)) {
+      const inQuestion = evaluateChain(ch, known);
+      const inWorking = evaluateChain(ch, env);
+      if (inQuestion.evaluable || inWorking.evaluable) {
+        if (inQuestion.evaluable && inQuestion.consistent) {
+          const row = { text: line, status: 'ok' };
+          const shown = stageShown(ch, inQuestion.values[inQuestion.values.length - 1]);
+          if (shown) stamp(credit(row, shown.idx), shown);
+          out.push(row);
+          settleChain(ch, env, shown ? shown.idx : null);
+          continue;
+        }
+        if (inWorking.evaluable && inWorking.consistent) {
+          const row = { text: line, status: 'ok', ecf: true, note: 'Correct, carrying the earlier slip forward.' };
+          const shown = stageShown(ch, inWorking.values[inWorking.values.length - 1]);
+          if (shown) credit(row, shown.idx);
+          out.push(row);
+          settleChain(ch, env, shown ? shown.idx : null);
+          continue;
+        }
+        const ev = inWorking.evaluable ? inWorking : inQuestion;
+        const at = ev.breakAt;
+        const from = ch.segments[at - 1], to = ch.segments[at];
+        const diag = chainDiagnosis(from.text, from.ast, ev.values[at - 1], to.text, ev.values[at]);
+        out.push(breakHere(i, { text: line, status: 'break', note: diag.message, diagnosis: diag }));
+        chain = { value: ev.values[ev.values.length - 1], trueValue: ev.values[0], text: to.text, ast: to.ast, stage: null };
+        continue;
+      }
     }
 
     // 3. A line that disproves an available stage is the break.
@@ -1039,38 +1482,64 @@ function stepCheckPlan(meta, workingText) {
     if (broken !== undefined) {
       const verdict = assess(broken);
       active = broken;
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      const row = breakHere(i, { text: line, status: 'break', stage: broken, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) });
+      out.push(row);
+      if (chainMode) {
+        carryFormula(broken, verdict);
+        settleChain(ch, env, broken, truthOf(broken));
+        // The value the student reached stands in for this stage from here on.
+        if (chain) carryYields(broken, verdict.value);
+      }
       continue;
     }
 
     // 4. Another equivalent form within a stage already verified (for
     //    example the source equation and then x = 2) keeps that stage's credit.
-    const again = done.find(idx => assess(idx).status === 'ok');
+    const again = done.find(proves);
     if (again !== undefined) {
-      out.push({ text: line, status: 'ok', stage: again });
+      out.push(stamp({ text: line, status: 'ok', stage: again }, assess(again)));
+      if (chainMode) settleChain(ch, env, again, truthOf(again));
       continue;
     }
 
     // 5. Equation solvers have strong exact solution-set diagnostics. A wrong
     //    root written after the equation stage was verified is a real break,
-    //    not an unsupported next operation.
-    const wrongRoot = done.find(idx => stages[idx].kind === 'equation' && assess(idx).status === 'break');
+    //    not an unsupported next operation. (With chains: so is a wrong value
+    //    under the label of an evaluation stage already shown, and a wrong
+    //    formula under the label of a formula stage already shown.)
+    const wrongRoot = done.find(idx => (stages[idx].kind === 'equation' || (chainMode && (stages[idx].kind === 'evaluation' || stages[idx].kind === 'formula'))) && assess(idx).status === 'break');
     if (wrongRoot !== undefined) {
       const verdict = assess(wrongRoot);
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      out.push(breakHere(i, { text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) }));
+      if (chainMode) {
+        carryFormula(wrongRoot, verdict);
+        settleChain(ch, env, wrongRoot, truthOf(wrongRoot));
+        if (chain) carryYields(wrongRoot, verdict.value);
+      }
       continue;
     }
 
     // 6. Abstain, saying why the nearest stage could not use the line.
-    const reason = [...open, ...done].map(idx => assess(idx).note).find(Boolean);
+    if (after) {
+      out.push({ text: line, status: 'note', note: FOLLOWS, stage: active });
+      if (chainMode) chain = null;
+      continue;
+    }
+    const unreadable = chainMode && (!ch || ch.segments.some(seg => !seg.ast));
+    // `9, 12, 15, …, 33`: the terms listed — several values, not one number.
+    const listed = chainMode && !ch && listsValues(cleanLine(line, { letters }));
+    // `T_1 = 9` on a question about T_9: a true line, perhaps, but not a step
+    // of this method — and not a formula written under the wrong label.
+    const foreign = chainMode && ch && ch.label !== null && !labels.has(ch.labelKey);
+    const reason = listed ? 'This line lists several values; Pri reads one value at a time, so it is not judged.'
+      : unreadable ? 'Pri could not read this line as mathematics, so it is not judged.'
+        : foreign ? 'Pri judges the steps this question’s method needs; this line is not one of them, so it is not judged.'
+          : [...open, ...done].map(idx => assess(idx).note).find(Boolean);
     out.push({
       text: line, status: 'note', stage: active,
       note: reason || 'Pri could not prove which authored operation this line belongs to.'
     });
+    if (chainMode) chain = null;
   }
 
   if (diagnosis) {
@@ -2301,6 +2770,13 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       for (const index of seen.lines) contradicted.add(index);
     }
   }
+  // On a plan: its stages (as stepCheckPlan indexes them), and whether any
+  // primary stage of the method — a formula or its substitution, not a
+  // supporting stage and not the givens recognised (`identify`) — was
+  // verified anywhere on the page under the rubric's carry-forward policy.
+  const planStages = meta.kind === 'plan' && Array.isArray(meta.stages) ? meta.stages.filter(Boolean) : [];
+  const primaryShown = allLines.some(l => l.status === 'ok' && Number.isInteger(l.stage) && planStages[l.stage] &&
+    planStages[l.stage].supporting !== true && planStages[l.stage].kind !== 'identify' && (l.ecf !== true || meta.ecf === 'method'));
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a
   // multi-line answer can show the examiner's tick (or its absence) per line.
@@ -2422,6 +2898,19 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
         checkedRoots.push(root);
         return credit();
       }
+    }
+    // On a plan, a line earns only as the proof of a stage. A true line that
+    // proves none — a given copied from the question, arithmetic beside the
+    // method, a value stated — is verified and earns nothing. A line true only
+    // of the student's own earlier slip (`ecf`) earns its stage when the
+    // rubric carries errors forward (`meta.ecf === 'method'`), never otherwise.
+    // A supporting stage — the last term on the way to a sum — earns only
+    // beside the method it supports: with no primary stage verified on the
+    // page, the last term alone is the answer to a different question.
+    if (meta.kind === 'plan') {
+      if (!Number.isInteger(l.stage)) { row.reason = l.given ? 'restated' : l.ecf === true ? 'after-mistake' : 'unrelated'; return row; }
+      if (l.ecf === true && meta.ecf !== 'method') { row.reason = 'after-mistake'; return row; }
+      if (planStages[l.stage]?.supporting === true && !primaryShown) { row.reason = 'supporting'; return row; }
     }
     // An evidence plan (creditPerStage) carries one mark per verified stage:
     // a second line inside a stage already credited is the same criterion

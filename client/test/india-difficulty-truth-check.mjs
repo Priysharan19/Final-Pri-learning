@@ -158,6 +158,12 @@ async function run() {
 
   // ── The owner's case ──────────────────────────────────────────────────────
   section('owner case: Class 12 · JEE Advanced · Complex Numbers · hardest');
+  // A JEE dot point that lacks a level inside its track's window, found from
+  // the live curriculum (not hard-coded), so the refusal fixtures keep
+  // exercising a real missing level as hardest-level tranches fill gaps. JEE
+  // Advanced is searched first; once every JEE Advanced dot point has both D3
+  // and D4 (tranches 2 and 3), the fixture is a JEE Main dot point without D2.
+  let missingD3 = null;
   const owner = (await POST('/profiles', { name: 'Owner', year: 12, course: 'in', indiaTrack: 'jee-advanced' })).user;
   await premium(owner.id);
   {
@@ -173,36 +179,66 @@ async function run() {
     const track = practiceDifficulties({ course: 'in', track: 'jee-advanced', grade: 12, ceiling: stream.difficultyCeiling });
     ok('JEE Advanced allows the hardest level, D4', track.includes(4), show(track));
     const buttons = selectableDifficulties(track, chapter.dotpoints[argument]);
-    ok('the picker does not offer D4 for the argument dot point', !buttons.includes(4), show(buttons));
-    eq('the argument dot point is requestable at D3 only', chapter.dotpoints[argument].requestable, [3]);
-
-    // A stale or typed link can still ask for it: it is refused, and nothing
-    // — least of all the D3 argument question — is served in its place.
+    for (const trackId of ['jee-advanced', 'jee-main']) {
+      const jee = curriculum.streams.find(s => s.track === trackId && s.year === 12);
+      if (!jee) continue;
+      const { floor, ceiling } = indiaDifficultyWindow(trackId, 12);
+      for (const sub of jee.subtopics) {
+        const dp = (sub.dotpoints || []).findIndex(d => d.requestable.length > 0 && d.requestable.length < ceiling - floor + 1);
+        if (dp < 0) continue;
+        const available = sub.dotpoints[dp].requestable;
+        const missing = [1, 2, 3, 4].find(d => d >= floor && d <= ceiling && !available.includes(d));
+        missingD3 = { track: trackId, chapterId: sub.id, dp, missing, available, top: Math.max(...available) };
+        break;
+      }
+      if (missingD3) break;
+    }
+    ok('a JEE dot point missing a level of its track exists for the refusal fixture', !!missingD3);
+    // Tranche 2 of the hardest-level forms authored the missing D4 form, so
+    // the owner's request is now answered by a real D4 question — never by
+    // the D3 argument question relabelled.
+    ok('the picker offers D4 for the argument dot point', buttons.includes(4), show(buttons));
+    eq('the argument dot point is requestable at D3 and D4', chapter.dotpoints[argument].requestable, [3, 4]);
     const link = practiceHref({ subtopic: chapter.id, dotpoint: argument, difficulty: 4, track: 'jee-advanced' });
     const body = practiceRequestFromQuery(new URLSearchParams(link.split('?')[1]));
+    for (let i = 0; i < 6; i++) {
+      const s = await serve(body);
+      if (!ok('hardest on the argument dot point is served', !s.error, s.error?.message)) break;
+      await assertServed('owner hardest D4', s, 4, { chapterId: chapter.id, dp: argument });
+      eq('it is labelled D4', s.res.question.diffLabel, DIFF_LABELS[4]);
+      ok('it is not the D3 argument question', s.res.question.prompt !== seed56.prompt);
+    }
+    // A level a dot point still lacks is refused, and nothing is served in its
+    // place: a stale link asking for the fixture's missing level names exactly
+    // the levels it does have as the alternatives.
+    const fx = missingD3 || { track: 'jee-advanced', chapterId: chapter.id, dp: 0, missing: 3, available: [], top: 4 };
+    const stale = practiceRequestFromQuery(new URLSearchParams(practiceHref({ subtopic: fx.chapterId, dotpoint: fx.dp, difficulty: fx.missing, track: fx.track }).split('?')[1]));
     for (let i = 0; i < 12; i++) {
       const before = await questionRows();
-      const s = await serve(body);
-      if (!ok('hardest on the argument dot point serves no question', !!s.error, s.error ? '' : show(s.res?.question?.prompt))) break;
+      const s = await serve(stale);
+      if (!ok('the missing level on the fixture dot point serves no question', !!s.error, s.error ? '' : show(s.res?.question?.prompt))) break;
       eq('it is refused as DIFFICULTY_UNAVAILABLE', s.error.code, 'DIFFICULTY_UNAVAILABLE');
-      eq('the refusal names D4', s.error.detail.difficultyRequested, 4);
-      eq('the only alternative offered is D3 · Advanced', s.error.detail.available, [{ difficulty: 3, label: DIFF_LABELS[3] }]);
+      eq('the refusal names the missing level', s.error.detail.difficultyRequested, fx.missing);
+      eq('the only alternatives offered are the levels it has', s.error.detail.available, fx.available.map(d => ({ difficulty: d, label: DIFF_LABELS[d] })));
       eq('no question row was written', await questionRows(), before);
     }
-    // The student presses "Practise at D3 · Advanced": only now is D3 served.
-    const chosen = await serve({ ...body, difficulty: 3 });
+    // The student presses an offered level: only now is a question served.
+    const chosen = await serve({ ...stale, difficulty: fx.top });
     if (ok('the level the student then chooses is served', !chosen.error, chosen.error?.message)) {
-      await assertServed('owner choice D3', chosen, 3, { chapterId: chapter.id, dp: argument });
-      eq('and it is labelled D3, never D4', chosen.res.question.diffLabel, DIFF_LABELS[3]);
+      await assertServed(`owner choice D${fx.top}`, chosen, fx.top, { chapterId: fx.chapterId, dp: fx.dp });
+      eq('and it is labelled with the chosen level, never the missing one', chosen.res.question.diffLabel, DIFF_LABELS[fx.top]);
     }
     // Every dot point and the chapter itself, at the hardest level.
     for (const dp of [null, ...chapter.dotpoints.map((_, i) => i)]) {
       const requestable = dp == null ? chapter.requestable : chapter.dotpoints[dp].requestable;
       await assertRequest(`hardest · ${dp == null ? 'chapter' : `dp${dp}`}`, { mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: dp ?? undefined, difficulty: 4 }, 4, requestable, { chapterId: chapter.id, dp });
     }
-    eq('the modulus dot point (authored D1–D2 only) has no JEE Advanced level', chapter.dotpoints[0].requestable, []);
+    // The modulus dot point was authored D1–D2 only; tranche 2 gave it a JEE
+    // D4 form (c11-complex-algebra-reasoning) and tranche 3 a CBSE D3 form
+    // (c11-complex-modulus-reasoning), both inside the JEE Advanced window.
+    eq('the modulus dot point has exactly D3 and D4 on JEE Advanced (its two hardest-level forms)', chapter.dotpoints[0].requestable, [3, 4]);
     const below = await serve({ mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: 0, difficulty: 2 });
-    ok('asking for its own D2 on JEE Advanced is refused too — D2 is not a level of that track', below.error?.code === 'DIFFICULTY_UNAVAILABLE' && below.error.detail.available.length === 0, show(below.error?.detail || below.res?.question?.difficulty));
+    ok('asking for its own D2 on JEE Advanced is refused — D2 is not a level of that track — and only D3 and D4 are offered', below.error?.code === 'DIFFICULTY_UNAVAILABLE' && JSON.stringify(below.error.detail.available) === JSON.stringify([{ difficulty: 3, label: DIFF_LABELS[3] }, { difficulty: 4, label: DIFF_LABELS[4] }]), show(below.error?.detail || below.res?.question?.difficulty));
   }
 
   // ── A refusal spends no allowance ─────────────────────────────────────────
@@ -331,19 +367,20 @@ async function run() {
     const resumeSame = await serve({ mode: 'topic', subtopic: 'c11-complex-numbers', track: 'jee-advanced', dotpoint: 1, difficulty: 3, resume: true });
     eq('a resume at the same level returns the unfinished question', resumeSame.res?.question?.id, open.res?.question?.id);
     const resumeOther = await serve({ mode: 'topic', subtopic: 'c11-complex-numbers', track: 'jee-advanced', dotpoint: 1, difficulty: 4, resume: true });
-    ok('a resume that names another level is refused, not answered with the D3 question', resumeOther.error?.code === 'DIFFICULTY_UNAVAILABLE', resumeOther.error?.code || resumeOther.res?.question?.id);
+    ok('a resume that names another level is answered at that level, not with the D3 question', !resumeOther.error && resumeOther.res.question.id !== open.res.question.id && resumeOther.res.question.difficulty === 4, resumeOther.error?.code || resumeOther.res?.question?.id);
     const smartResume = await serve({ mode: 'smart', difficulty: 4, resume: true });
     ok('smart resume at D4 does not return the unfinished D3 question', !smartResume.error && smartResume.res.question.id !== open.res.question.id && smartResume.res.question.difficulty === 4, show(smartResume.error?.code || smartResume.res?.question?.difficulty));
     // A task that names a level the dot point lacks.
-    const made = await POST('/tasks', { title: 'Argument at D4', count: 3, targets: [{ chapterId: 'c11-complex-numbers', dotpoint: 1, track: 'jee-advanced', difficulty: 4 }] });
+    const fx = missingD3 || { track: 'jee-advanced', chapterId: 'c11-complex-numbers', dp: 0, missing: 3, available: [], top: 4 };
+    const made = await POST('/tasks', { title: 'Missing level', count: 3, targets: [{ chapterId: fx.chapterId, dotpoint: fx.dp, track: fx.track, difficulty: fx.missing }] });
     const taskId = made.task?.id || made.id;
     const before = await questionRows();
     const task = await serve({ taskId });
     ok('a task naming a missing level is refused', task.error?.code === 'DIFFICULTY_UNAVAILABLE', task.error?.code || `served D${task.res?.question?.difficulty}`);
-    eq('with the level that exists', task.error?.detail?.available.map(a => a.difficulty), [3]);
+    eq('with the levels that exist', task.error?.detail?.available.map(a => a.difficulty), fx.available);
     eq('and no row', await questionRows(), before);
-    const taskChosen = await serve({ taskId, difficulty: 3 });
-    if (ok('the task serves the level the student then chooses', !taskChosen.error, taskChosen.error?.message)) await assertServed('task choice D3', taskChosen, 3);
+    const taskChosen = await serve({ taskId, difficulty: fx.top });
+    if (ok('the task serves the level the student then chooses', !taskChosen.error, taskChosen.error?.message)) await assertServed(`task choice D${fx.top}`, taskChosen, fx.top);
   }
 
   // ── The NSW path refuses a requested dot point to an authored form too ──────

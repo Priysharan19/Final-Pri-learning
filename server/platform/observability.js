@@ -33,9 +33,19 @@ const ROUTE_SEGMENT = /^(?:[a-z0-9][a-z0-9._-]*|:[A-Za-z][A-Za-z0-9]*|<[a-z-]+>|
 /** Every event this server logs. Anything else is logged as `unlisted_event`. */
 export const LOG_EVENTS = Object.freeze([
   'http_request', 'platform_error', 'server_error', 'provider_call_failed', 'auth_email_failed', 'security_email_failed',
-  'auth_delivery_failed', 'auth_delivery_worker_error', 'platform_db_pool_error', 'housekeeping_error', 'provider_usage', 'unlisted_event'
+  'auth_delivery_failed', 'auth_delivery_worker_error', 'platform_db_pool_error', 'housekeeping_error', 'provider_usage',
+  // A crash report a client sent (telemetry.js) and the error sink refusing an
+  // event (errorSink.js) — each a coded line, never the report's content.
+  'client_error', 'error_sink_failed', 'unlisted_event'
 ]);
 const PROVIDERS = new Set(['handwriting', 'working', 'web', 'apple', 'google', 'unsupported', 'resend']);
+// The shells a crash report may name (telemetry.js).
+const CLIENT_PLATFORMS = new Set(['web', 'ios-shell', 'android-shell']);
+// A client "surface" is a slug the client chose from its own route names
+// (practice, exam, settings): lower case, short, no spaces — never free text.
+const SURFACE = /^[a-z][a-z0-9-]{0,39}$/;
+// A crash fingerprint is a truncated hex digest the client computed; no text.
+const FINGERPRINT = /^[a-f0-9]{8,32}$/;
 const KINDS = new Set(['verify-email', 'reset-password', 'guardian-consent']);
 const OUTCOMES = new Set(['ok', 'failed', 'rejected', 'sent']);
 const STATES = new Set(['retrying', 'exhausted']);
@@ -83,7 +93,17 @@ const FIELD_SHAPES = Object.freeze({
   kind: value => KINDS.has(value),
   outcome: value => OUTCOMES.has(value),
   state: value => STATES.has(value),
-  retryable: value => typeof value === 'boolean'
+  retryable: value => typeof value === 'boolean',
+  platform: value => CLIENT_PLATFORMS.has(value),
+  surface: value => typeof value === 'string' && SURFACE.test(value),
+  fingerprint: value => typeof value === 'string' && FINGERPRINT.test(value),
+  // Where an error was captured: the /v1 handler, the app handler or a client report.
+  source: value => ['platform', 'app', 'client'].includes(value),
+  // Where one request's time went (requestTiming.js). Bounded numbers only.
+  ...Object.fromEntries(['dbStatements', 'dbRoundTrips', 'dbTransactions']
+    .map(name => [name, value => Number.isInteger(value) && value >= 0 && value <= 1_000_000])),
+  ...Object.fromEntries(['dbMs', 'dbAcquireMs', 'authMs', 'eligibilityMs', 'limitMs', 'providerMs', 'markerMs', 'commitMs', 'serializeMs']
+    .map(name => [name, value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 3_600_000]))
 });
 
 export const LOG_FIELDS = Object.freeze(Object.keys(FIELD_SHAPES));

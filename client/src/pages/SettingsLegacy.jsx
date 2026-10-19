@@ -14,6 +14,7 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -251,6 +252,26 @@ function HandwritingSection({ toast }) {
   );
 }
 
+/**
+ * Crash reports (platform/telemetry.js reportCrash). On by default for a
+ * signed-in account; one tap turns it off for this device. The copy promises
+ * exactly what is sent: a code, a screen name and a fingerprint — never the
+ * message, the stack, the question or the answer.
+ */
+function CrashReportsCard({ t }) {
+  const [on, setOn] = useState(() => errorReportsEnabled());
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 8 }}>{t('settings.crashReportsTitle')}</h2>
+      <label className="row" style={{ gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+        <input type="checkbox" checked={on} onChange={e => setOn(setErrorReportsEnabled(e.target.checked))} />
+        <span>{t('settings.crashReportsLabel')}</span>
+      </label>
+      <p className="muted" style={{ marginTop: 8 }}>{t('settings.crashReportsCopy')}</p>
+    </div>
+  );
+}
+
 const SECTIONS = [
   ['plan', '♛', 'settings.secPlan'],
   ['profile', '☺', 'settings.secProfile'],
@@ -302,7 +323,7 @@ function SecuritySection({ toast }) {
       <h2 style={{ marginBottom: 8 }}>{t('settings.secSecurity')}</h2>
       <div className="set-row">
         <span className="set-k">{t('settings.accountType')}</span>
-        <span className="set-v">{t('settings.accountTypeValue')}</span>
+        <span className="set-v" data-account-type={user.cloudLinked ? 'signed-in' : 'local'}>{t(user.cloudLinked ? 'settings.accountTypeSignedIn' : 'settings.accountTypeLocal')}</span>
       </div>
       <div className="set-row">
         <span className="set-k">{t('settings.email')}</span>
@@ -483,15 +504,16 @@ export default function Settings() {
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay })}</p>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
             <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
             <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
             <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allCourses')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allFeatures')}</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">✓</span></div>
+            {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
+            <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
           </div>
 
           {/* ── Account information ── */}
@@ -675,6 +697,9 @@ export default function Settings() {
               </div>
             )}
           </div>
+
+          {/* ── Crash reports: a device preference, shown only where a server exists to send them to ── */}
+          {cloudAvailable() && <CrashReportsCard t={t} />}
 
           {/* ── Help ── */}
           <div className="card" ref={el => secRefs.current.help = el}>

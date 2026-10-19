@@ -41,8 +41,10 @@ export const flowOff = {
       try { localStorage.setItem('pri-feature-tutor', '1'); } catch { /* storage may be unavailable */ }
       window.__PRI_TUTOR_OVERRIDE__ = true;
     }, base);
-    await ctx.route('**/v1/**', route => {
-      if (new URL(route.request().url()).pathname.startsWith('/v1/tutor')) tutorRequests.push(route.request().url());
+    // Only the tutor route is watched (and refused): the account the student
+    // enters with, and everything else, is the real platform server's.
+    await ctx.route('**/v1/tutor/**', route => {
+      tutorRequests.push(route.request().url());
       return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } }) });
     });
     const chunkRequests = [];

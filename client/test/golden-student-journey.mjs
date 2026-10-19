@@ -2,14 +2,18 @@
 //
 // Owner decision 2026-10-10: only Pri's server marks. The loop therefore runs
 // for a student signed in to the real platform server this file boots
-// (support/online-session.mjs: real /v1, SQLite file, a verified account signed
-// in through Settings). What "offline" protects changed with that decision and
-// is asserted positively: offline, the app still opens from the device, the
-// unfinished question and its typed draft are still there, History and
-// Progress are unchanged — and Submit marks NOTHING (the card asks to
-// reconnect, no verdict, no attempt). Back online, Try again is marked by the
-// server exactly once and practice continues. Offline marking is gone and is
-// not asserted anywhere.
+// (support/online-session.mjs: real /v1, SQLite file), who entered the way
+// every student does since issue #477: the one sign-in card (email, the
+// server's emailed code, name, age, agreement, class), then the activation
+// gate. What "offline" protects changed with those decisions and is asserted
+// positively: a connection lost while working keeps the unfinished question
+// and its typed draft on screen, and Submit marks NOTHING (the card asks to
+// reconnect, no verdict, no attempt); an app OPENED offline is the activation
+// gate's retry screen — the server cannot confirm the account, so nothing of
+// the app opens and nothing is lost. Back online the gate lets the same
+// student in by itself, History and Progress are unchanged, Try again is
+// marked by the server exactly once and practice continues. Offline marking is
+// gone and is not asserted anywhere.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -17,6 +21,7 @@ import { tmpdir } from 'node:os';
 import { chromium } from '@playwright/test';
 import { ensureBuild } from './e2e.mjs';
 import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
 const TOPIC = 'y7-equations';
 const TOPIC_NAME = 'Linear Equations';
@@ -43,24 +48,11 @@ async function waitApp(page) {
 
 async function createFreshStudent(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Use without an account' }).click();
-  await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.getByRole('button', { name: /Studying in Australia/ }).click();
-  await page.locator('#signup-course').selectOption('nsw');
-  await page.locator('#signup-year').selectOption('7');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('PRI-02 Golden Student');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Start learning' }).click();
-  await page.waitForSelector('.home-greet');
+  // The landing card and the gate (support/verified-onboarding.mjs): a
+  // verified adult account, Class 7 on the card, then NSW Year 7 in Settings.
+  await createVerifiedProfile(page, platform, { name: 'PRI-02 Golden Student', year: 7, course: 'nsw' });
 }
+
 
 async function gotoPractice(page, origin) {
   await page.goto(origin + '/practice?subtopic=' + TOPIC, { waitUntil: 'domcontentloaded' });
@@ -262,16 +254,15 @@ try {
   assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt);
   assert.equal(await page.locator('.editor-body input.answer-input').inputValue(), DRAFT);
 
-  // ── offline: the work is there, nothing is marked ──────────────────────────
+  // ── the connection drops while working: the work stays, nothing is marked ─
   await ctx.setOffline(true);
-  await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-  await page.waitForSelector('.q-prompt');
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
   assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt,
-    'offline reload must resume the same unfinished question');
+    'offline, the unfinished question must stay on screen');
   const offlineInput = page.locator('.editor-body input.answer-input');
   assert.equal(await offlineInput.inputValue(), DRAFT,
-    'offline reload must keep the unfinished typed draft');
+    'offline, the unfinished typed draft must stay in the box');
 
   await offlineInput.fill(WRONG_A);
   await page.getByRole('button', { name: 'Submit Answer' }).click();
@@ -285,6 +276,24 @@ try {
   assert.equal(platform.ledger(account.id).completions, 3, 'offline, the server must have marked nothing');
   assert.ok(!/marked on this device|checked on this device/i.test(await page.locator('.qpage').innerText()),
     'nothing may claim a mark made on this device');
+  await page.waitForTimeout(600);
+
+  // ── reopened offline: the 72-hour grace (#477) ─────────────────────────────
+  // The server let this account in on this device minutes ago, so an offline
+  // open is inside the grace: the app opens on the device's own work, with
+  // the one quiet line saying nothing is checked until it reconnects — and
+  // nothing is marked.
+  const OFFLINE_LINE = '[data-testid="offline-entry"]';
+  await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 });
+  const reopened = clean(await page.locator(OFFLINE_LINE).innerText());
+  assert.equal(await page.locator('.shell').count(), 1, 'reopened offline inside the grace, the app opens on the device');
+  assert.equal(await page.locator('[data-testid="account-activation-gate"]').count(), 0,
+    'reopened offline inside the grace, no gate and never a sign-out');
+  assert.ok(reopened.length > 0, 'reopened offline, the offline line says why nothing is checked: ' + reopened);
+  assert.equal(await page.locator('.verdict-bad, .eval-card, .eval-marks, .solution-block').count(), 0,
+    'reopened offline, nothing is marked');
+  assert.equal(platform.ledger(account.id).completions, 3, 'reopened offline, the server marked nothing');
 
   // ── a complete restart, still offline: nothing lost, nothing invented ──────
   await ctx.close();
@@ -297,20 +306,31 @@ try {
   await ctx.setOffline(true);
 
   await page.goto(server.origin + '/history', { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await page.waitForSelector('.hist-row');
-  assert.equal(await page.locator('.hist-row').count(), 3,
-    'the three server-marked attempts must survive a complete offline restart — and no fourth may appear');
+  await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 });
+  assert.equal(await page.locator('[data-testid="account-activation-gate"]').count(), 0,
+    'an offline restart inside the grace opens the app, not the gate');
+  assert.equal(await historyCount(page), 3,
+    'an offline restart shows the three server-marked attempts from the device — none lost, none invented');
+  assert.equal(await page.locator('.verdict-bad, .eval-card').count(), 0, 'an offline restart marks nothing');
+  assert.equal(platform.ledger(account.id).completions, 3, 'an offline restart must not mark the submission that was refused');
 
+  // Back online: the gate notices the connection by itself and lets the same
+  // student in, with no sign-in asked for.
+  await ctx.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.waitForSelector('.shell', { timeout: 60000 });
+  assert.equal(await page.locator('[data-testid="account-activation-gate"]').count(), 0,
+    'back online, the gate must let the same student in without a sign-in');
+  assert.equal(await historyCount(page), 3,
+    'the three server-marked attempts must survive the offline restart — and no fourth may appear');
   await page.goto(server.origin + '/practice?subtopic=' + TOPIC, { waitUntil: 'domcontentloaded' }).catch(() => {});
   await page.waitForSelector('.q-prompt');
   assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt,
-    'offline restart must resume the same unfinished question');
+    'back online, the same unfinished question must resume');
   assert.equal(await page.locator('.verdict-bad, .eval-card').count(), 0,
-    'an offline restart must not mark the submission that was refused');
+    'the submission refused offline must not have been marked');
 
   // ── back online: the same submission is marked by the server, once ─────────
-  await ctx.setOffline(false);
-  await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
   // The card may still hold the "reconnect" refusal from before the restart,
   // and the first press after reconnecting can be refused once more while the
@@ -354,7 +374,7 @@ try {
     'five attempt rows, each one a distinct server attempt: ' + JSON.stringify(rows));
   assert.equal(platform.ledger(account.id).completions, 5, 'the server must hold exactly five completed questions');
 
-  console.log('PASS — PRI-02 golden student journey: fresh profile → signed in → 5 server-marked questions → History/Progress/mastery → restart → unfinished recovery → offline: work kept, nothing marked, reconnect asked → offline restart → reconnect: marked once → continued practice.');
+  console.log('PASS — PRI-02 golden student journey: the sign-in card and the gate → 5 server-marked questions → History/Progress/mastery → restart → unfinished recovery → offline: work kept, nothing marked, reconnect asked → reopened offline: the gate, nothing lost → offline restart: the gate → reconnect: let in, marked once → continued practice.');
   console.log(JSON.stringify({ beforeRestart, finalState }, null, 2));
 } finally {
   if (ctx) await ctx.close().catch(() => {});
