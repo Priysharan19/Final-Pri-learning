@@ -2089,7 +2089,7 @@ html.theme-switching, html.theme-switching * {
 /* Everything a finger presses is at least 44px on a coarse-pointer phone. */
 @media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
   .btn-sm { min-width: var(--tap-min); min-height: var(--tap-min); }
-  .gen-opt, .seg > button, .ws-filter, .genbar .icon-btn { min-height: var(--tap-min); }
+  .gen-opt, .seg > button, .ws-filter, .genbar .icon-btn, .field input, .field select { min-height: var(--tap-min); }
   .genbar .icon-btn { min-width: var(--tap-min); }
   /* The wordmark keeps its drawn size; the finger lands in a 44px area laid
      under it (as .chip-x in theme-legacy.css). */

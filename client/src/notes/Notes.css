@@ -79,7 +79,7 @@
   opacity: 0; transform: scale(0.6);
   transition: opacity 360ms var(--nt-ease) calc(var(--i) * 30ms), transform 360ms var(--nt-ease) calc(var(--i) * 30ms), background-color 140ms, color 140ms;
 }
-.nt-map-node::after { content: ''; position: absolute; inset: -10px; border-radius: 50%; } /* 44px touch target on the 24px node */
+.nt-map-node::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; } /* 46px touch target */
 .nt-map.is-in .nt-map-node { opacity: 1; transform: none; }
 .nt-map-node.is-focus, .nt-map-node:hover { background: var(--nt-ink); color: var(--nt-paper); }
 .nt-map-caption { min-height: 1.5em; margin: 8px 0 0; font-family: var(--nt-serif); font-size: 16px; color: var(--nt-ink-2); }
@@ -255,6 +255,7 @@
   .nt-map-frame { grid-template-columns: 1fr; }
   .nt-map-strands { display: none; }
   .nt-map-node { width: 24px; height: 24px; margin: -12px 0 0 -12px; font-size: 10.5px; }
+  .nt-map-node::after { inset: -10px; } /* still a 44px touch target on the smaller node */
   .nt-concept-body { padding-left: 16px; }
   .nt-search { max-width: none; }
   .nt-classes { width: 100%; overflow-x: auto; }

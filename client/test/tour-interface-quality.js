@@ -183,7 +183,13 @@ export const flow = {
           const tag = `${route}@${size.id}/${scheme}`;
           await goto(route);
           await settle();
-          if (chromium) await page.evaluate(() => { window.__priShift = 0; });
+          // Nothing moves once the screen has painted and settled.
+          if (chromium) {
+            await page.evaluate(() => { window.__priShift = 0; });
+            await page.waitForTimeout(500);
+            const shift = await page.evaluate(() => window.__priShift || 0);
+            await check(`${tag}: no layout shift after paint`, shift < 0.001, `CLS ${shift.toFixed(4)}`);
+          }
 
           // Names and targets.
           const a = await page.evaluate(AUDIT);
@@ -212,20 +218,6 @@ export const flow = {
             await check(`${tag}: every keyboard stop is named and has a visible focus ring`, bad.length === 0, JSON.stringify(bad.slice(0, 5)));
           }
 
-          // Input answers fast and nothing jumps: press the first safe control
-          // (tabs/segmented choices, never a submit or a destructive action).
-          if (chromium) {
-            // Only the press below is timed, not the Tab walk above it.
-            await page.evaluate(() => { window.__priSlowInput = []; });
-            const safe = page.locator('[role=tab], .mode-tab, .pill-opt').first();
-            if (await safe.count()) await safe.click({ timeout: 3000 }).catch(() => {});
-            await page.waitForTimeout(400);
-            const { shift, slow } = await page.evaluate(() => ({ shift: window.__priShift || 0, slow: window.__priSlowInput || [] }));
-            await check(`${tag}: no layout shift after paint`, shift < 0.001, `CLS ${shift.toFixed(4)}`);
-            await check(`${tag}: input answers inside ${MAX_INPUT_MS} ms`, slow.length === 0, JSON.stringify(slow.slice(0, 4)));
-            await goto(route); await settle();
-          }
-
           // Text at 200%: no sideways scroll.
           if (scheme === 'light') {
             const overflow = await page.evaluate(async () => {
@@ -248,6 +240,18 @@ export const flow = {
           else if (existsSync(baseline)) {
             const ratio = diffRatio(decodePng(readFileSync(baseline)), decodePng(png));
             await check(`${tag}: matches its visual baseline`, ratio <= MAX_DIFF_RATIO, `${(ratio * 100).toFixed(2)}% of pixels differ (${join(outDir, file)})`);
+          }
+
+          // Input answers fast (pressed last, after the snapshot): press the first safe control
+          // (tabs/segmented choices, never a submit or a destructive action).
+          if (chromium) {
+            // Only the press below is timed, not the Tab walk above it.
+            await page.evaluate(() => { window.__priSlowInput = []; });
+            const safe = page.locator('[role=tab], .mode-tab, .pill-opt').first();
+            if (await safe.count()) await safe.click({ timeout: 3000 }).catch(() => {});
+            await page.waitForTimeout(400);
+            const slow = await page.evaluate(() => window.__priSlowInput || []);
+            await check(`${tag}: input answers inside ${MAX_INPUT_MS} ms`, slow.length === 0, JSON.stringify(slow.slice(0, 4)));
           }
         }
       }
