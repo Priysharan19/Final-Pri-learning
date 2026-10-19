@@ -24,7 +24,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { installApp, keepOnlySimulator, parseDevices } from './simulator-fleet.mjs';
+import { installApp, keepOnlySimulator, pickSimulator } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -47,9 +47,7 @@ const run = (cmd, args, opts = {}) =>
 
 function pickDevice() {
   const named = argOf('device');
-  const rows = parseDevices(run('xcrun', ['simctl', 'list', 'devices', 'available']));
-  const matching = rows.filter(d => (named ? d.name === named : /iPad/.test(d.name)));
-  const pick = matching.find(d => d.state === 'Booted') || matching[0];
+  const pick = pickSimulator(run('xcrun', ['simctl', 'list', 'devices', 'available']), { family: 'iPad', named });
   if (!pick) throw new Error(`no ${named || 'iPad'} simulator is available`);
   return pick;
 }
@@ -99,7 +97,7 @@ function verifyInstalled(device, bundleId) {
 
 const sim = pickDevice();
 const device = sim.udid;
-console.log(`Native ink self-check on ${sim.name} (${device})\n`);
+console.log(`Native ink self-check on ${sim.name} (${device}, ${sim.runtime})\n`);
 ensureBooted(sim);
 
 // CI builds the canonical package once and hands the .app to every step
