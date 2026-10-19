@@ -300,7 +300,31 @@ async function runFlow(flow, { browser, opts }) {
   });
   const page = await ctx.newPage();
   const crashes = [];
-  page.on('pageerror', e => crashes.push(String(e?.message || e).slice(0, 200)));
+  // WebKit, tearing a page down for a navigation, cancels its in-flight
+  // fetches and reports each one as a page error ("Fetch API cannot load <url>
+  // due to access control checks.") even when the app's own code awaits and
+  // handles it (a crash report that reportCrash catches is reported too). That
+  // is the browser describing the flow's own navigation, not an exception the
+  // app threw: it is counted separately and named in a note — only in WebKit,
+  // only that exact message, only for this platform's own origin, and only
+  // within a second after a top-level navigation started. Anything else is a
+  // crash.
+  let navigationStartedAt = 0;
+  const cancelledByNavigation = [];
+  page.on('request', r => { if (r.isNavigationRequest() && r.frame() === page.mainFrame()) navigationStartedAt = Date.now(); });
+  const CANCELLED_FETCH = /^Fetch API cannot load (https?:\/\/[^\s]+) due to access control checks\.$/;
+  page.on('pageerror', e => {
+    const message = String(e?.message || e);
+    // Playwright's WebKit message drops the text before the URL's "//";
+    // the stack's first line keeps the browser's whole sentence.
+    const headline = String(e?.stack || message).split('\n')[0].trim();
+    const cancelled = opts.browser === 'webkit' && CANCELLED_FETCH.exec(headline);
+    if (cancelled && new URL(cancelled[1]).origin === new URL(page.url() || 'about:blank').origin && Date.now() - navigationStartedAt < 1000) {
+      cancelledByNavigation.push(new URL(cancelled[1]).pathname);
+      return;
+    }
+    crashes.push(message.slice(0, 200));
+  });
 
   // Every flow runs against the real platform server, which serves this same
   // build from its own origin (support/online-session.mjs): the app opens for
@@ -321,6 +345,7 @@ async function runFlow(flow, { browser, opts }) {
   // An exception thrown out of a render is invisible to every assertion above
   // it — the boundary catches it and the page carries on looking plausible.
   ok('no uncaught errors reached the page', crashes.length === 0, crashes.slice(0, 3).join(' · '));
+  if (cancelledByNavigation.length) note(`WebKit: ${cancelledByNavigation.length} in-flight request(s) cancelled by a navigation the flow made (${[...new Set(cancelledByNavigation)].join(', ')}); not app errors`);
   await ctx.close();
   g.ms = Date.now() - started;
   return g.fail;
