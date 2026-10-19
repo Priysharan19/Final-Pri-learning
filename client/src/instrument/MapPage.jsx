@@ -41,8 +41,9 @@ export default function MapPage() {
     api.get('/stats').then(s => {
       if (!live) return;
       const hasHistory = Number(s?.totals?.attempts) > 0;
-      const top = s?.recommendation || s?.priorities?.[0] || null;
-      setRecommended(hasHistory && top ? String(top.subtopic || top.id || '') : null);
+      // Only the engine's own pick is called a recommendation.
+      const top = s?.recommendation || null;
+      setRecommended(hasHistory && top?.subtopic ? String(top.subtopic) : null);
     }).catch(() => { });
     return () => { live = false; };
   }, []);
@@ -139,20 +140,23 @@ export default function MapPage() {
               );
             })}
           </svg>
-          <ol className="in-map-list">
+          <ol className="in-map-list" aria-label={t('inst.mapTitle')}>
             {layout.nodes.map(node => (
               <li key={node.row.id} style={{ left: `${(node.x / W) * 100}%`, top: `${(node.y / layout.height) * 100}%` }}>
                 <button type="button" className="in-map-hit" data-map-chapter={node.row.id}
-                  aria-pressed={current?.row.id === node.row.id}
-                  aria-label={`${node.row.name}${isRecommended(node) ? ` · ${t('inst.mapNext')}` : ''}`}
-                  onClick={() => setPick(node.row.id)} onFocus={() => setPick(node.row.id)} onMouseEnter={() => setPick(node.row.id)} />
+                  aria-current={current?.row.id === node.row.id ? 'true' : undefined}
+                  aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
+                  aria-label={`${STRAND_KEY[node.strand] ? t(STRAND_KEY[node.strand]) + ' · ' : ''}${node.row.name}${isRecommended(node) ? ` · ${t('inst.mapNext')}` : ''}`}
+                  onClick={() => setPick(node.row.id)} onFocus={() => setPick(node.row.id)}>
+                  <span className="in-map-hit-name" aria-hidden="true"><b>{String(node.index + 1).padStart(2, '0')}</b>{node.row.name}</span>
+                </button>
               </li>
             ))}
           </ol>
         </div>
 
         {current && (
-          <aside className="in-map-card" style={{ '--cc': `var(${current.colour})` }} aria-live="polite" data-map-card={current.row.id}>
+          <aside className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
             <h2>{current.row.name}</h2>
             <dl className="in-map-facts">

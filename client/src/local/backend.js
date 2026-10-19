@@ -4728,7 +4728,7 @@ const routes = {
         canRetry: !q.custom && !q.multipart,
         answeredAt: a?.createdAt || r.createdAt,
         // The server-certified mark and its step rows, when the server sent one.
-        ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows } : {}; })()
+        ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
       };
     }).sort((a, b) => b.answeredAt - a.answeredAt);
 
@@ -4742,7 +4742,9 @@ const routes = {
   },
 
   // Marks per chapter, from server-certified receipts only (read-only; nothing
-  // is stored or inferred). A repeat earns nothing and is counted as such.
+  // is stored or inferred). A repeat (a question whose solution the student
+  // had already seen) is left out entirely — it earns nothing, and counting
+  // its possible marks would read as marks lost; `repeats` says how many.
   'GET /marks/by-chapter': async () => {
     const p = await requireProfile();
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
@@ -4753,8 +4755,9 @@ const routes = {
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       const id = inChapter ? inChapter.id : r.subtopic;
       if (!id) continue;
-      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0 };
-      c.earned += m.repeat ? 0 : m.earned;
+      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+      if (m.repeat || r.repeatOf) { c.repeats += 1; continue; }
+      c.earned += m.earned;
       c.possible += m.possible;
       c.questions += 1;
     }
