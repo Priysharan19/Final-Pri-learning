@@ -84,8 +84,8 @@ function wrongUnit(suffix) {
 function namedPrecision(text) {
   // A precision the GIVEN data was measured to is not the answer's precision.
   const s = String(text || '').replace(/\b(?:measured|recorded)\b[^?!]*?\bto the nearest \w+(?: \w+)?/gi, '');
-  let m = s.match(/(?:to|correct to)\s+(\w+)\s+decimal places?/i);
-  const words = { one: 1, two: 2, three: 3, four: 4, '1': 1, '2': 2, '3': 3, '4': 4 };
+  let m = s.match(/\b(\w+)\s*(?:decimal\s+places?|d\.\s?p\.?)/i);
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
   if (m && words[m[1].toLowerCase()] != null) return words[m[1].toLowerCase()];
   if (/(?:to|correct to)\s+(?:1|one)\s+decimal place\b/i.test(s)) return 1;
   if (/nearest\s+(?:whole number|integer|unit|rupee|degree|metre|cm|km|kg|gram|second|minute)/i.test(s)) return 0;
@@ -114,6 +114,9 @@ function numericProbes(q, a) {
       const x = Number((Number(v.toFixed(p)) + off).toFixed(p));
       if (Math.abs(x - v) > 0.5 * 10 ** -p * (1 + 1e-6)) out.push({ input: fmt(x), why: `wrong last digit at the named ${p} d.p.` });
     }
+    // Truncated instead of rounded, when that differs.
+    const cut = Math.trunc(v * 10 ** p) / 10 ** p;
+    if (Math.abs(cut - v) > 0.5 * 10 ** -p * (1 + 1e-6)) out.push({ input: fmt(cut), why: `truncated, not rounded, at ${p} d.p.` });
   }
   if (a.simplestFraction && a.simplestFraction.d !== 1) {
     const { n, d } = a.simplestFraction;
