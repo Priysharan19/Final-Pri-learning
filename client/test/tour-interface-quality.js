@@ -215,6 +215,8 @@ export const flow = {
           // Input answers fast and nothing jumps: press the first safe control
           // (tabs/segmented choices, never a submit or a destructive action).
           if (chromium) {
+            // Only the press below is timed, not the Tab walk above it.
+            await page.evaluate(() => { window.__priSlowInput = []; });
             const safe = page.locator('[role=tab], .mode-tab, .pill-opt').first();
             if (await safe.count()) await safe.click({ timeout: 3000 }).catch(() => {});
             await page.waitForTimeout(400);

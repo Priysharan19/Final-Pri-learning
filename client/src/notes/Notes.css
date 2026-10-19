@@ -79,7 +79,7 @@
   opacity: 0; transform: scale(0.6);
   transition: opacity 360ms var(--nt-ease) calc(var(--i) * 30ms), transform 360ms var(--nt-ease) calc(var(--i) * 30ms), background-color 140ms, color 140ms;
 }
-.nt-map-node::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; } /* 46px touch target */
+.nt-map-node::after { content: ''; position: absolute; inset: -10px; border-radius: 50%; } /* 44px touch target on the 24px node */
 .nt-map.is-in .nt-map-node { opacity: 1; transform: none; }
 .nt-map-node.is-focus, .nt-map-node:hover { background: var(--nt-ink); color: var(--nt-paper); }
 .nt-map-caption { min-height: 1.5em; margin: 8px 0 0; font-family: var(--nt-serif); font-size: 16px; color: var(--nt-ink-2); }
