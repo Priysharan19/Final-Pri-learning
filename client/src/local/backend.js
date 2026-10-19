@@ -2112,6 +2112,20 @@ function certifiedPracticeMarks(receipt) {
   return { marksEarned: earned, marksPossible: possible, ...(receipt.repeat === true ? { repeat: true } : {}) };
 }
 
+/**
+ * The server-certified mark of an answered question, or null. Read from the
+ * receipt the server sent (never inferred on the device), through the same
+ * consistency rules the card uses; anything uncertified counts for nothing.
+ */
+function certifiedMarksOfRow(row) {
+  const receipt = row?.serverReceipt;
+  if (!receipt) return null;
+  try {
+    const marks = certifiedPracticeMarks(receipt);
+    return { earned: marks.marksEarned, possible: marks.marksPossible, repeat: marks.repeat === true, markRows: receipt.markRows || null };
+  } catch { return null; }
+}
+
 async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
   const recorded = row.answered ? row.resolution : null;
   // A question skipped after its first try has no try left to report: the
@@ -4712,7 +4726,9 @@ const routes = {
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
         canRetry: !q.custom && !q.multipart,
-        answeredAt: a?.createdAt || r.createdAt
+        answeredAt: a?.createdAt || r.createdAt,
+        // The server-certified mark and its step rows, when the server sent one.
+        ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows } : {}; })()
       };
     }).sort((a, b) => b.answeredAt - a.answeredAt);
 
@@ -4723,6 +4739,26 @@ const routes = {
 
     const start = page * pageSize;
     return { total: list.length, page, pageSize, items: list.slice(start, start + pageSize) };
+  },
+
+  // Marks per chapter, from server-certified receipts only (read-only; nothing
+  // is stored or inferred). A repeat earns nothing and is counted as such.
+  'GET /marks/by-chapter': async () => {
+    const p = await requireProfile();
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const chapters = {};
+    for (const r of rows) {
+      const m = certifiedMarksOfRow(r);
+      if (!m) continue;
+      const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
+      const id = inChapter ? inChapter.id : r.subtopic;
+      if (!id) continue;
+      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0 };
+      c.earned += m.repeat ? 0 : m.earned;
+      c.possible += m.possible;
+      c.questions += 1;
+    }
+    return { chapters, source: 'server-certified-receipts' };
   },
 
   'POST /history/:id/bookmark': async (body, params) => {
