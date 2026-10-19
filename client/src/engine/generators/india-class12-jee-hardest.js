@@ -336,7 +336,7 @@ function continuityTestReasoning(rng) {
       };
     }
   }
-  for (let guard = 0; guard < 400; guard++) {
+  { // one draw: every branch returns (the old 400-step guard was never reached)
     const p = ri(rng, 2, 6), q = nz(rng, -6, 6);
     const askSum = rng() < 0.5;
     const a = R(p * p, 2), b = sub(a, R(q));
@@ -561,7 +561,7 @@ function vectorDirectionReasoning(rng) {
       };
     }
   }
-  for (let guard = 0; guard < 400; guard++) {
+  { // one draw: every branch returns (the old 400-step guard was never reached)
     const [x, y, z, w] = rc(rng, QUADS);
     const order = rc(rng, [[x, y, z], [x, z, y], [y, x, z], [y, z, x], [z, x, y], [z, y, x]]);
     const l = R(rng() < 0.5 ? -order[0] : order[0], w), m = R(rng() < 0.5 ? -order[1] : order[1], w);

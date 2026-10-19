@@ -84,7 +84,6 @@ function piRational(tex) {
   if (m) return Q((m[1] ? -1 : 1) * (m[2] === '' ? 1 : Number(m[2])), Number(m[3]));
   return null;
 }
-const pt = (s, name) => { const m = s.match(new RegExp(`${name}\\((-?\\d+), (-?\\d+)\\)`)); return m ? [Number(m[1]), Number(m[2])] : null; };
 /** "ax + by + c = 0" → [a, b, c]. */
 function parseLine(tex) {
   const s = tex.replace(/\s+/g, '').replace(/=0$/, '');
@@ -222,7 +221,7 @@ export const SOLVE_JEE_C11 = {
     if (m) {
       const P = parsePoly(m[1]), k = Number(m[2]);
       if (!P || P[2] !== 1) return ['could not read the quadratic'];
-      const b = P[1] || 0, c = P[0] || 0;
+      const b = P[1] || 0;
       // Scan for every crossing of |P(x)| − k on a fine grid, refined by bisection; tangencies checked at the vertex.
       const F = x => Math.abs(evalPoly(P, x)) - k;
       const roots = [];

@@ -59,10 +59,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { chromium } from '@playwright/test';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
-import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
-import { join, extname, resolve, sep, relative } from 'node:path';
+import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
@@ -140,31 +139,6 @@ function buildApp() {
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
-}
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
-  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
-  '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon'
-};
-
-async function serve(dir) {
-  // The build's own files, listed once: a request names one of them or it is a
-  // route (one page, many routes) — no request path is ever joined onto disk.
-  const root = resolve(dir);
-  const files = new Map(readdirSync(root, { recursive: true, withFileTypes: true })
-    .filter(e => e.isFile())
-    .map(e => { const abs = join(e.parentPath ?? e.path, e.name); return ['/' + relative(root, abs).split(sep).join('/'), abs]; }));
-  const shell = join(root, 'index.html');
-  const server = createServer((req, res) => {
-    const path = decodeURIComponent((req.url || '/').split('?')[0]);
-    const target = files.get(path) ?? shell;
-    res.writeHead(200, { 'Content-Type': MIME[extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-    res.end(readFileSync(target));
-  });
-  await new Promise(r => server.listen(0, '127.0.0.1', r));
-  return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
 
 // ── The audit, run inside the page ───────────────────────────────────────────
