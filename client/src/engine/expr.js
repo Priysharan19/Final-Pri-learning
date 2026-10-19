@@ -1032,10 +1032,14 @@ function exprEquivalentUncached(a, b, opts) {
  */
 export function numsClose(a, b, tol) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  const t = tol ?? (Number.isInteger(b)
+  return Math.abs(a - b) <= (tol ?? numericBand(b));
+}
+
+/** The default band numsClose allows around a target b. */
+export function numericBand(b) {
+  return Number.isInteger(b)
     ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
-    : Math.min(decimalCap(b), Math.max(1e-6, Math.abs(b) * 1e-4)));
-  return Math.abs(a - b) <= t;
+    : Math.min(decimalCap(b), Math.max(1e-6, Math.abs(b) * 1e-4));
 }
 
 // Half a unit of the last decimal place for a target authored to one or two
