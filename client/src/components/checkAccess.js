@@ -153,7 +153,7 @@ export function refusedCheckState(error, via, { diagnostic = false } = {}) {
 
 /** What Retry does for a refused check: the same action, never a new attempt. */
 export function retryActionFor(via) {
-  return via === 'reveal' ? 'reveal' : via === 'skip' ? 'skip' : via === 'tutor' ? null : 'submit';
+  return via === 'reveal' ? 'reveal' : via === 'skip' ? 'skip' : via === 'tutor' || via === 'hint' ? null : 'submit';
 }
 
 /**

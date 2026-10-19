@@ -2331,3 +2331,23 @@ html { background-color: var(--page); }
   .answer-row .answer-input { min-width: 0; flex: 1 1 96px; }
   .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 }
+
+/* Error notebook and per-dot-point review: plain rules, hairlines, no chrome. */
+.notebook { padding: 14px 16px; }
+.notebook-title { margin: 0; font-size: 17px; }
+.notebook-how, .notebook-empty { margin: 4px 0 10px; font-size: 13px; line-height: 1.45; }
+.notebook-groups, .notebook-items, .review-queue-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.notebook-group { border-top: 1px solid var(--hairline); }
+.notebook-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; width: 100%; text-align: left; padding: 10px 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.notebook-slip { font-weight: 600; }
+.notebook-count { margin-left: auto; font-size: 12.5px; white-space: nowrap; }
+.notebook-items { padding: 0 0 10px; }
+.notebook-item { display: grid; gap: 4px; }
+.notebook-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; }
+.notebook-meta .btn { margin-left: auto; }
+.review-queue { max-width: 420px; }
+.review-queue-title { margin: 6px 0 2px; font-size: 18px; }
+.review-queue-why { margin: 0 0 8px; font-size: 13px; line-height: 1.45; }
+.review-queue-row { display: flex; gap: 10px; align-items: flex-start; }
+.review-queue-name { flex: 1; min-width: 0; }
+.review-queue-text, .review-queue-recall { display: block; font-size: 12.5px; line-height: 1.4; }

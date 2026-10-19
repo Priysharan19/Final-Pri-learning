@@ -30,6 +30,7 @@ import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
+import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -1813,6 +1814,10 @@ function sanitize(q, row) {
     pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
+    // The hint ladder (engine/hintLadder.js): four rungs the server serves and
+    // charges. `hintLevel` is the level the server committed for this row.
+    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId ? HINT_RUNGS.length : 0,
+    hintLevel: rungLevelOf(row.hintLevel),
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
     // Who marks this question as it stands: the server (issued there, its
@@ -2898,6 +2903,34 @@ let tutorAskRoutePromise = null;
 const tutorAskRoute = () => (tutorAskRoutePromise ||= import('../tutor/askRoute.js')
   .then(m => m.createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText })));
 
+// ── Review queue and notebook naming ─────────────────────────────────────────
+// The server knows a generator and its dot point; this profile names them
+// through its own spine (the NCERT chapter on an Indian profile, the NSW
+// table otherwise) and links each to practice on that chapter.
+function namedDotpoint(p, subtopic, dotpointId) {
+  const dp = dotpointId ? dotpointById(String(dotpointId)) : null;
+  if (p.course === 'in') {
+    const named = indiaNameOf(subtopic, { grade: p.year });
+    return { chapterId: named?.id || subtopic, chapterName: named?.name || subtopic, text: dp?.text ?? null, ordinal: Number.isInteger(dp?.ordinal) ? dp.ordinal : null };
+  }
+  return { chapterId: subtopic, chapterName: SUBTOPIC_BY_ID[subtopic]?.name || subtopic, text: dp?.text ?? null, ordinal: Number.isInteger(dp?.ordinal) ? dp.ordinal : null };
+}
+
+async function serverReviewQueue(p) {
+  if (!(await profileCloudAccountId(p.id).catch(() => null))) return null;
+  let out;
+  try { out = await cloud.reviewQueue(); } catch { return null; }
+  const decorate = r => {
+    const named = namedDotpoint(p, r.subtopic, r.dotpoint);
+    const href = p.course === 'in'
+      ? `/practice?subtopic=${encodeURIComponent(named.chapterId)}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
+      : `/practice?subtopic=${encodeURIComponent(named.chapterId)}${Number.isInteger(named.ordinal) ? `&dotpoint=${named.ordinal}` : ''}`;
+    return { id: `${r.subtopic}|${r.dotpoint}`, subtopic: r.subtopic, dotpoint: r.dotpoint, chapterName: named.chapterName, text: named.text,
+      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href };
+  };
+  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
+}
+
 const routes = {
 
   // ---- profiles / accounts ----
@@ -3483,13 +3516,37 @@ const routes = {
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
-    const q = row.payload;
-    const hints = q.hints || [];
-    if (!hints.length) return { hint: 'No hints for this one — trust your instincts!', level: 0, remaining: 0 };
-    const used = Math.min((row.hintsUsed || 0) + 1, hints.length);
-    row.hintsUsed = used;
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    // The hint ladder is the server's: it serves each rung from its own copy
+    // of the question and charges it there, in order (server/platform/
+    // practice.js). This device asks for the next rung by name and records the
+    // level the server committed — never a level of its own.
+    const asked = HINT_RUNGS.includes(body?.rung) ? body.rung : nextRungAfter(rungLevelOf(row.hintLevel));
+    if (!asked) throw Object.assign(new Error('Every hint has been opened.'), { status: 409, code: 'HINT_LADDER_SPENT' });
+    await requireServerIssue(row);
+    const r = await viaServer(() => cloud.hintPractice(row.serverQuestionId, asked));
+    const level = rungLevelOf(r?.level);
+    row.hintLevel = Math.max(rungLevelOf(row.hintLevel), level);
+    // `hintsUsed` keeps feeding the rating update and the FSRS grade, in the
+    // same help units the server's attempt carries.
+    row.hintsUsed = helpUnitsAfter(row.hintLevel);
+    if (r?.endsQuestion) {
+      // The full solution: the server resolved the question as revealed.
+      if (r.authoritative !== true || r.revealed !== true || r.resolved !== true || r.questionId !== row.serverQuestionId ||
+          typeof r.attemptId !== 'string' || !r.solution) {
+        throw Object.assign(new Error('The server did not acknowledge the reveal.'), { status: 503, code: 'REVEAL_ACK_MISSING' });
+      }
+      certifiedPracticeMarks(r);
+      row.serverReceipt = r;
+      const meta = await resolve(p, row, row.payload, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
+      return { rung: 'solution', level, remaining: 0, markWeight: 0, endsQuestion: true,
+        correct: false, resolved: true, revealed: true, authoritative: true,
+        attemptId: r.attemptId, serverAcknowledgedAt: r.serverAcknowledgedAt,
+        solution: r.solution, ...meta, ...certifiedPracticeMarks(r), syncQueued: true };
+    }
     await put('questions', row);
-    return { hint: hints[used - 1], level: used, remaining: hints.length - used };
+    return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true,
+      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level), next: nextRungAfter(level) };
   },
 
   // ---- AI tutor (vision item 3) ----
@@ -3854,8 +3911,53 @@ const routes = {
     };
     return {
       due: rows.filter(r => r.dueAt <= now).map(decorate),
-      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate)
+      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate),
+      // The per-dot-point queue is derived by the server from this account's
+      // server-marked attempts (GET /v1/practice/review-queue). Signed out or
+      // offline there is none: null, never a locally invented schedule.
+      dotpoints: await serverReviewQueue(p)
     };
+  },
+
+  // ---- the error notebook ----
+  // The server files a wrong resolution only under a misconception its
+  // deterministic engine diagnosed; this device names what it is sent.
+  'GET /notebook': async () => {
+    const p = await requireProfile();
+    if (!(await profileCloudAccountId(p.id).catch(() => null))) return { entries: [], available: false, reason: 'sign-in' };
+    let out;
+    try { out = await cloud.practiceNotebook(); } catch { return { entries: [], available: false, reason: 'offline' }; }
+    const entries = (Array.isArray(out?.entries) ? out.entries : []).map(g => ({
+      key: String(g.key || ''),
+      misconception: { id: misconceptionById(g.misconception?.id)?.id || null, nameKey: misconceptionById(g.misconception?.id)?.name || null,
+        label: typeof g.misconception?.label === 'string' ? g.misconception.label : null },
+      count: Number(g.count) || 0, lastAt: Number(g.lastAt) || 0,
+      chapterNames: [...new Set((g.subtopics || []).map(s => namedDotpoint(p, s, null).chapterName))],
+      items: (g.items || []).map(item => ({
+        id: item.id, prompt: typeof item.prompt === 'string' ? item.prompt : null, difficulty: Number(item.difficulty) || 2,
+        answeredAt: Number(item.answeredAt) || 0, canTwin: item.canTwin === true,
+        dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
+      }))
+    }));
+    return { entries, available: true };
+  },
+
+  // A twin is drawn and issued by the server; this device keeps the row it
+  // will be answered on, exactly like a History repeat.
+  'POST /notebook/:id/twin': async (body, params) => {
+    const p = await requireProfile();
+    const linked = await profileCloudAccountId(p.id).catch(() => null);
+    if (!linked) throw checkUnavailable('sign-in');
+    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    const q = out?.question;
+    if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
+    const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;
+    // An Indian twin keeps its chapter, so its evidence lands where the slip was.
+    const newRow = { id: uuid(), serverQuestionId: q.id, pid: p.id, subtopic: named?.id || q.subtopic, difficulty: q.difficulty, payload: q,
+      ...(named ? { india: { chapterId: named.id, track: p.indiaTrack || 'cbse', dotpointIndex: null } } : {}),
+      generator: q.subtopic, mode: 'review', examId: null, taskId: null, answered: 0, tries: out.triesLeft === 1 ? 1 : 0, hintsUsed: 0, createdAt: Date.now() };
+    await put('questions', newRow);
+    return { question: sanitize(q, newRow), twin: { sameDotpoint: out.twin?.sameDotpoint === true } };
   },
 
   // ---- exams ----

@@ -460,6 +460,13 @@ export const cloud = Object.freeze({
   getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
+  // The hint ladder is served and charged by the server, one named rung at a
+  // time; the error notebook and the per-dot-point review queue are derived
+  // there from this account's server-marked attempts.
+  hintPractice: (questionId, rung) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/hint', { method: 'POST', body: { rung } }),
+  practiceNotebook: () => cloudRequest('/v1/practice/notebook'),
+  notebookTwin: attemptId => cloudRequest('/v1/practice/notebook/' + pathId(attemptId, 'attempt id') + '/twin', { method: 'POST', body: {} }),
+  reviewQueue: () => cloudRequest('/v1/practice/review-queue'),
   recognizePractice: (questionId, mode, image) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
       method: 'POST', body: { mode, image }, timeoutMs: 55000
