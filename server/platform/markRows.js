@@ -8,11 +8,12 @@
 export const VERIFIED_MARKS_SCHEME = 'pri-practice-verified-aggregate-v1';
 
 export function markRowsFor(_question, {
-  marksEarned, marksPossible, correct, creditedMarks = null, partial = null,
+  marksEarned, marksPossible, correct, attemptId, submissionId, creditedMarks = null, partial = null,
   resolved = false, invalid = false, revealed = false, workingNotRead = false
 } = {}) {
   if (resolved !== true || invalid === true || revealed === true ||
-      typeof correct !== 'boolean') return null;
+      typeof correct !== 'boolean' || typeof attemptId !== 'string' ||
+      !attemptId || typeof submissionId !== 'string' || !submissionId) return null;
   const possible = marksPossible;
   const earned = marksEarned;
   if (!Number.isInteger(possible) || possible < 1 || possible > 4 ||
@@ -35,6 +36,7 @@ export function markRowsFor(_question, {
   const result = {
     scheme: VERIFIED_MARKS_SCHEME,
     attribution: 'aggregate-only',
+    identity: { attemptId, submissionId },
     totals: { earned, possible },
     finalAnswer: correct ? 'accepted' : 'not-accepted'
   };

@@ -400,7 +400,6 @@ export default {
   'verdict.correct': 'Correct.',
   'verdict.revealed': 'Solution revealed.',
   'verdict.notThisTime': 'Not this time.',
-  'verdict.afterHints': { one: 'after {n} hint', other: 'after {n} hints' },
   // Said only when the server's step report is of exactly these lines and
   // verifies every one of them. "Verified" means each line holds for the
   // question; it is not a claim that each line follows from the one before.

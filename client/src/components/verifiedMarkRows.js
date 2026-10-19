@@ -8,6 +8,10 @@ export function verifiedMarkBreakdown(result, grade) {
   if (!info || info.scheme !== 'pri-practice-verified-aggregate-v1' ||
       info.attribution !== 'aggregate-only' ||
       Object.hasOwn(info, 'rows') || !info.totals ||
+      typeof info.identity?.attemptId !== 'string' ||
+      typeof info.identity?.submissionId !== 'string' ||
+      info.identity.attemptId !== result.attemptId ||
+      info.identity.submissionId !== result.submissionId ||
       !Number.isInteger(info.totals.earned) ||
       !Number.isInteger(info.totals.possible) ||
       info.totals.possible < 1 || info.totals.possible > 4 ||

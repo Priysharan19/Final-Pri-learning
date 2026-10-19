@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { markRowsFor, VERIFIED_MARKS_SCHEME } from '../platform/markRows.js';
 let pass = 0;
 function check(label, action) { try { action(); pass++; } catch (e) { throw new Error(label + ': ' + e.message, { cause: e }); } }
-const call = (props = {}) => markRowsFor({}, props);
+const call = (props = {}) => markRowsFor({}, { attemptId: 'att-1', submissionId: 'sub-1', ...props });
 for (let possible = 1; possible <= 4; possible++) {
   for (let earned = 0; earned <= possible; earned++) {
     for (const correct of [false, true]) {
@@ -23,6 +23,8 @@ for (let possible = 1; possible <= 4; possible++) {
             assert.equal(actual.totals.earned, earned);
             assert.equal(actual.totals.possible, possible);
             assert.equal(actual.attribution, 'aggregate-only');
+            assert.equal(actual.identity.attemptId, 'att-1');
+            assert.equal(actual.identity.submissionId, 'sub-1');
             assert.equal(Object.hasOwn(actual, 'rows'), false);
             assert.equal(actual.finalAnswer, correct ? 'accepted' : 'not-accepted');
             if (correct) assert.equal(actual.method, undefined);
@@ -51,6 +53,10 @@ for (const partial of [{ awarded: 0 }, { awarded: 2 }, { awarded: NaN }, { award
     resolved: true, correct: false, marksEarned: 1, marksPossible: 3, partial
   }) : null));
 }
+check('missing attempt identity suppresses optional breakdown', () => assert.equal(call({ attemptId: null,
+  resolved: true, correct: false, marksEarned: 0, marksPossible: 2 }), null));
+check('missing submission identity suppresses optional breakdown', () => assert.equal(call({ submissionId: '',
+  resolved: true, correct: false, marksEarned: 0, marksPossible: 2 }), null));
 check('unread working correct final answer cannot imply method verification', () => {
   const out = call({ resolved: true, correct: true, workingNotRead: true,
     marksEarned: 4, marksPossible: 4 });

@@ -1175,7 +1175,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           solution: solutionFor(q),
           // Supplemental aggregate marking: no per-step allocations are invented.
           ...(!invalid ? { markRows: markRowsFor(q, {
-            marksEarned, marksPossible, creditedMarks, correct: result.correct === true,
+            marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
+            correct: result.correct === true,
             partial, workingNotRead: notRead, resolved
           }) } : {}),
           // Only a committed resolution may disclose opportunity explanations.

@@ -9,9 +9,11 @@ const ok = (label, got, expected) => {
 };
 const r = {
   authoritative: true, resolved: true, correct: false,
+  attemptId: 'att-1', submissionId: 'sub-1',
   marksEarned: 2, marksPossible: 4,
   markRows: {
     scheme: 'pri-practice-verified-aggregate-v1', attribution: 'aggregate-only',
+    identity: { attemptId: 'att-1', submissionId: 'sub-1' },
     totals: { earned: 2, possible: 4 },
     finalAnswer: 'not-accepted', method: { awarded: 2, attribution: 'aggregate-only' }
   }
@@ -19,6 +21,8 @@ const r = {
 const grade = { awarded: 2, possible: 4 };
 ok('valid server aggregate', verifiedMarkBreakdown(r, grade), r.markRows);
 ok('no matched grade', verifiedMarkBreakdown(r, null), null);
+ok('stale attempt has no breakdown', verifiedMarkBreakdown({ ...r, attemptId: 'att-new' }, grade), null);
+ok('stale submission has no breakdown', verifiedMarkBreakdown({ ...r, submissionId: 'sub-new' }, grade), null);
 ok('incorrect submitted question', verifiedMarkBreakdown(r, { awarded: 1, possible: 4 }), null);
 ok('incorrect possible', verifiedMarkBreakdown(r, { awarded: 2, possible: 3 }), null);
 ok('unresolved', verifiedMarkBreakdown({ ...r, resolved: false }, grade), null);
@@ -32,6 +36,7 @@ ok('malformed after hint credit', verifiedMarkBreakdown({ ...r, markRows: { ...r
 ok('missing method attribution', verifiedMarkBreakdown({ ...r, markRows: { ...r.markRows, method: null } }, grade), null);
 const correct = { ...r, correct: true, marksEarned: 4, markRows: {
   scheme: r.markRows.scheme, attribution: 'aggregate-only',
+  identity: r.markRows.identity,
   totals: { earned: 4, possible: 4 }, finalAnswer: 'accepted'
 }};
 ok('correct answer without invented method', verifiedMarkBreakdown(correct, { awarded: 4, possible: 4 }), correct.markRows);

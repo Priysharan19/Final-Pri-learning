@@ -465,7 +465,6 @@ export default {
   'verdict.correct': 'सही।',
   'verdict.revealed': 'हल दिखा दिया गया।',
   'verdict.notThisTime': 'इस बार नहीं।',
-  'verdict.afterHints': { one: '{n} संकेत के बाद', other: '{n} संकेतों के बाद' },
   'verdict.everyLineChecked': {
     one: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} पंक्ति पढ़ी और सत्यापित की गई।',
     other: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} पंक्तियाँ पढ़ी और सत्यापित की गईं।'
