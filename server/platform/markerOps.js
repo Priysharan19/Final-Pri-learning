@@ -77,7 +77,7 @@ export function stepEvidence(q, answer, steps, result) {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
       });
-      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
+      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
     } catch { partial = null; }
   }
   return { stepReport: report, partial };
@@ -132,7 +132,7 @@ export function examWorkingStage(q, working, grid, stage) {
     const method = methodMarks({ meta: stage.meta, working: String(working), marks, prompt: q.prompt });
     if (method && method.awarded > 0) {
       response.awarded = Math.max(0, Math.min(marks - 1, method.awarded));
-      response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note };
+      response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note, lost: method.lost };
     }
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }

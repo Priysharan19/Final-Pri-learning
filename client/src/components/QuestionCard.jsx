@@ -2434,6 +2434,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
+              {state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
@@ -2520,6 +2521,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
+                {res.partial && !verdictGood &&
+                  (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
+                  <LostMarks lost={res.partial.lost} t={t} />}
                 {/* Said only when the server's step report is of exactly these
                     lines and verifies every one of them (#448): a right answer
                     alone establishes nothing about the working. */}
@@ -2545,7 +2549,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <Icon name={row.earned === row.outOf ? 'check' : 'correction'} size={14} />
                           </span>
                           {row.labelKey ? t(row.labelKey) : row.label}
-                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: '', ...(row.whyVars || {}), rule: row.whyVars?.ruleKey ? t(row.whyVars.ruleKey) : '' }) : row.why}</span>}
                         </span>
                         <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
@@ -2661,6 +2665,26 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Where the marks went (ledger 3.6): one line per lost mark, naming the line
+ * and the rule it broke, rendered from the catalogue keys the server's marker
+ * sent so a Hindi-medium student reads it in Hindi. It explains the server's
+ * award; it never computes one. Only known key namespaces render.
+ */
+const LOST_KEY = /^marks\.lost\.[a-zA-Z]+$/;
+const RULE_KEY = /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/;
+function LostMarks({ lost, t }) {
+  const rows = Array.isArray(lost) ? lost.filter(l => l && LOST_KEY.test(String(l.key))) : [];
+  if (!rows.length) return null;
+  return (
+    <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {rows.map((l, i) => (
+        <li key={i} data-lost-line={l.line} data-lost-key={l.key}>{t(l.key, { ...(l.vars || {}), rule: RULE_KEY.test(String(l.ruleKey)) ? t(l.ruleKey) : '' })}</li>
+      ))}
+    </ul>
   );
 }
 
