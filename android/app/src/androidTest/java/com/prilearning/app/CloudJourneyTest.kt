@@ -313,17 +313,23 @@ class CloudJourneyTest {
         assumeTrue("run by android/scripts/run-instrumented.sh with the server stopped", args.getString("priCloudOffline", "") == "true")
         val graded = JSONObject(gradedFile.readText())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
-            // Account-first: opened with the server unreachable, the gate cannot
-            // confirm the account, so it says "retry" and the shell stays closed.
-            waitFor(s, "$GATE && $GATE.getAttribute('data-activation-status') === 'retry'", 90_000)
+            // Account-first with the 72-hour grace (#477): the server let this
+            // account in on this device minutes ago (cloudSignInAndSync), so an
+            // open while it is unreachable is inside the grace — the app opens
+            // on the device's own work with the one offline line, and nothing
+            // is checked or marked until it reconnects.
+            val offlineLine = "document.querySelector('[data-testid=offline-entry]')"
+            waitFor(s, "!!$offlineLine && !!document.querySelector('.shell') && !$GATE", 90_000)
             Thread.sleep(3000)
-            assertEquals("the shell did not open while the server could not confirm the account", "false",
-                eval(s, "!!document.querySelector('.shell') || !!document.querySelector('.home-greet') || !!document.querySelector('.q-prompt')"))
+            assertEquals("opened offline inside the grace, the app says nothing is checked until it reconnects", "true",
+                eval(s, "!!$offlineLine && !$GATE"))
+            assertEquals("nothing is marked while the server cannot be reached", "false",
+                eval(s, "!!document.querySelector('.eval-card') || !!document.querySelector('.verdict-bad') || !!document.querySelector('.eval-marks')"))
             assertEquals("no device-only entry is offered", "false", eval(s, "!!document.querySelector('[data-testid=hero-offline]')"))
             // …and nothing was lost: the server's own record (its database, read
             // by the oracle while the server is stopped) is unchanged.
             assertEquals("the server's record is unchanged while it is stopped", graded.getString("server"), assertServerMarkedOnce("offline"))
-            Log.i("PRITEST", "opened offline: the gate says retry, the shell stays closed, the server's record is unchanged")
+            Log.i("PRITEST", "opened offline: inside the grace, the offline line, nothing marked, the server's record is unchanged")
         }
     }
 
