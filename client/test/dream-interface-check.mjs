@@ -238,6 +238,13 @@ check('the action bar holds exactly one primary action', () => {
   assert.equal((bar.match(/btn-primary/g) || []).length, 1);
 });
 
+check('Home offers one primary next action (#487)', () => {
+  // The "what next" card's CTA is the one primary button; filters, study,
+  // placement and the rest are secondary, so the eye has one place to go.
+  assert.equal((home.match(/btn-primary/g) || []).length, 1);
+  assert.match(home, /className="btn btn-primary btn-lg" data-home-primary-cta/);
+});
+
 check('status only claims what the device actually knows', () => {
   assert.doesNotMatch(en, /'verdict\.status[A-Za-z]*': '[^']*(synced|uploaded|cloud)/i);
   assert.match(card, /saveDraft\('question', question\.id/);
