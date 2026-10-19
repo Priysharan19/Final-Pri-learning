@@ -79,8 +79,10 @@ export default function MapPage() {
     const perRow = {};
     foundations.forEach(f => {
       const k = perRow[f.strand] = (perRow[f.strand] || 0) + 1;
-      f.x = LEFT - 40 - (k - 1) * 30;
-      f.y = 46 + used.indexOf(f.strand) * ROW_H + ((k % 2) ? -10 : 10);
+      // Packed three to a line between the labels and the first chapter.
+      const col = (k - 1) % 3; const line = Math.floor((k - 1) / 3);
+      f.x = LEFT - 20 - col * 20;
+      f.y = 46 + used.indexOf(f.strand) * ROW_H - 14 + line * 14;
     });
     const byId = new Map(nodes.map(node => [node.row.id, node]));
     const foundationById = new Map(foundations.map(f => [f.id, f]));
@@ -116,14 +118,14 @@ export default function MapPage() {
                 <text className="in-map-strand" x={8} y={r.y + 4}>{STRAND_KEY[r.id] ? t(STRAND_KEY[r.id]) : ''}</text>
               </g>
             ))}
-            <text className="in-map-strand is-col" x={LEFT - 40} y={18} textAnchor="middle">{t('inst.mapEarlier')}</text>
+            <text className="in-map-strand is-col" x={LEFT - 40} y={16} textAnchor="middle">{t('inst.mapEarlier')}</text>
             {layout.edges.map((e, i) => (
               <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}${e.earlier ? ' is-earlier' : ''}`}
                 d={`M${e.from.x} ${e.from.y} C ${(e.from.x + e.to.x) / 2} ${e.from.y}, ${(e.from.x + e.to.x) / 2} ${e.to.y}, ${e.to.x} ${e.to.y}`}
                 style={{ '--cc': `var(${e.to.colour})` }} />
             ))}
             {layout.foundations.map(f => (
-              <g key={f.id} className="in-map-foundation"><circle cx={f.x} cy={f.y} r={6} /></g>
+              <g key={f.id} className="in-map-foundation"><circle cx={f.x} cy={f.y} r={5} /></g>
             ))}
             {layout.nodes.map(node => {
               const r = 12 + Math.min(12, (node.marks?.earned || 0) / 2);
