@@ -57,6 +57,14 @@ jobs:
           grep -Fq '1880000/1880000 self-checks passed across 235 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 1964/1964 checks' suites.log
+          # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
+          grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
+          grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
+          grep -Fq 'JEE COMPLEX D4: PASS — 574/574 checks' suites.log
+          grep -Fq 'JEE ESCROW LANE: PASS — 210/210 checks' suites.log
+          grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
+          grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 49637/49637 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
