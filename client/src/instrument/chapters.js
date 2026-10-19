@@ -42,6 +42,23 @@ export function chapterEvidence(row, accuracyClaim, floor) {
   const attempts = Number(row?.attempts || row?.evidence?.attempts || 0);
   const correct = Number(row?.correct || row?.evidence?.correct || 0);
   const claim = accuracyClaim(correct, attempts, floor);
-  const mastery = Math.max(0, Math.min(100, Number(row?.mastery || 0)));
+  // The ring shows mastery only where accuracy may be stated, so it never
+  // implies a level the floor withholds.
+  const mastery = claim.enough ? Math.max(0, Math.min(100, Number(row?.mastery || 0))) : 0;
   return { attempts, correct, accuracy: claim.enough ? claim.value : null, mastery };
 }
+
+/** The student's own syllabus within /curriculum: their CBSE class, or their JEE stream. */
+export function scopeFor(curriculum, user) {
+  if (!curriculum || !user) return null;
+  const track = user.indiaTrack || (isIndian(user) ? 'cbse' : null);
+  if (!track || track === 'cbse') return (curriculum.years || []).find(s => Number(s.year) === Number(user.year)) || null;
+  return (curriculum.streams || []).find(s => s.track === track && (s.year == null || Number(s.year) === Number(user.year)))
+    || (curriculum.streams || []).find(s => s.track === track)
+    || null;
+}
+
+/** The track a practice link carries: an Indian track, or none outside India. */
+export const practiceTrack = user => user?.indiaTrack || (isIndian(user) ? 'cbse' : null);
+
+function isIndian(user) { return user?.course === 'in' || user?.country === 'in'; }

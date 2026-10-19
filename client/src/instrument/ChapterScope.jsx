@@ -115,7 +115,15 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
       }
     };
 
-    const loop = now => { draw(now); if (!reduce) frame = requestAnimationFrame(loop); };
+    // Runs only while the scope is on screen and the tab is visible.
+    let visible = true;
+    const loop = now => { draw(now); if (!reduce && visible && !document.hidden) frame = requestAnimationFrame(loop); };
+    const resume = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(loop); };
+    const io = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) resume(); })
+      : null;
+    io?.observe(box);
+    document.addEventListener('visibilitychange', resume);
     frame = requestAnimationFrame(loop);
     const move = e => { const r = el.getBoundingClientRect(); probe.current = (e.clientX - r.left) / r.width; if (reduce) draw(performance.now()); };
     const leave = () => { probe.current = -1; if (reduce) draw(performance.now()); };
@@ -123,7 +131,7 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
     box.addEventListener('pointerleave', leave);
     const resize = () => reduce && draw(performance.now());
     window.addEventListener('resize', resize);
-    return () => { cancelAnimationFrame(frame); box.removeEventListener('pointermove', move); box.removeEventListener('pointerleave', leave); window.removeEventListener('resize', resize); };
+    return () => { cancelAnimationFrame(frame); io?.disconnect(); document.removeEventListener('visibilitychange', resume); box.removeEventListener('pointermove', move); box.removeEventListener('pointerleave', leave); window.removeEventListener('resize', resize); };
   }, [figure, colourVar]);
 
   return (

@@ -80,7 +80,7 @@ export const flow = {
     await second.click();
     await check('choosing a chapter opens its plate', await page.locator(`[data-instrument-plate="${id}"]`).count() === 1);
     await check('the plate is titled with that chapter', (await page.locator('#in-plate-title').textContent()).trim() === name, name);
-    await check('the chosen chapter is marked current for assistive tech', await second.getAttribute('aria-current') === 'true');
+    await check('the chosen chapter is announced as pressed', await second.getAttribute('aria-pressed') === 'true');
     const kpis = await page.locator('.in-kpis b').allTextContents();
     await check('a new student’s plate states 0 answers and withholds accuracy', kpis[0] === '0' && kpis[2] === '—', JSON.stringify(kpis));
     const drawn = await page.evaluate(() => {

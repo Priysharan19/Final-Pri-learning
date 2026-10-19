@@ -28,10 +28,16 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
+  useEffect(() => { setOpen(false); }, [loc.pathname]);
 
   useEffect(() => {
     const key = e => {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); setOpen(o => !o); }
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'k' || e.isComposing) return;
+      // Inside a field the student is typing or writing in, the chord belongs
+      // to that field; the bar's own button stays the way in from there.
+      const field = e.target?.closest?.('input, textarea, select, [contenteditable="true"], .ink-stage, [data-ink-surface]');
+      if (field && !field.closest('[data-instrument-command]')) return;
+      e.preventDefault(); setOpen(o => !o);
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);

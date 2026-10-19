@@ -6,21 +6,13 @@ import { useT, tLater } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
-import { chapterEvidence, colourFor, figureFor } from './chapters.js';
+import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
 // the coloured tabs choose a chapter; its plate shows what the evidence says
 // (answers, correct, accuracy only over enough answers) and its mathematics on
 // the scope. Every figure is the server's; nothing is estimated here.
 
-function scopeFor(curriculum, user) {
-  if (!curriculum) return null;
-  const track = user.indiaTrack || (user.country === 'in' ? 'cbse' : null);
-  if (!track || track === 'cbse') return (curriculum.years || []).find(s => Number(s.year) === Number(user.year)) || null;
-  return (curriculum.streams || []).find(s => s.track === track && (s.year == null || Number(s.year) === Number(user.year)))
-    || (curriculum.streams || []).find(s => s.track === track)
-    || null;
-}
 
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
 
@@ -52,7 +44,7 @@ export default function IndexPage() {
     return () => { live = false; };
   }, []);
 
-  const track = user.indiaTrack || 'cbse';
+  const track = practiceTrack(user);
   const chapters = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
@@ -104,7 +96,7 @@ export default function IndexPage() {
                 return (
                   <li key={c.row.id}>
                     <button type="button" className="in-ch" style={{ '--cc': `var(${c.colour})` }}
-                      aria-current={on ? 'true' : undefined} data-chapter={c.row.id}
+                      aria-pressed={on} data-current={on ? 'true' : undefined} data-chapter={c.row.id}
                       onClick={() => setPick(c.row.id)} onFocus={() => setPick(c.row.id)}>
                       <span className="in-ch-n">{String(c.index + 1).padStart(2, '0')}</span>
                       <span className="in-ch-t">{c.row.name}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { practiceHref } from '../lib/practiceLinks.js';
-import { colourFor } from './chapters.js';
+import { colourFor, practiceTrack, scopeFor } from './chapters.js';
 
 // ⌘K / Ctrl+K anywhere, or the field in the bar: one list for chapters (in
 // their colours), pages and actions. Keyboard: ↑ ↓ move, ↵ opens, esc closes;
@@ -27,17 +27,17 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
     let live = true;
     api.get('/curriculum').then(c => {
       if (!live) return;
-      const scope = (c?.years || []).find(s => Number(s.year) === Number(user?.year))
-        || (c?.streams || []).find(s => s.track === user?.indiaTrack) || null;
+      const scope = scopeFor(c, user);
       setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, colour: colourFor(i) })));
     }).catch(() => { });
     return () => { live = false; cancelAnimationFrame(id); opener.current?.focus?.(); };
-  }, [open, user?.year, user?.indiaTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, user?.year, user?.indiaTrack, user?.country]);
 
   const items = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const match = s => !needle || String(s).toLowerCase().includes(needle);
-    const track = user?.indiaTrack || 'cbse';
+    const track = practiceTrack(user);
     const groups = [
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
         id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour,
@@ -47,7 +47,8 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
       { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, run: a.run })) }
     ];
     return groups.filter(g => g.rows.length);
-  }, [q, chapters, pages, actions, nav, t, user?.indiaTrack]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, chapters, pages, actions, nav, t, user?.indiaTrack, user?.country]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
@@ -56,7 +57,8 @@ export default function CommandBar({ open, onClose, user, pages, actions }) {
 
   const choose = row => { onClose(); row.run(); };
   const onKey = e => {
-    if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+    if (e.key === 'Tab') { e.preventDefault(); input.current?.focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); onClose(); }
     else if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(flat.length - 1, s + 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)); }
     else if (e.key === 'Enter' && flat[sel]) { e.preventDefault(); choose(flat[sel]); }

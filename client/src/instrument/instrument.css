@@ -51,7 +51,7 @@
 html.ui-instrument {
   --in-void: #e9e7e1; --in-base: #f4f3ef; --in-l1: #fbfaf7; --in-l2: #f7f6f2; --in-l3: #eeece6; --in-l4: #e4e1da; --in-l5: #d6d2c9;
   --in-edge: rgba(30, 28, 20, 0.08); --in-edge-2: rgba(30, 28, 20, 0.13); --in-edge-3: rgba(30, 28, 20, 0.2);
-  --in-tx: #1b1a17; --in-tx-2: #55534c; --in-tx-3: #79766d; --in-tx-4: #b6b2a8;
+  --in-tx: #1b1a17; --in-tx-2: #55534c; --in-tx-3: #66635b; --in-tx-4: #b6b2a8;
   --in-action: #1b1a17; --in-on-action: #f4f3ef; --in-signal: #d4400c;
   --in-c1: #3e6497; --in-c2: #a7701f; --in-c3: #4d7d5a; --in-c4: #a9472f; --in-c5: #715a8c; --in-c6: #6a7530; --in-c7: #8a7838; --in-c8: #94506b;
   --in-good: #2f7a45; --in-slip: #b5571f; --in-unc: #4f58a6; --in-bad: #b3261e; --in-ink: #1d2433;
@@ -99,7 +99,7 @@ html.ui-instrument {
 html.ui-instrument[data-theme="dark"] {
   --in-void: #121212; --in-base: #1a1a1b; --in-l1: #202021; --in-l2: #262627; --in-l3: #2d2d2f; --in-l4: #363638; --in-l5: #444447;
   --in-edge: rgba(255, 255, 255, 0.07); --in-edge-2: rgba(255, 255, 255, 0.11); --in-edge-3: rgba(255, 255, 255, 0.18);
-  --in-tx: #ecebe6; --in-tx-2: #a9a8a2; --in-tx-3: #8a8983; --in-tx-4: #57564f;
+  --in-tx: #ecebe6; --in-tx-2: #a9a8a2; --in-tx-3: #9a9993; --in-tx-4: #57564f;
   --in-action: #ecebe6; --in-on-action: #1a1a1b; --in-signal: #ff6a2e;
   --in-c1: #86a3c9; --in-c2: #d2a45e; --in-c3: #93b79c; --in-c4: #d27e66; --in-c5: #a990bd; --in-c6: #aab56f; --in-c7: #cdbf8e; --in-c8: #c78fa6;
   --in-good: #8cc796; --in-slip: #e08a52; --in-unc: #9ea6e2; --in-bad: #e2574c; --in-ink: #f1ede3;
@@ -227,10 +227,10 @@ html.ui-instrument .mnav-item.active::before { content: none; }
   width: 100%; padding: 9px 10px; border-radius: 4px; border: 0; background: none; text-align: left; cursor: pointer; color: var(--in-tx);
 }
 .in-ch:hover { background: var(--in-l1); }
-.in-ch[aria-current="true"] { background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2); }
-.in-ch[aria-current="true"]::before { content: ""; position: absolute; left: -10px; top: 10px; bottom: 10px; width: 2px; background: var(--cc); }
+.in-ch[aria-pressed="true"] { background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2); }
+.in-ch[aria-pressed="true"]::before { content: ""; position: absolute; left: -10px; top: 10px; bottom: 10px; width: 2px; background: var(--cc); }
 .in-ch-n { font: 500 13px var(--in-mono); color: var(--in-tx-4); }
-.in-ch[aria-current="true"] .in-ch-n, .in-ch:hover .in-ch-n { color: var(--cc); }
+.in-ch[aria-pressed="true"] .in-ch-n, .in-ch:hover .in-ch-n { color: var(--cc); }
 .in-ch-t { font: 500 14px/1.3 var(--in-ui); min-width: 0; }
 .in-ch-t small { display: block; margin-top: 2px; font: 400 12px var(--in-ui); color: var(--in-tx-3); }
 .in-ring { width: 26px; height: 26px; }
@@ -270,7 +270,7 @@ html.ui-instrument .mnav-item.active::before { content: none; }
 /* Touch screens: everything a finger presses is at least 44×44. */
 @media (pointer: coarse), (hover: none) {
   .in-btn, .in-cmd { min-height: 44px; }
-  .in-tab { min-height: 38px; }
+  .in-tab { min-height: 44px; }
   .in-mark { min-height: 44px; min-width: 44px; }
   .in-ch { min-height: 48px; }
 }
