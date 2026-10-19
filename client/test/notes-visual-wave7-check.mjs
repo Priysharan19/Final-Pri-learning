@@ -4,7 +4,7 @@ import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { evalNumeric } from '../src/engine/expr.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
 const expected=Object.freeze({7:20,8:20,9:20,10:20,11:20,12:20});
-const depths=Object.freeze({7:192,8:216,9:185,10:239,11:273,12:266});
+const depths=Object.freeze({7:262,8:296,9:275,10:339,11:393,12:406});
 const eq=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(a),Math.abs(b));
 let inspected=0,library=0,visual=0,covered=0;
 for (const g of IN_CURRICULUM){
@@ -44,7 +44,7 @@ for (const g of IN_CURRICULUM){
  }
 }
 assert.equal(inspected,120);
-assert.equal(library,1371);
-assert.equal(visual,1005);
+assert.equal(library,1971);
+assert.equal(visual,1605);
 assert.equal(covered,77);
 console.log('Wave 7 source PASS — 120/120 new; '+library+' worked; '+visual+' graphic; 77/77 chapters');

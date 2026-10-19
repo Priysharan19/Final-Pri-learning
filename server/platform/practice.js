@@ -61,7 +61,32 @@ const recordsProgress = q => q._practiceMode !== 'placement';
 // from the bundled generators any faster than by solving the question.
 const PREPARED_TTL = 12 * 60 * 60 * 1000;
 const PREPARED_CONTEXT = 'practice-prepared-v1';
-const SEEK_TRIES = 12;
+// How many questions the server draws before it gives up on a fresh one. It
+// used to be a flat twelve whatever was being avoided, so on a cell whose pool
+// is small the picker gave up on a fresh item it could still have found and
+// the student was handed a repeat (issue #540). The server does not know the
+// pool; it knows how many items, k, it is avoiding — and while a fresh item
+// exists at all, the pool holds at least k + 1. When a generator draws its
+// items about evenly, every draw therefore finds a fresh one with chance at
+// least 1 / (k + 1), and fourteen draws per such chance (≈ ln 10^6) miss a
+// surviving fresh item below once in a million for any pool size — the last
+// of twelve as surely as the eleventh of thirty. An item a generator reaches
+// from few seeds can still be missed more often; the student is then served a
+// repeat flagged as one, never one passed off as new. The budget is spent
+// only when the cell is nearly exhausted: a draw that is fresh ends the seek.
+// Capped at 300 draws (the shipped client's 20-item window, k ≤ 20, stays
+// below the cap at 294). A draw costs ~0.025 ms on the median cell; measured
+// on a development machine, a request that spends the whole cap costs ≈20 ms
+// on the slowest India cells (c12-applications-integrals, ~0.06 ms a draw)
+// and up to ≈50–60 ms on the slowest cell a client's 60-hash avoid list can
+// exhaust (y9-algebra at D4, ~0.16 ms a draw), against at most 12 draws
+// before. The practice-issue and practice-prepare rate limits bound how often
+// one account can make the server spend it. A pool genuinely smaller than the
+// window is served a flagged repeat, as before.
+const SEEK_TRIES = 12;                   // the floor: a trap or a written form is sought at least this far
+const SEEK_TRIES_PER_FRESH_CHANCE = 14;  // ≈ ln(10^6)
+const SEEK_TRIES_CAP = 300;
+export const seekBudget = avoided => Math.min(SEEK_TRIES_CAP, Math.max(SEEK_TRIES, SEEK_TRIES_PER_FRESH_CHANCE * (Math.max(0, avoided | 0) + 1)));
 const CONTENT_HASH = /^[a-zA-Z0-9:_-]{6,96}$/;
 const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // A caller-chosen seed makes a question predictable, so the product never
@@ -319,19 +344,22 @@ function readQuestionRequest(body, fields) {
 }
 
 /**
- * The server picks the question: a fresh random seed, re-drawn a few times to
- * avoid content the student has just seen and, when a misconception is being
- * worked on, to find a form that can spring it. `seed` is given only by the
- * test suites. Throws when the generator has no such form.
+ * The server picks the question: a fresh random seed, re-drawn (seekBudget)
+ * to avoid content the student has just seen and, when a misconception is
+ * being worked on, to find a form that can spring it. `seed` is given only by
+ * the test suites. `draw` is where each seed comes from — crypto.randomInt in
+ * the product; a test may hand in a seeded one. Throws when the generator has
+ * no such form.
  */
-function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null) {
+function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null,
+  { draw = () => randomInt(0x80000000), tries = seekBudget(avoid?.size || 0) } = {}) {
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
   let fallback = null;
-  for (let i = 0; i < SEEK_TRIES; i++) {
-    const q = generateQuestion(generator, difficulty, randomInt(0x80000000), dotpoint);
+  for (let i = 0; i < tries; i++) {
+    const q = generateQuestion(generator, difficulty, draw(), dotpoint);
     const fresh = !avoid.has(opaqueContentHash(q.contentHash));
     // `written` asks for a form the student writes out; a multiple-choice
     // item can be guessed, which a diagnostic must avoid where it can.

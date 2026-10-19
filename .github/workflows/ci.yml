@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -92,7 +92,8 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
+          # 306: one check added — every typed answer was marked, none stopped at the marker deadline after retries (#544 hardening).
+          grep -Fq 'INDIA ADAPTIVE: PASS — 306/306 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
@@ -139,13 +140,18 @@ jobs:
           grep -Fq 'BAD INPUT: PASS — 44/44 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 27 groups' suites.log
+          # A marker stopped at its deadline reaches the device as `tooComplex`, never as an unreadable entry (issue #544 hardening).
+          grep -Fq 'MARKER DEADLINE CLIENT: PASS — 14/14 checks' suites.log
           grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 149/149 checks' suites.log
+          # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
+          # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
+          grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 172/172 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
@@ -189,7 +195,7 @@ jobs:
           npm run --silent test:real || true
       - name: Suite log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: suites-log
           path: suites.log
@@ -217,8 +223,8 @@ jobs:
     env:
       PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -317,6 +323,7 @@ jobs:
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
@@ -325,6 +332,7 @@ jobs:
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
+          grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
@@ -374,8 +382,14 @@ jobs:
       # response or a log. The two engine-agnostic suites also run on Postgres below.
       - name: Security acceptance (route inventory, BOLA/authz negatives, abuse limits, production boundary)
         run: |
+          set -o pipefail
           node server/test/route-inventory-check.mjs
           node server/test/sql-parameterisation-check.mjs
+          # What the secret sweep below counts as a leaked key (support/secret-shapes.mjs):
+          # every real key shape is still read, the server's own session/CSRF mints never
+          # are (issue #526). Without this pin a loosened shape would make the sweep vacuous.
+          node server/test/secret-shape-check.mjs 2>&1 | tee secret-shapes.log
+          grep -Fq 'SECRET SHAPES — PASS — 69 checks' secret-shapes.log
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs
@@ -488,8 +502,8 @@ jobs:
       PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
@@ -627,7 +641,7 @@ jobs:
           fi
       - name: Browser log
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-log
           path: browser.log
@@ -638,8 +652,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
