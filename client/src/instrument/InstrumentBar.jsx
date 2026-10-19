@@ -12,6 +12,7 @@ import CommandBar from './CommandBar.jsx';
 const TABS = [
   { to: '/', key: 'inst.tabIndex', match: p => p === '/' },
   { to: '/practice', key: 'nav.practice', match: p => p.startsWith('/practice') || p.startsWith('/practise') },
+  { to: '/map', key: 'inst.tabMap', match: p => p.startsWith('/map') },
   { to: '/progress', key: 'nav.progress', match: p => p.startsWith('/progress') },
   { to: '/review', key: 'nav.review', match: p => p.startsWith('/review') },
   { to: '/notes', key: 'nav.notes', match: p => p.startsWith('/notes') }

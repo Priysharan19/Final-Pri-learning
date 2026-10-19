@@ -2954,4 +2954,12 @@ export default {
   "inst.stepMarksOrder": "Method marks count the working lines Pri’s engine verified, not particular steps.",
   "inst.stepMarksNote": "Pri practice feedback in a board-style layout — not a CBSE marking scheme.",
   "inst.stepMarksAfterHints": "These are the marks before the hint charge. Credited after hints: {credited}.",
+  "inst.tabMap": "Map",
+  "inst.mapTitle": "Syllabus map",
+  "inst.mapSub": "Your chapters, joined by what each builds on. A fuller dot is a more secure chapter; marks are the ones the server certified.",
+  "inst.mapNext": "Recommended next",
+  "inst.mapNextWhy": "Pri’s practice engine picked this chapter from your answers so far.",
+  "inst.mapMarks": "marks",
+  "inst.mapBuildsOn": "BUILDS ON",
+  "inst.mapProvenance": "Prerequisite links are Pri’s own teaching map, not an NCERT or CBSE publication.",
 };

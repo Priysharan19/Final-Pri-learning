@@ -125,6 +125,26 @@ export const flow = {
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
     await check('↵ on a chapter opens Practice for it', new URL(page.url()).searchParams.get('subtopic') === id, page.url());
 
+    // The syllabus map: one node per chapter, prerequisite edges drawn, a
+    // node opens its card, and the card's Practise opens that chapter.
+    await goto('/map');
+    await settle();
+    await page.waitForSelector('[data-instrument-map] [data-map-chapter]', { timeout: 15000 });
+    const nodes = await page.locator('[data-map-chapter]').count();
+    await check('the map shows one node per chapter', nodes === chapters, `${nodes} nodes, ${chapters} chapters`);
+    await check('prerequisite edges are drawn between chapters', await page.locator('.in-map-edge').count() > 0);
+    const third = page.locator('[data-map-chapter]').nth(2);
+    const thirdId = await third.getAttribute('data-map-chapter');
+    await third.focus();
+    await check('focusing a node opens its card', await page.locator(`[data-map-card="${thirdId}"]`).count() === 1);
+    await check('a node is a 44px target with a spoken name', await third.evaluate(el => el.getBoundingClientRect().width >= 43.5 && !!el.getAttribute('aria-label')));
+    await check('a new student’s card shows no certified marks yet', (await page.locator('.in-map-facts dd').first().textContent()).trim() === '—');
+    await check('no chapter is recommended before there is any history', await page.locator('.in-map-node.is-next').count() === 0);
+    writeFileSync(join(outDir, 'map-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    await page.locator('[data-map-practise]').click();
+    await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
+    await check('the card’s Practise opens that chapter', new URL(page.url()).searchParams.get('subtopic') === thirdId, page.url());
+
     // Every size, both themes: names, 44px on phone, no shift after paint.
     if (chromium) {
       await page.addInitScript(() => {
@@ -267,6 +287,18 @@ export const writeFlow = {
     const workingLabels = await page.locator('[data-step-marks] [data-step-mark="working"] .set-k').allTextContents();
     await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
     writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
+
+    // The map's marks are the server-certified receipts, nothing else.
+    if (reply) {
+      await page.goto(`${base}/map`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-map-chapter]', { timeout: 15000 }).catch(() => {});
+      const node = page.locator('[data-map-chapter="y7-integers"]');
+      if (await check('the chapter just practised is on the map', await node.count() === 1)) {
+        await node.focus();
+        const shownMarks = (await page.locator('[data-map-card="y7-integers"] .in-map-facts dd').first().textContent()).trim();
+        await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned} / ${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
+      }
+    }
     await page.emulateMedia({ colorScheme: 'light' });
     await page.waitForTimeout(400);
     writeFileSync(join(outDir, 'write-marked-web-light.png'), await page.screenshot({ animations: 'disabled' }));

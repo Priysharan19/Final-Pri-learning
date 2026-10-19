@@ -53,6 +53,7 @@ const PLACEMENT_ON = featureEnabled('placement');
 const INSTRUMENT_ON = featureEnabled('instrument');
 const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/InstrumentBar.jsx')) : null;
 const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
+const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.jsx')) : null;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   import('./instrument/instrument.css');
@@ -585,7 +586,7 @@ export default function App() {
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
-                    <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
+                    <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
