@@ -467,7 +467,13 @@ try {
     c.eq(exported.data.entitlement.plan, 'free', 'export entitlement summary is Alice\'s (free)');
     c.deq(exported.data.identities.map(row => row.provider), ['password'], 'export identities are Alice\'s sign-in methods, without subjects');
     c.eq(exported.data.guardianConsent, null, 'an adult export has no consent section');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'telemetry'], 'the export has exactly the sections checked above');
+    // Train-9 review P2 #2: idempotency receipts and phone numbers — exactly the caller's.
+    const ownReceipts = (await db.all('SELECT scope, key FROM idempotency_keys WHERE account_id=?', [alice.id])).map(row => `${row.scope}:${row.key}`).sort();
+    c.deq(exported.data.receipts.map(row => `${row.scope}:${row.key}`).sort(), ownReceipts, 'export receipts are exactly Alice\'s idempotency rows');
+    c.ok(exported.data.receipts.every(row => !('request_digest' in row) && !('requestDigest' in row)), 'no receipt carries its request digest');
+    const ownPhones = (await db.all('SELECT phone_e164 FROM account_phones WHERE account_id=?', [alice.id])).length;
+    c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');

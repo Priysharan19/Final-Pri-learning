@@ -20,6 +20,7 @@ import { clipText } from './text.js';
 import { createMfaRouter } from './mfa.js';
 import { isCommonPassword } from './commonPasswords.js';
 import { verifyReauthCode } from './otp.js';
+import { maskPhone } from './otpCore.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -264,6 +265,44 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
     await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
     // A receipt with no personal data: an opaque id that no longer resolves.
     await audit(db, null, 'account.delete', 'account', accountId, {}, Date.now());
+  });
+}
+
+// ── What of idempotency_keys an account export carries (P2, train 9) ─────────
+// The table is the account's server-side record of its exam papers, answers
+// and results and its practice questions, gradings and handwriting-reading
+// receipts, so it belongs in the export. Every row is listed (scope, key and
+// timestamps), but a row's body is exported only for the scopes below; the
+// request digest (a hash) never is.
+//   · EXPORT_BODY_SCOPES — what the student wrote or was already shown: their
+//     answer snapshots, results, gradings, reading transcripts, completions,
+//     reveals, hint rungs, tries, issue replies and the daily counter.
+//   · SEALED_SCOPES — the escrowed question/paper holds the answers, worked
+//     steps and marking criteria. Its body is exported only once the question
+//     is resolved (its completion/result row exists for the same key); an
+//     unresolved one is listed as withheld, so an export can never be used to
+//     read the answer to a question that is still open.
+//   · anything else (exam-layout's seed, sync-push / exam-create replay
+//     caches, a scope added later) is internal machinery: listed, body
+//     withheld. A new scope is withheld until someone decides otherwise here.
+const EXPORT_BODY_SCOPES = new Set([
+  'exam-answers', 'exam-result', 'practice-grade', 'practice-recognition', 'recognition-read', 'practice-completion',
+  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content'
+]);
+const SEALED_SCOPES = { 'exam-paper': 'exam-result', 'practice-question': 'practice-completion' };
+
+function exportReceipts(rows) {
+  const present = new Set(rows.map(row => row.scope + '\u0000' + row.key));
+  return rows.map(row => {
+    const base = { scope: row.scope, key: row.key, createdAt: Number(row.created_at), expiresAt: Number(row.expires_at) };
+    let withheld = null;
+    if (SEALED_SCOPES[row.scope]) {
+      if (!present.has(SEALED_SCOPES[row.scope] + '\u0000' + row.key)) withheld = 'unresolved-question';
+    } else if (!EXPORT_BODY_SCOPES.has(row.scope)) withheld = 'internal';
+    if (withheld) return { ...base, body: null, withheld };
+    let body;
+    try { body = JSON.parse(row.response_json); } catch { body = null; }
+    return { ...base, body };
   });
 }
 
@@ -689,6 +728,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const telemetryTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operational_events'").get();
     const telemetry = telemetryTable ? await db.all(`SELECT event_type,surface,metadata_json,created_at
       FROM operational_events WHERE account_id=? ORDER BY created_at`, [accountId]) : [];
+    const receiptRows = await db.all(`SELECT scope,key,response_json,created_at,expires_at
+      FROM idempotency_keys WHERE account_id=? ORDER BY created_at, scope, key`, [accountId]);
+    const receipts = exportReceipts(receiptRows);
+    // The account's own verified number, in full: it is the account's sign-in
+    // identifier, exactly as its email is exported in full above. On SQLite
+    // the OTP module creates the table lazily; Postgres is migrated.
+    const phonesTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='account_phones'").get();
+    const phones = phonesTable ? await db.all('SELECT phone_e164,verified_at FROM account_phones WHERE account_id=?', [accountId]) : [];
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
@@ -699,7 +746,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       format: 'pri-account-export-v1',
       counts: {
         identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
-        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length
+        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length,
+        receipts: receipts.length, phones: phones.length
       }
     }, Date.now());
     res.set('Cache-Control', 'no-store');
@@ -715,6 +763,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       assignmentFeedback: feedback,
       telemetry,
       issueReports: reports,
+      // Added within pri-account-export-v1: new top-level keys only, nothing
+      // existing renamed or removed, so a reader of the earlier shape still works.
+      receipts,
+      phones: phones.map(row => ({ phone: row.phone_e164, verifiedAt: Number(row.verified_at) })),
       entitlement: {
         plan: entitlement.plan,
         status: entitlement.status,
@@ -722,7 +774,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         currentPeriodEnd: entitlement.currentPeriodEnd ?? null
       },
       guardianConsent: consent.required
-        ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null, noticeVersion: consent.row?.notice_version || null }
+        // The guardian's phone is masked exactly as the guardian's email is (and
+        // as /guardian/state shows them). The account typed it in, so the
+        // masked form is enough to recognise which parent was asked; the full
+        // number is another person's identifier, and an export file is easily
+        // passed on from a shared device. Same reasoning as the email.
+        ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null,
+          guardianPhone: consent.row?.guardian_phone ? maskPhone(consent.row.guardian_phone) : null,
+          method: consent.row?.method || null, noticeVersion: consent.row?.notice_version || null }
         : null
     });
   });
