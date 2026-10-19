@@ -447,6 +447,7 @@ jobs:
           node server/test/account-deletion-public-check.mjs
           node server/test/account-deletion-session-binding-check.mjs
           node server/test/export-reauth-check.mjs
+          node server/test/password-set-check.mjs
           node server/test/session-alerts-check.mjs
           node server/test/native-origin-csrf-check.mjs
           node server/test/billing-config-check.mjs
@@ -556,6 +557,7 @@ jobs:
           grep -Fq '✓ rls-account-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-session-binding-check.mjs' platform-postgres.log
           grep -Fq '✓ export-reauth-check.mjs' platform-postgres.log
+          grep -Fq '✓ password-set-check.mjs' platform-postgres.log
           grep -Fq '✓ session-alerts-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log

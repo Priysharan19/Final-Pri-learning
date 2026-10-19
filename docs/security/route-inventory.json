@@ -298,6 +298,30 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/account/password",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "recentAuth": {
+        "freshMs": 600000
+      },
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires the credential proven inside 10 minutes (the sign-in, or POST /v1/account/reauth's session-bound step-up cookie); sets a first password only where password_hash IS NULL (never overwrites one) and only for a verified, non-synthetic sign-in email; revokes every session and issues a new one; writes an account.password-set audit row with no metadata",
+      "rateLimits": [
+        {
+          "key": "password-set",
+          "limit": 5,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/account/devices",
       "auth": "session",
