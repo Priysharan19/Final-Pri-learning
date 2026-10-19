@@ -537,6 +537,9 @@ export const cloud = Object.freeze({
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),
   changePassword: body => cloudRequest('/v1/account/password', { method: 'PATCH', body }),
+  // A first password for an account made without one (server/platform/
+  // accounts.js POST /password): needs fresh proof, like the export.
+  setPassword: body => cloudRequest('/v1/account/password', { method: 'POST', body }),
   verifyEmail: body => cloudRequest('/v1/account/email/verify', { method: 'POST', body }),
   devices: () => cloudRequest('/v1/account/devices'),
   revokeDevice: sessionId => cloudRequest(`/v1/account/devices/${pathId(sessionId, 'session id')}`, { method: 'DELETE' }),

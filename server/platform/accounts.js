@@ -19,7 +19,7 @@ import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
 import { createMfaRouter } from './mfa.js';
 import { isCommonPassword } from './commonPasswords.js';
-import { verifyReauthCode } from './otp.js';
+import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -582,6 +582,52 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?', [passwordHash, now, account.id]);
         await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, account.id]);
       });
+      await createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
+      res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
+    } catch (err) { next(err); }
+  });
+
+  // A first password for a signed-in account that has none (made with a
+  // one-time code, Apple or Google). PATCH above changes a password; this only
+  // ever sets one where password_hash IS NULL, so it can never overwrite a
+  // credential. A session cookie is not enough: the credential must have been
+  // proven inside REAUTH_FRESH_MS (the sign-in itself, or POST /reauth with a
+  // fresh code or provider token). The password signs in with the account's
+  // email, so a phone account (synthetic, undeliverable address) or one whose
+  // address was never verified is refused. Every other session is revoked and
+  // this one rotated, as a password change does.
+  router.post('/password', requireSession(db), requireRecentAuth(db), rateLimit(db, 'password-set', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const newPassword = String(req.body?.newPassword || '');
+      const weak = passwordProblem(newPassword);
+      if (weak) return res.status(400).json({ error: weak });
+      const account = await db.get('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
+      if (!account) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
+      if (account.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_ALREADY_SET', message: 'This account already has a password. Change it instead.' } });
+      const em = String(account.email || '');
+      if (!em || em.endsWith(`@${PHONE_ACCOUNT_EMAIL_DOMAIN}`) || !account.email_verified_at) {
+        return res.status(409).json({ error: { code: 'PASSWORD_NEEDS_EMAIL', message: 'A password signs in with a verified email address, and this account has none.' } });
+      }
+
+      const now = Date.now();
+      const deviceId = req.platformSession.device_id;
+      const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+      try {
+        await db.transaction(async () => {
+          // Only the request that finds password_hash still NULL sets it.
+          const info = await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ? AND password_hash IS NULL AND deleted_at IS NULL', [passwordHash, now, account.id]);
+          if (info.changes !== 1) throw Object.assign(new Error('Password already set.'), { code: 'PASSWORD_ALREADY_SET' });
+          await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+            VALUES ('password', ?, ?, ?, ?)`, [em, account.id, em, now]);
+          await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, account.id]);
+          await audit(db, account.id, 'account.password-set', 'account', account.id, {}, now);
+        });
+      } catch (err) {
+        if (err?.code === 'PASSWORD_ALREADY_SET' || isUniqueViolation(err)) {
+          return res.status(409).json({ error: { code: 'PASSWORD_ALREADY_SET', message: 'This account already has a password. Change it instead.' } });
+        }
+        throw err;
+      }
       await createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
       res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
     } catch (err) { next(err); }

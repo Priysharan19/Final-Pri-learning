@@ -346,6 +346,7 @@ jobs:
           node server/test/account-deletion-public-check.mjs
           node server/test/account-deletion-session-binding-check.mjs
           node server/test/export-reauth-check.mjs
+          node server/test/password-set-check.mjs
           node server/test/session-alerts-check.mjs
           node server/test/native-origin-csrf-check.mjs
           node server/test/billing-config-check.mjs
