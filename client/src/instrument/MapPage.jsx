@@ -149,6 +149,7 @@ export default function MapPage() {
                   aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
                   aria-label={`${STRAND_KEY[node.strand] ? t(STRAND_KEY[node.strand]) + ' · ' : ''}${node.row.name}${isRecommended(node) ? ` · ${t('inst.mapNext')}` : ''}`}
                   onClick={() => setPick(node.row.id)} onFocus={() => setPick(node.row.id)}>
+                  {/* The phone list shows the bare name for space; the card carries the gloss. */}
                   <span className="in-map-hit-name" aria-hidden="true"><b>{String(node.index + 1).padStart(2, '0')}</b><span lang="en">{node.row.name}</span>{STRAND_KEY[node.strand] && <small>{t(STRAND_KEY[node.strand])}</small>}</span>
                 </button>
               </li>

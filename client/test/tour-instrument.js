@@ -351,7 +351,7 @@ export const hindiFlow = {
     await page.waitForFunction(() => document.documentElement.lang === 'hi', null, { timeout: 15000 });
     const audit = async (screen, ready) => {
       await settle();
-      if (ready) await page.waitForSelector(ready, { timeout: 15000 }).catch(() => {});
+      if (ready) await check(`${screen}: the screen loaded`, await page.waitForSelector(ready, { timeout: 15000 }).then(() => true, () => false));
       await check(`${screen}: the document is declared Hindi`, await page.evaluate(() => document.documentElement.lang) === 'hi');
       const words = await page.evaluate(() => ((document.querySelector('.shell') || document.body).innerText.match(/[ऀ-ॿ]+/g) || []).length);
       await check(`${screen}: the screen is written in Devanagari`, words >= 8, `${words} Devanagari words`);

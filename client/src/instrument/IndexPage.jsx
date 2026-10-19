@@ -80,7 +80,7 @@ export default function IndexPage() {
         {recent && (
           <div className="in-resume" data-instrument-resume>
             <div>
-              <b>{t('inst.resumeLabel', { name: '' })}<span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
+              <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{t('inst.resumeSub')}</small>
             </div>
             <Link className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')}</Link>
