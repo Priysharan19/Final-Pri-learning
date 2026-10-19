@@ -239,7 +239,7 @@ export const writeFlow = {
 
     const wrong = String(Number(right.text) + 1);
     online.forgetKeptReads?.();
-    online.reader.lines = [{ text: '3 + 4 = 7' }, { text: wrong }];
+    online.reader.lines = [{ text: 'x + y = 35' }, { text: 'x - y = 13' }, { text: wrong }];
     const box = await page.locator('.ink-canvas-live').boundingBox();
     await handwrite(page, box, '3' + wrong.replace('-', ''), { x: 40 });
     await pressRead(page);
@@ -248,6 +248,10 @@ export const writeFlow = {
     await check('Pri’s reading shows each line as a chip', chips >= 2, `${chips} lines`);
     const chip = await look('.ink-line .ink-line-math');
     await check('a reading chip is drawn on the raised surface', !!chip && chip.radius === '4px', JSON.stringify(chip));
+    // The student's own simultaneous pair, drawn (display only).
+    const drawn = page.locator('[data-reading-plot]');
+    await check('the reading’s simultaneous pair is drawn as two lines', await drawn.count() === 1 && await drawn.getAttribute('data-reading-plot') === '2', await drawn.getAttribute('data-reading-plot').catch(() => 'none'));
+    await check('the drawing says it is not a mark', /never sets a mark/i.test(await drawn.textContent().catch(() => '')));
     writeFileSync(join(outDir, 'write-read-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
 
     await page.getByRole('button', { name: /^Submit/ }).last().click();

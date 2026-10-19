@@ -165,6 +165,7 @@ jobs:
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
           grep -Fq 'MARK ROWS: PASS — 2477/2477 checks' suites.log
+          grep -Fq 'STUDENT PLOT: PASS — 26/26 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
@@ -236,7 +237,7 @@ jobs:
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
-          grep -Fq 'I18N: PASS — 199/199 checks' suites.log
+          grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 68 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
