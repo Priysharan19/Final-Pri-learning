@@ -196,6 +196,7 @@ class InkInputTest {
             assertEquals("before any stylus event the shell has not seen a stylus", "\"false\"",
                 waitFor(s, "window.__f0 && window.__f0.ok && String(window.__f0.result.stylusSeen)"))
             stroke(s, MotionEvent.TOOL_TYPE_STYLUS, 0.55f)
+            StoreShots.shot("03-write")
             m = metrics(s)
             val pen = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
             assertEquals("a stylus arrives as pointerType pen", "pen", pen.getString("pointerType"))
@@ -265,6 +266,15 @@ class InkInputTest {
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
             val strokes: JSONArray = m.getJSONArray("strokes")
             for (i in 0 until strokes.length()) assertEquals("no stroke was cancelled", false, strokes.getJSONObject(i).getBoolean("cancelled"))
+
+            // Store listing only (priShots): the same question answered by a photo.
+            if (InstrumentationRegistry.getArguments().getString("priShots", "") == "1" &&
+                eval(s, "!!($byLabel)('Photo: answer with a photo of your working')") == "true") {
+                eval(s, "($byLabel)('Photo: answer with a photo of your working').click()")
+                Thread.sleep(800)
+                eval(s, "(function(){window.scrollTo(0,0);var q=document.querySelector('.q-prompt');if(q)q.scrollIntoView({block:'start'});return true;})()")
+                StoreShots.shot("04-photo")
+            }
         }
     }
 }
