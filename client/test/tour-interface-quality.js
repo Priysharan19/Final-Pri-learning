@@ -18,6 +18,7 @@
 // Run:
 //   node client/test/tour-interface-quality.js
 //   node client/test/tour-interface-quality.js --no-build --browser=webkit
+//   PRI_VISUAL_OUT=dir  where snapshots of this run are written (default: the temp dir)
 //   PRI_UPDATE_SNAPSHOTS=1 node client/test/tour-interface-quality.js   (rewrite baselines)
 // Synthetic browser evidence (S1). It is never evidence about a device.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
+import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SIZES = [
@@ -132,11 +134,12 @@ export const flow = {
     note(`engine: ${browserName}`);
     const chromium = browserName === 'chromium';
     const baseDir = join(HERE, 'visual-baselines', `${process.platform}-${browserName}`);
-    const outDir = join(HERE, '..', '..', 'artifacts', 'visual', `${process.platform}-${browserName}`);
+    // Outside the repo: a dirty tree blocks the release build.
+    const outDir = join(process.env.PRI_VISUAL_OUT || join(tmpdir(), 'pri-visual'), `${process.platform}-${browserName}`);
     const update = process.env.PRI_UPDATE_SNAPSHOTS === '1';
     mkdirSync(outDir, { recursive: true });
     if (update) mkdirSync(baseDir, { recursive: true });
-    if (!update && !existsSync(baseDir)) note(`no baselines for ${process.platform}-${browserName}: snapshots are captured to artifacts/visual, not compared`);
+    if (!update && !existsSync(baseDir)) note(`no baselines for ${process.platform}-${browserName}: snapshots are captured to ${outDir}, not compared`);
 
     // The signed-out welcome is a screen too.
     // Phones are touch screens: the product sizes targets for (pointer: coarse).
@@ -242,7 +245,7 @@ export const flow = {
           if (update) writeFileSync(baseline, png);
           else if (existsSync(baseline)) {
             const ratio = diffRatio(decodePng(readFileSync(baseline)), decodePng(png));
-            await check(`${tag}: matches its visual baseline`, ratio <= MAX_DIFF_RATIO, `${(ratio * 100).toFixed(2)}% of pixels differ (artifacts/visual/${process.platform}-${browserName}/${file})`);
+            await check(`${tag}: matches its visual baseline`, ratio <= MAX_DIFF_RATIO, `${(ratio * 100).toFixed(2)}% of pixels differ (${join(outDir, file)})`);
           }
         }
       }
