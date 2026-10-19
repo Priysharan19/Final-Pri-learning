@@ -624,7 +624,7 @@ export default function App() {
           return (
             <Link key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
-              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{INSTRUMENT_ON && item.to === '/' ? t('inst.tabIndex') : t(item.key)}</span>
             </Link>
           );
         })}
