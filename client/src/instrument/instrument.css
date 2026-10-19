@@ -461,6 +461,7 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
   .in-map-hit[aria-current="true"] { background: var(--in-l3); }
   .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: flex; gap: 10px; font: 500 14px var(--in-ui); white-space: normal; }
   .in-map-hit-name b { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+  .in-map-hit-name small { margin-left: auto; font: 500 11px var(--in-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-3); }
 }
 .in-map-card { position: sticky; top: 72px; display: grid; gap: 12px; padding: 18px; border-radius: 8px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2); }
 .in-map-card small { font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cc); }
