@@ -7,7 +7,7 @@ the owner approves a new promotion.
 
 | Step | UTC | Result |
 |---|---|---|
-| Placeholder workdir (our migrations at the train-10 head + 49 empty placeholders for the other repository's remote versions), dry run | before merge | lists **only** `20261019000000_rls_account_coverage.sql` |
+| Placeholder workdir (our migrations at the train-10 head + 38 empty placeholders for the other repository's remote versions), dry run | before merge | lists **only** `20261019000000_rls_account_coverage.sql` |
 | #590 merged as `f265a00d0` | 14:13:50 | Railway auto-deployed the merge and it could not serve on schema 12 |
 | Checks: migration file byte-identical at the merge commit, no other new migration, dry run unchanged | 14:15 | pass |
 | `supabase db push --linked` | 14:16:28 | applied; `pri.platform_meta` schema_version 13, billing 6 |
