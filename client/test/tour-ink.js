@@ -310,19 +310,25 @@ export const flow = {
 
     // ── 5b · and the mark was the server's ───────────────────────────────────
     const inkRow = await online.shownRow();
-    // The receipt the server takes at Submit is of the picture it has just
-    // read for the transcript: the kept read is reused, and no second provider
-    // call is paid for the same unchanged ink.
-    const submitReceipts = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/recognize$`));
-    await check('Submit after an unchanged read costs no further provider read: one receipt, reused: true, +0 provider calls',
-      submitReceipts.length === 1 && submitReceipts[0].status === 201 && submitReceipts[0].json?.reused === true && reader.requests.length === callsBeforeSubmit,
-      `recognize ${JSON.stringify(submitReceipts.map(c => [c.status, c.json?.reused]))}; provider calls +${reader.requests.length - callsBeforeSubmit}`);
+    // Submit is ONE request (#506): the picture travels with /submit, and the
+    // server reads it — reusing the read it kept for the transcript, so no
+    // second provider call is paid for the same unchanged ink — and writes
+    // the reading receipt in the mark's own transaction. There is no separate
+    // /recognize (or /confirm) request at Submit.
+    const submitReceipts = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/(recognize|recognition/[^/]+/confirm)$`));
     const inkGrades = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/submit$`));
+    const inkReading = inkGrades[0]?.json?.reading;
+    await check('Submit after an unchanged read costs no further provider read: one request, its reading reused: true, +0 provider calls',
+      submitReceipts.length === 0 && inkGrades.length === 1 && inkReading?.reused === true && reader.requests.length === callsBeforeSubmit,
+      `receipt requests ${submitReceipts.length}; submits ${inkGrades.length}; reading ${JSON.stringify(inkReading)}; provider calls +${reader.requests.length - callsBeforeSubmit}`);
+    const inkProof = online.recognitionProof(inkReading?.receipt);
     await check('the handwritten answer was marked by the server, once, against its own reading receipt',
       inkGrades.length === 1 && inkGrades[0].status === 200 && inkGrades[0].json?.authoritative === true &&
         inkGrades[0].json.correct === true && inkGrades[0].json.resolved === true && inkGrades[0].body?.mode === 'ink' &&
-        typeof inkGrades[0].body?.transcriptionReceipt === 'string' && !('answer' in inkGrades[0].body && inkGrades[0].body.answer === undefined),
-      JSON.stringify(inkGrades.map(c => ({ status: c.status, mode: c.body?.mode, receipt: typeof c.body?.transcriptionReceipt, json: c.json })).slice(0, 2)).slice(0, 400));
+        /^data:image\//.test(inkGrades[0].body?.image || '') && !('transcriptionReceipt' in inkGrades[0].body) &&
+        typeof inkGrades[0].body?.answer === 'string' && typeof inkReading?.receipt === 'string' &&
+        inkProof?.questionId === inkRow?.serverQuestionId && inkProof?.text === inkGrades[0].body.answer && inkProof?.submissionId === inkGrades[0].body.submissionId,
+      JSON.stringify(inkGrades.map(c => ({ status: c.status, mode: c.body?.mode, image: typeof c.body?.image, reading: c.json?.reading, proof: inkProof })).slice(0, 2)).slice(0, 400));
     await check('the server completed that question exactly once, and nothing calls it a device mark',
       online.ledger(inkRow?.serverQuestionId).thisDone === 1 && !/marked on this device/i.test(await page.locator('.qpage').innerText()),
       JSON.stringify(online.ledger(inkRow?.serverQuestionId)));
@@ -422,17 +428,24 @@ export const flow = {
     // on top of it; the doubtful "7" is never what gets marked.
     const doubtRow = await online.shownRow();
     const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${doubtRow?.serverQuestionId}/${suffix}$`));
+    // One request (#506): the receipts /recognize and /confirm used to write
+    // are written by /submit beside the mark — the provider's reading, and the
+    // student's correction chained to it.
     const [receipts, confirms, doubtGrades] = [await of('recognize'), await of('recognition/[^/]+/confirm'), await of('submit')];
+    const doubtReading = doubtGrades[0]?.json?.reading;
+    const correction = online.recognitionProof(doubtReading?.receipt);
+    const providerRead = online.recognitionProof(correction?.parentReceipt);
     await check('a verdict comes from the server\u2019s deterministic engine on the corrected line: one receipt reading, the correction confirmed as "1", one grade',
-      receipts.length === 1 && receipts[0].status === 201 && confirms.length === 1 && confirms[0].status < 300 && confirms[0].body?.text === '1' &&
-        doubtGrades.length === 1 && doubtGrades[0].json?.authoritative === true && doubtGrades[0].body?.mode === 'ink',
-      `recognize ${receipts.map(c => c.status)}, confirm ${JSON.stringify(confirms.map(c => c.body))}, grades ${doubtGrades.length}`);
-    // The receipt read is of the same unchanged picture: the server reuses the
-    // read it kept — doubt and all — and pays for nothing more.
+      receipts.length === 0 && confirms.length === 0 && doubtGrades.length === 1 && doubtGrades[0].json?.authoritative === true &&
+        doubtGrades[0].body?.mode === 'ink' && doubtGrades[0].body?.answer === '1' && /^data:image\//.test(doubtGrades[0].body?.image || '') &&
+        doubtReading?.corrected === true && correction?.correctedByStudent === true && correction?.text === '1' && !!providerRead,
+      `receipt requests ${receipts.length + confirms.length}, grades ${doubtGrades.length}, reading ${JSON.stringify(doubtReading)}, correction ${JSON.stringify(correction)}`);
+    // The read behind the receipt is of the same unchanged picture: the server
+    // reuses the read it kept — doubt and all — and pays for nothing more.
     await check('the receipt read at Submit reused the kept doubtful read: reused: true, still flagged for confirmation, +0 provider calls since the transcript',
-      receipts[0]?.json?.reused === true && receipts[0].json.transcription?.needsConfirmation === true && receipts[0].json.transcription.text === '7' &&
+      doubtReading?.reused === true && providerRead?.providerNeedsConfirmation === true && providerRead?.text === '7' &&
         reader.requests.length === readsBeforeCorrection,
-      `reused ${receipts[0]?.json?.reused}; receipt reading ${JSON.stringify(receipts[0]?.json?.transcription)}; provider reads +${reader.requests.length - readsBeforeCorrection}`);
+      `reused ${doubtReading?.reused}; provider reading ${JSON.stringify(providerRead)}; provider reads +${reader.requests.length - readsBeforeCorrection}`);
     const anyProvenance = (await page.locator('.eval-provenance').first().innerText().catch(() => '')) || '';
     await check('and whichever way it went, the handwritten verdict carries the honesty line',
       /Read by AI, marked by Pri’s engine/.test(anyProvenance), JSON.stringify(anyProvenance));
@@ -513,11 +526,15 @@ export const flow = {
         const [receipts, confirms, grades] = [await of('recognize'), await of('recognition/[^/]+/confirm'), await of('submit')];
         await check('equation last line: Submit sends the proposed value as the answer and all three recognised lines as working, in ink mode',
           grades.length === 1 && grades[0].body?.answer === final && grades[0].body.mode === 'ink' && grades[0].body.steps === written.join('\n') &&
-            typeof grades[0].body.transcriptionReceipt === 'string', JSON.stringify(grades.map(g => g.body)));
+            /^data:image\//.test(grades[0].body.image || '') && !('transcriptionReceipt' in grades[0].body),
+          JSON.stringify(grades.map(g => ({ ...g.body, image: typeof g.body?.image }))));
+        const valueReading = grades[0]?.json?.reading;
+        const valueProof = online.recognitionProof(valueReading?.receipt);
         await check('equation last line: the answer goes through the same confirm path as a hand-corrected line — one reused receipt read, one confirm of the value, +0 provider calls',
-          receipts.length === 1 && receipts[0].status === 201 && receipts[0].json?.reused === true && confirms.length === 1 && confirms[0].status < 300 &&
-            confirms[0].body?.text === final && reader.requests.length === callsBeforeSubmit,
-          `recognize ${JSON.stringify(receipts.map(c => [c.status, c.json?.reused]))}; confirm ${JSON.stringify(confirms.map(c => c.body))}; provider +${reader.requests.length - callsBeforeSubmit}`);
+          receipts.length === 0 && confirms.length === 0 && valueReading?.reused === true && valueReading?.corrected === true &&
+            valueProof?.correctedByStudent === true && valueProof?.text === final && !!online.recognitionProof(valueProof?.parentReceipt) &&
+            reader.requests.length === callsBeforeSubmit,
+          `receipt requests ${receipts.length + confirms.length}; reading ${JSON.stringify(valueReading)}; confirmed ${JSON.stringify(valueProof?.text)}; provider +${reader.requests.length - callsBeforeSubmit}`);
         await check('equation last line: the server marks it correct with every mark, on the first try — not "I couldn\'t read that"',
           grades[0]?.status === 200 && grades[0].json?.authoritative === true && grades[0].json.invalid === false && grades[0].json.correct === true &&
             grades[0].json.resolved === true && grades[0].json.marksEarned === grades[0].json.marksPossible && await page.locator('.eval-card').count() === 1,
@@ -536,10 +553,12 @@ export const flow = {
         await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
         const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/${suffix}$`));
         const [confirms, grades] = [await of('recognition/[^/]+/confirm'), await of('submit')];
+        const changedProof = online.recognitionProof(grades[0]?.json?.reading?.receipt);
         await check('proposal changed: what is sent and marked is the student\'s answer, not the proposed one; the working is still attached; marked correct',
           grades.length === 1 && grades[0].body?.answer === right.text && grades[0].body.answer !== final && grades[0].body.steps === written.join('\n') &&
-            confirms.length === 1 && confirms[0].body?.text === right.text && grades[0].json?.correct === true && grades[0].json.resolved === true,
-          JSON.stringify({ sent: grades[0]?.body?.answer, proposed: final, confirm: confirms.map(c => c.body), correct: grades[0]?.json?.correct }));
+            confirms.length === 0 && changedProof?.correctedByStudent === true && changedProof?.text === right.text &&
+            grades[0].json?.correct === true && grades[0].json.resolved === true,
+          JSON.stringify({ sent: grades[0]?.body?.answer, proposed: final, confirmed: changedProof?.text, correct: grades[0]?.json?.correct }));
       }
     }
     reader.lines = null;

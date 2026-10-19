@@ -213,7 +213,13 @@ export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
   /** How many completed reads the server is keeping for an account right now. */
   const keptReads = accountId => Number(h.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>?").get(accountId, Date.now()).n);
 
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, close };
+  // Test desk only: the reading receipt the server wrote (/recognize, /confirm,
+  // or beside the mark of a Submit that carried its picture), as stored.
+  const recognitionProof = (accountId, receipt) => {
+    const row = h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-recognition' AND account_id=? AND key=?").get(accountId, String(receipt || ''));
+    return row ? JSON.parse(row.response_json) : null;
+  };
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
@@ -487,7 +493,9 @@ function onlineSession(platform, ctx, page) {
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId),
     /** Test desk only: the stand-in reader was re-scripted — forget this account's kept reads. */
     forgetKeptReads: () => platform.forgetKeptReads(session.account?.id),
-    keptReads: () => platform.keptReads(session.account?.id)
+    keptReads: () => platform.keptReads(session.account?.id),
+    /** Test desk only: a stored reading receipt of this account, or null. */
+    recognitionProof: receipt => platform.recognitionProof(session.account?.id, receipt)
   };
   return session;
 }
