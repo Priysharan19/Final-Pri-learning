@@ -59,6 +59,12 @@ export const ENGINE_SUITES = [
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // Security P2s (train 10): admin MFA on class and assignment routes, the
+  // account export is complete, and every account-owned table is under RLS
+  // for the pri_server role — proved live on Postgres.
+  'admin-mfa-class-routes-check.mjs',
+  'account-export-completeness-check.mjs',
+  'rls-account-coverage-check.mjs',
   // The marker runs off the request thread under a hard deadline, and a
   // submission is read → marked → committed with the state re-read under the
   // account's lock. The re-check and the exactly-once guarantees under

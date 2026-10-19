@@ -78,7 +78,7 @@ compromised or malicious paid AI provider; a script holding a stolen session coo
 | T24 | A child's account created by an identity provider sign-in with nobody asked | A NEW account via Google/Apple must declare age like the form (428 `CONSENT_DECLARATION_REQUIRED`, nonce unspent so the client can retry); a child must name a guardian (not their own address) and gets the same consent row and email as registration; existing accounts sign in unchanged | `oidc-consent-check` |
 | T25 | A guardian who cannot withdraw because the emailed link died | Separate long-lived `guardian-withdraw` bearer issued on confirmation, exempt from housekeeping, permission-reducing only, revoked by use; email copy states both windows accurately | `security-hardening-check` H2; `guardian-consent-lifecycle-check` |
 | T26 | Storage exhaustion by one account (runaway or hostile device) | Per-account quota on stored sync rows and bytes (`PRI_SYNC_MAX_BYTES_PER_ACCOUNT`, `PRI_SYNC_MAX_EVENTS`), checked inside the push transaction before any write; 413 `SYNC_QUOTA_EXCEEDED` with the figures | `security-hardening-check` M4 |
-| T27 | A handler bug reading or writing another account's rows | Defence in depth under the handlers' own filters: every pri table fails closed without a declared `pri.scope`; inside `transaction({ accountScope })` RESTRICTIVE policies on the 19 account-owned tables hide every other account's row and refuse writes for it (`42501`). Shared tables, system-scope handlers and a compromised `pri_server` credential are **not** covered (§7) | `rls-fail-closed-check` (Postgres: unscoped sees nothing; per owned table read/update/delete/re-home/insert across accounts refused; shared-table behaviour pinned); `security-hardening-check` M5; `postgres-schema-live-check` / `postgres-schema-mutation-check` |
+| T27 | A handler bug reading or writing another account's rows | Defence in depth under the handlers' own filters: every pri table fails closed without a declared `pri.scope`; inside `transaction({ accountScope })` RESTRICTIVE policies on the 19 account-owned tables hide every other account's row and refuse writes for it (`42501`). Since 2026-10-19 the 15 account-bearing shared tables carry the same policy; tables with no account column, system-scope handlers and a compromised `pri_server` credential are **not** covered (§7) | `rls-account-coverage-check`; `rls-fail-closed-check` (Postgres: unscoped sees nothing; per owned table read/update/delete/re-home/insert across accounts refused; shared-table behaviour pinned); `security-hardening-check` M5; `postgres-schema-live-check` / `postgres-schema-mutation-check` |
 | T28 | Audit trail tampering through the server's database role | No server code updates or deletes `audit_log`; on Postgres `pri_server` has no UPDATE/DELETE on it | `security-hardening-check` M5; `postgres-schema-live-check` |
 | T29 | Weak or silently truncated passwords | ≥10 characters, ≤72 bytes (bcrypt truncation → `PASSWORD_TOO_LONG`), bundled top-1000 list with digit/punctuation stems (`PASSWORD_TOO_COMMON`) at registration, reset and change | `security-hardening-check` M6 |
 | T30 | Reconnaissance from the public liveness endpoint | Anonymous `/v1/health` carries ok, release identity, schema versions, engine, reachability and the two quota limits only; provider configuration flags, backlog counts and housekeeping go to `PRI_METRICS_TOKEN` holders and `/v1/admin/health` | `security-hardening-check` L3; `production-runtime-image-check` |
@@ -150,17 +150,22 @@ the transaction is refused (`STORE_ACCOUNT_SCOPE_INVALID`) before any SQL is sen
   and **inserting a row for another account fails `42501`** — per table, whatever the SQL says.
   Today account scope is opened by sync push and pull, practice issue, recognize, recognition
   confirm, reveal and submit, the examination routes, and the recognition receipt.
-- **Not covered — shared tables in account scope.** The 23 tables without a `NOT NULL account_id`
-  (`accounts`, `classes`, `class_members`, `assignments`, `assignment_submissions`,
-  `assignment_feedback`, `audit_log`, `billing_events`, `billing_payments`, `billing_refunds`,
-  `billing_apple_signed_events`, `billing_google_notifications`, `content_revisions`,
-  `feature_flags`, `issue_reports`, `login_attempts`, `oidc_nonces`, `otp_challenges`,
-  `platform_meta`, `rate_limits`, `sync_cursors`, `teacher_invites`, `tutor_cache`) are **readable
-  and writable from account scope exactly as from system scope**: an account-scope transaction
-  can read every account row and class membership, insert an account or a membership, and rename
-  another account. Only the table grants limit them (`audit_log` has no UPDATE/DELETE,
-  `sync_cursors` no writes). The test pins this list and this behaviour so that any change is a
-  deliberate edit.
+- **Covered since 2026-10-19 — the account-bearing shared tables** (migration
+  `20261019000000_rls_account_coverage.sql`, train-9 review P2 #3). The 15 tables that name an
+  account but had no account policy — `accounts`, `classes`, `class_members`, `assignments`,
+  `assignment_submissions`, `assignment_feedback`, `issue_reports`, `otp_challenges`, `audit_log`,
+  `billing_payments`, `billing_events`, `billing_apple_signed_events`, `content_revisions`,
+  `teacher_invites`, `feature_flags` — now carry the same RESTRICTIVE `pri_account_scope` policy:
+  inside account scope only the caller's own rows (by each table's owner column or columns) are
+  visible or writable; cross-account rows and ownerless rows are visible in system scope only.
+  Cross-account relations (a student reading a class, a teacher a submission) are therefore
+  system-scope paths, authorized in the handler. `rls-account-coverage-check` enumerates every
+  account-bearing table from the catalogue and fails if one lacks the policy.
+- **Not covered — tables with no account column.** `login_attempts` (keyed by an email hash),
+  `oidc_nonces`, `platform_meta`, `rate_limits`, `sync_cursors`, `tutor_cache`,
+  `billing_refunds` and `billing_google_notifications` (check `rls-account-coverage-check` for the
+  current list) are readable and writable from account scope as from system scope; only grants
+  limit them.
 - **Not covered — system scope.** Every statement outside an account-scope transaction runs in
   system scope and sees every row. That includes **all authentication, session, MFA, OTP,
   guardian-consent, billing, entitlement, teacher/class, admin and housekeeping handlers**, and
@@ -177,8 +182,8 @@ the transaction is refused (`STORE_ACCOUNT_SCOPE_INVALID`) before any SQL is sen
 **How this meets AGENTS.md's "Row-Level Security plus server authorization on every
 client-reachable record".** Every pri table has RLS enabled and fails closed for an undeclared
 scope, and server authorization covers every client-reachable record. Per-account *RLS* isolation
-is narrower than that sentence might be read to say: it applies to the 19 account-owned tables
-inside account-scope transactions only. The sentence is unchanged; this note records what it
+is narrower than that sentence might be read to say: it applies to the 19 account-owned tables and the 15
+account-bearing shared tables, inside account-scope transactions only. The sentence is unchanged; this note records what it
 means in the code today. Extending account scope to more handlers, or giving the shared tables
 their own policies, is tracked as R-15 in `accepted-risks.md`.
 
