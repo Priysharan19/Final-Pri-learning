@@ -71,7 +71,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
 // Leg 1 · no server: nothing opens without an account.
-const FIRST = ['launch', 'noEntryWithoutAccount', 'deepLinkHeld', 'nothingMarked', 'persistenceMarker'];
+const FIRST = ['launch', 'wordmarkClearsStatusBar', 'noEntryWithoutAccount', 'deepLinkHeld', 'nothingMarked', 'persistenceMarker'];
 const RELAUNCH = ['relaunchStillHeld', 'relaunchMarker'];
 // The signed-in leg. The server* steps are read by this process from the
 // server's own database, request log and the stand-in reader's request log.
