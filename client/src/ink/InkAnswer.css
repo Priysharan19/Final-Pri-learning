@@ -128,3 +128,13 @@
    beside the notice, in the notice's own quiet voice. */
 .ink-status-action { margin: 4px 2px 0; font-size: 12.5px; }
 .ink-status-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── v1.1 ink chrome (docs/design/PRI-V1.1-REDESIGN.md §3) ─────────────────
+   The selected tool reads as the one teal state on the strip, labels use the
+   control type, and every tool shows the token focus ring. Sizes unchanged. */
+.ink-tool { font: var(--t-control); font-size: 13px; transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard); }
+.ink-tool.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); }
+.ink-tool:focus-visible { outline: var(--focus-ring); outline-offset: calc(var(--focus-offset) * -1); }
+.ink-hint, .ink-pages { font: var(--t-caption); }
+.ink-pages { font-family: var(--font-mono); }
+@media (prefers-reduced-motion: reduce) { .ink-tool { transition: none; } }
