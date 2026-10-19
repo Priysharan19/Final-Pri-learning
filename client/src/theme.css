@@ -2425,10 +2425,10 @@ html { background-color: var(--page); }
 /* ── v1.1 practice: question card and answer chrome (spec §3) ──────────────
    Type and state only. The writing surface, its size and the canvas paint
    are untouched, so nothing moves under a pen and ink evidence is unchanged. */
-.q-topmeta, .q-topmeta .tag { font: var(--t-compact); }
+.q-topmeta, .q-topmeta .tag { font: var(--t-compact); font-size: 13px; }
 .q-timer { font: var(--t-mono); }
 .ws-qpeek { font: var(--t-compact); }
 .editor-shell { border-radius: var(--radius-lg); }
 .editor-tool:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
-.mode-tab { font: var(--t-control); font-size: 14px; }
+.mode-tab { font: var(--t-control); font-size: 14px; line-height: 24px; }
 .mode-tab:focus-visible, .ctx-next:focus-visible, .hint-bulb:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
