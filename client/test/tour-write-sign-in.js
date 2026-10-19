@@ -39,7 +39,7 @@
 // Run on its own:  node client/test/tour-write-sign-in.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
@@ -234,6 +234,8 @@ export const saveTruthFlow = {
     // ── draw ─────────────────────────────────────────────────────────────────
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
     const settledFirst = await waitWorkState(page, SETTLED);
     const first = await saveTruth(page, qid);
@@ -312,6 +314,8 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'throw'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const failed = await waitWorkState(page, 'save-failed');
     const refused = await saveTruth(page, qid);
     const refusedLog = await statusLog(page);
@@ -341,6 +345,8 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'drop'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '3', { x: 240 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const caught = await waitWorkState(page, 'save-failed');
     const droppedLog = await statusLog(page);
     const dropped = await saveTruth(page, qid);
@@ -384,6 +390,8 @@ export const sessionEndedWriteFlow = {
     // ── a REAL reader outage, signed in ──────────────────────────────────────
     reader.down = true;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const retry = page.locator('[data-ink-retry-reading]');
     await retry.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const outage = await cardText(page);
@@ -402,6 +410,8 @@ export const sessionEndedWriteFlow = {
     const ended = endServerSession(online);
     const readsBefore = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const recovery = page.locator('[data-ink-account-recovery]');
     const signIn = recovery.locator('[data-ink-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
@@ -477,6 +487,8 @@ export const sessionEndedWriteFlow = {
     reader.text = '7';
     const readsBeforeSecond = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     await check(`the cleared page is rewritten and read again for the second try [${EVIDENCE}]`,
       await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '7' && reader.requests.length > readsBeforeSecond,
@@ -597,6 +609,8 @@ export const sessionEndedSubmitFlow = {
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     const right = await online.answerOf();
     if (!await check(`signed in, the page is read and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,

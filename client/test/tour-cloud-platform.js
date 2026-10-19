@@ -6,7 +6,7 @@
 // this flow proves the browser product wiring reaches those contracts correctly.
 
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 import { enterThroughCard, mockAccountServer } from './support/mock-account.mjs';
 
 const ACCOUNT = {
@@ -204,6 +204,8 @@ export const flow = {
     const inkPrompt = (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim();
     const beforeInk = requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), reader.text);
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const guardianNote = await inkNotice();
     const guardianBlockedRequests = requests.slice(beforeInk).filter(row => row.path.startsWith('/v1/handwriting/'));
