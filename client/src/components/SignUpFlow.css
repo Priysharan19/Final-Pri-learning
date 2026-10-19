@@ -144,9 +144,10 @@
    capped at 600, the 3:1 control border on every control a student touches,
    and the token focus ring. Layout and sizes are unchanged. */
 .signup-title { font: var(--t-title); letter-spacing: 0; }
-.signup-subhead { font: var(--t-heading); }
-.signup-lead { font: var(--t-body); color: var(--text-secondary); }
-.signup-hint { font: var(--t-compact); color: var(--text-tertiary); }
+.signup-subhead { font: var(--t-heading); font-size: 15px; }
+.signup-inline .signup-title { line-height: 1.25; }
+.signup-lead { font: var(--t-body); line-height: 1.5; color: var(--text-secondary); }
+.signup-hint { font: var(--t-compact); font-size: 13px; color: var(--text-tertiary); }
 .signup-or { font: var(--t-caption); }
 .signup-back, .signup-cc, .otp-box { border-radius: var(--radius-sm); border-color: var(--border-control); }
 .signup-choice { border-radius: var(--radius); border-color: var(--border-control); font: var(--t-control); font-size: 16px; }
