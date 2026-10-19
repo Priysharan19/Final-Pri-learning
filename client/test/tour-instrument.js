@@ -105,6 +105,7 @@ export const flow = {
     // The plate's topic row: the chapter's own dot points, each a way into practice.
     const dot = page.locator('[data-plate-dotpoint]').first();
     if (await check('the plate shows the chapter’s topics', await dot.count() === 1)) {
+      await check('each topic is named, not an object', !/object Object/.test(await page.locator('.in-exs').textContent()));
       const href = await dot.getAttribute('href');
       await check('a topic opens practice for exactly that topic', /subtopic=/.test(href) && /dotpoint=0/.test(href), href);
     }
@@ -329,7 +330,7 @@ export const writeFlow = {
       await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.in-cmd', { timeout: 15000 });
       await page.locator('.in-cmd').click();
-      await page.waitForSelector('[data-instrument-command] [role=group]', { timeout: 10000 }).catch(() => {});
+      await page.waitForSelector('[data-instrument-command] [id^="in-pal-sc-"]', { timeout: 10000 }).catch(() => {});
       const scriptRow = page.locator('[data-instrument-command] [id^="in-pal-sc-"]').first();
       await check('the command bar lists your scripts', await scriptRow.count() === 1);
       await check('— with the certified mark', (await scriptRow.locator('small').textContent().catch(() => '')).trim() === `${reply.marksEarned}/${reply.marksPossible}`);

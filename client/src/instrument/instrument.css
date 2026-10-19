@@ -558,6 +558,8 @@ html.ui-instrument .error-box { border-radius: 6px; }
 @media (hover: hover) { .in-ex:hover { box-shadow: 0 0 0 1px var(--in-edge-3); } }
 .in-ex-h { display: flex; justify-content: space-between; font: 500 12px var(--in-mono); color: var(--in-tx-3); }
 .in-ex-h span:first-child { color: var(--cc); }
+.in-ex-bar { height: 3px; border-radius: 2px; background: var(--in-l4); overflow: hidden; }
+.in-ex-bar i { display: block; height: 100%; background: var(--cc); }
 .in-ex b { font: 500 13.5px/1.35 var(--in-ui); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 @media (max-width: 980px) { .in-exs { grid-template-columns: 1fr 1fr; } }
 @media (prefers-reduced-motion: reduce) { .in-ex { transition: none; } }

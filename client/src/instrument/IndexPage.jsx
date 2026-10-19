@@ -140,14 +140,21 @@ export default function IndexPage() {
           <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} />
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
-              {current.row.dotpoints.slice(0, 4).map((text, i) => (
-                <li key={i}>
-                  <Link className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
-                    <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{t('inst.cmdPractise')}</span></span>
-                    <b lang="en"><TermGloss text={String(text)} /></b>
-                  </Link>
-                </li>
-              ))}
+              {current.row.dotpoints.slice(0, 4).map((dp, i) => {
+                // A dot point is a string (India) or a row with its own evidence.
+                const text = typeof dp === 'string' ? dp : String(dp?.text || '');
+                const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
+                const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : t('inst.cmdPractise');
+                return (
+                  <li key={i}>
+                    <Link className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
+                      <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
+                      <b lang="en"><TermGloss text={text} /></b>
+                      {ev?.accuracy != null && <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev.mastery}%` }} /></span>}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           )}
           <div>
