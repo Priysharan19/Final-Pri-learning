@@ -33,6 +33,11 @@ export function contentSecurityPolicy({ connectSources = extraConnectSources() }
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    // No nested browsing context at all (#260): the app creates no frames, and
+    // a same-origin child frame could otherwise reach its parent's bridge
+    // (parent.webkit.messageHandlers.*) and be credited to the main frame by
+    // the native shells' sender gate. 'none' also covers about:blank/srcdoc.
+    "frame-src 'none'",
     "frame-ancestors 'none'"
   ].join('; ');
 }

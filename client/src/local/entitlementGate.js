@@ -1,11 +1,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Free tier and Premium gate for the local backend.
 //
-// The FREE plan is enforced here, on the device, so it works with no account
-// and no network: 20 practice questions per calendar day (the day boundary is
-// the profile's own timezone — Asia/Kolkata for India profiles), one exam
-// simulation every 30 days, and basic Pri Explain. Nothing about the free cap
-// is mirrored by the server; the counter is a device-local row.
+// The FREE plan's pre-check lives here, on the device, so the student is told
+// before a request leaves: 20 practice questions per calendar day (the day
+// boundary is the profile's own timezone — Asia/Kolkata for India profiles),
+// one exam simulation every 30 days, and basic Pri Explain. The counter is a
+// device-local row and is a courtesy, not the limit: since every creditable
+// question is issued by the server, the SERVER decides the daily cap per
+// account at issue (server/platform/practiceAllowance.js, #537) and the exam
+// allowance at paper creation (server/platform/exams.js), from its own
+// entitlement record and its own counts. A server refusal arrives in the same
+// shape this module throws (serverGateRefusal), so one paywall explains both.
 //
 // PREMIUM is never decided here. The only source of Premium is the cloud
 // entitlement snapshot the server issued for the linked account, read through
@@ -16,12 +21,13 @@
 import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
+import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
 
 export const FREE_TIER = Object.freeze({
-  practicePerDay: 20,
+  practicePerDay: FREE_PRACTICE_ALLOWANCE.perDay,
   examsPerWindow: FREE_EXAM_ALLOWANCE.examsPerWindow,
   examWindowDays: FREE_EXAM_ALLOWANCE.examWindowDays,
   explain: 'basic'
@@ -33,8 +39,8 @@ export const FREE_TIER = Object.freeze({
  * enforcement suite checks every ENTITLEMENTS value has an entry here.
  */
 export const CAPABILITY_ENFORCEMENT = Object.freeze({
-  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'local backend · POST /practice/next and /history/:id/retry lift the daily free cap',
-  [ENTITLEMENTS.PREMIUM_EXAMS]: 'local backend · POST /exams (HSC paper builder and India exam module) beyond the free simulation',
+  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'server · POST /v1/practice/issue and /v1/practice/:id/repeat refuse the twenty-first practice question of the account\'s day (server/platform/practiceAllowance.js, from the server\'s own entitlement record, #537); the local backend\'s POST /practice/next and /history/:id/retry pre-check is the device\'s courtesy copy',
+  [ENTITLEMENTS.PREMIUM_EXAMS]: 'server · POST /v1/exams counts the account\'s own sealed papers (server/platform/exams.js); local backend · POST /exams (HSC paper builder and India exam module) pre-checks beyond the free simulation',
   [ENTITLEMENTS.JEE_ADVANCED]: 'local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'client · PriExplainV5 adaptive teaching plan, retrieval checkpoints and follow-up (basic playback stays free)',
   [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'client · Progress priorities / knowledge map tabs and the teacher progress-file export',
@@ -214,6 +220,28 @@ export async function requireCapability(profile, capability, now = clock()) {
 /** True for the two error shapes the paywall knows how to explain. */
 export function isEntitlementGate(error) {
   return !!error && Number(error.status) === 402 && (error.code === 'FREE_CAP_REACHED' || error.code === 'PREMIUM_REQUIRED');
+}
+
+const TIME_ZONE_NAME = /^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/;
+
+/**
+ * The server's own entitlement refusal (402 FREE_CAP_REACHED or
+ * PREMIUM_REQUIRED from /v1/practice/issue, /v1/practice/:id/repeat or
+ * /v1/exams), as the gate error this module throws — same code, same fields,
+ * so FreeCapNotice explains it with the server's count and the server's
+ * reset instant. The transport names "when the refusal lifts" `resetAt`; the
+ * gate (and the notice) call it `resetsAt`. Null for any other error.
+ */
+export function serverGateRefusal(cause) {
+  if (!isEntitlementGate(cause)) return null;
+  const n = v => (Number.isFinite(Number(v)) ? Number(v) : undefined);
+  const timeZone = typeof cause.timeZone === 'string' && TIME_ZONE_NAME.test(cause.timeZone) && validTimeZone(cause.timeZone) ? cause.timeZone : undefined;
+  return gateError(cause.code, cause.message || `${CAPABILITY_COPY[cause.capability] || 'This is part of Pri Learning Premium.'}`, {
+    capability: typeof cause.capability === 'string' ? cause.capability : null,
+    used: n(cause.used), limit: n(cause.limit),
+    resetsAt: n(cause.resetsAt) ?? n(cause.resetAt), nextAt: n(cause.nextAt), windowDays: n(cause.windowDays),
+    timeZone, reason: 'server-refused', refreshRequired: false, server: true, beforeMarking: true
+  });
 }
 
 /** What /me and question responses expose about the plan — no secrets, no ids. */

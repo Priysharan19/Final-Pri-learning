@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { tagPolicy } from './routePolicy.js';
+import { noteSessionCreated } from './sessionAlerts.js';
 
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
@@ -75,6 +76,55 @@ export function clearSessionCookies(res) {
   const secure = process.env.NODE_ENV === 'production';
   res.clearCookie(SESSION_COOKIE, { httpOnly: true, secure, sameSite: 'lax', path: '/' });
   res.clearCookie(CSRF_COOKIE, { httpOnly: false, secure, sameSite: 'lax', path: '/' });
+  res.clearCookie(STEP_UP_COOKIE, { httpOnly: true, secure, sameSite: 'lax', path: '/' });
+}
+
+// ── Fresh proof of the credential (step-up) ──────────────────────────────────
+//
+// A sensitive read — the full data export — needs the credential proven
+// recently, not just a long-lived session cookie (#368 port, #506). Proof is a
+// sign-in inside the window or POST /v1/account/reauth, which sets this cookie:
+// an HMAC over the session id and the time of proof, under a key derived from
+// the CSRF secret. It is bound to the session it was issued on (another
+// session's cookie proves nothing), expires with the window, and holds no
+// state on the server, so it needs no schema change and dies with the session.
+export const STEP_UP_COOKIE = 'pri_step_up';
+/** How recently the credential must have been proven for a sensitive read. */
+export const REAUTH_FRESH_MS = 10 * 60 * 1000;
+const STEP_UP_KEY = createHash('sha256').update(`pri-step-up:${CSRF_SECRET}`).digest();
+
+function stepUpSignature(sessionId, issuedAt) {
+  return createHmac('sha256', STEP_UP_KEY).update(`${sessionId}.${issuedAt}`).digest('base64url');
+}
+
+/** The step-up cookie value for a session proven at `issuedAt` (exported for the tests' expiry case). */
+export function stepUpToken(sessionId, issuedAt) {
+  return `${sessionId}.${issuedAt}.${stepUpSignature(sessionId, issuedAt)}`;
+}
+
+/** Issue fresh proof for this session: the step-up cookie, for REAUTH_FRESH_MS. Returns when it lapses. */
+export function issueStepUp(res, sessionId, now = Date.now()) {
+  const secure = process.env.NODE_ENV === 'production';
+  res.cookie(STEP_UP_COOKIE, stepUpToken(sessionId, now), { httpOnly: true, secure, sameSite: 'lax', path: '/', maxAge: REAUTH_FRESH_MS });
+  return now + REAUTH_FRESH_MS;
+}
+
+/**
+ * When this session last proved its credential inside `freshMs`: its sign-in,
+ * or a step-up cookie bound to it — else null. A cookie for another session,
+ * with a bad signature, from the future or past the window counts for nothing.
+ */
+export function freshProofAt(req, session, now = Date.now(), { freshMs = REAUTH_FRESH_MS } = {}) {
+  let at = Number(session?.created_at) || 0;
+  const raw = req.cookies?.[STEP_UP_COOKIE];
+  if (raw && String(raw).length <= 256 && session?.id) {
+    const parts = String(raw).split('.');
+    if (parts.length === 3 && parts[0] === session.id && /^\d{1,16}$/.test(parts[1])) {
+      const issuedAt = Number(parts[1]);
+      if (issuedAt <= now + 60_000 && safeEqual(parts[2], stepUpSignature(session.id, issuedAt))) at = Math.max(at, issuedAt);
+    }
+  }
+  return at && now - at <= freshMs ? at : null;
 }
 
 export async function createSession(db, res, accountId, deviceId = 'web', userAgent = '', now = Date.now()) {
@@ -83,10 +133,15 @@ export async function createSession(db, res, accountId, deviceId = 'web', userAg
   const sessionId = id('ses');
   const role = (await db.get('SELECT role FROM accounts WHERE id = ?', [accountId]))?.role || 'student';
   const expiresAt = sessionExpiry(role, now, now);
+  const device = String(deviceId).slice(0, 160);
   await db.run(`INSERT INTO account_sessions
     (id, account_id, token_hash, device_id, user_agent_hash, created_at, last_seen_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, expiresAt]);
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), device, userAgent ? sha256(userAgent) : null, now, now, expiresAt]);
   setSessionCookies(res, raw, expiresAt - now);
+  // A sign-in from a device this account has never used: an audit row and a
+  // notice to the account's own address (sessionAlerts.js). It can never fail
+  // the sign-in: the row is written here, the mail is sent off the request.
+  try { await noteSessionCreated(db, { accountId, sessionId, deviceId: device, now }); } catch { /* the sign-in stands */ }
   return sessionId;
 }
 
