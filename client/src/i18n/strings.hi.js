@@ -1719,7 +1719,7 @@ export default {
   'progressAu.examsSat': { one: '{n} परीक्षा दी', other: '{n} परीक्षाएँ दीं' },
   'progressAu.noExams': 'अभी तक कोई परीक्षा नहीं',
   'progressAu.accuracyByDifficulty': 'कठिनाई के अनुसार सटीकता',
-  'progressAu.engineNear70': 'इंजन आपको लगभग 70% के आसपास रखता है — वही दायरा जहाँ सीखना सबसे तेज़ होता है।',
+  'progressAu.engineNear70': 'इंजन आपकी सफलता दर को लगभग 70% के आसपास रखने का प्रयास करता है।',
   'progressAu.practiceCalendar': 'अभ्यास कैलेंडर',
   'progressAu.achievements': 'उपलब्धियाँ',
   'progressAu.dotPoints': 'बिंदु',

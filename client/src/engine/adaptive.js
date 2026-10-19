@@ -375,6 +375,24 @@ export const TRAP_CREDIT_QUIET = 2;
 export const TRAP_CREDIT_FORGET = 4;
 export const TRAP_MAX_PRESSURE = 5;
 export const TRAP_WINDOW_DAYS = 45;
+// Two slips seconds apart are one bad minute, not a pattern. An occurrence
+// opens a new sitting only when it lands at least this long after the previous
+// sighting, and a misconception is live only once it has been seen in
+// TRAP_ACTIVE_AT distinct sittings since it was last walked back (`s`). A
+// record written before sittings were counted has no `s` and reads as one
+// sitting per occurrence, which is what it was treated as when it was written.
+export const TRAP_SITTING_GAP_MS = 30 * 60 * 1000;
+// The server is asked for a question that can spring the slip; when it says
+// TRAP_SEEK_GIVE_UP times running that it has none (`trapDelivered:false` on
+// an issued question), the misconception is marked unreachable: it stays on
+// the student's record, but stops boosting the topic it cannot be practised in.
+export const TRAP_SEEK_GIVE_UP = 3;
+
+/** Distinct sittings a ledger record has been seen in since it was last walked back. */
+export function trapSittingsOf(t) {
+  const s = Number(t?.s);
+  return Number.isFinite(s) ? Math.max(0, s) : Math.max(0, Number(t?.n) || 0);
+}
 
 /** The live misconceptions in one subtopic, strongest first. */
 export function activeTraps(traps, nowMs = Date.now()) {
@@ -382,19 +400,26 @@ export function activeTraps(traps, nowMs = Date.now()) {
     .map(([key, t]) => ({
       key,
       n: Math.max(0, Number(t?.n) || 0),
+      sittings: trapSittingsOf(t),
       credit: Math.max(0, Number(t?.credit) || 0),
       label: String(t?.label || ''),
       dotpoint: t?.dotpoint || null,
-      lastAt: Number(t?.lastAt) || 0
+      lastAt: Number(t?.lastAt) || 0,
+      unreachable: t?.unreachable === true
     }))
-    .filter(t => t.n >= TRAP_ACTIVE_AT && t.credit < TRAP_CREDIT_QUIET
+    .filter(t => t.n >= TRAP_ACTIVE_AT && t.sittings >= TRAP_ACTIVE_AT && t.credit < TRAP_CREDIT_QUIET
       && (!t.lastAt || (nowMs - t.lastAt) / DAY <= TRAP_WINDOW_DAYS))
     .sort((a, b) => b.n - a.n || b.lastAt - a.lastAt);
 }
 
+/** The live misconceptions a question can still be sought for: not marked unreachable. */
+export function seekableTraps(traps, nowMs = Date.now()) {
+  return activeTraps(traps, nowMs).filter(t => !t.unreachable);
+}
+
 /** Total misconception pressure on a subtopic, capped so one trap cannot own the queue. */
 export function trapPressureOf(traps, nowMs = Date.now()) {
-  return Math.min(TRAP_MAX_PRESSURE, activeTraps(traps, nowMs).reduce((n, t) => n + t.n, 0));
+  return Math.min(TRAP_MAX_PRESSURE, seekableTraps(traps, nowMs).reduce((n, t) => n + t.n, 0));
 }
 
 // ── Interleaving ─────────────────────────────────────────────────────────────
@@ -572,6 +597,10 @@ export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand
  * `rotation` is the interleaving axis — nothing was due, weak or slipping, so
  * the picker kept practice balanced instead of blocking on one idea.
  */
+// What a misconception pick says when the question served for it cannot be
+// shown to carry the slip: true of the record, silent about the question.
+export const MISCONCEPTION_UNTARGETED_WHY = 'Practising a topic where the same mistake has come up before.';
+
 export const REASON_TAG = Object.freeze({
   review: 'review-due', 'weak-spot': 'weak-spot', misconception: 'misconception',
   'new-ground': 'new-ground', rotation: 'interleave'
@@ -650,11 +679,11 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
   // name a different difficulty on every refresh and no history could be
   // replayed to the choice it produced.
   const difficulty = pickDifficulty(best.st.rating, best.st.attempts, { target, rand: jitterFor(`${best.s.id}#difficulty`, rand) });
-  const trap = activeTraps(best.st.traps, nowMs)[0] || null;
+  const trap = seekableTraps(best.st.traps, nowMs)[0] || null;
   const why = {
     review: 'Spaced review — your memory of this one is due to fade.',
-    'weak-spot': 'Targeting your weakest topic — the fastest way to lift your predicted mark.',
-    misconception: trap ? `Same slip keeps coming back: ${trap.label}` : 'Working on a mistake that keeps repeating.',
+    'weak-spot': 'Your lowest-scoring topic so far.',
+    misconception: trap ? `Same slip keeps coming back: ${trap.label}` : MISCONCEPTION_UNTARGETED_WHY,
     'new-ground': 'Fresh territory — expanding your syllabus coverage.',
     rotation: 'Keeping your practice balanced across the syllabus.'
   }[best.reason];
