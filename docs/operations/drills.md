@@ -66,7 +66,7 @@ production; their staging results stand for the same build.
 | Drill | Environment | Release SHA | Date / operator | Detected by (alert id) | Time to detect | Time to recover | Result / follow-up |
 |---|---|---|---|---|---|---|---|
 | 1 Server down | staging | 967e23174 | 2026-10-19 / Claude Code (owner authority) | operator probe (no monitor configured) | 6 s | 3 min 51 s (rebuild 2 min 18 s) | PASS with gap: no `SERVER_DOWN` route |
-| 2 Database unreachable | staging | 967e23174 | 2026-10-19 / Claude Code | `/v1/ready` 503; `DB_CONNECTIVITY` did **not** fire | 14 s | 22 s after restore, no redeploy | FAIL: app routes 500 `XX000`, finding A in `ops-staging-log-2026-10-19.md` |
+| 2 Database unreachable | staging | f265a00d0 (re-run 2026-10-20; first run 2026-10-19 on 967e23174 failed) | 2026-10-20 / Claude Code | `DB_CONNECTIVITY` (metrics), `/v1/ready` 503 | 13 s | 1 min 57 s after restore, no redeploy | PASS: app routes 503 `PLATFORM_DB_UNAVAILABLE` + `Retry-After: 5`; finding A fixed by #590 |
 | 3 Email provider failure | staging | 967e23174 | 2026-10-19 / Claude Code | `AUTH_EMAIL_FAILURES` (metrics) | at boot | delivered 81 s after key restore | PASS (code not redeemed) |
 | 4 Handwriting provider failure | staging | 967e23174 | 2026-10-19 / Claude Code | `/v1/ready` `HANDWRITING_PROVIDER_AUTH` | at boot | 2 min 16 s (redeploy) | PARTIAL: transcription and `PROVIDER_FAILURE_SPIKE` need a signed-in session |
 | 5 Webhook failure | staging | — | 2026-10-19 | — | — | — | BLOCKED_EXTERNAL: billing not configured on staging |
