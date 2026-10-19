@@ -21,6 +21,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { handwrite, pressRead, turnOnServerReading } from './fakeServerReader.js';
+import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const SIZES = [
   { id: 'phone', width: 390, height: 844, phone: true },
@@ -155,8 +157,89 @@ export const flow = {
   }
 };
 
+
+// Write & Check in the instrument material: the same practice surface (its
+// hooks, roles and marks are the existing ones), with the reading as chips,
+// the verdict as a panel and the scan on Check. The reader's provider hop is
+// the scripted stand-in; the canvas, routes and every mark are real.
+export const writeFlow = {
+  id: 'instrument-write',
+  name: 'Instrument · Write & Check — reading chips, verdict panel, scan, marks unchanged',
+  online: true,
+
+  async run({ page, base, check, goto, settle, createProfile, note, online, browserName = 'chromium' }) {
+    const outDir = join(process.env.PRI_VISUAL_OUT || mkdtempSync(join(tmpdir(), 'pri-instrument-')), `instrument-${browserName}`);
+    mkdirSync(outDir, { recursive: true });
+    note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "${writeFlow.name}" is the scripted stand-in. Not real-handwriting or real-device evidence.`);
+    Object.assign(online.reader, { text: '1', lines: null, confidence: 0.97, down: false, gate: null });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'no-preference' });
+    await goto('/');
+    await createProfile({ name: 'Instrument Writer', year: 7 });
+    await online.signIn({ name: 'Instrument Writer' });
+    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    await check('server reading is on for this profile', await turnOnServerReading(page, base));
+
+    await page.goto(`${base}/practice?subtopic=y7-integers`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    let right = null;
+    for (let i = 0; i < 8; i++) {
+      right = await online.answerOf().catch(() => null);
+      if (right && right.answerType === 'numeric' && /^-?\d+$/.test(String(right.text))) break;
+      const leaving = await page.locator('.qpage').getAttribute('data-question-id');
+      await page.locator('.ctx-next').click();
+      await page.waitForFunction(id => { const e = document.querySelector('.qpage[data-question-id]'); return e && e.getAttribute('data-question-id') !== id; }, leaving, { timeout: 30000 });
+      await settle();
+    }
+    if (!await check('a numeric question is on the card', !!right && right.answerType === 'numeric')) return;
+    const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+    if (await tab.count()) await tab.click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+
+    const shell = page.locator('.editor-shell').first();
+    const look = sel => page.evaluate(q => { const el = document.querySelector(q); if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, radius: s.borderRadius, font: s.fontFamily }; }, sel);
+    const stage = await look('.ink-stage');
+    const voidBg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-void').trim());
+    await check('the writing surface is the instrument void', !!stage && !!voidBg, JSON.stringify({ stage, voidBg }));
+    await check('the mode switch is the instrument segmented control', (await look('.mode-tabs.seg'))?.radius === '6px');
+
+    const wrong = String(Number(right.text) + 1);
+    online.forgetKeptReads?.();
+    online.reader.lines = [{ text: '3 + 4 = 7' }, { text: wrong }];
+    const box = await page.locator('.ink-canvas-live').boundingBox();
+    await handwrite(page, box, '3' + wrong.replace('-', ''), { x: 40 });
+    await pressRead(page);
+    await page.waitForFunction(n => document.querySelectorAll('.ink-line').length >= n, 2, { timeout: 20000 }).catch(() => {});
+    const chips = await page.locator('.ink-line .ink-line-math').count();
+    await check('Pri’s reading shows each line as a chip', chips >= 2, `${chips} lines`);
+    const chip = await look('.ink-line .ink-line-math');
+    await check('a reading chip is drawn on the raised surface', !!chip && chip.radius === '4px', JSON.stringify(chip));
+    writeFileSync(join(outDir, 'write-read-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+
+    await page.getByRole('button', { name: /^Submit/ }).last().click();
+    await page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
+    await check('Check marks the shell for the scan', await shell.getAttribute('data-marked') === 'yes');
+    const scan = await page.evaluate(() => {
+      const el = document.querySelector('.editor-shell[data-marked="yes"] .ink-stage');
+      if (!el) return null;
+      const s = getComputedStyle(el, '::after');
+      return { name: s.animationName, border: s.borderBottomColor };
+    });
+    const signal = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-signal').trim());
+    await check('the scan runs once, in the signal colour', scan?.name === 'in-scan', JSON.stringify({ scan, signal }));
+    const verdict = page.locator('.verdict').first();
+    await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
+    await page.waitForTimeout(1300);
+    writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.waitForTimeout(400);
+    writeFileSync(join(outDir, 'write-marked-web-light.png'), await page.screenshot({ animations: 'disabled' }));
+  }
+};
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   process.env.PRI_FEATURE_INSTRUMENT = '1';
-  const { runOne } = await import('./e2e.mjs');
-  process.exit(await runOne(flow) ? 1 : 0);
+  const { runFlows } = await import('./e2e.mjs');
+  process.exit(await runFlows([flow, writeFlow]) ? 1 : 0);
 }
