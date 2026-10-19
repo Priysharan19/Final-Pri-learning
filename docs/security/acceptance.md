@@ -53,9 +53,9 @@ suites and `request-size-contract-check`.
 | route-inventory-check | 31/31 (116 routes) | n/a (no database) |
 | sql-parameterisation-check | 24 reviewed interpolations | n/a |
 | security-acceptance-check | 219/219 | 219/219 |
-| abuse-limits-check | 29/29 | 29/29 |
+| abuse-limits-check | 33/33 | 33/33 |
 | security-production-mode-check | 52/52 | n/a (headers/cookies) |
-| mfa-check | 101/101 | 101/101 |
+| mfa-check | 139/139 | 139/139 |
 | account-deletion-session-binding-check | 28/28 (a delete naming another account is 409 ACCOUNT_MISMATCH before any proof; the id never selects, #521) | 28/28 |
 | export-reauth-check | 56/56 (the data export needs the credential proven inside 10 minutes: sign-in or the session-bound `pri_step_up` cookie from `POST /v1/account/reauth`; another session's, a tampered, an expired or a future cookie proves nothing; receipts carry counts only; guessing is rate limited) | 56/56 |
 | session-alerts-check | 43/43 (a sign-in from a device the account never used: one `session.new-device` audit row and one notice to the account's own address with no address, link or code; first session, known device and phone-only accounts send nothing; a failed send never fails the sign-in) | 43/43 |

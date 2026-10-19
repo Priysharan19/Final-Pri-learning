@@ -1,11 +1,10 @@
-import { asyncRouter } from './asyncRouter.js';
+import { asyncHandler, asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
   REAUTH_FRESH_MS, clearSessionCookies, consumeRateLimit, createSession, freshProofAt, id, issueStepUp, opaqueToken, rateLimit,
   requireSession, sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
-import { asyncHandler } from './asyncRouter.js';
 import { tagPolicy } from './routePolicy.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
@@ -603,9 +602,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // to the account's own address (POST /otp/reauth-request), or a fresh
   // Apple/Google token with the same nonce rule. Success sets the step-up
   // cookie bound to this session for REAUTH_FRESH_MS (security.js issueStepUp)
-  // and leaves one audit row naming the method only. Bounded per account so a
-  // stolen session cannot be used to guess the password here instead of at
-  // /login (which locks).
+  // and leaves one audit row naming the method only. Bounded per account, and a
+  // wrong password here counts toward the same lockout /login applies
+  // (loginLockout.js, keyed by the account's address), so a stolen session is
+  // not a second, unlocked place to guess the password: ten failures in the
+  // window lock both doors for LOCKOUT_LOCK_MS.
   router.post('/reauth', requireSession(db), rateLimit(db, 'account-reauth', { limit: 10, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const body = req.body || {};
@@ -613,7 +614,21 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
       }
       const accountId = req.platformSession.account_id;
-      const proof = await authorizeFreshProof(db, accountId, body, undefined, { action: 'continuing' });
+      const lockKey = String(req.platformSession.email || '').trim().toLowerCase();
+      const lock = await loginLockStatus(db, lockKey, Date.now());
+      if (lock.locked) {
+        res.set('Retry-After', String(Math.max(1, Math.ceil(lock.retryAfterMs / 1000))));
+        return res.status(429).json({ error: { code: 'ACCOUNT_LOCKED', message: 'Too many failed attempts. Try again later.' } });
+      }
+      let proof;
+      try {
+        proof = await authorizeFreshProof(db, accountId, body, undefined, { action: 'continuing' });
+      } catch (error) {
+        // Only a wrong password is a guess at the credential /login guards.
+        if (error?.code === 'REAUTH_REQUIRED' && body.password) await recordLoginFailure(db, lockKey, Date.now());
+        throw error;
+      }
+      if (proof.method === 'password') await clearLoginFailures(db, lockKey);
       const now = Date.now();
       const freshUntil = issueStepUp(res, req.platformSession.id, now);
       await audit(db, accountId, 'account.reauth', 'account', accountId, { method: proof.method }, now);
@@ -634,8 +649,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // Bounded so a stolen session cannot be used to pull the whole learning
   // history over and over, and one account cannot monopolise the database — and
   // behind fresh proof of the credential (requireRecentAuth), so a stolen or
-  // forgotten session cookie alone cannot pull it at all.
-  router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), requireRecentAuth(db), async (req, res) => {
+  // forgotten session cookie alone cannot pull it at all. The proof gate runs
+  // before the limit: a 401 REAUTH_REQUIRED reads nothing and spends none of
+  // the ten exports an hour, so a cold export (refusal, re-auth, export) costs
+  // one credit, not two.
+  router.get('/export', requireSession(db), requireRecentAuth(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
     const identities = await db.all('SELECT provider,linked_at FROM account_identities WHERE account_id = ? ORDER BY linked_at', [accountId]);

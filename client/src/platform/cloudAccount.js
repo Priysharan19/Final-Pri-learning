@@ -176,9 +176,21 @@ export async function verifyCloudSession(pid) {
       // 1): the session that asked has died with the account, so the account is
       // gone. Forget it on every profile here rather than leaving this one
       // "linked · sign-in required" for an account that no longer exists.
+      //
+      // The stamp is honoured for DELETE_STAMP_TTL_MS only. Past that, a 401 is
+      // far more likely to be an ordinary ending of the session (idle or
+      // absolute expiry, "sign out everywhere", a revocation from the devices
+      // list) than the lost reply, and saying "deleted" of a live account is a
+      // false statement about a privacy action; the stamp is dropped and the
+      // 401 reads as it always did. The caller is told the deletion was
+      // inferred (confirmedBy 'probe'), never witnessed, and words it that way.
       if (prior?.accountId && prior.deleteRequestedAt) {
-        await forgetCloudAccountEverywhere(prior.accountId, pid);
-        return { connected: false, reason: 'deleted', link: null };
+        if (Date.now() - prior.deleteRequestedAt <= DELETE_STAMP_TTL_MS) {
+          await forgetCloudAccountEverywhere(prior.accountId, pid);
+          return { connected: false, reason: 'deleted', confirmedBy: 'probe', link: null };
+        }
+        await clearDeleteStamp(pid);
+        return { connected: false, reason: 'signed-out', link: await cloudAccountLink(pid) };
       }
       return { connected: false, reason: 'signed-out', link: prior };
     }
@@ -272,38 +284,47 @@ async function forgetCloudAccountEverywhere(accountId, pid) {
  * error (with its server code) reaches the caller. If no answer arrives at all
  * the outcome is unknown, so the intent is kept on the link row
  * (deleteRequestedAt) and settled by one probe now and by verifyCloudSession
- * later: a 401 after the request means the session died with the account
- * (#521 item 1); a 200 means the deletion never happened.
+ * later: a 401 after the request, inside DELETE_STAMP_TTL_MS, means the
+ * session died with the account (#521 item 1); a later 200 means the deletion
+ * never happened. Either way the outcome is inferred (confirmedBy 'probe'), so
+ * the panel says the account appears to have been deleted.
  */
+export const DELETE_STAMP_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Drop a pending-deletion stamp from the link row, leaving the link itself. */
+async function clearDeleteStamp(pid) {
+  const current = await get('device', linkRowId(pid)).catch(() => null);
+  if (!current?.deleteRequestedAt) return;
+  const { deleteRequestedAt, ...rest } = current;
+  await put('device', rest).catch(() => {});
+}
+
 export async function deleteCloudAccount(pid, proof) {
   const rowId = linkRowId(pid); // never delete an account this device could not then forget
   const link = await get('device', rowId).catch(() => null);
   if (!link?.accountId) throw Object.assign(new Error('This local profile is not linked to a cloud account'), { code: 'CLOUD_ACCOUNT_NOT_LINKED' });
   const accountId = String(link.accountId);
   await put('device', { ...link, deleteRequestedAt: Date.now() });
-  const unstamp = async () => {
-    const current = await get('device', rowId).catch(() => null);
-    if (!current?.deleteRequestedAt) return;
-    const { deleteRequestedAt, ...rest } = current;
-    await put('device', rest).catch(() => {});
-  };
   try {
     await cloud.deleteAccount({ ...(proof || {}), accountId });
   } catch (error) {
     if (error?.status) {
       // The server answered and refused: the account is exactly as it was.
-      await unstamp();
+      await clearDeleteStamp(pid);
       throw error;
     }
-    // No answer. One probe tells "never sent" from "sent, answer lost": the
-    // session that asked dies with the account.
+    // No answer. One probe tells "sent, answer lost" (the session that asked
+    // dies with the account → 401) from everything else. A 200 does NOT clear
+    // the stamp: on a client-side timeout the server may still be inside the
+    // deletion transaction, so a session alive this instant can be gone a
+    // moment later. The stamp stays, bounded by DELETE_STAMP_TTL_MS, and
+    // verifyCloudSession settles it: a later 200 clears it (saveAccount writes
+    // the row without it), a later 401 inside the TTL reads as the deletion.
     const probe = await cloud.me().then(() => 'alive', err => (err?.status === 401 ? 'gone' : 'unknown'));
     if (probe === 'gone') {
       await forgetCloudAccountEverywhere(accountId, pid);
       return { deleted: true, connected: false, confirmedBy: 'probe' };
     }
-    if (probe === 'alive') await unstamp();
-    // 'unknown' (still offline): the stamp stays for verifyCloudSession to settle.
     throw error;
   }
   await forgetCloudAccountEverywhere(accountId, pid);
