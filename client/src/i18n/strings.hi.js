@@ -3047,4 +3047,6 @@ export default {
   "inst.reportHeatCell": "{date}: {n} प्रश्न",
   "inst.plotTitle": "आपकी पंक्तियाँ, आलेख में",
   "inst.plotNote": "आपकी लिखावट से Pri ने जो पढ़ा, उसका चित्र। इससे कभी अंक तय नहीं होते।",
+  "inst.dotpoints": "इस अध्याय के विषय",
+  "inst.cmdScripts": "आपकी उत्तर-पुस्तिकाएँ",
 };

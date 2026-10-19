@@ -102,6 +102,14 @@ export const flow = {
     await check('the scope is labelled for assistive tech', !!(await page.locator('[data-instrument-scope]').getAttribute('aria-label')));
     writeFileSync(join(outDir, 'index-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
 
+    // The plate's topic row: the chapter's own dot points, each a way into practice.
+    const dot = page.locator('[data-plate-dotpoint]').first();
+    if (await check('the plate shows the chapter’s topics', await dot.count() === 1)) {
+      const href = await dot.getAttribute('href');
+      await check('a topic opens practice for exactly that topic', /subtopic=/.test(href) && /dotpoint=0/.test(href), href);
+    }
+    await check('the plate states certified marks (none yet: —)', (await page.locator('[data-plate-marks] b').textContent()).trim() === '—');
+
     // Practise this chapter → Practice for that chapter.
     await page.locator('[data-instrument-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
@@ -314,6 +322,18 @@ export const writeFlow = {
       await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
       await check('today’s practice is lit on the heat-map', await page.locator('.in-heat i.is-on').count() >= 1);
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    }
+
+    // The command bar lists the attempt under "Your scripts" with its certified mark.
+    if (reply) {
+      await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.in-cmd', { timeout: 15000 });
+      await page.locator('.in-cmd').click();
+      await page.waitForSelector('[data-instrument-command] [role=group]', { timeout: 10000 }).catch(() => {});
+      const scriptRow = page.locator('[data-instrument-command] [id^="in-pal-sc-"]').first();
+      await check('the command bar lists your scripts', await scriptRow.count() === 1);
+      await check('— with the certified mark', (await scriptRow.locator('small').textContent().catch(() => '')).trim() === `${reply.marksEarned}/${reply.marksPossible}`);
+      await page.keyboard.press('Escape');
     }
 
     // The map's marks are the server-certified receipts, nothing else.
