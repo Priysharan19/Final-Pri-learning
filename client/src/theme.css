@@ -199,6 +199,45 @@
   --border-strong: var(--hairline-strong);
   --border-control: var(--control-border);
   --accent-subtle: var(--accent-soft);
+
+  /* v1.1 system (docs/design/PRI-V1.1-REDESIGN.md §2). Additive: every older
+     name above stays, so screens migrate one branch at a time. */
+  --t-display: 400 30px/36px var(--font-display);
+  --t-title: 400 24px/30px var(--font-display);
+  --t-heading: 600 17px/24px var(--font);
+  --t-body: 400 15.5px/24px var(--font);
+  --t-control: 500 15px/20px var(--font);
+  --t-compact: 400 13.5px/20px var(--font);
+  --t-label: 600 12px/16px var(--font);
+  --t-caption: 400 12px/16px var(--font);
+  --t-mono: 400 13px/20px var(--font-mono);
+  --space-0_5: 2px;
+  --space-16: 64px;
+  --gutter: 16px;
+  --radius-xl: 8px;
+  --elev-1: 0 1px 2px rgba(28, 27, 24, 0.06);
+  --elev-2: 0 4px 16px rgba(28, 27, 24, 0.10), 0 1px 2px rgba(28, 27, 24, 0.06);
+  --elev-3: 0 12px 40px rgba(28, 27, 24, 0.14), 0 1px 3px rgba(28, 27, 24, 0.06);
+  --scrim: rgba(0, 0, 0, 0.32);
+  --z-sticky: 50;
+  --z-nav: 60;
+  --z-popover: 80;
+  --z-sheet: 90;
+  --z-toast: 100;
+  --focus-ring: 2px solid var(--focus);
+  --focus-offset: 2px;
+}
+
+@media (min-width: 600px) { :root { --gutter: 24px; } }
+@media (min-width: 1100px) { :root { --gutter: 32px; } }
+
+/* Devanagari needs more leading at every step so Hindi wraps to the same
+   rhythm as English (v1.1 §2.1). */
+:lang(hi) {
+  --t-body: 400 15.5px/28px var(--font);
+  --t-compact: 400 13.5px/24px var(--font);
+  --t-heading: 600 17px/28px var(--font);
+  --t-caption: 400 12px/20px var(--font);
 }
 
 [data-theme="dark"] {
@@ -251,6 +290,11 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-focus: 0 0 0 3px rgba(93, 184, 173, 0.22);
+  --surface-overlay: #2a2924;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-2: 0 4px 16px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-3: 0 12px 40px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --scrim: rgba(0, 0, 0, 0.5);
 }
 
 /* Paper is the default. The explicit light attribute exists so a light-only
