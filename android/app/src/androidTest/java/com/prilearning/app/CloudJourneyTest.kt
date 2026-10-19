@@ -154,10 +154,11 @@ class CloudJourneyTest {
         // page that is the first practice question (Login.jsx `intended`,
         // tour-otp-onboarding) — and only once the gate has let the account in.
         waitFor(s, inside, 90_000)
-        if (eval(s, "!!document.querySelector('.home-greet')") != "true") {
-            eval(s, "(function(){history.pushState({}, '', '/');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
-        }
-        waitFor(s, "!!document.querySelector('.home-greet') && !$GATE", 90_000)
+        // Then Home. The card's own navigation may still be settling, so a
+        // route change made too early can be overtaken: ask again until Home is
+        // on screen (the app's router, the same pushState/popstate as Settings).
+        waitFor(s, "(function(){if(document.querySelector('.home-greet'))return !$GATE;" +
+            "if(location.pathname!=='/')history.pushState({}, '', '/');dispatchEvent(new PopStateEvent('popstate'));return false;})()", 90_000)
     }
 
     private fun openSettings(s: ActivityScenario<MainActivity>) {
