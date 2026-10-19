@@ -52,8 +52,13 @@ export function stepMetaFor(q) {
 // An issued question and every committed grade must use the SAME server-owned
 // rubric. Difficulty alone is not marks; the authored non-auxiliary criteria
 // define the total, bounded by the question's four-mark practice contract.
+/** A step that carries a mark (not an auxiliary Check / Note / Bonus line). */
+export function isSchemeStep(step) {
+  return !/^(check|note|bonus)/i.test(step?.h);
+}
+
 export function marksPossibleFor(q) {
-  const keySteps = (q.steps || []).filter(step => !/^(check|note|bonus)/i.test(step.h));
+  const keySteps = (q.steps || []).filter(isSchemeStep);
   const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }

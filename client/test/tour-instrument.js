@@ -254,6 +254,8 @@ export const writeFlow = {
     const shown = await page.locator('[data-step-marks] [data-step-mark]').count();
     await check('the card shows one row per mark', !!reply && shown === reply.marksPossible, `${shown} rows for ${reply?.marksPossible} marks`);
     await check('no half marks are shown', !/½|0\.5/.test(await page.locator('[data-step-marks]').textContent().catch(() => '')));
+    const workingLabels = await page.locator('[data-step-marks] [data-step-mark="working"] .set-k').allTextContents();
+    await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
     writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
     await page.emulateMedia({ colorScheme: 'light' });
     await page.waitForTimeout(400);

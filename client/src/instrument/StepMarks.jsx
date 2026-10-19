@@ -5,8 +5,9 @@ import Icon from '../components/Icon.jsx';
 // The server's mark, set out as CBSE-style step rows (server/platform/
 // markRows.js). Display only: the rows sum to the mark the deterministic
 // engine gave, and the server omits them rather than send rows that would
-// not. Whole marks; an authored step heading is engine content (English, like
-// the question and its solution); the frame is translated.
+// not. Whole marks. Authored step headings appear only on a correct answer;
+// a wrong answer's method marks are numbered, never named. Pri practice
+// feedback in a board-style layout, not a CBSE marking scheme.
 
 export default function StepMarks({ markRows }) {
   const t = useT();
@@ -37,7 +38,10 @@ export default function StepMarks({ markRows }) {
           </div>
         );
       })}
-      <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('inst.stepMarksOrder')} {t('verdict.boardStyleNote')}</p>
+      {Number.isFinite(markRows.creditedAfterHints) && (
+        <p style={{ fontSize: 13, marginTop: 8 }} data-step-marks-hints>{t('inst.stepMarksAfterHints', { credited: markRows.creditedAfterHints })}</p>
+      )}
+      <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('inst.stepMarksOrder')} {t('inst.stepMarksNote')}</p>
     </div>
   );
 }

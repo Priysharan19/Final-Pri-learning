@@ -2950,6 +2950,8 @@ export default {
   "inst.cmdThemeSystem": "Follow the device theme",
   "inst.online": "online",
   "inst.offline": "offline",
-  "inst.workingStep": "Working, step {n}",
-  "inst.stepMarksOrder": "Marks for working are credited in order, for lines Pri’s engine verified.",
+  "inst.workingStep": "Method mark {n}",
+  "inst.stepMarksOrder": "Method marks count the working lines Pri’s engine verified, not particular steps.",
+  "inst.stepMarksNote": "Pri practice feedback in a board-style layout — not a CBSE marking scheme.",
+  "inst.stepMarksAfterHints": "These are the marks before the hint charge. Credited after hints: {credited}.",
 };

@@ -54,6 +54,7 @@ for (const [si, shape] of shapes.entries()) {
         ok(`${tag}: labelled as Pri practice feedback, not an official scheme`, out.scheme === 'pri-practice-cbse-style');
         ok(`${tag}: no Check/Note/Bonus heading becomes a mark`, out.rows.every(r => !/^(check|note|bonus)/i.test(r.label || '')));
         ok(`${tag}: a nameless heading is left unlabelled`, out.rows.every(r => !/^step\s*\d/i.test(r.label || '')));
+        ok(`${tag}: a wrong answer names no step`, correct || out.rows.every(r => r.label === null));
       }
     }
   }
@@ -61,8 +62,37 @@ for (const [si, shape] of shapes.entries()) {
 for (const bad of [{ marksEarned: 5, marksPossible: 4, correct: false }, { marksEarned: 1.5, marksPossible: 3, correct: false }, { marksEarned: 2, marksPossible: 0, correct: true }, { marksEarned: -1, marksPossible: 2, correct: false }]) {
   ok(`impossible ${JSON.stringify(bad)} gets no rows`, markRowsFor(q(['Solve', 'Answer']), bad) === null);
 }
-const named = markRowsFor(q(['Form the equations', 'Check', 'Solve the pair', 'Answer']), { marksEarned: 1, marksPossible: 3, correct: false });
-ok('authored headings label the working rows, Check skipped', JSON.stringify(named.rows.map(r => r.label)) === JSON.stringify(['Form the equations', 'Solve the pair', null]), JSON.stringify(named.rows.map(r => r.label)));
+// Method credit counts verified lines; it is never matched to an authored
+// step. So a wrong answer's rows are never named after steps (they would
+// claim which step the student did), and only a correct answer — every row
+// earned — carries the authored headings.
+const wrongRows = markRowsFor(q(['Form the equations', 'Check', 'Solve the pair', 'Answer']), { marksEarned: 1, marksPossible: 3, correct: false });
+ok('a wrong answer with partial credit names no authored step', wrongRows.rows.every(r => r.label === null), JSON.stringify(wrongRows.rows.map(r => r.label)));
+const rightRows = markRowsFor(q(['Form the equations', 'Check', 'Solve the pair', 'Answer']), { marksEarned: 3, marksPossible: 3, correct: true });
+ok('a correct answer carries the authored headings, Check skipped', JSON.stringify(rightRows.rows.map(r => r.label)) === JSON.stringify(['Form the equations', 'Solve the pair', null]), JSON.stringify(rightRows.rows.map(r => r.label)));
+const hinted = markRowsFor(q(['Solve', 'Answer']), { marksEarned: 2, marksPossible: 2, correct: true, creditedMarks: 1.4 });
+ok('a hint charge is stated beside the rows', hinted.creditedAfterHints === 1.4);
+ok('no hint charge, nothing stated', !('creditedAfterHints' in markRowsFor(q(['Solve', 'Answer']), { marksEarned: 2, marksPossible: 2, correct: true, creditedMarks: 2 })));
+
+// Real questions: every generator, every difficulty — the rows agree with the
+// server's own marksPossibleFor and never name a step on a wrong answer.
+const { marksPossibleFor } = await import('../platform/markerOps.js');
+const gen = await import('../../client/src/engine/generators/index.js');
+await gen.loadAllBanks?.();
+let real = 0;
+for (const id of Object.keys(gen.GENERATORS).slice(0, 400)) {
+  for (const d of [1, 4]) {
+    let question; try { question = gen.generateQuestion(id, d, 7919 * d + 3); } catch { continue; }
+    if (!question) continue;
+    real += 1;
+    const possible = marksPossibleFor(question);
+    const right = markRowsFor(question, { marksEarned: possible, marksPossible: possible, correct: true });
+    const wrong = possible > 1 ? markRowsFor(question, { marksEarned: possible - 1, marksPossible: possible, correct: false }) : null;
+    ok(`${id} D${d}: one row per mark`, right?.rows.length === possible);
+    if (wrong) ok(`${id} D${d}: a wrong answer names no step`, wrong.rows.every(r => r.label === null));
+  }
+}
+ok('real questions were exercised', real >= 200, `${real}`);
 
 if (fails.length) {
   console.log(`MARK ROWS: FAIL — ${fails.length} of ${pass + fails.length} checks failed`);
