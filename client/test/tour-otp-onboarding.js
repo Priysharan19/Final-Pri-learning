@@ -173,6 +173,8 @@ export const flow = {
     h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), account.id);
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await page.locator(GATE).waitFor({ timeout: 20000 });
+    // The gate is up while it asks; the "needs attention" screen is its answer.
+    await page.getByTestId('activation-blocked').waitFor({ timeout: 20000 }).catch(() => {});
     await check('a guardian’s withdrawal, noticed on the next recheck, closes the app with the "needs attention" screen',
       await page.locator('.shell').count() === 0 && await page.getByTestId('activation-blocked').isVisible());
 

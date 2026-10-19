@@ -83,7 +83,10 @@ export const flow = {
 
   async run({ page, ctx, check, goto, createProfile, settle, online }) {
     await page.setViewportSize(IPAD_PORTRAIT);
-    await goto('/');
+    // Entered from a deep link to Progress, so the finished card returns there
+    // rather than to the first practice question (Login.jsx `intended`): this
+    // learner has truly never been issued a question when Home is first read.
+    await goto('/progress');
     await createProfile({
       name: 'KALP04 Class 10 Student',
       year: 10,
