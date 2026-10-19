@@ -382,10 +382,13 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 //   "Write by hand"). Off: a paper offers Type only, so no path can leave
 //   unread handwriting on a paper. On: the frozen-page / pending / Retry
 //   checking flow of server/platform/exams.js applies.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING']);
+// INSTRUMENT (v1.1 interface) is opt-in everywhere, the dev server included,
+// so the interface production ships stays the one developers see by default.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT']);
+const OPT_IN_FLAGS = new Set(['INSTRUMENT']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
-  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
   return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
 }
 export function featureDefines(command, env = process.env) {
@@ -394,7 +397,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
-    __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting)
+    __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
+    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument)
   };
 }
 
