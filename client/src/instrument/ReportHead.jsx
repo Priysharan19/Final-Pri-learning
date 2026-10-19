@@ -10,7 +10,10 @@ import { colourFor, scopeFor } from './chapters.js';
 
 const WEEKS = 15;
 
-function dayKeyUTC(ms) { return new Date(ms).toISOString().slice(0, 10); }
+// Activity is keyed by the student's own calendar day (local/store.js), so
+// the squares are too.
+const pad = n => String(n).padStart(2, '0');
+function dayKey(ms) { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
 export default function ReportHead() {
   const { user } = useApp();
@@ -35,7 +38,7 @@ export default function ReportHead() {
     const days = activity.filter(d => Number(d.questions) > 0).length;
     const today = Date.now();
     const cells = Array.from({ length: WEEKS * 7 }, (_, i) => {
-      const key = dayKeyUTC(today - (WEEKS * 7 - 1 - i) * 86400000);
+      const key = dayKey(today - (WEEKS * 7 - 1 - i) * 86400000);
       return { key, n: byDay.get(key) || 0 };
     });
     const max = Math.max(1, ...cells.map(c => c.n));

@@ -301,6 +301,7 @@ export const writeFlow = {
       await page.waitForSelector('[data-instrument-report]', { timeout: 15000 }).catch(() => {});
       const fig = (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '');
       await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
+      await check('today’s practice is lit on the heat-map', await page.locator('.in-heat i.is-on').count() >= 1);
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     }
 
