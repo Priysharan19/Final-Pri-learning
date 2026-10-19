@@ -14,7 +14,7 @@
 //   node tools/examiner-dossier.mjs           # write the dossier
 //   node tools/examiner-dossier.mjs --check   # fail if the dossier is stale
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -28,24 +28,37 @@ await loadAllBanks();
 const sha = s => createHash('sha256').update(s).digest('hex');
 const canon = v => JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(key => [key, x[key]])) : x));
 
-// The marking source an examiner signs. A change to any of these voids the digest.
-const SOURCES = [
-  'client/src/engine/checker.js',
-  'client/src/engine/checker-core.js',
-  'client/src/engine/reason-chain.js',
-  'client/src/engine/lost-marks.js',
-  'client/src/engine/cbseMarking.js',
-  'client/src/engine/tolerance.js',
-  'client/src/engine/generators/workingRubrics.js',
-  'client/src/engine/generators/india-class10-base.js',
-  'server/platform/markerOps.js',
-  'docs/product/marking-first-error-ecf.md',
-  'docs/content/marking-tolerance.md'
-].filter(f => existsSync(path.join(ROOT, f)));
+// The marking source an examiner signs: the full static and dynamic import tree
+// of the server marker (which includes the engine's checker), every generator
+// file that builds a step check, and the policy documents. A change to any of
+// them voids the digest. A listed file that is missing is an error, not a skip.
+function importTree(entries) {
+  const seen = new Set(), todo = [...entries];
+  while (todo.length) {
+    const file = todo.pop();
+    if (seen.has(file)) continue;
+    const abs = path.join(ROOT, file);
+    if (!existsSync(abs)) { console.error(`EXAMINER DOSSIER: FAIL — marking source ${file} is missing`); process.exit(1); }
+    seen.add(file);
+    const text = readFileSync(abs, 'utf8');
+    for (const m of text.matchAll(/(?:from\s*|import\s*\(\s*|import\s+)['"](\.{1,2}\/[^'"]+)['"]/g)) {
+      const dep = path.relative(ROOT, path.resolve(path.dirname(abs), m[1]));
+      if (/\.(m?js|jsx)$/.test(dep)) todo.push(dep);
+    }
+  }
+  return seen;
+}
+const GEN_DIR = 'client/src/engine/generators';
+const stepcheckGenerators = readdirSync(path.join(ROOT, GEN_DIR)).filter(f => /\.m?js$/.test(f) && /stepcheck/.test(readFileSync(path.join(ROOT, GEN_DIR, f), 'utf8'))).map(f => `${GEN_DIR}/${f}`);
+const DOCS = ['docs/product/marking-first-error-ecf.md', 'docs/content/marking-tolerance.md'];
+for (const d of DOCS) if (!existsSync(path.join(ROOT, d))) { console.error(`EXAMINER DOSSIER: FAIL — policy document ${d} is missing`); process.exit(1); }
+const SOURCES = [...new Set([...importTree(['server/platform/markerOps.js', ...stepcheckGenerators]), ...DOCS])].sort();
 const sourceRows = SOURCES.map(f => ({ file: f, sha256: sha(readFileSync(path.join(ROOT, f))) }));
 
 // Every rubric bank: a (generator, difficulty) that issues a chain plan on the fixed seeds.
 const SEEDS = Array.from({ length: 12 }, (_, i) => 1009 + i * 7919);
+// A wider sweep finds banks; the digest samples SEEDS within each one.
+const DISCOVERY = Array.from({ length: 200 }, (_, i) => 1 + i * 37);
 const banks = [];
 for (const id of Object.keys(GENERATORS).sort()) {
   for (const diff of [1, 2, 3, 4]) {
@@ -62,7 +75,11 @@ for (const id of Object.keys(GENERATORS).sort()) {
         ? (sc.chain ? 'chain plan: ' : 'plan: ') + (sc.stages || []).map(s => s.kind + (s.supporting ? '(supporting)' : '') + (s.evidence ? `[${s.evidence}]` : '')).join(' → ')
         : `${sc.kind} step check`;
     }
-    if (!plans.length) continue;
+    if (!plans.length) {
+      const found = DISCOVERY.some(seed => { try { return !!generateQuestion(id, diff, seed)?.stepcheck; } catch { return false; } });
+      if (found) { console.error(`EXAMINER DOSSIER: FAIL — ${id}/D${diff} issues step checks but none on the sampled seeds; widen SEEDS`); process.exit(1); }
+      continue;
+    }
     const ecf = plans[0].plan.chain ? (plans[0].plan.ecf || 'none') : 'n/a';
     banks.push({ id, diff, marks, shape, ecf, seeds: plans.map(p => p.seed), hash: sha(canon(plans)) });
   }
@@ -110,7 +127,7 @@ p('## 1. What the examiner signs: the rubric digest');
 p('');
 p(`**Rubric digest (sha256): \`${digest}\`**`);
 p('');
-p(`It hashes (a) the marking source files below and (b) the full plan and keyed answer of every sampled question in every rubric bank (${SEEDS.length} fixed seeds: ${SEEDS.join(', ')}). Any change to the marker, a rubric, a plan, a key or this policy text produces a different digest, and a signature over the old digest does not carry over.`);
+p(`It hashes (a) the marking source files below — the full import tree of \`server/platform/markerOps.js\`, every generator file that builds a step check, and the two policy documents — and (b) the full plan and keyed answer of every sampled question in every rubric bank (${SEEDS.length} fixed seeds: ${SEEDS.join(', ')}). Any change to the marker, a rubric, a plan, a key or this policy text produces a different digest, and a signature over the old digest does not carry over.`);
 p('');
 p(`- Source digest: \`${sourceDigest}\``);
 p(`- Bank digest: \`${bankDigest}\``);
@@ -144,7 +161,7 @@ p('- Marking is online-only and server-authoritative (ADR-0001 amendment 2026-10
 p('');
 p('## 4. The two open #430 policy calls — decisions the examiner must make');
 p('');
-p('Both are current engine behaviour, probed below on real issued `c10-arithmetic-progressions` questions (seed 1009) through the server marker (`markerOps.stepEvidence`). They are **not** approved. The examiner rules on each.');
+p('Both are current engine behaviour, probed below on real issued `c10-arithmetic-progressions` questions (seed 1009) through the server marker (`markerOps.stepEvidence`). The final award applies the server rule (full marks for a correct answer, otherwise the method award capped at marks − 1), restated in the tool rather than called through the HTTP route. They are **not** approved. The examiner rules on each.');
 p('');
 p('**Call A — ECF on wholly wrong givens pays the substitution mark.** A student who copies every given wrongly, then uses the right formula and substitutes their own values correctly, earns the formula and substitution stages (within the cap), never the answer mark.');
 p('');
