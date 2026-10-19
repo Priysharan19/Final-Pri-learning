@@ -99,7 +99,8 @@ await test('the card and the gate both judge the statement through this module, 
 });
 await test('the server answers with the binding: account id, state, eligibility and the verified flag in one reply', async () => {
   const accounts = readFileSync(new URL('../../server/platform/accounts.js', import.meta.url), 'utf8');
-  assert.match(accounts, /router\.get\('\/guardian\/state', requireSession\(db\), async \(req, res\) => \{[\s\S]{0,900}accountId: String\(req\.platformSession\.account_id\),[\s\S]{0,400}eligible: blockerCode === null && !!account\?\.email_verified_at,[\s\S]{0,200}emailVerified: !!account\?\.email_verified_at/);
+  assert.match(accounts, /router\.get\('\/guardian\/state', requireSession\(db\), async \(req, res\) => \{[\s\S]{0,900}accountId: String\(req\.platformSession\.account_id\),[\s\S]{0,700}eligible: consentBlockerCode\(state\) === null && !!req\.platformSession\.email_verified_at,[\s\S]{0,200}emailVerified: !!req\.platformSession\.email_verified_at/,
+    'one handler, one session: the account id, the eligibility verdict and the verified flag come from the same session in the same reply');
   assert.match(accounts, /res\.set\('Cache-Control', 'no-store'\);\s*res\.json\(\{\s*accountId/, 'and the statement is never cached');
 });
 

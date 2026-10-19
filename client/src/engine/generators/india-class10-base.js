@@ -14,6 +14,7 @@
 // as an exact fraction, never as a rounded decimal.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, Frac, mcq } from '../qhelpers.js';
+import { formulaPlan, ANGLE_ALIASES } from './workingRubrics.js';
 
 const PI_N = 22, PI_D = 7;
 /** Area of a circle of radius r with π = 22/7, exactly. */
@@ -401,6 +402,11 @@ export const indiaClass10 = {
       return {
         prompt: `Find the area of a sector of angle $${deg}^\\circ$ in a circle of radius $${r}$ cm. Take $\\pi = \\dfrac{22}{7}$.`,
         answerType: 'numeric', ...exact(a, 'cm²'),
+        // The sector formula, then its substitution (#430 plan): the first
+        // false line is named, and a misread radius is carried forward.
+        stepcheck: formulaPlan({ givens: { r, t: deg }, aliases: ANGLE_ALIASES, parts: [{ labels: ['A', 'area', 'sector'], forms: ['t/360*pi*r^2'], source: 't/360*(22/7)*r^2', expected: a.value,
+              why: 'The area of a sector is θ/360 of the whole circle: θ/360 × πr².',
+              traps: [{ expr: 't/360*2*pi*r', why: 'That is the arc length. The area of a sector is θ/360 × πr².' }, { expr: 'pi*r^2', why: 'That is the whole circle. A sector is θ/360 of it.' }] }] }),
         traps: [{ value: circleArea(r).value, why: `That is the area of the whole circle. A sector is $\\dfrac{${deg}}{360}$ of it.` }].filter(t => t.value !== a.value),
         hints: [
           'A sector is a fraction of the whole circle.',
@@ -421,6 +427,16 @@ export const indiaClass10 = {
       return {
         prompt: `Find the perimeter of a sector of angle $${deg}^\\circ$ in a circle of radius $${r}$ cm. Take $\\pi = \\dfrac{22}{7}$.`,
         answerType: 'numeric', ...exact(per, 'cm'),
+        // Two parts: the arc (formula and substitution), then arc + 2r. An arc
+        // slipped and then added correctly is error carried forward.
+        stepcheck: formulaPlan({
+          givens: { r, t: deg }, aliases: { ...ANGLE_ALIASES, s: ['l', 'arc', 'arc length'] },
+          parts: [{ letter: 's', labels: ['l', 'arc', 'arc length'], forms: ['t/360*2*pi*r'], source: 't/360*2*(22/7)*r', expected: arc.value,
+            why: 'The arc length is θ/360 of the circumference: θ/360 × 2πr.',
+            traps: [{ expr: 't/360*pi*r^2', why: 'That is the area of the sector. The arc length is θ/360 × 2πr.' }] }],
+          combine: { labels: ['P', 'perimeter'], source: 's+2*r', expected: per.value,
+            substitutionTraps: [{ source: 's+r', why: 'The boundary has two radii, one on each side of the arc.' }] }
+        }),
         traps: [{ value: arc.value, why: `The arc is only part of the boundary — the two straight radii, $2 \\times ${r} = ${2 * r}$ cm, close the shape.` }].filter(t => t.value !== per.value),
         hints: [
           'The boundary of a sector is one arc and two radii.',
@@ -440,6 +456,17 @@ export const indiaClass10 = {
       return {
         prompt: `A chord of a circle of radius $${r}$ cm subtends a right angle at the centre. Find the area of the minor segment cut off. Take $\\pi = \\dfrac{22}{7}$.`,
         answerType: 'numeric', ...exact(seg, 'cm²'),
+        // Sector, triangle, then sector − triangle; either part slipped and
+        // then subtracted correctly is error carried forward.
+        stepcheck: formulaPlan({
+          givens: { r, t: 90 }, aliases: { ...ANGLE_ALIASES, s: ['sector'], q: ['triangle'] },
+          parts: [{ letter: 's', labels: ['sector'], forms: ['t/360*pi*r^2'], source: 't/360*(22/7)*r^2', expected: sectorArea(r, 90).value,
+              why: 'The area of a sector is θ/360 of the whole circle: θ/360 × πr².',
+              traps: [{ expr: 't/360*2*pi*r', why: 'That is the arc length. The area of a sector is θ/360 × πr².' }, { expr: 'pi*r^2', why: 'That is the whole circle. A sector is θ/360 of it.' }] },
+            { letter: 'q', labels: ['triangle'], forms: ['1/2*r^2', '1/2*r*r'], source: '1/2*r*r', expected: r * r / 2,
+              why: 'The triangle has two radii as its legs at a right angle: ½ × r × r.' }],
+          combine: { labels: ['A', 'area', 'segment'], source: 's-q', expected: seg.value }
+        }),
         traps: [{ value: sectorArea(r, 90).value, why: `That is the whole quarter-circle. The segment is what is left after the triangle $\\dfrac{1}{2} \\times ${r} \\times ${r} = ${r * r / 2}$ cm² is removed.` }].filter(t => t.value !== seg.value),
         hints: [
           'A segment is a sector with the triangle cut away.',
@@ -459,6 +486,16 @@ export const indiaClass10 = {
     return {
       prompt: `From a square of side $${side}$ cm, four quarter-circles of radius $${r}$ cm are removed, one at each corner. Find the area remaining. Take $\\pi = \\dfrac{22}{7}$.`,
       answerType: 'numeric', ...exact(left, 'cm²'),
+      // Square, the circle the four quarters make, then square − circle.
+      stepcheck: formulaPlan({
+        givens: { s: side, r }, aliases: { q: ['square'], c: ['circle'] },
+        parts: [
+          { letter: 'q', labels: ['square'], forms: ['s^2'], source: 's^2', expected: side * side, why: 'The square is side × side.' },
+          { letter: 'c', labels: ['circle'], forms: ['pi*r^2'], source: '(22/7)*r^2', expected: circleArea(r).value,
+            why: 'Four quarter-circles of radius r make one circle: πr².',
+            traps: [{ expr: '1/4*pi*r^2', why: 'There are four quarter-circles, which together make one whole circle.' }] }],
+        combine: { labels: ['A', 'area', 'remaining'], source: 'q-c', expected: left.value }
+      }),
       traps: [{ value: side * side, why: 'That is the square before anything is removed — the four quarter-circles make one whole circle, and its area comes off.' }].filter(t => t.value !== left.value),
       hints: [
         'Four quarter-circles of the same radius make exactly one whole circle.',
@@ -484,6 +521,17 @@ export const indiaClass10 = {
       return {
         prompt: `A solid is a cylinder of radius $${r}$ cm and height $${h}$ cm with a hemisphere of the same radius on top. Find its total volume. Take $\\pi = \\dfrac{22}{7}$.`,
         answerType: 'numeric', ...exact(total, 'cm³'),
+        // Cylinder, hemisphere, then their sum; a part slipped and then added
+        // correctly is error carried forward.
+        stepcheck: formulaPlan({
+          givens: { r, h }, aliases: { c: ['V_1', 'cylinder'], e: ['V_2', 'hemisphere'] },
+          parts: [
+            { letter: 'c', labels: ['V_1', 'cylinder'], forms: ['pi*r^2*h'], source: '(22/7)*r^2*h', expected: cyl.value,
+              why: 'The volume of a cylinder is πr²h.', traps: [{ expr: '2*pi*r*h', why: 'That is the curved surface area. The volume of a cylinder is πr²h.' }] },
+            { letter: 'e', labels: ['V_2', 'hemisphere'], forms: ['2/3*pi*r^3'], source: '2/3*(22/7)*r^3', expected: hemi.value,
+              why: 'A hemisphere is half a sphere: ⅔πr³.', traps: [{ expr: '4/3*pi*r^3', why: 'That is a whole sphere. A hemisphere is half of it: ⅔πr³.' }] }],
+          combine: { labels: ['V', 'total'], source: 'c+e', expected: total.value }
+        }),
         traps: [
           { value: cyl.value, why: 'That is the cylinder alone — the hemisphere sitting on it adds its own volume.' },
           { value: cyl.add(hemi).add(hemi).value, why: 'A *hemisphere* is half a sphere, so its volume is $\\dfrac{2}{3}\\pi r^3$, not $\\dfrac{4}{3}\\pi r^3$.' }

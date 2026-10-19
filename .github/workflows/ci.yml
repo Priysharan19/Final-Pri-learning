@@ -164,13 +164,22 @@ jobs:
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
+          # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
+          grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
+          grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
+          grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
+          grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
+          grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
+          grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
+          grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
+          grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
@@ -198,8 +207,8 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          # 306: one check added — every typed answer was marked, none stopped at the marker deadline after retries (#544 hardening).
-          grep -Fq 'INDIA ADAPTIVE: PASS — 306/306 checks' suites.log
+          # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
+          grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
@@ -219,7 +228,11 @@ jobs:
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 65 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 68 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
+          # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
+          grep -Fq 'LOST MARKS: PASS — 170/170 checks' suites.log
+          grep -Fq 'TOLERANCE POLICY: PASS — 178/178 checks' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -397,6 +410,10 @@ jobs:
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-hints-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
@@ -406,6 +423,10 @@ jobs:
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
+          grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
+          grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
+          grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
+          grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
@@ -677,6 +698,11 @@ jobs:
             # its own spacer, the full-width mode switch, Write and Photo space,
             # and iPad/desktop composition unchanged. Both engines.
             node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
+            # Phase 3: every student screen at phone and tablet, paper and dark —
+            # accessible names, keyboard focus, 44px touch targets, 200% text,
+            # layout shift, input timing and visual snapshots (compared only
+            # against baselines committed for this platform and engine).
+            node client/test/tour-interface-quality.js --no-build 2>&1 | tee -a browser.log
             # The owner's photographed page (scripted reader): transcript, unrelated lines,
             # corrected line, proposed answer, durable draft; and the usage-limit state.
             node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
@@ -696,6 +722,7 @@ jobs:
             # here (WebKit cannot reload a page offline under Playwright, so the
             # opened-offline checks are Chromium-only and the run says so).
             node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -828,6 +855,8 @@ jobs:
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
           grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
+          # Both engines ran the interface-quality tour (pipefail fails the shard on a red check).
+          test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
@@ -914,3 +943,37 @@ jobs:
               exit 1
             fi
           done
+
+  engine-benchmark:
+    # Ledger 3.8: the deterministic marker's confusion table, regenerated on
+    # every merge to main and kept as a run artifact. Synthetic evidence only
+    # (the report's header says so); --strict fails on any accepted wrong
+    # answer. The release gates for marking live in the suites job above.
+    name: Engine benchmark report (main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Regenerate the confusion table
+        run: |
+          set -o pipefail
+          npm run engine:benchmark -- --strict 2>&1 | tee engine-benchmark.log
+          test -s docs/evidence/engine-benchmark.md
+          grep -Fq 'Synthetic self-consistency evidence. Not an accuracy claim.' docs/evidence/engine-benchmark.md
+      - name: Engine benchmark report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: engine-benchmark
+          path: |
+            docs/evidence/engine-benchmark.md
+            engine-benchmark.log
+          retention-days: 90

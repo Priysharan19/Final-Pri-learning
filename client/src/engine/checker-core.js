@@ -19,6 +19,7 @@ import {
   parseComplexInput, sameComplex
 } from './answer-forms.js';
 import { unitContradicts, withoutUnit, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
+import { acceptsNumeric } from './tolerance.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -450,7 +451,9 @@ function checkAnswerWithinBudget(question, rawInput) {
         // value is compared in the relative band a non-integer target gets.
         const converted = Boolean(angleUnit && angleRead && angleRead !== angleUnit);
         const tolUsed = ans.tol ?? (converted ? Math.max(1e-6, Math.abs(target) * 1e-4) : undefined);
-        let ok = numsClose(value, target, tolUsed);
+        // A declared JEE rounding rule (engine/tolerance.js) is read only when the
+        // reviewed key itself declares it; nothing is inferred.
+        let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
         let matched = ok ? value : null;
         let wantsExactValue = false;
         // Fraction questions that demand simplest form (e.g. simplify 12/18 → 2/3)

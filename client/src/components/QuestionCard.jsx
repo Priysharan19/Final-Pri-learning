@@ -36,6 +36,10 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
+import { HINT_RUNGS, markWeightAfter } from '../engine/hintLadder.js';
+
+// The hint ladder's rungs, as catalogue keys.
+const RUNG_KEY = { nudge: 'verdict.rung.nudge', method: 'verdict.rung.method', worked: 'verdict.rung.worked', solution: 'verdict.rung.solution' };
 import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
@@ -293,8 +297,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // A blocker before the reader runs must never be labelled bad handwriting.
   const [inkReaderState, setInkReaderState] = useState({ kind: INK_READER_STATE.IDLE });
   const [inkHasStrokes, setInkHasStrokes] = useState(false);
+  // The hint ladder (engine/hintLadder.js): the rungs opened on this card,
+  // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
-  const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
+  const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
+  // The last rung is the whole solution: like Show solution it takes two presses.
+  const [solutionRungArmed, setSolutionRungArmed] = useState(false);
   const [showTutor, setShowTutor] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
@@ -385,7 +393,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   useEffect(() => {
     const draft = readDraft('question', question.id);
-    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintsLeft(question.hintsAvailable);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
@@ -439,10 +447,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // A question that carries method marks keeps its working area open, so
   // working typed there is always part of the submission.
   const workingOpen = showWorking || (!isMcq && !isWorking && workingAreaMode(question, totalMarks) === 'open');
-  const hintsUsed = hints.length;
-  // Each opened tutor level is charged like a hint (backend resolve()).
-  const helpUsed = hintsUsed + tutorUsed;
-  const credit = Math.max(0.55, 1 - 0.15 * helpUsed);
+  // Each opened tutor level is charged like a hint (backend resolve()). Once a
+  // rung is open, a correct answer is worth the ladder's mark weight — the
+  // same table the server charged (engine/hintLadder.js).
+  const ladderOffered = !diagnostic && question.hintLadder > 0;
+  const nextRung = ladderOffered ? (HINT_RUNGS[hintLevel] || null) : null;
+  const helpUsed = hintLevel + tutorUsed;
+  const credit = hintLevel > 0
+    ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed))
+    : Math.max(0.55, 1 - 0.15 * tutorUsed);
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -1376,14 +1389,61 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // the student was told it would be read, checks the reading, and presses
   // Submit. Nothing spends a try without that press.
 
+  // The next rung of the ladder, served and charged by the server. The last
+  // rung is the whole solution: it ends the question as a reveal, so it takes
+  // a second deliberate press, exactly like Show solution.
   async function getHint() {
-    if (hintsLeft <= 0 || resolved) return;
+    if (!nextRung || resolved || busy || inFlightRef.current) return;
+    if (nextRung === 'solution') {
+      if (!solutionRungArmed) { setSolutionRungArmed(true); return; }
+      setSolutionRungArmed(false);
+      inFlightRef.current = true;
+      const wasFrozen = inkFrozenRef.current;
+      inkFrozenRef.current = true;
+      setBusy(true);
+      try {
+        const r = await api.post(`/practice/${question.id}/hint`, { rung: 'solution', ms: Date.now() - startRef.current });
+        if (!mountedRef.current) return;
+        if (!serverRevealReceipt(r)) throw new Error(gradingReceiptMismatch(language));
+        setHintLevel(HINT_RUNGS.length);
+        settleReveal(r);
+      } catch (e) {
+        inkFrozenRef.current = wasFrozen;
+        refuseCheck(e, 'reveal');
+      } finally {
+        inFlightRef.current = false;
+        if (mountedRef.current) setBusy(false);
+      }
+      return;
+    }
     try {
-      const r = await api.post(`/practice/${question.id}/hint`, {});
-      setHints(h => [...h, r.hint]);
-      setHintsLeft(r.remaining);
-    } catch { }
+      const r = await api.post(`/practice/${question.id}/hint`, { rung: nextRung });
+      if (!mountedRef.current) return;
+      setHints(h => (h.some(x => x.rung === r.rung) ? h : [...h, { rung: r.rung || nextRung, text: r.hint || null }]));
+      setHintLevel(l => Math.max(l, Number(r.level) || 0));
+    } catch (e) { refuseCheck(e, 'hint'); }
   }
+
+  // H opens the next rung, when focus is not in a field.
+  const getHintRef = useRef(getHint);
+  getHintRef.current = getHint;
+  useEffect(() => {
+    if (!ladderOffered) return undefined;
+    const onKey = e => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'h' && e.key !== 'H')) return;
+      const el = e.target;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+      e.preventDefault();
+      getHintRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ladderOffered, question.id]);
+  useEffect(() => {
+    if (!solutionRungArmed) return undefined;
+    const disarm = setTimeout(() => setSolutionRungArmed(false), 5000);
+    return () => clearTimeout(disarm);
+  }, [solutionRungArmed]);
 
   // Showing the solution ends the attempt with no marks, so it takes two
   // deliberate presses: a slip of the Pencil beside Submit cannot do it.
@@ -1927,9 +1987,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {hints.length > 0 && (
           <div className="hints-block">
             <div className="hints-block-title">{t('verdict.hints')}</div>
-            {hints.map((h, i) => (
-              <div className="hintbox" key={i}><span className="h-n">{t('verdict.hintNumber', { n: i + 1 })}</span><MathText text={h} /></div>
+            {hints.map(h => (
+              <div className="hintbox" key={h.rung} data-hint-shown={h.rung}>
+                <span className="h-n">{t(RUNG_KEY[h.rung])}</span>
+                {h.text ? <MathText text={h.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
+              </div>
             ))}
+            {!resolved && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
           </div>
         )}
 
@@ -1969,15 +2033,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           )}
           <div className="ws-tools-end">
-            {!diagnostic && !isMcq && question.hintsAvailable > 0 && !resolved && (
-              <button type="button" className="icon-btn hint-bulb" disabled={hintsLeft <= 0}
-                title={t('verdict.hintTitle', { n: hintsUsed + 1 })}
-                aria-label={hintsLeft > 0 ? t('verdict.hintLabel', { n: hintsUsed + 1, total: question.hintsAvailable }) : t('verdict.noHintsLeft')}
-                onClick={getHint}>
-                <Icon name="hint" /><span>{t('verdict.hint')}</span>
-                <span className="hint-left">{t('verdict.hintsLeft', { count: hintsLeft, n: hintsLeft })}</span>
-              </button>
-            )}
+            {/* The hint ladder: one control, naming the next rung and what
+                it leaves. nudge → method → worked step → full solution. */}
+            {ladderOffered && !resolved && nextRung && (() => {
+              const left = Math.round(markWeightAfter(hintLevel + 1) * 100);
+              const label = nextRung === 'solution'
+                ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                : t('verdict.rungLabel', { n: hintLevel + 1, rung: t(RUNG_KEY[nextRung]), percent: left });
+              return (
+                <button type="button" className={`icon-btn hint-bulb${solutionRungArmed ? ' on' : ''}`} disabled={busy}
+                  data-hint-rung={nextRung} title={label} aria-label={label} aria-keyshortcuts="H" onClick={getHint}>
+                  <Icon name="hint" /><span>{solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[nextRung])}</span>
+                  <span className="hint-left">{nextRung === 'solution' ? t('verdict.rungEndsShort') : t('verdict.markWeightShort', { percent: left })}</span>
+                </button>
+              );
+            })()}
             {!resolved && (
               <button type="button" className={`icon-btn q-rail-btn ${showScribble ? 'on' : ''}`} aria-pressed={showScribble}
                 title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} onClick={() => setShowScribble(s => !s)}><Icon name="scratch" /></button>
@@ -2434,6 +2504,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
+              {state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
@@ -2520,6 +2591,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
+                {res.partial && !verdictGood &&
+                  (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
+                  <LostMarks lost={res.partial.lost} t={t} />}
                 {/* Said only when the server's step report is of exactly these
                     lines and verifies every one of them (#448): a right answer
                     alone establishes nothing about the working. */}
@@ -2545,7 +2619,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <Icon name={row.earned === row.outOf ? 'check' : 'correction'} size={14} />
                           </span>
                           {row.labelKey ? t(row.labelKey) : row.label}
-                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: '', ...(row.whyVars || {}), rule: row.whyVars?.ruleKey ? t(row.whyVars.ruleKey) : '' }) : row.why}</span>}
                         </span>
                         <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
@@ -2661,6 +2735,26 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Where the marks went (ledger 3.6): one line per lost mark, naming the line
+ * and the rule it broke, rendered from the catalogue keys the server's marker
+ * sent so a Hindi-medium student reads it in Hindi. It explains the server's
+ * award; it never computes one. Only known key namespaces render.
+ */
+const LOST_KEY = /^marks\.lost\.[a-zA-Z]+$/;
+const RULE_KEY = /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/;
+function LostMarks({ lost, t }) {
+  const rows = Array.isArray(lost) ? lost.filter(l => l && LOST_KEY.test(String(l.key))) : [];
+  if (!rows.length) return null;
+  return (
+    <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {rows.map((l, i) => (
+        <li key={i} data-lost-line={l.line} data-lost-key={l.key}>{t(l.key, { ...(l.vars || {}), rule: RULE_KEY.test(String(l.ruleKey)) ? t(l.ruleKey) : '' })}</li>
+      ))}
+    </ul>
   );
 }
 

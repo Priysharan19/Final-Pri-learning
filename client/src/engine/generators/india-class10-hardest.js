@@ -35,6 +35,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
 import { exact as exactForm, frac, fracTex, traps, twoNames } from './india-native-helpers.js';
+import { formulaPlan, ANGLE_ALIASES } from './workingRubrics.js';
 
 /**
  * An exact answer that also accepts its exact decimal. The marker reads any
@@ -857,6 +858,19 @@ function sectorReasoning(rng) {
       return {
         prompt: `The minute hand of a clock is $${r}$ cm long. Find the ${askArc ? 'distance travelled by its tip' : 'area swept by it'} in $${t}$ minutes. ${PI_NOTE}`,
         answerType: 'numeric', ...exact(ans, askArc ? 'cm' : 'cm²'),
+        // The angle from the time (6° a minute), then the sector formula with
+        // it. An angle slipped and then used correctly is error carried forward.
+        stepcheck: formulaPlan({
+          givens: { r, m: t }, aliases: ANGLE_ALIASES,
+          parts: [
+            { letter: 't', labels: ['θ', 'angle'], source: '6*m', expected: 6 * t },
+            askArc
+              ? { labels: ['l', 'arc', 'distance'], forms: ['t/360*2*pi*r'], source: 't/360*2*(22/7)*r', expected: arc.value,
+                why: 'The tip moves along the arc: θ/360 × 2πr.', traps: [{ expr: 't/360*pi*r^2', why: 'That is the area swept, not the distance the tip moves.' }] }
+              : { labels: ['A', 'area'], forms: ['t/360*pi*r^2'], source: 't/360*(22/7)*r^2', expected: area.value,
+                why: 'The hand sweeps a sector: θ/360 × πr².', traps: [{ expr: 't/360*2*pi*r', why: 'That is the arc length, not the area swept.' }] }
+          ]
+        }),
         traps: traps(ans.value, [
           { value: askArc ? frac(44 * t * r, 7 * 360).value : frac(22 * t * r * r, 7 * 360).value, why: `In ${t} minutes the hand turns through $6^\\circ$ per minute, not $1^\\circ$ per minute.` },
           { value: askArc ? area.value : arc.value, why: askArc ? 'That is the area swept, not the distance moved by the tip.' : 'That is the length of the arc, not the area.' }
