@@ -51,13 +51,18 @@ for (const [claim, why] of FALSE_NOW) {
   ok(!readme.includes(claim), `the README no longer claims "${claim}" — ${why}`);
 }
 
+// #283: Premium is enforced now, so the README must state the free tier the
+// gate enforces rather than the old "Premium buys nothing" gap.
+const { FREE_TIER } = await import(join(ROOT, 'client/src/local/entitlementGate.js'));
+ok(new RegExp(`${FREE_TIER.practicePerDay} practice questions a day`).test(readme) && !/Premium buys nothing/i.test(readme),
+  'the README states the enforced free-tier cap and no longer says Premium buys nothing');
+
 // The gaps that must stay named while they are still real.
 const { plotSpecFor } = await import(join(ROOT, 'client/src/engine/plotSpec.js'));
 ok(typeof plotSpecFor === 'function', 'the plotting detector is importable');
 const MUST_NAME = [
   ['one real Apple Pencil writer', /one\*{0,2} real\s+Apple Pencil writer|holds \*\*one\*\* real/i],
   ['the empty JEE archive', /0 of 1,968|JEE previous-year archive is empty/i],
-  ['unenforced Premium', /Premium buys nothing/i],
   ['no guardian consent', /guardian-consent|guardian consent/i],
   ['nothing deployed', /Nothing is deployed/i]
 ];
