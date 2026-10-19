@@ -196,6 +196,7 @@ class InkInputTest {
             assertEquals("before any stylus event the shell has not seen a stylus", "\"false\"",
                 waitFor(s, "window.__f0 && window.__f0.ok && String(window.__f0.result.stylusSeen)"))
             stroke(s, MotionEvent.TOOL_TYPE_STYLUS, 0.55f)
+            StoreShots.shot("03-write")
             m = metrics(s)
             val pen = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
             assertEquals("a stylus arrives as pointerType pen", "pen", pen.getString("pointerType"))
@@ -268,6 +269,28 @@ class InkInputTest {
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
             val strokes: JSONArray = m.getJSONArray("strokes")
             for (i in 0 until strokes.length()) assertEquals("no stroke was cancelled", false, strokes.getJSONObject(i).getBoolean("cancelled"))
+        }
+    }
+
+    /** Store listing only (-e priShots 1): a question answered by a photo. Skipped otherwise. */
+    @Test
+    fun storeShotPhoto() {
+        assumeTrue("store screenshots only", InstrumentationRegistry.getArguments().getString("priShots", "") == "1")
+        AccountFirst.useFixtureServer()
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
+            eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt')")
+            val label = "Photo: answer with a photo of your working"
+            for (i in 0 until 14) {
+                if (eval(s, "!!($byLabel)('$label')") == "true") break
+                eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
+                Thread.sleep(1100)
+            }
+            assertEquals("a question offering Photo was found", "true", eval(s, "!!($byLabel)('$label')"))
+            eval(s, "($byLabel)('$label').click()")
+            Thread.sleep(1000)
+            StoreShots.shot("04-photo")
         }
     }
 }
