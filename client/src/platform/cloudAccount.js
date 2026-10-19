@@ -6,7 +6,7 @@
 // provider credentials, account email and cloud display name are never copied
 // into IndexedDB by this module.
 
-import { get, put, del, uuid } from '../local/idb.js';
+import { all, get, put, del, uuid } from '../local/idb.js';
 import { cloud, cloudAvailable, forgetNativeCloudSession } from './cloudTransport.js';
 import { announceCloudSessionChange, announceEntitlementChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
@@ -52,8 +52,20 @@ export async function cloudAccountLink(pid) {
     linkedAt: Number(row.linkedAt) || null,
     lastVerifiedAt: Number(row.lastVerifiedAt) || null,
     lastSyncAt: Number(row.lastSyncAt) || null,
+    // A deletion this device asked the server for and has not heard back from
+    // (deleteCloudAccount). Cleared by a reply either way; read by
+    // verifyCloudSession to settle a half-done deletion (#521).
+    deleteRequestedAt: Number(row.deleteRequestedAt) || null,
     entitlement: normalizeEntitlementSnapshot(row.entitlement || {})
   };
+}
+
+/** Every local profile on this device whose link names `accountId`. */
+async function profilesLinkedTo(accountId) {
+  const rows = await all('device').catch(() => []);
+  return rows
+    .filter(row => typeof row?.id === 'string' && row.id.startsWith(LINK_PREFIX) && String(row.accountId || '') === String(accountId))
+    .map(row => row.id.slice(LINK_PREFIX.length));
 }
 
 async function saveAccount(pid, account, patch = {}) {
@@ -158,7 +170,18 @@ export async function verifyCloudSession(pid) {
     if (prior && prior.emailVerified !== link.emailVerified) announceLink(pid, link, true);
     return { connected: true, account: result.account, link };
   } catch (error) {
-    if (error?.status === 401) return { connected: false, reason: 'signed-out', link: await cloudAccountLink(pid) };
+    if (error?.status === 401) {
+      const prior = await cloudAccountLink(pid);
+      // A deletion this device asked for and never heard back from (#521 item
+      // 1): the session that asked has died with the account, so the account is
+      // gone. Forget it on every profile here rather than leaving this one
+      // "linked · sign-in required" for an account that no longer exists.
+      if (prior?.accountId && prior.deleteRequestedAt) {
+        await forgetCloudAccountEverywhere(prior.accountId, pid);
+        return { connected: false, reason: 'deleted', link: null };
+      }
+      return { connected: false, reason: 'signed-out', link: prior };
+    }
     throw error;
   }
 }
@@ -192,10 +215,10 @@ export async function markCloudSynced(pid, at = Date.now()) {
 }
 
 /** The device half of ending a link: native session, replica state, link row. */
-async function forgetCloudAccountLocally(pid) {
+async function forgetCloudAccountLocally(pid, { nativeSession = true } = {}) {
   // The device must stop holding the session even when the server cannot be
   // told (the native shells keep it outside the page).
-  await forgetNativeCloudSession();
+  if (nativeSession) await forgetNativeCloudSession();
 
   // Fail closed locally: first remove account-specific replica metadata and put
   // the profile outbox back into its mandatory full-rescan state. Only after
@@ -217,21 +240,72 @@ export async function disconnectCloudAccount(pid) {
 }
 
 /**
+ * A deleted account is forgotten on every profile of this device: `pid` first,
+ * then every other local profile whose link names the same account (#521 item
+ * 2) — a second profile would otherwise keep a link to an account that no
+ * longer exists and have every sign-in and sync refused (#500). The native
+ * session is dropped once; it is device-wide.
+ */
+async function forgetCloudAccountEverywhere(accountId, pid) {
+  const others = (await profilesLinkedTo(accountId)).filter(other => other !== String(pid));
+  await forgetCloudAccountLocally(pid);
+  for (const other of others) await forgetCloudAccountLocally(other, { nativeSession: false });
+  return { connected: false };
+}
+
+/**
  * Delete the cloud account this profile is linked to, and forget it here.
  *
  * `proof` is whatever the server asks for to re-authenticate the deletion —
  * `{ password }`, `{ provider, idToken, nonce }` or `{ otpChallengeId, otpCode }`
- * — and is sent as given. Once the server confirms, the device always drops the
- * link, the account's replica state and the native session, whichever proof was
- * used: a link left behind names an account that no longer exists, and every
- * later sign-in and sync on this profile is refused while it stays (#500). No
- * logout is sent; the deletion has already ended every session of the account.
- * If the server refuses, nothing on the device changes and the error (with its
- * server code) reaches the caller.
+ * — and is sent as given, together with the id of the account this profile is
+ * linked to: the session cookie is device-wide and may have changed hands since
+ * the panel was drawn, and the server refuses to delete any other account
+ * (409 ACCOUNT_MISMATCH, #521 item 3). Once the server confirms, the device
+ * always drops the link, the account's replica state and the native session,
+ * on this profile and on every other profile linked to the same account,
+ * whichever proof was used: a link left behind names an account that no longer
+ * exists, and every later sign-in and sync on it is refused while it stays
+ * (#500). No logout is sent; the deletion has already ended every session.
+ *
+ * If the server answers with a refusal, nothing on the device changes and the
+ * error (with its server code) reaches the caller. If no answer arrives at all
+ * the outcome is unknown, so the intent is kept on the link row
+ * (deleteRequestedAt) and settled by one probe now and by verifyCloudSession
+ * later: a 401 after the request means the session died with the account
+ * (#521 item 1); a 200 means the deletion never happened.
  */
 export async function deleteCloudAccount(pid, proof) {
-  linkRowId(pid); // never delete an account this device could not then forget
-  await cloud.deleteAccount(proof);
-  await forgetCloudAccountLocally(pid);
+  const rowId = linkRowId(pid); // never delete an account this device could not then forget
+  const link = await get('device', rowId).catch(() => null);
+  if (!link?.accountId) throw Object.assign(new Error('This local profile is not linked to a cloud account'), { code: 'CLOUD_ACCOUNT_NOT_LINKED' });
+  const accountId = String(link.accountId);
+  await put('device', { ...link, deleteRequestedAt: Date.now() });
+  const unstamp = async () => {
+    const current = await get('device', rowId).catch(() => null);
+    if (!current?.deleteRequestedAt) return;
+    const { deleteRequestedAt, ...rest } = current;
+    await put('device', rest).catch(() => {});
+  };
+  try {
+    await cloud.deleteAccount({ ...(proof || {}), accountId });
+  } catch (error) {
+    if (error?.status) {
+      // The server answered and refused: the account is exactly as it was.
+      await unstamp();
+      throw error;
+    }
+    // No answer. One probe tells "never sent" from "sent, answer lost": the
+    // session that asked dies with the account.
+    const probe = await cloud.me().then(() => 'alive', err => (err?.status === 401 ? 'gone' : 'unknown'));
+    if (probe === 'gone') {
+      await forgetCloudAccountEverywhere(accountId, pid);
+      return { deleted: true, connected: false, confirmedBy: 'probe' };
+    }
+    if (probe === 'alive') await unstamp();
+    // 'unknown' (still offline): the stamp stays for verifyCloudSession to settle.
+    throw error;
+  }
+  await forgetCloudAccountEverywhere(accountId, pid);
   return { deleted: true, connected: false };
 }

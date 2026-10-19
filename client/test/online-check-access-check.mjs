@@ -97,6 +97,13 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(checkRefusal(err(422, 'RECOGNITION_IMAGE_REQUIRED')), null, 'and an unreadable image');
   eq(checkRefusal(err(503, 'GRADE_ACK_MISSING')), null, 'a server answer this device cannot trust is not called "offline"');
   eq(checkRefusal(err(403, 'EXAM_QUESTION_LOCKED')), null, 'an exam question opened as practice is not an account state');
+  // The server's own daily cap (#537): the check would have bound a question the
+  // account's free day has no room for. Only that code at that status is it;
+  // a Premium gate on a feature keeps FreeCapNotice's own copy.
+  eq(checkRefusal(err(402, 'FREE_CAP_REACHED')), 'free-cap', 'FREE_CAP_REACHED at 402 is the free cap');
+  eq(checkRefusal(err(402, 'PREMIUM_REQUIRED')), null, 'a Premium feature gate is not a refused check');
+  eq(checkRefusal(err(409, 'FREE_CAP_REACHED')), null, 'and the code alone, at another status, is not the cap');
+  eq(checkRefusalCopy('free-cap').action, 'premium', 'the free cap offers Premium as the way through, never a blind retry');
   eq(checkRefusal(err(401, undefined, { needsPassword: true })), null, 'the device profile\'s own password lock is not a Pri sign-in');
   eq(checkRefusal(new Error('The server response did not match this submission.')), null, 'a receipt mismatch raised by the card keeps its own wording');
   eq(checkRefusal(null), null, 'nothing is nothing');
@@ -107,13 +114,15 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 // ── 2 · Words for every reason, in both languages ────────────────────────────
 {
   const kinds = Object.values(CHECK_REFUSAL);
-  eq(kinds.length, 10, 'ten reasons are named');
+  // The eleventh is the free day's cap (#537): the server refused to issue the
+  // question that a check would have bound, so nothing was marked.
+  eq(kinds.length, 11, 'eleven reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInAgainAction', 'check.sessionEnded', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
   for (const context of ['answer', 'exam', 'game', 'placement']) {
     for (const kind of kinds) {
       const copy = checkRefusalCopy(kind, context);
-      ok(copy && ['sign-in', 'retry', 'account', 'next', 'none', 'restart'].includes(copy.action), `${kind}/${context} has one next step`);
+      ok(copy && ['sign-in', 'retry', 'account', 'next', 'none', 'restart', 'premium'].includes(copy.action), `${kind}/${context} has one next step`);
       for (const key of [copy.titleKey, copy.contextKey, copy.hintKey]) {
         used.add(key);
         ok(typeof en[key] === 'string' && en[key].trim() && typeof hi[key] === 'string' && hi[key].trim() && en[key] !== hi[key], `${key} is in both catalogues`);
@@ -367,6 +376,11 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
     ok(unavailable.includes(en['check.questionTitle']) && unavailable.includes(en['check.notChecked']), 'question: it cannot be checked right now, and the working is kept on the page');
     ok(new RegExp(`<button[^>]*data-check-next[^>]*>${en['practice.nextQuestion']}</button>`).test(unavailable) && /data-check-retry/.test(unavailable), 'question: Next question, or try again');
     ok(!/data-check-next/.test(reconnect), 'only that reason offers to leave the question');
+    const freeCap = refusal('free-cap');
+    ok(freeCap.includes(en['check.freeCapTitle']) && freeCap.includes(en['check.notChecked']) && freeCap.includes(en['check.freeCapHint']),
+      'free cap: today\'s free questions are used up, the answer was not checked, and when they come back');
+    ok(/<a[^>]*href="\/settings#cloud-account-title"[^>]*>See Premium<\/a>/.test(freeCap) && !/data-check-retry|data-check-sign-in|data-check-next/.test(freeCap),
+      'free cap: See Premium is the one next step — no retry (the day does not change), no sign-in, no next question (capped the same way)');
     for (const kind of Object.values(CHECK_REFUSAL)) {
       const html = refusal(kind);
       ok(new RegExp(`data-check-refusal="${kind}"`).test(html) && !/marks|XP|Correct|solution/i.test(html.replace(/<[^>]+>/g, ' ')), `${kind}: the refusal shows no verdict, marks, XP or solution`);

@@ -116,6 +116,9 @@ export function CheckRefusal({
         {copy.action === 'account' && (inRouter
           ? <Link to="/settings" {...settings}>{t('app.accountSettings')}</Link>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
+        {copy.action === 'premium' && (inRouter
+          ? <Link to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</Link>
+          : <a href="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</a>)}
         {onRetry && (copy.action === 'retry' || copy.action === 'account') && (
           <button type="button" className="btn btn-ghost btn-sm" data-check-retry disabled={busy} onClick={onRetry}>
             {t('common.tryAgain')}

@@ -74,6 +74,9 @@ object AssetOrigin {
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
+        // No nested browsing context at all (#260): a same-origin child frame
+        // could otherwise reach the parent's bridge object through `parent`.
+        "frame-src 'none'",
         "frame-ancestors 'none'"
     )
     val CONTENT_SECURITY_POLICY: String = CSP_DIRECTIVES.joinToString("; ")

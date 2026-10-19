@@ -326,6 +326,27 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/account/reauth",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own account only: proves the session account's own credential (password, one-time code to its own address, or a fresh linked Apple/Google token with a consumed nonce); on success sets the pri_step_up cookie bound to this session id for 10 minutes and writes an account.reauth audit row naming the method only; nothing is read or changed about any other account",
+      "rateLimits": [
+        {
+          "key": "account-reauth",
+          "limit": 10,
+          "windowMs": 900000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/account/export",
       "auth": "session",
@@ -333,7 +354,10 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
+      "recentAuth": {
+        "freshMs": 600000
+      },
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires the credential proven inside 10 minutes (the sign-in, or POST /v1/account/reauth's session-bound step-up cookie), else 401 REAUTH_REQUIRED naming the proofs the account can offer; every export leaves an account.export audit receipt with the format and per-section row counts only",
       "rateLimits": [
         {
           "key": "account-export",
@@ -354,7 +378,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires fresh password or linked OIDC re-authentication",
+      "ownership": "own account only: every query is keyed by the session account id; the optional body accountId never selects what is deleted — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before any proof is spent (#521); requires fresh password, one-time code or linked OIDC re-authentication",
       "rateLimits": [
         {
           "key": "account-delete",
@@ -2005,7 +2029,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test",
+      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test; the free plan's daily cap (20 practice/review/task questions per account per Asia/Kolkata day, server/platform/practiceAllowance.js) is decided here from the server's own entitlement record and count — 402 FREE_CAP_REACHED with Retry-After, nothing escrowed, replays never counted twice",
       "rateLimits": [
         {
           "key": "practice-issue",
@@ -2097,7 +2121,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused",
+      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused; counts toward, and is refused at, the account's free daily practice cap (402 FREE_CAP_REACHED, server/platform/practiceAllowance.js)",
       "rateLimits": [
         {
           "key": "practice-repeat",
