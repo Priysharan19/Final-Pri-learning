@@ -181,6 +181,19 @@ if (engine === 'postgres') {
       const control = await store.transaction(async tx => { await tx.run(copyAs(t, 'acct-a')); throw PROBE; }, { accountScope: 'acct-a' }).catch(error => error);
       ok(String(control?.dbCode || control?.code) !== '42501', `${t}: control — the same INSERT for its own account is not refused by RLS (got ${control?.dbCode || control?.code})`);
     }
+    // Two owner columns: a row is the account's when EITHER column names it, and
+    // a third account sees it under neither. The seeds above put the same account
+    // in both columns, which cannot tell `a AND (b OR c)` from `(a AND b) OR c`;
+    // this mixed row (student A, teacher B) can.
+    await su.query(`INSERT INTO pri.assignment_feedback(assignment_id,student_account_id,teacher_account_id,returned_at,updated_at) VALUES ('as-acct-b','acct-a','acct-b',${NOW},${NOW})`);
+    const mixedSeen = {};
+    for (const who of ['acct-a', 'acct-b', 'acct-c']) {
+      await store.transaction(async tx => {
+        mixedSeen[who] = Number((await tx.get("SELECT count(*)::int AS n FROM assignment_feedback WHERE assignment_id = 'as-acct-b' AND student_account_id = 'acct-a'")).n);
+        throw PROBE;
+      }, { accountScope: who }).catch(error => { if (error?.code !== 'PROBE') mixedSeen[who] = `error ${error?.dbCode || error?.code}`; });
+    }
+    eq(mixedSeen, { 'acct-a': 1, 'acct-b': 1, 'acct-c': 0 }, 'a feedback row with student A and teacher B is visible to A and to B, and to no third account');
     // An account scope with an empty id sees nothing of the covered tables.
     await raw.query("SELECT set_config('pri.scope', 'account', false), set_config('pri.account_id', '', false)");
     eq(Number((await raw.query('SELECT count(*)::int AS n FROM accounts')).rows[0].n), 0, 'account scope with an empty account id sees no account row');
