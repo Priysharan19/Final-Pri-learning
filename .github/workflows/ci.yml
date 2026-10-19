@@ -181,6 +181,8 @@ jobs:
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133330 wrong answers marked correct across 17304 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
+          # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
+          grep -Eq 'EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
@@ -205,6 +207,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -218,7 +221,10 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
+          # A marked handwritten attempt says only what the server established
+          # (synthetic evidence: scripted transcripts, the server's marking function).
+          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -238,7 +244,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'ACCOUNT DELETION LINK: PASS — 111/111 checks' suites.log
@@ -380,16 +386,16 @@ jobs:
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
-          grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
+          grep -Fq 'RECOGNITION DEDUPE: PASS — 212/212 checks' recognition-dedupe.log
           # Round trips pinned per hot request; ink Submit is one request with one
           # paid read, answer-blind; the request meter is numbers only and
           # Server-Timing is opt-in for signed-in callers (#441 port).
           node server/test/hot-path-budget-check.mjs 2>&1 | tee hot-path-budget.log
-          grep -Fq 'HOT PATH BUDGET: PASS — 108/108 checks' hot-path-budget.log
+          grep -Fq 'HOT PATH BUDGET: PASS — 117/117 checks' hot-path-budget.log
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 739/739 checks' photo-pipeline.log
+          grep -Fq 'PHOTO PIPELINE: PASS — 830/830 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs
@@ -441,6 +447,7 @@ jobs:
           node server/test/account-deletion-public-check.mjs
           node server/test/account-deletion-session-binding-check.mjs
           node server/test/export-reauth-check.mjs
+          node server/test/password-set-check.mjs
           node server/test/session-alerts-check.mjs
           node server/test/native-origin-csrf-check.mjs
           node server/test/billing-config-check.mjs
@@ -504,6 +511,12 @@ jobs:
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
           grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
+      - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
+        run: |
+          set -o pipefail
+          node server/test/exam-handwriting-check.mjs 2>&1 | tee exam-handwriting.log
+          grep -Fq 'EXAM HANDWRITING: PASS — 109/109 checks' exam-handwriting.log
+          grep -Fq 'SYNTHETIC-READER EVIDENCE' exam-handwriting.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -525,11 +538,12 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 52 → 53 (#430): the owner AP first-mistake contract also runs on real Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 57/57 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 59/59 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
+          grep -Fq '✓ exam-handwriting-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
           grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log
@@ -543,6 +557,7 @@ jobs:
           grep -Fq '✓ rls-account-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-session-binding-check.mjs' platform-postgres.log
           grep -Fq '✓ export-reauth-check.mjs' platform-postgres.log
+          grep -Fq '✓ password-set-check.mjs' platform-postgres.log
           grep -Fq '✓ session-alerts-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
@@ -616,6 +631,9 @@ jobs:
       PRI_FEATURE_PLACEMENT: '1'
       PRI_FEATURE_EXTENDED_TRACKS: '1'
       PRI_FEATURE_AUSTRALIA: '1'
+      # Handwriting input in timed exams (off by default in a shipped build): the
+      # browser suites drive the gate-ON flow explicitly.
+      PRI_FEATURE_EXAM_HANDWRITING: '1'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -727,6 +745,10 @@ jobs:
             # pointer input. Chromium + WebKit × dpr 1.25/1.5 × mouse/pen, dark.
             # Emulated scale factors, not Windows 11 hardware evidence.
             node client/test/ink-canvas-loss-browser-check.mjs 2>&1 | tee -a browser.log
+            # Truthful handwritten feedback (scripted reader, real server marks): a
+            # misread page with a typed final answer, working the server did and did
+            # not check, and annotations that die with the revision they were about.
+            node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -738,6 +760,7 @@ jobs:
             # opened-offline checks are Chromium-only and the run says so).
             node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -790,7 +813,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*417/417.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*431/431.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -805,7 +828,7 @@ jobs:
           test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 1
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          test "$(grep -Ec 'E2E SUITE PASSED.*20/20.*1 flows' browser.log)" -ge 2
+          test "$(grep -Ec 'E2E SUITE PASSED.*21/21.*1 flows' browser.log)" -ge 2
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
@@ -814,7 +837,7 @@ jobs:
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*63/63.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*65/65.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
@@ -843,7 +866,7 @@ jobs:
           grep -Fq 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked' browser.log
           grep -Fq 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once' browser.log
           grep -Fq 'Type · typed answer and working survive a reload, then the same question is server-marked' browser.log
-          grep -Eq 'E2E SUITE.*57/57.*5 flows' browser.log
+          grep -Eq 'E2E SUITE.*59/59.*5 flows' browser.log
           grep -Fq 'Type · offline: reconnect asked, work kept, Retry marked exactly once' browser.log
           grep -Fq 'Write · offline: reconnect asked, ink kept, Retry marked exactly once' browser.log
           grep -Fq 'Draft · offline inside the app: never marked, work kept; a new question online is server-issued' browser.log
@@ -867,17 +890,23 @@ jobs:
           grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log
           # The accessibility walk must have reached the refused-check states.
           grep -Eq 'online-only checking +8/8' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*46/46.*13 groups' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*47/47.*13 groups' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*50/50.*14 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
-          grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
+          grep -Eq 'E2E SUITE.*41/41.*2 flows' browser.log
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
           grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
+          grep -Fq 'Ink · a marked attempt says only what the server established' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED — 49/49 checks across 1 flows' browser.log)" -eq 2
           grep -Fq 'E2E BROWSER: webkit' browser.log
           # Both engines ran the interface-quality tour (pipefail fails the shard on a red check).
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
+          # Preserve evidence that the interface tour ran in both engines.
+          # Their measured coverage counts differ, so verify each separately.
+          grep -Fq 'E2E SUITE PASSED — 200/200 checks across 1 flows' browser.log
+          grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1

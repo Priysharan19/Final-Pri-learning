@@ -378,7 +378,11 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 // it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
 //   EXTENDED_TRACKS — the Olympiad track and the Teacher role in onboarding,
 //   classroom panels for students (src/platform/features.js).
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS']);
+//   EXAM_HANDWRITING — handwriting as an input in TIMED exams (the exam room's
+//   "Write by hand"). Off: a paper offers Type only, so no path can leave
+//   unread handwriting on a paper. On: the frozen-page / pending / Retry
+//   checking flow of server/platform/exams.js applies.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
@@ -389,7 +393,8 @@ export function featureDefines(command, env = process.env) {
   return {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
-    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia)
+    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
+    __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting)
   };
 }
 

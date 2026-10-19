@@ -901,11 +901,13 @@ async function run() {
       answer: worked.right, ms: 5000, viaInk: true,
       ink: { strokes: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }], recognized: canaryInk }
     });
-    // One-request Submit (#441 port): the picture travels with the submission,
-    // so a handwritten Submit is ONE request to the server — no separate
-    // /recognize (and no /confirm) before it.
-    eq('a handwritten Submit is one request: one /submit, no separate /recognize',
-      [online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 0]);
+    // Read on request (#440): the page was read when the student asked (the
+    // harness plays that press: one /handwriting/transcribe). Submit buys no
+    // read: it is ONE /submit (#506) whose picture the server only replays
+    // against the kept reading (paid: false — server/test/recognition-dedupe-check.mjs),
+    // and no separate /recognize.
+    eq('a handwritten Submit buys no read: the student\'s one read, then one /submit and no /recognize',
+      [(online.traffic.read || 0) - (inkTraffic.read || 0), online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 1, 0]);
 
     const disk = JSON.stringify(rawRows());
     ok('the question is on disk at all', disk.includes(sealed.id), 'no row on disk names this profile — nothing was written');
@@ -1850,6 +1852,8 @@ async function run() {
 
     blankExam = (await POST('/exams', { length: 10 })).exam;
     const blank = await POST(`/exams/${blankExam.id}/submit`, { answers: {}, ms: 60000 });
+    await rejects('Retry checking on a marked paper that holds no saved page says so by name and marks nothing',
+      POST(`/exams/${blankExam.id}/handwriting`, { key: 'no-such-page' }), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
     eq('an unanswered paper scores nothing', blank.score, 0);
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);
@@ -2346,6 +2350,29 @@ async function run() {
     eq('the ink archive keeps the strokes that were drawn', archived.strokes.length, 1);
     eq('and the reading taken off them', archived.recognized, inkQ.right);
     eq('an unknown ink id comes back empty rather than throwing', (await GET('/ink/not-a-real-id')).ink, null);
+    // Review 18, N10: the harness plays the student's Read before a handwritten
+    // Submit. A device that submits ink which was NEVER read must not get it
+    // marked: no provider call is made for it and nothing is graded.
+    {
+      const unread = await answerableQuestion({});
+      const before = { ...online.traffic };
+      online.traffic.studentHasRead = false;
+      // (Every picture in this harness is the same stand-in image, so the read
+      // an earlier question paid for is forgotten first: this page was never read.)
+      await online.db.run("DELETE FROM idempotency_keys WHERE scope='recognition-read'");
+      try {
+        await rejects('ink submitted without ever being read is not marked: the server answers "read again", never a silent read',
+          POST(`/practice/${unread.question.id}/submit`, { answer: unread.right, ms: 4000, viaInk: true, ink: { strokes: [{ points: [{ x: 5, y: 5 }, { x: 40, y: 60 }, { x: 80, y: 20 }] }], recognized: unread.right } }),
+          { status: 409, code: 'RECOGNITION_READ_EXPIRED' });
+      } finally { online.traffic.studentHasRead = true; }
+      // The one-request Submit (#506) reaches /submit once and is refused there
+      // before marking; the server holds no completion and the device no attempt.
+      const completed = await online.db.get("SELECT key FROM idempotency_keys WHERE scope='practice-completion' AND key=?", [(await idb.get('questions', unread.question.id)).serverQuestionId]);
+      const unreadRow = await idb.get('questions', unread.question.id);
+      const unreadAttempts = (await idb.byIndex('attempts', 'pid', unreadRow.pid)).filter(a => a.questionId === unread.question.id).length;
+      eq('and for that submission the device asked for no read and nothing was marked: at most one refused /submit, no server completion, no attempt, no try spent',
+        [(online.traffic.read || 0) - (before.read || 0), online.traffic.grade - before.grade <= 1, !!completed, unreadAttempts, unreadRow.answered || 0], [0, true, false, 0, 0]);
+    }
     const inkDetail = await GET(`/history/${inkQ.question.id}/detail`).then(value => ({ value }), error => ({ error }));
     eq('the same ink reaches history', inkDetail.value?.ink?.recognized ?? `threw ${inkDetail.error?.name}: ${inkDetail.error?.message}`, inkQ.right);
 

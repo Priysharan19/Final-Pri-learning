@@ -455,6 +455,10 @@ enum JourneySelfCheck {
         at = 'write'; await writeMode();
         const echoed = await writeOnNativeSurface();
         at = 'saved'; await inkSavedTruthfully(id);
+        // Reading is asked for (owner decision): writing and saving send nothing.
+        at = 'unread'; await sleep(1500);
+        if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
+        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
         at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
         const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
         if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
@@ -642,7 +646,14 @@ enum JourneySelfCheck {
         catch (e) { throw new Error('no thumbnail for a ' + blob.size + '-byte PNG: ' + where()); }
         const shown = Date.now() - t0;
         at = 'unread'; let said;
-        try { said = await waitFor(() => !/reading your work/i.test(seen('.photo-attach [role=status]')) && seen('.photo-attach [role=status] .verdict-body'), 30000); }
+        try { said = await waitFor(() => {
+          const status = seen('.photo-attach [role=status]');
+          if (!status || /reading your work/i.test(status)) return false;
+          const unread = q('.photo-attach [data-photo-unread]');
+          if (unread && vis(unread) && q('.photo-attach [data-photo-read]') && /not been sent anywhere/i.test(status)) return status;
+          if (!unread && /the attachment remains on this screen.*online eligible account/i.test(status)) return status;
+          return false;
+        }, 30000); }
         catch (e) { throw new Error('the status never settled: ' + where()); }
         if (q('[data-photo-correct-transcript]')) throw new Error('a photo transcript appeared with no server');
         await sleep(800);
