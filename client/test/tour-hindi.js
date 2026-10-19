@@ -170,7 +170,9 @@ export const flow = {
       // Read on request (#440): the stroke alone sends nothing to be read. The
       // student presses Read my answer — labelled in Hindi — and only then is
       // the page sent to the server's reader, exactly once.
-      const isRead = c => /^\/v1\/handwriting\//.test(c.path) || /\/recogni[sz]e$/.test(c.path);
+      // A read is a page sent to the reader; /v1/handwriting/status only asks
+      // whether the reader is on.
+      const isRead = c => /^\/v1\/handwriting\/(?!status$)/.test(c.path) || /\/recogni[sz]e$/.test(c.path);
       await settle();
       await online.settled();
       await check('Handwriting: nothing is read until the student presses Read my answer',
