@@ -37,7 +37,7 @@ const SCHEMES = ['light', 'dark'];
 const SCREENS = ['/', '/practice', '/progress', '/exams', '/tasks', '/notes', '/review', '/plan', '/settings'];
 // Content that changes from run to run (drawn questions, dates, counts) is
 // masked in snapshots; the layout around it is what the baseline holds.
-const MASK = ['.q-prompt', '.q-card .katex', '.home-greet', 'time', '[data-volatile]', '.mode-tab ~ *'];
+const MASK = ['.q-prompt', '.q-card .katex', '.home-greet', 'time', '[data-volatile]'];
 const MAX_INPUT_MS = 100;
 // A pixel differs when any channel moves by more than this; a snapshot fails
 // when more than this share of pixels differ (anti-aliasing noise stays under).
@@ -112,7 +112,9 @@ const AUDIT = () => {
   // get a 44px area underneath on touch screens (theme-legacy.css). Probe the
   // points 21px either side of the centre; each must land on the control.
   const small = controls.filter(el => {
-    if (el.tagName === 'A' && el.closest('p, li, .katex')) return false; // inline text links (WCAG 2.5.8 inline exception)
+    // Inline text links (WCAG 2.5.8 inline exception): a link sitting in a run
+    // of text, not a list row or nav item that happens to be a link.
+    if (el.tagName === 'A' && el.parentElement && [...el.parentElement.childNodes].some(n => n !== el && n.nodeType === 3 && n.textContent.trim())) return false;
     if (el.tagName === 'INPUT' && /checkbox|radio/.test(el.type) && el.closest('label')) return false; // the label is the target
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
@@ -206,8 +208,15 @@ export const flow = {
               stops.push(await page.evaluate(() => {
                 const el = document.activeElement;
                 if (!el || el === document.body) return null;
+                // A ring is an outline, or a shadow/border that focus changed: a
+                // control that always has a shadow does not pass by having it.
                 const s = getComputedStyle(el);
-                const ring = (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) || (s.boxShadow && s.boxShadow !== 'none');
+                const focused = { shadow: s.boxShadow, border: s.borderColor, outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 };
+                el.blur();
+                const u = getComputedStyle(el);
+                const rest = { shadow: u.boxShadow, border: u.borderColor };
+                el.focus({ preventScroll: true });
+                const ring = focused.outline || focused.shadow !== rest.shadow || focused.border !== rest.border;
                 const name = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || (el.labels?.[0]?.textContent) || '').trim();
                 return { ring, name: name.slice(0, 30), tag: el.tagName };
               }));
@@ -248,7 +257,8 @@ export const flow = {
             // Only the press below is timed, not the Tab walk above it.
             await page.evaluate(() => { window.__priSlowInput = []; });
             const safe = page.locator('[role=tab], .mode-tab, .pill-opt').first();
-            if (await safe.count()) await safe.click({ timeout: 3000 }).catch(() => {});
+            if (!(await safe.count())) { note(`${tag}: no tab or choice control to time`); continue; }
+            await safe.click({ timeout: 3000 });
             await page.waitForTimeout(400);
             const slow = await page.evaluate(() => window.__priSlowInput || []);
             await check(`${tag}: input answers inside ${MAX_INPUT_MS} ms`, slow.length === 0, JSON.stringify(slow.slice(0, 4)));

@@ -528,7 +528,8 @@ jobs:
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
-          grep -Eq 'E2E SUITE PASSED.*220/220.*1 flows' browser.log
+          # Both engines ran the interface-quality tour (pipefail fails the step on a red check).
+          test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
