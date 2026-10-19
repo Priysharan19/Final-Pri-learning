@@ -494,17 +494,21 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // between them, which would let account B's "not required" admit account A.
   router.get('/guardian/state', requireSession(db), async (req, res) => {
     const state = await consentState(db, req.platformSession.account_id);
+    // The account row was read with the session a moment ago, in this request
+    // (security.js joins accounts into the session lookup), so `eligible` and
+    // `emailVerified` describe exactly the account this reply names — with no
+    // second read.
+    const account = req.platformSession;
+    const blockerCode = consentBlockerCode(state);
     res.set('Cache-Control', 'no-store');
     res.json({
       accountId: String(req.platformSession.account_id),
       required: state.required,
       state: state.state,
       ageBasis: state.ageBasis,
-      blockerCode: consentBlockerCode(state),
-      // Read with the session a moment ago, in this request, from the same row,
-      // so `eligible` describes exactly the account this reply names.
-      eligible: consentBlockerCode(state) === null && !!req.platformSession.email_verified_at,
-      emailVerified: !!req.platformSession.email_verified_at,
+      blockerCode,
+      eligible: blockerCode === null && !!account?.email_verified_at,
+      emailVerified: !!account?.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
       method: state.row?.method || null
