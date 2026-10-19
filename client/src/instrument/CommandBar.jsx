@@ -88,7 +88,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
                     className="in-pal-item" tabIndex={-1} onMouseMove={() => setSel(mine)} onClick={() => choose(row)}
                     style={row.colour ? { '--cc': `var(${row.colour})` } : undefined}>
                     {row.colour && <i className="in-pal-swatch" aria-hidden="true" />}
-                    <b>{row.label}</b>
+                    <b lang={row.colour ? 'en' : undefined}>{row.label}</b>
                     {row.hint && <small>{row.hint}</small>}
                   </button>
                 );

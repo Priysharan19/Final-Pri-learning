@@ -8,6 +8,7 @@ import TermGloss from '../components/TermGloss.jsx';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
+import { blueprintLabel } from '../lib/blueprintKeys.js';
 
 function scopeFor(curriculum, user) {
   if (!curriculum) return null;
@@ -92,7 +93,7 @@ export default function IndiaProgress() {
           <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
             <div>
               <h2 className="sc-label" id="pg-paper">{t('progress.ifYouSatTomorrow')}</h2>
-              <p className="sub" style={{ margin: 0 }}>{prediction.label}</p>
+              <p className="sub" style={{ margin: 0 }}>{blueprintLabel(t, prediction.blueprintId, prediction.label)}</p>
             </div>
             {prediction.show && (
               <div style={{ textAlign: 'right' }}>
@@ -126,7 +127,9 @@ export default function IndiaProgress() {
               {prediction.priorities.slice(0, 4).map(unit => (
                 <div key={unit.unitId} className="set-row">
                   <span className="set-k">
-                    {unit.name}
+                    {/* Unit names are curriculum data, English by design (as in
+                        the chapter table below), with their Hindi terms glossed. */}
+                    <span lang="en"><TermGloss text={unit.name} /></span>
                     <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
                       {unit.covered
                         ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: Math.round(unit.expected), marks: unit.marks })

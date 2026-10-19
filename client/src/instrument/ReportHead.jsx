@@ -4,6 +4,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, timezoneOf } from '../lib/locale.js';
+import TermGloss from '../components/TermGloss.jsx';
 
 // The top of the v1.1 Report: four honest figures, the practice heat-map and
 // where marks were lost. Every figure states its count; marks are the server-
@@ -86,7 +87,7 @@ export default function ReportHead() {
           {view.lost.length ? (
             <ul>{view.lost.map(c => (
               <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
-                <i aria-hidden="true" /><span>{c.name}</span><small>{`${c.earned} / ${c.possible}`}</small>
+                <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned} / ${c.possible}`}</small>
               </li>
             ))}</ul>
           ) : <p className="in-note">{t('inst.reportLostNone')}</p>}

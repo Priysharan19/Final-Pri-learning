@@ -2919,7 +2919,7 @@ export default {
   "inst.greetMorning": "Good morning, {name}.",
   "inst.greetAfternoon": "Good afternoon, {name}.",
   "inst.greetEvening": "Good evening, {name}.",
-  "inst.resumeLabel": "Continue · {name}",
+  "inst.resumePrefix": "Continue",
   "inst.resumeSub": "Pick up where you stopped",
   "inst.resume": "Resume",
   "inst.chapters": "Chapters",
