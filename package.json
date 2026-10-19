@@ -179,7 +179,7 @@
     "test:platform:working": "node server/test/working-check-check.mjs",
     "test:platform:question-photo": "node server/test/question-photo-check.mjs",
     "test:platform:tutor": "node server/test/tutor-help-check.mjs && node server/test/tutor-device-journey-check.mjs && node server/test/tutor-issued-grounding-check.mjs && node server/test/tutor-guard-complexity-check.mjs",
-    "test:platform:practice:http": "node server/test/method-progress-http-check.mjs && node server/test/flagship-ap-working-http-check.mjs && node server/test/owner-ap-first-mistake-contract-check.mjs && node server/test/ap-term-firstbreak-regression-check.mjs && node server/test/practice-seed-reissue-check.mjs && node server/test/practice-daily-cap-check.mjs && node server/test/practice-seek-budget-check.mjs",
+    "test:platform:practice:http": "node server/test/method-progress-http-check.mjs && node server/test/flagship-ap-working-http-check.mjs && node server/test/owner-ap-first-mistake-contract-check.mjs && node server/test/ap-term-firstbreak-regression-check.mjs && node server/test/practice-seed-reissue-check.mjs && node server/test/practice-hints-notebook-check.mjs && node client/test/hint-ladder-check.mjs && node client/test/review-queue-check.mjs && node server/test/practice-daily-cap-check.mjs && node server/test/practice-seek-budget-check.mjs",
     "test:platform:tutor:stream": "node server/test/tutor-stream-check.mjs",
     "test:tutor:ui": "node client/test/tutor-ui-check.mjs",
     "test:account:withdraw": "node client/test/account-action-guardian-withdraw-check.mjs",

@@ -12,6 +12,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
+import ErrorNotebook from '../components/ErrorNotebook.jsx';
 import { createHistoryLoadGate } from './historyLoadLifecycle.js';
 
 const FILTERS = [
@@ -133,6 +134,8 @@ function HistoryForProfile() {
         </div>
         <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>
       </div>
+
+      <ErrorNotebook />
 
       <div className="row" role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
         {FILTERS.map(([k, key]) => (

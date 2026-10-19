@@ -328,6 +328,12 @@ jobs:
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-hints-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
+          grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
+          grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log

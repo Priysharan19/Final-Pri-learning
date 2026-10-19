@@ -191,7 +191,10 @@ const BODY_RULES = [
     optionalId(body, 'pendingQuestionId');
   }],
   [/^POST \/practice\/[A-Za-z0-9._-]+\/(?:hint|reveal)$/, body => {
-    requireObject(body, 'practice action'); optionalNumber(body, 'ms');
+    requireObject(body, 'practice action'); optionalNumber(body, 'ms'); optionalString(body, 'rung', 12);
+  }],
+  [/^POST \/notebook\/[A-Za-z0-9._-]+\/twin$/, body => {
+    requireObject(body, 'notebook twin');
   }],
   // AI tutor: a level and the student's own working, nothing else. The
   // backend adds the verified solution itself — the UI never supplies one.
