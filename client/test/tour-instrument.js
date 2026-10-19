@@ -200,6 +200,16 @@ export const writeFlow = {
     if (await tab.count()) await tab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
 
+    // The hint ladder: a rung opened is a numbered card, marked as a rung.
+    await page.locator('.hint-bulb').click();
+    await page.waitForSelector('.hintbox[data-hint-shown]', { timeout: 15000 }).catch(() => {});
+    const rung = await page.evaluate(() => {
+      const box = document.querySelector('.hintbox[data-hint-shown]'); if (!box) return null;
+      const b = getComputedStyle(box, '::before'); const probe = document.createElement('div'); probe.style.background = 'var(--in-action)'; document.body.append(probe);
+      const action = getComputedStyle(probe).backgroundColor; probe.remove();
+      return { numbered: b.content !== 'none' && b.content !== '', bg: b.backgroundColor, action, radius: getComputedStyle(box).borderRadius };
+    });
+    await check('an opened hint is a numbered rung on the ladder', !!rung && rung.numbered && rung.bg === rung.action && rung.radius === '6px', JSON.stringify(rung));
     const shell = page.locator('.editor-shell').first();
     const look = sel => page.evaluate(q => { const el = document.querySelector(q); if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, radius: s.borderRadius, font: s.fontFamily }; }, sel);
     const stage = await look('.ink-stage');
