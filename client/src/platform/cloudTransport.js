@@ -72,6 +72,13 @@ export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
  * the hands of whatever was answering the request — a service worker, a
  * captive portal, an in-app browser — and the first render waits on this.
  */
+// What the last health probe heard: `answered` is true when ANY HTTP answer
+// came back (a 503, a non-JSON page, another service), false when none did
+// (a network error or the time limit). The activation gate's offline grace is
+// for "nothing answered" only: a live server that answered is not offline.
+let lastProbe = { answered: null, at: 0 };
+export const lastCloudProbe = () => ({ ...lastProbe });
+
 export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   if (discovery) return discovery;
   discovery = (async () => {
@@ -81,6 +88,7 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
     const loc = globalThis.location;
     if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
     const controller = new AbortController();
+    let answered = false;
     let timer;
     const limit = new Promise(resolve => {
       timer = setTimeout(() => {
@@ -97,6 +105,7 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
         redirect: 'error',
         signal: controller.signal
       });
+      answered = true;
       if (!response.ok || !/json/i.test(response.headers.get('content-type') || '')) return null;
       const text = await response.text();
       if (byteLength(text) > 64 * 1024) return null;
@@ -110,6 +119,7 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       return await Promise.race([asked, limit]);
     } finally {
       clearTimeout(timer);
+      lastProbe = { answered, at: Date.now() };
     }
   })();
   // A page loaded while the server was unreachable must find it again once it

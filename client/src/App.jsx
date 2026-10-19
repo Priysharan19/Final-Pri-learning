@@ -252,7 +252,7 @@ export default function App() {
       } catch (error) {
         if (!live) return;
         if (activation.isActivationDenied(error)) setActivated(null);
-        else if (offlineEntry && !(Date.now() - offlineVerifiedAt < activation.OFFLINE_GRACE_MS)) setActivated(null);
+        else if (offlineEntry && (offlineVerifiedAt == null || !(Date.now() - offlineVerifiedAt < activation.OFFLINE_GRACE_MS))) setActivated(null);
       }
     };
     const visible = () => { if (document.visibilityState === 'visible') void recheck(); };

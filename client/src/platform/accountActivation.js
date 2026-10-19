@@ -27,8 +27,8 @@
 // SESSION_UNAVAILABLE / CONSENT_UNAVAILABLE, which the caller shows as a
 // retry, never as a sign-out.
 // ─────────────────────────────────────────────────────────────────────────────
-import { cloud, cloudAvailable, discoverCloudOrigin } from './cloudTransport.js';
-import { cloudAccountLink, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
+import { cloud, cloudAvailable, discoverCloudOrigin, lastCloudProbe } from './cloudTransport.js';
+import { cloudAccountLink, noteCloudClock, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
 
 export class ActivationBlocked extends Error {
@@ -69,7 +69,7 @@ export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
 
 /** The server could not be reached at all (no HTTP answer) — the only case the grace covers. */
 function serverUnreachable(error) {
-  if (error?.code === 'CLOUD_UNAVAILABLE') return true;
+  if (error?.code === 'CLOUD_UNAVAILABLE') return error.cause?.probeAnswered === false;
   if (error?.code !== 'SESSION_UNAVAILABLE' && error?.code !== 'CONSENT_UNAVAILABLE') return false;
   const cause = error.cause;
   if (!cause) return false;
@@ -83,8 +83,11 @@ export async function offlineGraceFor(pid, now = Date.now()) {
   if (!link?.accountId || !link.lastSyncAt || !link.activatedAt) return null;
   if (String(link.activatedAccountId) !== String(link.accountId)) return null;
   const age = now - link.activatedAt;
-  // A timestamp from the future is a clock that moved, not a fresh answer.
+  // A timestamp from the future is a clock that moved, not a fresh answer;
+  // so is a clock earlier than the latest time this device has already shown.
   if (!(age >= 0 && age < OFFLINE_GRACE_MS)) return null;
+  if (link.clockSeenAt && now < link.clockSeenAt) return null;
+  try { await noteCloudClock(pid, now); } catch { return null; }
   return { profileId: pid, accountId: String(link.accountId), guardian: null, offline: true, verifiedAt: link.activatedAt };
 }
 
@@ -131,8 +134,12 @@ async function activateOnline(pid, { expectedAccountId = null, sync = true } = {
     // build has no server": that is said only when the probe itself finds none.
     await discoverCloudOrigin().catch(() => null);
     if (!cloudAvailable()) {
-      if (globalThis.navigator?.onLine === false) throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: new TypeError('offline'), retryable: true });
-      throw new ActivationBlocked('CLOUD_UNAVAILABLE', { retryable: true });
+      // Whether anything answered the probe decides the grace: a 503 or a
+      // stranger's page is a server that is there, not an offline device; a
+      // probe that never ran (no web origin to ask) is not "nothing answered".
+      const probeAnswered = lastCloudProbe().answered;
+      if (globalThis.navigator?.onLine === false && probeAnswered !== true) throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: new TypeError('offline'), retryable: true });
+      throw new ActivationBlocked('CLOUD_UNAVAILABLE', { cause: { probeAnswered }, retryable: true });
     }
   }
 

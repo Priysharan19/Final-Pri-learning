@@ -61,6 +61,9 @@ export async function cloudAccountLink(pid, { strict = false } = {}) {
     // cannot be reached at all.
     activatedAt: Number(row.activatedAt) || null,
     activatedAccountId: row.activatedAccountId ? String(row.activatedAccountId) : null,
+    // The latest device time the grace has seen: a clock earlier than this
+    // has moved backwards, and the grace refuses it.
+    clockSeenAt: Number(row.clockSeenAt) || null,
     entitlement: normalizeEntitlementSnapshot(row.entitlement || {})
   };
 }
@@ -87,6 +90,7 @@ async function saveAccount(pid, account, patch = {}) {
     // above guarantees it is the same one); a new link starts without it.
     activatedAt: prior?.accountId ? prior.activatedAt || null : null,
     activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
+    clockSeenAt: prior?.clockSeenAt || null,
     ...patch
   };
   // Defense in depth for rows written by an earlier development build.
@@ -213,7 +217,18 @@ export async function recordCloudActivation(pid, accountId, at = Date.now()) {
   const prior = await get('device', id);
   if (!prior) return;
   if (accountId && String(prior.accountId) !== String(accountId)) return;
-  await put('device', { ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null });
+  await put('device', {
+    ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
+    clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
+  });
+}
+
+/** Raise the clock high-water mark the offline grace checks against. */
+export async function noteCloudClock(pid, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior || (Number(prior.clockSeenAt) || 0) >= at) return;
+  await put('device', { ...prior, clockSeenAt: at });
 }
 
 /** The device half of ending a link: native session, replica state, link row. */

@@ -353,6 +353,47 @@ reset();
   ok('a record naming another account is ignored by the writer', (await cloudAccountLink('p1')).activatedAccountId === 'acct-A' && (await cloudAccountLink('p1')).activatedAt === row.activatedAt);
 }
 
+// ── 10 · the grace is for "nothing answered", never for a live server's no ──
+reset();
+{
+  // A profile of its own: section 9 deliberately left p1's clock mark ahead.
+  await put('profiles', { id: 'p6', name: 'Zoya', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p6', { email: 'a@example.test', password: 'test-password-only' });
+  ok('a fresh online answer to start from', !!(await gate('p6')).ready);
+  const origin = globalThis.__PRI_CLOUD_ORIGIN__;
+  const realFetch = globalThis.fetch;
+  const hadLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
+  Object.defineProperty(globalThis, 'location', { value: { origin: 'https://pri.example.test', protocol: 'https:' }, configurable: true, writable: true });
+  delete globalThis.__PRI_CLOUD_ORIGIN__;
+  try {
+    for (const [label, answer] of [
+      ['a 503', () => new Response('down', { status: 503, headers: { 'content-type': 'text/plain' } })],
+      ['a non-JSON page (a captive portal)', () => new Response('<html>wifi login</html>', { status: 200, headers: { 'content-type': 'text/html' } })],
+      ['another service\'s JSON', () => json({ service: 'someone-else' })]
+    ]) {
+      globalThis.fetch = async (url, options) => (new URL(url).pathname === '/v1/health' ? answer() : realFetch(url, options));
+      const r = await gate('p6', { offlineGrace: true });
+      ok(`/v1/health answering ${label} is a server that is there: no grace, the retry screen`, !r.ready && r.code === 'CLOUD_UNAVAILABLE' && r.retryable, JSON.stringify(r));
+    }
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    const none = await gate('p6', { offlineGrace: true });
+    ok('nothing answering /v1/health at all is the offline case: the grace applies', none.ready?.offline === true, JSON.stringify(none));
+    // A clock moved backwards since the device last looked is refused.
+    const seen = (await cloudAccountLink('p6')).clockSeenAt;
+    ok('a grace raises the clock high-water mark', Number(seen) > 0);
+    const realNow = Date.now;
+    Date.now = () => seen - 60 * 60 * 1000;
+    try {
+      const back = await gate('p6', { offlineGrace: true });
+      ok('a device clock set back an hour, still inside 72 h of the answer, gets no grace', !back.ready && back.code === 'CLOUD_UNAVAILABLE', JSON.stringify(back));
+    } finally { Date.now = realNow; }
+  } finally {
+    globalThis.fetch = realFetch;
+    if (hadLocation) Object.defineProperty(globalThis, 'location', hadLocation); else delete globalThis.location;
+    globalThis.__PRI_CLOUD_ORIGIN__ = origin;
+  }
+}
+
 if (failures.length) {
   console.log(`ACCOUNT ACTIVATION: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures) console.log(`  · ${f}`);
