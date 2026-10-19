@@ -68,6 +68,7 @@ if [ "$EXPECT" != "floor" ]; then
   run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "$@"
   run "com.prilearning.app.WebViewAccessibilityTest#theProductPassesTheAccessibilitySmokeInTheShell" "$@"
   run "com.prilearning.app.WebViewAccessibilityTest#theSystemFontScaleReachesThePage" "$@"
+  run "com.prilearning.app.WebViewAccessibilityTest#noScreenClipsHorizontally" "$@"
   summary="$summary, share/picker/camera/print, finger + stylus ink, accessibility smoke"
 fi
 

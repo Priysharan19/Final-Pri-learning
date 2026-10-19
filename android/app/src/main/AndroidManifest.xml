@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Pri Learning · Android shell (CP-06)
-  · INTERNET is the only permission. Files come through the system document
+  · INTERNET is the only permission (sign-in codes come through the SMS User
+    Consent API, which needs no SMS permission). Files come through the system document
     picker (SAF) and photos through the camera app's own capture activity
     (CP-07): no storage or camera permission. Shared files leave through a
     FileProvider whose only roots are two cache subdirectories.
@@ -16,6 +17,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <queries>
+        <!-- SMS User Consent: the shell checks the consent screen belongs to Play services. -->
+        <package android:name="com.google.android.gms" />
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
         </intent>
