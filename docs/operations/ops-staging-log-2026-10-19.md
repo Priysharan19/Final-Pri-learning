@@ -134,3 +134,32 @@ billing.
    outside the repository.
 5. Rehearse one restore (`postgres-cutover.md` §6.3) and record it here before the
    production cutover.
+
+## 6. Production promotion of `169bcdfe7` on SQLite (train 9)
+
+Owner approvals, relayed verbatim by the orchestrating session: "Keep SQLite today: promote
+the release SHA to production on SQLite, Postgres cutover after the 24-hour soak." and "Yes:
+I accept promoting 169bcdfe7 to production on SQLite with only the pre-existing
+native-ink-app App Health check red. Go now, then hand off to iOS." No Postgres variable was
+set on production and no cutover was run.
+
+| Step | Result |
+|---|---|
+| Staging on the SHA | `169bcdfe7` on Postgres, schema 12 / billing 6, ready since **09:12:25 UTC**. The 24 h soak clock starts here |
+| `release-nominate.mjs` | **FAIL 19/20.** The only failure is Pri App Health Agent run 39227834970, `native-ink-app` (iPad simulator self-check reports no score). It is red on every main SHA since at least `2fd740016` and stayed red after one infra rerun. Android Shell failed once (emulator input injection) and passed on rerun. The four required contexts and Production Container are green. **Exception accepted by the owner (quote above).** |
+| SQLite upgrade check | A schema-11 database created by `4d34439` opens on `169bcdfe7` at schema 12 with `integrity_check ok`. This used an empty database, not a production copy |
+| Backup | Railway volume snapshot `pre-promotion-169bcdfe7-20261019` (id `4bc17786-add4-4e50-975f-1377c314b206`), volume `pri-learning-data` `/data`, 53 MB, 09:11:46 UTC, no expiry. A file-level copy needs `railway ssh`, which needs a human SSH-key signup, so it was not taken |
+| Push | The first push was refused because `deploy/production` required linear history and the range holds 153 merge commits. The owner unticked "Require linear history" (enforce-admins and the 4 checks are kept). The fast-forward `4d3443962..169bcdfe7` was pushed at 12:14:56 UTC |
+| Deploy | The push did not trigger Railway (the trigger exists, `checkSuites=false`, probably a missed webhook). `serviceInstanceDeployV2` for that exact commit at 12:15:44 created deployment `536de612` |
+| Verify | 12:19:19 UTC: `/v1/health` `releaseSha 169bcdfe7`, `database.engine sqlite`, reachable. `/v1/ready` ready, schema 12 / billing 6, nothing failing. `/release.json` matches the SHA. `/` returns 200 |
+| Preflight | `staging-acceptance.mjs --target production` refuses because the SHA is not nominated (by design). The same read-only checks were run by hand (row above) |
+| OTP smoke | `POST /v1/account/otp/request` → 202. Resend shows the production sender delivered it at 12:19:46. The code was not redeemed |
+
+Rollback: redeploy `8207ff23` (`4d34439`) from the Railway deployment list. It expects schema
+11 and the volume is now at 12, so the server refuses a schema newer than it expects. A
+rollback therefore also restores snapshot `4bc17786`, which loses writes made since 12:19 UTC.
+
+Open: `PRI_RELEASE_SHA` on staging is still set (now `169bcdfe7`). Staging deploys by
+`railway up` with no `.git`, so deleting it would rebuild without identity. Delete it once
+staging is source-connected to GitHub. Production has `PRI_RELEASE_SHA=796184f…`, overridden
+by `RAILWAY_GIT_COMMIT_SHA`. It is harmless but stale.
