@@ -371,7 +371,7 @@ function releaseIdentityManifest(identity) {
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA', 'INSTRUMENT']);
 // Flags built and recorded in features.json like the ones above, but not yet
 // asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
 // check.mjs), because those bundles predate the flag and carry no record of
@@ -394,7 +394,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
-    __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting)
+    __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
+    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument)
   };
 }
 

@@ -48,6 +48,15 @@ const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
+// The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
+// the owner flips it. Its code and stylesheet load only when the flag is on.
+const INSTRUMENT_ON = featureEnabled('instrument');
+const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/InstrumentBar.jsx')) : null;
+const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
+if (INSTRUMENT_ON && typeof document !== 'undefined') {
+  document.documentElement.classList.add('ui-instrument');
+  import('./instrument/instrument.css');
+}
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.
 const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
@@ -528,16 +537,23 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
-        <header className="topbar">
-          <Logo onClick={() => nav('/')} />
-          <div className="top-stats">
-            <ThemeToggle />
-            <AccountMenu user={user} onSwitch={switchProfile} />
-          </div>
-        </header>
+        {INSTRUMENT_ON ? (
+          <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
+            <InstrumentBar user={user} setUser={setUser} navItems={navItems}
+              accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
+          </React.Suspense>
+        ) : (
+          <header className="topbar">
+            <Logo onClick={() => nav('/')} />
+            <div className="top-stats">
+              <ThemeToggle />
+              <AccountMenu user={user} onSwitch={switchProfile} />
+            </div>
+          </header>
+        )}
 
         <div className="body-row">
-          <aside className="sidebar no-print">
+          {!INSTRUMENT_ON && <aside className="sidebar no-print">
             <div className="sidebar-inner">
               {navSections.map(section => (
                 <div className="nav-section" key={section.label}>
@@ -548,7 +564,7 @@ export default function App() {
               <div className="nav-spacer" />
               {user.role !== 'teacher' && <SidebarHistory recent={recent} />}
             </div>
-          </aside>
+          </aside>}
 
           <div className="main">
             {activated?.offline && (
@@ -563,7 +579,7 @@ export default function App() {
                     reported as a broken route rather than blanking the shell. */}
                 <React.Suspense fallback={<RouteLoading />}>
                   <Routes>
-                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
+                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : (INSTRUMENT_ON ? <IndexPage /> : <Home />)} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
