@@ -120,8 +120,24 @@ const browserCommands = [...job('browser-shard').matchAll(/^\s+((?:node|npm run)
 const at = browserCommands.indexOf(e2eChain[0]);
 assert.ok(at >= 0 && e2eChain.every((cmd, i) => browserCommands[at + i] === cmd),
   'the browser groups must run every command of npm run test:e2e, in order (update ci.yml when test:e2e changes)');
-for (const cmd of ['npm run test:a11y', 'npm run test:boot']) {
-  assert.ok(browserCommands.includes(cmd), `the browser groups must run ${cmd}`);
+// The tours CI adds beyond test:e2e (both engines, the photo page, ink canvas
+// loss, and the platform tours repeated on tour-ai-tutor.js's build).
+for (const cmd of [
+  'npm run test:a11y', 'npm run test:boot',
+  'node client/test/tour-cloud-platform.js --no-build',
+  'node client/test/tour-admin-cms-platform.js --no-build',
+  'node client/test/tour-admin-independent-review.js --no-build',
+  'node client/test/tour-responsive-matrix.js --no-build',
+  'node client/test/tour-responsive-matrix.js --no-build --browser=webkit',
+  'node client/test/tour-iphone-layout.js --no-build',
+  'node client/test/tour-iphone-layout.js --no-build --browser=webkit',
+  'node client/test/tour-activation-gate.js --no-build --browser=webkit',
+  'node client/test/tour-photo-answer.js --no-build',
+  'node client/test/ink-canvas-loss-browser-check.mjs'
+]) {
+  const expected = e2eChain.filter(c => c === cmd).length + 1;
+  assert.equal(browserCommands.filter(c => c === cmd).length,
+    cmd.startsWith('npm run') ? 1 : expected, `the browser groups must run ${cmd} as the single job did`);
 }
 const groups = (job('browser-shard').match(/group: \[([^\]]+)\]/) || [])[1]?.split(',').map(s => s.trim()) || [];
 assert.ok(groups.length >= 2, 'the browser matrix names its groups');
