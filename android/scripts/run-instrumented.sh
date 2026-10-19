@@ -57,6 +57,7 @@ run() {
      { [ "$EXPECT" != "floor" ] && grep -q "INSTRUMENTATION_STATUS_CODE: -4" "$log"; }; then
     echo "INSTRUMENTED: FAIL in $method" >&2
     adb logcat -d -s PRITEST PriBridge AndroidRuntime chromium > "$OUT/logcat.txt" || true
+    [ -n "${PRI_CLOUD_SERVER_LOG:-}" ] && cp "$PRI_CLOUD_SERVER_LOG" "$OUT/server.log" 2>/dev/null || true
     exit 1
   fi
 }

@@ -361,7 +361,12 @@ class CloudJourneyTest {
             // Signed in: the server marks. A wrong answer first, then the right
             // one, on a question whose sealed answer the oracle can state.
             openPractice(s)
-            openTypedQuestion(s)
+            // This device profile was the deleted account's a moment ago
+            // (cloudSignUpThenDeleteAccount): the card it finished on issued a
+            // question to THAT account, which Practice resumes, and which this
+            // account may not submit (the card says it does not belong to this
+            // account). The journey starts on a question issued to this account.
+            openTypedQuestion(s, advanceFirst = true)
             var escrow: JSONObject? = null
             val passed = mutableListOf<String>()
             for (i in 0 until 12) {
