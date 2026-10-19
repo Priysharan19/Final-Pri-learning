@@ -22,10 +22,12 @@ umask 077
 mkdir -p "$dir"
 chmod 700 "$dir"
 pass="$(openssl rand -base64 33 | tr -d '/+=\n' | cut -c1-32)"
+# Passed to keytool through the environment, never on its command line (ps).
+export PRI_KS_PASS="$pass"
 # PKCS12 uses one password for the store and the key.
 keytool -genkeypair -v -storetype PKCS12 -keystore "$store" -alias "$alias" \
   -keyalg RSA -keysize 4096 -validity 10000 -sigalg SHA256withRSA \
-  -storepass "$pass" -keypass "$pass" \
+  -storepass:env PRI_KS_PASS -keypass:env PRI_KS_PASS \
   -dname "CN=Pri Learning Upload, O=Pri Learning, C=IN" >/dev/null 2>&1
 cat > "$props" <<PROPS
 # Pri Learning Play upload key — secret, never commit or share.
@@ -37,4 +39,4 @@ PROPS
 chmod 600 "$store" "$props"
 echo "upload key written to $store (properties: $props)"
 echo "upload certificate SHA-256 (register in Play Console → App integrity if asked):"
-keytool -list -v -keystore "$store" -storepass "$pass" -alias "$alias" 2>/dev/null | grep -E 'SHA256:' | sed 's/^[[:space:]]*//'
+keytool -list -v -keystore "$store" -storepass:env PRI_KS_PASS -alias "$alias" 2>/dev/null | grep -E 'SHA256:' | sed 's/^[[:space:]]*//'

@@ -28,9 +28,9 @@ export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 aab="$root/android/app/build/outputs/bundle/release/app-release.aab"
 [[ -f "$aab" ]] || { echo "no bundle at $aab" >&2; exit 1; }
 store="$(sed -n 's/^storeFile=//p' "$props")"
-pass="$(sed -n 's/^storePassword=//p' "$props")"
+PRI_KS_PASS="$(sed -n 's/^storePassword=//p' "$props")"; export PRI_KS_PASS
 alias="$(sed -n 's/^keyAlias=//p' "$props")"
-want="$(keytool -list -v -keystore "$store" -storepass "$pass" -alias "$alias" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p')"
+want="$(keytool -list -v -keystore "$store" -storepass:env PRI_KS_PASS -alias "$alias" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p')"
 got="$(keytool -printcert -jarfile "$aab" 2>/dev/null | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
 jarsigner -verify "$aab" >/dev/null || { echo "bundle signature does not verify" >&2; exit 1; }
 [[ -n "$want" && "$want" == "$got" ]] || { echo "bundle is not signed by the upload key (want $want, got ${got:-none})" >&2; exit 1; }

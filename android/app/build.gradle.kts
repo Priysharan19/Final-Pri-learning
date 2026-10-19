@@ -150,3 +150,14 @@ dependencies {
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }
+
+// The task-name check above catches the usual invocations early; this catches
+// every other route to a release artefact (abbreviated names, `bundle`,
+// `assembleRelease`, `build`): if a release bundle or APK is about to be
+// packaged with no upload key, the build stops.
+gradle.taskGraph.whenReady {
+    val packagesRelease = allTasks.any { it.project == project && it.name in setOf("signReleaseBundle", "packageReleaseBundle", "packageRelease") }
+    if (packagesRelease && !unsignedRelease && android.signingConfigs.findByName("upload") == null) {
+        throw GradleException("release bundles are signed with the upload key: $uploadSigningFile is missing — run android/scripts/create-upload-key.sh (or pass -Ppri.unsignedRelease=true for a compile-only check)")
+    }
+}

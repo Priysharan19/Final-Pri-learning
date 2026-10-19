@@ -72,6 +72,9 @@ check('main manifest refuses cleartext traffic', () =>
 //    list is still checked against the libraries that are known to add them.
 check('merged-manifest permissions are all declared in the doc', () => {
   const merged = 'android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml';
+  // On CI (after bundleRelease) the merged manifest must exist; a silent
+  // fallback there would check the doc against itself.
+  if (process.env.PRI_REQUIRE_MERGED_MANIFEST === '1' && !existsSync(join(ROOT, merged))) return `${merged} is missing — build the release variant first`;
   const perms = existsSync(join(ROOT, merged))
     ? permissionsIn(read(merged)).map(p => p.replace(/^\$\{applicationId\}/, 'com.prilearning.app'))
     : ['android.permission.INTERNET', 'com.android.vending.BILLING', 'android.permission.ACCESS_NETWORK_STATE'];
