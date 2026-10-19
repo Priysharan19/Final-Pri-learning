@@ -253,13 +253,16 @@ class InkInputTest {
             assertTrue("the stylus eraser end removes that stroke ($bandErased px left, was $bandInked)", bandErased <= bandEmpty + 5)
 
             // ── reading is the server's job (owner decision: server-only) ────
-            // The emulator has no Pri server, so the strokes must NOT be read or
-            // marked on the device; the student is told why and the ink is kept.
-            val status = waitFor(s, "(function(){var e=document.querySelector('.ink-status');return e&&e.innerText.trim()?e.innerText.trim().slice(0,160):false;})()", 30_000)
-            assertTrue("the student is told why the handwriting is not read yet: $status", status.length > 10)
+            // Signed in against the fixture server (#477), the strokes are never
+            // read or marked on the device. The card either says the server
+            // reads handwriting (its status line) or offers the student's own
+            // Read my answer (#440: nothing is read until the student asks).
+            val status = waitFor(s, "(function(){var b=document.querySelector('[data-ink-read]');if(b)return 'read-button: '+b.innerText.trim();var e=document.querySelector('.ink-status');return e&&e.innerText.trim()?e.innerText.trim().slice(0,160):false;})()", 30_000)
+            assertTrue("the student is shown how the server reads this handwriting: $status",
+                status.startsWith("read-button: Read my answer") || status.contains("read by Pri", ignoreCase = true) || status.contains("Pri’s server") || status.contains("Pri's server"))
             assertEquals("no on-device reading is shown or offered for marking", "0",
                 eval(s, "String(document.querySelectorAll('.ink-preview .ink-line').length)").trim('"'))
-            assertTrue("the ink is kept on the page while it waits", inkPixels(s) > 0)
+            assertTrue("the ink is kept on the page", inkPixels(s) > 0)
 
             m = metrics(s)
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
