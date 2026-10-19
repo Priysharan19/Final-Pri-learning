@@ -2950,4 +2950,6 @@ export default {
   "inst.cmdThemeSystem": "Follow the device theme",
   "inst.online": "online",
   "inst.offline": "offline",
+  "inst.workingStep": "Working, step {n}",
+  "inst.stepMarksOrder": "Marks for working are credited in order, for lines Pri’s engine verified.",
 };

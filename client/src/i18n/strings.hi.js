@@ -3013,4 +3013,6 @@ export default {
   "inst.cmdThemeSystem": "डिवाइस की थीम अपनाएँ",
   "inst.online": "ऑनलाइन",
   "inst.offline": "ऑफ़लाइन",
+  "inst.workingStep": "हल, चरण {n}",
+  "inst.stepMarksOrder": "हल के अंक क्रम से दिए जाते हैं, उन पंक्तियों के लिए जिन्हें Pri के इंजन ने सत्यापित किया।",
 };
