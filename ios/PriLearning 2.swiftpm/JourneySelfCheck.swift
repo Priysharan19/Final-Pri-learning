@@ -800,14 +800,17 @@ enum JourneySelfCheck {
     return JSON.stringify(steps);
     """#
 
-    // Opened while the cloud server is unreachable: account-first, the gate
-    // cannot confirm the account, so it says "retry" and the shell stays shut.
+    // Opened while the cloud server is unreachable, minutes after the server
+    // let this account in on this device: inside #477's 72-hour grace the app
+    // opens on the device's own work with the one offline line, no gate, and
+    // nothing is checked or marked until it reconnects.
     private static let offline = cloudHelpers + cardHelpers + oracleHelpers + #"""
-    await step('offlineGateHolds', async () => {
-      await waitFor(() => q(GATE) || shellOpen(), 40000);
-      await waitFor(() => gateStatus() === 'retry' || shellOpen(), 60000);
+    await step('offlineGraceOpens', async () => {
+      await waitFor(() => q('[data-testid="offline-entry"]') && shellOpen() && !q(GATE), 60000);
       await sleep(2000);
-      return assertHeld('opened offline');
+      if (!q('[data-testid="offline-entry"]') || q(GATE)) throw new Error('opened offline inside the grace: no offline line, or the gate is up');
+      if (q('.eval-card') || q('.verdict-bad') || q('.eval-marks')) throw new Error('opened offline: something is marked');
+      return 'inside the grace: the offline line, no gate, nothing marked';
     });
     return JSON.stringify(steps);
     """#
