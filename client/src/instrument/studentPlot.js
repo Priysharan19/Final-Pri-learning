@@ -16,7 +16,9 @@ import { parse, evaluate, variablesOf, withEvaluationBudget } from '../engine/ex
 const MAX_FNS = 3;
 // Operators whose cost grows with their arguments (sums, products, counting,
 // calculus, factorials) are never drawn: a 120-character line of them can
-// cost seconds when a graph samples it hundreds of times.
+// cost seconds when a graph samples it hundreds of times. This filter is the
+// ONLY cost guard for PriPlot's sampling (buildPlot runs outside a budget):
+// keep it in step with any new operator or alias engine/expr.js gains.
 const COSTLY = /\b(sum|prod|ncr|npr|int|integral|diff|lim)\s*\(|[Σ∑∏!]/i;
 // Every evaluation here runs inside the engine's own evaluation budget.
 const BUDGET = 4000;
