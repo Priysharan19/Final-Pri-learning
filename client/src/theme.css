@@ -2432,3 +2432,12 @@ html { background-color: var(--page); }
 .editor-tool:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 .mode-tab { font: var(--t-control); font-size: 14px; line-height: 24px; }
 .mode-tab:focus-visible, .ctx-next:focus-visible, .hint-bulb:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+
+/* ── v1.1 feedback (spec §3) ───────────────────────────────────────────────
+   The verdict keeps its four-state colours; v1.1 sets its type on the tokens
+   and squares it to the card radius. Wording still comes only from the
+   engine's step evidence. */
+.verdict { border-radius: var(--radius); font: var(--t-body); }
+.verdict-title { font: var(--t-heading); }
+.verdict-body { font: var(--t-body); }
+.verdict-next { font: var(--t-compact); font-size: 14px; }
