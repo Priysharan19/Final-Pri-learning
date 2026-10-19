@@ -1316,23 +1316,28 @@ const keyOfLine = (sq, d, part = null) => (part
  * just been read put in as its answer. Everything else is the frozen line's.
  */
 function lineResponses(sq, old, key, given, working) {
-  // Exam keys are data, never properties on Object.prototype. A page key
-  // supplied by a client must not invoke a setter or change map behavior.
-  const answers = Object.create(null), workings = Object.create(null), ink = Object.create(null);
-  const putOwn = (map, k, value) => Object.defineProperty(map, k, {
-    value, enumerable: true, writable: true, configurable: true
-  });
+  // Dynamic exam identifiers remain Map data until final serialization.
+  // In particular, neither the stored id nor a client-supplied page key
+  // ever becomes a dynamic property assignment/defineProperty sink.
+  // Object.fromEntries safely defines own data properties even for names
+  // such as "__proto__"; a null prototype also prevents inherited lookups.
+  const asDictionary = entries => Object.setPrototypeOf(Object.fromEntries(entries), null);
+  const answers = new Map(), workings = new Map(), ink = new Map();
   const keep = (k, d) => {
-    if (!blank(d.given)) putOwn(answers, k, String(d.given));
-    if (!blank(d.working)) putOwn(workings, k, String(d.working));
-    if (d.pending) putOwn(ink, k, 'pending');
+    if (!blank(d.given)) answers.set(k, String(d.given));
+    if (!blank(d.working)) workings.set(k, String(d.working));
+    if (d.pending) ink.set(k, 'pending');
   };
   if (old.multipart) for (const part of old.parts) keep(keyOfLine(sq, old, part), part);
   else keep(keyOfLine(sq, old), old);
-  putOwn(answers, key, given);
-  if (!blank(working)) putOwn(workings, key, working); else delete workings[key];
-  delete ink[key];
-  return { answers, workings, times: old.timed ? { [sq.id]: old.ms } : {}, modes: { [key]: 'ink' }, ink };
+  answers.set(key, given);
+  if (!blank(working)) workings.set(key, working); else workings.delete(key);
+  ink.delete(key);
+  return {
+    answers: asDictionary(answers), workings: asDictionary(workings),
+    times: old.timed ? asDictionary([[sq.id, old.ms]]) : asDictionary([]),
+    modes: asDictionary([[key, 'ink']]), ink: asDictionary(ink)
+  };
 }
 
 /** The answer a confident reading states, by the rule the exam room itself uses. */
@@ -1382,8 +1387,12 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     return db.run("UPDATE idempotency_keys SET response_json=?, request_digest=? WHERE account_id=? AND scope='exam-result' AND key=?", [json, digest(json), accountId, id]);
   };
   const withPage = (result, page) => {
-    const pages = Object.assign(Object.create(null), result.handwriting.pages);
-    Object.defineProperty(pages, key, { value: page, enumerable: true, writable: true, configurable: true });
+    // The requested key was established as an own frozen page in load().
+    // Rebuild via entries instead of writing any user-controlled property.
+    const pages = Object.setPrototypeOf(Object.fromEntries(
+      Object.entries(result.handwriting.pages).map(([storedKey, storedPage]) =>
+        [storedKey, storedKey === key ? page : storedPage])
+    ), null);
     return { ...result, handwriting: { ...result.handwriting, pages } };
   };
 
