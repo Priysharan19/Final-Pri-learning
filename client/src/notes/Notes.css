@@ -256,6 +256,10 @@
   .nt-map-strands { display: none; }
   .nt-map-node { width: 24px; height: 24px; margin: -12px 0 0 -12px; font-size: 10.5px; }
   .nt-map-node::after { inset: -11px; } /* 22px inner box + 22 = a 44px touch target on the smaller node */
+  /* A finger needs its own 44px per chapter: a long book scrolls sideways
+     inside the map instead of packing the nodes on top of each other. */
+  .nt-map-frame { overflow-x: auto; overscroll-behavior-x: contain; }
+  .nt-map-canvas { min-width: calc(var(--n, 1) * 46px + 24px); }
   .nt-concept-body { padding-left: 16px; }
   .nt-search { max-width: none; }
   .nt-classes { width: 100%; overflow-x: auto; }
