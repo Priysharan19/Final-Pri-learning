@@ -23,7 +23,7 @@
 // Synthetic browser evidence (S1). It is never evidence about a device.
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
@@ -137,7 +137,7 @@ export const flow = {
     const chromium = browserName === 'chromium';
     const baseDir = join(HERE, 'visual-baselines', `${process.platform}-${browserName}`);
     // Outside the repo: a dirty tree blocks the release build.
-    const outDir = join(process.env.PRI_VISUAL_OUT || join(tmpdir(), 'pri-visual'), `${process.platform}-${browserName}`);
+    const outDir = join(process.env.PRI_VISUAL_OUT || mkdtempSync(join(tmpdir(), 'pri-visual-')), `${process.platform}-${browserName}`);
     const update = process.env.PRI_UPDATE_SNAPSHOTS === '1';
     mkdirSync(outDir, { recursive: true });
     if (update) mkdirSync(baseDir, { recursive: true });

@@ -94,7 +94,7 @@ for (const [id, name] of [
   ['platform', 'Production account, sync and commercial schema']
 ]) {
   assert.equal(ci.split(`\n    name: ${name}\n`).length - 1, 1, `exactly one CI job is the required check "${name}"`);
-  assert.match(job(id), new RegExp(`^    name: ${name.replace(/[()]/g, '\\$&')}\\n`), `the ${id} job carries the required check name "${name}"`);
+  assert.match(job(id), new RegExp(`^    name: ${name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}\\n`), `the ${id} job carries the required check name "${name}"`);
 }
 for (const [id, shards] of [['suites', ['suites-shard', 'suites-contracts']], ['browser', ['browser-shard']]]) {
   const body = job(id);
