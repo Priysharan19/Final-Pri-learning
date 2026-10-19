@@ -2463,3 +2463,17 @@ html { background-color: var(--page); }
 .pg-chapter { font-weight: 500; }
 @media (max-width: 760px) { .pg-head h1 { font: var(--t-title); } }
 @media (prefers-reduced-motion: reduce) { .hist-row { transition: none; } }
+
+/* ── v1.1 Settings (spec §3) ───────────────────────────────────────────────
+   A grouped list: the section menu marks the open section with the same
+   teal tick as the rail, rows use control type, values sit in secondary
+   text. Row heights and the menu's position are unchanged. */
+.set-menu { border-color: var(--hairline); border-radius: var(--radius); background: var(--surface-default); }
+.set-menu-item { font: var(--t-control); font-size: 14.5px; transition: background var(--motion-fast) var(--ease-standard); }
+.set-menu-item:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.set-menu-item.on { background: var(--accent-soft); color: var(--text-primary); box-shadow: inset 2px 0 0 var(--accent); }
+.set-menu-item:focus-visible { outline: var(--focus-ring); outline-offset: calc(var(--focus-offset) * -1); }
+.set-row { font: var(--t-body); font-size: 14.5px; }
+.set-row .set-k { color: var(--text-secondary); }
+.set-row .set-v { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .set-menu-item { transition: none; } }
