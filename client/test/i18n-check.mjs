@@ -229,7 +229,9 @@ const CONVERTED = [
   'src/instrument/CommandBar.jsx',
   'src/instrument/IndexPage.jsx',
   'src/instrument/StepMarks.jsx',
-  'src/instrument/MapPage.jsx'
+  'src/instrument/MapPage.jsx',
+  'src/instrument/ReportHead.jsx',
+  'src/instrument/MarkStrip.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and
