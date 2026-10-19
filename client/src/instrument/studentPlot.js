@@ -11,9 +11,20 @@
 //   · anything else (one variable, other letters, non-linear in y, a line
 //     that will not parse) → nothing. At most three lines are drawn.
 // Pure: no DOM, no network.
-import { parse, evaluate, variablesOf } from '../engine/expr.js';
+import { parse, evaluate, variablesOf, withEvaluationBudget } from '../engine/expr.js';
 
 const MAX_FNS = 3;
+// Operators whose cost grows with their arguments (sums, products, counting,
+// calculus, factorials) are never drawn: a 120-character line of them can
+// cost seconds when a graph samples it hundreds of times.
+const COSTLY = /\b(sum|prod|ncr|npr|int|integral|diff|lim)\s*\(|[Σ∑∏!]/i;
+// Every evaluation here runs inside the engine's own evaluation budget.
+const BUDGET = 4000;
+// Probe points off every grid (irrational x and y), so an expression that is
+// only zero at whole or half numbers — sin(2πx), floor(2x)/2, a polynomial
+// with roots at the probes — cannot pass as a straight line.
+const XS = [-2.718281828, -0.6180339887, 0.3183098862, 1.414213562, 2.236067977, 5.773502692, -3.605551275, 7.071067812];
+const YS = [0.2928932188, 1.732050808, 2.645751311, 3.141592654, -1.259921050, -4.123105626, 0.5772156649, 6.403124237];
 
 const tryParse = s => { try { return parse(String(s)); } catch { return null; } };
 const valueAt = (ast, x, y) => { try { const v = evaluate(ast, { x, y }); return Number.isFinite(v) ? v : NaN; } catch { return NaN; } };
@@ -27,7 +38,11 @@ function onlyVars(ast, allowed) {
 /** One reading line → a plottable `{ expr, label }`, or null. */
 export function plotLineOf(text) {
   const line = String(text || '').trim();
-  if (!line || line.length > 120) return null;
+  if (!line || line.length > 120 || COSTLY.test(line)) return null;
+  return withEvaluationBudget(BUDGET, () => plotLineWithin(line));
+}
+
+function plotLineWithin(line) {
   const sides = line.split('=');
   if (sides.length !== 2 || !sides[0].trim() || !sides[1].trim()) return null;
   const [left, right] = sides.map(s => s.trim());
@@ -44,16 +59,17 @@ export function plotLineOf(text) {
   if (!g || !onlyVars(g, ['x', 'y'])) return null;
   const vars = [...variablesOf(g)];
   if (!vars.includes('x') || !vars.includes('y')) return null;
-  const b = valueAt(g, 0, 1) - valueAt(g, 0, 0);
-  if (!Number.isFinite(b) || Math.abs(b) < 1e-12) return null;
-  for (const x of [-3, -1, 0.5, 2, 7]) {
-    // the y-coefficient is the same everywhere (linear in y)…
-    if (!near(valueAt(g, x, 1) - valueAt(g, x, 0), b) || !near(valueAt(g, x, 4) - valueAt(g, x, 3), b)) return null;
+  // Fit g(x, y) = a0 + slope·x + b·y from three off-grid points, then require
+  // the equation to BE that plane at eight more: anything not linear in both
+  // variables (a curve, a step, a wiggle, a higher power of y) fails here.
+  const [x1, x2] = [XS[0], XS[3]]; const [y1, y2] = [YS[0], YS[1]];
+  const b = (valueAt(g, x1, y2) - valueAt(g, x1, y1)) / (y2 - y1);
+  const slope = (valueAt(g, x2, y1) - valueAt(g, x1, y1)) / (x2 - x1);
+  const a0 = valueAt(g, x1, y1) - slope * x1 - b * y1;
+  if (![b, slope, a0].every(Number.isFinite) || Math.abs(b) < 1e-9) return null;
+  for (let i = 0; i < XS.length; i += 1) {
+    if (!near(valueAt(g, XS[i], YS[i]), a0 + slope * XS[i] + b * YS[i])) return null;
   }
-  // …and A(x) = g(x, 0) is affine in x (so the line is straight).
-  const a0 = valueAt(g, 0, 0); const a1 = valueAt(g, 1, 0);
-  const slope = a1 - a0;
-  for (const x of [-4, -1.5, 3, 9]) if (!near(valueAt(g, x, 0), a0 + slope * x)) return null;
   // Written as exact quotients of the measured coefficients (no rounding).
   return { expr: `(${-slope})/(${b})*x + (${-a0})/(${b})`, label: line };
 }

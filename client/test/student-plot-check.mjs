@@ -20,6 +20,23 @@ for (const [line, x, want] of [['x + y = 35', 24, 11], ['x - y = 13', 24, 11], [
   ok(`${line}: solved for y`, !!fn && Math.abs(at(fn, 0, x) - want) < 1e-9, JSON.stringify(fn));
 }
 // Refused: anything it cannot draw exactly.
+// Adversarial: zero at whole and half numbers, so a grid-sampled test would
+// call them straight lines. They are curves, steps or higher powers.
+for (const line of ['2x+y+sin(2*pi*x)=0', 'x+y=floor(2x)/2', 'y*(1+sin(2*pi*x))=x', 'y+x+y*(y-1)*(y-3)*(y-4)=0', 'x+y+x*(x-1)*(x+4)*(2x+3)*(x-3)*(x-9)=0', 'x+y=abs(x)', 'y=x+round(x)-x+y-y']) {
+  const fn = plotLineOf(line);
+  ok(`"${line}": not drawn as a straight line it is not`, fn === null, JSON.stringify(fn));
+}
+// Costly operators are never drawn, and nothing takes long.
+const heavy = 'y=' + Array.from({ length: 5 }, () => 'sum(k*k*x,k,1,10000)').join('+');
+for (const line of ['x+y=' + Array.from({ length: 5 }, () => 'sum(k*k*x,k,1,10000)').join('+'), heavy.slice(0, 120), 'y = 5!', 'y = ncr(30, x)']) {
+  ok(`"${line.slice(0, 30)}…": a costly line is not drawn`, plotLineOf(line) === null);
+}
+{
+  const t0 = performance.now();
+  plotSpecFromReading([heavy, heavy, heavy, 'x + y = 35', 'x - y = 13']);
+  const ms = performance.now() - t0;
+  ok('reading five lines, heavy ones included, stays fast', ms < 100, `${ms.toFixed(1)} ms`);
+}
 for (const line of ['x = 50', '2x = 48', 'x^2 + y^2 = 25', 'xy = 6', 'x + z = 3', 'y^2 = x', 'x + y', '= 5', 'y = ', 'x + y = 3 = 4', 'sin(y) + x = 1', '']) {
   ok(`"${line}": not drawn`, plotLineOf(line) === null, JSON.stringify(plotLineOf(line)));
 }
