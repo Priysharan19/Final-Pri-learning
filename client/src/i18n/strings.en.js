@@ -404,7 +404,10 @@ export default {
   'verdict.revealed': 'Solution revealed.',
   'verdict.notThisTime': 'Not this time.',
   'verdict.afterHints': { one: 'after {n} hint', other: 'after {n} hints' },
-  'verdict.everyLineChecked': { one: 'Every line of your handwritten working was checked — {n} step read and verified, reaching the required result through a logical chain.', other: 'Every line of your handwritten working was checked — {n} steps read and verified, reaching the required result through a logical chain.' },
+  // Said only when the server's step report is of exactly these lines and
+  // verifies every one of them. "Verified" means each line holds for the
+  // question; it is not a claim that each line follows from the one before.
+  'verdict.everyLineChecked': { one: 'Every line of your handwritten working was checked — {n} line read and verified.', other: 'Every line of your handwritten working was checked — {n} lines read and verified.' },
   'verdict.expected': 'Expected:',
   'verdict.workedSolution': 'Worked solution',
   'verdict.finalAnswer': 'Final answer',
@@ -516,6 +519,10 @@ export default {
   'verdict.showSolution': 'Show solution',
   'verdict.stepCheck': 'Step check on your working',
   'verdict.mistakeIsHere': 'look here',
+  // A later line that is false on its own, after the first mistake.
+  'verdict.alsoWrong': 'also wrong',
+  // A line that is right on the student's own earlier value (error carried forward).
+  'verdict.carriedForward': 'carried forward',
 
   // The symbol palette announces each key by name, so a screen reader says
   // "square root" rather than "open bracket backslash".

@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
+import { labelKey, listsValues } from './reason-chain.js';
 
 function cleanText(value) {
   return String(value ?? '')
@@ -29,8 +30,9 @@ function finiteValue(ast, env = {}) {
   } catch { return null; }
 }
 
+// `T_9`, `T₉`, `t_{9}` and `t9` are one label (reason-chain.js labelKey).
 function compactLabel(text) {
-  return cleanText(text).toLowerCase().replace(/\s+/g, '');
+  return labelKey(cleanText(text));
 }
 
 function labelAllowed(text, labels = []) {
@@ -39,7 +41,7 @@ function labelAllowed(text, labels = []) {
 }
 
 function simpleIdentifier(text) {
-  return /^[a-z][a-z0-9_]*$/i.test(cleanText(text));
+  return /^[a-z][a-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*(?:\s+[a-z]+)*$/i.test(cleanText(text));
 }
 
 function substitutionDiagnosis(expected, got) {
@@ -77,6 +79,13 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
   }
 
   const clause = cleanText(text).split(/(?:=>|⇒|→)/).pop().trim();
+  // `9, 12, 15, 18` lists values. The expression engine drops commas as
+  // thousands separators, so read as one value it would be 9121518 — a number
+  // the student never wrote. A comma that groups digits (`5,941`, `1,00,000`)
+  // or sits in brackets (`C(5, 2)`) is not a list.
+  if (listsValues(clause)) {
+    return { status: 'note', trusted: false, note: 'This line lists several values; Pri reads one value at a time, so it is not judged.' };
+  }
   const parts = clause.split('=').map(part => part.trim()).filter(Boolean);
   if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this substitution safely.' };
 
@@ -113,7 +122,7 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
     }
     if (!numsClose(value, expected, 1e-9)) {
       const diagnosis = substitutionDiagnosis(expected, value);
-      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+      return { status: 'break', trusted: false, value: got, note: diagnosis.message, diagnosis };
     }
   }
 
