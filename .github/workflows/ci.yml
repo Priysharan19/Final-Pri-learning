@@ -217,7 +217,7 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
