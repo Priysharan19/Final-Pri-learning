@@ -491,7 +491,22 @@ async function goTo(page, base, path) {
   const watch = watchBoot(page);
   try {
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 });
+    await page.waitForSelector('.shell, .auth-wrap, #root .qpage h1', { timeout: 20000 });
+    // The boot screen is an .auth-wrap too (a logo and a progress bar), and so
+    // is the activation gate while it is still asking the server. Neither is
+    // a view: a step that changes the server's state next (ending the
+    // session) would race the gate's own boot check. Wait until the app has
+    // settled — the shell, the gate's answer, the sign-in card, or a public
+    // legal page (rendered on its own, outside the shell, until the gate has
+    // let the profile in).
+    await page.waitForFunction(() => {
+      const gate = document.querySelector('[data-testid="account-activation-gate"]');
+      if (gate) return gate.getAttribute('data-activation-status') !== 'checking';
+      if (document.querySelector('.shell')) return true;
+      const wrap = document.querySelector('.auth-wrap');
+      if (wrap) return !!wrap.querySelector('h1, h2, button, input, form');
+      return !!document.querySelector('#root .qpage h1');
+    }, null, { timeout: 30000 });
   } catch (err) {
     throw await bootFailure(err, watch, `${path} never showed the app`);
   }
@@ -838,11 +853,16 @@ async function run() {
 
     // signed in, but the account may not check yet: the server's own refusal
     // (email not verified), produced by the real server for this account.
+    // The question is opened first, while the account is verified: since the
+    // activation gate (issue #477) a load with an unverified account is the
+    // gate's sign-in (EMAIL_UNVERIFIED), never the page. The verification is
+    // withdrawn on the server only once the student is already working, which
+    // is when the check card's own refusal is what they meet.
     await step('practice · account blocker', '/practice', async () => {
+      const input = await typedQuestion();
       const verifiedAt = platform.db.prepare('SELECT email_verified_at AS at FROM accounts WHERE id=?').get(online.account.id).at;
       platform.db.prepare('UPDATE accounts SET email_verified_at=NULL WHERE id=?').run(online.account.id);
       try {
-        const input = await typedQuestion();
         await input.fill('99902');
         await pressSubmit();
         refusals.blocker = {
@@ -1186,16 +1206,35 @@ async function run() {
       refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
     });
 
+    // Each refusal below starts from a student who is inside the app with a
+    // live session, which the server then ends. The step before ended it
+    // already, and since the activation gate (issue #477) a load without a
+    // session is the gate's sign-in, never the page: so the student signs in
+    // on the gate first (the same account, the server's emailed code), and
+    // only then is the session ended under them.
+    const insideLive = async (path) => {
+      await goTo(page, BASE, path);
+      const gateCard = page.locator('[data-testid="account-activation-gate"][data-activation-status="signin"]');
+      if (await gateCard.count()) {
+        await online.signInHere(gateCard, { account: online.account });
+        await page.waitForSelector('.shell', { timeout: 60000 });
+        await wait(page, SETTLE);
+      }
+    };
+
     await step('placement · refused, session ended', '/placement', async () => {
-      await goTo(page, BASE, '/placement?go=1');
+      // ?go=1 starts the check as the page mounts, so the session is ended
+      // first and the page is then opened inside the app, without a reload.
+      await insideLive('/');
       endSession();
+      await page.evaluate(() => { history.pushState({}, '', '/placement?go=1'); dispatchEvent(new PopStateEvent('popstate')); });
       await page.waitForSelector('[data-placement-refused]', { timeout: 30000 });
       await wait(page, 400);
       refusals.placement = await refusalBlock('[data-placement-refused]');
     });
 
     await step('rapid fire · refused, session ended', '/rush', async () => {
-      await goTo(page, BASE, '/rush');
+      await insideLive('/rush');
       endSession();
       await click(page, '.qcard .btn-primary.btn-lg');
       await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
@@ -1204,7 +1243,7 @@ async function run() {
     });
 
     await step('match · refused, session ended', '/match', async () => {
-      await goTo(page, BASE, '/match');
+      await insideLive('/match');
       endSession();
       await click(page, '.btn-glow');
       await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
@@ -1215,7 +1254,7 @@ async function run() {
     // The India student signs in where the paper was refused (a real account on
     // the real server), and the paper — issued and marked by the server — opens.
     await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
-      await goTo(page, BASE, '/exams');
+      await insideLive('/exams');
       endSession();
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       const refusedStart = page.locator('[data-exam-start-refused]');
@@ -1241,7 +1280,7 @@ async function run() {
 
     // ── teacher-only workspace, exercised under a real teacher profile ──────
     await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/');
+      await insideLive('/');
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
       await page.waitForSelector('.auth-wrap', { timeout: 15000 });
