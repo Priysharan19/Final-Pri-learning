@@ -19,6 +19,8 @@ A release candidate must preserve all of these properties:
 
 ## 2. Version and build-number policy
 
+The App Store marketing version is `1.0`, the owner's choice of 2026-10-19 (LAUNCH-CHECKLIST-OWNER C6), recorded in `ios/app-store-version.json`. It is deliberately independent of `release/metadata.json` `productVersion`, which versions the web and server product.
+
 `displayVersion` is the user-visible marketing version. `bundleVersion` is the monotonically increasing App Store build number.
 
 Before producing a candidate:
@@ -112,6 +114,22 @@ After the exact candidate SHA is merged/approved and preflight is green:
 9. save the archive/export validation result in release evidence without committing credentials or private signing material.
 
 If the archive differs from the reviewed commit or required a source/config edit in Xcode, stop. Commit the change through a new PR and rerun exact-head gates; do not create an unreviewed release-only variant.
+
+### Command-line archive (no Xcode UI)
+
+The same archive can be produced headless from `ios/PriLearning.swiftpm` (scheme `PriLearning`, team `8BY7H9SXY8`):
+
+```bash
+xcodebuild archive -scheme PriLearning -destination 'generic/platform=iOS' \
+  -archivePath <out>.xcarchive DEVELOPMENT_TEAM=8BY7H9SXY8 \
+  PRI_CLOUD_ORIGIN=https://<approved-production-origin> \
+  CODE_SIGN_ENTITLEMENTS=<plist granting com.apple.developer.applesignin = [Default]> \
+  'OTHER_LDFLAGS=-Xlinker -platform_version -Xlinker ios -Xlinker 16.0 -Xlinker <iOS SDK version>'
+```
+
+- `CODE_SIGN_ENTITLEMENTS`: a package cannot declare Sign in with Apple; without the entitlement the Apple button fails with `PROVIDER_ERROR`.
+- `OTHER_LDFLAGS`: with Xcode 27.1, the SwiftPM app product stamps `LC_BUILD_VERSION sdk 16.0` (the deployment target) into the executable. App Store Connect then rejects the upload with error 90725 ("built with the iOS 16.0 SDK"). Passing the real SDK version (`xcodebuild -showsdks`) restores the correct stamp. Check it with `otool -l <app>/'Pri Learning' | grep -A4 LC_BUILD_VERSION`.
+- Export with `xcodebuild -exportArchive` (method `app-store-connect`, manual signing, "Apple Distribution" certificate, App Store profile for `com.prilearning.app`), then run `xcrun altool --validate-app` before uploading.
 
 ## 7. TestFlight evidence gate
 

@@ -74,9 +74,13 @@ for (const file of ['package.json', 'client/package.json', 'server/package.json'
   const pkg = JSON.parse(readFileSync(join(root, file), 'utf8'));
   assert.equal(pkg.version, `${metadata.productVersion}.0`, `${file} version drift`);
 }
+// The App Store marketing version is the owner's choice for the store listing
+// (ios/app-store-version.json), not the web/server product version.
+const appStore = JSON.parse(readFileSync(join(root, 'ios/app-store-version.json'), 'utf8'));
+assert.match(appStore.marketingVersion, /^\d+\.\d+(\.\d+)?$/);
 for (const nativePackage of ['ios/PriLearning.swiftpm/Package.swift', 'ios/PriLearning 2.swiftpm/Package.swift']) {
   const body = readFileSync(join(root, nativePackage), 'utf8');
-  assert.ok(body.includes(`displayVersion: "${metadata.productVersion}"`), `${nativePackage} version drift`);
+  assert.ok(body.includes(`displayVersion: "${appStore.marketingVersion}"`), `${nativePackage} version drift`);
 }
 
 const router = readFileSync(join(root, 'server/platform/router.js'), 'utf8');
