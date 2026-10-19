@@ -480,8 +480,13 @@ try {
     c.eq(grant.status, 403, 'a student cannot grant herself Premium');
     c.eq((await db.get('SELECT plan FROM entitlement_snapshots WHERE account_id=?', [alice.id])).plan, 'free', 'Alice is still free');
 
+    // A body naming another account is refused before any proof is read (#521):
+    // the id never selects what is deleted, and Bob's password on Alice's own
+    // account is still just a wrong password.
     const deleteBob = await h.request('/v1/account/', { method: 'DELETE', jar: alice.jar, body: { password: bob.password, accountId: bob.id } });
-    c.eq(deleteBob.status, 401, 'Alice cannot delete with Bob\'s password (and never names an account)');
+    c.deq([deleteBob.status, deleteBob.data?.error?.code], [409, 'ACCOUNT_MISMATCH'], 'Alice naming Bob\'s account is refused as a mismatch, whatever the proof');
+    const bobsPassword = await h.request('/v1/account/', { method: 'DELETE', jar: alice.jar, body: { password: bob.password, accountId: alice.id } });
+    c.eq(bobsPassword.status, 401, 'Alice cannot delete her own account with Bob\'s password');
     c.ok(await db.get('SELECT 1 FROM accounts WHERE id=?', [bob.id]) && await db.get('SELECT 1 FROM accounts WHERE id=?', [alice.id]), 'both accounts survive');
 
     // Guardian links bind to their own child only.

@@ -103,6 +103,11 @@ final class LocalSchemeHandler: NSObject, WKURLSchemeHandler {
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
+        // No nested browsing context at all (#260): a same-origin child frame
+        // could otherwise reach parent.webkit.messageHandlers.* and be credited
+        // to the main frame by the sender gate. WebKit does not apply frame-src
+        // to about:srcdoc, so WebShell also cancels every subframe navigation.
+        "frame-src 'none'",
         "frame-ancestors 'none'"
     ]
 

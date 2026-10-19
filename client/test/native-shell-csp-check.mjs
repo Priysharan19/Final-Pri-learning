@@ -63,6 +63,10 @@ ok(server.size >= 13, `server policy parsed into ${server.size} directives`);
 ok(server.get('script-src')?.join(' ') === "'self'", "server script-src is exactly 'self'");
 ok(server.get('object-src')?.join(' ') === "'none'", "server object-src is exactly 'none'");
 ok(server.get('frame-ancestors')?.join(' ') === "'none'", "server frame-ancestors is exactly 'none'");
+// #260: no nested browsing context, so no same-origin child frame can reach the
+// parent's bridge handlers (parent.webkit.messageHandlers.*) and be credited to
+// the main frame by the shells' sender gate.
+ok(server.get('frame-src')?.join(' ') === "'none'", "server frame-src is exactly 'none'");
 
 function notWeakerThanServer(label, directives) {
   ok(Array.isArray(directives) && directives.length > 0, `${label}: CSP directive list found in source`);
@@ -86,6 +90,7 @@ function notWeakerThanServer(label, directives) {
   ok(!script.some(src => WEAKENERS.has(src) || HOST_SOURCE.test(src)), `${label}: script-src carries no weakening source`);
   ok((shell.get('object-src') || []).join(' ') === "'none'", `${label}: object-src 'none'`);
   ok((shell.get('frame-ancestors') || []).join(' ') === "'none'", `${label}: frame-ancestors 'none'`);
+  ok((shell.get('frame-src') || []).join(' ') === "'none'", `${label}: frame-src 'none' (no child frame can reach the parent's bridge)`);
   ok((shell.get('base-uri') || []).join(' ') === "'self'", `${label}: base-uri 'self'`);
   ok((shell.get('default-src') || []).join(' ') === "'self'", `${label}: default-src 'self'`);
   // The native shells route every /v1 call through the native cloud bridge
@@ -125,6 +130,23 @@ ok(swiftSources[0] === swiftSources[1], 'LocalSchemeHandler.swift is byte-identi
     `${label}: the task still receives response, data and finish`);
   ok(/charset=utf-8/.test(swift), `${label}: text responses keep their utf-8 charset through Content-Type`);
   ok(/index\.html/.test(swift), `${label}: SPA index.html fallback is untouched`);
+}
+
+// ── iOS: no subframe navigation at all (#260) ───────────────────────────────
+// WebKit does not apply frame-src to about:srcdoc, and a same-origin child
+// calling parent.webkit.messageHandlers.* is credited to the main frame by the
+// sender gate (proven on the simulator by BridgeSelfCheck's
+// subframeReachThroughRefused). The navigation policy must cancel every
+// non-main-frame navigation before any other decision.
+{
+  const shells = IOS_PACKAGES.map(pkg => read(`${pkg}/WebShell.swift`));
+  ok(shells[0] === shells[1], 'WebShell.swift is byte-identical in PriLearning.swiftpm and PriLearning 2.swiftpm');
+  const policy = shells[0].match(/decidePolicyFor navigationAction: WKNavigationAction,[\s\S]*?decisionHandler\(\.allow\)/);
+  const body = policy ? policy[0] : '';
+  const guard = body.search(/if let target = navigationAction\.targetFrame, !target\.isMainFrame \{\s*decisionHandler\(\.cancel\)\s*return\s*\}/);
+  ok(guard >= 0, 'iOS WebShell: every subframe navigation is cancelled');
+  ok(guard >= 0 && guard < body.indexOf('shouldPerformDownload') && guard < body.indexOf('UIApplication.shared.open'),
+    'iOS WebShell: the subframe guard runs before the download and outbound-link branches');
 }
 
 // ── Android: WebViewAssetLoader path handler ────────────────────────────────

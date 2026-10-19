@@ -34,6 +34,10 @@ import {
 import { authoredRegion, formatRegion, formatMatrix, formatVector, formatComplex } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
+// The free plan's daily cap is decided here, per account, where a creditable
+// question is issued (#537): practiceAllowance.js reads the server's own
+// entitlement record and its own count, inside the issue transaction.
+import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -459,7 +463,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const payload = JSON.stringify(q);
     const id = randomUUID();
     const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    // The free plan's daily cap counts the Practice surface's own modes; Rush,
+    // Match and the placement check are "everything else", unlimited.
+    const counted = practiceModeCounted(practiceMode);
     const response = await db.transaction(async () => {
+      // Replays come first: a question already issued is handed back whatever
+      // today's count says. Then the account's standing against the free daily
+      // cap (#537), read under the same lock that serialises its issues, so two
+      // devices on one account cannot both be the twentieth question — and
+      // before anything is written, so a capped bind never burns a prepared
+      // token and a capped issue escrows nothing.
       if (preparedNonce) {
         // One account, once — decided in the same transaction as the issue it
         // allows, so a failed issue never burns the token and a retry by the
@@ -467,9 +480,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const mine = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-prepared' AND key=? AND expires_at>?",
           [accountId, preparedNonce, now]);
         if (mine) return JSON.parse(mine.response_json);
-        const claim = await db.run("INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1) ON CONFLICT(bucket) DO NOTHING",
-          ['practice-prepared-claim:' + preparedNonce, now]);
-        if (!claim?.changes) return { preparedUsed: true };
       }
       if (idem) {
         const before = await db.get("SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='practice-issue' AND key=? AND expires_at>?", [accountId, idem, now]);
@@ -478,16 +488,28 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           return JSON.parse(before.response_json);
         }
       }
+      if (counted) {
+        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+        if (!allowance.allowed) return { capped: allowance };
+      }
+      if (preparedNonce) {
+        const claim = await db.run("INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1) ON CONFLICT(bucket) DO NOTHING",
+          ['practice-prepared-claim:' + preparedNonce, now]);
+        if (!claim?.changes) return { preparedUsed: true };
+      }
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
       if (idem) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-issue',?,?,?,?,?)",
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",
         [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, Math.max(preparedExpiry, now) + PREPARED_TTL]);
+      // Counted only now: this question was really issued, in this transaction.
+      if (counted) await recordPracticeIssue(db, { accountId, now });
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
     if (response.preparedUsed) return reject(res, 409, 'PRACTICE_PREPARED_USED', 'This prepared question has already been taken up.');
+    if (response.capped) return refusePracticeCap(res, response.capped, now);
     // The account that owns this issue, so a device holding several profiles
     // can refuse a question issued under another profile's session.
     return res.status(201).json({ ...response, accountId: String(accountId) });
@@ -514,8 +536,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     q._repeat = true;
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
-      [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+    // A repeat is a practice question the account is issued, so it counts
+    // toward the free day exactly as a retry from History does on the device
+    // (#537) — decided and counted under the account's issue lock.
+    const outcome = await db.transaction(async () => {
+      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+      if (!allowance.allowed) return { capped: allowance };
+      await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
+        [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+      await recordPracticeIssue(db, { accountId, now });
+      return {};
+    }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
   });
 

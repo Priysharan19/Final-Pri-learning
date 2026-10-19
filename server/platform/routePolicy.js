@@ -63,6 +63,9 @@ export function derivePolicy(method, chain) {
     // false, true (a verified second factor on the session), or
     // { stepUpMs } (one presented inside that window).
     mfa: false,
+    // false, or { freshMs }: the credential itself proven inside that window
+    // (a sign-in or POST /v1/account/reauth) — security.js freshProofAt.
+    recentAuth: false,
     rateLimits: [],
     csrf: false,
     outOfOrder: []
@@ -70,10 +73,15 @@ export function derivePolicy(method, chain) {
   for (const fn of chain) {
     const tag = fn?.priPolicy;
     if (!tag) continue;
-    if ((tag.verifiedEmail || Array.isArray(tag.roles)) && !policy.session) {
-      policy.outOfOrder.push(tag.verifiedEmail ? 'verifiedEmail-before-session' : 'role-before-session');
+    if ((tag.verifiedEmail || Array.isArray(tag.roles) || tag.recentAuth) && !policy.session) {
+      policy.outOfOrder.push(tag.verifiedEmail ? 'verifiedEmail-before-session' : tag.recentAuth ? 'recentAuth-before-session' : 'role-before-session');
     }
     if (tag.session) policy.session = true;
+    if (tag.recentAuth) {
+      // Successive windows tighten: the shortest wins.
+      const window = Number(tag.recentAuth.freshMs);
+      if (policy.recentAuth === false || policy.recentAuth.freshMs > window) policy.recentAuth = { freshMs: window };
+    }
     if (tag.verifiedEmail) policy.verifiedEmail = true;
     if (tag.guardianConsent) policy.guardianConsent = true;
     if (tag.operatorToken) policy.operatorToken = true;

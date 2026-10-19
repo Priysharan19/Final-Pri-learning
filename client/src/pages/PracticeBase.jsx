@@ -258,7 +258,10 @@ function ProfilePractice() {
       if (options?.replaceUnmarkable === true && currentQuestionRef.current) return 'still-unmarkable';
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
-      if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
+      // Nothing was served in answer to this request — and a question Next
+      // just left has been discarded on the device — so nothing stays on
+      // screen beneath the notice to be worked or submitted (#537).
+      if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') { setServe(null); setCapped(e); }
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
         setError(e.message); setErrorCode(e?.status === 401 ? 'AUTH_REQUIRED' : (e?.code || ''));
