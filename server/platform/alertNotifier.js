@@ -224,7 +224,9 @@ export function createAlertNotifier({
 
   function start() {
     if (timer) return api;
-    if (!enabled) log('alert_notifier_disabled', { code: disabledCode || 'ALERT_EMAIL_TRANSPORT_UNCONFIGURED' });
+    // An unset address is the default for local and test servers: counted, not logged, so a
+    // clean boot keeps an empty stderr. A set-but-unusable address is a misconfiguration.
+    if (!enabled && disabledCode !== 'ALERT_EMAIL_UNSET') log('alert_notifier_disabled', { code: disabledCode || 'ALERT_EMAIL_TRANSPORT_UNCONFIGURED' });
     timer = setInterval(() => { tick().catch(() => {}); }, intervalMs);
     timer.unref?.();
     return api;
