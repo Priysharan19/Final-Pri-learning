@@ -276,10 +276,16 @@ function rejected(cls, question, input, label = input) {
   for (const s of ['cosec²θ', 'tan²θ', '1', 'sec θ', '1 + cot²θ']) rejected(C, trig, s);
 
   const index = { answerType: 'expression', prompt: 'Simplify (a³)² · a.', answer: { expr: 'a^7' } };
-  // (`a⁷` written with a superscript digit is a separate reader change, not
-  // ported here: see the PR that brought this suite onto the online engine.)
-  for (const s of ['a^7', 'a^6 * a', 'a*a^6', 'a^3*a^3*a']) accepted(C, index, s);
-  for (const s of ['a^6', 'a^8', 'a^5', '7a', 'a^9']) rejected(C, index, s);
+  // Superscript digits are a power (ledger 3.3, #366): a⁷ is a^7, a⁶ is not.
+  for (const s of ['a^7', 'a⁷', 'a⁶ · a', 'a^6 * a', 'a*a^6', 'a^3*a^3*a']) accepted(C, index, s);
+  for (const s of ['a^6', 'a^8', 'a^5', '7a', 'a^9', 'a⁶', 'a⁸', 'a⁷⁰', 'a⁻⁷']) rejected(C, index, s);
+  // A multi-digit and a negative superscript: x¹² is x^12 (not x^1·2), 10⁻³ is 0.001.
+  const twelve = { answerType: 'expression', prompt: 'Simplify (x³)⁴.', answer: { expr: 'x^12' } };
+  for (const s of ['x¹²', 'x^12', '(x³)⁴']) accepted(C, twelve, s);
+  for (const s of ['x¹', 'x²', 'x^(1*2)', 'x¹³', 'x⁷', '12x']) rejected(C, twelve, s);
+  const milli = { answerType: 'numeric', prompt: 'Write 1/1000 as a power of ten.', answer: { value: 0.001 } };
+  for (const s of ['10⁻³', '10^(-3)', '0.001']) accepted(C, milli, s);
+  for (const s of ['10³', '10⁻²', '10⁻⁴', '-1000', '10⁻³⁰']) rejected(C, milli, s);
 }
 
 // ── Review of #513: paise only on a money question; π in a degree answer ─────

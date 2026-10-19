@@ -21,6 +21,9 @@ import { assessFormulaLine, bareNumbers, chainDiagnosis, cleanLine, evaluateChai
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
+import { lostMarks, ruleKeyFor } from './lost-marks.js';
+
+export { lostMarks, ruleKeyFor };
 
 export { cleanInput, parseNumericInput };
 
@@ -2979,5 +2982,7 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
     : restated
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
-  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, report: rep };
+  // Where each mark not awarded went (ledger 3.6): explanation only, never credit.
+  const lost = lostMarks(vector, allLines, meta);
+  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, lost, report: rep };
 }
