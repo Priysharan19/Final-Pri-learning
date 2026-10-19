@@ -181,6 +181,8 @@ jobs:
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133330 wrong answers marked correct across 17304 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
+          # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
+          grep -Eq 'EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
