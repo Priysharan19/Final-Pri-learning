@@ -1,8 +1,8 @@
 # Cancellation and refund policy
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
-This policy covers subscriptions bought from {{OWNER_LEGAL_NAME}} through the
+This policy covers subscriptions bought from Priysharan Tripathi through the
 website. Subscriptions bought inside the iPad app are handled by Apple under its
 own refund policy, and are cancelled and refunded through your Apple account.
 
@@ -28,7 +28,7 @@ through a period, except in the cases above.
 
 ## How to ask
 
-Write to {{SUPPORT_EMAIL}} from the email address on the account, with the date
+Write to impriysharan@icloud.com from the email address on the account, with the date
 of the charge. We reply within 3 working days and, where a refund is due, issue
 it to the original payment method within 5 to 7 working days. Your bank may take
 longer to show it.
