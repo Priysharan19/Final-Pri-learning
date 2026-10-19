@@ -1822,7 +1822,7 @@ export default {
   'cloud.pricingOffline': 'Storefront pricing is not available while the cloud service is offline.',
   'cloud.pricingSummary': '{prices}. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.',
   'cloud.pricingSummaryTrial': '{prices} with a {days}-day trial when eligible. Display pricing is advisory; checkout/storefront pricing and server entitlements remain authoritative.',
-  'cloud.storefrontMissing': 'The configured Pri Learning subscription is not available in this App Store storefront.',
+  'cloud.appleNotOnSale': 'Premium subscriptions are not on sale in the app yet. Everything in the free plan works as usual.',
   'cloud.appleUnavailable': 'App Store subscriptions are unavailable.',
   'cloud.appleVerified': 'App Store purchase verified. Premium status has been refreshed from the server.',
   'cloud.applePendingVerification': 'An App Store purchase is waiting for server verification.',

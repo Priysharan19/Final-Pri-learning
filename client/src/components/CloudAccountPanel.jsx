@@ -73,6 +73,11 @@ export default function CloudAccountPanel() {
   const [appleBootstrap, setAppleBootstrap] = useState(null);
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
+  // True when this deployment or storefront sells no App Store subscription
+  // (server billing not configured, or StoreKit returns none of its products).
+  // That is a state, not a fault: the panel says Premium is not on sale yet
+  // instead of showing an error and buttons that cannot work.
+  const [appleNotOnSale, setAppleNotOnSale] = useState(false);
   const [mode, setMode] = useState('login');
   // When a linked account's cookie expires, this is reauthentication, not
   // registration of a second identity on the existing student profile.
@@ -207,22 +212,32 @@ export default function CloudAccountPanel() {
       setAppleBootstrap(null);
       setAppleProducts([]);
       setAppleStoreError('');
+      setAppleNotOnSale(false);
       return () => { live = false; };
     }
     (async () => {
-      const result = await cloud.appleBillingBootstrap();
+      let result;
+      try { result = await cloud.appleBillingBootstrap(); }
+      catch (err) {
+        if (err?.code === 'BILLING_PROVIDER_NOT_CONFIGURED') return { notOnSale: true };
+        throw err;
+      }
       const bootstrap = result?.apple;
       const productIds = [bootstrap?.products?.monthly, bootstrap?.products?.annual].filter(Boolean);
-      if (!bootstrap?.appAccountToken || !productIds.length) throw new Error('App Store subscriptions are not configured for this account.');
+      if (!bootstrap?.appAccountToken || !productIds.length) return { notOnSale: true };
       const products = await getNativeProducts(productIds);
+      return { bootstrap, products, notOnSale: !products.length };
+    })().then(({ bootstrap = null, products = [], notOnSale }) => {
       if (!live) return;
       setAppleBootstrap(bootstrap);
       setAppleProducts(products);
-      setAppleStoreError(products.length ? '' : tLater('cloud.storefrontMissing'));
-    })().catch(err => {
+      setAppleNotOnSale(notOnSale);
+      setAppleStoreError('');
+    }).catch(err => {
       if (!live) return;
       setAppleBootstrap(null);
       setAppleProducts([]);
+      setAppleNotOnSale(false);
       setAppleStoreError(err.message || tLater('cloud.appleUnavailable'));
     });
     return () => { live = false; };
@@ -814,7 +829,11 @@ export default function CloudAccountPanel() {
             )}
           </div>}
 
-          {nativeShell && nativeStoreKit && <div style={{ marginTop: 12 }}>
+          {nativeShell && nativeStoreKit && appleNotOnSale && <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
+            {t('cloud.appleNotOnSale')}
+          </div>}
+
+          {nativeShell && nativeStoreKit && !appleNotOnSale && <div style={{ marginTop: 12 }}>
             <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
               {t('cloud.storeKitNote')}
             </div>
