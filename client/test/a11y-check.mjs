@@ -61,8 +61,8 @@ import { chromium } from '@playwright/test';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
-import { join, extname, resolve, sep } from 'node:path';
+import { readFileSync, existsSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import { join, extname, resolve, sep, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
@@ -150,13 +150,16 @@ const MIME = {
 };
 
 async function serve(dir) {
+  // The build's own files, listed once: a request names one of them or it is a
+  // route (one page, many routes) — no request path is ever joined onto disk.
+  const root = resolve(dir);
+  const files = new Map(readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter(e => e.isFile())
+    .map(e => { const abs = join(e.parentPath ?? e.path, e.name); return ['/' + relative(root, abs).split(sep).join('/'), abs]; }));
+  const shell = join(root, 'index.html');
   const server = createServer((req, res) => {
     const path = decodeURIComponent((req.url || '/').split('?')[0]);
-    const root = resolve(dir);
-    let target = resolve(root, '.' + path);
-    // one page, many routes: an unknown path is a route, not a missing file;
-    // anything resolving outside the build directory is never read
-    if (!target.startsWith(root + sep) || !existsSync(target) || statSync(target).isDirectory()) target = join(dir, 'index.html');
+    const target = files.get(path) ?? shell;
     res.writeHead(200, { 'Content-Type': MIME[extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(readFileSync(target));
   });
