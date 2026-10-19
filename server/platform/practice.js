@@ -778,10 +778,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // instead of a receipt, and this one request does what the three did, in
     // the same order and under the same checks:
     //
-    //   · the picture is read through recognitionOps — the transcript the
-    //     student was just shown is reused, so Submit never pays for a second
-    //     read of an unchanged picture; a picture not read before (a photo) is
-    //     read once, under the same allowance and ceiling;
+    //   · the picture's reading comes from recognitionOps — only the
+    //     transcript the student asked for and was shown is reused; a picture
+    //     never read is refused (RECOGNITION_READ_EXPIRED) and nothing is
+    //     paid for or marked (#440: Submit never buys a read);
     //   · the reader is sent the picture and nothing else. The answer in this
     //     body, the question, its solution and its key never reach it: reading
     //     stays answer-blind (handwritingProvider.js);
@@ -929,7 +929,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         let read;
         try {
-          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+          // Read on request (#440): Submit never buys a read. Only a reading the
+          // student asked for (Read my answer / Read my photo) is replayed; a
+          // picture never read is refused before anything is marked.
+          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+          if (read.missing) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
           if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
         } catch (error) {
           if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);

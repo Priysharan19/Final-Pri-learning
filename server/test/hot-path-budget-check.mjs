@@ -229,6 +229,16 @@ try {
       // The page holds the equation's working and, on its last line, the answer.
       const image = picture(`${variable} = ${root}`, `single-${i}`);
       const readsBefore = provider.calls;
+      // #440: never-read pictures are refused at Submit, with no provider call.
+      const unread = await h.request(`/v1/practice/${qid}/submit`, {
+        method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': `hot-unread-${i}` },
+        body: { submissionId: `hot-unread-${i}`, answer: root, mode: 'ink', image }
+      });
+      c.deq([unread.status, unread.data?.error?.code, provider.calls - readsBefore], [409, 'RECOGNITION_READ_EXPIRED', 0],
+        `one-request ink ${i}: a picture never read is refused at Submit, nothing read or marked`);
+      // The student presses Read my answer: the one paid read (not counted below).
+      const shown = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image, questionId: qid } });
+      c.eq(shown.status, 200, `one-request ink ${i}: Read my answer 200`);
       const receiptsBefore = Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition'", [a.id]))?.n);
       const submissionId = `hot-single-${i}`;
       const graded = await counted(`/v1/practice/${qid}/submit`, {
@@ -237,7 +247,7 @@ try {
       });
       c.eq(graded.status, 200, `one-request ink ${i}: 200`);
       c.ok(graded.data?.correct === true && graded.data?.authoritative === true, `one-request ink ${i}: marked right by the server`);
-      c.eq(provider.calls - readsBefore, 1, `one-request ink ${i}: one provider read`);
+      c.eq(provider.calls - readsBefore, 1, `one-request ink ${i}: one provider read, at Read my answer`);
       c.ok(graded.data?.reading?.corrected === true && typeof graded.data?.reading?.receipt === 'string', `one-request ink ${i}: the answer is not the whole transcript, so a correction receipt is written with the mark`);
       const receiptsAfter = Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition'", [a.id]))?.n);
       c.eq(receiptsAfter - receiptsBefore, 2, `one-request ink ${i}: the provider and correction receipts are both stored`);
@@ -275,6 +285,8 @@ try {
       // mark is the engine's verdict on the submitted text.
       const image = picture(`${variable} = ${root}`, 'blind');
       const sentBefore = provider.sent.length;
+      // Read on request (#440): the student has the page read first.
+      await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image, questionId: issued.data.question.id } });
       const graded = await h.request(`/v1/practice/${issued.data.question.id}/submit`, {
         method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'hot-blind' }, body: { submissionId: 'hot-blind', answer: wrong, mode: 'ink', image }
       });
@@ -417,7 +429,7 @@ try {
       // #440 read on request: the paid read is Read my answer (/handwriting/transcribe,
       // not counted here); /recognize at Submit replays it — 45 -> 35, --report on sqlite.
       'ink Submit, three requests (recognize + confirm + submit)': 35,   // was 86
-      'ink Submit, one request (picture with the submission)': 29,       // was 86 (three requests)
+      'ink Submit, one request (picture with the submission)': 19,       // 29 before #440 (the read moved to Read my answer); was 86
       'POST /v1/sync/push (5 events + 1 entity)': 32,                    // was 37
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1
