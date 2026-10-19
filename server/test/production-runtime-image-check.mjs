@@ -43,11 +43,14 @@ const clientRuntimeCopies = copies.flatMap(tokens => {
 const requiredClientCopies = [
   ['client/src/engine', './client/src/engine'],
   ['client/package.json', './client/package.json'],
-  ['/app/client/dist', './client/dist']
+  ['/app/client/dist', './client/dist'],
+  // The marker's explanations: the English catalogue and plural rules only.
+  ['client/src/i18n/strings.en.js', './client/src/i18n/'],
+  ['client/src/i18n/languages.js', './client/src/i18n/']
 ];
 const stablePairs = arr => arr.map(pair => pair.join(' -> ')).sort();
 c.eq(JSON.stringify(stablePairs(clientRuntimeCopies)), JSON.stringify(stablePairs(requiredClientCopies)),
-  'runtime allowlists ONLY the private maths engine, its ESM package marker and compiled web dist');
+  'runtime allowlists ONLY the private maths engine, its ESM package marker, the two i18n files the marker explains with, and compiled web dist');
 
 const userIndex = runtime.findIndex(line => /^USER\s+node\s*$/.test(line));
 const lastCopy = runtime.reduce((last, line, index) => (/^COPY\s/.test(line) ? index : last), -1);
@@ -117,8 +120,17 @@ for (const required of ['client/src/engine/generators/index.js', 'client/src/eng
   'client/src/engine/answer-forms.js', 'client/package.json']) {
   c.ok(existsSync(join(stage, required)), `${required} is available to the production grader`);
 }
-c.eq(JSON.stringify(readdirSync(join(stage, 'client', 'src')).sort()), JSON.stringify(['engine']),
+c.eq(JSON.stringify(readdirSync(join(stage, 'client', 'src')).sort()), JSON.stringify(['engine', 'i18n']),
   'no other client source directory can enter the production image');
+c.eq(JSON.stringify(readdirSync(join(stage, 'client', 'src', 'i18n')).sort()), JSON.stringify(['languages.js', 'strings.en.js']),
+  'only the English catalogue and plural rules the marker explains with are in the image');
+// Every module the server and its marker workers load must resolve from the
+// image's file set alone (staging 2048530b crashed on engine → i18n).
+for (const entry of ['server/platform/markerOps.js', 'server/platform/markerWorker.js', 'server/app.js']) {
+  let error = null;
+  try { await import(pathToFileURL(join(stage, entry))); } catch (e) { error = e; }
+  c.ok(!error || error.code !== 'ERR_MODULE_NOT_FOUND', `${entry} resolves every import from the image file set${error ? ` — ${String(error.message).split('\n')[0]}` : ''}`);
+}
 c.eq(JSON.parse(readFileSync(join(stage, 'client', 'package.json'), 'utf8')).type, 'module',
   'runtime maths engine retains the ESM package scope');
 const stagedMaths = await import(pathToFileURL(join(stage, 'client', 'src', 'engine', 'generators', 'index.js')));

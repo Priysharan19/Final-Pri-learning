@@ -58,6 +58,10 @@ COPY server/tools ./server/tools
 # router imports these ESM files at runtime; the built web assets alone cannot
 # satisfy those imports. Never copy the whole client/src tree into runtime.
 COPY client/src/engine ./client/src/engine
+# The marker's lost-mark and board-row explanations read the English catalogue
+# and plural rules (engine/lost-marks.js, engine/cbseMarking.js). Only these two
+# self-contained files; no other client source enters the image.
+COPY client/src/i18n/strings.en.js client/src/i18n/languages.js ./client/src/i18n/
 COPY client/package.json ./client/package.json
 COPY release ./release
 COPY --from=server-deps /app/server/node_modules ./server/node_modules
