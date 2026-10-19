@@ -182,11 +182,16 @@ export function crashReport({ surface, code = 'RENDER_ERROR', scope = 'route', e
  * as one client-error operational event (90-day retention).
  */
 export async function reportCrash(options = {}) {
-  const report = crashReport(options);
-  if (!report) return false;
-  if (!errorReportsEnabled() || !cloudAvailable()) return false;
-  try { await cloud.reportError(report); return true; }
-  catch { return false; }
+  // Everything inside the try: building the report reads the native host and
+  // the release identity, and a throw there must resolve false, never reject
+  // into an error boundary that does not await this promise.
+  try {
+    if (!errorReportsEnabled() || !cloudAvailable()) return false;
+    const report = crashReport(options);
+    if (!report) return false;
+    await cloud.reportError(report);
+    return true;
+  } catch { return false; }
 }
 
 export function reportSyncFailure(code = 'SYNC_FAILED') {

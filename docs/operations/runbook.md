@@ -31,8 +31,9 @@ Four facts shape every procedure:
 4. **Rollback is a Railway redeploy of the previous deployment, never a hot edit.** Each Railway
    deployment is one `main` commit; `GET /v1/health` names the SHA it runs.
 
-First step for every incident: take a `requestId` from the alert's log line or the Sentry issue
-(the error sink tags every event with it), search the Railway logs of the affected environment
+First step for every incident: take a `requestId` from the alert's log line (or, only on an
+environment where `PRI_SENTRY_DSN` has been set, from the Sentry issue — the error sink tags every
+event with it), search the Railway logs of the affected environment
 for it, and read `route`, `code`, `status` and `release`. The same `requestId` is returned to the
 client in `X-Request-Id` and in every error body.
 
@@ -147,6 +148,13 @@ Record each rotation in `drills.md` (date, credential name, who — never the va
 lines; a spike that starts with a deploy is §3. `ERROR_SINK_FAILURES`: errors are still in the
 Railway logs; check the Sentry project's quota and the DSN (§4). `error_sink_total{outcome=noop}`
 rising means `PRI_SENTRY_DSN` is unset on that environment.
+
+This repository configures no Sentry project and no environment has been verified to hold a DSN;
+until one does, every event is a counted no-op and the Railway logs are the only error record.
+Setting `PRI_SENTRY_DSN` sends coded error events (request id, route, code, platform, surface,
+fingerprint, release) to a third-party processor: the privacy notice (`docs/legal/privacy.md`)
+and `docs/privacy/data-retention.md` do not yet name one, so the DSN is an owner decision that
+needs that notice updated and legal sign-off first.
 
 ## 6. Who may do what
 
