@@ -72,7 +72,18 @@ async function approveAsParent(ctx, base, platform, parentEmail, childName) {
 
 /** Wait until the service worker controls the page, so an offline reload can paint the app at all. */
 async function workerInCharge(page) {
-  return page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 }).then(() => true).catch(() => false);
+  const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 }).then(() => true).catch(() => false);
+  if (!claimed) return false;
+  // The install holds what the first paint needs; the rest of the offline
+  // build (every route's code) is the worker's second pass, which the app asks
+  // for when idle. Ask for it and wait, as boot-resilience-check.mjs does.
+  const warmed = await page.evaluate(() => new Promise(resolve => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = e => resolve(e.data);
+    navigator.serviceWorker.controller.postMessage({ type: 'pri-warm', optional: true }, [channel.port2]);
+    setTimeout(() => resolve(null), 60000);
+  })).catch(() => null);
+  return !!warmed && warmed.warmed === warmed.of && warmed.of > 0;
 }
 
 export const flow = {
@@ -388,7 +399,7 @@ export const flow = {
     await goto('/');
     await page.locator('.shell').waitFor({ timeout: 30000 });
     const claimed = await workerInCharge(page);
-    if (await check('the service worker is in charge of the page, so an offline open can paint anything at all', claimed)) {
+    if (await check('the service worker is in charge of the page and holds the whole offline build, so an offline open can paint anything at all', claimed)) {
       const reloaded = await offlineReload(page, ctx);
       if (!reloaded && browserName === 'webkit') {
         // Playwright's offline emulation in WebKit fails the service worker's
@@ -396,7 +407,11 @@ export const flow = {
         // document is ever loaded, so the offline open is not exercised in
         // this engine. Said, not passed; Chromium runs it.
         note('offline open: NOT exercised in WebKit — Playwright\'s offline emulation fails the service-worker navigation, so the page never reloaded');
+        // The connection's return makes the shell ask the server again; let
+        // that answer land before the page is closed under it.
+        const asked = page.waitForResponse(r => r.url().includes('/v1/account/me'), { timeout: 15000 }).catch(() => null);
         await ctx.setOffline(false);
+        await asked;
       } else {
       // 5a · under 72 hours: inside, with the offline line, History from the device
       await page.locator(`.shell, ${GATE}`).first().waitFor({ timeout: 30000 }).catch(() => {});
@@ -404,10 +419,11 @@ export const flow = {
       await check('opened offline within 72 hours of the server\'s last yes, the same student is inside, told that nothing is checked until they reconnect',
         reloaded && await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0 &&
           /nothing is checked/.test(await page.locator(OFFLINE_LINE).innerText().catch(() => '')), `gate ${await gateStatus(page)}`);
-      await inApp(page, '/history');
-      await page.locator('main#main').waitFor({ timeout: 20000 }).catch(() => {});
-      await check('History opens offline, from the device', new URL(page.url()).pathname === '/history' &&
-        await page.locator('.shell').count() === 1 && (await page.locator('main#main').innerText().catch(() => '')).trim().length > 0);
+      await inApp(page, '/review');
+      await page.waitForFunction(() => { const m = document.querySelector('main#main'); return m && m.innerText.trim() && !/^Loading/.test(m.innerText.trim()); }, null, { timeout: 30000 }).catch(() => {});
+      const historyText = (await page.locator('main#main').innerText().catch(() => '')).trim();
+      await check('History opens offline, from the device', new URL(page.url()).pathname === '/review' &&
+        await page.locator('.shell').count() === 1 && historyText.length > 0 && !/^Loading/.test(historyText), historyText.slice(0, 120));
       await backOnline(page, ctx);
       await page.waitForFunction(sel => !document.querySelector(sel), OFFLINE_LINE, { timeout: 60000 }).catch(() => {});
       await check('back online, the server answers again: the offline line goes and the same student stays inside, with no sign-in asked for',
@@ -418,8 +434,12 @@ export const flow = {
       await page.getByRole('menuitem', { name: 'Switch profile' }).click();
       await page.locator('.acct-row', { hasText: 'Kabir Child' }).waitFor({ timeout: 15000 });
       await page.locator('.acct-row', { hasText: 'Kabir Child' }).click();
+      // One session per device: the adult's is live, so the child's profile
+      // asks for its own account on the gate's card first.
+      await page.locator(`${GATE} ${INLINE}`).waitFor({ timeout: 30000 }).catch(() => {});
+      if (await page.locator(`${GATE} ${INLINE}`).count()) await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: kabirEmail });
       await page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {});
-      await check('the approved child\'s saved profile is let in online', await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0);
+      await check('the approved child\'s saved profile, signed in as the child, is let in online', await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0);
       const childReloaded = await offlineReload(page, ctx);
       await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 }).catch(() => {});
       await check('opened offline inside the grace, the child is inside on the device\'s last server answer',
@@ -442,7 +462,7 @@ export const flow = {
         await staleCtx.clock.install({ time: new Date() });
         const stale = await staleCtx.newPage();
         await stale.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
-        await createVerifiedProfile(stale, platform, { name: 'Ravi Stale', year: 10, email: freshEmail('stale'), age: 19, note });
+        await createVerifiedProfile(stale, platform, { name: 'Ravi Stale', year: 10, email: freshEmail('stale'), note });
         await stale.locator('.shell').waitFor({ timeout: 60000 });
         if (await check('a second adult\'s device is inside, with the service worker in charge', await workerInCharge(stale))) {
           await staleCtx.clock.setSystemTime(new Date(Date.now() + 73 * 60 * 60 * 1000));

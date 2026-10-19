@@ -542,7 +542,7 @@ jobs:
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log
           grep -Eq 'E2E SUITE.*35/35.*1 flows' browser.log
           grep -Fq 'Account first · one card, the gate on every route, guardian approval, sign-out, deep links, reload, offline' browser.log
-          grep -Fq 'E2E SUITE PASSED — 65/65 checks across 1 flows' browser.log
+          grep -Fq 'E2E SUITE PASSED — 72/72 checks across 1 flows' browser.log
           test "$(grep -Fc 'Account first · one card, the gate on every route' browser.log)" -ge 2
           grep -Fq 'Cloud · Continue with Google signs in, and Google confirms deletion' browser.log
           # Online-only, server-authoritative grading (owner decision
