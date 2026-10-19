@@ -78,7 +78,12 @@ assert.match(activation, /statement = await cloud\.guardianState\(\);[\s\S]{0,60
 assert.match(activation, /if \(authority\.outcome === 'changed'\) throw new ActivationBlocked\('ACCOUNT_MISMATCH'\);/,
   'a statement about another account (a second tab) is a mismatch, never a permission');
 assert.match(activation, /if \(sync && !link\.lastSyncAt\) \{[\s\S]{0,400}await syncNow\(pid\);/, 'the first sync runs before the shell opens');
-assert.match(activation, /status\.requiresFullRescan\) \{\s*throw/, 'a first sync that did not finish its reconciliation is not a first sync');
+// The first sync binds the profile to the account (a completed sync whose
+// status names this account); an older history the server only partly takes
+// stays queued for the scheduler rather than locking a returning student out
+// (account-activation-check.mjs proves both halves).
+assert.match(activation, /!report\?\.lastSyncAt \|\| !status\?\.lastSyncAt \|\| String\(status\.accountId\) !== String\(link\.accountId\)\) \{\s*throw/, 'a first sync that did not complete for this account is not a first sync');
+assert.doesNotMatch(activation, /status\.requiresFullRescan\) \{\s*throw/, 'and a partly accepted older history does not keep the student out');
 assert.match(activation, /'FIRST_SYNC_PENDING', \{ cause: error, retryable: true \}/, 'a failed first sync is said as retryable, never as a sign-out');
 assert.match(activation, /ACTIVATION_DENIED_CODES = Object\.freeze\(\[[^\]]*'GUARDIAN_CONSENT_PENDING', 'GUARDIAN_CONSENT_WITHDRAWN', 'AGE_DECLARATION_REQUIRED'/,
   'a pending or withdrawn guardian decision and a missing age are authoritative refusals');
