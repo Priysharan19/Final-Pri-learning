@@ -445,17 +445,23 @@ export const sessionEndedWriteFlow = {
     await correctReading(page, SURELY_WRONG);
     await pressSubmit(page);
     await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
+    // One request (#506): the picture travels with /submit, and the server
+    // writes the reader's receipt and the student's correction on top of it
+    // beside the mark — the same two records /recognize and /confirm wrote.
     const recognized = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognize$`));
     const confirmed = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognition/[^/]+/confirm$`));
-    await check('the correction is recorded by the server as the student\'s, on top of the reader\'s receipt (recognize, then recognition/:id/confirm)',
-      recognized.some(c => c.status === 201 && c.json?.transcription?.text === readLine) &&
-        confirmed.some(c => c.status < 300 && c.body?.text === SURELY_WRONG),
-      JSON.stringify({ readLine, recognize: recognized.map(c => `${c.status} ${c.json?.transcription?.text}`), confirm: confirmed.map(c => `${c.status} ${c.body?.text}`) }));
     const firstGrade = (await grades()).at(-1);
+    const firstCorrection = online.recognitionProof(firstGrade?.json?.reading?.receipt);
+    const firstReading = online.recognitionProof(firstCorrection?.parentReceipt);
+    await check('the correction is recorded by the server as the student\'s, on top of the reader\'s receipt (one request: the receipt and the correction written with the mark)',
+      recognized.length === 0 && confirmed.length === 0 && firstGrade?.json?.reading?.corrected === true &&
+        firstCorrection?.correctedByStudent === true && firstCorrection.text === SURELY_WRONG && firstReading?.text === readLine,
+      JSON.stringify({ readLine, separate: recognized.length + confirmed.length, reading: firstGrade?.json?.reading, correction: firstCorrection?.text, read: firstReading?.text }));
     await check('a wrong answer: server-authoritative, 0 marks, not resolved, one try remaining, graded as handwriting under the receipt',
       firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false &&
         firstGrade.json.resolved === false && firstGrade.json.triesLeft === 1 && firstGrade.json.marksEarned === 0 &&
-        firstGrade.json.marksPossible >= 1 && firstGrade.body?.mode === 'ink' && typeof firstGrade.body?.transcriptionReceipt === 'string',
+        firstGrade.json.marksPossible >= 1 && firstGrade.body?.mode === 'ink' && /^data:image\//.test(firstGrade.body?.image || '') &&
+        typeof firstGrade.json.reading?.receipt === 'string' && !!firstCorrection,
       JSON.stringify(firstGrade && { status: firstGrade.status, json: firstGrade.json }).slice(0, 400));
     await check('the card shows that miss and keeps the question open for the second try',
       await page.locator('.verdict-bad').count() >= 1 && await page.locator('.eval-card').count() === 0 && await shownId(page) === qid &&

@@ -216,7 +216,9 @@ export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
   // Test desk only: the reading receipt the server wrote (/recognize, /confirm,
   // or beside the mark of a Submit that carried its picture), as stored.
   const recognitionProof = (accountId, receipt) => {
-    const row = h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-recognition' AND account_id=? AND key=?").get(accountId, String(receipt || ''));
+    const row = accountId
+      ? h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-recognition' AND account_id=? AND key=?").get(accountId, String(receipt || ''))
+      : h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-recognition' AND key=?").get(String(receipt || ''));
     return row ? JSON.parse(row.response_json) : null;
   };
   const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, close };

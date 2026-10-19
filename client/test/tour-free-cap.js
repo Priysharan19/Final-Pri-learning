@@ -227,6 +227,9 @@ export const capAtCheck = {
     await answerBox.fill(SURELY_WRONG);
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     const bindsBefore = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).length;
+    await check('before Submit nothing is bound or marked: the question is still only prepared and the server holds no new completion',
+      (await online.shownRow())?.serverQuestionId === null && platform.ledger(account.id).completions === completionsAtCap &&
+        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0);
 
     // ── Submit: binding would be a twenty-first question ─────────────────────
     await pressSubmit(page);
@@ -238,8 +241,10 @@ export const capAtCheck = {
         /free plan includes 20 a day/.test(verdict) && /midnight/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 1,
       `${JSON.stringify(shown)} ${JSON.stringify(verdict.slice(0, 240))}`);
     await check('and with NO verdict, marks, XP or solution', nothingMarked(shown), JSON.stringify(shown));
-    await check('the same question and page: the typed answer is still in the box',
-      await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await answerBox.inputValue() === SURELY_WRONG, JSON.stringify(await answerBox.inputValue()));
+    await check('the refusal is in the card on the same question, without leaving the page',
+      new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid,
+      `${page.url()} ${await shownId(page)}`);
+    await check('the typed answer is still in the box', await answerBox.inputValue() === SURELY_WRONG, JSON.stringify(await answerBox.inputValue()));
     const binds = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).slice(bindsBefore);
     const submits = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
     await check('the server refused the bind with its own code; the answer was never sent to be marked',

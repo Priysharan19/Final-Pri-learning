@@ -628,7 +628,7 @@ jobs:
           # screen from the server's 402 and fetches nothing instead; a capped
           # account cannot have a signed-out question bound and marked.
           grep -Fq 'Free cap · nineteen used on another device: the twentieth is issued, Next shows the cap screen from the server, nothing fetched instead' browser.log
-          grep -Fq 'Free cap · a prepared question, signed in on the card to a capped account: Submit refused as the free cap, nothing marked, work kept' browser.log
+          grep -Fq 'Free cap · a prepared question on a signed-in account that reaches its cap elsewhere: Submit refused as the free cap, nothing marked, work kept' browser.log
           grep -Eq 'E2E SUITE.*24/24.*2 flows' browser.log
           grep -Fq 'Pri Explain V8 · adaptive board-style reasoning playback' browser.log
           grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
