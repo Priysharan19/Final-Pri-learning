@@ -672,7 +672,7 @@ try {
 
     // Prototype-pollution keys never reach Object.prototype or an authority field.
     const pollute = { ['__proto__']: { polluted: 'yes', role: 'admin', isAdmin: true }, constructor: { prototype: { polluted: 'yes' } } };
-    const polluteRaw = body => JSON.stringify(body).replace('"__proto__"', '"__proto__"');
+    const polluteRaw = body => JSON.stringify(body); // the computed ['__proto__'] key is an own property, so it is serialised as-is
     await resetLimits();
     const pollutedReg = await bare('/v1/account/register', { method: 'POST', rawBody: polluteRaw({ ...pollute, name: 'Proto', email: 'proto@example.test', password: 'correct-horse-battery', isAdult: true }) });
     c.eq(pollutedReg.status, 201, 'register with __proto__ keys');

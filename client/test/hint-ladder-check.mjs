@@ -17,10 +17,6 @@ const section = n => { group = n; };
 const show = v => JSON.stringify(v) ?? String(v);
 const ok = (name, cond, detail = '') => { if (cond) { pass++; return true; } failures.push(`${group} · ${name}${detail ? `\n      ${detail}` : ''}`); return false; };
 const eq = (name, a, b) => ok(name, show(a) === show(b), `expected ${show(b)}, got ${show(a)}`);
-async function rejects(name, promise, { status, code } = {}) {
-  try { await promise; ok(name, false, 'resolved instead of throwing'); }
-  catch (err) { ok(name, (!status || err?.status === status) && (!code || err?.code === code), `threw ${show({ status: err?.status, code: err?.code, message: err?.message })}`); }
-}
 
 const L = await import(`${SRC}engine/hintLadder.js`);
 const A = await import(`${SRC}engine/adaptive.js`);
