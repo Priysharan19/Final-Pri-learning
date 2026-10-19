@@ -741,6 +741,8 @@ jobs:
             # here (WebKit cannot reload a page offline under Playwright, so the
             # opened-offline checks are Chromium-only and the run says so).
             node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            # Task 02: identical mounted grade UI contract in WebKit as Chromium.
+            node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)

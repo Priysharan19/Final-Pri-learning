@@ -26,6 +26,7 @@ async function submit(page) {
 
 export const flow = {
   id: 'verified-mark-breakdown',
+  inspectNetwork: true,
   name: 'Verified marks · real resolved method credit, hints, stale/unresolved suppression',
   online: true,
   async run({ page, base, goto, createProfile, online, check, note, settle }) {
@@ -37,17 +38,34 @@ export const flow = {
     // certified by server/test/practice-repeat-credit-check.mjs. The client
     // NEVER sees the key or the seed; the real server still issues and marks.
     let issued = 0;
+    let issuedResult = null;
     await page.route(POST_ISSUE, async route => {
       issued++;
       const original = route.request().postDataJSON() || {};
-      await route.continue({ postData: JSON.stringify({ ...original, ...PAIR }) });
+      const response = await route.fetch({ postData: JSON.stringify({ ...original, ...PAIR, seed: issued === 1 ? 7 : 8 }) });
+      issuedResult = { status: response.status(), body: (await response.text()).slice(0, 900), original };
+      await route.fulfill({ response });
     });
     await openPractice({ page, base, settle });
-    const known = await online.answerOf();
+    let known = await online.answerOf();
+    // Some browsers restore an unanswered question created during onboarding
+    // before the route interception was installed. Ask for a *new* question,
+    // rather than passing on a different question or changing its response.
+    for (let n = 0; n < 4 && !(known.kind === 'text' && known.text === '-6' &&
+      known.prompt?.includes('Solve by elimination')); n++) {
+      const before = await front(page).getAttribute('data-question-id');
+      await page.locator('.ctx-next').click();
+      await page.waitForFunction(id => {
+        const next = document.querySelector('.qpage[data-question-id]');
+        return next && next.getAttribute('data-question-id') !== id && !!next.querySelector('.q-prompt');
+      }, before, { timeout: 30000 });
+      known = await online.answerOf();
+    }
     if (!await check('the real server issued the pinned two-mark elimination question',
       issued > 0 && known.kind === 'text' && known.text === '-6' &&
-      known.prompt.includes('Solve by elimination'), JSON.stringify(known).slice(0, 500))) return;
+      known.prompt.includes('Solve by elimination'), JSON.stringify({ known, issuedResult }).slice(0, 1500))) return;
     const questionId = await front(page).getAttribute('data-question-id');
+    await page.getByRole('button', { name: 'Answer by typing' }).click();
     await page.locator('[data-final-answer]').fill(BAD);
     const work = page.locator('[data-typed-working]');
     await work.waitFor({ state: 'visible', timeout: 10000 });
@@ -153,7 +171,7 @@ export const flow = {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { onlinePlatform } = await import('./support/online-session.mjs');
   // The preselected seed is accepted ONLY by the test server, never deployed.
-  await onlinePlatform({ env: { NODE_ENV: 'test' } });
+  await onlinePlatform({ allowSeededPractice: true });
   const { runOne } = await import('./e2e.mjs');
   process.exit(await runOne(flow) ? 1 : 0);
 }
