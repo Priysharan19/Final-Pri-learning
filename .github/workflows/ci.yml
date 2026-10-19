@@ -182,6 +182,8 @@ jobs:
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
+          grep -Fq 'VERIFIED STEP MARKS: PASS' suites.log
+          grep -Fq 'VERIFIED STEP MARKS CLIENT: PASS' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,

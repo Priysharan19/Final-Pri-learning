@@ -47,6 +47,7 @@ import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
+import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
@@ -2604,6 +2605,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
                 {res.stepReport && <StepReport report={res.stepReport} />}
+                {/* Only display the matched server receipt after resolution. */}
+                {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
                 {boardAward && (
                   <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
                     {/* The header above already states the total. It is repeated here

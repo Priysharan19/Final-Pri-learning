@@ -2158,6 +2158,8 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
+    // Replayed mark explanations come from the same immutable server receipt.
+    ...(row.serverQuestionId && row.serverReceipt?.markRows ? { markRows: row.serverReceipt.markRows } : {}),
     ...(row.serverQuestionId ? {
       ...replayMarks,
       authoritative: true, attemptId: row.serverReceipt.attemptId,
@@ -3958,6 +3960,7 @@ const routes = {
       solution: authoritative.solution || null,
       ...meta,
       ...certified,
+      ...(authoritative.markRows ? { markRows: authoritative.markRows } : {}),
       syncQueued: true,
       ...(submissionId ? { submissionId } : {})
     };
