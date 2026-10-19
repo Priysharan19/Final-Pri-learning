@@ -2584,7 +2584,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     ? t('verdict.marksOutOf', { earned: shownGrade.awarded, total: shownGrade.possible })
                     : diagnostic && serverAuthoritative ? null
                     : <span data-grade-unavailable>{numericalGradeUnavailable(language)}</span>}
-                  {shownGrade && helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
+                  {shownGrade && helpUsed > 0 && <small> · {t('verifiedMarks.beforeHints')}</small>}
                 </span>
               </div>
               <div className="eval-body">

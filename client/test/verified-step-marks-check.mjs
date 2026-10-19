@@ -1,6 +1,8 @@
 // Client gate refuses stale, mixed and invented mark rows.
 import assert from 'node:assert/strict';
 import { verifiedMarkBreakdown } from '../src/components/verifiedMarkRows.js';
+import { readFileSync } from 'node:fs';
+const cardSource = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 let pass = 0;
 const ok = (label, got, expected) => {
   assert.equal(got, expected, label); pass++;
@@ -37,4 +39,6 @@ ok('correct answer cannot acquire method marks', verifiedMarkBreakdown({
   ...correct, markRows: { ...correct.markRows, method: { awarded: 3, attribution: 'aggregate-only' } }
 }, { awarded: 4, possible: 4 }), null);
 ok('older response safely degrades', verifiedMarkBreakdown({ ...r, markRows: undefined }, grade), null);
+ok('header labels pre-hint marks truthfully', cardSource.includes("t('verifiedMarks.beforeHints')"), true);
+ok('header never equates server marks with credited-after-hints', cardSource.includes("t('verdict.afterHints', { count: helpUsed"), false);
 console.log('VERIFIED STEP MARKS CLIENT: PASS — ' + pass + '/' + pass + ' checks');
