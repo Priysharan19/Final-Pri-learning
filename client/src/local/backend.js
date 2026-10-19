@@ -70,8 +70,10 @@ import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../pla
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
+  markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
+import { pendingSummary } from './examPages.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -1893,6 +1895,9 @@ function sanitize(q, row) {
     // Who marks this question as it stands: the server (issued there, its
     // answer key never on this device) or the bundled deterministic engine.
     serverIssued: !!row.serverQuestionId,
+    // The server's own id of the issued question: an opaque reference the
+    // card passes with a read so the read receipt is bound to this question.
+    serverQuestionId: row.serverQuestionId || null,
     // issued: the server's, markable now. prepared: markable once an account
     // binds it. draft: opened with no connection, never markable.
     checkState: row.serverQuestionId ? 'issued' : row.prepared ? 'prepared' : row.draftOnly ? 'draft' : 'legacy',
@@ -4125,7 +4130,10 @@ const routes = {
       id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt,
       deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total,
       // Who marked a finished paper, and whether one is still waiting to be.
-      marked_by: markedByOf(e), pending: !!e.pendingFinish
+      marked_by: markedByOf(e), pending: !!e.pendingFinish,
+      // Marks not yet decided: handwriting saved at the close and not read.
+      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0,
+      provisional: !!e.finishedAt && (e.provisional === true || pendingSummary(e.detail).any)
     })) };
   },
   'GET /exams/:id': async (body, params) => {
@@ -4156,6 +4164,13 @@ const routes = {
         const out = await reconcileWithServer(fresh, { rebuildRow: (sq, localId) => paperRowOf(p.id, fresh.id, sq, fresh.createdAt, localId) });
         if (out.result && !fresh.finishedAt) await adoptPaperResult(p, fresh, out.result);
         else if (out.changed) await put('exams', fresh);
+      });
+    } else if (held && held.pid === p.id && isServerPaper(held) && held.finishedAt && held.server.handwriting) {
+      // Handwriting that was not read when the paper closed is still pending:
+      // its frozen page is presented again (the server bounds how often).
+      await withMutationLock(`exam:${params.id}`, async () => {
+        const fresh = await get('exams', params.id);
+        if (fresh && await recoverHandwriting(fresh)) await put('exams', fresh);
       });
     }
     const exam = await examFor(p.id, params.id);
@@ -4229,7 +4244,19 @@ const routes = {
     // Saved on the device; the server's copy follows a moment later and is
     // retried until it lands. It never delays or fails this save.
     if (isServerPaper(e)) scheduleCheckpoint(e.id, body?.urgent === true ? 0 : undefined);
-    return { saved: true, ...saved };
+    // A frozen page of handwriting is "saved" only once it has been read back.
+    return { saved: true, ...saved, pagesSaved: await confirmExamPagesSaved(e.id, e.responses?.pages) };
+  },
+  // "Retry checking" for one answer whose handwriting was saved at the close
+  // and is not marked: the frozen picture, no edits, the server's limits.
+  'POST /exams/:id/handwriting': async (body, params) => {
+    const p = await requireProfile();
+    return withMutationLock(`exam:${params.id}`, async () => {
+      const e = await get('exams', params.id);
+      if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+      try { return await retryHandwriting(e, String(body?.key || '')); }
+      finally { await put('exams', e); }
+    });
   },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
@@ -5454,6 +5481,8 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
     settled.serverReceipt = { authoritative: true, examId: e.server.examId, attemptId: d.attemptId || null, solution: d.solution };
     await put('questions', settled);
   }
+  // An answer pending on handwriting that was not read says so on its line.
+  markPendingLines(result, detail, e);
   Object.assign(e, { finishedAt: finishedAtOf(e, result), score: result.score, total: result.total, detail });
   e.final = serverFinal(e, { ...result, detail });
   delete e.responses;
@@ -5904,16 +5933,11 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   let receipt = earlier?.submissionId === submissionId ? earlier.receipt : null;
   // The request bytes of an earlier send under this key, when there was one.
   const resend = earlier?.submissionId === submissionId && earlier.payload ? earlier.payload : null;
-  // A handwritten or photographed answer goes to the server in ONE request:
-  // the picture travels with the submission, and the server reads it (reusing
-  // the transcript it has just shown, so Submit never pays for a second read
-  // of an unchanged picture), writes the reading receipt — and the student's
-  // correction when the answer is not the whole transcript — and marks, in
-  // one transaction. The reader is sent the picture alone (answer-blind), and
-  // the mark is the deterministic engine's verdict on the answer text. That
-  // was three requests (/recognize, /recognition/…/confirm, /submit). The
-  // three-request sequence below is kept for a server that does not accept a
-  // picture here yet, and for a picture too large to share a request body.
+  // A handwritten or photographed answer was read when the student asked
+  // (Read my answer / Read my photo, #440), so Submit sends the confirmed
+  // answer with the server's reading receipt and never a picture to read.
+  // `picture` stays null; the server's picture-in-Submit path (#441) is not
+  // used by this client.
   let picture = null;
   // Reading the handwriting or photo comes before marking and is not marking:
   // a failure anywhere in it means the answer was not sent to be marked. (It
@@ -5928,30 +5952,27 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         status: 422, code: 'RECOGNITION_IMAGE_REQUIRED'
       });
     }
-    const workingChars = Array.isArray(body.steps) ? body.steps.join('\n').length : String(body.steps || '').length;
-    if (receiptFlow !== true && image.length + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
-      picture = image;
-    } else {
-      // The reader's own refusal (the service's reading limit, this account's
-      // allowance or rate limit, a reader that did not answer) is kept beside
-      // the "not checked" error, so the card can name it instead of saying
-      // "reconnect" for a limit that reconnecting does not lift.
-      const read = await cloud.recognizePractice(row.serverQuestionId, mode, image).catch(cause => {
-        throw readerRefusal(cause);
+    // Read on request (#440): the student pressed Read my answer / Read my
+    // photo, saw the reading and confirmed or corrected it. Submit never buys
+    // a read: the attested read replays the server's kept reading (or its
+    // signed read receipt proves it), and a correction is sent explicitly.
+    // The picture never travels with the marking request.
+    const attested = mode === 'ink' ? body.ink?.attested : body.photoAttested;
+    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image, attested && typeof attested === 'object' ? attested : null).catch(cause => {
+      throw readerRefusal(cause);
+    });
+    receipt = read?.receipt;
+    if (!receipt || typeof read?.transcription?.text !== 'string') {
+      throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
+        status: 503, code: 'RECOGNITION_ACK_MISSING'
       });
-      receipt = read?.receipt;
-      if (!receipt || typeof read?.transcription?.text !== 'string') {
-        throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
-          status: 503, code: 'RECOGNITION_ACK_MISSING'
-        });
-      }
-      // Student corrections cannot forge a provider receipt. The server saves
-      // the original reading and the explicit correction under a second token.
-      if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
-        const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
-        if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
-        receipt = corrected.receipt;
-      }
+    }
+    // Student corrections cannot forge a provider receipt. The server saves
+    // the original reading and the explicit correction under a second token.
+    if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
+      const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
+      if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
+      receipt = corrected.receipt;
     }
   } catch (cause) { throw notMarked(cause); }
   // Preserve the complete request bytes across uncertain acknowledgements.
