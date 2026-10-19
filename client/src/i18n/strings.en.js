@@ -2982,4 +2982,6 @@ export default {
   "inst.reportLost": "Where marks were lost",
   "inst.reportLostNone": "No certified marks lost yet.",
   "inst.reportHeatCell": "{date}: {n} questions",
+  "inst.plotTitle": "Your lines, drawn",
+  "inst.plotNote": "A drawing of what Pri read from your writing. It never sets a mark.",
 };

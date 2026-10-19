@@ -231,7 +231,8 @@ const CONVERTED = [
   'src/instrument/StepMarks.jsx',
   'src/instrument/MapPage.jsx',
   'src/instrument/ReportHead.jsx',
-  'src/instrument/MarkStrip.jsx'
+  'src/instrument/MarkStrip.jsx',
+  'src/instrument/ReadingPlot.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and

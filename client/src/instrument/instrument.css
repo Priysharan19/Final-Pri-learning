@@ -503,3 +503,9 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-strip i { width: 8px; height: 8px; border-radius: 2px; }
 .in-strip i.is-earned { background: var(--in-good); }
 .in-strip i.is-lost { background: transparent; box-shadow: inset 0 0 0 1.25px var(--in-slip); }
+
+/* ── The student's own equations, drawn (step 7) ───────────────────────────── */
+.in-reading-plot { margin: 12px 0 0; padding: 12px; border-radius: 6px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); max-width: 520px; }
+.in-reading-plot figcaption { margin-bottom: 8px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-reading-plot .in-note { margin-top: 8px; font-size: 12px; }
+html.ui-instrument { --plot-a: var(--in-c1); --plot-b: var(--in-c3); --plot-c: var(--in-c2); --plot-grid: var(--in-edge); --plot-axis: var(--in-tx-3); }
