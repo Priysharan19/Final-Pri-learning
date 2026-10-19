@@ -347,7 +347,7 @@ html.ui-instrument .ink-comment { border-radius: 4px; }
 
 /* The status line under the page: what was read, in figures. */
 html.ui-instrument .status-line { font: 400 12.5px var(--in-ui); color: var(--in-tx-3); }
-html.ui-instrument .ws-answer-preview { font: 500 13px var(--in-mono); color: var(--in-tx); }
+html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeric: tabular-nums; }
 
 /* The scan: on Check, one signal line passes down the page. Opacity and
    transform only; off under reduced motion (the existing rule hides it). */
@@ -365,3 +365,6 @@ html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { animation: none; display: none; }
 }
+/* The line the engine marked as the slip carries the copper edge on its chip. */
+html.ui-instrument .ink-line:has(.ink-line-verdict.bad) .ink-line-math { box-shadow: 0 0 0 1px var(--in-slip); }
+html.ui-instrument .ink-line:has(.ink-line-verdict.good) .ink-line-math { box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 55%, transparent); }
