@@ -504,15 +504,16 @@ export default function Settings() {
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay })}</p>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
             <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
             <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
             <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allCourses')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allFeatures')}</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">✓</span></div>
+            {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
+            <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
           </div>
 
           {/* ── Account information ── */}

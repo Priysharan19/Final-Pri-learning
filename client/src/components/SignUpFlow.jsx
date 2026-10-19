@@ -31,7 +31,7 @@ const TRACKS = [
 const RESEND_SECONDS = 30;
 // Must equal CONSENT_NOTICE_VERSION in server/platform/guardianConsent.js; the
 // server refuses an approval that names any other notice.
-export const GUARDIAN_NOTICE_VERSION = '2026-10-02';
+export const GUARDIAN_NOTICE_VERSION = '2026-10-19';
 
 function stepsFor({ mode, role, minor }) {
   if (role === 'parent') return ['role', 'parent-home'];

@@ -38,7 +38,9 @@ import { timedMiddleware } from './requestTiming.js';
  */
 // 2026-10-02: the notice's Children section now describes this flow (it said
 // no consent was recorded), and its retention section changed.
-export const CONSENT_NOTICE_VERSION = '2026-10-02';
+// 2026-10-19 (#284): the notice now says answers are marked online by the
+// server, handwriting and photos are read by OpenAI, and where data is stored.
+export const CONSENT_NOTICE_VERSION = '2026-10-19';
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
