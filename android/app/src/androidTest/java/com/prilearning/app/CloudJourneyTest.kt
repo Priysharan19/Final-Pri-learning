@@ -366,7 +366,10 @@ class CloudJourneyTest {
                     assertEquals("a signed-in student is not told checking needs an account", "false",
                         eval(s, QuestionCardJs.visible("[data-check-needs-account]")))
                     setValue(s, ".editor-body input.answer-input", WRONG)
-                    Thread.sleep(300)
+                    // Typing saves a draft on the device first ("Saving on this
+                    // device…" shares the status line a check uses): wait for
+                    // that save to say Saved — a running check never does.
+                    waitFor(s, "(function(){var l=document.querySelector('.ws-actions .status-line');return !!l&&l.getAttribute('data-state')==='saved';})()", 15_000)
                     assertEquals("no check is running before Submit is pressed", "true", eval(s, QuestionCardJs.CHECK_IDLE))
                     assertUnmarked(s, "before Submit")
                     assertEquals("before Submit the server marked nothing", 0, oracle("/marked").getJSONArray("completed").length())
