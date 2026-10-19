@@ -184,6 +184,8 @@ jobs:
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
           grep -Eq 'EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
+          grep -Fq 'VERIFIED STEP MARKS: PASS' suites.log
+          grep -Fq 'VERIFIED STEP MARKS CLIENT: PASS' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,
@@ -235,7 +237,7 @@ jobs:
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 68 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 69 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
           grep -Fq 'LOST MARKS: PASS — 170/170 checks' suites.log
@@ -717,6 +719,8 @@ jobs:
             node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-write-sign-in.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
+            # Task 02: mounted server-authoritative method credit and stale receipt rejection.
+            node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-ai-tutor.js 2>&1 | tee -a browser.log
             node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
@@ -759,6 +763,8 @@ jobs:
             # here (WebKit cannot reload a page offline under Playwright, so the
             # opened-offline checks are Chromium-only and the run says so).
             node client/test/tour-activation-gate.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            # Task 02: identical mounted grade UI contract in WebKit as Chromium.
+            node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
