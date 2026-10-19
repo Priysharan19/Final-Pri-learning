@@ -492,6 +492,12 @@ jobs:
           # and iPad/desktop composition unchanged. Both engines.
           node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+          # Phase 3: every student screen at phone and tablet, paper and dark —
+          # accessible names, keyboard focus, 44px touch targets, 200% text,
+          # layout shift, input timing and visual snapshots (compared only
+          # against baselines committed for this platform and engine).
+          node client/test/tour-interface-quality.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
@@ -522,6 +528,7 @@ jobs:
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
+          grep -Eq 'E2E SUITE PASSED.*220/220.*1 flows' browser.log
           test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log

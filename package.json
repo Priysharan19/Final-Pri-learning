@@ -199,6 +199,7 @@
     "test:native:journey": "node scripts/iphone-journey.mjs",
     "check:apple:v1": "node scripts/apple-shipping-target.mjs --check-v1",
     "test:ios:status-bar": "node client/test/ios-status-bar-check.mjs",
+    "test:interface": "node client/test/tour-interface-quality.js && node client/test/tour-interface-quality.js --no-build --browser=webkit",
     "test:responsive": "node client/test/tour-responsive-matrix.js && node client/test/tour-responsive-matrix.js --no-build --browser=webkit && node client/test/tour-iphone-layout.js --no-build && node client/test/tour-iphone-layout.js --no-build --browser=webkit",
     "test:native:contract": "node client/test/native-host-contract-check.mjs",
     "test:native:apple-sign-in": "node client/test/apple-sign-in-check.mjs",
