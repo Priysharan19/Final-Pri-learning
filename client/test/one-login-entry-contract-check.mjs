@@ -59,8 +59,11 @@ assert.match(app, /useEffect\(\(\) => \{ setActivated\(a => \(a && user\?\.id &&
   'a different profile is a different question: its activation starts over');
 assert.match(app, /if \(!sameIdentity\) setActivated\(null\);/,
   'a sign-out, or another account or profile signing in (this tab or another), relocks the gate');
-assert.match(app, /if \(live && activation\.isActivationDenied\(error\)\) setActivated\(null\);/,
-  'the periodic recheck ejects only on the server\'s own refusal');
+assert.match(app, /if \(!live\) return;\s*if \(activation\.isActivationDenied\(error\)\) setActivated\(null\);\s*else if \(offlineEntry && !\(Date\.now\(\) - offlineVerifiedAt < activation\.OFFLINE_GRACE_MS\)\) setActivated\(null\);/,
+  'the periodic recheck ejects only on the server\'s own refusal, or when an offline grace has run out');
+assert.match(app, /window\.addEventListener\('online', online\)/, 'and asks the server again the moment the connection returns');
+assert.match(gate, /ensureAccountActivated\(user\.id, \{ offlineGrace: true \}\)/,
+  'only the gate\'s own check may use the 72-hour offline grace');
 assert.match(app, /ensureAccountActivated\(user\.id, \{ sync: false \}\)/, 'the recheck of a profile already inside does not repeat the first sync');
 assert.match(app, /if \(!user\?\.id \|\| activated\?\.profileId !== user\.id\) return undefined;\s*const pid = user\.id;\s*let uninstall = null;/,
   'the sync scheduler is installed only once the gate has let the profile in');
