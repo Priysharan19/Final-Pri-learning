@@ -137,7 +137,7 @@ try {
     const r = await raw(path, { headers: { Accept: accept } });
     c.match(r.headers.get('strict-transport-security') || '', /^max-age=\d{7,}; includeSubDomains$/, `${label}: HSTS`);
     const csp = r.headers.get('content-security-policy') || '';
-    c.ok(/script-src 'self'(;|$)/.test(csp) && /frame-ancestors 'none'/.test(csp) && /object-src 'none'/.test(csp), `${label}: enforced CSP (script-src self only, no framing, no plugins)`);
+    c.ok(/script-src 'self'(;|$)/.test(csp) && /frame-ancestors 'none'/.test(csp) && /frame-src 'none'/.test(csp) && /object-src 'none'/.test(csp), `${label}: enforced CSP (script-src self only, no framing either way, no plugins)`);
     c.eq(r.headers.get('content-security-policy-report-only'), null, `${label}: CSP is enforced, not report-only`);
   }
 

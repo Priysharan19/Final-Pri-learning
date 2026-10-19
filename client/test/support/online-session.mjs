@@ -52,7 +52,14 @@ const ENV = {
   PRI_HANDWRITING_MODEL: 'synthetic-reader',
   PRI_HANDWRITING_FALLBACK_MODEL: 'synthetic-reader',
   PRI_PAID_CALLS_PER_HOUR: '10000',
-  PRI_PAID_CALLS_PER_DAY: '100000'
+  PRI_PAID_CALLS_PER_DAY: '100000',
+  // A flow that skips through questions can ask one account for more than the
+  // free plan's twenty in a day. The server's cap (#537) is proved at its
+  // shipped default by server/test/practice-daily-cap-check.mjs and, in the
+  // browser, by tour-free-cap.js — which boots this platform with the default
+  // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
+  // the cap raised by configuration so it is never read as a fault.
+  PRI_FREE_PRACTICE_PER_DAY: '100000'
 };
 // PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
 // page's own origin, which is this server's ephemeral loopback port.
@@ -62,9 +69,13 @@ const ENV_CLEARED = ['PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_PROBE_ENDPOINT
 let shared = null;
 let accountSerial = 0;
 
-/** The one platform of this suite run, booted on first use. */
-export function onlinePlatform() {
-  if (!shared) shared = startOnlinePlatform().catch(err => { shared = null; throw err; });
+/**
+ * The one platform of this suite run, booted on first use. A tour that needs
+ * the server configured differently boots it first, before the runner does:
+ * `env` entries override ENV for this run (`null` leaves a variable unset).
+ */
+export function onlinePlatform(options = {}) {
+  if (!shared) shared = startOnlinePlatform(options).catch(err => { shared = null; throw err; });
   return shared;
 }
 
@@ -75,11 +86,13 @@ export async function closeOnlinePlatform() {
   if (running) await (await running.catch(() => null))?.close();
 }
 
-export async function startOnlinePlatform({ dist = DIST } = {}) {
+export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`online-session: ${dist} has no built client`);
-  const saved = Object.fromEntries([...Object.keys(ENV), ...ENV_CLEARED, 'PRI_AUTH_DELIVERY_KEY'].map(k => [k, process.env[k]]));
+  const saved = Object.fromEntries([...Object.keys(ENV), ...Object.keys(env), ...ENV_CLEARED, 'PRI_AUTH_DELIVERY_KEY'].map(k => [k, process.env[k]]));
   process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '44'.repeat(32);
-  Object.assign(process.env, ENV);
+  for (const [k, v] of Object.entries({ ...ENV, ...env })) {
+    if (v === null || v === undefined) delete process.env[k]; else process.env[k] = String(v);
+  }
   for (const k of ENV_CLEARED) delete process.env[k];
 
   // The stand-in reader. `text` / `confidence` are scripted by the flow; every

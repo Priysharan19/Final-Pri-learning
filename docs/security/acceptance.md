@@ -50,12 +50,15 @@ suites and `request-size-contract-check`.
 
 | Suite | SQLite | Postgres 17 |
 |---|---|---|
-| route-inventory-check | 31/31 (90 routes) | n/a (no database) |
+| route-inventory-check | 31/31 (116 routes) | n/a (no database) |
 | sql-parameterisation-check | 24 reviewed interpolations | n/a |
-| security-acceptance-check | 218/218 | 218/218 |
+| security-acceptance-check | 219/219 | 219/219 |
 | abuse-limits-check | 29/29 | 29/29 |
 | security-production-mode-check | 52/52 | n/a (headers/cookies) |
 | mfa-check | 101/101 | 101/101 |
+| account-deletion-session-binding-check | 28/28 (a delete naming another account is 409 ACCOUNT_MISMATCH before any proof; the id never selects, #521) | 28/28 |
+| export-reauth-check | 56/56 (the data export needs the credential proven inside 10 minutes: sign-in or the session-bound `pri_step_up` cookie from `POST /v1/account/reauth`; another session's, a tampered, an expired or a future cookie proves nothing; receipts carry counts only; guessing is rate limited) | 56/56 |
+| session-alerts-check | 43/43 (a sign-in from a device the account never used: one `session.new-device` audit row and one notice to the account's own address with no address, link or code; first session, known device and phone-only accounts send nothing; a failed send never fails the sign-in) | 43/43 |
 | oidc-consent-check | 32/32 | 32/32 |
 | security-hardening-check | 141/141 | 144/144 (three Postgres-only RLS checks) |
 | rls-fail-closed-check | 134/134 | 272/272 (only store.js declares the scope; exec() never pools a session left in a transaction; fail closed outside the store; per owned table read/update/delete/re-home/insert across accounts refused; shared-table behaviour pinned — threat-model §7) |
@@ -101,6 +104,7 @@ page does not accept them.
 | `roles` | Roles that pass every `requireRole` gate on the route (intersection), or `null` for any signed-in role. |
 | `verifiedEmail`, `guardianConsent` | Whether `requireVerifiedEmail` / `requireGuardianConsent` sit in front of the handler. |
 | `mfa` | The staff second-factor gate (`requireMfa`): `false`, `true` (a code verified on this session), or `{ "stepUpMs": N }` (one presented inside that window). Machine-derived; every route whose roles are only `admin`/`support` must carry it, except the enrolment ceremony under `/v1/account/mfa/`. |
+| `recentAuth` | Fresh proof of the credential itself (`requireRecentAuth`, `security.js freshProofAt`): `false`, or `{ "freshMs": N }` — the session signed in, or `POST /v1/account/reauth` set the session-bound `pri_step_up` cookie, inside that window; otherwise `401 REAUTH_REQUIRED` naming the proofs the account can offer. Machine-derived; `GET /v1/account/export` must carry it. |
 | `ownership` | The object-level rule, in words: which rows the caller can reach and what answer anything else gets. |
 | `rateLimits` | Every `rateLimit` bucket in front of the handler: key, limit, window, and `identity` (`account` if keyed by the session account, `ip` if it runs before any session). |
 | `csrf` | `double-submit-when-session-cookie` for mutations behind `csrfGuard`. |

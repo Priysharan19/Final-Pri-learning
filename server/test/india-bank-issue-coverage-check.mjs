@@ -10,6 +10,10 @@ import assert from 'node:assert/strict';
 
 process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '55'.repeat(32);
 process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
+// This suite is about bank coverage, not the free plan: its accounts are issued far
+// more than twenty questions a day. The cap itself is proved by
+// practice-daily-cap-check.mjs; here it is raised by configuration.
+process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');

@@ -52,6 +52,9 @@ export function compareInventory(mounted, inventory) {
     // The second-factor gate (security.js requireMfa): false, true, or a
     // step-up window. An inventory entry that omits it declares false.
     if (JSON.stringify(entry.mfa ?? false) !== JSON.stringify(p.mfa)) problems.push(`${k}: inventory mfa=${JSON.stringify(entry.mfa ?? false)} but mounted ${JSON.stringify(p.mfa)}`);
+    // Fresh proof of the credential (security.js freshProofAt via a tagged
+    // requireRecentAuth): false, or { freshMs }. Omitted declares false.
+    if (JSON.stringify(entry.recentAuth ?? false) !== JSON.stringify(p.recentAuth)) problems.push(`${k}: inventory recentAuth=${JSON.stringify(entry.recentAuth ?? false)} but mounted ${JSON.stringify(p.recentAuth)}`);
     if (entry.guardianConsent !== p.guardianConsent) problems.push(`${k}: inventory guardianConsent=${entry.guardianConsent} but mounted ${p.guardianConsent}`);
     if (JSON.stringify(entry.rateLimits) !== JSON.stringify(p.rateLimits)) problems.push(`${k}: inventory rateLimits ${JSON.stringify(entry.rateLimits)} but mounted ${JSON.stringify(p.rateLimits)}`);
     for (const problem of p.outOfOrder || []) problems.push(`${k}: guard order — ${problem} (it would answer 403 where 401 is due, or read no session)`);
@@ -82,6 +85,10 @@ export function compareInventory(mounted, inventory) {
     const staffOnly = Array.isArray(entry.roles) && entry.roles.every(role => role === 'admin' || role === 'support');
     if (staffOnly && !(entry.mfa ?? false) && !entry.path.startsWith('/v1/account/mfa/')) problems.push(`${k}: a staff-only route must require a second factor (mfa)`);
     if ((entry.mfa ?? false) && entry.auth !== 'session') problems.push(`${k}: mfa requires a session`);
+    if ((entry.recentAuth ?? false) && entry.auth !== 'session') problems.push(`${k}: recentAuth requires a session`);
+    // The one route that hands the whole account record to the caller must ask
+    // for the credential again, not just the cookie (#368 port).
+    if (k === 'GET /v1/account/export' && !(entry.recentAuth ?? false)) problems.push(`${k}: the data export must require recent authentication`);
   }
   return problems;
 }
