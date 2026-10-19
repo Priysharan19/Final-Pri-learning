@@ -711,14 +711,16 @@ enum JourneySelfCheck {
     return JSON.stringify(steps);
     """#
 
-    // Relaunched while the server is still down: the gate cannot confirm the
-    // account, so nothing opens — and nothing on the device was lost.
+    // Relaunched while the server is still down, minutes after it let this
+    // account in on this device: inside #477's 72-hour grace the app opens on
+    // the device's own work with the offline line and no gate; nothing is
+    // checked or marked — and nothing on the device was lost.
     private static let offlineRelaunch = helpers + cardHelpers + #"""
-    await step('offlineRelaunchHeld', async () => {
-      await waitFor(() => q(GATE) || shellOpen(), 40000);
-      await waitFor(() => gateStatus() === 'retry' || shellOpen(), 60000);
-      if (shellOpen()) throw new Error('the shell opened while the server could not confirm the account');
-      return assertHeld('offline relaunch');
+    await step('offlineRelaunchGrace', async () => {
+      await waitFor(() => q('[data-testid="offline-entry"]') && shellOpen() && !q(GATE), 60000);
+      if (q(GATE)) throw new Error('offline relaunch inside the grace: the gate is up');
+      if (q('.eval-card') || q('.verdict-bad') || q('.eval-marks')) throw new Error('offline relaunch: something is marked');
+      return 'inside the grace: the offline line, no gate, nothing marked';
     });
     await step('offlineDraftOnDisk', async () => {
       const draft = JSON.parse(localStorage.getItem('pri-journey-draft') || 'null');
