@@ -2962,4 +2962,12 @@ export default {
   "inst.mapMarks": "marks",
   "inst.mapBuildsOn": "BUILDS ON",
   "inst.mapProvenance": "Prerequisite links are Pri’s own teaching map, not an NCERT or CBSE publication.",
+  "inst.mapEarlier": "EARLIER CLASSES",
+  "inst.strand.number": "Number",
+  "inst.strand.algebra": "Algebra",
+  "inst.strand.geometry": "Geometry",
+  "inst.strand.trig": "Trigonometry",
+  "inst.strand.coord": "Coordinates",
+  "inst.strand.calculus": "Calculus",
+  "inst.strand.data": "Data",
 };

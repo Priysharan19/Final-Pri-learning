@@ -3025,4 +3025,12 @@ export default {
   "inst.mapMarks": "अंक",
   "inst.mapBuildsOn": "इस पर आधारित",
   "inst.mapProvenance": "पूर्व-आवश्यकता की कड़ियाँ Pri का अपना शिक्षण मानचित्र हैं, NCERT या CBSE का प्रकाशन नहीं।",
+  "inst.mapEarlier": "पिछली कक्षाएँ",
+  "inst.strand.number": "संख्या",
+  "inst.strand.algebra": "बीजगणित",
+  "inst.strand.geometry": "ज्यामिति",
+  "inst.strand.trig": "त्रिकोणमिति",
+  "inst.strand.coord": "निर्देशांक",
+  "inst.strand.calculus": "कलन",
+  "inst.strand.data": "आँकड़े",
 };

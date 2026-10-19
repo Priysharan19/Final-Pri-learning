@@ -433,6 +433,11 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-map-graph { position: relative; border-radius: 8px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); padding: 10px; }
 .in-map-graph svg { display: block; width: 100%; height: auto; }
 .in-map-edge { fill: none; stroke: var(--in-edge-3); stroke-width: 1.4; }
+.in-map-edge.is-earlier { stroke-dasharray: 2 4; stroke: var(--in-edge-2); }
+.in-map-row { stroke: var(--in-edge); stroke-width: 1; }
+.in-map-strand { font: 500 10.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; fill: var(--in-tx-3); }
+.in-map-strand.is-col { fill: var(--in-tx-4); }
+.in-map-foundation circle { fill: var(--in-l4); stroke: var(--in-edge-3); stroke-width: 1; }
 .in-map-edge.is-toward { stroke: var(--in-signal); stroke-dasharray: 3 7; animation: in-map-flow 1.6s linear infinite; }
 @keyframes in-map-flow { to { stroke-dashoffset: -20; } }
 .in-map-dot { fill: var(--cc); }
