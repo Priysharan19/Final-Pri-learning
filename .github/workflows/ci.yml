@@ -905,7 +905,7 @@ jobs:
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Preserve evidence that the interface tour ran in both engines.
           # Their measured coverage counts differ, so verify each separately.
-          grep -Fq 'E2E SUITE PASSED — 196/196 checks across 1 flows' browser.log
+          grep -Fq 'E2E SUITE PASSED — 200/200 checks across 1 flows' browser.log
           grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
