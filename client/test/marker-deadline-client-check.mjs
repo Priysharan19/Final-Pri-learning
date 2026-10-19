@@ -6,12 +6,12 @@
 // the answer — is answered like an entry the marker could not read: invalid,
 // unresolved, nothing spent, nothing recorded. The device used to flatten the
 // two into one shape, so nothing downstream could tell "write it simply" from
-// "the marker did not finish; send it again as it is". The adaptive suite took
-// such a reply for an unanswerable question and revealed it; the chapter stayed
-// in acquisition, and the picker was entitled to serve it three in a row
-// (issue #544, one CI run in many, never reproducible locally). The device now
-// carries the server's word — `tooComplex` and `code` — through to the card
-// and the suites.
+// "the marker did not finish; send it again as it is". The device now carries
+// the server's word — `tooComplex` and `code` — through to the card and the
+// suites. This is hardening against a so far unobserved trigger: issue #544's
+// failing run logged no deadline stop at all; its cause was the server's
+// unseeded question dice (crypto.randomInt in practice.js chooseQuestion),
+// now seeded from PRI_SUITE_SEED in the suites' online authority.
 //
 // Deterministic: the server's pool is swapped for the test worker and told to
 // spin on a marker in the answer text, so the deadline is hit on purpose, not
