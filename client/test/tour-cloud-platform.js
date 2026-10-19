@@ -161,6 +161,8 @@ export const flow = {
     await goto('/settings');
     await page.locator('#cloud-account-title').waitFor({ state: 'visible', timeout: 30000 });
     const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
+    // The panel paints before it has asked the server who is signed in.
+    await accountPanel.getByText('Connected', { exact: false }).first().waitFor({ timeout: 15000 }).catch(() => {});
     await check('Settings opens connected: the account the student entered with, no second sign-in form',
       /Connected/.test(await accountPanel.innerText()) && await accountPanel.locator('#cloud-password').count() === 0,
       `account panel reads ${JSON.stringify((await accountPanel.innerText()).slice(0, 180))}`);
