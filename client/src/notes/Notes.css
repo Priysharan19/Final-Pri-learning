@@ -255,7 +255,7 @@
   .nt-map-frame { grid-template-columns: 1fr; }
   .nt-map-strands { display: none; }
   .nt-map-node { width: 24px; height: 24px; margin: -12px 0 0 -12px; font-size: 10.5px; }
-  .nt-map-node::after { inset: -10px; } /* still a 44px touch target on the smaller node */
+  .nt-map-node::after { inset: -11px; } /* 22px inner box + 22 = a 44px touch target on the smaller node */
   .nt-concept-body { padding-left: 16px; }
   .nt-search { max-width: none; }
   .nt-classes { width: 100%; overflow-x: auto; }
