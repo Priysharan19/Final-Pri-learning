@@ -2037,7 +2037,26 @@ html.theme-switching, html.theme-switching * {
 
 /* The status-bar inset is added to the bar's height instead of being taken
    out of it, so an installed web app on a notched phone keeps a full-height
-   bar. Insets are 0 inside the native shells and on desktop: no change there. */
+   bar. Inside the native shells env() is 0 (the web view ignores the safe
+   area), so the shell sets --pri-inset-* on <html> itself (WebShell.swift
+   applySafeArea); on desktop they are 0. */
+
+/* The welcome, sign-in and activation screens have no top bar: their own
+   padding clears the status bar, the Dynamic Island and the home indicator. */
+.auth-wrap {
+  padding-top: calc(24px + var(--pri-inset-top));
+  padding-bottom: calc(24px + var(--pri-inset-bottom));
+  padding-left: calc(24px + var(--pri-inset-left));
+  padding-right: calc(24px + var(--pri-inset-right));
+}
+@media (max-width: 760px) {
+  .auth-wrap {
+    padding-top: calc(18px + var(--pri-inset-top));
+    padding-bottom: calc(18px + var(--pri-inset-bottom));
+    padding-left: calc(18px + var(--pri-inset-left));
+    padding-right: calc(18px + var(--pri-inset-right));
+  }
+}
 .topbar { height: auto; min-height: calc(54px + var(--pri-inset-top)); }
 @media (min-width: 761px) {
   .topbar { min-height: calc(64px + var(--pri-inset-top)); }
@@ -2103,7 +2122,7 @@ html.theme-switching, html.theme-switching * {
 
 /* SHORT (phone landscape, keyboard open): reclaim vertical space. */
 @media (max-height: 480px) {
-  .auth-wrap { place-items: start center; padding-top: 12px; }
+  .auth-wrap { place-items: start center; padding-top: calc(12px + var(--pri-inset-top)); }
   /* A 40px question peek costs a short landscape screen too much of its page. */
   .ws-qpeek.is-on { display: none; }
   :root:has(.shell.is-focus) { scroll-padding-top: 60px; }
@@ -2256,7 +2275,7 @@ html { background-color: var(--page); }
   /* First entry: clear of the status bar and the home indicator. Ruled paper
      keeps its feint lines; the margin rule, at 8vw, ran through centred text
      on a phone, so it is drawn only where there is a margin to rule. */
-  .auth-wrap { padding: calc(18px + var(--pri-inset-top)) 18px calc(18px + var(--pri-inset-bottom)); }
+  .auth-wrap { padding: calc(18px + var(--pri-inset-top)) calc(18px + var(--pri-inset-right)) calc(18px + var(--pri-inset-bottom)) calc(18px + var(--pri-inset-left)); }
   .mathfield { background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--paper-rule) 31px 32px); }
   .hero-demo-detail { display: none; }
   .hero-demo-note { display: block; }
