@@ -32,7 +32,7 @@ function outcome(registry, rule, o) { return registry.sum('alert_notifications_t
 
 await check('every ALERT_RULES id has a severity', () => {
   for (const rule of ALERT_RULES) assert.ok(ALERT_SEVERITY[rule.id], rule.id);
-  assert.equal(ALERT_RULES.length, 7);
+  assert.equal(ALERT_RULES.length, 9);
 });
 
 await check('recipient validation', () => {

@@ -33,7 +33,9 @@ export const ALERT_SEVERITY = Object.freeze({
   AUTH_EMAIL_FAILURES: 'critical',
   PROVIDER_FAILURE_SPIKE: 'warning',
   HANDWRITING_LATENCY_P95: 'warning',
-  WEBHOOK_FAILURES: 'critical'
+  WEBHOOK_FAILURES: 'critical',
+  CLIENT_ERROR_SPIKE: 'warning',
+  ERROR_SINK_FAILURES: 'warning'
 });
 
 // The counters each rule rests on, reported as numbers over the rule window.
@@ -49,7 +51,9 @@ const WINDOW_COUNTS = Object.freeze({
     ['working_total', 'provider_calls_total', { provider: 'working' }]
   ],
   HANDWRITING_LATENCY_P95: [],
-  WEBHOOK_FAILURES: [['webhook_failed', 'webhook_total', { outcome: 'failed' }]]
+  WEBHOOK_FAILURES: [['webhook_failed', 'webhook_total', { outcome: 'failed' }]],
+  CLIENT_ERROR_SPIKE: [['client_errors', 'client_errors_total', {}]],
+  ERROR_SINK_FAILURES: [['error_sink_failed', 'error_sink_total', { outcome: 'failed' }]]
 });
 
 const EMAIL = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
