@@ -106,11 +106,20 @@ const AUDIT = () => {
   const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=link], [role=switch], [role=checkbox], [role=radio], [role=menuitem]')]
     .filter(el => visible(el) && !el.closest('[aria-hidden="true"], [inert]'));
   const unnamed = controls.filter(el => !nameOf(el)).map(el => `${el.tagName}.${String(el.className).slice(0, 40)}`);
+  // The hit area, not the drawn box: small glyph controls keep their size and
+  // get a 44px area underneath on touch screens (theme-legacy.css). Probe the
+  // points 21px either side of the centre; each must land on the control.
   const small = controls.filter(el => {
-    if (el.closest('.katex, .ink-surface, p, li') && el.tagName === 'A') return false; // inline text links (WCAG 2.5.8 inline exception)
+    if (el.tagName === 'A' && el.closest('p, li, .katex')) return false; // inline text links (WCAG 2.5.8 inline exception)
     if (el.tagName === 'INPUT' && /checkbox|radio/.test(el.type) && el.closest('label')) return false; // the label is the target
-    const r = el.getBoundingClientRect(); return r.width < 44 - 0.5 || r.height < 44 - 0.5;
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    const r = el.getBoundingClientRect();
+    if (r.width >= 43.5 && r.height >= 43.5) return false;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const owns = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); };
+    return ![[cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].every(([x, y]) => owns(x, y));
   }).map(el => { const r = el.getBoundingClientRect(); return `${nameOf(el).slice(0, 24) || el.tagName} ${Math.round(r.width)}×${Math.round(r.height)}`; });
+  window.scrollTo(0, 0);
   return { count: controls.length, unnamed, small };
 };
 
@@ -130,13 +139,20 @@ export const flow = {
     if (!update && !existsSync(baseDir)) note(`no baselines for ${process.platform}-${browserName}: snapshots are captured to artifacts/visual, not compared`);
 
     // The signed-out welcome is a screen too.
+    // Phones are touch screens: the product sizes targets for (pointer: coarse).
+    // Chromium emulates that over CDP; WebKit cannot, so it skips the 44px rule.
+    const cdp = chromium ? await page.context().newCDPSession(page) : null;
+    const touch = async on => { if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: on, maxTouchPoints: on ? 5 : 0 }); };
+    if (!chromium) note('44px hit areas are checked in Chromium only (WebKit cannot emulate a coarse pointer here)');
+
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
+      await touch(size.phone);
       await goto('/');
       await settle();
       const a = await page.evaluate(AUDIT);
       await check(`welcome@${size.id}: every control has an accessible name`, a.unnamed.length === 0, JSON.stringify(a.unnamed.slice(0, 6)));
-      if (size.phone) await check(`welcome@${size.id}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 6)));
+      if (size.phone && chromium) await check(`welcome@${size.id}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 6)));
     }
 
     await createProfile({ name: 'Quality Student', year: 10, course: 'in' });
@@ -157,6 +173,7 @@ export const flow = {
     }
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
+      await touch(size.phone);
       for (const scheme of SCHEMES) {
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
         for (const route of SCREENS) {
@@ -169,7 +186,7 @@ export const flow = {
           const a = await page.evaluate(AUDIT);
           await check(`${tag}: the screen has controls`, a.count > 0, `${a.count}`);
           await check(`${tag}: every control has an accessible name`, a.unnamed.length === 0, JSON.stringify(a.unnamed.slice(0, 6)));
-          if (size.phone) await check(`${tag}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+          if (size.phone && chromium) await check(`${tag}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
 
           // Keyboard: the first stops are named and show where focus is.
           if (scheme === 'light') {
@@ -230,6 +247,7 @@ export const flow = {
         }
       }
     }
+    await touch(false);
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   }
 };
