@@ -26,7 +26,7 @@
 //    keep a random token out. A PEM private-key header is NOT anchored: it
 //    contains spaces, so no random token can produce one, and anchoring it
 //    would only lose a header glued to its body when a newline is collapsed
-//    (`-----BEGIN PRIVATE KEY-----MIIE…`).
+//    (the closing dashes of BEGIN PRIVATE KEY run straight into `MIIE…`).
 //
 // Everything is deterministic given the text, so secret-shape-check.mjs can
 // pin both halves with crafted tokens.
