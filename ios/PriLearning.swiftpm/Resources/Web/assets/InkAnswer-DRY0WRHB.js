@@ -1,0 +1,1 @@
+import{t as e}from"./strokeSignature-3QvLBAgu.js";import{n as t,t as n}from"./InkAnswer-j9GxMmyC.js";export{t as STILL_READING_MS,n as default,e as strokeSignature};
