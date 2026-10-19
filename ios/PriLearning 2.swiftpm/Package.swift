@@ -16,7 +16,7 @@ let package = Package(
             name: "Pri Learning",
             targets: ["AppModule"],
             bundleIdentifier: "com.prilearning.app",
-            displayVersion: "4.0",
+            displayVersion: "1.0",
             bundleVersion: "2",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),

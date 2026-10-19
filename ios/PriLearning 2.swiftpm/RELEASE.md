@@ -19,6 +19,8 @@ A release candidate must preserve all of these properties:
 
 ## 2. Version and build-number policy
 
+The App Store marketing version is `1.0`, the owner's choice of 2026-10-19 (LAUNCH-CHECKLIST-OWNER C6), recorded in `ios/app-store-version.json`. It is deliberately independent of `release/metadata.json` `productVersion`, which versions the web and server product.
+
 `displayVersion` is the user-visible marketing version. `bundleVersion` is the monotonically increasing App Store build number.
 
 Before producing a candidate:
@@ -38,8 +40,10 @@ Start from a clean checkout of the exact candidate SHA. From the repository root
 ```bash
 npm ci --prefix client
 npm run build
+npm run verify:release
 npm run sync:ios
 npm run check:ios
+npm run verify:release:native
 node scripts/check-native-package-sync.mjs
 npm run test:ink:bridge
 ```
@@ -64,7 +68,7 @@ Set Xcode user-defined build setting:
 PRI_CLOUD_ORIGIN=https://<approved-production-origin>
 ```
 
-The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. Do not ship a localhost, arbitrary path, query-bearing or fragment-bearing origin. If the value is absent or invalid, native cloud requests fail closed with cloud-disabled behavior while the bundled offline-first learning runtime remains available.
+The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. Do not ship a localhost, arbitrary path, query-bearing or fragment-bearing origin. If the value is absent or invalid, native cloud requests fail closed — and because grading is online-only (ADR-0001 amendment, 2026-10-10) such a build can never mark an answer: every question is an unmarkable draft. A release archive with no valid origin is unshippable; the archive gate in §6 enforces this.
 
 Never put credentials, session cookies, API keys or provider secrets into this build setting or the web bundle.
 
@@ -101,7 +105,8 @@ After the exact candidate SHA is merged/approved and preflight is green:
 1. open `ios/PriLearning.swiftpm` in the supported Xcode release environment;
 2. select the `PriLearning` scheme and a generic/eligible iOS device destination suitable for archiving;
 3. verify production signing team and bundle identifier;
-4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin;
+4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
+   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha> --probe` must print `NATIVE ARCHIVE GATE: PASS` (it refuses an empty, non-https, local, staging or path-bearing origin, a non-shipping bundle id, and a web bundle from another commit);
 5. confirm the intended marketing/build versions shown by the package;
 6. create a Release archive with Product → Archive;
 7. in Organizer, inspect the archive identity, version/build number, signing and bundled app icon;
@@ -109,6 +114,22 @@ After the exact candidate SHA is merged/approved and preflight is green:
 9. save the archive/export validation result in release evidence without committing credentials or private signing material.
 
 If the archive differs from the reviewed commit or required a source/config edit in Xcode, stop. Commit the change through a new PR and rerun exact-head gates; do not create an unreviewed release-only variant.
+
+### Command-line archive (no Xcode UI)
+
+The same archive can be produced headless from `ios/PriLearning.swiftpm` (scheme `PriLearning`, team `8BY7H9SXY8`):
+
+```bash
+xcodebuild archive -scheme PriLearning -destination 'generic/platform=iOS' \
+  -archivePath <out>.xcarchive DEVELOPMENT_TEAM=8BY7H9SXY8 \
+  PRI_CLOUD_ORIGIN=https://<approved-production-origin> \
+  CODE_SIGN_ENTITLEMENTS=<plist granting com.apple.developer.applesignin = [Default]> \
+  'OTHER_LDFLAGS=-Xlinker -platform_version -Xlinker ios -Xlinker 16.0 -Xlinker <iOS SDK version>'
+```
+
+- `CODE_SIGN_ENTITLEMENTS`: a package cannot declare Sign in with Apple; without the entitlement the Apple button fails with `PROVIDER_ERROR`.
+- `OTHER_LDFLAGS`: with Xcode 27.1, the SwiftPM app product stamps `LC_BUILD_VERSION sdk 16.0` (the deployment target) into the executable. App Store Connect then rejects the upload with error 90725 ("built with the iOS 16.0 SDK"). Passing the real SDK version (`xcodebuild -showsdks`) restores the correct stamp. Check it with `otool -l <app>/'Pri Learning' | grep -A4 LC_BUILD_VERSION`.
+- Export with `xcodebuild -exportArchive` (method `app-store-connect`, manual signing, "Apple Distribution" certificate, App Store profile for `com.prilearning.app`), then run `xcrun altool --validate-app` before uploading.
 
 ## 7. TestFlight evidence gate
 
