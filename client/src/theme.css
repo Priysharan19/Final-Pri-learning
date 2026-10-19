@@ -2332,5 +2332,5 @@ html { background-color: var(--page); }
   .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 }
 
-/* The offline grace (issue #477): one quiet line above the page. */
+/* The offline grace (issue 477): one quiet line above the page. */
 .offline-entry { margin: 8px 16px 0; font-size: 13px; }

@@ -434,7 +434,7 @@ try {
   const hrefs = html => [...html.matchAll(/href="([^"]+)"/g)].map(m => m[1]);
   c.deq(hrefs(staging.html), ['https://staging.prilearning.example/guardian/consent'], 'a guardian email from staging links only to staging\'s own consent page');
   c.deq(hrefs(production.html), ['https://prilearning.example/guardian/consent'], 'and one from production only to production\'s');
-  c.ok(!staging.html.includes('https://prilearning.example') && !production.html.includes('staging.'), 'neither names the other environment');
+  c.ok(!/https:\/\/prilearning\.example/.test(staging.html) && !/staging\./.test(production.html), 'neither names the other environment');
   c.eq(otpEmailConsentLink('https://prilearning.example/login?next=https://evil.example'), null, 'an origin carrying a query (an open-redirect vector) yields no link');
   c.eq(otpEmailConsentLink('https://user:pw@prilearning.example'), null, 'nor one carrying credentials');
   c.eq(otpEmailConsentLink('javascript:alert(1)'), null, 'nor a non-http scheme');

@@ -62,7 +62,7 @@ import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
-import { join, extname } from 'node:path';
+import { join, extname, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
@@ -152,9 +152,11 @@ const MIME = {
 async function serve(dir) {
   const server = createServer((req, res) => {
     const path = decodeURIComponent((req.url || '/').split('?')[0]);
-    let target = join(dir, path);
-    // one page, many routes: an unknown path is a route, not a missing file
-    if (!target.startsWith(dir) || !existsSync(target) || statSync(target).isDirectory()) target = join(dir, 'index.html');
+    const root = resolve(dir);
+    let target = resolve(root, '.' + path);
+    // one page, many routes: an unknown path is a route, not a missing file;
+    // anything resolving outside the build directory is never read
+    if (!target.startsWith(root + sep) || !existsSync(target) || statSync(target).isDirectory()) target = join(dir, 'index.html');
     res.writeHead(200, { 'Content-Type': MIME[extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(readFileSync(target));
   });

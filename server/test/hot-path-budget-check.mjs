@@ -402,9 +402,13 @@ try {
   // origin/main d76725115, before this change, so a reviewer can see what each
   // pin replaced. (The one-request Submit did not exist: an ink Submit was the
   // three-request sequence.)
+  // practice/issue re-measured on merge train 9: the free plan's daily cap
+  // (#537, practiceAllowance.js) reads the entitlement snapshot and today's
+  // count, then counts the issue, inside the issue transaction — 7 -> 11 on
+  // sqlite and 9 -> 13 on postgres, measured with --report on both engines.
   const PINS = {
     sqlite: {
-      'POST /v1/practice/issue': 7,                                      // was 13
+      'POST /v1/practice/issue': 11,                                     // was 13 (7 before the #537 cap)
       'POST /v1/practice/:id/submit (typed, resolves)': 17,              // was 34
       'ink Submit, three requests (recognize + confirm + submit)': 45,   // was 86
       'ink Submit, one request (picture with the submission)': 29,       // was 86 (three requests)
@@ -414,7 +418,7 @@ try {
       'GET /v1/account/guardian/state': 2                                // was 4
     },
     postgres: {
-      'POST /v1/practice/issue': 9,                                      // was 15
+      'POST /v1/practice/issue': 13,                                     // was 15 (9 before the #537 cap)
       'POST /v1/practice/:id/submit (typed, resolves)': 19,              // was 37
       'ink Submit, three requests (recognize + confirm + submit)': 51,   // was 94
       'ink Submit, one request (picture with the submission)': 31,       // was 94 (three requests)
