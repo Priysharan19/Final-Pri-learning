@@ -136,7 +136,7 @@ The letters are this tool's names for the parts of the §22.2 journey
 
 | Step | What runs | Needs a person |
 |---|---|---|
-| 0 | `/v1/health`, `/v1/ready`, `/release.json`: identity, Postgres, schema 12 / billing 6 of this checkout, readiness, email readiness | no |
+| 0 | `/v1/health`, `/v1/ready`, `/release.json`: identity, Postgres, schema 13 / billing 6 of this checkout, readiness, email readiness | no |
 | A | `otp/request` → **HUMAN STEP: read the code** → `otp/verify` (sign-up as an adult test account on a new address, sign-in on a known one) → `/me` | yes: the mailbox |
 | B | child sign-up by code → refused a question (`GUARDIAN_CONSENT_PENDING`) → `otp/guardian/request` to the parent's address → **HUMAN STEP: the parent reads the code** → `otp/guardian/approve` (no child session) → state `given` → issued a question | yes: both mailboxes (plus-addressed into one by default) |
 | C | issue → SIMULATED ink of the term number worked out from the printed question → `handwriting/transcribe` (body exactly `{ image }`) → `practice/:id/recognize` (reuses the paid read) → confirm if needed → `submit` (authoritative mark, replay returns the same attempt) → `sync/pull` shows the attempt | no |

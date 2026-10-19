@@ -136,11 +136,17 @@ not apply for the "Teacher Approved" programme until counsel has reviewed the co
 
 | Asset | Spec (confirm in Play Console) |
 |---|---|
-| App icon | 512 × 512 PNG, 32-bit, the P′ mark (owner decision 2026-10-02) |
-| Feature graphic | 1024 × 500 JPG or 24-bit PNG; wordmark and a single writing screen; no price or ranking text |
+| App icon | 512 × 512 PNG, 32-bit, the P′ mark (owner decision 2026-10-02) — **generated:** `docs/release/store/play/icon-512.png` |
+| Feature graphic | 1024 × 500 JPG or 24-bit PNG; wordmark, P′ mark and the first sentence of the short description on ruled paper; no price or ranking text — **generated:** `docs/release/store/play/feature-graphic-1024x500.png` (24-bit RGB, no alpha) |
 | Phone screenshots | 2–8, 16:9 or 9:16, each side 320–3840 px; at least 4 at 1080 px or more for promotion eligibility |
 | 7-inch tablet screenshots | Up to 8; required for tablet listing |
 | 10-inch tablet screenshots | Up to 8; required for tablet listing |
+
+Both graphics are rendered by `node tools/play-graphics.mjs` from `client/public/favicon.svg` and the
+`client/src/theme.css` tokens; `node tools/play-listing-check.mjs` checks §1 and the graphics.
+
+**Screenshots: still to capture — none exist yet.** They must be real captures from the Android
+release build on hardware or an emulator; none are generated or mocked.
 
 Shots (same order and captions as `app-store-listing.md` §7, captured on Android hardware from the
 release build with demo data): handwriting in progress; reading shown back with the correction

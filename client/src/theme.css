@@ -2089,12 +2089,16 @@ html.theme-switching, html.theme-switching * {
 
 /* Everything a finger presses is at least 44px on a coarse-pointer phone. */
 @media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
-  .btn-sm { min-height: var(--tap-min); }
-  
-  
-  
-  
-  
+  .btn-sm { min-width: var(--tap-min); min-height: var(--tap-min); }
+  .gen-opt, .seg > button, .ws-filter, .genbar .icon-btn, .field input, .field select { min-height: var(--tap-min); }
+  .genbar .icon-btn { min-width: var(--tap-min); }
+  /* The wordmark keeps its drawn size; the finger lands in a 44px area laid
+     under it (as .chip-x in theme-legacy.css). */
+  .logo-btn { position: relative; }
+  .logo-btn::after {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: max(100%, var(--tap-min)); height: var(--tap-min); transform: translate(-50%, -50%);
+  }
 }
 
 /* SHORT (phone landscape, keyboard open): reclaim vertical space. */
@@ -2334,3 +2338,39 @@ html { background-color: var(--page); }
 
 /* The offline grace (issue 477): one quiet line above the page. */
 .offline-entry { margin: 8px 16px 0; font-size: 13px; }
+
+/* Error notebook and per-dot-point review: plain rules, hairlines, no chrome. */
+.notebook { padding: 14px 16px; }
+.notebook-title { margin: 0; font-size: 17px; }
+.notebook-how, .notebook-empty { margin: 4px 0 10px; font-size: 13px; line-height: 1.45; }
+.notebook-groups, .notebook-items, .review-queue-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.notebook-group { border-top: 1px solid var(--hairline); }
+.notebook-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; width: 100%; text-align: left; padding: 10px 0; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.notebook-slip { font-weight: 600; }
+.notebook-count { margin-left: auto; font-size: 12.5px; white-space: nowrap; }
+.notebook-items { padding: 0 0 10px; }
+.notebook-item { display: grid; gap: 4px; }
+.notebook-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; }
+.notebook-meta .btn { margin-left: auto; }
+.review-queue { max-width: 420px; }
+.review-queue-title { margin: 6px 0 2px; font-size: 18px; }
+.review-queue-why { margin: 0 0 8px; font-size: 13px; line-height: 1.45; }
+.review-queue-row { display: flex; gap: 10px; align-items: flex-start; }
+.review-queue-name { flex: 1; min-width: 0; }
+.review-queue-text, .review-queue-recall { display: block; font-size: 12.5px; line-height: 1.4; }
+
+/* Where the rail is a fixed, labelled column (tablets, and touch screens from
+   iPad landscape up), keyboard focus inside it must not widen it over the
+   page: the focus rule above is for the hover-to-open rail only. */
+@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 1024px) {
+  .sidebar:focus-within .sidebar-inner { width: 178px; box-shadow: none; }
+}
+
+/* The first screen never rises under the status bar (App Review sees it
+   first). A grid that centres its column lets a column taller than the screen
+   overflow equally above and below, past the top safe-area padding and under
+   the Dynamic Island (iPhone 6.9", native shell). Start-aligned with auto
+   block margins, the column is still centred when it fits and starts at the
+   padding — which carries --pri-inset-top on phones — when it does not. */
+.auth-wrap { place-items: start center; }
+.auth-wrap > * { margin-block: auto; }

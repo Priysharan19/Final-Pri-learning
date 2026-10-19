@@ -1,13 +1,17 @@
+<<<<<<<< HEAD:ios/PriLearning 2.swiftpm/Resources/Web/assets/Legal-BFWcEuIS.js
 import{n as e}from"./rolldown-runtime-CbXtAM7H.js";import{c as t,m as n,r,t as i}from"./vendor-react-Dtm3F6TO.js";import{t as a}from"./preload-helper-BZ1Pz5am.js";import{t as o}from"./languages-Djq7P--5.js";import{l as s,s as c}from"./i18n-Cg2UiMyd.js";var l=e(n(),1),u=`# Privacy notice
+========
+import{n as e}from"./rolldown-runtime-CbXtAM7H.js";import{c as t,m as n,r,t as i}from"./vendor-react-Dtm3F6TO.js";import{t as a}from"./preload-helper-BZ1Pz5am.js";import{n as o}from"./strings.en-jOhE7Kyu.js";import{l as s,s as c}from"./i18n-CwU-ok5R.js";var l=e(n(),1),u=`# Privacy notice
+>>>>>>>> f265a00d06a758d9f7b74ecf0aa002f05912a25f:ios/PriLearning 2.swiftpm/Resources/Web/assets/Legal-xzDJWmiO.js
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
 This notice explains what Pri Learning collects, why, and what you can ask us to
 do about it. It is written for students, parents and teachers in India, and
 follows the Digital Personal Data Protection Act 2023.
 
 The person responsible for your data (the "data fiduciary") is
-{{OWNER_LEGAL_NAME}}, {{OWNER_ADDRESS}}.
+Priysharan Tripathi, 5 Juniper Pl, Oakville NSW 2765, Australia.
 
 ## The short version
 
@@ -215,7 +219,7 @@ You can ask us to:
 - **Withdraw consent**, after which we stop processing and delete.
 - **Nominate** someone to exercise these rights if you cannot.
 
-Write to {{GRIEVANCE_OFFICER_EMAIL}}. See [Grievances](/grievance) for how
+Write to impriysharan@icloud.com. See [Grievances](/grievance) for how
 complaints are handled and how to escalate to the Data Protection Board of
 India.
 
@@ -234,13 +238,13 @@ will tell you and the Data Protection Board as the DPDP Act requires.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: {{SUPPORT_EMAIL}}.
+Questions: impriysharan@icloud.com.
 `,d=`# Terms of use
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
-These terms are an agreement between you and {{OWNER_LEGAL_NAME}},
-{{OWNER_ADDRESS}}, about your use of Pri Learning.
+These terms are an agreement between you and Priysharan Tripathi,
+5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning.
 
 ## Using Pri Learning
 
@@ -251,7 +255,7 @@ If you are under 18, a parent or guardian must agree to these terms for you.
 
 ## Your account
 
-You are responsible for keeping your password. Tell us at {{SUPPORT_EMAIL}} if
+You are responsible for keeping your password. Tell us at impriysharan@icloud.com if
 you think someone else has used your account. We may suspend an account that is
 being used to attack the service or to harm other users.
 
@@ -315,14 +319,14 @@ your access if you break these terms.
 ## Law
 
 These terms are governed by the laws of India, and the courts of
-{{JURISDICTION_CITY}} have exclusive jurisdiction.
+New Delhi have exclusive jurisdiction.
 
-Questions: {{SUPPORT_EMAIL}}.
+Questions: impriysharan@icloud.com.
 `,f=`# Cancellation and refund policy
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
-This policy covers subscriptions bought from {{OWNER_LEGAL_NAME}} through the
+This policy covers subscriptions bought from Priysharan Tripathi through the
 website. Subscriptions bought inside the iPad app are handled by Apple under its
 own refund policy, and are cancelled and refunded through your Apple account.
 
@@ -348,7 +352,7 @@ through a period, except in the cases above.
 
 ## How to ask
 
-Write to {{SUPPORT_EMAIL}} from the email address on the account, with the date
+Write to impriysharan@icloud.com from the email address on the account, with the date
 of the charge. We reply within 3 working days and, where a refund is due, issue
 it to the original payment method within 5 to 7 working days. Your bank may take
 longer to show it.
@@ -358,17 +362,17 @@ longer to show it.
 If you are not satisfied with our answer, see [Grievances](/grievance).
 `,p=`# Grievances
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
 If something about your data or your subscription is wrong, tell us. This page
 says who reads it and what happens next.
 
 ## Grievance officer
 
-- {{GRIEVANCE_OFFICER_NAME}}
-- {{OWNER_LEGAL_NAME}}
-- {{OWNER_ADDRESS}}
-- {{GRIEVANCE_OFFICER_EMAIL}}
+- Priysharan Tripathi
+- Priysharan Tripathi
+- 5 Juniper Pl, Oakville NSW 2765, Australia
+- impriysharan@icloud.com
 
 Publishing this contact is required of us by India's Digital Personal Data
 Protection Act 2023.
@@ -398,8 +402,8 @@ have raised it with us first, which is what this page is for.
 
 ## Subscriptions
 
-For billing questions write to {{SUPPORT_EMAIL}}; see the
+For billing questions write to impriysharan@icloud.com; see the
 [refund policy](/refund-policy). If a payment provider handled the charge, you
 may also raise it with them.
-`,m=i(),h=Object.freeze({privacy:{source:u},terms:{source:d},"refund-policy":{source:f},grievance:{source:p}});function g(e){return[...new Set(String(e||``).match(/\{\{[A-Z_]+\}\}/g)||[])]}function _(e){return String(e||``).match(/^#[ \t]+(.+)$/m)?.[1].trim()||``}var v=null,y=null;function b(){return v?Promise.resolve(v):(y||=a(()=>import(`./legalHindi-BUW1UzE_.js`).then(e=>(v=e.default,v)),[]).catch(()=>(y=null,null)),y)}function x(e,t){let n=[],i=String(e),a=0,o=/\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`/;for(;;){let e=i.match(o);if(!e){i&&n.push(i);break}if(e.index>0&&n.push(i.slice(0,e.index)),e[1])n.push((0,m.jsx)(`b`,{children:e[1]},`${t}-b${a}`));else if(e[2]){let i=e[3];n.push(i.startsWith(`/`)&&!i.startsWith(`/account/`)?(0,m.jsx)(r,{to:i,children:e[2]},`${t}-l${a}`):(0,m.jsx)(`a`,{href:i,rel:`noreferrer noopener`,target:`_blank`,children:e[2]},`${t}-a${a}`))}else e[4]&&n.push((0,m.jsx)(`code`,{children:e[4]},`${t}-c${a}`));i=i.slice(e.index+e[0].length),a+=1}return n}function S(e){let t=[],n=null,r=!1,i=null,a=()=>{n&&=(t.push({kind:r?`ol`:`ul`,items:n}),null)},o=()=>{i&&=(t.push({kind:`p`,text:i}),null)},s=()=>{a(),o()};for(let c of String(e).split(`
+`,m=i(),h=Object.freeze({privacy:{source:u},terms:{source:d},"refund-policy":{source:f},grievance:{source:p}});function g(e){return[...new Set(String(e||``).match(/\{\{[A-Z_]+\}\}/g)||[])]}function _(e){return String(e||``).match(/^#[ \t]+(.+)$/m)?.[1].trim()||``}var v=null,y=null;function b(){return v?Promise.resolve(v):(y||=a(()=>import(`./legalHindi-CC1D42-C.js`).then(e=>(v=e.default,v)),[]).catch(()=>(y=null,null)),y)}function x(e,t){let n=[],i=String(e),a=0,o=/\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`/;for(;;){let e=i.match(o);if(!e){i&&n.push(i);break}if(e.index>0&&n.push(i.slice(0,e.index)),e[1])n.push((0,m.jsx)(`b`,{children:e[1]},`${t}-b${a}`));else if(e[2]){let i=e[3];n.push(i.startsWith(`/`)&&!i.startsWith(`/account/`)?(0,m.jsx)(r,{to:i,children:e[2]},`${t}-l${a}`):(0,m.jsx)(`a`,{href:i,rel:`noreferrer noopener`,target:`_blank`,children:e[2]},`${t}-a${a}`))}else e[4]&&n.push((0,m.jsx)(`code`,{children:e[4]},`${t}-c${a}`));i=i.slice(e.index+e[0].length),a+=1}return n}function S(e){let t=[],n=null,r=!1,i=null,a=()=>{n&&=(t.push({kind:r?`ol`:`ul`,items:n}),null)},o=()=>{i&&=(t.push({kind:`p`,text:i}),null)},s=()=>{a(),o()};for(let c of String(e).split(`
 `)){let e=c.replace(/\s+$/,``);if(!e.trim()){s();continue}let l=e.match(/^\s*[-*]\s+(.*)$/),u=e.match(/^\s*\d+[.)]\s+(.*)$/);if(l||u){o(),n&&r!==!!u&&a(),r=!!u,(n||=[]).push((l||u)[1]);continue}let d=e.match(/^(#{1,4})\s+(.*)$/);if(d){s(),t.push({kind:`h${d[1].length}`,text:d[2]});continue}if(/^\|/.test(e)){s(),t.push({kind:`p`,text:e.replace(/\|/g,` `).trim()});continue}let f=e.trim();n?n[n.length-1]+=` ${f}`:i=i?`${i} ${f}`:f}return s(),t}function C({source:e}){let t=(0,l.useMemo)(()=>S(e),[e]);return(0,m.jsx)(m.Fragment,{children:t.map((e,t)=>{if(e.kind===`ul`||e.kind===`ol`){let n=e.items.map((e,n)=>(0,m.jsx)(`li`,{children:x(e,`${t}-${n}`)},n));return e.kind===`ol`?(0,m.jsx)(`ol`,{children:n},t):(0,m.jsx)(`ul`,{children:n},t)}return e.kind===`h1`?null:e.kind===`h2`?(0,m.jsx)(`h2`,{style:{marginTop:26},children:x(e.text,t)},t):e.kind===`h3`?(0,m.jsx)(`h3`,{style:{marginTop:20},children:x(e.text,t)},t):e.kind===`h4`?(0,m.jsx)(`h4`,{children:x(e.text,t)},t):(0,m.jsx)(`p`,{children:x(e.text,t)},t)})})}function w(){let e=t().pathname.replace(/^\/+|\/+$/g,``),n=h[e],{language:i,t:a}=c(),u=s(),[d,f]=(0,l.useState)(null),p=d??i,[y,x]=(0,l.useState)(v),[S,w]=(0,l.useState)(!1);(0,l.useEffect)(()=>{if(p!==`hi`||y||S)return;let e=!0;return b().then(t=>{e&&(t?x(t):w(!0))}),()=>{e=!1}},[p,y,S]);let T=e=>_(p===`hi`&&y?.[e]||h[e].source);if(!n){let e=Object.keys(h).map((e,t,n)=>(0,m.jsxs)(l.Fragment,{children:[(0,m.jsx)(r,{to:`/${e}`,children:T(e)}),t<n.length-1?` · `:``]},e));return(0,m.jsxs)(`div`,{className:`qpage`,children:[(0,m.jsx)(`h1`,{children:a(`legal.notFoundTitle`)}),(0,m.jsx)(`p`,{className:`muted`,children:u(`legal.notFoundBody`,{pages:e})})]})}let E=p===`hi`?y?.[e]:null,D=E||n.source,O=g(D);return(0,m.jsxs)(`div`,{className:`qpage`,style:{maxWidth:720},children:[(0,m.jsx)(`h1`,{children:_(D)}),(0,m.jsx)(`div`,{className:`seg-tabs`,role:`group`,"aria-label":a(`legal.languageLabel`),style:{marginTop:0,marginBottom:18},children:o.map(({id:e,label:t})=>(0,m.jsx)(`button`,{type:`button`,className:`seg-tab${p===e?` on`:``}`,"aria-pressed":p===e,onClick:()=>{f(e),w(!1)},children:t},e))}),p===`hi`&&!E&&S&&(0,m.jsx)(`div`,{className:`notice`,role:`status`,style:{marginBottom:18},"data-legal-fallback":`true`,children:a(`legal.translationUnavailable`)}),O.length>0&&(0,m.jsxs)(`div`,{className:`notice error`,role:`alert`,style:{marginBottom:18},"data-legal-draft":`true`,children:[(0,m.jsx)(`b`,{children:a(`legal.draftTitle`)}),` `,a(`legal.draftBody`,{count:O.length,n:O.length})]}),(0,m.jsx)(`article`,{className:`legal-body`,lang:E?`hi`:`en`,children:(0,m.jsx)(C,{source:D})}),(0,m.jsx)(`p`,{className:`muted`,style:{marginTop:28},children:Object.keys(h).filter(t=>t!==e).map((e,t,n)=>(0,m.jsxs)(l.Fragment,{children:[(0,m.jsx)(r,{to:`/${e}`,children:T(e)}),t<n.length-1?` · `:``]},e))})]})}export{h as LEGAL_PAGES,S as blocksOf,w as default,g as placeholdersIn,_ as titleOf};

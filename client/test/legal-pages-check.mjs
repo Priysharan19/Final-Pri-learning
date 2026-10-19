@@ -300,6 +300,14 @@ const LATIN_IN_HINDI = new Map([
   ['OpenAI', 'the company’s name — the notice names the reading provider, and a name is not translated']
 ]);
 
+// The owner's facts as filled into the templates (docs/legal/README.md). Each
+// must appear in the English notices too, so this cannot hide prose.
+const OWNER_FACTS = ['Priysharan Tripathi', '5 Juniper Pl, Oakville NSW 2765, Australia'];
+for (const fact of OWNER_FACTS) {
+  ok(PAGES.some(([slug]) => readDoc(slug, 'en').replace(/\s+/g, ' ').includes(fact)),
+    `owner fact "${fact}" is filled into the English notices as well`);
+}
+
 for (const [slug] of PAGES) {
   const english = readDoc(slug, 'en');
   const file = fileFor(slug, 'hi');
@@ -343,8 +351,14 @@ for (const [slug] of PAGES) {
 
   // Nothing was left in English inside the prose. Placeholders and link targets
   // are machinery, not prose, so they come out first.
-  const prose = hindi.replace(/\{\{[A-Z_]+\}\}/g, ' ').replace(/\]\([^)]*\)/g, ' ');
-  const strayLatin = [...new Set(prose.match(/[A-Za-z]{2,}/g) || [])].filter(w => !LATIN_IN_HINDI.has(w));
+  // A filled-in owner fact (a person's name, a postal address, an email
+  // address) is data the owner supplied, identical in both languages — like
+  // a placeholder, it is machinery, not untranslated prose.
+  const prose = hindi.replace(/\{\{[A-Z_]+\}\}/g, ' ').replace(/\]\([^)]*\)/g, ' ')
+    .replace(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g, ' ')
+    .split(/\s+/).join(' ');
+  const proseWithoutFacts = OWNER_FACTS.reduce((text, fact) => text.split(fact).join(' '), prose);
+  const strayLatin = [...new Set(proseWithoutFacts.match(/[A-Za-z]{2,}/g) || [])].filter(w => !LATIN_IN_HINDI.has(w));
   same(strayLatin, [], `${slug}.hi.md leaves nothing in English outside the reasoned allowlist`);
 }
 

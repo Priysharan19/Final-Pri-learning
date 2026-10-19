@@ -48,7 +48,7 @@ const { requestedEngine, openTestStore } = await import('./support/engine.mjs');
 const { createPlatformDb } = await import('../platform/db.js');
 const { ensureBillingSchema } = await import('../platform/billingSchema.js');
 const { ensureAuthDeliverySchema, drainAuthDeliveryOutbox, createResendAuthEmailTransport } = await import('../platform/authDelivery.js');
-const { asStore, createPostgresStore, databaseOverload } = await import('../platform/store.js');
+const { asStore, createPostgresStore, databaseOverload, connectionFailure } = await import('../platform/store.js');
 const { metrics } = await import('../platform/metrics.js');
 const { setLogSink } = await import('../platform/observability.js');
 
@@ -67,8 +67,20 @@ async function tcpRelay(targetHost, targetPort) {
   const sockets = new Set();
   let server = null;
   let port = 0;
+  let refuseLogin = null; // a SQLSTATE: answer every new login with a FATAL ErrorResponse, as a pooler does
   const listen = () => new Promise((resolve, reject) => {
     server = createTcpServer(client => {
+      if (refuseLogin) {
+        sockets.add(client);
+        client.on('error', () => {});
+        client.once('data', () => {
+          const field = (tag, text) => Buffer.concat([Buffer.from(tag), Buffer.from(text + '\0')]);
+          const body = Buffer.concat([field('S', 'FATAL'), field('V', 'FATAL'), field('C', refuseLogin), field('M', 'drill: login refused'), Buffer.from('\0')]);
+          const len = Buffer.alloc(4); len.writeInt32BE(body.length + 4);
+          client.end(Buffer.concat([Buffer.from('E'), len, body]));
+        });
+        return;
+      }
       const upstream = connect(targetPort, targetHost);
       sockets.add(client); sockets.add(upstream);
       const drop = () => { client.destroy(); upstream.destroy(); sockets.delete(client); sockets.delete(upstream); };
@@ -85,7 +97,10 @@ async function tcpRelay(targetHost, targetPort) {
     async cut() {
       await new Promise(resolve => { server.close(() => resolve()); for (const socket of sockets) socket.destroy(); sockets.clear(); });
     },
-    async restore() { await listen(); },
+    async restore() { if (server?.listening) await this.cut(); refuseLogin = null; await listen(); },
+    // Every live session ends and every new login is refused with this code
+    // (staging drill 2: Supavisor answers XX000; a disabled role or rotated password is 28000 / 28P01).
+    async refuseLogins(sqlstate) { await this.cut(); refuseLogin = sqlstate; await listen(); },
     async close() { try { await this.cut(); } catch { /* already cut */ } }
   };
 }
@@ -98,12 +113,14 @@ function faultable(store) {
   // mode: null | 'down' | 'hang' | 'crash-before-commit'; failWhen(sql) faults
   // only the statements it matches (once, when failOnce is set).
   const state = { mode: null, failWhen: null, failOnce: false, failed: 0 };
-  const refused = () => databaseOverload(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), { code: 'ECONNREFUSED' }));
+  const refused = () => state.mode === 'login-refused'
+    ? connectionFailure(Object.assign(new Error('drill: login refused'), { code: state.loginCode }))
+    : databaseOverload(Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5432'), { code: 'ECONNREFUSED' }));
   const proxy = new Proxy(store, {
     get(target, prop) {
       const value = Reflect.get(target, prop, target);
       if (typeof value !== 'function') return value;
-      if (state.mode === 'down' && ['get', 'all', 'run', 'exec', 'transaction'].includes(prop)) return async () => { throw refused(); };
+      if ((state.mode === 'down' || state.mode === 'login-refused') && ['get', 'all', 'run', 'exec', 'transaction'].includes(prop)) return async () => { throw refused(); };
       // A silent partition: packets dropped, no reset, the statement never returns.
       if (state.mode === 'hang' && ['get', 'all'].includes(prop)) return () => new Promise(() => {});
       if (state.failWhen && ['get', 'all', 'run'].includes(prop)) {
@@ -237,6 +254,51 @@ try {
     });
     c.eq(pushAgain.status, 200, 'drill 1: the refused push, resent under its key, is accepted');
     c.eq((await app.db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [student.account.id])).n, 1, 'drill 1: and stored once');
+  }
+
+  // ── Drill 1b · the database refuses the app's login (staging drill 2, finding A) ──
+  // A pooler that cannot log in upstream answers XX000; a disabled role or a
+  // rotated password is 28000 / 28P01. Each must be a coded 503 that fires
+  // DB_CONNECTIVITY, never a 500 INTERNAL, and recover with no restart.
+  for (const sqlstate of ['XX000', '28000', '28P01']) {
+    const tag = `drill 1b (${sqlstate})`;
+    const database = await openDrillDatabase(`drill_login_${sqlstate.toLowerCase()}`);
+    cleanups.push(() => database.close());
+    const fault = faultable(database.store());
+    const app = await startApp({ db: engine === 'postgres' ? database.store() : fault.store });
+    cleanups.push(() => app.close());
+    const student = await verifiedStudent(app, `login.${sqlstate.toLowerCase()}@example.test`);
+    c.eq((await app.request('/v1/account/me', { jar: student.jar })).status, 200, `${tag}: signed in before the outage`);
+    metrics.reset();
+
+    if (engine === 'postgres') await database.relay.refuseLogins(sqlstate);
+    else Object.assign(fault.state, { mode: 'login-refused', loginCode: sqlstate });
+
+    for (let i = 0; i < 3; i++) {
+      const me = await app.request('/v1/account/me', { jar: student.jar });
+      c.eq(me.status, 503, `${tag}: request ${i + 1} is a 503, not a 500`);
+      c.eq(me.data?.error?.code, 'PLATFORM_DB_UNAVAILABLE', `${tag}: coded PLATFORM_DB_UNAVAILABLE`);
+      c.eq(me.headers.get('retry-after'), '5', `${tag}: with Retry-After`);
+    }
+    c.ok(counter('db_errors_total{code=PLATFORM_DB_UNAVAILABLE}') >= 3, `${tag}: counted as unavailable`);
+    c.eq(counter('server_errors_total{code=INTERNAL}'), 0, `${tag}: nothing is answered as INTERNAL`);
+    c.ok(metrics.snapshot().firing.includes('DB_CONNECTIVITY'), `${tag}: fires DB_CONNECTIVITY`);
+
+    if (engine === 'postgres') await database.relay.restore();
+    else fault.state.mode = null;
+    let back = null;
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) { back = await app.request('/v1/account/me', { jar: student.jar }); if (back.status === 200) break; await wait(200); }
+    c.eq(back.status, 200, `${tag}: the same session works again with no restart`);
+  }
+  {
+    // An XX000 from a statement on an open connection is a server bug, not an outage: it is not disguised.
+    const midQuery = Object.assign(new Error('internal error'), { code: 'XX000' });
+    c.ok(databaseOverload(midQuery) === midQuery, 'drill 1b: XX000 from a running statement stays an error (500), not a 503');
+    c.eq(connectionFailure(midQuery).code, 'PLATFORM_DB_UNAVAILABLE', 'drill 1b: the same code while opening a connection is unavailable');
+    const setupBug = Object.assign(new Error('syntax error'), { code: '42601' });
+    c.ok(connectionFailure(setupBug) === setupBug, 'drill 1b: a syntax error in session setup stays a 500, not an outage');
+    c.eq(connectionFailure(new Error('timeout exceeded when trying to connect')).code, 'PLATFORM_DB_BUSY', 'drill 1b: a pool wait timeout keeps its own code');
   }
 
   // ── Drill 2 · provider timeout, 5xx, 429 and malformed answers ───────────

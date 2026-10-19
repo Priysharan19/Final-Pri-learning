@@ -2,7 +2,7 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 import { classAnalytics, validateAssignmentSpecification } from './assignmentTargets.js';
-import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { id, opaqueToken, rateLimit, requireMfa, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { decryptDeliveryToken, encryptDeliveryToken } from './deliveryCrypto.js';
 import { clipText } from './text.js';
 
@@ -242,6 +242,15 @@ export function createClassRouter(db) {
       WHERE cm.student_account_id=? AND cm.removed_at IS NULL AND c.archived_at IS NULL ORDER BY cm.joined_at DESC`, [accountId]);
     res.json({ classes: rows.map(x => ({ id: x.id, name: x.name, createdAt: x.created_at, joinedAt: x.joined_at, role: 'student' })) });
   });
+
+  // Every route below grants an admin access to any class by virtue of the
+  // role (or creates one under it), so the role brings the same verified second
+  // factor every other admin route requires (admin.js). GET / above lists only
+  // the classes the signed-in account itself teaches or belongs to, so it stays
+  // open to an enrolled admin before a code is presented (mfa-check.mjs).
+  // Teachers and students are unaffected.
+  const adminMfa = requireMfa();
+  router.use((req, res, next) => (req.platformSession?.role === 'admin' ? adminMfa(req, res, next) : next()));
 
   router.post('/', requireVerifiedEmail, requireRole('teacher', 'admin'), rateLimit(db, 'class-create', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const name = cleanTitle(req.body?.name, 120);

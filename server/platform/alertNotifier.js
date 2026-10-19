@@ -167,7 +167,7 @@ export function createAlertNotifier({
   async function deliver(rule, kind, at) {
     const s = state.get(rule.id);
     const counts = alertWindowCounts(registry, rule);
-    let sha = 'unknown';
+    let sha;
     try { sha = safeSha(releaseSha()); } catch { sha = 'unknown'; }
     const message = alertEmailMessage({
       kind, ruleId: rule.id, severity: ALERT_SEVERITY[rule.id] || 'warning',

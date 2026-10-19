@@ -30,17 +30,19 @@ import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
+import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
 import {
-  misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById, confirmCloudMisconception
+  misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById, confirmCloudMisconception,
+  verifiedWorkingRepairs
 } from '../engine/misconceptions.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext, pickNextAmong,
   predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, pickDotpoint, scheduleReview, migrateReview, gradeFor,
-  retrievability, misconceptionLabel, activeTraps, trapPressureOf,
-  TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
+  retrievability, misconceptionLabel, activeTraps, seekableTraps, trapPressureOf, trapSittingsOf,
+  TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET, TRAP_SITTING_GAP_MS, TRAP_SEEK_GIVE_UP, MISCONCEPTION_UNTARGETED_WHY
 } from '../engine/adaptive.js';
 import { BADGES, checkBadges } from './badges.js';
 import {
@@ -469,9 +471,17 @@ async function ratingWithOccurrence(pid, row, q, owner, key, label) {
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const traps = { ...(st.traps || {}) };
   const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
+  // Sittings since the slip was last walked back: a recurrence after any
+  // repair credit starts the count again, and a second slip inside the same
+  // sitting adds an occurrence but not a sitting (adaptive.js).
+  const fresh = !traps[key] || (Number(prev.credit) || 0) > 0;
+  const newSitting = !prev.lastAt || now - prev.lastAt >= TRAP_SITTING_GAP_MS;
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
+    s: Math.min(9, fresh ? 1 : trapSittingsOf(prev) + (newSitting ? 1 : 0)),
     label: safeLabel(label, 140),
+    // A fresh sighting proves a form in this owner can spring the slip, so any
+    // earlier give-up on the seek (noteTrapSeek) is dropped with it.
     dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
   return { ...st, traps: trimTraps(traps) };
@@ -662,7 +672,10 @@ const safeTrapLedger = (v) => {
     out[key] = {
       n: safeInt(t.n, 0, 9, 0), credit: safeInt(t.credit, 0, 9, 0),
       firstAt: safeTime(t.firstAt), lastAt: safeTime(t.lastAt),
-      label: safeLabel(t.label, 140), dotpoint: safeId(t.dotpoint)
+      label: safeLabel(t.label, 140), dotpoint: safeId(t.dotpoint),
+      ...(t.s != null ? { s: safeInt(t.s, 0, 9, 0) } : {}),
+      ...(t.seekMisses ? { seekMisses: safeInt(t.seekMisses, 0, 9, 0) } : {}),
+      ...(t.unreachable === true ? { unreachable: true } : {})
     };
   }
   return out;
@@ -1078,7 +1091,7 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
 const INDIA_WHY = {
   review: c => `Spaced review — your memory of ${c.name} is due to fade.`,
   'weak-spot': c => `Targeting your weakest chapter — ${c.name} has the most room to grow.`,
-  misconception: (c, trap) => (trap ? `Same slip keeps coming back in ${c.name}: ${trap.label}` : `Working on a mistake that keeps repeating in ${c.name}.`),
+  misconception: (c, trap) => (trap ? `Same slip keeps coming back in ${c.name}: ${trap.label}` : `Practising ${c.name}, where the same mistake has come up before.`),
   'new-ground': c => `New ground — ${c.name} has not been practised yet.`,
   rotation: (c, _t, track) => `Keeping your practice balanced across ${track} — ${c.name} is up.`,
   topic: (c, _t, track) => `${track} · focused practice on ${c.name}.`
@@ -1185,7 +1198,7 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   let choice;
   if (chapter) {
     const st = states[chapter.id] || indiaState(chapter, ratings, now);
-    choice = { chapter, st, reason: 'topic', reasonTag: null, trap: activeTraps(st.traps, now)[0] || null, target: null, difficulty: null, nextUp: null, explicit: true };
+    choice = { chapter, st, reason: 'topic', reasonTag: null, trap: seekableTraps(st.traps, now)[0] || null, target: null, difficulty: null, nextUp: null, explicit: true };
   } else {
     if (!pool.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
     const poolIds = new Set(pool.map(c => c.id));
@@ -1283,9 +1296,13 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     throw Object.assign(new Error(`That India ${ordinal != null ? 'dot point' : 'chapter'} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
   }
   // What is said about a question describes the cell that answers it — which
-  // may not be `target` when that cell is spent (retargetOnRepeat.js).
-  const whyFor = t => {
-    let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
+  // may not be `target` when that cell is spent (retargetOnRepeat.js). A
+  // misconception hunt whose question could not carry the slip (`untargeted`)
+  // says so with the misconception sentence that names no slip.
+  const whyFor = (t, { untargeted = false } = {}) => {
+    let why = untargeted && choice.reason === 'misconception'
+      ? INDIA_WHY.misconception(c, null, trackName)
+      : INDIA_WHY[choice.reason](c, choice.trap, trackName);
     if (t.pyq) why += ' This one is a real previous-year question.';
     if (t.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[t.dotpointIndex]}`;
     if (t.windowed === false) why += ` (Served at D${t.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
@@ -1318,9 +1335,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     hunting: !!choice.trap?.key
   });
   return {
-    chapter: c, target,
+    chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
     retarget, whyFor,
     reason: choice.reason, reasonTag: choice.reasonTag, why: whyFor(target), nextUp: choice.nextUp, trap: choice.trap,
+    // The same sentence for a question that could not carry the slip.
+    whyUntargeted: whyFor(target, { untargeted: true }),
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };
 }
@@ -1811,6 +1830,23 @@ function stepMetaFor(q) {
 // A row whose payload is the public form: issued, prepared, or an offline draft.
 const publicShaped = row => !!(row.serverQuestionId || row.prepared || row.draftOnly || row.examServer);
 
+// Lost-mark explanations restored from a file: catalogue keys only, from the
+// namespaces the marker writes, with whole-number line references. A key
+// outside those namespaces would render as itself, so it is dropped here.
+function safeLostMarks(list) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 40).map(l => {
+    if (!l || typeof l !== 'object') return null;
+    const key = typeof l.key === 'string' && /^marks\.lost\.[a-zA-Z]+$/.test(l.key) ? l.key : null;
+    if (!key) return null;
+    const ruleKey = typeof l.ruleKey === 'string' && /^(?:marks\.rule\.[a-zA-Z]+|misconception\.[a-zA-Z]+\.name)$/.test(l.ruleKey) ? l.ruleKey : null;
+    const line = safeInt(l.line, 1, 400, 1);
+    const vars = { line };
+    if (l.vars && Number.isFinite(Number(l.vars.breakLine))) vars.breakLine = safeInt(l.vars.breakLine, 1, 400, 1);
+    return { line, key, vars, ruleKey };
+  }).filter(Boolean);
+}
+
 function sanitize(q, row) {
   if (q.multipart) {
     return {
@@ -1848,6 +1884,10 @@ function sanitize(q, row) {
     pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
+    // The hint ladder (engine/hintLadder.js): four rungs the server serves and
+    // charges. `hintLevel` is the level the server committed for this row.
+    hintLadder: !q.multipart && !q.custom && !['rush', 'match', 'placement', 'exam'].includes(row.mode) && !row.examId ? HINT_RUNGS.length : 0,
+    hintLevel: rungLevelOf(row.hintLevel),
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
     // Who marks this question as it stands: the server (issued there, its
@@ -2009,7 +2049,7 @@ function markSubmission(q, answer, steps) {
   if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
     try {
       const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
-      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note, lost: mm.lost };
     } catch { partial = null; }
   }
   return { result, feedback, stepReport, partial, meta0 };
@@ -2177,6 +2217,9 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     const opportunities = row.serverQuestionId
       ? new Set((row.serverRepairOpportunities || []).map(why => misconceptionIdForTrap(owner, why)).filter(Boolean))
       : repairOpportunitiesOf(q, owner);
+    // A clean, fully verified piece of working is also an opportunity for each
+    // misconception Step Check can see in working (misconceptions.js).
+    if (clean) for (const key of verifiedWorkingRepairs(st.traps, resolution?.stepReport)) opportunities.add(key);
     const traps = clean ? decayTraps(st.traps, opportunities) : (st.traps || {});
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
     ratingNext = {
@@ -2582,7 +2625,7 @@ function safeExamDetail(rows, ids = null) {
       answerType: sanitizeText(d.answerType, 20), mcqOptions: safeOptions(d.mcqOptions),
       given: sanitizeText(d.given, 300), feedback: sanitizeText(d.feedback, 600),
       partial: d.partial && typeof d.partial === 'object'
-        ? { okLines: safeInt(d.partial.okLines, 0, 40, 0), awarded: safeInt(d.partial.awarded, 0, 40, 0), note: sanitizeText(d.partial.note, 300) }
+        ? { okLines: safeInt(d.partial.okLines, 0, 40, 0), awarded: safeInt(d.partial.awarded, 0, 40, 0), note: sanitizeText(d.partial.note, 300), lost: safeLostMarks(d.partial.lost) }
         : null,
       working: d.working == null ? null : sanitizeText(d.working, 4000),
       solution: safeSolution(d.solution)
@@ -2932,6 +2975,34 @@ function importProgress(src) {
 let tutorAskRoutePromise = null;
 const tutorAskRoute = () => (tutorAskRoutePromise ||= import('../tutor/askRoute.js')
   .then(m => m.createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText })));
+
+// ── Review queue and notebook naming ─────────────────────────────────────────
+// The server knows a generator and its dot point; this profile names them
+// through its own spine (the NCERT chapter on an Indian profile, the NSW
+// table otherwise) and links each to practice on that chapter.
+function namedDotpoint(p, subtopic, dotpointId) {
+  const dp = dotpointId ? dotpointById(String(dotpointId)) : null;
+  if (p.course === 'in') {
+    const named = indiaNameOf(subtopic, { grade: p.year });
+    return { chapterId: named?.id || subtopic, chapterName: named?.name || subtopic, text: dp?.text ?? null, ordinal: Number.isInteger(dp?.ordinal) ? dp.ordinal : null };
+  }
+  return { chapterId: subtopic, chapterName: SUBTOPIC_BY_ID[subtopic]?.name || subtopic, text: dp?.text ?? null, ordinal: Number.isInteger(dp?.ordinal) ? dp.ordinal : null };
+}
+
+async function serverReviewQueue(p) {
+  if (!(await profileCloudAccountId(p.id).catch(() => null))) return null;
+  let out;
+  try { out = await cloud.reviewQueue(); } catch { return null; }
+  const decorate = r => {
+    const named = namedDotpoint(p, r.subtopic, r.dotpoint);
+    const href = p.course === 'in'
+      ? `/practice?subtopic=${encodeURIComponent(named.chapterId)}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
+      : `/practice?subtopic=${encodeURIComponent(named.chapterId)}${Number.isInteger(named.ordinal) ? `&dotpoint=${named.ordinal}` : ''}`;
+    return { id: `${r.subtopic}|${r.dotpoint}`, subtopic: r.subtopic, dotpoint: r.dotpoint, chapterName: named.chapterName, text: named.text,
+      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href };
+  };
+  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
+}
 
 const routes = {
 
@@ -3409,7 +3480,8 @@ const routes = {
       // the student asked for by name is their sitting, not the picker's.
       if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, dotpointKey); }
       return {
-        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: served === pick.target ? pick.why : pick.whyFor(served), nextUp: pick.nextUp,
+        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag,
+        why: served === pick.target ? (trapKey ? pick.why : pick.whyUntargeted) : pick.whyFor(served, { untargeted: !trapKey }), nextUp: pick.nextUp,
         dotpoint: served.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: served.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
@@ -3447,8 +3519,8 @@ const routes = {
       let auto = null;
       if (!asked) {
         const chosen = chooseDotpoint(subtopic, st, {
-          fixed: difficulty ? d : null, want: d, prefer: activeTraps(st?.traps, now)[0]?.dotpoint || null,
-          trapKey: activeTraps(st?.traps, now)[0]?.key || null, nowMs: now
+          fixed: difficulty ? d : null, want: d, prefer: seekableTraps(st?.traps, now)[0]?.dotpoint || null,
+          trapKey: seekableTraps(st?.traps, now)[0]?.key || null, nowMs: now
         });
         auto = chosen.dp;
         d = chosen.difficulty;
@@ -3463,7 +3535,7 @@ const routes = {
         : `Focused practice on ${sub.name}.`;
       choice = {
         subtopic, difficulty: d, reason: 'topic', dotpoint: real ? asked.id : (auto?.id || null),
-        trap: activeTraps(st?.traps, now)[0] || null,
+        trap: seekableTraps(st?.traps, now)[0] || null,
         whyPlain,
         why: real ? `Focused on this dot point: ${asked.text}`
           : auto ? `Focused practice on ${sub.name}. Dot point: ${auto.text}`
@@ -3499,7 +3571,12 @@ const routes = {
     );
     return {
       question: sanitize(payload, row), reason: choice.reason, repeat,
-      why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
+      // "Same slip keeps coming back" only when the server said this question
+      // can spring that slip; otherwise the true, question-neutral reason.
+      why: (() => {
+        const why = served || !choice.dotpoint ? choice.why : choice.whyPlain;
+        return choice.reason === 'misconception' && !trapKey ? why.replace(choice.whyPlain, MISCONCEPTION_UNTARGETED_WHY) : why;
+      })(),
       dotpoint: served, target: choice.target ?? null,
       misconception: trapKey ? choice.trap?.label || null : null,
       ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
@@ -3525,13 +3602,37 @@ const routes = {
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
-    const q = row.payload;
-    const hints = q.hints || [];
-    if (!hints.length) return { hint: 'No hints for this one — trust your instincts!', level: 0, remaining: 0 };
-    const used = Math.min((row.hintsUsed || 0) + 1, hints.length);
-    row.hintsUsed = used;
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    // The hint ladder is the server's: it serves each rung from its own copy
+    // of the question and charges it there, in order (server/platform/
+    // practice.js). This device asks for the next rung by name and records the
+    // level the server committed — never a level of its own.
+    const asked = HINT_RUNGS.includes(body?.rung) ? body.rung : nextRungAfter(rungLevelOf(row.hintLevel));
+    if (!asked) throw Object.assign(new Error('Every hint has been opened.'), { status: 409, code: 'HINT_LADDER_SPENT' });
+    await requireServerIssue(row);
+    const r = await viaServer(() => cloud.hintPractice(row.serverQuestionId, asked));
+    const level = rungLevelOf(r?.level);
+    row.hintLevel = Math.max(rungLevelOf(row.hintLevel), level);
+    // `hintsUsed` keeps feeding the rating update and the FSRS grade, in the
+    // same help units the server's attempt carries.
+    row.hintsUsed = helpUnitsAfter(row.hintLevel);
+    if (r?.endsQuestion) {
+      // The full solution: the server resolved the question as revealed.
+      if (r.authoritative !== true || r.revealed !== true || r.resolved !== true || r.questionId !== row.serverQuestionId ||
+          typeof r.attemptId !== 'string' || !r.solution) {
+        throw Object.assign(new Error('The server did not acknowledge the reveal.'), { status: 503, code: 'REVEAL_ACK_MISSING' });
+      }
+      certifiedPracticeMarks(r);
+      row.serverReceipt = r;
+      const meta = await resolve(p, row, row.payload, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
+      return { rung: 'solution', level, remaining: 0, markWeight: 0, endsQuestion: true,
+        correct: false, resolved: true, revealed: true, authoritative: true,
+        attemptId: r.attemptId, serverAcknowledgedAt: r.serverAcknowledgedAt,
+        solution: r.solution, ...meta, ...certifiedPracticeMarks(r), syncQueued: true };
+    }
     await put('questions', row);
-    return { hint: hints[used - 1], level: used, remaining: hints.length - used };
+    return { hint: typeof r?.hint === 'string' ? r.hint : null, rung: r?.rung || asked, level, thin: r?.thin === true,
+      remaining: Math.max(0, HINT_RUNGS.length - level), markWeight: markWeightAfter(level), next: nextRungAfter(level) };
   },
 
   // ---- AI tutor (vision item 3) ----
@@ -3771,16 +3872,17 @@ const routes = {
     // A wrong answer that landed on a designed distractor is not a random miss:
     // the trap names the misconception behind it. Counted here, before the
     // two-try branch below, because the first attempt is the honest evidence.
-    // Where the working itself names the misstep, that is counted instead — the
-    // distractor infers the mistake, the working shows it.
+    // The server-attested distractor is counted first; only where there is
+    // none does a confidently named misstep in the working count instead.
+    // Nothing is recorded from local feedback: every answer reaching this line
+    // was marked by the server (requireServerIssue above), and a locally
+    // produced verdict is not evidence (ADR-0001 amendment 2026-10-10).
     let trapHit = null;
     if (!result.correct && !result.invalid) {
       if (row.serverQuestionId && authoritative.trapWhy) {
         const owner = evidenceKeyOf(row, q);
         trapHit = await recordMisconception(p.id, row, q, owner,
           misconceptionIdForTrap(owner, authoritative.trapWhy), misconceptionLabel(authoritative.trapWhy));
-      } else if (!row.serverQuestionId) {
-        trapHit = await recordTrap(p.id, row, q, feedback);
       }
       if (!trapHit) trapHit = await recordStepTrap(p.id, row, q, stepReport?.diagnosis);
     }
@@ -3846,6 +3948,7 @@ const routes = {
         submissionId, requestDigest, trapHit: trapHit || null,
         replay: replayRecord({ feedback, stepReport, partial, diagnosis: stepReport?.diagnosis || null })
       } : null,
+      stepReport: result.correct ? stepReport || null : null,
       syncQueue: true
     });
     return {
@@ -3905,8 +4008,53 @@ const routes = {
     };
     return {
       due: rows.filter(r => r.dueAt <= now).map(decorate),
-      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate)
+      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate),
+      // The per-dot-point queue is derived by the server from this account's
+      // server-marked attempts (GET /v1/practice/review-queue). Signed out or
+      // offline there is none: null, never a locally invented schedule.
+      dotpoints: await serverReviewQueue(p)
     };
+  },
+
+  // ---- the error notebook ----
+  // The server files a wrong resolution only under a misconception its
+  // deterministic engine diagnosed; this device names what it is sent.
+  'GET /notebook': async () => {
+    const p = await requireProfile();
+    if (!(await profileCloudAccountId(p.id).catch(() => null))) return { entries: [], available: false, reason: 'sign-in' };
+    let out;
+    try { out = await cloud.practiceNotebook(); } catch { return { entries: [], available: false, reason: 'offline' }; }
+    const entries = (Array.isArray(out?.entries) ? out.entries : []).map(g => ({
+      key: String(g.key || ''),
+      misconception: { id: misconceptionById(g.misconception?.id)?.id || null, nameKey: misconceptionById(g.misconception?.id)?.name || null,
+        label: typeof g.misconception?.label === 'string' ? g.misconception.label : null },
+      count: Number(g.count) || 0, lastAt: Number(g.lastAt) || 0,
+      chapterNames: [...new Set((g.subtopics || []).map(s => namedDotpoint(p, s, null).chapterName))],
+      items: (g.items || []).map(item => ({
+        id: item.id, prompt: typeof item.prompt === 'string' ? item.prompt : null, difficulty: Number(item.difficulty) || 2,
+        answeredAt: Number(item.answeredAt) || 0, canTwin: item.canTwin === true,
+        dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
+      }))
+    }));
+    return { entries, available: true };
+  },
+
+  // A twin is drawn and issued by the server; this device keeps the row it
+  // will be answered on, exactly like a History repeat.
+  'POST /notebook/:id/twin': async (body, params) => {
+    const p = await requireProfile();
+    const linked = await profileCloudAccountId(p.id).catch(() => null);
+    if (!linked) throw checkUnavailable('sign-in');
+    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    const q = out?.question;
+    if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
+    const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;
+    // An Indian twin keeps its chapter, so its evidence lands where the slip was.
+    const newRow = { id: uuid(), serverQuestionId: q.id, pid: p.id, subtopic: named?.id || q.subtopic, difficulty: q.difficulty, payload: q,
+      ...(named ? { india: { chapterId: named.id, track: p.indiaTrack || 'cbse', dotpointIndex: null } } : {}),
+      generator: q.subtopic, mode: 'review', examId: null, taskId: null, answered: 0, tries: out.triesLeft === 1 ? 1 : 0, hintsUsed: 0, createdAt: Date.now() };
+    await put('questions', newRow);
+    return { question: sanitize(q, newRow), twin: { sameDotpoint: out.twin?.sameDotpoint === true } };
   },
 
   // ---- exams ----
@@ -5611,6 +5759,7 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
     try {
       const out = await cloud.issuePractice({ ...body, ...(trap ? { trap } : {}), account: linkedAccount });
       if (String(out?.accountId || '') === linkedAccount && out?.question?.id && usable(out.question)) {
+        if (trap) await noteTrapSeek(pid, trap, out.trapDelivered === true);
         // A copy of content this account has already spent a try on starts with
         // that try spent; the card must say one try is left, as the server will.
         return { q: out.question, fields: { serverQuestionId: out.question.id, ...(out.triesLeft === 1 ? { tries: 1 } : {}) }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
@@ -5633,6 +5782,27 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
   } catch { /* no server: an offline draft */ }
   const local = localDraft();
   return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
+}
+
+/**
+ * The server's answer to "a question that can spring this slip", kept on the
+ * ledger record. Only an issued question counts — a prepared or offline draft
+ * never asked. TRAP_SEEK_GIVE_UP misses running mark the misconception
+ * unreachable (it stops boosting its topic, adaptive.js); a delivery, or a
+ * fresh sighting of the slip (ratingWithOccurrence), clears it.
+ */
+async function noteTrapSeek(pid, trap, delivered) {
+  try {
+    const st = await getRating(pid, trap.owner);
+    const t = st?.traps?.[trap.key];
+    if (!t) return;
+    const misses = delivered ? 0 : Math.min(9, (Number(t.seekMisses) || 0) + 1);
+    const next = { ...t, seekMisses: misses };
+    if (!misses) delete next.seekMisses;
+    if (delivered) delete next.unreachable;
+    else if (misses >= TRAP_SEEK_GIVE_UP) next.unreachable = true;
+    await putRating(pid, trap.owner, { ...st, traps: { ...st.traps, [trap.key]: next } });
+  } catch { /* bookkeeping only: the question is still served */ }
 }
 
 /**

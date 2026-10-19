@@ -287,6 +287,41 @@ export function misconceptionIdForDiagnosis(diagnosis) {
   return m && m.recordable ? m.id : null;
 }
 
+// ── Repair by verified working ───────────────────────────────────────────────
+
+/**
+ * True when a Step Check report verifies a whole piece of working: at least two
+ * lines, every one of them checked 'ok', no break and no diagnosis. A note
+ * line (one the checker could not read) is not verified, so it disqualifies.
+ */
+export function fullyVerifiedWorking(report) {
+  const lines = Array.isArray(report?.lines) ? report.lines : [];
+  if (lines.length < 2) return false;
+  if (Number.isInteger(report?.firstBreak) && report.firstBreak !== -1) return false;
+  if (report?.diagnosis) return false;
+  return lines.every(l => l && l.status === 'ok');
+}
+
+/**
+ * The ledger keys a clean, correct, fully verified piece of working in the same
+ * owner is a repair opportunity for: every recordable misconception Step Check
+ * can see in working. Step Check checks each transition, so a fully verified
+ * solution is one where that slip had its chance and did not happen. That is
+ * the only route by which a misconception named from working (Step Check or a
+ * cloud proposal it confirmed), which no authored trap maps to, can ever be
+ * walked back. Misconceptions only an authored distractor can detect are left
+ * to the questions that carry that distractor (#232).
+ */
+export function verifiedWorkingRepairs(traps, report) {
+  const keys = new Set();
+  if (!fullyVerifiedWorking(report)) return keys;
+  for (const key of Object.keys(traps || {})) {
+    const m = misconceptionById(key);
+    if (m && m.recordable && m.detectors.includes(STEP)) keys.add(key);
+  }
+  return keys;
+}
+
 // ── Learner-state migration ──────────────────────────────────────────────────
 
 const LEGACY_STEP = /^(.+)\.step-([a-z][a-z-]*)$/;

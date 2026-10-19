@@ -244,6 +244,26 @@ struct WebShell: UIViewRepresentable {
         private func pinDeviceAppearance(_ webView: WKWebView) {
             let device = (webView.window?.windowScene?.screen ?? UIScreen.main).traitCollection.userInterfaceStyle
             if webView.overrideUserInterfaceStyle != device { webView.overrideUserInterfaceStyle = device }
+            observeSceneAppearance(webView)
+        }
+
+        private var sceneAppearanceRegistration: Any?
+
+        /// iOS 17+: the device can switch light/dark on its schedule while Pri
+        /// stays in the foreground (#533). The window scene's traits follow the
+        /// device (the web view's own override does not reach them), so a change
+        /// there re-pins the web view live. iOS 16 keeps refresh-on-active only.
+        /// Registered once, as soon as the web view has a scene.
+        private func observeSceneAppearance(_ webView: WKWebView) {
+            guard sceneAppearanceRegistration == nil, let scene = webView.window?.windowScene else { return }
+            if #available(iOS 17.0, *) {
+                sceneAppearanceRegistration = scene.registerForTraitChanges(
+                    [UITraitUserInterfaceStyle.self]
+                ) { [weak self, weak webView] (_: UIWindowScene, _: UITraitCollection) in
+                    guard let webView else { return }
+                    self?.pinDeviceAppearance(webView)
+                }
+            }
         }
 
         /// Only `https://<signed cloud host>/account-action#…` is accepted, and it

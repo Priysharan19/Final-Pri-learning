@@ -334,7 +334,7 @@ try {
   // Driver errors that mean "the database is not there" become one coded,
   // retryable 503; a programming error stays what it is.
   const { databaseOverload, isDatabaseOverload } = await import('../platform/store.js');
-  for (const code of ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', '57P01', '57P03', '08006', '08001', '53300']) {
+  for (const code of ['ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', '57P01', '57P03', '08006', '08001', '53300', '28000', '28P01']) {
     const mapped = databaseOverload(Object.assign(new Error(`connect ${code} db.internal:5432 postgres://u:p@h`), { code }));
     c.ok(mapped.code === 'PLATFORM_DB_UNAVAILABLE' && mapped.status === 503 && mapped.retryAfter === 5 && isDatabaseOverload(mapped) && !/5432|postgres:/.test(mapped.message),
       `driver ${code} → 503 PLATFORM_DB_UNAVAILABLE, Retry-After 5, no host in the message`);

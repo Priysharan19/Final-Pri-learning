@@ -253,13 +253,15 @@ class InkInputTest {
             assertTrue("the stylus eraser end removes that stroke ($bandErased px left, was $bandInked)", bandErased <= bandEmpty + 5)
 
             // ── reading is the server's job (owner decision: server-only) ────
-            // The emulator has no Pri server, so the strokes must NOT be read or
-            // marked on the device; the student is told why and the ink is kept.
-            val status = waitFor(s, "(function(){var e=document.querySelector('.ink-status');return e&&e.innerText.trim()?e.innerText.trim().slice(0,160):false;})()", 30_000)
-            assertTrue("the student is told why the handwriting is not read yet: $status", status.length > 10)
-            assertEquals("no on-device reading is shown or offered for marking", "0",
-                eval(s, "String(document.querySelectorAll('.ink-preview .ink-line').length)").trim('"'))
-            assertTrue("the ink is kept on the page while it waits", inkPixels(s) > 0)
+            // Signed in against the fixture server (#477), started with its
+            // SYNTHETIC reader (scripts/synthetic-reader-server.mjs: the model
+            // hop is a scripted stand-in answering "7"), the strokes are read by
+            // the server and never on the device: the reading the card shows is
+            // the server's, labelled as such, and carries the stand-in's text.
+            val read = waitFor(s, "(function(){var p=document.querySelector('.ink-preview');if(!p)return false;var n=p.querySelector('.ink-status');var l=p.querySelector('.ink-line[data-text]');return n&&l?(n.innerText.trim()+'|'+l.getAttribute('data-text')):false;})()", 30_000).trim('"')
+            assertTrue("the card shows a reading made on Pri's server: $read", read.startsWith("Read on the server"))
+            assertEquals("the reading is the server reader's (synthetic stand-in), not the device's: $read", "7", read.substringAfter('|'))
+            assertTrue("the ink is kept on the page", inkPixels(s) > 0)
 
             m = metrics(s)
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())

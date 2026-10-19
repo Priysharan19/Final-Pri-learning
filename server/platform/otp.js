@@ -320,6 +320,9 @@ export function createOtpRouter(db, {
     } catch (error) { return sendError(res, error); }
   });
 
+  // Mailbox-only proof, unlike the in-app delete's password step-up: accepted
+  // risk R-22 (docs/security/accepted-risks.md). The mailbox can already reset
+  // the password, so this grants nothing the mailbox does not already have.
   router.post('/delete-confirm', rateLimit(db, 'otp-delete-confirm', { limit: 30, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const destination = normalizeEmail(req.body?.email);

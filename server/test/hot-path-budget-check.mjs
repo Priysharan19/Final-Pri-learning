@@ -409,9 +409,11 @@ try {
   const PINS = {
     sqlite: {
       'POST /v1/practice/issue': 11,                                     // was 13 (7 before the #537 cap)
-      'POST /v1/practice/:id/submit (typed, resolves)': 17,              // was 34
-      'ink Submit, three requests (recognize + confirm + submit)': 45,   // was 86
-      'ink Submit, one request (picture with the submission)': 29,       // was 86 (three requests)
+      // Train 10, --report on both engines: +2 per submit for the server-charged
+      // hint ladder (#584) and misconception targeting (#586).
+      'POST /v1/practice/:id/submit (typed, resolves)': 19,              // was 34
+      'ink Submit, three requests (recognize + confirm + submit)': 47,   // was 86
+      'ink Submit, one request (picture with the submission)': 31,       // was 86 (three requests)
       'POST /v1/sync/push (5 events + 1 entity)': 32,                    // was 37
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1
@@ -419,9 +421,9 @@ try {
     },
     postgres: {
       'POST /v1/practice/issue': 13,                                     // was 15 (9 before the #537 cap)
-      'POST /v1/practice/:id/submit (typed, resolves)': 19,              // was 37
-      'ink Submit, three requests (recognize + confirm + submit)': 51,   // was 94
-      'ink Submit, one request (picture with the submission)': 31,       // was 94 (three requests)
+      'POST /v1/practice/:id/submit (typed, resolves)': 21,              // was 37
+      'ink Submit, three requests (recognize + confirm + submit)': 53,   // was 94
+      'ink Submit, one request (picture with the submission)': 33,       // was 94 (three requests)
       'POST /v1/sync/push (5 events + 1 entity)': 34,                    // was 39
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1
