@@ -54,6 +54,7 @@ const INSTRUMENT_ON = featureEnabled('instrument');
 const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/InstrumentBar.jsx')) : null;
 const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
 const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.jsx')) : null;
+const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportHead.jsx')) : null;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   import('./instrument/instrument.css');
@@ -583,7 +584,7 @@ export default function App() {
                     <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : (INSTRUMENT_ON ? <IndexPage /> : <Home />)} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
-                    <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
+                    <Route path="/progress" element={studentOnly(INSTRUMENT_ON ? <><ReportHead /><Progress /></> : <Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />

@@ -288,6 +288,22 @@ export const writeFlow = {
     await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
     writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
 
+    // Scripts: the resolved attempt's row carries its certified mark strip.
+    if (reply) {
+      await page.goto(`${base}/review`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.hist-row', { timeout: 15000 }).catch(() => {});
+      const strip = page.locator('[data-mark-strip]').first();
+      await check('Scripts shows the certified mark strip on the attempt', await strip.count() === 1 && await strip.getAttribute('data-mark-strip') === `${reply.marksEarned}/${reply.marksPossible}`, await strip.getAttribute('data-mark-strip').catch(() => 'none'));
+      await check('the strip has one square per mark', await strip.locator('i').count() === reply.marksPossible);
+      writeFileSync(join(outDir, 'scripts-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+      // Report: the certified total is the receipts' total.
+      await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-instrument-report]', { timeout: 15000 }).catch(() => {});
+      const fig = (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '');
+      await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
+      writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    }
+
     // The map's marks are the server-certified receipts, nothing else.
     if (reply) {
       await page.goto(`${base}/map`, { waitUntil: 'domcontentloaded' });

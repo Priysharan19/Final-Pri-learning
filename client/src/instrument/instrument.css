@@ -477,3 +477,29 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-map-foot { font-size: 12.5px; }
 @media (max-width: 980px) { .in-map-body { grid-template-columns: 1fr; } .in-map-card { position: static; } }
 @media (prefers-reduced-motion: reduce) { .in-map-edge.is-toward { animation: none; } }
+
+/* ── Report and Scripts (step 6) ───────────────────────────────────────────── */
+.in-report { display: grid; gap: 16px; margin-bottom: 28px; }
+.in-report-title { margin: 0; font: 500 34px/1.05 var(--in-ui); letter-spacing: -0.045em; color: var(--in-tx); }
+.in-report-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.in-report-figs div { padding: 16px; border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
+.in-report-figs b { display: block; font: 500 34px/1 var(--in-ui); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; color: var(--in-tx); }
+.in-report-figs b span { font-size: 18px; color: var(--in-tx-3); letter-spacing: -0.02em; }
+.in-report-figs small { color: var(--in-tx-3); font-size: 12.5px; }
+.in-report-row { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
+.in-report-heat, .in-report-lost { padding: 16px; border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
+.in-report-heat h2, .in-report-lost h2 { margin: 0 0 12px; font: 500 11.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-heat { display: grid; grid-template-columns: repeat(15, 1fr); grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 4px; }
+.in-heat i { aspect-ratio: 1; border-radius: 2px; background: var(--in-l3); }
+.in-heat i.is-on { background: color-mix(in srgb, var(--in-tx) calc(var(--v) * 100%), var(--in-l3)); }
+.in-report-lost ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.in-report-lost li { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px; color: var(--in-tx); }
+.in-report-lost li i { width: 8px; height: 8px; border-radius: 2px; background: var(--cc); }
+.in-report-lost li small { font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
+@media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } .in-report-row { grid-template-columns: 1fr; } }
+
+.in-strip { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px var(--in-mono); color: var(--in-tx-2); }
+.in-strip > span:first-child { display: inline-flex; gap: 2px; }
+.in-strip i { width: 8px; height: 8px; border-radius: 2px; }
+.in-strip i.is-earned { background: var(--in-good); }
+.in-strip i.is-lost { background: transparent; box-shadow: inset 0 0 0 1.25px var(--in-slip); }
