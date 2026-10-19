@@ -54,7 +54,7 @@ html.ui-instrument {
   --in-tx: #1b1a17; --in-tx-2: #55534c; --in-tx-3: #66635b; --in-tx-4: #b6b2a8;
   --in-action: #1b1a17; --in-on-action: #f4f3ef; --in-signal: #d4400c;
   --in-c1: #3e6497; --in-c2: #a7701f; --in-c3: #4d7d5a; --in-c4: #a9472f; --in-c5: #715a8c; --in-c6: #6a7530; --in-c7: #8a7838; --in-c8: #94506b;
-  --in-good: #2f7a45; --in-slip: #b5571f; --in-unc: #4f58a6; --in-bad: #b3261e; --in-ink: #1d2433;
+  --in-good: #2f7a45; --in-slip: #a94f1b; --in-unc: #4f58a6; --in-bad: #b3261e; --in-ink: #1d2433;
   --in-ui: 'Instrument Sans Variable', 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --in-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
@@ -311,6 +311,7 @@ html.ui-instrument .seg > button[aria-pressed="true"], html.ui-instrument .seg >
 /* The writing surface. */
 html.ui-instrument .editor-shell { border-radius: 6px; box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; overflow: hidden; }
 html.ui-instrument .ink-toolbar { gap: 2px; padding: 5px; background: var(--in-l2); border-bottom: 1px solid var(--in-edge); }
+html.ui-instrument .editor-shell .ink-tool:focus-visible { outline-offset: -2px; }
 html.ui-instrument .ink-tool { border-radius: 4px; color: var(--in-tx-2); font: 500 13px var(--in-ui); }
 html.ui-instrument .ink-tool:hover:not(:disabled) { background: var(--in-l4); color: var(--in-tx); }
 html.ui-instrument .ink-tool.on { background: var(--in-l5); color: var(--in-tx); border-color: transparent; box-shadow: 0 0 0 1px var(--in-edge-2); }
@@ -352,19 +353,23 @@ html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeri
 /* The scan: on Check, one signal line passes down the page. Opacity and
    transform only; off under reduced motion (the existing rule hides it). */
 html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
-  inset: auto 0 auto 0; top: 0; height: 64px; border-top: 0;
+  inset: auto 0 auto 0; top: -64px; height: 64px; border-top: 0;
   border-bottom: 1.5px solid var(--in-signal);
   background: color-mix(in srgb, var(--in-signal) 7%, transparent);
   animation: in-scan 1100ms cubic-bezier(.45, 0, .2, 1) 1 both;
 }
+/* `top` rather than a transform, so the line reaches the foot of a page of
+   any height (a tall iPad stage included); it is one small layer. */
 @keyframes in-scan {
-  0% { transform: translateY(-64px); opacity: 1; }
+  0% { top: -64px; opacity: 1; }
   90% { opacity: 1; }
-  100% { transform: translateY(var(--in-scan-to, 520px)); opacity: 0; }
+  100% { top: 100%; opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { animation: none; display: none; }
 }
-/* The line the engine marked as the slip carries the copper edge on its chip. */
-html.ui-instrument .ink-line:has(.ink-line-verdict.bad) .ink-line-math { box-shadow: 0 0 0 1px var(--in-slip); }
-html.ui-instrument .ink-line:has(.ink-line-verdict.good) .ink-line-math { box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 55%, transparent); }
+/* The line the engine marked as the slip carries the copper edge on its chip,
+   and an earned line a faint green one — never on a line Pri read with low
+   confidence: that keeps its indigo "unsure" edge whatever the verdict. */
+html.ui-instrument .ink-line:not(.ink-line-low):has(.ink-line-verdict.bad) .ink-line-math { box-shadow: 0 0 0 1px var(--in-slip); }
+html.ui-instrument .ink-line:not(.ink-line-low):has(.ink-line-verdict.good) .ink-line-math { box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 55%, transparent); }

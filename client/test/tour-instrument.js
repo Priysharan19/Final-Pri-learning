@@ -200,8 +200,8 @@ export const writeFlow = {
     const shell = page.locator('.editor-shell').first();
     const look = sel => page.evaluate(q => { const el = document.querySelector(q); if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, radius: s.borderRadius, font: s.fontFamily }; }, sel);
     const stage = await look('.ink-stage');
-    const voidBg = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-void').trim());
-    await check('the writing surface is the instrument void', !!stage && !!voidBg, JSON.stringify({ stage, voidBg }));
+    const voidBg = await page.evaluate(() => { const p = document.createElement('div'); p.style.background = 'var(--in-void)'; document.body.append(p); const v = getComputedStyle(p).backgroundColor; p.remove(); return v; });
+    await check('the writing surface is the instrument void', !!stage && stage.bg === voidBg, JSON.stringify({ stage: stage?.bg, voidBg }));
     await check('the mode switch is the instrument segmented control', (await look('.mode-tabs.seg'))?.radius === '6px');
 
     const wrong = String(Number(right.text) + 1);
@@ -224,10 +224,11 @@ export const writeFlow = {
       const el = document.querySelector('.editor-shell[data-marked="yes"] .ink-stage');
       if (!el) return null;
       const s = getComputedStyle(el, '::after');
-      return { name: s.animationName, border: s.borderBottomColor };
+      return { name: s.animationName, border: s.borderBottomColor, pointer: s.pointerEvents };
     });
     const signal = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-signal').trim());
     await check('the scan runs once, in the signal colour', scan?.name === 'in-scan', JSON.stringify({ scan, signal }));
+    await check('the scan never takes the pen: it ignores pointer input', scan?.pointer === 'none');
     const verdict = page.locator('.verdict').first();
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);
