@@ -115,9 +115,11 @@ export const flow = {
     await page.keyboard.press('Escape');
     await check('esc closes the command bar', await page.locator('[data-instrument-command]').count() === 0);
     await check('focus returns to what opened it', await page.evaluate(() => document.activeElement?.classList.contains('in-cmd')));
+    // No wait between opening and typing: a key pressed the instant the bar
+    // opens must land in the field.
     await opener.click();
-    await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'combobox', null, { timeout: 5000 });
     await page.keyboard.type(name.slice(0, 5));
+    await check('keys typed the instant the bar opens land in the field', (await page.locator('.in-pal-q input').inputValue()) === name.slice(0, 5), await page.locator('.in-pal-q input').inputValue());
     await page.waitForTimeout(150);
     await page.keyboard.press('Enter');
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });

@@ -28,11 +28,15 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   const nav = useNavigate();
   const [open, setOpenState] = useState(false);
   const returnFocus = useRef(null);
-  const setOpen = next => setOpenState(was => {
-    const value = typeof next === 'function' ? next(was) : next;
-    if (value && !was) returnFocus.current = document.activeElement;
-    return value;
-  });
+  const openRef = useRef(false);
+  openRef.current = open;
+  // The opener is recorded before the field takes focus, so it can be handed
+  // focus back when the bar closes.
+  const setOpen = next => {
+    const value = typeof next === 'function' ? next(openRef.current) : next;
+    if (value && !openRef.current) returnFocus.current = document.activeElement;
+    setOpenState(value);
+  };
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   useEffect(() => { setOpen(false); }, [loc.pathname]);
 

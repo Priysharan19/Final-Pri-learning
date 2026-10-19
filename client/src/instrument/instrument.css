@@ -350,8 +350,9 @@ html.ui-instrument .ink-comment { border-radius: 4px; }
 html.ui-instrument .status-line { font: 400 12.5px var(--in-ui); color: var(--in-tx-3); }
 html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeric: tabular-nums; }
 
-/* The scan: on Check, one signal line passes down the page. Opacity and
-   transform only; off under reduced motion (the existing rule hides it). */
+/* The scan: on Check, one signal line passes down the page. Animates `top`
+   and opacity once, on one small layer; off under reduced motion (the
+   existing rule hides it). */
 html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
   inset: auto 0 auto 0; top: -64px; height: 64px; border-top: 0;
   border-bottom: 1.5px solid var(--in-signal);
