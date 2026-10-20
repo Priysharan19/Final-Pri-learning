@@ -1,6 +1,6 @@
 # App Store listing — Pri Learning (draft for App Store Connect)
 
-**Status:** draft prepared 2026-10-18 for Phase 6 against `main` `7bef402f7`. **Not entered in App
+**Status:** original Phase 6 draft prepared 2026-10-18 against `7bef402f7`; reconciled at `98a30194caf349885a24b11d75edf01ac50df428` on 20 October. This document retains a **price-gated historical draft**, not approved public copy; the conservative proposed listing in `task04-acceptance/01-Apple-Listing-and-Review.md` must be used until payment and privacy evidence are satisfied. **Not entered in App
 Store Connect.** Every product statement below is checked against the code it describes (cited in
 §9). Nothing here claims superiority over another app, a level of accuracy, complete syllabus
 coverage or production readiness. Where a fact belongs to the owner (prices, URLs, reviewer
@@ -9,7 +9,7 @@ account), it is marked **OWNER**.
 | Fact | Value | Source |
 |---|---|---|
 | Bundle id | `com.prilearning.app` | `ios/PriLearning.swiftpm/Package.swift` |
-| Source version / build | `4.0` (`2`) — **OWNER** decides whether App Store Connect's first version is 1.0 or 4.0 (`docs/release/V1_COMPLETION_LEDGER.md` surface 22) | `Package.swift` |
+| App Store marketing version / build | **`1.0` (`2`)** in both Swift Package.swift copies; `ios/app-store-version.json` also records 1.0. Confirm exact archive and Connect entry before submission. The web/server product's separate `4.0` release number is not the App Store version. | `ios/app-store-version.json`; both `Package.swift` files |
 | Device families in the current build | **iPhone and iPad** (`supportedDeviceFamilies: [.pad, .phone]`; iPhone portrait-only) since #523 | `Package.swift`; `PRI_V1_RELEASE_SCOPE.md` §22 (owner scope change #504) |
 | Consequence | Both the iPad and the iPhone screenshot sets in §7 are mandatory | — |
 | Subscription products | `com.prilearning.app.premium.monthly`, `com.prilearning.app.premium.annual` — created in App Store Connect, **not yet priced** | owner; server reads them from `PRI_APPLE_MONTHLY_PRODUCT_ID` / `PRI_APPLE_ANNUAL_PRODUCT_ID` (`server/platform/appleBilling.js`) |
@@ -94,9 +94,7 @@ account), it is marked **OWNER**.
 > Privacy notice: <PRI_PUBLIC_ORIGIN>/privacy
 
 **Do not publish this description until:** (a) the prices are set in App Store Connect and match;
-(b) the Premium feature list is checked against the paywall on the release build; (c) the privacy
-notice at `/privacy` has been rewritten to match the paragraph above (it does not yet — see
-`docs/legal/counsel/COUNSEL-INFORMATION-PACK.md` §8); (d) if an introductory offer or free trial is
+(b) the Premium feature list is checked against the paywall on the release build; (c) the **19 October revised** privacy notice at `/privacy` is tested against live providers/data flows and receives counsel approval; the 18 October counsel pack's assertion that it still describes on-device marking is historically stale; (d) if an introductory offer or free trial is
 configured, its terms are added to the subscription paragraph.
 
 ## 3. Keywords, category, other metadata
@@ -201,9 +199,10 @@ Required sizes (confirm current specifications in App Store Connect):
 
 | Device | Required? | Size (portrait) |
 |---|---|---|
-| iPad 13-inch | **Yes** | 2064 × 2752 or 2048 × 2732 |
-| iPhone 6.9-inch | **Yes** | 1320 × 2868 or 1290 × 2796 |
-| iPhone 6.5-inch | Only if App Store Connect still asks for it when 6.9-inch is supplied | 1284 × 2778 or 1242 × 2688 |
+| iPad 13-inch | **Yes (iPadOS app)** | 2064 × 2752 or 2048 × 2732 |
+| iPhone Dynamic Island (medium display) | **Yes (iPhone app)** | 1179 × 2556 or 1206 × 2622 |
+| iPhone Dynamic Island (large display) | Additional/scaled option; verify current Connect slot | 1260 × 2736, 1290 × 2796 or 1320 × 2868 |
+| iPhone Face ID (large display) | Additional/conditional according to Connect scaling | 1284 × 2778 or 1242 × 2688 |
 
 Rules: real screens from the release build on the production deployment with demo data; no real
 student names, emails or photos; no device frames with fake notifications; captions state only
