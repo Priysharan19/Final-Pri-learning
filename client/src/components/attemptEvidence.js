@@ -135,20 +135,42 @@ export function inkLineVerdicts({ outcome, res, submitted, shownLines, live = tr
   return base.some(v => v.status !== 'unknown') ? base : null;
 }
 
+// The previous 24-character photo suffix was not an image identity: two
+// different camera images can have the same length and suffix. Fingerprint the
+// WHOLE data URL instead, with cached linear work so render loops remain cheap.
+// This is an in-process UI revision discriminator, not a security signature.
+let lastPhoto = null;
+let lastPhotoFingerprint = null;
+function photoFingerprint(photo) {
+  if (photo == null) return '';
+  const value = String(photo);
+  if (value === lastPhoto) return lastPhotoFingerprint;
+  let a = 0x811c9dc5;
+  let b = 0x9e3779b9;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x85ebca6b);
+  }
+  lastPhoto = value;
+  lastPhotoFingerprint = `${value.length}:${(a >>> 0).toString(16)}:${(b >>> 0).toString(16)}`;
+  return lastPhotoFingerprint;
+}
+
 /**
  * The revision of the page a submission is made from. Any difference between
  * two of these is a change the student made: a stroke, an erase, a clear, a
  * new or corrected reading, a different typed answer or working, another
  * input mode, another photo.
  */
-export function revisionKey({ questionId, mode, inkSignature = null, inkStale = false, transcript = '', inkAnswer = '', answer = '', working = '', choice = null, photo = null } = {}) {
+export function revisionKey({ questionId, mode, inkSignature = null, inkStale = false, transcript = '', inkAnswer = '', answer = '', working = '', choice = null, photo = null, photoLines = null } = {}) {
   const m = String(mode || '');
   return JSON.stringify([
     String(questionId ?? ''), m,
     m === 'write' ? [String(inkSignature ?? ''), inkStale === true, String(transcript ?? ''), clean(inkAnswer)] : null,
     m === 'write' ? null : [clean(answer), clean(working)],
     choice === null || choice === undefined ? null : String(choice),
-    m === 'photo' ? (photo ? `${String(photo).length}:${String(photo).slice(-24)}` : '') : null
+    m === 'photo' ? [photoFingerprint(photo), Array.isArray(photoLines?.lines) ? photoLines.lines.map(line => [String(line?.text ?? ''), line?.excluded === true]) : null] : null
   ]);
 }
 

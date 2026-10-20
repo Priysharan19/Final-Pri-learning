@@ -1168,7 +1168,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const currentRevision = revisionKey({
     questionId: question.id, mode: isMcq ? 'mcq' : mode, inkSignature, inkStale,
     transcript: inkResult?.text ?? '', inkAnswer: isWorking ? '' : inkAnswer,
-    answer, working, choice: isMcq ? mcqSel : null, photo
+    answer, working, choice: isMcq ? mcqSel : null, photo, photoLines
   });
   // The same, for a result that lands outside a render (a relaunch replay).
   const screenRef = useRef(null);
