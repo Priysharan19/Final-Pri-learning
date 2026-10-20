@@ -313,6 +313,12 @@ jobs:
           : > /tmp/pri-pin-empty.diff
           node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-empty.diff | grep -q '"lane":"governed-required"'
 
+      - name: Release automation safety contract self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-automation-contract-check.mjs
+
       # A PR from main into deploy/production is a RELEASE POINTER proposal,
       # not an autonomous writer mission and not a protected-main push. It may
       # not merge through the ordinary PR lane: doing so could deploy on Railway.
