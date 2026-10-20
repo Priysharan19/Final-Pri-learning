@@ -1,0 +1,97 @@
+# Read-only evidence only. Nothing here changes Railway, database, branches, or secrets.
+# Production activation deliberately requires a separate reviewed change.
+name: Release Staging Proof
+
+on:
+  workflow_run:
+    workflows: ["Main Integrity"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: "Exact 40-character SHA already merged into protected main"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-staging-proof-${{ github.event.workflow_run.head_sha || inputs.candidate_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  verify-staging:
+    name: Exact-SHA staging smoke (read-only)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}
+      STAGING_ORIGIN: https://pri-learning-staging-staging.up.railway.app
+    steps:
+      - name: Validate input and GitHub event
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::candidate must be one full SHA"; exit 1; }
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ github.ref }}" == "refs/heads/main" ]] || { echo "::error::dispatch this read-only check from main"; exit 1; }
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove candidate identity and main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$CANDIDATE_SHA" origin/main
+          mkdir -p "$RUNNER_TEMP/release-audit"
+          printf 'repository=%s\ncandidate=%s\nworkflow_run=%s\ntrigger=%s\n' \
+            "${{ github.repository }}" "$CANDIDATE_SHA" "${{ github.run_id }}" "${{ github.event_name }}" \
+            > "$RUNNER_TEMP/release-audit/identity.txt"
+
+      - name: Wait for and verify the exact staging deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Railway deployment on main is independent; it may not be ready when
+          # Main Integrity completes. Never mistake an older healthy SHA as proof.
+          # The command is read-only and checks server, web, database and email
+          # readiness using THIS checked-out SHA's schema constants.
+          for attempt in $(seq 1 12); do
+            if node tools/verify-deployment.mjs \
+                --origin "$STAGING_ORIGIN" --sha "$CANDIDATE_SHA" \
+                --engine postgres --auth-email-proven \
+                > "$RUNNER_TEMP/release-audit/staging-check.txt" 2>&1; then
+              cat "$RUNNER_TEMP/release-audit/staging-check.txt"
+              echo "PASS: staging matches $CANDIDATE_SHA (not a release authorization)." \
+                >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [[ "$attempt" -lt 12 ]]; then sleep 30; fi
+          done
+          cat "$RUNNER_TEMP/release-audit/staging-check.txt"
+          echo "::error::Staging did not prove exact SHA $CANDIDATE_SHA. No release authorization."
+          exit 1
+
+      - name: Archive exact-SHA read-only proof
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-proof-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-audit/
+          if-no-files-found: warn
+          retention-days: 30
