@@ -177,7 +177,7 @@ export function ensureBuild(build) {
   // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
     cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
-    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' }
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -296,7 +296,10 @@ async function runFlow(flow, { browser, opts }) {
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     hasTouch: true,
-    reducedMotion: 'reduce'
+    reducedMotion: 'reduce',
+    // A route-interception regression needs network requests visible to
+    // Playwright, not intercepted first by a service worker (WebKit too).
+    ...(flow.inspectNetwork ? { serviceWorkers: 'block' } : {})
   });
   const page = await ctx.newPage();
   const crashes = [];

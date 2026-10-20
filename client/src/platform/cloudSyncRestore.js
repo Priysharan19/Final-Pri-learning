@@ -332,7 +332,10 @@ async function applyExamEvent(pid, event) {
       finishedAt: clockOf(p.finishedAt) || at,
       score: p.score == null ? null : num(p.score, 0),
       total: p.total == null ? null : num(p.total, 0),
-      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null
+      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null,
+      // The server said some answers were still waiting on handwriting when
+      // it wrote this event: the score is provisional, and is shown as such.
+      ...(Number(p.pendingHandwriting) > 0 ? { provisional: true } : {})
     };
   } else {
     const safe = (await sanitisers()).exams({

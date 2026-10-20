@@ -406,21 +406,27 @@ try {
     await resetBudget();
     ceiling(1, 1000);
     c.eq((await transcribe(a.jar, picture('takes the last unit'))).status, 200, 'another student takes the deployment\'s last unit');
-    const refusedRead = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.deq([refusedRead.status, refusedRead.data?.error?.code], [503, 'PAID_CAPACITY_REACHED'], 'this student\'s submit is refused for capacity');
+    // Submit never starts a read (review 17, F3): a picture with no kept read
+    // is a named, retryable refusal — whatever the capacity — and costs nothing.
+    const nines = callsFor('9');
+    const unreadAtSubmit = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
+    c.deq([unreadAtSubmit.status, unreadAtSubmit.data?.error?.code, callsFor('9') - nines], [409, 'RECOGNITION_READ_EXPIRED', 0], 'a submit for a picture with no kept read is refused by name and reaches no provider');
+    const refusedRead = await transcribe(s.jar, picture('9', 'ok', 'z'));
+    c.deq([refusedRead.status, refusedRead.data?.error?.code], [503, 'PAID_CAPACITY_REACHED'], 'this student\'s own Read is refused for capacity');
     c.deq(await attemptState(), untouched, 'and wrote no receipt, no completion and no graded attempt');
     ceiling(10000, 100000);
     process.env.PRI_AI_DAILY_FREE = '1';
     c.eq((await transcribe(s.jar, picture('uses the allowance'))).status, 200, 'the student uses their one daily read');
-    const overAllowance = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.eq(overAllowance.status, 429, 'a submit over the allowance is refused');
+    const overAllowance = await transcribe(s.jar, picture('9', 'ok', 'z'));
+    c.eq(overAllowance.status, 429, 'a Read over the allowance is refused');
     c.deq(await attemptState(), untouched, 'and likewise consumed nothing of the attempt');
     delete process.env.PRI_AI_DAILY_FREE;
     const typed = await h.request(`/v1/practice/${sqid}/submit`, { method: 'POST', jar: s.jar, headers: { 'Idempotency-Key': 'dedupe-first-real-try' },
       body: { submissionId: 'dedupe-first-real-try', answer: '5', mode: 'typed' } });
     c.deq([typed.status, typed.data.correct, typed.data.resolved], [200, false, false], 'the question is still on its FIRST try: a wrong answer now leaves a second try');
+    c.deq([(await transcribe(s.jar, picture('9', 'ok', 'z'))).status, callsFor('9')], [200, nines + 1], 'once capacity is back the student\'s Read costs one provider call');
     const second = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.eq(second.status, 201, 'and once capacity is back the same picture is read and receipted');
+    c.deq([second.status, second.data.reused, callsFor('9')], [201, true, nines + 1], 'and the same picture is receipted at Submit from that read, with no further call');
     const final = await h.request(`/v1/practice/${sqid}/submit`, { method: 'POST', jar: s.jar, headers: { 'Idempotency-Key': 'dedupe-second-real-try' },
       body: { submissionId: 'dedupe-second-real-try', answer: '9', mode: 'ink', transcriptionReceipt: second.data.receipt } });
     c.deq([final.status, final.data.correct], [200, true], 'for the second try the student still had');
@@ -509,9 +515,64 @@ try {
     ops.configure({ now: () => Date.now() + offset });
     c.eq((await transcribe(a.jar, image)).data.reused, true, 'and is reused just inside the 15-minute lifetime');
     offset = RECOGNITION_TTL_MS + 1000;
+    // Reading and marking are separate (owner decision). Once the 15-minute
+    // kept read has gone, Submit still never buys a read:
+    //  · with the READ RECEIPT the student was given when the page was read,
+    //    Submit binds the text they were shown — 0 provider calls;
+    //  · with no receipt, or one that does not verify, the answer is the
+    //    distinct "read again" refusal — 0 provider calls.
+    const { issueReadReceipt, verifyReadReceipt, READ_RECEIPT_TTL_MS } = await import('../platform/readReceipt.js');
+    const forQ = await issue(a.jar);
+    const qid = forQ.data.question.id;
+    const otherQ = await issue(a.jar);
+    const page = picture('receipt page');
+    ops.configure({ now: () => Date.now() });
+    const shown = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image: page, questionId: qid } });
+    const receipt = shown.data.receipt;
+    c.deq([shown.status, typeof receipt, callsFor('receipt page')], [200, 'string', 1], 'a read asked for a named, owned question returns a read receipt (one provider call)');
+    const inside = Buffer.from(receipt.split('.')[1], 'base64url').toString('utf8');
+    c.ok(!inside.includes('receipt page') && !receipt.includes(page.split(',')[1].slice(0, 24)) && Object.keys(JSON.parse(inside)).sort().join() === 'a,c,d,iat,n,q,t',
+      'the receipt holds digests and ids only: no transcript text and no image bytes');
+    c.eq((await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image: page, questionId: '00000000-0000-4000-8000-000000000000' } })).data.receipt, undefined,
+      'no receipt is issued for a question this account was not issued');
+    const text = shown.data.transcription.text;
+    const bind = (jar, question, body) => h.request(`/v1/practice/${question}/recognize`, { method: 'POST', jar, body: { mode: 'ink', ...body } });
+    offset = RECOGNITION_TTL_MS + 1000;
+    ops.configure({ now: () => Date.now() + offset });
+    const refusedAll = [];
+    const stranger = await student();
+    const strangerQ = await issue(stranger.jar);
+    for (const [why, jar, question, body] of [
+      ['no receipt', a.jar, qid, { image: page }],
+      ['the transcript text changed', a.jar, qid, { image: page, receipt, text: text + '1' }],
+      ['another question of the same account', a.jar, otherQ.data.question.id, { image: page, receipt, text }],
+      ['another account, on its own question', stranger.jar, strangerQ.data.question.id, { image: page, receipt, text }],
+      ['another picture', a.jar, qid, { image: picture('a different page'), receipt, text }],
+      ['a forged signature', a.jar, qid, { image: page, receipt: receipt.slice(0, -4) + (receipt.endsWith('AAAA') ? 'BBBB' : 'AAAA'), text }],
+      ['a forged payload', a.jar, qid, { image: page, receipt: receipt.split('.').map((part, i) => (i === 1 ? Buffer.from(inside.replace(/"n":(true|false)/, '"n":false').replace(a.id, stranger.id)).toString('base64url') : part)).join('.'), text }]
+    ]) {
+      const r = await bind(jar, question, body);
+      refusedAll.push([why, r.status, r.data?.error?.code]);
+    }
+    c.deq(refusedAll.map(([, status, code]) => [status, code]), refusedAll.map(() => [409, 'RECOGNITION_READ_EXPIRED']),
+      'after the kept read is gone, Submit with no receipt, a changed text, the wrong question, the wrong account, the wrong picture or a forged receipt is refused by the distinct read-again code: ' + refusedAll.map(r => r[0]).join('; '));
+    c.deq([callsFor('receipt page'), callsFor('a different page')], [1, 0], 'and none of those refusals reached the provider');
+    const bound = await bind(a.jar, qid, { image: page, receipt, text });
+    c.deq([bound.status, bound.data.reused, bound.data.transcription.text, callsFor('receipt page')], [201, true, text, 1],
+      'with the valid receipt Submit binds the text the student was shown — the server no longer holds the read — with 0 provider calls');
+    const again = await bind(a.jar, qid, { image: page, receipt, text });
+    c.deq([again.status, callsFor('receipt page')], [201, 1], 'a replayed Submit is answered the same way, still 0 provider calls');
+    const graded = await h.request(`/v1/practice/${qid}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'receipt-first-try' },
+      body: { submissionId: 'receipt-first-try', answer: text, mode: 'ink', transcriptionReceipt: bound.data.receipt } });
+    c.deq([graded.status, typeof graded.data.correct], [200, 'boolean'], 'and the answer is then marked by the engine through the same receipt path as ever');
+    const base = { accountId: 'acct', questionId: 'q-1', image: page, text: 'x = 9' };
+    const token = issueReadReceipt({ ...base, now: 1_000_000 });
+    c.deq([verifyReadReceipt(token, { ...base, now: 1_000_000 + READ_RECEIPT_TTL_MS }).ok, verifyReadReceipt(token, { ...base, now: 1_000_000 + READ_RECEIPT_TTL_MS + 1 }),
+      verifyReadReceipt(token, { ...base, now: 0 }).reason, READ_RECEIPT_TTL_MS],
+    [true, { ok: false, reason: 'expired' }, 'expired', 7 * 24 * 60 * 60 * 1000], 'a receipt is valid for a bounded time (7 days) and never from the future');
     const expired = await transcribe(a.jar, image);
-    c.eq(expired.data.reused, false, 'and read afresh just after it');
-    c.eq(callsFor('expires'), 2, 'TTL expiry → a new provider call');
+    c.eq(expired.data.reused, false, 'a picture read again after the kept read expired is read afresh');
+    c.eq(callsFor('expires'), 2, 'TTL expiry + the student\'s own Read → one new provider call');
     c.eq(RECOGNITION_TTL_MS, 15 * 60 * 1000, 'the lifetime is the documented 15 minutes');
     ops.configure({ now: () => Date.now() });
     // Reuse does not extend the lifetime: it is measured from the paid read.
@@ -568,8 +629,8 @@ try {
     const mintedAtCeiling = await recognize(a.jar, open.data.question.id, image);
     c.deq([mintedAtCeiling.status, mintedAtCeiling.data.reused], [201, true], 'and its receipt can still be minted');
     const recognizeRefused = await recognize(a.jar, open.data.question.id, picture('one too many for recognize'));
-    c.deq([recognizeRefused.status, recognizeRefused.data?.error?.code, recognizeRefused.data?.error?.window, Number.isInteger(recognizeRefused.data?.error?.resetAt)],
-      [503, 'PAID_CAPACITY_REACHED', 'hour', true], 'the recognize route refuses in the same shape');
+    c.deq([recognizeRefused.status, recognizeRefused.data?.error?.code, callsFor('one too many for recognize')],
+      [409, 'RECOGNITION_READ_EXPIRED', 0], 'the recognize route never asks for capacity: it starts no read at all');
 
     // The per-account allowance refusal, same idea.
     await resetBudget();

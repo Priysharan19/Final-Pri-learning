@@ -50,7 +50,7 @@ run() {
   local target="$1" method="${1##*#}" log; shift
   [[ "$target" == *.* ]] || target="$CLASS#$target"
   log="$OUT/$method.txt"
-  adb shell am instrument -w -r -e class "$target" -e priExpect "$EXPECT" "$@" "$RUNNER" | tee "$log"
+  adb shell am instrument -w -r -e class "$target" -e priExpect "$EXPECT" ${PRI_STORE_SHOTS:+-e priShots 1} "$@" "$RUNNER" | tee "$log"
   # am instrument exits 0 even when a test fails: decide from its own report.
   # A skipped test (assumption failure, status -4) only counts on the floor image.
   if grep -q "FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed" "$log" || ! grep -q "^OK (" "$log" ||

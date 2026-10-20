@@ -30,6 +30,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
 import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import { markRowsFor } from './markRows.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
@@ -42,6 +43,7 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // entitlement record and its own count, inside the issue transaction.
 import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
+import { verifyReadReceipt } from './readReceipt.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -102,7 +104,7 @@ const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transc
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
 const RECOGNIZE_LIMIT = Object.freeze({ limit: 120, windowMs: 60 * 60 * 1000 });
-const RECOGNITION_FIELDS = new Set(['image', 'mode']);
+const RECOGNITION_FIELDS = new Set(['image', 'mode', 'receipt', 'text']);
 const CORRECTION_FIELDS = new Set(['text']);
 const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
 
@@ -591,7 +593,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const qid = String(req.params.id || '');
     const body = req.body;
     if (!UUID.test(qid) || !plain(body) || unknown(body, RECOGNITION_FIELDS).length ||
-        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string') {
+        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string' ||
+        (body.receipt !== undefined && typeof body.receipt !== 'string') || (body.text !== undefined && !limitedText(body.text, 12000))) {
       return reject(res, 400, 'RECOGNITION_INVALID', 'Send only an ink/photo image and its input mode.');
     }
     const accountId = req.platformSession.account_id;
@@ -611,9 +614,25 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     let result;
     let reused = false;
     try {
-      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
-      if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
-      ({ result, reused } = read);
+      // Submit is not a request to read. This route never starts a provider
+      // call: it binds the transcript the student was already shown (the kept
+      // read, or one still in flight). When that read is gone the answer is a
+      // named, retryable refusal and the student presses Read again.
+      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+      if (read.missing) {
+        // The 15-minute kept read is gone. The student was given a read
+        // receipt when they had the page read (readReceipt.js): if it
+        // verifies — this account, this question, this picture, this reader,
+        // this text, recent enough — the read is proven and marking proceeds
+        // on the text they were shown. Otherwise: read again. Never a call.
+        const proven = verifyReadReceipt(body.receipt, { accountId, questionId: qid, image: body.image, text: body.text, env });
+        if (!proven.ok) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
+        result = { text: body.text, lines: [], confidence: null, needsConfirmation: proven.needsConfirmation };
+        reused = true;
+      } else {
+        if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+        ({ result, reused } = read);
+      }
     } catch (error) {
       if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
       return reject(res, 502, 'RECOGNITION_FAILED', 'The answer could not be read this time.');
@@ -834,10 +853,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // instead of a receipt, and this one request does what the three did, in
     // the same order and under the same checks:
     //
-    //   · the picture is read through recognitionOps — the transcript the
-    //     student was just shown is reused, so Submit never pays for a second
-    //     read of an unchanged picture; a picture not read before (a photo) is
-    //     read once, under the same allowance and ceiling;
+    //   · the picture's reading comes from recognitionOps — only the
+    //     transcript the student asked for and was shown is reused; a picture
+    //     never read is refused (RECOGNITION_READ_EXPIRED) and nothing is
+    //     paid for or marked (#440: Submit never buys a read);
     //   · the reader is sent the picture and nothing else. The answer in this
     //     body, the question, its solution and its key never reach it: reading
     //     stays answer-blind (handwritingProvider.js);
@@ -987,7 +1006,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         let read;
         try {
-          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+          // Read on request (#440): Submit never buys a read. Only a reading the
+          // student asked for (Read my answer / Read my photo) is replayed; a
+          // picture never read is refused before anything is marked.
+          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+          if (read.missing) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
           if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
         } catch (error) {
           if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
@@ -1172,6 +1195,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
           solution: solutionFor(q),
+          // Supplemental aggregate marking: no per-step allocations are invented.
+          ...(!invalid ? { markRows: markRowsFor(q, {
+            marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
+            correct: result.correct === true,
+            partial, workingNotRead: notRead, resolved
+          }) } : {}),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these
           // server-attested authored distractor explanations, not from an answer key.

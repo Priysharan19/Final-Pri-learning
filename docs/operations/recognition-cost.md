@@ -217,3 +217,13 @@ Per-account quotas and abuse protections, recommended: keep the per-account requ
 - Token counts, latency and fallback frequency for real handwriting, real photos, or real devices.
 - Tutor token usage (modelled only); working-check and question-photo costs (not examined).
 - Any behaviour on staging or production: nothing here is deployed.
+
+## Reading and marking are separate: the read receipt
+
+Reading (the paid OCR call) happens only when the student presses **Read my answer** / **Read my photo**. Submit marks the confirmed mathematical answer and never starts a provider call (`POST /v1/practice/:id/recognize` runs with `paid: false`).
+
+The kept read above lasts 15 minutes and is a cost guard only. Submit does not depend on it. When a read is served for a named question the account was issued, `/v1/handwriting/transcribe` also returns a **read receipt** (`server/platform/readReceipt.js`): an HMAC under a server key over the account id, the issued-question id, the SHA-256 of the picture, a digest of the reader configuration and contract, the SHA-256 of the transcript text, whether the reader asked for confirmation, and the server's issue time. It contains no transcript, no answer and no image. The device keeps it with the draft.
+
+At Submit the device sends the picture, the receipt and the text it was shown. If the server no longer holds the kept read it verifies the receipt — signature, same account, same question, same picture, same reader configuration, same text, issued within 7 days — and then proceeds exactly as for a kept read: its own receipt row, the student's corrections recorded as corrections through the confirm route, the deterministic engine deciding, and every eligibility, consent and idempotency check unchanged. A missing, forged, cross-account, cross-question, mismatched or expired receipt is answered `409 RECOGNITION_READ_EXPIRED`; the card then asks the student to press **Read again** and keeps the ink or photo, the transcript and the typed answer. No schema change: nothing is stored for a receipt.
+
+Tested in `server/test/recognition-dedupe-check.mjs` (§12) and `client/test/tour-read-cost.js` (scenario 9).
