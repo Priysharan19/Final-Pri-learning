@@ -49,8 +49,12 @@ function hookFlush() {
 }
 
 /** What is kept of the card's Photo state. Everything else is dropped. */
-export function photoDraftPayload({ photo, transcript = null, answer = '', answerSource = null, engine = null, confidence = null, reduced = false } = {}) {
+export function photoDraftPayload({ photo, transcript = null, answer = '', answerSource = null, engine = null, confidence = null, reduced = false, attested = null } = {}) {
   return {
+    // The server's read receipt for this photo and the text it covers: what
+    // lets Submit prove the read later without reading again.
+    ...(attested && typeof attested.receipt === 'string' && attested.receipt.length <= 1200 && typeof attested.text === 'string' && attested.text.length <= 12000
+      ? { attested: { receipt: attested.receipt, text: attested.text } } : {}),
     photo: isPicture(photo) ? photo : null,
     transcript: transcript && Array.isArray(transcript.lines) ? transcript : null,
     answer: String(answer ?? '').slice(0, MAX_ANSWER_CHARS),

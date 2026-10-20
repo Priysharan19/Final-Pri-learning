@@ -489,6 +489,9 @@ export const cloud = Object.freeze({
     method: 'POST', body, idempotencyKey, timeoutMs
   }),
   getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
+  // One page of handwriting frozen, unread, when the paper closed. The server
+  // reads it only if its picture is the frozen one, and bounds how often.
+  resolveExamHandwriting: (examId, body, timeoutMs = 60000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/handwriting', { method: 'POST', body, timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
   // The hint ladder is served and charged by the server, one named rung at a
@@ -498,9 +501,14 @@ export const cloud = Object.freeze({
   practiceNotebook: () => cloudRequest('/v1/practice/notebook'),
   notebookTwin: attemptId => cloudRequest('/v1/practice/notebook/' + pathId(attemptId, 'attempt id') + '/twin', { method: 'POST', body: {} }),
   reviewQueue: () => cloudRequest('/v1/practice/review-queue'),
-  recognizePractice: (questionId, mode, image) =>
+  // Submit never reads: it binds a read the student asked for. `attested`
+  // is the read receipt and the text that was read (readReceipt.js on the
+  // server), sent so the read is proven even after the server's short kept
+  // record of it has gone.
+  recognizePractice: (questionId, mode, image, attested = null) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
-      method: 'POST', body: { mode, image }, timeoutMs: 55000
+      method: 'POST', timeoutMs: 55000,
+      body: { mode, image, ...(attested && typeof attested.receipt === 'string' && typeof attested.text === 'string' ? { receipt: attested.receipt, text: attested.text } : {}) }
     }),
   confirmPracticeRecognition: (questionId, receipt, text) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') +
@@ -562,8 +570,11 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
   // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
   // 45 s by default) so the server answers before the client gives up.
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
-    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
+  // `questionId` (the server's id of the issued question) only lets the
+  // server bind its read receipt to that question; the reader is sent the
+  // picture alone.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null } = {}) =>
+    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.

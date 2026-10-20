@@ -47,7 +47,10 @@ has(account, /mode === 'register' && !link\?\.accountId/, 'Linked profile cannot
 // The photo goes to the server reader through the single-flight sender
 // (one paid read per picture), which is the only caller of the transport.
 has(reader, /await transcribeOnce\(transport, prepared\.dataUrl, \{ signal \}\)/, 'Photo recognition remains server-authoritative');
-has(reader, /transport\.transcribeHandwriting\(image, \{ signal: controller\?\.signal \?\? null \}\)/, 'and the request carries the picture and a cancel signal, nothing else');
+has(reader, /transport\.transcribeHandwriting\(image, \{ signal: controller\?\.signal \?\? null, \.\.\.\(questionId \? \{ questionId \} : \{\}\) \}\)/,
+  'and the request carries the picture, a cancel signal and — only when the card names one — the opaque id of the issued question (for the read receipt); nothing else');
+has(reader, /readingQuestion = typeof serverQuestionId === 'string' && \/\^\[0-9a-f-\]\{36\}\$\/i\.test\(serverQuestionId\) \? serverQuestionId : null/,
+  'that id can only ever be a UUID: never a prompt, an answer or any text about the question');
 // Refusals are named in one place (ink/readerFailure.js), which the reader uses.
 has(readFileSync(new URL('../src/ink/readerFailure.js', import.meta.url), 'utf8'), /GUARDIAN_CONSENT/, 'Guardian restrictions remain understood by the reader');
 has(reader, /classifyReaderFailure\(failure, \{ now \}\)/, 'and the reader names every refusal through that classification');

@@ -455,6 +455,10 @@ enum JourneySelfCheck {
         at = 'write'; await writeMode();
         const echoed = await writeOnNativeSurface();
         at = 'saved'; await inkSavedTruthfully(id);
+        // Reading is asked for (owner decision): writing and saving send nothing.
+        at = 'unread'; await sleep(1500);
+        if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
+        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
         at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
         const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
         if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
@@ -642,7 +646,14 @@ enum JourneySelfCheck {
         catch (e) { throw new Error('no thumbnail for a ' + blob.size + '-byte PNG: ' + where()); }
         const shown = Date.now() - t0;
         at = 'unread'; let said;
-        try { said = await waitFor(() => !/reading your work/i.test(seen('.photo-attach [role=status]')) && seen('.photo-attach [role=status] .verdict-body'), 30000); }
+        try { said = await waitFor(() => {
+          const status = seen('.photo-attach [role=status]');
+          if (!status || /reading your work/i.test(status)) return false;
+          const unread = q('.photo-attach [data-photo-unread]');
+          if (unread && vis(unread) && q('.photo-attach [data-photo-read]') && /not been sent anywhere/i.test(status)) return status;
+          if (!unread && /the attachment remains on this screen.*online eligible account/i.test(status)) return status;
+          return false;
+        }, 30000); }
         catch (e) { throw new Error('the status never settled: ' + where()); }
         if (q('[data-photo-correct-transcript]')) throw new Error('a photo transcript appeared with no server');
         await sleep(800);
@@ -1065,6 +1076,11 @@ enum JourneySelfCheck {
         guard let directory, !directory.isEmpty else { return nil }
         let base = URL(fileURLWithPath: directory, isDirectory: true)
         var waiting = Set<Int>()
+        var inFlight = Set<Int>()
+        // Exercise the retry path in the DEBUG simulator background journey.
+        // No fault is injected in other journeys or production builds.
+        var injectedBackgroundFailure = false
+        let injectBackgroundFailure = phase == "background"
         let take = "(() => { const a = window.__priJourneyAsk; if (!a || a.taken) return null; a.taken = true; return JSON.stringify(a); })()"
         return Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak webView] _ in
             guard let webView else { return }
@@ -1072,13 +1088,31 @@ enum JourneySelfCheck {
                 guard let text = value as? String, let data = text.data(using: .utf8),
                       let ask = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let n = ask["n"] as? Int else { return }
-                try? data.write(to: base.appendingPathComponent("ask-\(n).json"), options: .atomic)
-                waiting.insert(n)
+                do {
+                    try data.write(to: base.appendingPathComponent("ask-\(n).json"), options: .atomic)
+                    waiting.insert(n)
+                } catch {
+                    NSLog("PRIORACLE failed to persist request %d: %@", n, String(describing: error))
+                }
             }
-            for n in waiting {
+            for n in waiting where !inFlight.contains(n) {
                 guard let reply = try? String(contentsOf: base.appendingPathComponent("reply-\(n).json"), encoding: .utf8) else { continue }
-                waiting.remove(n)
-                webView.callAsyncJavaScript("window.__priJourneyReply = JSON.parse(reply);", arguments: ["reply": reply], in: nil, in: .page, completionHandler: nil)
+                inFlight.insert(n)
+                let inject = injectBackgroundFailure && !injectedBackgroundFailure
+                if inject { injectedBackgroundFailure = true }
+                let script = inject
+                    ? "throw new Error('PRI injected transient oracle delivery failure');"
+                    : "window.__priJourneyReply = JSON.parse(reply); return window.__priJourneyReply?.n === n;"
+                // A failed WebKit delivery remains pending. A confirmed
+                // page-level acknowledgement, not a simctl launch, retires it.
+                webView.callAsyncJavaScript(script, arguments: ["reply": reply, "n": n], in: nil, in: .page) { result in
+                    inFlight.remove(n)
+                    if case .success(let ack) = result, ack as? Bool == true {
+                        waiting.remove(n)
+                    } else {
+                        NSLog("PRIORACLE retrying reply %d after unacknowledged WebKit delivery", n)
+                    }
+                }
             }
         }
     }
