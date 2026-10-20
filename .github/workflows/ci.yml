@@ -226,7 +226,7 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
-          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
+          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 101/101 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -915,9 +915,12 @@ jobs:
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Preserve evidence that the interface tour ran in both engines.
           # Their measured coverage counts differ, so verify each separately.
-          # The hosted integrated tree measures 196 Chromium interface-quality checks.
-          # The separate ink-canvas 200/200 invariant remains fully enforced above.
-          grep -Fq 'E2E SUITE PASSED — 196/196 checks across 1 flows' browser.log
+          # Chromium asserts 196 baseline interface-quality checks. Four more
+          # are exercised when the responsive Practice tab is present across
+          # the light/dark phone/tablet matrix (200/200). Both represent
+          # complete measured coverage; neither permits any failed assertion.
+          # The separate ink-canvas 200/200 invariant remains enforced above.
+          grep -Eq 'E2E SUITE PASSED — (196/196|200/200) checks across 1 flows' browser.log
           grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
