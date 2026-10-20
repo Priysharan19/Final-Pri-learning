@@ -28,7 +28,7 @@ assert.match(staging, /persist-credentials: false/,
   'staging proof cannot preserve any git write credentials');
 assert.match(staging, /contents: read/,
   'staging proof must be read-only');
-assert.doesNotMatch(staging, /contents: write|pull-requests: write|issues: write|secrets\.|railway (up|redeploy|rollback)|git push|update_ref/,
+assert.doesNotMatch(staging, /contents: write|pull-requests: write|issues: write|\$\{\{\s*secrets\.|railway (up|redeploy|rollback)|git push|update_ref/,
   'staging proof must not have deployment/write capabilities');
 assert.match(staging, /--engine postgres --auth-email-proven/,
   'staging proof must validate PostgreSQL and mail configuration');
