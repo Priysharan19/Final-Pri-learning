@@ -137,14 +137,12 @@ export function inkLineVerdicts({ outcome, res, submitted, shownLines, live = tr
 
 // The previous 24-character photo suffix was not an image identity: two
 // different camera images can have the same length and suffix. Fingerprint the
-// WHOLE data URL instead, with cached linear work so render loops remain cheap.
-// This is an in-process UI revision discriminator, not a security signature.
-let lastPhoto = null;
-let lastPhotoFingerprint = null;
-function photoFingerprint(photo) {
+// WHOLE data URL. This is an in-process UI revision discriminator, not a
+// security signature. Never cache raw student images at module scope; the
+// caller memoizes the short digest for the lifetime of the current page.
+export function photoFingerprint(photo) {
   if (photo == null) return '';
   const value = String(photo);
-  if (value === lastPhoto) return lastPhotoFingerprint;
   let a = 0x811c9dc5;
   let b = 0x9e3779b9;
   for (let i = 0; i < value.length; i++) {
@@ -152,9 +150,7 @@ function photoFingerprint(photo) {
     a = Math.imul(a ^ c, 0x01000193);
     b = Math.imul(b ^ c, 0x85ebca6b);
   }
-  lastPhoto = value;
-  lastPhotoFingerprint = `${value.length}:${(a >>> 0).toString(16)}:${(b >>> 0).toString(16)}`;
-  return lastPhotoFingerprint;
+  return `${value.length}:${(a >>> 0).toString(16)}:${(b >>> 0).toString(16)}`;
 }
 
 /**
@@ -163,14 +159,14 @@ function photoFingerprint(photo) {
  * new or corrected reading, a different typed answer or working, another
  * input mode, another photo.
  */
-export function revisionKey({ questionId, mode, inkSignature = null, inkStale = false, transcript = '', inkAnswer = '', answer = '', working = '', choice = null, photo = null, photoLines = null } = {}) {
+export function revisionKey({ questionId, mode, inkSignature = null, inkStale = false, transcript = '', inkAnswer = '', answer = '', working = '', choice = null, photo = null, photoIdentity = null, photoLines = null } = {}) {
   const m = String(mode || '');
   return JSON.stringify([
     String(questionId ?? ''), m,
     m === 'write' ? [String(inkSignature ?? ''), inkStale === true, String(transcript ?? ''), clean(inkAnswer)] : null,
     m === 'write' ? null : [clean(answer), clean(working)],
     choice === null || choice === undefined ? null : String(choice),
-    m === 'photo' ? [photoFingerprint(photo), Array.isArray(photoLines?.lines) ? photoLines.lines.map(line => [String(line?.text ?? ''), line?.excluded === true]) : null] : null
+    m === 'photo' ? [photoIdentity ?? photoFingerprint(photo), Array.isArray(photoLines?.lines) ? photoLines.lines.map(line => [String(line?.text ?? ''), line?.excluded === true]) : null] : null
   ]);
 }
 

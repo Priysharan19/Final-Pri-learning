@@ -36,7 +36,7 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { strokeSignature } from '../ink/strokeSignature.js';
-import { annotationsLive, inkLineVerdicts, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
+import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { HINT_RUNGS, markWeightAfter } from '../engine/hintLadder.js';
 
@@ -1165,10 +1165,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const needsCheck = !!doubt && !!reading && !inkStale && vouched !== reading;
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
+  const photoIdentity = useMemo(() => photoFingerprint(photo), [photo]);
   const currentRevision = revisionKey({
     questionId: question.id, mode: isMcq ? 'mcq' : mode, inkSignature, inkStale,
     transcript: inkResult?.text ?? '', inkAnswer: isWorking ? '' : inkAnswer,
-    answer, working, choice: isMcq ? mcqSel : null, photo, photoLines
+    answer, working, choice: isMcq ? mcqSel : null, photoIdentity, photoLines
   });
   // The same, for a result that lands outside a render (a relaunch replay).
   const screenRef = useRef(null);
