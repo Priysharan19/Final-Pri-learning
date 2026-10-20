@@ -17,6 +17,13 @@ Both Railway services were observed with `source.checkSuites: false` on
 new source-branch commit**. The critical control is restricting mutations to
 `deploy/production`. Do not enable auto-promotion or merge a release-pointer PR.
 
+Railway's *Wait for CI* feature is a distinct service setting; it only helps
+when GitHub push check suites actually run on the source branch. Merely turning
+it on cannot substitute for a verified push workflow on `deploy/production`,
+required GitHub branch protection, and human release authorization. The normal
+required CI jobs target PRs/main, so test the exact production-pointer event
+before relying on any Wait for CI configuration.
+
 ## 2. Diagnosis: fleet-governance failure #39461096485
 
 The failing run's actual `event` is `pull_request` for draft [PR #616]
@@ -160,7 +167,11 @@ not real account email delivery. Require separately recorded real sign-in tests.
   Prior Railway SUCCESS deployment
   `536de612-9d14-4046-b2da-ff869f65c817` is a *candidate* only:
   verify compatibility with the live SQLite schema and retained data before
-  rollback. Snapshot or copy `/data` safely; never delete or overwrite it.
+  rollback. Railway image rollback also restores the deployment's recorded
+  custom variables and may briefly interrupt a volume-backed service;
+  scrutinize both effects. Snapshot or copy `/data` safely; never delete or
+  overwrite it. Railway volume backup restoration stages a new mounted volume
+  and retains the old one; it is a separate operator-governed database action.
 - **Non-backward-compatible migration:** an image-only rollback may corrupt
   expectations. Follow a separate restore runbook using the rehearsed snapshot
   and explicit owner approval; no automatic database rollback.
