@@ -226,7 +226,7 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
-          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
+          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 101/101 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
