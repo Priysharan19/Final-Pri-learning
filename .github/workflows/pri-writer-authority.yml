@@ -55,29 +55,6 @@ jobs:
           set -euo pipefail
           test "$DISPATCH_REF" = refs/heads/main
           test "$DISPATCH_SHA" = "$(git rev-parse HEAD)"
-      - name: Build isolated trusted transaction input
-        shell: bash
-        env:
-          REQUEST_OPERATION: ${{ inputs.operation }}
-          REQUEST_ISSUE_NUMBER: ${{ inputs.issue_number }}
-          REQUEST_PR_NUMBER: ${{ inputs.pr_number }}
-          REQUEST_HEAD_SHA: ${{ inputs.head_sha }}
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs=require('node:fs');
-          const op=process.env.REQUEST_OPERATION;
-          const issue=Number(process.env.REQUEST_ISSUE_NUMBER);
-          const pr=Number(process.env.REQUEST_PR_NUMBER);
-          const sha=process.env.REQUEST_HEAD_SHA;
-          if(!['GRANT','RENEW','REVOKE'].includes(op) || !Number.isSafeInteger(issue) ||
-             issue<1 || (op!=='REVOKE' &&
-             (!Number.isSafeInteger(pr) || pr<1 || !/^[0-9a-f]{40}$/.test(sha))))
-            throw Error('invalid dispatch inputs');
-          fs.writeFileSync('/tmp/pri-authority-request.json',JSON.stringify({
-            operation:op,issue_number:issue,pr_number:pr,head_sha:sha
-          }));
-          NODE
       # App installation token is scoped to THIS repo. An approved GitHub
       # ruleset grants only this app narrow non-force ref update authority.
       # Never put this key/token into pull_request jobs.
@@ -100,4 +77,8 @@ jobs:
           PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
           GITHUB_TOKEN: ${{ steps.governor-app.outputs.token }}
           PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
-        run: node scripts/pri-admission-github.mjs transact /tmp/pri-authority-request.json
+          PRI_REQUEST_OPERATION: ${{ inputs.operation }}
+          PRI_REQUEST_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          PRI_REQUEST_PR_NUMBER: ${{ inputs.pr_number }}
+          PRI_REQUEST_HEAD_SHA: ${{ inputs.head_sha }}
+        run: node scripts/pri-admission-github.mjs transact
