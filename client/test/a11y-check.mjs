@@ -886,10 +886,14 @@ async function run() {
       // Regression for #627: that one replay is held for a while, as a slow
       // runner does by chance, so the surface is still disabled when the
       // canvas shows. `times: 1` — only the replay; nothing later is slowed.
-      await page.route('**/v1/practice/*/submit', async route => {
+      const REPLAY = '**/v1/practice/*/submit';
+      let held = 0;
+      const holdReplay = async route => {
+        held += 1;
         await new Promise(r => setTimeout(r, 2500));
         await route.continue().catch(() => { });
-      }, { times: 1 });
+      };
+      await page.route(REPLAY, holdReplay, { times: 1 });
       await typedQuestion();
       const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
       if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
@@ -960,7 +964,13 @@ async function run() {
           again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
           reason: await reason()
         };
-      } finally { release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6; }
+      } finally {
+        release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6;
+        // Never left armed for a later step's submit.
+        await page.unroute(REPLAY, holdReplay).catch(() => { });
+        // Without a replay the regression above proved nothing: said, not hidden.
+        if (held !== 1) console.log(`note: read on request — the relaunch replay was held ${held} times (expected 1); the #627 regression did not run`);
+      }
     });
 
     // the marked state — the verdict, the evaluation card and the criteria table
