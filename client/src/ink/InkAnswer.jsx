@@ -97,7 +97,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -476,10 +476,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language) })
         : shownStatus?.kind === 'waiting'
           ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language) })
-          : null;
+          : checkingEarlier
+            // An earlier submission of this question is being checked again
+            // (after the app was closed mid-check). The page stays writable;
+            // a read waits until that check has its answer.
+            ? t('ink.checkingEarlier')
+            : null;
   // "Read my answer": offered whenever there is ink that has not been read as
   // it now stands and nothing is known to stop a read. One press, one read.
-  const canAskToRead = hasInk && !disabled && !shownStatus && (!rec.lines.length || stale);
+  const canAskToRead = hasInk && !disabled && !shownStatus && !checkingEarlier && (!rec.lines.length || stale);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>

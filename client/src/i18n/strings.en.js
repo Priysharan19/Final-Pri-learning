@@ -2307,6 +2307,7 @@ export default {
   'ink.mistakeHere': "Look here",
   'ink.serverReading': 'Reading your handwriting…',
   'ink.serverStillReading': 'Still reading your handwriting — this can take a little longer. Keep going; nothing is lost.',
+  'ink.checkingEarlier': 'Checking your earlier answer… Keep writing; this page is kept.',
   'ink.serverEmpty': "Nothing readable in that writing. Rewrite it more clearly, one step per line, then read it again — or type your answer.",
   'ink.waitingTurnedOff': 'Handwriting is read by Pri’s server, and that is turned off in Settings → Handwriting. Turn it on to have this read, or type your answer.',
   'ink.waitingNotOnThisInstall': 'This version of Pri can’t read handwriting. Your working is kept here; type your answer to have it marked.',
