@@ -74,7 +74,8 @@ export default function IndiaProgress() {
           are, then the syllabus itself. Sections are separated by space and
           hairlines; the paper estimate is the only sheet on the page. */}
       <header className="pg-head">
-        <h1>{t('progress.title', { track: trackName })}</h1>
+        {/* Under the instrument the Report above carries the page's h1. */}
+        {featureEnabled('instrument') ? <h2 className="pg-title">{t('progress.title', { track: trackName })}</h2> : <h1>{t('progress.title', { track: trackName })}</h1>}
         <p className="sub">{t('progress.evidenceSub')}</p>
       </header>
 

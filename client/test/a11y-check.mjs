@@ -883,11 +883,31 @@ async function run() {
     // the scripted stand-in reader. Where focus goes when "Read my answer"
     // leaves the page, and what the stale and submit-reason states say.
     await step('practice · read on request', '/practice', async () => {
-      await typedQuestion();
-      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
-      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
-      await writeTab.click();
-      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      // Regression for #627: that one replay is held for a while, as a slow
+      // runner does by chance, so the surface is still disabled when the
+      // canvas shows. `times: 1` — only the replay; nothing later is slowed.
+      const REPLAY = '**/v1/practice/*/submit';
+      let held = 0;
+      const holdReplay = async route => {
+        held += 1;
+        await new Promise(r => setTimeout(r, 2500));
+        await route.continue().catch(() => { });
+      };
+      await page.route(REPLAY, holdReplay, { times: 1 });
+      try {
+        await typedQuestion();
+        const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+        if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+        await writeTab.click();
+        // The question reopened here is the one "reconnect asked" left a held
+        // submission on, and relaunch recovery replays it as the card mounts.
+        // While that replay is in flight the writing surface is disabled
+        // (.ink-disabled: pointer-events none), so a stroke drawn then is never
+        // written and "Read my answer" never comes (#627; on a slow runner the
+        // replay outlasted the canvas appearing). Drawing waits until the surface
+        // accepts the pen, not merely until the canvas exists.
+        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      } catch (err) { await page.unroute(REPLAY, holdReplay).catch(() => { }); throw err; }
       const box = await page.locator('.ink-canvas-live').boundingBox();
       const stroke = async (x) => {
         await page.mouse.move(box.x + x, box.y + 40);
@@ -910,7 +930,26 @@ async function run() {
       try {
         await stroke(60);
         const read = page.locator('[data-ink-read]').first();
-        await read.waitFor({ timeout: 15000 });
+        await read.waitFor({ timeout: 15000 }).catch(async (err) => {
+          // What the writing surface was showing when "Read my answer" never
+          // came: enough to tell no ink, a known block and a missing button apart.
+          const state = await page.evaluate((at) => {
+            const ink = document.querySelector('.ink-answer');
+            const live = document.querySelector('.ink-canvas-live');
+            const hit = document.elementFromPoint(at.x, at.y);
+            return {
+              question: (document.querySelector('.q-prompt')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+              canvases: document.querySelectorAll('.ink-canvas-live').length,
+              hitAtStroke: hit ? `${hit.tagName.toLowerCase()}.${String(hit.className || '').split(' ').join('.')}` : null,
+              online: navigator.onLine,
+              inkClass: ink?.className || null,
+              status: (ink?.querySelector('[role="status"]')?.textContent || '').trim().slice(0, 120),
+              buttons: [...(ink?.querySelectorAll('button') || [])].map(b => (b.textContent || '').trim()).slice(0, 12),
+              canvas: live ? { w: live.width, h: live.height, rect: live.getBoundingClientRect().toJSON() } : null
+            };
+          }, { x: box.x + 60, y: box.y + 40 }).catch(e => ({ error: String(e) }));
+          throw new Error(`${String(err.message || err).split('\n')[0]} — ${JSON.stringify({ box, state })}`);
+        });
         refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
         await read.focus();
         await page.keyboard.press('Enter');
@@ -927,7 +966,13 @@ async function run() {
           again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
           reason: await reason()
         };
-      } finally { release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6; }
+      } finally {
+        release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6;
+        // Never left armed for a later step's submit.
+        await page.unroute(REPLAY, holdReplay).catch(() => { });
+        // Without a replay the regression above proved nothing: said, not hidden.
+        if (held !== 1) console.log(`note: read on request — the relaunch replay was held ${held} times (expected 1); the #627 regression did not run`);
+      }
     });
 
     // the marked state — the verdict, the evaluation card and the criteria table
