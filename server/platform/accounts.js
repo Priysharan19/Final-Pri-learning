@@ -10,7 +10,7 @@ import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
 import {
-  ageDecision, confirmConsent, consentBlockerCode, consentState, recordConsentRequest, withdrawConsent
+  acceptsCurrentNotice, ageDecision, confirmConsent, consentBlockerCode, consentState, recordConsentRequest, withdrawConsent
 } from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -473,6 +473,12 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // permission, is revoked by the withdrawal it performs, goes with the account,
   // and housekeeping never purges it while it is live (housekeeping.js).
   router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    // Checked before the token is spent, so a page showing an older notice
+    // (a tab left open over a deploy) costs the guardian nothing: they reload
+    // and the same link still works.
+    if (!acceptsCurrentNotice(req.body)) {
+      return res.status(400).json({ error: { code: 'GUARDIAN_NOTICE_REQUIRED', message: 'Read and accept the current notice first.' } });
+    }
     const raw = String(req.body?.token || '');
     const now = Date.now();
     const token = raw ? await db.get(`SELECT * FROM account_tokens
@@ -484,7 +490,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       await db.transaction(async () => {
         await spendToken(db, token.id, now);
         await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
-        confirmed = await confirmConsent(db, token.account_id, now);
+        confirmed = await confirmConsent(db, token.account_id, req.body.noticeVersion, now);
         if (confirmed) {
           const consent = await db.get('SELECT guardian_email FROM guardian_consents WHERE account_id = ?', [token.account_id]);
           // One live withdrawal bearer per account: a re-confirmation (a new
@@ -550,6 +556,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       emailVerified: !!account?.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
+      renewalRequired: !!state.renewal,
       method: state.row?.method || null
     });
   });

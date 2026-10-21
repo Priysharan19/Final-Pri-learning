@@ -1032,20 +1032,41 @@ function exprEquivalentUncached(a, b, opts) {
  */
 export function numsClose(a, b, tol) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  return Math.abs(a - b) <= (tol ?? numericBand(b));
+  if (tol != null) return Math.abs(a - b) <= tol;
+  // A rounded decimal is right only when it is the target rounded to the
+  // places it was written to: 141.43 is not 100√2 to two places (141.42),
+  // though it sits inside the relative band (#518).
+  const band = Number.isInteger(b) ? numericBand(b) : Math.min(numericBand(b), 0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9));
+  return Math.abs(a - b) <= band;
 }
 
 /** The default band numsClose allows around a target b. */
 export function numericBand(b) {
   return Number.isInteger(b)
     ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
-    : Math.min(decimalCap(b), Math.max(1e-6, Math.abs(b) * 1e-4));
+    : Math.min(decimalCap(b), relativeBand(b));
+}
+
+/**
+ * The relative band a non-integer value gets: 1e-4 of its size, with a 1e-9
+ * floor that only absorbs floating-point noise around zero (a 1e-6 floor
+ * forgave 0 for a target of 3e-7).
+ */
+export function relativeBand(b) {
+  return Math.max(1e-9, Math.abs(b) * 1e-4);
+}
+
+// The decimal places a value is written to: the fewest (up to 12) that
+// reproduce it to floating-point noise, so a computed 1357.9500000000003 is
+// two places, not sixteen. Infinity for anything longer (π, √2, 1/3).
+function decimalPlaces(b) {
+  for (let p = 0; p <= 12; p++) if (Math.abs(b - Number(b.toFixed(p))) <= Math.abs(b) * 4 * Number.EPSILON + 1e-12) return p;
+  return Infinity;
 }
 
 // Half a unit of the last decimal place for a target authored to one or two
 // places; 0.05 (one-place rounding) for every longer or non-terminating value.
 function decimalCap(b) {
-  const text = String(Math.abs(b));
-  const places = /e/i.test(text) ? Infinity : (text.split('.')[1] || '').length;
+  const places = decimalPlaces(b);
   return places <= 2 ? 0.5 * 10 ** -places : 0.05;
 }
