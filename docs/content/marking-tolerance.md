@@ -13,7 +13,7 @@ Two invariants hold everywhere:
 | Target | Band | Why |
 |---|---|---|
 | Whole number (`12`, `0`, `−3`) | exact, within floating-point noise (`max(1e-9, |t|·1e-9)`, capped at 0.25) | 12 m² is 120000 cm², not 120012; no other whole number can fall inside the band |
-| Non-integer (`3.14159`, `2 − √3`) | **relative 1e-4** (`max(1e-6, |t|·1e-4)`) — about five significant figures | forgives the student's final rounding of a real calculation without admitting a neighbouring value; `0.26795` passes for `2 − √3`, `0.268` does not |
+| Non-integer (`3.14159`, `2 − √3`) | **relative 1e-4** (`max(1e-9, |t|·1e-4)`) — about five significant figures, never wider than half a unit of the last place of a one- or two-decimal target (floating-point noise such as `1357.9500000000003` still counts as two places), nor than half a unit of the last place the student wrote (#518) | forgives the student's final rounding of a real calculation without admitting a neighbouring value or a wrong rounding; `0.26795` passes for `2 − √3`, `0.268` does not; `141.42` passes for `100√2`, `141.43` and `3.1413` (for `3.14159`) do not; `0` is not `3e-7` |
 | Authored `tol` | `|given − target| ≤ tol` | the question states how its answer is measured or rounded ("to one decimal place" authors `tol: 0.05`); an authored `tol` always wins over every default |
 
 Equivalent exact forms (`1/2`, `0.5`, `2/4`, `√8`, `2√2`, `2 1/2`) are all read to their value first, so the band applies to the value, not the spelling.
@@ -30,7 +30,7 @@ Equivalent exact forms (`1/2`, `0.5`, `2/4`, `√8`, `2√2`, `2 1/2`) are all r
 
 ## 3. Angles (degrees vs radians)
 
-`answerSuffix: '°'` (or `answer.angle: 'deg' | 'rad'`) makes the answer an angle. The unit the student writes decides how the number is read: `60°`, `60 degrees`, `π/3 rad` and a bare number in the question's unit are one answer; on a degree question a bare `π/3` names no unit and is refused (owner decision, review of #513), while on a radian question it is the answer; `60 rad` is not `60°`. A value written in the *other* unit was rounded in that unit (`1.0472 rad`), so it is compared in the relative 1e-4 band rather than the whole-number exact band; `1.05 rad` (60.16°) is still refused.
+`answerSuffix: '°'` (or `answer.angle: 'deg' | 'rad'`) makes the answer an angle. The unit the student writes decides how the number is read: `60°`, `60 degrees`, `π/3 rad` and a bare number in the question's unit are one answer; on a degree question a bare `π/3` names no unit and is refused (owner decision, review of #513), while on a radian question it is the answer; `60 rad` is not `60°`. A value written in the *other* unit was rounded in that unit (`1.0472 rad`), so it is compared in the same relative 1e-4 band (`relativeBand` in `engine/expr.js`) rather than the whole-number exact band; `1.05 rad` (60.16°) is still refused.
 
 ## 4. Complex numbers (`a + bi` and polar)
 
@@ -55,3 +55,7 @@ Interval, set, matrix, vector, point and ratio answers compare each component wi
 ## Evidence status
 
 Every band above is pinned by deterministic, authored test cases against the engine's own parser. That is **synthetic self-consistency evidence**: it shows what the marker accepts and refuses for typed input; it is not a measured accuracy claim on student answers, and no human-review or physical-device evidence is implied.
+
+## Paise
+
+"975 paise" on a question asked in rupees is ₹9.75. A question is money only when a rupee mark or paise sits beside the answer box, or, with no unit beside the box, when the prompt names rupees or paise. Any other unit beside the box (`%`, `pens`, `km`) makes it not money, whatever the prompt is priced in, so `2000 paise` is never a 20% profit (#518).

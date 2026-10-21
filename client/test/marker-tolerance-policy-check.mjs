@@ -48,7 +48,9 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   accept(whole, '12'); accept(whole, '12.0'); accept(whole, '24/2'); accept(whole, '11.9999999999');
   reject(whole, '12.0001'); reject(whole, '11.99'); reject(whole, '12.1'); reject(whole, '13'); reject(whole, '11');
   const dec = { answerType: 'numeric', prompt: 'Find the mean.', answer: { value: 3.14159 } };
-  accept(dec, '3.14159'); accept(dec, '3.1416'); accept(dec, '3.14160'); accept(dec, '3.1413');
+  accept(dec, '3.14159'); accept(dec, '3.1416'); accept(dec, '3.14160');
+  // 3.1413 sat inside the relative band but is not 3.14159 to four places (3.1416): refused since #518.
+  reject(dec, '3.1413');
   reject(dec, '3.14'); reject(dec, '3.142'); reject(dec, '3.15'); reject(dec, '3.1'); reject(dec, '3');
   ok(numsClose(0.26795, 2 - Math.sqrt(3)), '0.26795 is within the relative band of 2 − √3');
   ok(!numsClose(0.268, 2 - Math.sqrt(3)), '0.268 is outside the relative band of 2 − √3 (documented: ≈ 5 significant figures)');
@@ -58,7 +60,7 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   const zero = { answerType: 'numeric', prompt: 'Find the gradient.', answer: { value: 0 } };
   accept(zero, '0'); accept(zero, '0.0'); accept(zero, '-0'); reject(zero, '0.001'); reject(zero, '0.1');
   const neg = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: -2.5 } };
-  accept(neg, '-2.5'); accept(neg, '−5/2'); accept(neg, '-2.50001'); reject(neg, '2.5'); reject(neg, '-2.51'); reject(neg, '-2.4');
+  accept(neg, '-2.5'); accept(neg, '−5/2'); reject(neg, '-2.50001'); reject(neg, '2.5'); reject(neg, '-2.51'); reject(neg, '-2.4');
 }
 
 // ── 3 · Percent policy ───────────────────────────────────────────────────────
@@ -145,6 +147,36 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   // A bare π/3 on a degree question names no unit, and is refused (owner decision, review of #513).
   reject(deg, 'π/3'); reject(deg, 'pi/3');
   reject(deg, '1.05 rad'); reject(deg, '1.04 rad'); reject(deg, '60.01'); reject(deg, '1.0472');
+}
+
+// ── 7b · Follow-ups from the #515 review (#518) ──────────────────────────────
+{
+  // Floating-point noise on a computed two-decimal target is still two decimals:
+  // the band is half a cent, not the 0.05 a long decimal gets.
+  const noisy = { answerType: 'numeric', prompt: 'Find the amount.', answer: { value: 1357.9500000000003 } };
+  accept(noisy, '1357.95'); reject(noisy, '1357.96'); reject(noisy, '1357.94'); reject(noisy, '1357.99'); reject(noisy, '1357.9');
+  ok(numsClose(1357.95, 1357.9500000000003) && !numsClose(1357.96, 1357.9500000000003), 'numsClose: a noisy 2-dp target keeps the 2-dp band');
+  // A rounded decimal must be the target rounded to the places written: 141.43
+  // is not 100√2 = 141.42135… to two places, though it sits in the relative band.
+  const surd = { answerType: 'numeric', prompt: 'Find the diagonal of a 100 cm square.', answer: { value: 100 * Math.SQRT2 } };
+  accept(surd, '141.42'); accept(surd, '141.421'); accept(surd, '141.4214'); accept(surd, '100sqrt(2)');
+  reject(surd, '141.43'); reject(surd, '141.41'); reject(surd, '141.4'); reject(surd, '141.5'); reject(surd, '141.422'); reject(surd, '141.4213');
+  const third = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 1 / 3 } };
+  accept(third, '0.33333'); accept(third, '0.333333'); reject(third, '0.33334'); reject(third, '0.3334'); reject(third, '0.3332');
+  // A tiny target is not forgiven a whole micro-unit: 0 is not 3e-7.
+  const tiny = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 3e-7 } };
+  accept(tiny, '0.0000003'); accept(tiny, '3e-7'); reject(tiny, '0'); reject(tiny, '0.0000001'); reject(tiny, '0.000001');
+  ok(!numsClose(0, 3e-7) && numsClose(3e-7, 3e-7), 'numsClose: no 1e-6 floor around a tiny target');
+  // A ₹-priced question that asks for a percentage is not money: paise are a wrong unit.
+  const pct = { answerType: 'numeric', prompt: 'A shopkeeper buys a toy for ₹100 and sells it for ₹120. Find the profit percent.', answerSuffix: '%', answer: { value: 20 } };
+  accept(pct, '20'); reject(pct, '2000 paise'); reject(pct, '20 paise'); reject(pct, '0.2 paise');
+  const count = { answerType: 'numeric', prompt: 'Pens cost ₹5 each. How many pens can you buy with ₹100?', answerSuffix: 'pens', answer: { value: 20 } };
+  accept(count, '20'); reject(count, '2000 paise');
+  // Still money where the box is money.
+  const rupees = { answerType: 'numeric', prompt: 'Find the cost.', answerPrefix: '₹', answer: { value: 9.75 } };
+  accept(rupees, '975 paise'); accept(rupees, '9.75'); reject(rupees, '9.75 paise'); reject(rupees, '976 paise');
+  const pricedNoBox = { answerType: 'numeric', prompt: 'A pen costs ₹9.75. What do two pens cost, in rupees?', answer: { value: 19.5 } };
+  accept(pricedNoBox, '1950 paise'); reject(pricedNoBox, '1950');
 }
 
 // ── 8 · The policy document names every policy this file tests ──────────────
