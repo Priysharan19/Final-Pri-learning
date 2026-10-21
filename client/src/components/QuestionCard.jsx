@@ -390,10 +390,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // `busy` is React state and lands a render late, so two taps inside one frame
   // both saw it false and both posted. The ref is set synchronously.
   const inFlightRef = useRef(false);
-  // A relaunch replay of an earlier submission is in flight (Relaunch
-  // recovery below). The page stays writable meanwhile: it is the student's
-  // new work, not the submission being checked (#627).
+  // A relaunch replay of an earlier typed or photo submission is in flight
+  // (Relaunch recovery below). The page stays writable meanwhile: ink is the
+  // student's new work, not the submission being checked (#627). (An ink
+  // replay is the page itself, and stays frozen while it is checked.)
   const [replaying, setReplaying] = useState(false);
+  const replayingRef = useRef(false);
   // Strokes reported while a submission was in flight, reported again when it
   // settles, so the draft never misses them.
   const deferredInkRef = useRef(null);
@@ -1556,14 +1558,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (plan.reattach) setPhotoReattachRequired(true);
       return;
     }
-    setReplaying(true);
+    if (!pending.viaInk) { replayingRef.current = true; setReplaying(true); }
     (pending.viaInk ? Promise.resolve().then(() => readInkDraft(question.id)).catch(() => null) : Promise.resolve(null)).then(kept => {
       return deliver({
         answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
         ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
         submissionId: pending.submissionId
       }, { lines: pending.lines, recovering: true, sourceMode: pending.sourceMode });
-    }).finally(() => { if (mountedRef.current) setReplaying(false); });
+    }).finally(() => { replayingRef.current = false; if (mountedRef.current) setReplaying(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
@@ -1574,7 +1576,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (r?.stale !== true) setInkReadExpired(false);
     // Recovery: the page restored after a relaunch is read once, for display
     // beside the verdict, and then frozen like any submitted reading.
-    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+    if ((inFlightRef.current && !replayingRef.current) || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
   // Ink that waited for the reader (offline, signed out, reader down) is READ
