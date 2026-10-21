@@ -354,6 +354,23 @@ export const writeFlow = {
       await check('“Needs another look” lists that script', await page.locator('.hist-row').count() === 1);
       await page.locator('[data-history-filter="all"]').click();
       await check('the chapter and sort menus are there', await page.locator('[data-history-chapter]').count() === 1 && await page.locator('[data-history-sort] option').count() === 3);
+      // Design s8: the search sits in the shared bar in place of the ⌘K field,
+      // and ⌘K still opens the command bar from here.
+      await check('Scripts: the search is in the top bar, the ⌘K field reduced to its icon', await page.locator('[data-instrument-bar-slot] [data-history-search]').count() === 1 && !(await page.locator('.in-cmd .in-cmd-t').isVisible()));
+      await page.locator('body').click({ position: { x: 5, y: 600 } });
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
+      await check('Scripts: ⌘K still opens the command bar', await page.locator('[data-instrument-command] [role=dialog]').count() === 1);
+      await page.keyboard.press('Escape');
+      const icon = page.locator('.in-cmd');
+      await check('Scripts: a 32px icon button still opens the command bar', await icon.isVisible() && await icon.evaluate(el => Math.round(el.getBoundingClientRect().width) === 32 && !!el.getAttribute('aria-label')));
+      await icon.click();
+      await check('— clicking it opens the command bar', await page.locator('[data-instrument-command] [role=dialog]').count() === 1);
+      await page.keyboard.press('Escape');
+      await page.locator('[data-instrument-bar-slot] [data-history-search]').focus();
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
+      await check('Scripts: ⌘K works from inside the bar’s search', await page.locator('[data-instrument-command] [role=dialog]').count() === 1);
+      await page.keyboard.press('Escape');
+      await check('Scripts: the bar search is described by the filters and controls the ledger', await page.locator('[data-history-search]').getAttribute('aria-describedby') === 'in-hist-filters' && await page.locator('#in-hist-ledger').count() === 1);
       // Sorted by marks lost: one flat list, no repeated day headings, unique ids.
       await page.locator('[data-history-sort]').selectOption('marks');
       await page.waitForFunction(() => document.querySelectorAll('.hist-row').length > 0 && !document.querySelector('.in-led-dayh'), null, { timeout: 10000 }).catch(() => {});
@@ -380,6 +397,13 @@ export const writeFlow = {
       await check('below the floor the chart draws no point and says so', await page.locator('[data-report-chart="empty"] [data-chart-empty]').count() === 1 && await page.locator('[data-chart-line]').count() === 0);
       await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === '—');
       await check('the lede is the fixed template over the figures', /^1 question answered in this period/.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
+      await check('Report: the period switch is in the top bar (design s7)', await page.locator('[data-instrument-bar-slot] [data-report-periods]').count() === 1);
+      await check('Report: the online dot stays in the bar', await page.locator('.in-status i').isVisible());
+      await page.context().setOffline(true);
+      await page.waitForSelector('.in-status.is-off', { timeout: 5000 }).catch(() => {});
+      await check('Report: offline shows in full in the bar', await page.locator('.in-status.is-off .in-status-t').isVisible() && /offline/i.test(await page.locator('.in-status').textContent()));
+      await page.context().setOffline(false);
+      await page.waitForSelector('.in-status:not(.is-off)', { timeout: 5000 }).catch(() => {});
       // The period switch refetches the series for that window.
       // The old period's figures never show under the new title: until the
       // month arrives, the report holds no figures at all.
@@ -400,6 +424,11 @@ export const writeFlow = {
       await check('the month series loaded (the marks figure is still the receipts’ total)', (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '') === `${reply.marksEarned}/${reply.marksPossible}`);
       await check('the month chart has its four weekly points', await page.locator('.in-chart-tick').count() === 4, `${await page.locator('.in-chart-tick').count()} ticks`);
       await page.locator('[data-report-period-btn="week"]').click();
+      // On a phone the bar is compact: the switch and the search stay in the page.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.waitForTimeout(300);
+      await check('phone: the period switch stays in the page, not the bar', await page.locator('[data-instrument-report] [data-report-periods]').count() === 1 && await page.locator('[data-instrument-bar-slot] *').count() === 0);
+      await page.setViewportSize({ width: 1440, height: 900 });
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     }
 

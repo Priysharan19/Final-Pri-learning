@@ -5,6 +5,7 @@ import { useT } from '../i18n/index.js';
 import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
+import BarSlot from './BarSlot.jsx';
 
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the
@@ -190,13 +191,13 @@ export default function ReportHead() {
             </p>
           )}
         </div>
-        <div className="in-segc" role="group" aria-label={t('inst.periodGroup')}>
+        <BarSlot><div className="in-segc" role="group" aria-label={t('inst.periodGroup')} data-report-periods>
           {PERIODS.map(p => (
             <button key={p} type="button" aria-pressed={period === p} data-report-period-btn={p} onClick={() => setPeriod(p)}>
               {p === 'week' ? t('inst.periodWeek') : p === 'month' ? t('inst.periodMonth') : t('inst.periodTerm')}
             </button>
           ))}
-        </div>
+        </div></BarSlot>
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
