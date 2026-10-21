@@ -12,18 +12,20 @@ import {
 } from './pri-admission-state.mjs';
 import {verifyDiffOwnership} from './pri-admission-paths.mjs';
 
-const REPO=process.env.GITHUB_REPOSITORY || '';
+// Egress is restricted to this one canonical GitHub repository.
+const REPO='Priysharan19/Final-Pri-learning';
 const GH_TOKEN=process.env.GITHUB_TOKEN || '';
 const REF='pri-writer-admissions';
 const FILE='.pri-os/authorized-writer-events.json';
 let PUBKEY;
 try { PUBKEY=readFileSync(new URL('../.pri-os/admission-public-key.pem',import.meta.url),'utf8'); }
 catch { PUBKEY=null; }
-const API='https://api.github.com/repos/' + REPO + '/';
+const API='https://api.github.com/repos/Priysharan19/Final-Pri-learning/';
 const mode=process.argv[2] || 'verify';
 function ensure(cond,reason){if(!cond) throw new Error(reason);}
 async function api(method,path,data) {
-  ensure(REPO==='Priysharan19/Final-Pri-learning' && GH_TOKEN,'TRUSTED_REPOSITORY_TOKEN_REQUIRED');
+  ensure(process.env.GITHUB_REPOSITORY===REPO && GH_TOKEN,'TRUSTED_REPOSITORY_TOKEN_REQUIRED');
+  ensure(/^(GET|POST|PATCH)$/.test(method) && /^[a-z0-9_/%?&=.+\-]+$/i.test(path) && !path.includes('..') && !path.startsWith('/'), 'DISALLOWED_GITHUB_API_REQUEST');
   const response=await fetch(API+path,{method,headers:{
     'Authorization':'Bearer '+GH_TOKEN,'Accept':'application/vnd.github+json',
     'X-GitHub-Api-Version':'2022-11-28',
@@ -85,20 +87,6 @@ function replace(body,key,value) {
   const lines=String(body).split('\n').filter(x=>!x.toLowerCase().startsWith((key+':').toLowerCase()));
   if(value!==null) lines.push(key+': '+value);
   return lines.join('\n').trim()+'\n';
-}
-function fileMatches(pattern,p) {
-  if (typeof pattern!=='string' || typeof p!=='string' || !pattern ||
-    pattern.startsWith('/') || p.startsWith('/') ||
-    pattern.split('/').includes('..') || p.split('/').includes('..')) return false;
-  let rx='^';
-  for(let i=0;i<pattern.length;i++) {
-    const c=pattern[i];
-    if(c==='*' && pattern[i+1]==='*') {rx+='.*';i++;}
-    else if(c==='*') rx+='[^/]*';
-    else if(c==='?') rx+='[^/]';
-    else rx+=c.replace(/[\\^$+?.()|{}\[\]]/g,'\\$&');
-  }
-  return new RegExp(rx+'$').test(p);
 }
 function run(args) {
   const p=spawnSync(process.execPath,args,{encoding:'utf8'});
