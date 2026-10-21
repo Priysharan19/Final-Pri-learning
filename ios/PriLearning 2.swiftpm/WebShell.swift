@@ -124,6 +124,7 @@ struct WebShell: UIViewRepresentable {
         coordinator.detachBilling()
         coordinator.detachCloud()
         coordinator.detachHost()
+        coordinator.detachPageTone()
     }
 
     // MARK: - Coordinator
@@ -257,6 +258,18 @@ struct WebShell: UIViewRepresentable {
         }
 
         private var deviceAppearanceWatch: Timer?
+
+        /// Undoes attachPageTone when SwiftUI takes the shell down.
+        func detachPageTone() {
+            deviceAppearanceWatch?.invalidate()
+            deviceAppearanceWatch = nil
+            themeColorObservation = nil
+            for observer in [becameActiveObserver, resignedActiveObserver].compactMap({ $0 }) {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            becameActiveObserver = nil
+            resignedActiveObserver = nil
+        }
 
         /// The device can switch light/dark on its schedule while Pri stays in
         /// the foreground (#533). Nothing in the shell is told: on iPhone,
