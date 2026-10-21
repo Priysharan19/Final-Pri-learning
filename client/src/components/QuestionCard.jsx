@@ -59,7 +59,9 @@ import QuestionHead from '../instrument/QuestionHead.jsx';
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
 const INSTRUMENT = featureEnabled('instrument');
-const CHECK_KEY_GLYPH = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '') ? '⌘↵' : 'Ctrl ↵';
+// Both chords work (the handler takes Meta or Control), so the chip names both
+// rather than guessing the keyboard from the device.
+const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
 // the bundler folds only what it can see in this module, and that fold is what
