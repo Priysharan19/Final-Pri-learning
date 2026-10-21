@@ -1,5 +1,0 @@
-<<<<<<<< HEAD:ios/PriLearning.swiftpm/Resources/Web/assets/accountActivation-DFrtaXi3.js
-import{a as e,c as t,i as n,l as r,n as i,o as a,r as o,s,t as c,u as l}from"./accountActivation-BSF4vTpz.js";export{c as ACTIVATION_BLOCKED_CODES,i as ACTIVATION_DENIED_CODES,o as ACTIVATION_GUARDIAN_CODES,n as ACTIVATION_SIGN_IN_CODES,e as ActivationBlocked,a as OFFLINE_GRACE_MS,s as ensureAccountActivated,t as isActivationDenied,r as offlineGraceExpired,l as offlineGraceFor};
-========
-import{a as e,c as t,i as n,l as r,n as i,o as a,r as o,s,t as c,u as l}from"./accountActivation-C2O5Dlnh.js";export{c as ACTIVATION_BLOCKED_CODES,i as ACTIVATION_DENIED_CODES,o as ACTIVATION_GUARDIAN_CODES,n as ACTIVATION_SIGN_IN_CODES,e as ActivationBlocked,a as OFFLINE_GRACE_MS,s as ensureAccountActivated,t as isActivationDenied,r as offlineGraceExpired,l as offlineGraceFor};
->>>>>>>> origin/main:ios/PriLearning.swiftpm/Resources/Web/assets/accountActivation-CBtdDc8U.js
