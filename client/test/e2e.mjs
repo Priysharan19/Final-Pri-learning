@@ -296,7 +296,10 @@ async function runFlow(flow, { browser, opts }) {
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     hasTouch: true,
-    reducedMotion: 'reduce'
+    reducedMotion: 'reduce',
+    // A route-interception regression needs network requests visible to
+    // Playwright, not intercepted first by a service worker (WebKit too).
+    ...(flow.inspectNetwork ? { serviceWorkers: 'block' } : {})
   });
   const page = await ctx.newPage();
   const crashes = [];

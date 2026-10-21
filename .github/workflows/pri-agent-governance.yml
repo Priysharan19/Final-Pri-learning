@@ -313,8 +313,31 @@ jobs:
           : > /tmp/pri-pin-empty.diff
           node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-empty.diff | grep -q '"lane":"governed-required"'
 
+      - name: Release automation safety contract self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-automation-contract-check.mjs
+
+      # A PR from main into deploy/production is a RELEASE POINTER proposal,
+      # not an autonomous writer mission and not a protected-main push. It may
+      # not merge through the ordinary PR lane: doing so could deploy on Railway.
+      - name: Block production-pointer PR merges (release authorization is external)
+        if: github.event_name == 'pull_request' && github.base_ref == 'deploy/production'
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REF" != "main" ]]; then
+            echo "::error::Production pointer PR has unexpected head '$HEAD_REF'; only an exact certified main SHA can ever be promoted."
+            exit 1
+          fi
+          echo "::error::main → deploy/production is a RELEASE PROMOTION, not a writer-leased mission. No PR merge is authorized: this path would trigger Railway production. Leave the PR draft; use the separately approved release runbook after all external release gates pass."
+          exit 1
+
       - name: Classify PR diff and parse autonomous metadata
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.base_ref != 'deploy/production'
         id: meta
         shell: bash
         env:

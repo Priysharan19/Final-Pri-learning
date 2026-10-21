@@ -106,6 +106,8 @@ export const ENGINE_SUITES = [
   'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
+  // CodeQL #461: the same account-keyed quota must serialize on real Postgres.
+  'pr618-recognition-rate-concurrency-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening
   // set (session lifetime, sync quota, per-account RLS scope, password policy,
   // join-code encryption, guardian withdrawal credential, health exposure).

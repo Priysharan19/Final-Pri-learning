@@ -401,7 +401,6 @@ export default {
   'verdict.correct': 'Correct.',
   'verdict.revealed': 'Solution revealed.',
   'verdict.notThisTime': 'Not this time.',
-  'verdict.afterHints': { one: 'after {n} hint', other: 'after {n} hints' },
   // Said only from the server's step report of the lines that were submitted
   // (components/attemptEvidence.js). A right final answer is never presented
   // as a check of the working.
@@ -463,6 +462,15 @@ export default {
   'practice.pyqTranscribedFrom': 'Transcribed from',
   'verdict.pdfPagesUnread': '{unread} of {total} pages could not be read — check the working below before marking.',
   'verdict.markedStepByStep': 'Marked step by step',
+  'verifiedMarks.heading': 'How your marks were awarded',
+  'verifiedMarks.methodAggregate': '{count} method marks awarded from verified working (not assigned to particular lines).',
+  'verifiedMarks.methodNone': 'No method marks were awarded.',
+  'verifiedMarks.finalAccepted': 'Final answer accepted. Full marks here do not mean every working line was independently verified.',
+  'verifiedMarks.finalNotAccepted': 'The final answer was not accepted; any method credit is separate.',
+  'verifiedMarks.unread': 'The working could not be read or checked, so no claim is made about those lines.',
+  'verifiedMarks.hints': 'Marks before hint deductions: {before}. Account credit after hints: {after}.',
+  'verifiedMarks.notOfficial': 'Pri practice feedback, not an official CBSE marking scheme.',
+  'verifiedMarks.beforeHints': 'Marks before hint deductions',
   'verdict.boardStyleNote': 'Board-style step marking, worked out from this question\'s own solution. It follows the convention CBSE publishes; it is not CBSE\'s official marking scheme for a past paper.',
   'verdict.rowMarks': '{earned} of {total} marks.',
   'verdict.whyItFails': 'Why it fails',

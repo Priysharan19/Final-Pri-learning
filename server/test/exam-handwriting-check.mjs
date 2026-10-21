@@ -68,7 +68,8 @@ const fake = createServer((req, res) => {
     if (behaviour === 'hang' && provider.hanging.has(label)) return; // never answers: the adapter's own timeout ends it
     if (behaviour === 'hold') {
       provider.held.set(label, () => reply(res, sent.model, read));
-      provider.arrivals.get(label)?.();
+      const arrival = provider.arrivals.get(label);
+      if (typeof arrival === 'function') arrival();
       provider.arrivals.delete(label);
       return;
     }
@@ -315,6 +316,10 @@ try {
       'a different picture for the frozen answer — new strokes, an erasure, a replacement photo — is refused and never reaches the reader');
     const elsewhere = await present(s.jar, s.exam.id, q3.id, changed);
     eq([elsewhere.status, elsewhere.data.error.code], [409, 'EXAM_HANDWRITING_NOT_PENDING'], 'and a page cannot be added to an answer that had none when the paper closed');
+    const inheritedNames = await Promise.all(['__proto__', 'constructor', 'toString'].map(k => present(s.jar, s.exam.id, k, image)));
+    eq([inheritedNames.map(r => [r.status, r.data?.error?.code]), provider.total - before],
+      [Array.from({ length: 3 }, () => [409, 'EXAM_HANDWRITING_NOT_PENDING']), 0],
+      'inherited object-property names cannot refer to frozen handwriting pages or spend a recognition request');
     eq((await storedResult(s.exam.id)).handwriting.pages[q2.id].attempts, 0, 'none of that used an attempt');
     const outsider = await student();
     eq([(await present({}, s.exam.id, q2.id, image)).status, (await present(outsider.jar, s.exam.id, q2.id, image)).status], [401, 404],
@@ -322,10 +327,14 @@ try {
 
     // The frozen page is read once, after the clock has expired.
     skew += 20 * 60000;
+    // Distinct questions can legitimately share the same short mathematical
+    // answer. Count this read's provider calls rather than all prior fixture
+    // calls for that answer label in earlier independent test scenarios.
+    const labelCallsBefore = callsFor(right2);
     const resolved = await present(s.jar, s.exam.id, q2.id, image);
     const after = resolved.data.result;
     const r2 = lineOf(after, q2);
-    eq([resolved.status, resolved.data.attempted, provider.total - before, callsFor(right2)], [200, true, 1, 1],
+    eq([resolved.status, resolved.data.attempted, provider.total - before, callsFor(right2) - labelCallsBefore], [200, true, 1, 1],
       `the frozen page is read after the deadline with exactly one provider call [${EVIDENCE}]`);
     eq([r2.pending, r2.outcome, r2.correct, r2.awarded, r2.given, r2.readAfterClose, typeof r2.attemptId, typeof r2.solution?.answerText],
       [undefined, 'correct', true, Number(q2.marking.correct), right2, true, 'string', 'string'],

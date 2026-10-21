@@ -169,7 +169,8 @@ p('**Call B — formula-then-guess pays the method mark.** A student who writes 
 p('');
 p('| Level | Question | Right answer | A: wrong givens, right method | B: formula, then a guess | Control: bare guess |');
 p('|---|---|---:|---:|---:|---:|');
-for (const x of probes) p(`| D${x.diff} | ${x.prompt.replace(/\|/g, '\\|')} | ${x.right} | ${x.wrongGivens.earned}/${x.wrongGivens.marks} | ${x.formulaGuess.earned}/${x.formulaGuess.marks} | ${x.bareGuess.earned}/${x.bareGuess.marks} |`);
+const tableCell = value => String(value).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+for (const x of probes) p(`| D${x.diff} | ${tableCell(x.prompt)} | ${x.right} | ${x.wrongGivens.earned}/${x.wrongGivens.marks} | ${x.formulaGuess.earned}/${x.formulaGuess.marks} | ${x.bareGuess.earned}/${x.bareGuess.marks} |`);
 p('');
 for (const x of probes) {
   p(`<details><summary>D${x.diff} pages</summary>`);
