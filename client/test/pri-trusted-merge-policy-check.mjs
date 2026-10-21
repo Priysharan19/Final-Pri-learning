@@ -1,0 +1,74 @@
+import assert from 'node:assert/strict';
+import {generateKeyPairSync} from 'node:crypto';
+import {appendGrant,inspectSignedLog,reconcileIssueAuthority,revokeAuthoritativeGrant} from '../../scripts/pri-admission-state.mjs';
+import {verifyMergePolicy} from '../../scripts/pri-trusted-merge-policy.mjs';
+const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+const main='1'.repeat(40),head='2'.repeat(40),changed='3'.repeat(40),now=Date.now();
+const repo={full_name:'Priysharan19/Final-Pri-learning'},file='server/platform/accounts.js';
+const branch='agent/mission/platform/provenance';
+const body=['Pri-Mission-ID: provenance','Pri-Mission-Status: TRIAGED','Pri-Agent: platform','Pri-Branch: '+branch,
+  'Pri-Risk: R4','Pri-Base-SHA: '+main,'Pri-Paths: '+file].join('\n');
+const i=(text=body)=>({number:8,state:'open',title:'[PRI-MISSION] provenance',body:text});
+const p=(ref=branch,sha=head)=>({number:9,state:'open',draft:false,changed_files:1,user:{login:'Priysharan19',type:'User'},
+ head:{ref,sha,repo},base:{ref:'main',sha:main,repo}});
+const req=(op)=>({operation:op,issue_number:8,pr_number:9,head_sha:head});
+const empty={version:1,events:[]};
+const granted=appendGrant(empty,req('GRANT'),[i()],p(),main,'Priysharan19',1,now,privateKey,publicKey);
+const activeIssue=i(reconcileIssueAuthority(i(),inspectSignedLog(granted,publicKey,now),now).body.replace('Pri-Mission-Status: ACTIVE','Pri-Mission-Status: TESTING'));
+const released=appendGrant(granted,req('RELEASE'),[activeIssue],p(),main,'Priysharan19',2,now+60,privateKey,publicKey);
+const authority=inspectSignedLog(released,publicKey,now+100);
+const frozen=i(reconcileIssueAuthority(activeIssue,authority,now+100).body);
+const policy={enforce_admins:true,strict:true,required_approving_review_count:1,dismiss_stale_reviews:true,
+ require_last_push_approval:true,required_checks:[{context:'Suite',app_id:15368}]};
+const approvals=[{state:'APPROVED',commit_id:head,submitted_at:new Date().toISOString(),user:{login:'Kalp-Bajpai',type:'User'}}];
+const permissions={'Priysharan19':'admin','Kalp-Bajpai':'write',OtherReviewer:'write'};
+const files=[{filename:file,status:'modified'}];
+const routeOwner=path=>({owned:path===file || path==='README.md',primary:path===file?'platform':'qa-release',risk:path===file?'R4':'R2'});
+const checks=[{name:'Suite',sha:head,app_id:15368,conclusion:'success'}];
+const good={pr:p(),head,mainSha:main,files,missionIssue:frozen,authority,reviews:approvals,
+  permissions,branchProtection:policy,checks,routeOwner,lastPushActor:'Priysharan19'};
+let cases=0;
+const pass=(name,fn)=>{fn();cases++};
+const reject=(name,pattern,data)=>pass(name,()=>assert.throws(()=>verifyMergePolicy(data),pattern));
+pass('signed reviewed autonomous exact head succeeds',()=>assert.equal(verifyMergePolicy(good).decision,'SOURCE_REVIEW_POLICY_VERIFIED'));
+const compromised=revokeAuthoritativeGrant(released,8,'Kalp-Bajpai',3,now+120,privateKey,publicKey);
+reject('green CI cannot authorize compromised source',/REVIEW_WITHOUT_SIGNED_PROVENANCE/,
+  {...good,authority:inspectSignedLog(compromised,publicKey,now+130)});
+reject('missing true signing lineage',/REVIEW_WITHOUT_SIGNED_PROVENANCE/,{...good,authority:inspectSignedLog(empty,publicKey,now)});
+reject('review source branch head changed',/REVIEW_PROVENANCE_MISMATCH|STALE_OR_UNTRUSTED_REVIEW_PR/,{...good,pr:p(branch,changed),head:changed,checks:[{...checks[0],sha:changed}]});
+reject('old approval cannot cover new head',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,reviews:[{...approvals[0],commit_id:changed}]});
+reject('author cannot approve their work',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,reviews:[{...approvals[0],user:{login:'Priysharan19',type:'User'}}]});
+reject('last pusher cannot approve',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,lastPushActor:'Kalp-Bajpai'});
+reject('last push unverified fails closed',/LATEST_PUSH_ACTOR_UNVERIFIED/,{...good,lastPushActor:undefined});
+reject('bot cannot provide formal approval',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,reviews:[{...approvals[0],user:{login:'Kalp-Bajpai',type:'Bot'}}]});
+reject('security owner must approve sensitive route',/SECURITY_OWNER_APPROVAL_MISSING/,{...good,reviews:[{...approvals[0],user:{login:'OtherReviewer',type:'User'}}]});
+reject('newest failing check overrides stale prior green',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],id:1},{...checks[0],id:2,conclusion:'failure'}]});
+reject('unbound expected app rejected',/REQUIRED_CHECK_APP_UNPINNED/,{...good,branchProtection:{...policy,required_checks:[{context:'Suite',app_id:null}]}});
+reject('failed required check',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],conclusion:'failure'}]});
+reject('spoofed app identity denied',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],app_id:9999}]});
+reject('checks for old commit denied',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],sha:changed}]});
+reject('weak branch approval protection rejected',/PROTECTED_BRANCH_POLICY_WEAKENED/,{...good,branchProtection:{...policy,required_approving_review_count:0}});
+reject('branch protection allows stale approvals rejected',/PROTECTED_BRANCH_POLICY_WEAKENED/,{...good,branchProtection:{...policy,dismiss_stale_reviews:false}});
+reject('unowned sensitive file rejected',/UNOWNED_CHANGED_FILE/,{...good,routeOwner:()=>({owned:false})});
+reject('rename from unowned file rejected',/UNOWNED_CHANGED_FILE/,{...good,files:[{filename:file,previous_filename:'scripts/pri-admission-state.mjs',status:'renamed'}]});
+reject('incomplete changed file list rejected',/INCOMPLETE_PR_FILES/,{...good,files:[]});
+reject('draft source rejected',/DRAFT_PR_UNMERGEABLE/,{...good,pr:{...p(),draft:true}});
+const manualP=p('task/legitimately-reviewed');
+pass('manual task branch with review works without autonomous lease',()=>assert.equal(verifyMergePolicy({...good,pr:manualP,missionIssue:null,authority:null}).source.manual,true));
+reject('manual task author without permission denied',/MANUAL_AUTHOR_LACKS_WRITE_PERMISSION/,{...good,pr:manualP,missionIssue:null,authority:null,permissions:{...permissions,'Priysharan19':'read'}});
+reject('manual task without independent security review denied',/SECURITY_OWNER_APPROVAL_MISSING/,{...good,pr:manualP,missionIssue:null,authority:null,reviews:[{...approvals[0],user:{login:'OtherReviewer',type:'User'}}]});
+const mixedFiles=[{filename:file,status:'modified'},{filename:'README.md',status:'modified'}];
+const mixedPr={...manualP,changed_files:2};
+const mixed={...good,pr:mixedPr,files:mixedFiles,authority:null,missionIssue:null};
+reject('mixed canonical-owner manual paths need external authorization',/PROTECTED_MANUAL_SCOPE_POLICY_UNAVAILABLE/,mixed);
+const protectedEntry={repository:'Priysharan19/Final-Pri-learning',pr_number:9,head_sha:head,main_sha:main,
+ author:'Priysharan19',primary_owners:['qa-release','platform'],changed_paths:['README.md',file],
+ expires_ms:Date.now()+3600000};
+const protectedScopePolicy={version:1,repository:'Priysharan19/Final-Pri-learning',authorizations:[protectedEntry]};
+pass('explicit protected exact-head mixed-owner grant',()=>assert.equal(verifyMergePolicy({...mixed,manualScopePolicy:protectedScopePolicy}).source.scope_authorized_by,'protected-main-manual-owner-policy'));
+reject('stale cross-owner scope expiration',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,expires_ms:Date.now()-1000}]}});
+reject('cross-owner grant cannot cover changed SHA',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,head_sha:changed}]}});
+reject('cross-owner grant cannot omit modified path',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,changed_paths:[file]}]}});
+reject('cross-owner grant cannot be reassigned to new PR',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,pr_number:999}]}});
+reject('cross-owner grant cannot use old main SHA',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,main_sha:changed}]}});
+console.log('PASS: '+cases+' independent merge-policy and manual-authority cases');
