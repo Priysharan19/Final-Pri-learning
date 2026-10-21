@@ -18,6 +18,7 @@ import { transcriptIsAnswer } from '../components/attemptEvidence.js';
 import { featureEnabled } from '../platform/features.js';
 import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
+import Glyph from '../instrument/Glyph.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = featureEnabled('instrument');
@@ -300,7 +301,15 @@ function HistoryForProfile() {
             </button>
           </div>
         )}
-        {data && !data.items.length && (
+        {INSTRUMENT_STRIP && data && !data.items.length && (
+          <div className="in-state" data-state="empty">
+            <span className="in-state-orb is-good"><Glyph name="doc" size={20} /></span>
+            <p className="in-state-title">{t('history.emptyTitle')}</p>
+            <p className="in-state-copy">{t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}</p>
+            {filter === 'all' && <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/practice')}>{t('history.startPractising')}</button>}
+          </div>
+        )}
+        {!INSTRUMENT_STRIP && data && !data.items.length && (
           <p className="muted" style={{ padding: 14 }}>
             {t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}
           </p>
