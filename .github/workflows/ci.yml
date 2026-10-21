@@ -91,6 +91,8 @@ jobs:
       # real platform server in-process (client/test/support/online-authority.mjs).
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Sign-in email template matches what the real-provider acceptance asserts
+        run: node tools/acceptance/auth-email-template-check.mjs
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs client
       - name: Person 2 India + commercial contracts
