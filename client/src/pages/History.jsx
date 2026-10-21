@@ -308,6 +308,10 @@ function HistoryForProfile() {
     );
   }
 
+  // The counts stay on the filters while the next page loads.
+  const lastCounts = useRef(null);
+  if (data?.counts) lastCounts.current = data.counts;
+  const counts = data?.counts || lastCounts.current;
   const pages = data && !searching ? Math.ceil(data.total / data.pageSize) : 0;
   const words = normal(query).trim().split(' ').filter(Boolean);
   const shown = !data ? [] : !searching ? data.items
@@ -333,7 +337,7 @@ function HistoryForProfile() {
             {INSTRUMENT_FILTERS.map(([k, key]) => (
               <button key={k} type="button" className="in-flt" aria-pressed={filter === k} data-history-filter={k}
                 onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>
-                {t(key)} <b data-history-count={k}>{data?.counts ? formatNumber(data.counts[k] ?? 0, user) : '·'}</b>
+                {t(key)} <b data-history-count={k}>{counts ? formatNumber(counts[k] ?? 0, user) : '·'}</b>
               </button>
             ))}
           </div>
