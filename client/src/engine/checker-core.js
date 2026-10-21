@@ -6,7 +6,7 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, variablesOf, withEvaluationBudget } from './expr.js';
+import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, relativeBand, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
@@ -132,7 +132,12 @@ const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
 /** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
 function moneyQuestion(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
-  return RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || RUPEE_MARK.test(prompt) || /paise/i.test(suffix) || /\bpaise\b/i.test(prompt);
+  if (RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || /paise/i.test(suffix)) return true;
+  // An answer box with any other unit beside it (%, km, students) asks for
+  // something that is not money, whatever the prompt is priced in: 2000 paise
+  // is not a 20% profit (#518).
+  if (suffix.trim()) return false;
+  return RUPEE_MARK.test(prompt) || /\bpaise\b/i.test(prompt);
 }
 /** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
 function paiseAsked(question) {
@@ -478,7 +483,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         // for 60°), so an exact whole-number band would refuse it: a converted
         // value is compared in the relative band a non-integer target gets.
         const converted = Boolean(angleUnit && angleRead && angleRead !== angleUnit);
-        let tolUsed = ans.tol ?? (converted ? Math.max(1e-6, Math.abs(target) * 1e-4) : undefined);
+        let tolUsed = ans.tol ?? (converted ? relativeBand(target) : undefined);
         // A precision the question names ("to 2 d.p.") narrows the band: a
         // wrong last digit is wrong (false-positive sweep, m-fp-sweep).
         const named = namedPrecisionBand(question);

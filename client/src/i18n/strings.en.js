@@ -2591,7 +2591,7 @@ export default {
   'signup.noticeHeading': "What you are agreeing to",
   'signup.noticeWhat': "Pri stores your child’s name, class, contact, their answers and their progress on its servers. Today those run on Railway in the Netherlands (Amsterdam); a move to Supabase in Mumbai is planned.",
   'signup.noticeWhy': "Pri’s server marks their answers, and a picture of their handwriting or photo is sent to OpenAI to be read. Their progress also syncs between devices and is backed up. It is never sold or used for advertising.",
-  'signup.noticeNot': "Without your confirmation, nothing of theirs is sent and their answers are not checked.",
+  'signup.noticeNot': "Until you confirm, Pri’s server holds only what it needs to set up the account and reach you: their name, class and contact details, and yours. Their answers are not checked, their handwriting and photos are not read, and nothing syncs.",
   'signup.noticeWithdraw': "You can withdraw at any time from the parent screen in Pri with a code sent to your phone, or from the link in our email. Sync stops at once.",
   'signup.noticeVersion': "Notice version {v}",
   'signup.consentAgree': "I am this learner’s parent or guardian, and I agree.",
