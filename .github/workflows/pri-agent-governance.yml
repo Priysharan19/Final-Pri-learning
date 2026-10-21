@@ -288,9 +288,12 @@ jobs:
           node --check scripts/pri-admission-state.mjs
           node --check scripts/pri-admission-github.mjs
           node --check scripts/pri-admission-paths.mjs
+          node --check scripts/pri-trusted-merge-policy.mjs
           node --check scripts/pri-manual-authorization.mjs
           node client/test/pri-mission-control-regression.mjs
           node client/test/pri-admission-state-check.mjs
+          node client/test/pri-source-provenance-check.mjs
+          node client/test/pri-trusted-merge-policy-check.mjs
           node client/test/pri-admission-paths-check.mjs
           node client/test/pri-manual-authorization-check.mjs
 

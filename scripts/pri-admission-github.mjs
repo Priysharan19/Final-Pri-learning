@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {
-  appendGrant, assertLedgerMatchesGrants, inspectSignedLog, issueIdentity, eventDigest, verifyAuthorityHistory, revokeAuthoritativeGrant
+  appendGrant, assertLedgerMatchesGrants, inspectSignedLog, issueIdentity, eventDigest, verifyAuthorityHistory, revokeAuthoritativeGrant, verifyReleasedSource, reconcileIssueAuthority
 } from './pri-admission-state.mjs';
 import {verifyDiffOwnership} from './pri-admission-paths.mjs';
 
@@ -82,7 +82,6 @@ async function assertProtection() {
   ensure(branch.enforce_admins?.enabled===true && branch.allow_force_pushes?.enabled===false
     && branch.allow_deletions?.enabled===false,'AUTHORITY_REF_NOT_PROTECTED');
 }
-function parseMarker(body,key){const lines=String(body).split('\n').filter(x=>x.toLowerCase().startsWith((key+':').toLowerCase()));ensure(lines.length===1,'MARKER_'+key);return lines[0].slice(key.length+1).trim();}
 function replace(body,key,value) {
   const lines=String(body).split('\n').filter(x=>!x.toLowerCase().startsWith((key+':').toLowerCase()));
   if(value!==null) lines.push(key+': '+value);
@@ -120,13 +119,8 @@ async function verifyOnly() {
   const mission=issueIdentity(matching[0]);
   ensure(mission.branch==='agent/mission/'+mission.agent+'/'+mission.mission,
     'MISSION_BRANCH_ID_MISMATCH');
-  const grant=inspected.replay.live.find(g=>g.issue_number===matching[0].number);
-  ensure(grant && grant.mission===mission.mission && grant.agent===mission.agent &&
-    grant.branch===mission.branch && grant.risk===mission.risk &&
-    grant.head_sha===head && grant.base_sha===mission.base_sha &&
-    grant.main_sha===inspected.mainSha &&
-    eventDigest(grant)===parseMarker(matching[0].body,'Pri-Lease-Grant-ID'),
-    'MISSING_SCOPE_BOUND_SIGNED_CURRENT_HEAD_GRANT');
+  const proof=verifyReleasedSource({authority:inspected.replay,issue:matching[0],
+    pr,head,mainSha:inspected.mainSha});
   const files=await allPages('pulls/'+number+'/files');
   ensure(files.length>0 && files.length===pr.changed_files,'INCOMPLETE_EXACT_PR_DIFF');
   verifyDiffOwnership(files,mission.paths,mission.agent, filename=>{
@@ -137,8 +131,8 @@ async function verifyOnly() {
   console.log(JSON.stringify({decision:'EXACT_PR_SIGNED_GRANT_VERIFIED',pr_number:number,
     head_sha:head,issue_number:matching[0].number,mission:mission.mission,
     agent:mission.agent,risk:mission.risk,paths:mission.paths,
-    expiry_ms:grant.expiry_ms,authority_head:inspected.auth.head,
-    event_digest:eventDigest(grant),checked_files:files.length}));
+    review_provenance:proof.provenance_digest,authority_head:inspected.auth.head,
+    grant_id:proof.grant_id,checked_files:files.length}));
 }
 async function commitSignedTransaction(inspected,next,request,runId) {
   inspectSignedLog(next,PUBKEY,Date.now());
@@ -157,40 +151,40 @@ async function commitSignedTransaction(inspected,next,request,runId) {
   ensure(await reference()===commit.data.sha,'CAS_COMMIT_NOT_VISIBLE');
   return commit.data.sha;
 }
+// CAS is the authority; an issue patch is a separate, auditable projection.
+// Recovery is safe to repeat, including after a post-CAS transport failure.
+async function reconcileRemoteIssue(issueNumber, expectedAuthorityHead) {
+  const snapshot=await inspectRemote(Date.now(),false);
+  ensure(snapshot.auth.head===expectedAuthorityHead,'AUTHORITY_MOVED_DURING_RECOVERY');
+  const current=snapshot.issues.find(x=>x.number===issueNumber && !x.pull_request);
+  ensure(current && current.state==='open','MANAGED_ISSUE_NOT_OPEN_FOR_RECONCILIATION');
+  const repair=reconcileIssueAuthority(current,snapshot.replay,Date.now(),snapshot.mainSha);
+  if(repair.changed) await api('PATCH','issues/'+issueNumber,{body:repair.body});
+  const after=await get('issues/'+issueNumber);
+  ensure(after.body===repair.body && after.state==='open','ISSUE_RECONCILIATION_NOT_CONFIRMED');
+  ensure(await reference()===expectedAuthorityHead,'AUTHORITY_CHANGED_AFTER_RECONCILIATION');
+  return {status:repair.status,changed:repair.changed,event:repair.authority_event};
+}
 async function transactRevocation(request,inspected,actor,runId,nowMs,secret) {
-  const prior=inspected.replay.active.get(request.issue_number);
+  const prior=inspected.replay.active.get(request.issue_number) ||
+    inspected.replay.released.get(request.issue_number);
   if(!prior) {
-    const latest=[...inspected.auth.log.events].reverse().find(e=>
-      e.payload.issue_number===request.issue_number);
-    ensure(latest?.payload.operation==='REVOKE', 'NO_AUTHORITY_GRANT_TO_REVOKE');
-    console.log(JSON.stringify({decision:'ALREADY_REVOKED_SIGNED_AUTHORITY',
-      receipt:eventDigest(latest.payload),issue_number:request.issue_number,
-      authority_head:inspected.auth.head,issue_reconciliation_required:true}));
+    ensure(inspected.replay.invalidated.has(request.issue_number),
+      'NO_SIGNED_GRANT_TO_REVOKE');
+    const repair=await reconcileRemoteIssue(request.issue_number,inspected.auth.head);
+    console.log(JSON.stringify({decision:'ALREADY_REVOKED_AND_RECONCILED',
+      issue_number:request.issue_number,authority_head:inspected.auth.head,repair}));
     return;
   }
   const next=revokeAuthoritativeGrant(inspected.auth.log,request.issue_number,
     actor,runId,nowMs,secret,PUBKEY);
   const committed=await commitSignedTransaction(inspected,next,request,runId);
-  // A signed revocation is effective immediately. A closed or deleted PR
-  // is deliberately NOT required to release a writer.
-  let current;
-  try { current=await get('issues/'+request.issue_number); }
-  catch(e) {
-    if(!/GITHUB_GET_(404|410)_/.test(String(e.message))) throw e;
-    current={state:'missing'};
-  }
-  if(current.state==='open' && String(current.title||'').startsWith('[PRI-MISSION]')) {
-    let body=replace(current.body,'Pri-Mission-Status','BLOCKED_AUTOMATION');
-    for(const key of ['Pri-Lease-Grant-ID','Pri-Lease-Heartbeat-At',
-      'Pri-Lease-Heartbeat-Ref','Pri-Lease-Heartbeat-By'])
-      body=replace(body,key,null);
-    await api('PATCH','issues/'+request.issue_number,{body});
-  }
-  const final=await inspectRemote(Date.now(),false);
-  ensure(final.auth.head===committed,'REVOKED_REF_CHANGED');
-  console.log(JSON.stringify({decision:'REVOKED_SIGNED_AUTHORITY',
+  // If patching fails, leave the signed invalidation effective and emit a
+  // failed run. A protected RECONCILE request repairs the issue projection.
+  const repair=await reconcileRemoteIssue(request.issue_number,committed);
+  console.log(JSON.stringify({decision:'REVOKED_AND_RECONCILED',
     receipt:eventDigest(next.events.at(-1).payload),issue_number:request.issue_number,
-    authority_head:committed,issue_reconciliation_required:current.state!=='open'}));
+    authority_head:committed,repair}));
 }
 
 async function transact() {
@@ -226,14 +220,20 @@ async function transact() {
     head_sha:process.env.PRI_REQUEST_HEAD_SHA
   };
   ensure(Number.isInteger(request.issue_number) && request.issue_number>0 &&
-    ['GRANT','RENEW','REVOKE'].includes(request.operation) &&
-    (request.operation==='REVOKE' ||
+    ['GRANT','RENEW','RELEASE','REVOKE','RECONCILE'].includes(request.operation) &&
+    (['REVOKE','RECONCILE'].includes(request.operation) ||
       (Number.isInteger(request.pr_number) && request.pr_number>0 &&
        /^[0-9a-f]{40}$/.test(request.head_sha))),
     'INVALID_GOVERNOR_REQUEST');
   const nowMs=Date.now();
-  const inspected=await inspectRemote(nowMs,request.operation!=='REVOKE');
+  const inspected=await inspectRemote(nowMs,!['REVOKE','RECONCILE'].includes(request.operation));
   ensure(inspected.mainSha===process.env.GITHUB_SHA,'MAIN_SHA_DRIFT');
+  if(request.operation==='RECONCILE') {
+    const repair=await reconcileRemoteIssue(request.issue_number,inspected.auth.head);
+    console.log(JSON.stringify({decision:'SIGNED_AUTHORITY_PROJECTION_RECONCILED',
+      issue_number:request.issue_number,authority_head:inspected.auth.head,repair}));
+    return;
+  }
   const secret=process.env.PRI_ADMISSION_PRIVATE_KEY?.replace(/\\n/g,'\n');
   ensure(secret?.includes('PRIVATE KEY'),'PROTECTED_SIGNING_SECRET_REQUIRED');
   if(request.operation==='REVOKE')
@@ -294,32 +294,15 @@ async function transact() {
   });
   await api('PATCH','git/refs/heads/'+REF,{sha:commit.data.sha,force:false});
   ensure(await reference()===commit.data.sha,'CAS_COMMIT_NOT_VISIBLE');
-  // The issue is a synchronised view ONLY; the signed git lineage is truth.
-  // A crash or concurrent body edit after CAS fails closed, never fabricates
-  // permission. Recovery requires another independently approved transaction.
-  const current=await get('issues/'+request.issue_number);
-  ensure(current.body===issue.body,'POST_CAS_ISSUE_BODY_DRIFT');
-  const p=next.events[next.events.length-1].payload;
-  let body=issue.body;
-  if(request.operation==='REVOKE') {
-    body=replace(body,'Pri-Mission-Status','REVIEW');
-    body=replace(body,'Pri-Review-Head',request.head_sha);
-    for(const key of ['Pri-Lease-Grant-ID','Pri-Lease-Heartbeat-At','Pri-Lease-Heartbeat-Ref','Pri-Lease-Heartbeat-By'])
-      body=replace(body,key,null);
-  } else {
-    body=replace(body,'Pri-Mission-Status','ACTIVE');
-    body=replace(body,'Pri-Lease-Grant-ID',eventDigest(p));
-    body=replace(body,'Pri-Lease-Heartbeat-At',new Date(nowMs).toISOString());
-    body=replace(body,'Pri-Lease-Heartbeat-Ref',request.head_sha);
-    body=replace(body,'Pri-Lease-Heartbeat-By',mission.agent);
-  }
-  await api('PATCH','issues/'+request.issue_number,{body});
-  const final=await inspectRemote(Date.now(),request.operation!=='REVOKE');
+  // A signed CAS winner becomes authoritative even if issue synchronization
+  // fails. RECONCILE requires the same independently approved environment.
+  const repair=await reconcileRemoteIssue(request.issue_number,commit.data.sha);
+  const final=await inspectRemote(Date.now(),true);
   ensure(final.auth.head===commit.data.sha && final.mainSha===inspected.mainSha,
     'POST_ADMISSION_AUTHORITY_MOVED');
-  console.log(JSON.stringify({decision:'COMMITTED_AND_VERIFIED',operation:request.operation,
-    event_sha:eventDigest(p),main_sha:final.mainSha,authority_head:final.auth.head,
-    ...(final.ledger || {status:'RECOVERY_REVOKED_PENDING_FULL_LEDGER_RECONCILIATION'})}));
+  console.log(JSON.stringify({decision:'COMMITTED_AND_RECONCILED',operation:request.operation,
+    event_sha:eventDigest(next.events.at(-1).payload),main_sha:final.mainSha,
+    authority_head:final.auth.head,repair,ledger:final.ledger}));
 }
 try {
   if(mode==='verify') await verifyOnly();
