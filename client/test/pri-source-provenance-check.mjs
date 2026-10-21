@@ -50,6 +50,9 @@ deny('cannot renew released mission',/NO_LIVE_GRANT_TO_MODIFY/,()=>appendGrant(r
 const compromised=revokeAuthoritativeGrant(released,1001,'Kalp-Bajpai',15,now+3*H,privateKey,publicKey);
 const c=inspectSignedLog(compromised,publicKey,now+3*H);
 deny('compromise invalidates reviewed provenance',/REVIEW_WITHOUT_SIGNED_PROVENANCE/,()=>verifyReleasedSource({authority:c,issue:frozen,pr:pr(reviewed),head:reviewed,mainSha:main}));
+const incorrectRevoke={...compromised.events.at(-1).payload,head_sha:later};
+deny('signed revocation cannot rewrite attested release SHA',/REVOKE_IDENTITY_OR_SOURCE_DRIFT/,
+ ()=>inspectSignedLog({version:1,events:[...released.events,signEvent(incorrectRevoke,privateKey)]},publicKey,now+3*H));
 ok('reconciliation after compromise produces deny-state',()=>assert.equal(reconcileIssueAuthority(frozen,c,now+3*H).status,'BLOCKED_AUTOMATION'));
 ok('post-CAS recovery idempotent',()=>{let body=reconcileIssueAuthority(afterRenew,r,now+2*H).body;assert.equal(reconcileIssueAuthority(issue(body),r,now+2*H).changed,false)});
 deny('reconcile after malicious issue edit refused',/ISSUE_IDENTITY_DIFFERS_FROM_SIGNED_AUTHORITY/,()=>reconcileIssueAuthority(issue(frozen.body.replace('Pri-Agent: platform','Pri-Agent: security')),r,now+3*H));

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
-import {appendGrant,inspectSignedLog,reconcileIssueAuthority} from '../../scripts/pri-admission-state.mjs';
+import {appendGrant,inspectSignedLog,reconcileIssueAuthority,revokeAuthoritativeGrant} from '../../scripts/pri-admission-state.mjs';
 import {verifyMergePolicy} from '../../scripts/pri-trusted-merge-policy.mjs';
 const {privateKey,publicKey}=generateKeyPairSync('ed25519');
 const main='1'.repeat(40),head='2'.repeat(40),changed='3'.repeat(40),now=Date.now();
@@ -31,6 +31,9 @@ let cases=0;
 const pass=(name,fn)=>{fn();cases++};
 const reject=(name,pattern,data)=>pass(name,()=>assert.throws(()=>verifyMergePolicy(data),pattern));
 pass('signed reviewed autonomous exact head succeeds',()=>assert.equal(verifyMergePolicy(good).decision,'SOURCE_REVIEW_POLICY_VERIFIED'));
+const compromised=revokeAuthoritativeGrant(released,8,'Kalp-Bajpai',3,now+120,privateKey,publicKey);
+reject('green CI cannot authorize compromised source',/REVIEW_WITHOUT_SIGNED_PROVENANCE/,
+  {...good,authority:inspectSignedLog(compromised,publicKey,now+130)});
 reject('missing true signing lineage',/REVIEW_WITHOUT_SIGNED_PROVENANCE/,{...good,authority:inspectSignedLog(empty,publicKey,now)});
 reject('review source branch head changed',/REVIEW_PROVENANCE_MISMATCH|STALE_OR_UNTRUSTED_REVIEW_PR/,{...good,pr:p(branch,changed),head:changed,checks:[{...checks[0],sha:changed}]});
 reject('old approval cannot cover new head',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,reviews:[{...approvals[0],commit_id:changed}]});
