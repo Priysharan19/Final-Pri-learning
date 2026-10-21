@@ -281,6 +281,21 @@ export const writeFlow = {
     await check('an opened hint is a numbered rung on the ladder', !!rung && rung.numbered && rung.bg === rung.action && rung.radius === '6px', JSON.stringify(rung));
     await check('opening a rung moves the ladder on: 1 of 4 used, the next rung offered', /1\D+4/.test(await ladder.locator('.hints-block-title').first().textContent()) && await ladder.locator('[data-hint-shown]').count() === 1 && await ladder.locator('[data-hint-rung-open]').count() === 1 && await ladder.locator('[data-hint-rung-locked]').count() === 2);
     await shootAll(page, outDir, 'hint');
+    // The footer Hint is the ladder's one trigger under the instrument (the
+    // toolbar bulb is not drawn twice). At the last rung it names the reveal,
+    // and its first press arms a confirmation rather than revealing.
+    await check('the hint trigger is drawn once, in the footer', await page.locator('.hint-bulb').count() === 1 && await page.locator('.ws-actions .hint-bulb[data-wbar-hint]').count() === 1);
+    for (const n of [2, 3]) {
+      await page.locator('.hint-bulb').click();
+      await page.waitForFunction(k => document.querySelectorAll('.hintbox[data-hint-shown]').length >= k, n, { timeout: 15000 }).catch(() => {});
+    }
+    const footHint = page.locator('.ws-actions [data-wbar-hint]');
+    await check('at the last rung the footer Hint names the reveal', await footHint.getAttribute('data-wbar-hint') === 'solution' && /ends the question with no marks/.test(await footHint.getAttribute('aria-label') || ''), await footHint.getAttribute('aria-label').catch(() => 'none'));
+    await footHint.click();
+    await check('one press arms it: the footer Hint changes to the confirm text', await footHint.getAttribute('data-armed') === 'true' && /Press again/.test(await footHint.textContent()) && /Press again to see the full solution/.test(await footHint.getAttribute('aria-label') || ''), (await footHint.textContent()).trim());
+    await check('the armed press revealed nothing', await page.locator('.eval-card').count() === 0 && await page.locator('[data-hint-rung-open="solution"]').count() === 1);
+    await page.waitForFunction(() => !document.querySelector('.ws-actions [data-wbar-hint][data-armed]'), null, { timeout: 8000 }).catch(() => {});
+    await check('left alone, it disarms', await footHint.getAttribute('data-armed') === null);
     const shell = page.locator('.editor-shell').first();
     const look = sel => page.evaluate(q => { const el = document.querySelector(q); if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, radius: s.borderRadius, font: s.fontFamily }; }, sel);
     const stage = await look('.ink-stage');

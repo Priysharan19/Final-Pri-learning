@@ -2329,7 +2329,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="ws-tools-end">
             {/* The hint ladder: one control, naming the next rung and what
                 it leaves. nudge → method → worked step → full solution. */}
-            {ladderOffered && !resolved && nextRung && (() => {
+            {/* Under the instrument the footer's Hint is this control (same hook, label and arming). */}
+            {!INSTRUMENT && ladderOffered && !resolved && nextRung && (() => {
               const left = Math.round(markWeightAfter(hintLevel + 1) * 100);
               const label = nextRung === 'solution'
                 ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
@@ -3072,9 +3073,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 rung (getHint, as H and the bulb do); Reset is the page's Clear,
                 which the toolbar can still undo. */}
             {INSTRUMENT && ladderOffered && nextRung && !resolved && (
-              <button type="button" className="btn btn-quiet in-wbar-hint" data-wbar-hint={nextRung} disabled={busy} aria-keyshortcuts="H" onClick={getHint}>
-                <Icon name="hint" size={16} />{t('inst.hint')}
-              </button>
+              (() => {
+                // The last rung reveals the solution (no marks): it says so, and
+                // its second press reads as a confirmation, exactly as the bulb.
+                const solution = nextRung === 'solution';
+                const label = solution
+                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                  : t('verdict.rungLabel', { n: hintLevel + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                return (
+                  <button type="button" className={`btn btn-quiet hint-bulb in-wbar-hint${solution && solutionRungArmed ? ' on is-armed' : ''}`}
+                    data-wbar-hint={nextRung} data-hint-rung={nextRung} data-armed={solution && solutionRungArmed ? 'true' : undefined}
+                    disabled={busy} title={label} aria-label={label} aria-keyshortcuts="H" onClick={getHint}>
+                    <Icon name="hint" size={16} />
+                    {solution ? (solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY.solution)) : t('inst.hint')}
+                  </button>
+                );
+              })()
             )}
             {INSTRUMENT && writeMode && !resolved && inkHasStrokes && (
               <button type="button" className="btn btn-quiet in-wbar-reset" data-wbar-reset disabled={busy}

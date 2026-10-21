@@ -1114,3 +1114,5 @@ html.ui-instrument .stepcheck-line:has(.in-step-k) b { font: 500 12.5px var(--in
 html.ui-instrument .in-ladder .hintbox.in-rung { display: block; }
 html.ui-instrument .in-ladder .hintbox .h-n { width: 100%; margin-bottom: 4px; }
 html.ui-instrument .q-topmeta:has(.in-qh) .q-marks::before { content: "·"; margin-right: 8px; }
+/* The footer Hint armed on the reveal rung: the bulb's armed state, in slip. */
+html.ui-instrument .ws-actions .in-wbar-hint.is-armed { color: var(--in-slip); box-shadow: 0 0 0 1px var(--in-slip); }
