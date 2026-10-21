@@ -196,6 +196,17 @@ export const flow = {
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Linear Equations')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+    // Each row names the real chapter (never a demo, generator or device label)
+    // and dates it the India way: day then month ("22 Oct"), not "Oct 22".
+    const names = await page.locator('.hist-row .hist-name').allInnerTexts();
+    await check('each History row names the chapter, not a demo, generator or device',
+      names.length === 2 && names.every(n => /Linear Equations/.test(n)) && !names.some(n => /Pri demo|generator|iPad/i.test(n)),
+      `names read ${JSON.stringify(names)}`);
+    const dates = await page.locator('.hist-row .hist-top > .muted').allInnerTexts();
+    await check('History dates read day then month (en-IN), not US month-first',
+      dates.length === 2 && dates.every(d => /^\d{1,2}\s+[A-Za-z]{3}$/.test(d.trim())),
+      `dates read ${JSON.stringify(dates)}`);
+    await check('History never calls the device an iPad', !/\biPad\b/i.test(await page.locator('main').innerText()));
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
     // The missed question is tried again. The server — which chose it and
