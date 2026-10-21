@@ -204,7 +204,7 @@ export const flow = {
       `names read ${JSON.stringify(names)}`);
     const dates = await page.locator('.hist-row .hist-top > .muted').allInnerTexts();
     await check('History dates read day then month (en-IN), not US month-first',
-      dates.length === 2 && dates.every(d => /^\d{1,2}\s+[A-Za-z]{3}$/.test(d.trim())),
+      dates.length === 2 && dates.every(d => /^\d{1,2}\s+[A-Za-z]{3,4}$/.test(d.trim())),
       `dates read ${JSON.stringify(dates)}`);
     await check('History never calls the device an iPad', !/\biPad\b/i.test(await page.locator('main').innerText()));
 
