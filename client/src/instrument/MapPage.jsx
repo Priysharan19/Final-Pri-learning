@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -269,7 +269,7 @@ export default function MapPage() {
                 ? named('inst.mapCardFeedsSecure', { n: firstPre.evidence.mastery }, 'chapter', feeds.join(', '))
                 : named('inst.mapCardFeeds', {}, 'chapter', feeds.join(', '))}</>}
             </p>
-            <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</Link>
+            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</PageLink>
             {isRecommended(current) && <p className="in-note">{t('inst.mapNextWhy')}</p>}
           </aside>
         )}
