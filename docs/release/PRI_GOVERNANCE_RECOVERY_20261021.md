@@ -117,3 +117,54 @@ change `deploy/production`, or deploy Railway through this candidate.
 
 **Added QA tests:** `client/test/pri-source-provenance-check.mjs` and
 `client/test/pri-trusted-merge-policy-check.mjs`.
+
+### Read-only trusted runner adapter
+
+`node scripts/pri-trusted-github-verifier.mjs` is an **offline-reviewable,
+read-only adapter**, not an active required check. It requires a protected-main
+checkout, matching GitHub `main` SHA, dedicated read token, pinned admission
+genesis, live GitHub API responses and an independently sourced latest push
+actor. No candidate-provided identity may be substituted for that actor. The
+caller must be an independent GitHub App/webhook service whose code is deployed
+from protected main. Status publication and atomic merge controls require
+separately approved reliability/security infrastructure.
+
+A revoked authority can invalidate review eligibility in the pure policy, but
+a previously reported successful GitHub commit check does not automatically
+expire when the signed ledger changes. Deploy a separate, protected verifier
+with a revocation-sensitive required check and exclusive merge authorization
+before allowing autonomous protected merges. Until then FAIL CLOSED.
+
+### Exact mission ledger evidence — 21 October 2026
+
+An authenticated, paginated read of all managed GitHub issues returned **74**
+mission records with **9 open**. Issue #603 (platform / first-password work)
+remains `CI`, source PR #602 head
+`f19fc659e0c1288ee1d53eda66aef723ec8a07cd`. That issue lacks both
+`Pri-Review-Head` and `Pri-Provenance-Event`; PR #602 has no APPROVED review.
+The strict QA mission validator correctly denies this snapshot rather than
+inventing historic grants. Closed #172, #207 and #577 are retained as audit
+history, not current writers. Do not modify status or infer DONE from closure.
+
+### Exact infrastructure dependencies
+
+On 21 October, GitHub `main` still requires an eligible approval, dismissal of
+stale approvals, approval after last push and strict passing checks. The four
+product check contexts are pinned to GitHub Actions App ID 15368, which DOES
+NOT prove the candidate could not alter the authorizing Actions workflow.
+The `pri-writer-admission` protected environment requires Kalp-Bajpai's
+independent approval, prevents self-approval and limits deployment to protected
+branches. The `pri-writer-admissions` ruleset prohibits deletion and non-fast-
+forward updates. Its signed-event file remains empty at genesis
+`43390383a4ad5ea51315756094d0075b4477b9ed`.
+No installed dedicated governor App or protected signing secrets were verified;
+no Ed25519 public key was present in protected main. Branch restrictions for
+signed authority may block the GitHub App's non-force CAS until an explicit
+narrow App bypass is independently provisioned and tested.
+
+A pending authentic emergency revocation that loses a non-force CAS must be
+reported as FAILURE, and a new independently approved revocation must be
+retried against the new authority head. The previous successful GitHub check
+cannot be treated as sufficient for merging while revocation remains pending.
+Until a protected, independent merge controller can revalidate at merge time,
+this remains an external hard block. No test claim substitutes for that control.

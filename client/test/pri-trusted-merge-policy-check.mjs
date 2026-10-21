@@ -39,6 +39,8 @@ reject('last pusher cannot approve',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL
 reject('last push unverified fails closed',/LATEST_PUSH_ACTOR_UNVERIFIED/,{...good,lastPushActor:undefined});
 reject('bot cannot provide formal approval',/NO_ELIGIBLE_EXACT_HEAD_INDEPENDENT_APPROVAL/,{...good,reviews:[{...approvals[0],user:{login:'Kalp-Bajpai',type:'Bot'}}]});
 reject('security owner must approve sensitive route',/SECURITY_OWNER_APPROVAL_MISSING/,{...good,reviews:[{...approvals[0],user:{login:'OtherReviewer',type:'User'}}]});
+reject('newest failing check overrides stale prior green',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],id:1},{...checks[0],id:2,conclusion:'failure'}]});
+reject('unbound expected app rejected',/REQUIRED_CHECK_APP_UNPINNED/,{...good,branchProtection:{...policy,required_checks:[{context:'Suite',app_id:null}]}});
 reject('failed required check',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],conclusion:'failure'}]});
 reject('spoofed app identity denied',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],app_id:9999}]});
 reject('checks for old commit denied',/REQUIRED_CURRENT_HEAD_CHECK_MISSING/,{...good,checks:[{...checks[0],sha:changed}]});

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync, randomUUID} from 'node:crypto';
 import {appendGrant, inspectSignedLog, verifyReleasedSource, reconcileIssueAuthority,
-  assertLedgerMatchesGrants, eventDigest, signEvent, revokeAuthoritativeGrant} from '../../scripts/pri-admission-state.mjs';
+  assertLedgerMatchesGrants, eventDigest, signEvent, revokeAuthoritativeGrant, authorizeCAS} from '../../scripts/pri-admission-state.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('ed25519');
 const now=Date.now(), H=3600000;
@@ -73,4 +73,27 @@ deny('nonmonotonic signed event time',/NON_MONOTONIC_SIGNED_EVENT_TIME/,()=>insp
 // Once first writer expires, another grant at a later historical instant does not overlap.
 const afterExpiry={...e2,agent:'platform',timestamp_ms:now+13*H,expiry_ms:now+20*H};
 ok('expired historical lease frees owner later',()=>assert.equal(inspectSignedLog({version:1,events:[g.events[0],signEvent(afterExpiry,privateKey)]},publicKey,now+14*H).live.length,1));
+// A loss of CAS by an emergency revoker must be explicit. A different
+// contender winning RELEASE never silently counts as a completed REVOKE.
+const memory={head:'1',log:renew}, attempts=[];
+const adapter={read:async()=>({head:memory.head,log:memory.log}),
+  putIfFastForward:async(parent,next)=>{
+    await new Promise(resolve=>setImmediate(resolve));
+    if(memory.head!==parent)throw Error('NON_FAST_FORWARD_CAS_COLLISION');
+    memory.head='2';memory.log=next;return true;
+  }};
+const contend=await Promise.allSettled([
+  authorizeCAS(adapter, log=>appendGrant(log,request('RELEASE',reviewed),[afterRenew],pr(reviewed),main,'Priysharan19',200,now+2*H,privateKey,publicKey)),
+  authorizeCAS(adapter,log=>revokeAuthoritativeGrant(log,1001,'Kalp-Bajpai',201,now+2*H,privateKey,publicKey))
+]);
+ok('concurrent release versus compromise revocation one CAS winner',()=>{
+  assert.equal(contend.filter(x=>x.status==='fulfilled').length,1);
+  assert.equal(contend.filter(x=>x.status==='rejected').length,1);
+  assert.match(String(contend.find(x=>x.status==='rejected').reason),/NON_FAST_FORWARD_CAS_COLLISION/);
+});
+ok('replayed winner remains exactly signed',()=>assert.equal(inspectSignedLog(memory.log,publicKey,now+2*H).nextSeq,4));
+const invalidatedThenForgedGrant={...g.events[0].payload,seq:5,prev:eventDigest(compromised.events.at(-1).payload),
+  grant_id:randomUUID(),timestamp_ms:now+4*H,expiry_ms:now+8*H};
+deny('revoked mission cannot be resurrected by signed replay',/REVOKED_MISSION_REGRANT_FORBIDDEN/,()=>
+ inspectSignedLog({version:1,events:[...compromised.events,signEvent(invalidatedThenForgedGrant,privateKey)]},publicKey,now+4*H));
 console.log('PASS: '+count+' source provenance, lifecycle, replay, concurrency and recovery assertions');

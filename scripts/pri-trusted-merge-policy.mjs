@@ -74,9 +74,11 @@ export function verifyMergePolicy({pr,head,mainSha,files,missionIssue,authority,
   const required=branchProtection.required_checks;
   requireRule(Array.isArray(required) && required.length>0,'REQUIRED_CHECKS_UNDEFINED');
   for(const check of required) {
+    requireRule(Number.isInteger(check.app_id) && check.app_id>0,'REQUIRED_CHECK_APP_UNPINNED');
     const matching=checks.filter(c=>c.name===check.context && c.sha===head &&
-      c.app_id===check.app_id && c.conclusion==='success');
-    requireRule(matching.length>0,'REQUIRED_CURRENT_HEAD_CHECK_MISSING_'+check.context);
+      c.app_id===check.app_id).sort((a,b)=>(b.id||0)-(a.id||0));
+    requireRule(matching.length>0 && matching[0].conclusion==='success',
+      'REQUIRED_CURRENT_HEAD_CHECK_MISSING_'+check.context);
   }
   return {decision:'SOURCE_REVIEW_POLICY_VERIFIED',pr_number:pr.number,head,main_sha:mainSha,
     source,reviewers:independent.approvers,checked_paths:changedPaths.length,
