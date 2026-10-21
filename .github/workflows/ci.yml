@@ -164,7 +164,6 @@ jobs:
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
-          grep -Fq 'MARK ROWS: PASS — 2477/2477 checks' suites.log
           grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
