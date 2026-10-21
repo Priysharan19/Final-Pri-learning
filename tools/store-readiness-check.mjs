@@ -27,7 +27,9 @@ const failures = [];
 const check = (condition, message) => { if (condition) passed += 1; else failures.push(message); };
 
 // ── Apple privacy manifest ───────────────────────────────────────────────────
-const PKGS = readdirSync(join(ROOT, 'ios')).filter(p => p.endsWith('.swiftpm')).map(p => `ios/${p}`);
+// The shipping package first: it is the manifest every other copy must equal.
+const PKGS = readdirSync(join(ROOT, 'ios')).filter(p => p.endsWith('.swiftpm')).map(p => `ios/${p}`)
+  .sort((x, y) => (y === 'ios/PriLearning.swiftpm') - (x === 'ios/PriLearning.swiftpm'));
 check(PKGS.includes('ios/PriLearning.swiftpm'), `the shipping package is present (${PKGS.join(', ')})`);
 const manifests = PKGS.map(p => `${p}/Resources/PrivacyInfo.xcprivacy`);
 for (const m of manifests) check(existsSync(join(ROOT, m)), `${m} exists`);
@@ -39,7 +41,11 @@ check(/<key>NSPrivacyTrackingDomains<\/key>\s*<array(\/>|>\s*<\/array>)/.test(a)
 check(!/<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<true\/>/.test(a), 'no collected data type is used for tracking');
 const types = [...a.matchAll(/<key>NSPrivacyCollectedDataType<\/key>\s*<string>NSPrivacyCollectedDataType(\w+)<\/string>/g)].map(x => x[1]);
 check(types.length > 0 && new Set(types).size === types.length, `each collected type is declared once (${types.join(', ')})`);
-const unlinked = [...a.matchAll(/<string>NSPrivacyCollectedDataType(\w+)<\/string>\s*<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<false\/>/g)].map(x => x[1]);
+// Each collected type is its own innermost <dict>; read keys per dict so key order does not matter.
+const typeDicts = [...a.matchAll(/<dict>((?:(?!<\/?dict>)[\s\S])*?<key>NSPrivacyCollectedDataType<\/key>(?:(?!<\/?dict>)[\s\S])*?)<\/dict>/g)].map(m => m[1]);
+check(typeDicts.length === types.length, `each collected type sits in its own dict (${typeDicts.length} dicts, ${types.length} types)`);
+const unlinked = typeDicts.filter(d => !/<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<true\/>/.test(d))
+  .map(d => (d.match(/NSPrivacyCollectedDataType(\w+)<\/string>/) || [])[1]);
 check(unlinked.length === 0, `every collected type is declared linked to the signed-in account (${unlinked.join(', ')})`);
 for (const p of PKGS) check(/\.copy\("Resources\/PrivacyInfo\.xcprivacy"\)/.test(read(`${p}/Package.swift`)), `${p}/Package.swift copies the manifest to the bundle root`);
 
