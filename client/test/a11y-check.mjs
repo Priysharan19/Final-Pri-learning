@@ -910,7 +910,22 @@ async function run() {
       try {
         await stroke(60);
         const read = page.locator('[data-ink-read]').first();
-        await read.waitFor({ timeout: 15000 });
+        await read.waitFor({ timeout: 15000 }).catch(async (err) => {
+          // What the writing surface was showing when "Read my answer" never
+          // came: enough to tell no ink, a known block and a missing button apart.
+          const state = await page.evaluate(() => {
+            const ink = document.querySelector('.ink-answer');
+            const live = document.querySelector('.ink-canvas-live');
+            return {
+              online: navigator.onLine,
+              inkClass: ink?.className || null,
+              status: (ink?.querySelector('[role="status"]')?.textContent || '').trim().slice(0, 120),
+              buttons: [...(ink?.querySelectorAll('button') || [])].map(b => (b.textContent || '').trim()).slice(0, 12),
+              canvas: live ? { w: live.width, h: live.height, rect: live.getBoundingClientRect().toJSON() } : null
+            };
+          }).catch(e => ({ error: String(e) }));
+          throw new Error(`${String(err.message || err).split('\n')[0]} — ${JSON.stringify({ box, state })}`);
+        });
         refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
         await read.focus();
         await page.keyboard.press('Enter');
