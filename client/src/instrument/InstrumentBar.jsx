@@ -48,7 +48,8 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
       // Inside a field the student is typing or writing in, the chord belongs
       // to that field; the bar's own button stays the way in from there.
       const field = e.target?.closest?.('input, textarea, select, [contenteditable="true"], .ink-stage, [data-ink-surface]');
-      if (field && !field.closest('[data-instrument-command]')) return;
+      // The bar's own fields (a page's search in the slot) pass it through.
+      if (field && !field.closest('[data-instrument-command], .in-bar-slot')) return;
       e.preventDefault(); setOpen(o => !o);
     };
     window.addEventListener('keydown', key);
@@ -82,9 +83,9 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className="in-spacer" />
         <div className="in-bar-slot" ref={setBarSlot} data-instrument-bar-slot />
         <button type="button" className="in-cmd" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={t('inst.cmdOpenLabel')}>
-          <Glyph name="search" /><span>{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">⌘K</span>
+          <Glyph name="search" /><span className="in-cmd-t">{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">⌘K</span>
         </button>
-        <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" />{online ? t('inst.online') : t('inst.offline')}</span>
+        <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" /><span className="in-status-t">{online ? t('inst.online') : t('inst.offline')}</span></span>
         {accountMenu}
       </header>
       {/* Mounted only while open: every opening starts from an empty query. */}

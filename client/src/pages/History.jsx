@@ -337,7 +337,7 @@ function HistoryForProfile() {
 
       {INSTRUMENT_STRIP && (
         <div className="in-led-tools">
-          <div className="in-led-bar in-hsb" role="group" aria-label={t('history.filterGroup')}>
+          <div className="in-led-bar in-hsb" role="group" aria-label={t('history.filterGroup')} id="in-hist-filters">
             {INSTRUMENT_FILTERS.map(([k, key]) => (
               <button key={k} type="button" className="in-flt" aria-pressed={filter === k} data-history-filter={k}
                 onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>
@@ -362,12 +362,13 @@ function HistoryForProfile() {
             <label className="in-led-search">
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M10.4 10.4 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               <input ref={searchRef} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={t('history.searchPlaceholder')}
-                aria-label={t('history.searchPlaceholder')} aria-keyshortcuts="/" data-history-search />
+                aria-label={t('history.searchPlaceholder')} aria-keyshortcuts="/" data-history-search
+                aria-controls="in-hist-ledger" aria-describedby={searching && data ? 'in-hist-search-count' : 'in-hist-filters'} />
               <kbd className="in-kbd" aria-hidden="true">/</kbd>
             </label>
             </BarSlot>
           </div>
-          {searching && data && <p className="in-note" role="status" data-history-search-count>{t('history.searchFound', { count: shown.length, n: formatNumber(shown.length, user) })}</p>}
+          {searching && data && <p className="in-note" role="status" id="in-hist-search-count" data-history-search-count>{t('history.searchFound', { count: shown.length, n: formatNumber(shown.length, user) })}</p>}
         </div>
       )}
 
@@ -378,7 +379,7 @@ function HistoryForProfile() {
         ))}
       </div>}
 
-      <div className={`card${INSTRUMENT_STRIP ? ' in-led' : ''}`} style={INSTRUMENT_STRIP ? undefined : { padding: 10 }}>
+      <div id={INSTRUMENT_STRIP ? 'in-hist-ledger' : undefined} className={`card${INSTRUMENT_STRIP ? ' in-led' : ''}`} style={INSTRUMENT_STRIP ? undefined : { padding: 10 }}>
         {!data && !loadFailed && <div className="skeleton" style={{ height: 300 }} role="status" aria-label={t('common.loading')} />}
         {loadFailed && (
           <div className="error-box" role="alert" data-history-load-error>
