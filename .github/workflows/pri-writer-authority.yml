@@ -1,0 +1,103 @@
+name: Pri Authoritative Writer Admission
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Signed admission operation (approval required)
+        required: true
+        type: choice
+        options: [GRANT, RENEW, REVOKE]
+      issue_number:
+        description: Canonical open mission issue
+        required: true
+        type: number
+      pr_number:
+        description: Exact mission source pull request
+        required: true
+        type: number
+      head_sha:
+        description: Exact 40-character source PR commit
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# A global Actions concurrency group can evict an already-pending REVOKE
+# when a new operation queues. Do not use it for security-critical revocations.
+# Serialization is instead the non-force Git compare-and-swap; collisions
+# MUST fail visibly and require a fresh, independently approved dispatch.
+
+jobs:
+  authorize:
+    name: Independent protected writer transaction
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pri-writer-admission
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Require independently approved protected-main workflow
+        shell: bash
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$DISPATCH_REF" = refs/heads/main
+          test "$DISPATCH_SHA" = "$(git rev-parse HEAD)"
+      - name: Build isolated trusted transaction input
+        shell: bash
+        env:
+          REQUEST_OPERATION: ${{ inputs.operation }}
+          REQUEST_ISSUE_NUMBER: ${{ inputs.issue_number }}
+          REQUEST_PR_NUMBER: ${{ inputs.pr_number }}
+          REQUEST_HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('node:fs');
+          const op=process.env.REQUEST_OPERATION;
+          const issue=Number(process.env.REQUEST_ISSUE_NUMBER);
+          const pr=Number(process.env.REQUEST_PR_NUMBER);
+          const sha=process.env.REQUEST_HEAD_SHA;
+          if(!['GRANT','RENEW','REVOKE'].includes(op) || !Number.isSafeInteger(issue) ||
+             issue<1 || (op!=='REVOKE' &&
+             (!Number.isSafeInteger(pr) || pr<1 || !/^[0-9a-f]{40}$/.test(sha))))
+            throw Error('invalid dispatch inputs');
+          fs.writeFileSync('/tmp/pri-authority-request.json',JSON.stringify({
+            operation:op,issue_number:issue,pr_number:pr,head_sha:sha
+          }));
+          NODE
+      # App installation token is scoped to THIS repo. An approved GitHub
+      # ruleset grants only this app narrow non-force ref update authority.
+      # Never put this key/token into pull_request jobs.
+      - name: Obtain dedicated approved governor app identity
+        id: governor-app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.PRI_GOVERNOR_APP_ID }}
+          private-key: ${{ secrets.PRI_GOVERNOR_APP_PRIVATE_KEY }}
+          owner: Priysharan19
+          repositories: Final-Pri-learning
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: read
+          permission-administration: read
+          permission-actions: read
+
+      - name: Apply signed non-fast-forward CAS, reconcile issue, verify ledger
+        env:
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
+          GITHUB_TOKEN: ${{ steps.governor-app.outputs.token }}
+          PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
+        run: node scripts/pri-admission-github.mjs transact /tmp/pri-authority-request.json
