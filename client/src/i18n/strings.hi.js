@@ -3081,7 +3081,7 @@ export default {
   "inst.ledeMethod": "आपकी विधि के अंक {m}% और अंतिम उत्तर के अंक {a}% हैं।",
   "inst.ledeLostAnswer": "ज़्यादातर अंक विधि में नहीं, अंतिम उत्तर में गए हैं।",
   "inst.ledeLostMethod": "ज़्यादातर अंक अंतिम उत्तर में नहीं, विधि में गए हैं।",
-  "inst.ledeFew": "इस अवधि में {n} प्रश्न हल किए — विधि और सटीकता का प्रतिशत बताने के लिए अभी पर्याप्त नहीं।",
+  "inst.ledeFew": { one: 'इस अवधि में {n} प्रश्न हल किया — विधि और सटीकता का प्रतिशत बताने के लिए अभी पर्याप्त नहीं।', other: 'इस अवधि में {n} प्रश्न हल किए — विधि और सटीकता का प्रतिशत बताने के लिए अभी पर्याप्त नहीं।' },
   "inst.ledeNone": "इस अवधि में अभी कोई उत्तर जाँचा नहीं गया।",
   "inst.ledeChapter": "अब तक सबसे ज़्यादा अंक {chapter} में गए हैं।",
   "inst.kpiQuestions": "प्रश्न",
@@ -3101,6 +3101,6 @@ export default {
   "history.chapterLabel": "अध्याय",
   "history.chapterAll": "अध्याय: सभी",
   "history.searchPlaceholder": "अपनी स्क्रिप्ट खोजें",
-  "history.searchFound": "{n} मिलती स्क्रिप्ट",
+  "history.searchFound": { one: '{n} मिलती स्क्रिप्ट', other: '{n} मिलती स्क्रिप्ट' },
   "history.searchNone": "इस खोज से कुछ नहीं मिला।",
 };

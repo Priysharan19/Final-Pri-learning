@@ -3018,7 +3018,7 @@ export default {
   "inst.ledeMethod": "Your method marks are at {m}% and your final-answer marks at {a}%.",
   "inst.ledeLostAnswer": "Most lost marks are in the final answer, not the method.",
   "inst.ledeLostMethod": "Most lost marks are in the method, not the final answer.",
-  "inst.ledeFew": "{n} questions answered in this period — not enough yet to give method and accuracy percentages.",
+  "inst.ledeFew": { one: '{n} question answered in this period — not enough yet to give method and accuracy percentages.', other: '{n} questions answered in this period — not enough yet to give method and accuracy percentages.' },
   "inst.ledeNone": "No answers checked in this period yet.",
   "inst.ledeChapter": "{chapter} has lost the most marks so far.",
   "inst.kpiQuestions": "questions",
@@ -3038,6 +3038,6 @@ export default {
   "history.chapterLabel": "Chapter",
   "history.chapterAll": "Chapter: all",
   "history.searchPlaceholder": "Search your scripts",
-  "history.searchFound": "{n} matching scripts",
+  "history.searchFound": { one: '{n} matching script', other: '{n} matching scripts' },
   "history.searchNone": "Nothing matches that search.",
 };

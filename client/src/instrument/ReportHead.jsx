@@ -57,6 +57,10 @@ function Chart({ series, labels, t, spoken, failed }) {
   const any = series.some(p => p.methodPct != null || p.accuracyPct != null);
   const last = key => { for (let i = n - 1; i >= 0; i--) if (series[i][key] != null) return i; return -1; };
   const lm = last('methodPct'); const la = last('accuracyPct');
+  // The two end values never collide: the higher line's value goes above its
+  // dot and the lower line's below, decided from the values (deterministic).
+  const methodAbove = lm < 0 || la < 0 || Y(series[lm].methodPct) <= Y(series[la].accuracyPct);
+  const side = above => (above ? ' is-above' : ' is-below');
   // Label every tick when they fit, else every other one (13 term weeks).
   const every = n > 8 ? 2 : 1;
   const gridX = Array.from({ length: 33 }, (_, i) => i * (CW / 32));
@@ -80,8 +84,8 @@ function Chart({ series, labels, t, spoken, failed }) {
       </svg>
       {/* Text sits outside the stretched SVG so it is never distorted. */}
       <div className="in-chart-text" aria-hidden="true">
-        {lm >= 0 && <span className="in-chart-val is-method" style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }}>{fmtPct(series[lm].methodPct)}</span>}
-        {la >= 0 && <span className="in-chart-val is-accuracy" style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }}>{fmtPct(series[la].accuracyPct)}</span>}
+        {lm >= 0 && <span className={`in-chart-val is-method${side(methodAbove)}`} style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }}>{fmtPct(series[lm].methodPct)}</span>}
+        {la >= 0 && <span className={`in-chart-val is-accuracy${side(!methodAbove)}`} style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }}>{fmtPct(series[la].accuracyPct)}</span>}
         {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
       </div>
       <div className="in-chart-lg" aria-hidden="true"><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></div>
@@ -160,7 +164,7 @@ export default function ReportHead() {
       const answerLost = cur.accuracyMarksPossible - cur.accuracyMarksEarned;
       if (answerLost > methodLost) lede.push(t('inst.ledeLostAnswer'));
       else if (methodLost > answerLost) lede.push(t('inst.ledeLostMethod'));
-    } else if (cur.questions > 0) lede.push(t('inst.ledeFew', { n: cur.questions }));
+    } else if (cur.questions > 0) lede.push(t('inst.ledeFew', { count: cur.questions, n: cur.questions }));
     else lede.push(t('inst.ledeNone'));
   }
   const worst = view.lost[0];

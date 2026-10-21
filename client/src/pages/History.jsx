@@ -361,7 +361,7 @@ function HistoryForProfile() {
               <kbd className="in-kbd" aria-hidden="true">/</kbd>
             </label>
           </div>
-          {searching && data && <p className="in-note" role="status" data-history-search-count>{t('history.searchFound', { n: shown.length })}</p>}
+          {searching && data && <p className="in-note" role="status" data-history-search-count>{t('history.searchFound', { count: shown.length, n: formatNumber(shown.length, user) })}</p>}
         </div>
       )}
 

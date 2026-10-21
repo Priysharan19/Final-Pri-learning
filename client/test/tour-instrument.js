@@ -367,7 +367,7 @@ export const writeFlow = {
       // never a zero, and says why.
       await check('below the floor the chart draws no point and says so', await page.locator('[data-report-chart="empty"] [data-chart-empty]').count() === 1 && await page.locator('[data-chart-line]').count() === 0);
       await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === '—');
-      await check('the lede is the fixed template over the figures', /1 questions? answered|not enough/i.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
+      await check('the lede is the fixed template over the figures', /^1 question answered in this period/.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
       // The period switch refetches the series for that window.
       const series = page.waitForResponse(r => /\/report\/series\?period=month/.test(r.url()) || false, { timeout: 5000 }).catch(() => null);
       await page.locator('[data-report-period-btn="month"]').click();
@@ -375,6 +375,7 @@ export const writeFlow = {
       await page.waitForSelector('[data-instrument-report][data-report-period="month"]', { timeout: 10000 }).catch(() => {});
       await check('Month is pressed and the report shows the month', await page.locator('[data-report-period-btn="month"]').getAttribute('aria-pressed') === 'true' && await page.locator('[data-instrument-report]').getAttribute('data-report-period') === 'month');
       await check('the month series loaded (the marks figure is still the receipts’ total)', (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '') === `${reply.marksEarned}/${reply.marksPossible}`);
+      await check('the month chart has its four weekly points', await page.locator('.in-chart-tick').count() === 4, `${await page.locator('.in-chart-tick').count()} ticks`);
       await page.locator('[data-report-period-btn="week"]').click();
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     }
@@ -399,6 +400,7 @@ export const writeFlow = {
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
         const shownMarks = await page.locator('[data-map-card="y7-integers"] [data-map-marks]').getAttribute('data-map-marks');
+        await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} / ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
         await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
     }

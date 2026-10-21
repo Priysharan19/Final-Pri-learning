@@ -613,9 +613,11 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 @keyframes in-chart-fade { from { opacity: 0; } to { opacity: 1; } }
 .in-chart-text { position: absolute; inset: 0; pointer-events: none; font: 400 11.5px var(--in-mono); color: var(--in-tx-3); }
 .in-chart-tick { position: absolute; bottom: 8px; transform: translateX(-50%); white-space: nowrap; }
-.in-chart-val { position: absolute; transform: translate(-115%, -170%); font-variant-numeric: tabular-nums; }
+.in-chart-val { position: absolute; font-variant-numeric: tabular-nums; }
+.in-chart-val.is-above { transform: translate(-115%, -170%); }
+.in-chart-val.is-below { transform: translate(-115%, 60%); }
 .in-chart-val.is-method { color: var(--in-tx); }
-.in-chart-val.is-accuracy { color: var(--in-slip); transform: translate(-115%, 60%); }
+.in-chart-val.is-accuracy { color: var(--in-slip); }
 .in-chart-lg { position: absolute; left: 16px; top: 12px; display: flex; gap: 14px; font: 500 11.5px var(--in-mono); color: var(--in-tx-2); }
 .in-chart-lg i { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: 3px; background: var(--in-tx); }
 .in-chart-lg i.is-accuracy { background: var(--in-slip); }
