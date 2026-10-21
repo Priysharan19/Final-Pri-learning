@@ -84,17 +84,21 @@ export default function IndexPage() {
     if (m) return `${m.earned}/${m.possible} ${t('inst.mapMarks')}`;
     return c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted');
   };
-  // "Covered": the share of the chapter's dot points with at least one
-  // server-certified answer filed under exactly that dot point
+  // "Covered": the share of the chapter's dot points with at least one answer
+  // — the dot point's own evidence from /curriculum (the figure its tile
+  // shows), or a server-certified answer filed under exactly that dot point
   // (GET /marks/by-chapter dotpoints). A chapter with no dot point list has
   // nothing to cover against, so it says "—".
   const coveredOf = c => {
-    const total = Array.isArray(c.row.dotpoints) ? c.row.dotpoints.length : 0;
-    if (!total) return '—';
-    const keys = c.row.dotpoints.map((dp, i) => (typeof dp === 'object' && dp?.id ? String(dp.id) : String(i)));
+    const dps = Array.isArray(c.row.dotpoints) ? c.row.dotpoints : [];
+    if (!dps.length) return '—';
     const seen = marks[c.row.id]?.dotpoints || {};
-    const n = keys.filter(k => Number(seen[k]?.questions) > 0).length;
-    return `${Math.round((100 * n) / total)}%`;
+    const n = dps.filter((dp, i) => {
+      const own = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy).attempts : 0;
+      const key = typeof dp === 'object' && dp?.id ? String(dp.id) : String(i);
+      return own > 0 || Number(seen[key]?.questions) > 0 || Number(seen[String(i)]?.questions) > 0;
+    }).length;
+    return `${Math.round((100 * n) / dps.length)}%`;
   };
   // The resume card's ten segments: the last attempt's own marks, nothing more.
   const resumeMarks = recent && Number.isInteger(recent.marksPossible) && recent.marksPossible > 0 && !recent.repeat
