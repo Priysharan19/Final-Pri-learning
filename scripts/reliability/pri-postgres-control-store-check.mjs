@@ -72,7 +72,7 @@ try {
  await ok('advisory lock serializes concurrent Postgres clients',async()=>{
   const events=[];
   const first=store.transaction('prilearning:trusted-main-authority',async()=>{
-   events.push('A-enter');await new Promise(resolve=>setTimeout(resolve,150));events.push('A-exit')
+   events.push('A-enter');await new Promise(resolve=>setTimeout(resolve,150));events.push('A-exit');
   });
   await new Promise(resolve=>setTimeout(resolve,20));
   const second=store.transaction('prilearning:trusted-main-authority',async()=>{events.push('B-enter')});
@@ -87,5 +87,5 @@ try {
   assert.equal(r.rowCount,1);
  });
  console.log(`PASS: ${count} real isolated PostgreSQL 17 transaction, webhook replay, emergency queue, CAS receipt and serialization checks`);
-}catch(error){console.error('DISPOSABLE_POSTGRES_TEST_FAILED',error);process.exitCode=1}
-finally{await pool.end()}
+}catch(error){console.error('DISPOSABLE_POSTGRES_TEST_FAILED',error);process.exitCode=1;}
+finally{await pool.end();}
