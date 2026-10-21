@@ -1198,33 +1198,28 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
 .in-bar-slot .in-segc button { min-height: 28px; }
 
 /* ── Craft layer (interface polish 1) ──────────────────────────────────────
-   One motion vocabulary, one elevation scale, one focus ring. Additive: it
-   restates timing and depth on existing hooks and changes no geometry that a
-   tour measures. Motion is transform/opacity only and is off under
+   One motion vocabulary and one elevation scale; focus keeps the global
+   outline ring (it survives forced-colors and never hides a state shadow). Additive: it
+   restates timing and depth on existing hooks; the one geometry change is the
+   iPad writing bar below. Motion is transform/opacity only and is off under
    prefers-reduced-motion (theme.css also zeroes every duration there). */
 html.ui-instrument {
   --in-ease-out: cubic-bezier(.2, 0, 0, 1);
-  --in-ease-spring: cubic-bezier(.3, 1.3, .5, 1);
+  --in-ease-spring: cubic-bezier(.2, 1.1, .4, 1);
   --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms;
   --in-sh-1: 0 0 0 1px var(--in-edge), 0 1px 0 var(--in-edge);
   --in-sh-2: 0 0 0 1px var(--in-edge-2), 0 1px 2px var(--in-edge), 0 8px 24px -14px var(--in-shadow);
   --in-sh-3: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3), 0 24px 64px -24px var(--in-shadow);
-  --in-ring: 0 0 0 2px var(--in-base), 0 0 0 4px var(--in-signal);
-}
-
-/* Focus: a two-tone ring that reads on every surface, paper or graphite. */
-html.ui-instrument :is(.in-btn, .in-tab, .in-ch, .in-cmd, .in-pal-item, .in-thumb, .in-strip button, .in-flt, .mnav-item):focus-visible {
-  outline: none; box-shadow: var(--in-ring);
 }
 
 /* Press: everything a finger or cursor commits to gives back a little. */
 .in-btn, .in-ch, .in-tab, .in-flt, .in-pal-item, .in-cmd {
   transition: transform var(--in-dur-1) var(--in-ease-out), background-color var(--in-dur-2) var(--in-ease-out), color var(--in-dur-2) var(--in-ease-out), box-shadow var(--in-dur-2) var(--in-ease-out);
 }
-.in-btn:active, .in-flt:active { transform: scale(.98); }
+.in-btn:active, .in-flt:active { transform: scale(.985); }
 .in-ch:active, .in-pal-item:active { transform: scale(.995); }
 .in-tab:hover { background: color-mix(in srgb, var(--in-l3) 55%, transparent); }
-.in-tab:active { transform: scale(.97); }
+.in-tab:active { transform: scale(.98); }
 .in-flt:hover:not([aria-pressed="true"]) { background: var(--in-l1); color: var(--in-tx); }
 .in-pal-item:hover:not([aria-selected="true"]) { background: var(--in-l3); }
 
@@ -1259,11 +1254,11 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
 @media (min-width: 761px) and (max-width: 1100px) {
   html.ui-instrument .ws-actions .in-wbar-note { display: none; }
   html.ui-instrument .ws-actions .status-line { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 1; min-width: 0; }
-  html.ui-instrument .ws-actions .status-line > * { margin-left: 0; }
+  html.ui-instrument .ws-actions .status-line > * { margin-left: 0; overflow-wrap: anywhere; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .in-pal, .in-plate-head, .in-plate .in-scope, .in-plate-acts, .in-report-head, .in-report-figs, .in-rp { animation: none; }
+  .in-pal, .in-scrim, .in-plate-head, .in-plate .in-scope, .in-plate-acts, .in-report-head, .in-report-figs, .in-rp { animation: none; }
   .in-btn, .in-ch, .in-tab, .in-flt, .in-pal-item, .in-cmd { transition: none; }
   .in-btn:active, .in-flt:active, .in-ch:active, .in-pal-item:active, .in-tab:active { transform: none; }
 }
