@@ -77,6 +77,7 @@ export const ENGINE_SUITES = [
   // The data export behind fresh proof of the credential, and the new-device
   // sign-in notice: session rows, audit rows and the step-up on Postgres too.
   'export-reauth-check.mjs',
+  'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   'verification-enforcement-check.mjs',
@@ -105,6 +106,8 @@ export const ENGINE_SUITES = [
   'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
+  // CodeQL #461: the same account-keyed quota must serialize on real Postgres.
+  'pr618-recognition-rate-concurrency-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening
   // set (session lifetime, sync quota, per-account RLS scope, password policy,
   // join-code encryption, guardian withdrawal credential, health exposure).

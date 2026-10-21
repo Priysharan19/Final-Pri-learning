@@ -66,7 +66,7 @@ try{
  eq(a.status,201);
  eq((await verifyEmail(h,a.account.id)).status,200);
  const q=await issue(a.jar);eq(q.status,201);
- const shown=reading({...a.jar});
+ void reading({...a.jar});
  const reply=await waitingProvider();
  const running=recognize({...a.jar},q.data.question.id);
  await joined();
@@ -82,7 +82,7 @@ try{
  const foreign=await recognize({...b.jar},q.data.question.id);
  eq(foreign.status,404,'foreign account cannot enter provider route for another question');
  const fresh=await issue(b.jar);eq(fresh.status,201);
- const shown2=reading({...b.jar});
+ void reading({...b.jar});
  const reply2=await waitingProvider();
  const running2=recognize({...b.jar},fresh.data.question.id);
  await joined();
@@ -114,7 +114,7 @@ try{
  eq(confirmed.data?.confirmed,true,'guardian consent granted');
  const childQuestion=await issue(childJar);
  eq(childQuestion.status,201,'guardian-approved minor receives online issued question');
- const shownChild=reading({...childJar});
+ void reading({...childJar});
  const heldReply=await waitingProvider();
  const heldChild=recognize({...childJar},childQuestion.data.question.id);
  await joined();

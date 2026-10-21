@@ -86,7 +86,7 @@ export async function closeOnlinePlatform() {
   if (running) await (await running.catch(() => null))?.close();
 }
 
-export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
+export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPractice = false } = {}) {
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`online-session: ${dist} has no built client`);
   const saved = Object.fromEntries([...Object.keys(ENV), ...Object.keys(env), ...ENV_CLEARED, 'PRI_AUTH_DELIVERY_KEY'].map(k => [k, process.env[k]]));
   process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '44'.repeat(32);
@@ -94,6 +94,9 @@ export async function startOnlinePlatform({ dist = DIST, env = {} } = {}) {
     if (v === null || v === undefined) delete process.env[k]; else process.env[k] = String(v);
   }
   for (const k of ENV_CLEARED) delete process.env[k];
+  // Only an explicit, isolated browser test can use the deterministic seed
+  // gate. Default tours and every production runtime keep seed rejection.
+  if (allowSeededPractice === true) process.env.NODE_ENV = 'test';
 
   // The stand-in reader. `text` / `confidence` are scripted by the flow; every
   // request the provider module sends is kept so a flow can prove the reader

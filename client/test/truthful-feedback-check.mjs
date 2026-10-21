@@ -48,7 +48,7 @@ const hi = say(HI, 'hi');
 // A resolved reply carries { correct, stepReport, partial } from exactly this.
 function serverReply(q, answer, lines) {
   const steps = lines && lines.length ? lines.join('\n') : undefined;
-  const result = checkAnswer(q, answer, { steps });
+  const result = checkAnswer(q, answer);
   const evidence = stepEvidence(q, answer, steps, result);
   return {
     authoritative: true, resolved: true, invalid: result.invalid === true, correct: result.correct === true,
@@ -249,6 +249,24 @@ const EQN = { answerType: 'numeric', answer: { value: 4 }, answerPrefix: 'x =', 
   ok(typed !== revisionKey({ questionId: 'q1', mode: 'type', answer: '168', working: '100 + 68' }), 'different typed working is a different revision');
   ok(typed === revisionKey({ questionId: 'q1', mode: 'type', answer: ' 168 ', working: '' }), 'surrounding spaces are not a correction');
   ok(revisionKey({ questionId: 'q1', mode: 'photo', photo: 'data:a', answer: '1' }) !== revisionKey({ questionId: 'q1', mode: 'photo', photo: 'data:bb', answer: '1' }), 'another photo is a different revision');
+  // Regression: two different photos can share length and base64 suffix.
+  // The old suffix-only revision key wrongly kept the prior verdict live.
+  const a = 'data:image/png;base64,' + 'A'.repeat(1500) + 'B'.repeat(30);
+  const b = 'data:image/png;base64,' + 'C'.repeat(1500) + 'B'.repeat(30);
+  const photoBase = { questionId: 'q1', mode: 'photo', answer: '8', working: '2 + 6' };
+  const photoA = revisionKey({ ...photoBase, photo: a });
+  const photoB = revisionKey({ ...photoBase, photo: b });
+  ok(photoA !== photoB, 'different equal-length photos sharing a suffix have different revisions');
+  ok(annotationsLive({ judged: { revision: photoA }, currentKey: photoB }) === false,
+    'old feedback is withdrawn on equal-length replacement photo');
+  const lines = { lines: [{ text: '2 + 6', excluded: false }, { text: '8', excluded: false }] };
+  const lineEdited = { lines: [{ text: '2 + 6', excluded: false }, { text: '8', excluded: true }] };
+  ok(revisionKey({ ...photoBase, photo: a, photoLines: lines }) !==
+     revisionKey({ ...photoBase, photo: a, photoLines: lineEdited }),
+    'exclusion of a photo transcript line invalidates its prior verdict even when answer and working fields match');
+  ok(revisionKey({ ...photoBase, photo: a, photoLines: lines }) ===
+     revisionKey({ ...photoBase, photo: a, photoLines: lines }),
+    'unchanged photo and transcript have a stable revision identity');
   ok(revisionKey({ questionId: 'q1', mode: 'mcq', choice: 0 }) !== revisionKey({ questionId: 'q1', mode: 'mcq', choice: 2 }), 'another choice is a different revision');
 }
 

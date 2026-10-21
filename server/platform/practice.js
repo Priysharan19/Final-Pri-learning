@@ -1195,10 +1195,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
           solution: solutionFor(q),
-          // The engine's mark said as CBSE-style step rows (display only; they
-          // sum to marksEarned or are omitted). Only on a resolution, when the
-          // solution is disclosed anyway, so an open try learns nothing.
-          ...(invalid ? {} : { markRows: markRowsFor(q, { marksEarned, marksPossible, correct: result.correct === true, creditedMarks }) }),
+          // Supplemental aggregate marking: no per-step allocations are invented.
+          ...(!invalid ? { markRows: markRowsFor(q, {
+            marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
+            correct: result.correct === true,
+            partial, workingNotRead: notRead, resolved
+          }) } : {}),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these
           // server-attested authored distractor explanations, not from an answer key.

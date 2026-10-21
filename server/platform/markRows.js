@@ -1,74 +1,53 @@
-// Pri Learning — step-mark rows for a resolved practice reply (display only).
-//
-// The deterministic engine has already decided `marksEarned` out of
-// `marksPossible` (server/platform/practice.js, markerOps.js). These rows only
-// SAY that decision in the shape of a CBSE marking scheme — one row per
-// authored key step of the question, the last row the final answer — so the
-// student can see which part of the question the marks sit on. They never
-// decide, raise or lower a mark:
-//
-//   · the rows are built from the same facts the mark came from (the
-//     question's key steps, `marksPossible`, `marksEarned`, `correct`) and
-//     their earned column sums to `marksEarned` by construction — the reply
-//     is refused rows if it would not (fail closed);
-//   · method credit is shown in the order an examiner reads down the page:
-//     the first `marksEarned` working rows, never the answer row, for a wrong
-//     answer (the server caps a wrong answer at marksPossible − 1);
-//   · authored step headings label the rows ONLY when the answer is correct
-//     (every row earned, so naming them claims nothing). For a wrong answer
-//     the engine's method credit counts verified lines without matching them
-//     to authored steps, so the rows are neutral numbered method marks — a
-//     row never says which named step the student did or missed. Headings
-//     are engine content (English by policy, like the question and solution);
-//     a heading that names nothing ("Step 2") becomes a numbered row.
-//
-import { isSchemeStep } from './markerOps.js';
+// Pri Learning — truthful V1 aggregate mark presentation.
+// Extracted from the feature intention in PR #608, NOT its speculative
+// "first N rows earned" algorithm. This module NEVER awards marks.
+// Only committed, resolved deterministic practice outcomes reach clients.
+// An authored solution step is not evidence that the student's matching
+// step was verified. The current marker gives aggregate method credit, not
+// a per-rubric-row allocation, so this contract contains NO earned step rows.
+export const VERIFIED_MARKS_SCHEME = 'pri-practice-verified-aggregate-v1';
 
-// Research decision D-R4-CBSE-STEP-MARKS-01 (issue #178, accepted): a generic
-// split is Pri practice feedback, not an official CBSE scheme, and is labelled
-// so (`scheme: 'pri-practice-cbse-style'`). Whole marks only: the engine has
-// no half-mark rubric, so this never shows ½. Pure: no store, clock or secret.
+export function markRowsFor(_question, {
+  marksEarned, marksPossible, correct, attemptId, submissionId, creditedMarks = null, partial = null,
+  resolved = false, invalid = false, revealed = false, workingNotRead = false
+} = {}) {
+  if (resolved !== true || invalid === true || revealed === true ||
+      typeof correct !== 'boolean' || typeof attemptId !== 'string' ||
+      !attemptId || typeof submissionId !== 'string' || !submissionId) return null;
+  const possible = marksPossible;
+  const earned = marksEarned;
+  if (!Number.isInteger(possible) || possible < 1 || possible > 4 ||
+      !Number.isInteger(earned) || earned < 0 || earned > possible ||
+      (correct && earned !== possible) || (!correct && earned >= possible)) return null;
 
-const NAMELESS = /^\s*(step\s*\d*|working|\d+)\s*[.:)]?\s*$/i;
+  // Hint deductions are a separate ACCOUNT-CREDITED total. Invalid credit
+  // metadata must suppress this optional presentation, never the saved grade.
+  if (creditedMarks !== null &&
+      (!Number.isFinite(creditedMarks) || creditedMarks < 0 || creditedMarks > earned)) return null;
 
-const heading = step => String(step?.h ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  // A wrong answer gets its marks ONLY from the deterministic method checker.
+  // We can accurately display that number as aggregate credit, but cannot
+  // assign it to particular authored headings or student lines.
+  if (!correct && (
+    (partial != null && (!Number.isInteger(partial.awarded) || partial.awarded !== earned)) ||
+    (earned > 0 && (workingNotRead || partial == null))
+  )) return null;
 
-export function markRowsFor(q, { marksEarned, marksPossible, correct, creditedMarks = null }) {
-  const possible = Number(marksPossible);
-  const earned = Number(marksEarned);
-  if (!Number.isInteger(possible) || possible < 1 || !Number.isInteger(earned) || earned < 0 || earned > possible) return null;
-  if (!correct && earned > possible - 1) return null;
-
-  const keySteps = (q?.steps || []).filter(isSchemeStep);
-  // One row per mark. The final answer is always the last row and worth one
-  // mark; the working steps before it share the rest, earlier ones grouped
-  // when there are more steps than marks.
-  const working = keySteps.slice(0, -1).map((s, i) => ({ label: NAMELESS.test(heading(s)) || !heading(s) ? null : heading(s), n: i + 1 }));
-  const rowsWanted = possible - 1;
-  const rows = [];
-  if (rowsWanted > 0) {
-    const per = Math.max(1, Math.ceil(working.length / rowsWanted));
-    for (let i = 0; i < rowsWanted; i += 1) {
-      const group = working.slice(i * per, (i + 1) * per);
-      const named = group.map(g => g.label).filter(Boolean);
-      rows.push({ kind: 'working', label: correct && named.length ? named.join(', ') : null, step: i + 1, outOf: 1 });
-    }
+  const result = {
+    scheme: VERIFIED_MARKS_SCHEME,
+    attribution: 'aggregate-only',
+    identity: { attemptId, submissionId },
+    totals: { earned, possible },
+    finalAnswer: correct ? 'accepted' : 'not-accepted'
+  };
+  if (!correct && !workingNotRead) {
+    result.method = { awarded: earned, attribution: 'aggregate-only' };
   }
-  rows.push({ kind: 'answer', label: null, step: possible, outOf: 1 });
-
-  // Credit, in reading order.
-  let budget = correct ? possible : earned;
-  for (const row of rows) {
-    if (row.kind === 'answer') { row.earned = correct ? 1 : 0; continue; }
-    row.earned = correct || budget > 0 ? 1 : 0;
-    if (!correct) budget -= row.earned;
+  if (workingNotRead) result.workingEvidence = 'not-read';
+  if (creditedMarks !== null && creditedMarks < earned) {
+    result.totals.creditedAfterHints = creditedMarks;
   }
-  const sum = rows.reduce((s, r) => s + r.earned, 0);
-  const total = rows.reduce((s, r) => s + r.outOf, 0);
-  if (sum !== earned || total !== possible) return null; // never contradict the mark
-  // The rows are the engine's mark before any hint charge; when hints lowered
-  // what was credited, the reply says so beside them.
-  const credited = Number(creditedMarks);
-  const charged = Number.isFinite(credited) && credited >= 0 && credited < earned;
-  return { scheme: 'pri-practice-cbse-style', rows, ...(charged ? { creditedAfterHints: credited } : {}) };
+  // Correct answers get full question marks from answer correctness, NOT
+  // independent confirmation that every intermediate step was verified.
+  return result;
 }
