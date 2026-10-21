@@ -137,7 +137,7 @@
     "test:marker:rubrics": "node client/test/marker-working-rubrics-check.mjs",
     "test:marker:lost": "node client/test/marker-lost-marks-check.mjs",
     "test:marker:verified": "node server/test/verified-step-marks-check.mjs && node client/test/verified-step-marks-check.mjs",
-    "test:marker:tolerance": "node client/test/marker-tolerance-policy-check.mjs",
+    "test:marker:tolerance": "node client/test/marker-tolerance-policy-check.mjs && node client/test/marker-precision-tol-content-check.mjs",
     "test:working:evidence": "node client/test/working-evidence-check.mjs",
     "test:typed:working": "node client/test/typed-answer-working-check.mjs",
     "test:drafts:background": "node client/test/background-draft-flush-check.mjs",
