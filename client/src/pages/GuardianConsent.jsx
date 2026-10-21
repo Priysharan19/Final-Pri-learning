@@ -12,9 +12,9 @@
 // phone or inbox approved. It is not identity verification (no DigiLocker);
 // see docs/release/otp-sign-in.md.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
-import { tLater, useT } from '../i18n/index.js';
+import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, tLater, useLanguage, useT } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import { GUARDIAN_NOTICE_VERSION } from '../components/SignUpFlow.jsx';
 import '../components/SignUpFlow.css';
@@ -37,6 +37,31 @@ function Notice({ t }) {
   );
 }
 
+// Parents can open this page on a different device with no student profile.
+// Their own notice must be readable in either supported language before approval.
+function GuardianLanguagePicker() {
+  const { chosen, t } = useLanguage();
+
+  useEffect(() => { void setLanguage(signInLanguage()); }, []);
+
+  const pick = (id) => {
+    rememberSignInLanguage(id);
+    void setLanguage(id);
+  };
+
+  return (
+    <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
+      role="group" aria-label={t('login.chooseLanguage')}>
+      {LANGUAGES.map(l => (
+        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+          lang={l.htmlLang} aria-pressed={chosen === l.id}
+          aria-label={t('lang.switchTo', { language: l.english })}
+          onClick={() => pick(l.id)}>{l.label}</button>
+      ))}
+    </div>
+  );
+}
+
 function Page({ children }) {
   return (
     <div className="auth-wrap">
@@ -44,6 +69,7 @@ function Page({ children }) {
         <div className="logo logo-lg" aria-label="Pri Learning">
           <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">{WORDMARK}<span className="logo-dot">.</span></span>
         </div>
+        <GuardianLanguagePicker />
         <div style={{ marginTop: 24 }}>{children}</div>
       </main>
     </div>

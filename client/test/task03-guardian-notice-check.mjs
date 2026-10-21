@@ -26,6 +26,10 @@ ok(guardianPage.includes('guardianConfirm(linkToken, GUARDIAN_NOTICE_VERSION)'),
 ok(/<Notice t=\{t\} \/>[\s\S]*guardian-link-approve/.test(guardianPage), 'and renders it above the approve button');
 ok(guardianPage.includes('noticeVersion: GUARDIAN_NOTICE_VERSION'), 'the code route sends the same version');
 ok(!accountAction.includes('guardianConfirm('), 'the account-action page, which shows no notice, never confirms');
+ok(guardianPage.includes('<GuardianLanguagePicker />'), 'both guardian channels offer an explicit language choice before the notice');
+ok(guardianPage.includes('setLanguage(signInLanguage())'), 'the unprofiled guardian restores a remembered language');
+ok(guardianPage.includes('rememberSignInLanguage(id)') && guardianPage.includes('lang={l.htmlLang}'),
+  'the guardian language control remembers the choice and names the script for assistive technology');
 ok(accountAction.includes('/guardian/consent#'), 'it sends a confirming guardian to the page that does');
 
 for (const [lang, strings] of [['en', en], ['hi', hi]]) {
