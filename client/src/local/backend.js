@@ -3963,6 +3963,9 @@ const routes = {
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: authoritative.solution || null,
+      // The server's mark as CBSE-style step rows (server/platform/markRows.js):
+      // display only, passed through as the server sent them.
+      markRows: authoritative.markRows || null,
       ...meta,
       ...certified,
       ...(authoritative.markRows ? { markRows: authoritative.markRows } : {}),

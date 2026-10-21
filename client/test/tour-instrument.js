@@ -236,6 +236,27 @@ export const writeFlow = {
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);
     writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+
+    // A second wrong try resolves the question: the reply now carries the
+    // server's mark as CBSE-style step rows, which must agree with it.
+    const replies = [];
+    page.on('response', async r => { if (/\/v1\/practice\/[^/]+\/submit$/.test(r.url())) { try { replies.push(await r.json()); } catch { /* not json */ } } });
+    await page.getByRole('button', { name: /^Submit/ }).last().click();
+    await page.waitForSelector('[data-step-marks]', { timeout: 30000 }).catch(() => {});
+    const reply = replies.at(-1) || null;
+    await check('the resolving reply carries step-mark rows', !!reply?.markRows?.rows?.length, JSON.stringify(reply?.markRows || null));
+    if (reply?.markRows?.rows) {
+      const sum = reply.markRows.rows.reduce((n, r) => n + r.earned, 0);
+      await check('the rows sum to the engine’s mark', sum === reply.marksEarned, `${sum} vs ${reply.marksEarned}/${reply.marksPossible}`);
+      await check('a wrong answer’s final-answer row earns nothing', reply.markRows.rows.at(-1).kind === 'answer' && reply.markRows.rows.at(-1).earned === 0);
+      await check('the rows are labelled Pri practice feedback, not an official scheme', reply.markRows.scheme === 'pri-practice-cbse-style');
+    }
+    const shown = await page.locator('[data-step-marks] [data-step-mark]').count();
+    await check('the card shows one row per mark', !!reply && shown === reply.marksPossible, `${shown} rows for ${reply?.marksPossible} marks`);
+    await check('no half marks are shown', !/½|0\.5/.test(await page.locator('[data-step-marks]').textContent().catch(() => '')));
+    const workingLabels = await page.locator('[data-step-marks] [data-step-mark="working"] .set-k').allTextContents();
+    await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
+    writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
     await page.emulateMedia({ colorScheme: 'light' });
     await page.waitForTimeout(400);
     writeFileSync(join(outDir, 'write-marked-web-light.png'), await page.screenshot({ animations: 'disabled' }));

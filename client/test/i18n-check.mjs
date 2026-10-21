@@ -227,7 +227,8 @@ const CONVERTED = [
   // the command bar and the chapter Index are read before anything else.
   'src/instrument/InstrumentBar.jsx',
   'src/instrument/CommandBar.jsx',
-  'src/instrument/IndexPage.jsx'
+  'src/instrument/IndexPage.jsx',
+  'src/instrument/StepMarks.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and
