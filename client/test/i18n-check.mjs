@@ -222,7 +222,17 @@ const CONVERTED = [
   // paper/instrument redesign: both are read by Hindi-medium students mid-task.
   'src/pages/ExamRoom.jsx',
   'src/ink/InkAnswer.jsx',
-  'src/pages/Placement.jsx'
+  'src/pages/Placement.jsx',
+  // The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): the shell bar,
+  // the command bar and the chapter Index are read before anything else.
+  'src/instrument/InstrumentBar.jsx',
+  'src/instrument/CommandBar.jsx',
+  'src/instrument/IndexPage.jsx',
+  'src/instrument/StepMarks.jsx',
+  'src/instrument/MapPage.jsx',
+  'src/instrument/ReportHead.jsx',
+  'src/instrument/MarkStrip.jsx',
+  'src/instrument/ReadingPlot.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and
@@ -246,6 +256,9 @@ const LITERAL_ALLOWLIST = new Map([
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD', 'examination boards, printed in Latin on the Hindi admit card too'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED', 'examination boards (flag-off build, no Olympiad), printed in Latin on the Hindi admit card too'],
   ['you@example.com', 'an example address, not prose'],
+  ['Pri', 'the product’s short name beside its mark in the instrument bar'],
+  ['⌘K', 'a key chord, printed as the keyboard prints it'],
+  ['esc', 'the label on the Escape key, printed as the keyboard prints it'],
   ['Password', 'placeholder replaced by t(); any survivor here is a failure'],
 ]);
 

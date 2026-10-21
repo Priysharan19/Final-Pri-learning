@@ -163,6 +163,8 @@ jobs:
           grep -Fq '2712000/2712000 self-checks passed across 339 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
+          # v1.1: step-mark rows say the engine's mark and never contradict it.
+          grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
@@ -236,7 +238,7 @@ jobs:
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
-          grep -Fq 'I18N: PASS — 189/189 checks' suites.log
+          grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 69 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
@@ -757,6 +759,9 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
+            # v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): builds with the
+            # flag on, so it runs last in this group.
+            node client/test/tour-instrument.js 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -912,6 +917,8 @@ jobs:
           grep -Fq 'E2E BROWSER: webkit' browser.log
           # Both engines ran the interface-quality tour (pipefail fails the shard on a red check).
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
+          # The v1.1 instrument tour ran (Chromium, flag-on build).
+          test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Preserve evidence that the interface tour ran in both engines.
           # Their measured coverage counts differ, so verify each separately.
