@@ -883,11 +883,24 @@ async function run() {
     // the scripted stand-in reader. Where focus goes when "Read my answer"
     // leaves the page, and what the stale and submit-reason states say.
     await step('practice · read on request', '/practice', async () => {
-      await typedQuestion();
-      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
-      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
-      await writeTab.click();
-      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      // Regression for #627: the replay is held for a while, as a slow runner
+      // does by chance, so the surface is still disabled when the canvas shows.
+      const SLOW_REPLAY = '**/v1/practice/*/submit';
+      await page.route(SLOW_REPLAY, async route => { await new Promise(r => setTimeout(r, 2500)); await route.continue().catch(() => { }); });
+      try {
+        await typedQuestion();
+        const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+        if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+        await writeTab.click();
+        // The question reopened here is the one "reconnect asked" left a held
+        // submission on, and relaunch recovery replays it as the card mounts.
+        // While that replay is in flight the writing surface is disabled
+        // (.ink-disabled: pointer-events none), so a stroke drawn then is never
+        // written and "Read my answer" never comes (#627; on a slow runner the
+        // replay outlasted the canvas appearing). Drawing waits until the surface
+        // accepts the pen, not merely until the canvas exists.
+        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      } finally { await page.unroute(SLOW_REPLAY); }
       const box = await page.locator('.ink-canvas-live').boundingBox();
       const stroke = async (x) => {
         await page.mouse.move(box.x + x, box.y + 40);
