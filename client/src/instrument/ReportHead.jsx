@@ -68,29 +68,32 @@ export default function ReportHead() {
     <section className="in-report" aria-labelledby="in-report-title" data-instrument-report>
       {/* The Progress page below carries the page's h1; this summary is its own
           section heading so the page keeps one h1. */}
-      <h2 id="in-report-title" className="in-report-title">{t('inst.reportTitle')}</h2>
+      {/* For an India profile the Progress page below demotes its own heading
+          under the instrument, so this is the page's one h1. */}
+      {user?.course === 'in'
+        ? <h1 id="in-report-title" className="in-report-title">{t('inst.reportTitle')}</h1>
+        : <h2 id="in-report-title" className="in-report-title">{t('inst.reportTitle')}</h2>}
       <div className="in-report-figs">
         <div><b>{view.answered}</b><small>{t('inst.reportAnswered')}</small></div>
-        <div data-report-marks><b>{view.certified.possible ? `${view.certified.earned}` : '—'}{view.certified.possible ? <span>/{view.certified.possible}</span> : null}</b><small>{t('inst.reportMarks')}</small></div>
-        <div><b>{view.days}</b><small>{t('inst.reportDays', { n: WEEKS })}</small></div>
-        <div><b>{view.streak}</b><small>{t('inst.reportStreak')}</small></div>
+        <div data-report-marks><b>{view.certified.possible ? `${view.certified.earned}` : '—'}{view.certified.possible ? <span>/{view.certified.possible}</span> : null}</b><small>{view.certified.possible ? t('inst.reportMarksPct', { p: Math.round((view.certified.earned / view.certified.possible) * 100) }) : t('inst.reportMarks')}</small></div>
+        <div><b>{view.days}</b><small>{t('inst.reportDays', { n: WEEKS })}</small>{view.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: view.streak })}</em></>}</div>
       </div>
-      <div className="in-report-row">
-        <div className="in-report-heat">
-          <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
+      <div className="in-report-heat">
+        <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
+        <div className="in-report-heat-body">
           <div className="in-heat" role="img" aria-label={t('inst.reportHeatSpoken', { days: view.days, n: WEEKS })}>
             {view.cells.map(c => <i key={c.key} style={{ '--v': c.n ? 0.25 + (c.n / view.max) * 0.75 : 0 }} className={c.n ? 'is-on' : ''} title={t('inst.reportHeatCell', { date: c.key, n: c.n })} />)}
           </div>
-        </div>
-        <div className="in-report-lost">
-          <h2>{t('inst.reportLost')}</h2>
-          {view.lost.length ? (
-            <ul>{view.lost.map(c => (
-              <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
-                <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned} / ${c.possible}`}</small>
-              </li>
-            ))}</ul>
-          ) : <p className="in-note">{t('inst.reportLostNone')}</p>}
+          <div className="in-report-lost">
+            <h3>{t('inst.reportLost')}</h3>
+            {view.lost.length ? (
+              <ul>{view.lost.map(c => (
+                <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
+                  <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned} / ${c.possible}`}</small>
+                </li>
+              ))}</ul>
+            ) : <p className="in-note">{t('inst.reportLostNone')}</p>}
+          </div>
         </div>
       </div>
     </section>
