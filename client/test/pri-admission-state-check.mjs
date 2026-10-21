@@ -28,7 +28,7 @@ ok('signed-event linkage',()=>assert.equal(eventDigest(signed.payload).length,64
 denied('missing source mission',/NON_MANAGED_ISSUE/,()=>appendGrant(empty,request,[],pr,sha,'owner',1,now,privateKey,publicKey));
 denied('wrong PR exact head',/UNTRUSTED_PR_HEAD/,()=>appendGrant(empty,request,[issue()],{...pr,head:{ref:branch,sha}},sha,'owner',1,now,privateKey,publicKey));
 denied('wrong base',/BASE_SHA_MOVED/,()=>appendGrant(empty,request,[issue()],pr,head,'owner',1,now,privateKey,publicKey));
-denied('non-triaged grant',/WRITER_STATE_NOT_ADMISSIBLE/,()=>appendGrant(empty,request,[issue('REVIEW')],pr,sha,'owner',1,now,privateKey,publicKey));
+denied('non-triaged grant',/REVIEW_WITHOUT_SIGNED_PROVENANCE|WRITER_STATE_NOT_ADMISSIBLE/,()=>appendGrant(empty,request,[issue('REVIEW')],pr,sha,'owner',1,now,privateKey,publicKey));
 denied('forged signature',/INVALID_EVENT_SIGNATURE/,()=>inspectSignedLog({...grant,events:[{...signed,signature:'AAAA'}]},publicKey,now));
 denied('edited identity after signature',/INVALID_EVENT_SIGNATURE/,()=>inspectSignedLog({...grant,events:[{...signed,payload:{...signed.payload,agent:'qa-release'}}]},publicKey,now));
 denied('reordered sequence',/BROKEN_EVENT_CHAIN/,()=>inspectSignedLog({...grant,events:[{...signed,payload:{...signed.payload,seq:2}}]},publicKey,now));
@@ -129,7 +129,7 @@ const colliding={...signed.payload,
   seq:2, prev:eventDigest(signed.payload),issue_number:801,
   mission:'collision',agent:'platform',branch:'agent/mission/platform/collision',
   grant_id:'550e8400-e29b-41d4-a716-446655440000',paths:['client/src/pages/Login.jsx']};
-denied('signed conflicting source scopes rejected',/WRITER_SCOPE_CONFLICT/,()=>
+denied('signed conflicting source scopes rejected',/HISTORICAL_SCOPE_CONFLICT|WRITER_SCOPE_CONFLICT/,()=>
  inspectSignedLog({version:1,events:[signed,signEvent(colliding,privateKey)]},publicKey,now));
 denied('signed grant identifier reuse rejected',/REUSED_GRANT_ID/,()=>
  inspectSignedLog({version:1,events:[signed,signEvent({...colliding,grant_id:signed.payload.grant_id},privateKey)]},publicKey,now));

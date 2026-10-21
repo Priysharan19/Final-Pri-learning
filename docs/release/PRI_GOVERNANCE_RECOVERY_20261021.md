@@ -81,3 +81,39 @@ This PR alone does not satisfy the above conditions, and its passing tests
 cannot substitute for protected authority transaction evidence. Do not activate
 admissions, auto-merge review-gated code, rotate production credentials,
 change `deploy/production`, or deploy Railway through this candidate.
+
+## Phase 2 signed lifecycle (21 October) — implementation candidate
+
+- Writer GRANT -> checkpoint RENEW -> signed RELEASE is deliberately distinct from
+  emergency REVOKE. RELEASE is allowed only from truthful TESTING while the
+  signed checkpoint is unexpired and exactly equals the reviewed PR head.
+- A RELEASE removes write authority and preserves a signed immutable
+  `Pri-Review-Head` + `Pri-Provenance-Event` for REVIEW/CI/MERGE_READY. The
+  source remains reviewable after normal 12-hour lease expiration; a later
+  malicious REVOKE invalidates source eligibility.
+- Historical cap, owner, scope, temporal and source-base consistency are
+  checked after every event in the authenticated chain, not just at current
+  time. Expired historical leases do not falsely consume concurrent slots.
+- Protected signed Git CAS is first; editable issue status is a separately
+  reconciled projection. `RECONCILE` is idempotent and must use independent
+  environment approval. After CAS success + issue patch failure, authority
+  remains the signed chain, the workflow fails visibly, and repeat RECONCILE
+  is required. No issue edit grants permission.
+- `verifyReleasedSource` checks source PR, main, mission, exact release digest,
+  head SHA and scope. `verifyMergePolicy` additionally checks signed provenance
+  (autonomous lanes), live permissions/human reviews, last pusher exclusion,
+  source file owners, risk owners and pinned current-head hosted checks.
+  Legitimate task/* and feature/* branches retain the manual reviewed lane.
+- Code in the candidate checkout remains NOT trusted to authorize its own
+  merge. A distinct, installed, independently controlled GitHub App with
+  checks:write must execute protected-main code and publish the required status.
+  A green status from GitHub Actions App 15368 is NOT sufficient proof.
+- Native GitHub required checks are commit-based and a previously green check
+  need not automatically fail at the exact time of a later authority revocation.
+  Until the application has an enforced serialized just-in-time merge control,
+  revocation-aware webhook revalidation and a pinned required check source,
+  **DO NOT MERGE OR ACTIVATE** autonomous governance. This remaining platform
+  and credential dependency must not be represented as solved by passing tests.
+
+**Added QA tests:** `client/test/pri-source-provenance-check.mjs` and
+`client/test/pri-trusted-merge-policy-check.mjs`.
