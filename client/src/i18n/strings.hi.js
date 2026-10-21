@@ -3061,4 +3061,6 @@ export default {
   "inst.reportLost": "जहाँ अंक कटे",
   "inst.reportLostNone": "अभी तक कोई प्रमाणित अंक नहीं कटे।",
   "inst.reportHeatCell": "{date}: {n} प्रश्न",
+  "inst.plotTitle": "आपकी पंक्तियाँ, आलेख में",
+  "inst.plotNote": "आपकी लिखावट से Pri ने जो पढ़ा, उसका चित्र। इससे कभी अंक तय नहीं होते।",
 };
