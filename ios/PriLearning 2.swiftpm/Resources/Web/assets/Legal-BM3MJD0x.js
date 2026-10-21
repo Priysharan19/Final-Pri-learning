@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:ios/PriLearning 2.swiftpm/Resources/Web/assets/Legal-BM3MJD0x.js
 import{n as e}from"./rolldown-runtime-CbXtAM7H.js";import{c as t,m as n,r,t as i}from"./vendor-react-Dtm3F6TO.js";import{t as a}from"./preload-helper-BZ1Pz5am.js";import{n as o}from"./strings.en-CNA9ELlQ.js";import{l as s,s as c}from"./i18n-BIDPPCzP.js";var l=e(n(),1),u=`# Privacy notice
+========
+import{n as e}from"./rolldown-runtime-CbXtAM7H.js";import{c as t,m as n,r,t as i}from"./vendor-react-Dtm3F6TO.js";import{t as a}from"./preload-helper-BZ1Pz5am.js";import{n as o}from"./strings.en-B59ZYa-8.js";import{l as s,s as c}from"./i18n-BMNarpw_.js";var l=e(n(),1),u=`# Privacy notice
+>>>>>>>> origin/agent/mission/student-experience/m-v11-instrument-15:ios/PriLearning 2.swiftpm/Resources/Web/assets/Legal-CNBL8Elg.js
 
 **Last updated: 19 October 2026**
 
