@@ -230,6 +230,8 @@ export default {
   'history.modeTask': 'Task',
   'history.emptyAll': 'Nothing here yet — answer some questions and they’ll appear immediately.',
   'history.emptyFiltered': 'Nothing matches this filter yet.',
+  'history.emptyTitle': 'No scripts yet',
+  'history.startPractising': 'Start practising',
   'history.addBookmark': 'Bookmark this question',
   'history.removeBookmark': 'Remove bookmark',
   'history.addBookmarkOn': 'Add the bookmark on this {topic} question',
@@ -2803,6 +2805,7 @@ export default {
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to Pri Learning",
   'login.welcomeSub': "Your mathematics journey starts here.",
+  'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",
   'signup.inlineLead': "We’ll email you a six-digit code. Everything on this page stays as it is.",

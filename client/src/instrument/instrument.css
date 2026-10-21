@@ -617,39 +617,181 @@ html.ui-instrument .pg { width: 100%; }
 .in-reading-plot .in-note { margin-top: 8px; font-size: 12px; }
 html.ui-instrument { --plot-a: var(--in-c1); --plot-b: var(--in-c3); --plot-c: var(--in-c2); --plot-grid: var(--in-edge); --plot-axis: var(--in-tx-3); }
 
-/* ── Settings, sign-in and states (step 8) ─────────────────────────────────── */
-/* Settings: the open section carries the same signal tick as the rail. */
-html.ui-instrument .set-menu { border-radius: 6px; border-color: var(--in-edge); background: var(--in-l1); }
-html.ui-instrument .set-menu-item { font: 500 14px var(--in-ui); color: var(--in-tx-2); border-bottom-color: var(--in-edge); }
-html.ui-instrument .set-menu-item.on { background: var(--in-l3); color: var(--in-tx); box-shadow: inset 2px 0 0 var(--in-signal); }
-@media (hover: hover) { html.ui-instrument .set-menu-item:hover { background: var(--in-l2); color: var(--in-tx); } }
-html.ui-instrument .set-row { border-bottom-color: var(--in-edge); }
-html.ui-instrument .set-row .set-k { color: var(--in-tx-2); }
+/* ── Settings, sign-in and states (step 8, design s9–s11) ──────────────────── */
+/* Settings: a borderless section rail with glyphs; the open section is a
+   raised chip, not a signal tick (signal orange belongs to the scan and the
+   app rail's current place). */
+html.ui-instrument .settings-grid { grid-template-columns: 240px minmax(0, 1fr); gap: 0; }
+html.ui-instrument .settings-grid > .grid { padding: 4px 0 0 32px; max-width: 640px; gap: 16px !important; }
+html.ui-instrument .set-menu { border: 0; border-right: 1px solid var(--in-edge); border-radius: 0; background: transparent; padding: 4px 12px 20px 0; display: grid; gap: 2px; align-content: start; overflow: visible; }
+html.ui-instrument .set-menu-item { border: 0; border-radius: 4px; padding: 8px 12px; gap: 10px; font: 500 14px var(--in-ui); color: var(--in-tx-2); transition: background 140ms cubic-bezier(.2, 0, 0, 1), color 140ms cubic-bezier(.2, 0, 0, 1); }
+html.ui-instrument .set-menu-item .in-glyph { flex: none; color: var(--in-tx-3); }
+html.ui-instrument .set-menu-item.on { background: var(--in-l2); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+html.ui-instrument .set-menu-item.on .in-glyph { color: var(--in-tx); }
+@media (hover: hover) { html.ui-instrument .set-menu-item:not(.on):hover { background: var(--in-l2); color: var(--in-tx); } }
+html.ui-instrument .set-menu-item:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--in-tx-2), 0 0 0 4px color-mix(in srgb, var(--in-tx) 14%, transparent); }
 
-/* Sign-in: one calm card on the base, the primary action filled. The ruled
-   notebook backdrop belongs to the paper interface; the instrument has none. */
+/* Grouped panels: each section is one .grp — a mono caption over rows. */
+html.ui-instrument .settings-grid .card {
+  border: 0; border-radius: 6px; padding: 0 0 4px; background: var(--in-l1);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge);
+}
+/* The panels below the grid (cloud account, reminders) keep their padding and
+   take the same surface, offset to the content column. */
+html.ui-instrument .settings-grid ~ .card, html.ui-instrument .content > [data-reminders-panel] {
+  border: 0; border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge);
+}
+html.ui-instrument .settings-grid .card > h2,
+html.ui-instrument .settings-grid .card > .spread > h2 {
+  margin: 0 !important; padding: 14px 16px 4px; font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3);
+}
+html.ui-instrument .settings-grid .card > .spread:has(> h2) { padding-right: 16px; }
+html.ui-instrument .settings-grid .card > :not(h2):not(.set-row):not(.spread:has(> h2)) { margin-left: 16px; margin-right: 16px; }
+html.ui-instrument .settings-grid .card > p.muted { font-size: 13px; color: var(--in-tx-3); }
+html.ui-instrument .set-row { padding: 13px 16px; border-bottom: 0; border-top: 1px solid var(--in-edge); border-radius: 0; font-size: 14px; gap: 16px; }
+html.ui-instrument .card > h2 + .set-row, html.ui-instrument .card > p + .set-row { border-top-color: var(--in-edge); }
+html.ui-instrument .set-row .set-k { color: var(--in-tx); font-weight: 500; display: block; }
+html.ui-instrument .set-row .set-k .muted { font-weight: 400; font-size: 13px !important; color: var(--in-tx-3); }
+html.ui-instrument .set-row .set-v { color: var(--in-tx-2); font-family: var(--in-ui); }
+html.ui-instrument .settings-grid .meter { height: 3px; border-radius: 2px; background: var(--in-l4); }
+html.ui-instrument .settings-grid .meter > i { background: var(--in-tx-2); }
+
+/* Switch skin for the on/off buttons (still a button with aria-pressed and its
+   On/Off name; only the drawing changes). */
+html.ui-instrument .set-v > .btn[aria-pressed] {
+  position: relative; width: 38px; min-width: 38px; height: 22px; min-height: 22px; padding: 0; border: 0; border-radius: 4px;
+  background: var(--in-l5); box-shadow: none; color: transparent; overflow: hidden; font-size: 0; transition: background 160ms cubic-bezier(.2, 0, 0, 1);
+}
+html.ui-instrument .set-v > .btn[aria-pressed]::after {
+  content: ''; position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--in-base); transition: transform 160ms cubic-bezier(.2, 0, 0, 1);
+}
+html.ui-instrument .set-v > .btn[aria-pressed="true"] { background: var(--in-tx); }
+html.ui-instrument .set-v > .btn[aria-pressed="true"]::after { transform: translateX(16px); }
+html.ui-instrument .set-v > .btn[aria-pressed]:disabled { opacity: 0.45; }
+@media (pointer: coarse) { html.ui-instrument .set-v > .btn[aria-pressed] { outline: 11px solid transparent; } }
+
+/* Segmented control (Appearance). */
+html.ui-instrument .seg { gap: 2px; padding: 3px; border: 0; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); }
+html.ui-instrument .seg > button { min-height: 30px; padding: 5px 12px; border-radius: 3px; font: 500 13px var(--in-ui); color: var(--in-tx-2); }
+html.ui-instrument .seg > button[aria-pressed="true"], html.ui-instrument .seg > button.on { background: var(--in-l5); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi); }
+
+/* Quiet and secondary buttons: a hairline ring, not a box. */
+html.ui-instrument .settings-grid .btn-ghost, html.ui-instrument .settings-grid .btn-quiet {
+  border: 0; border-radius: 4px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2), 0 1px 0 var(--in-edge);
+}
+
+/* Danger zone: last in its stack, a red hairline, a red caption. */
+html.ui-instrument .cs-stack { display: flex; flex-direction: column; }
+html.ui-instrument .cs-stack > .set-danger { order: 99; }
+html.ui-instrument .set-danger {
+  border: 0 !important; border-radius: 6px; background: var(--in-l1);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px color-mix(in srgb, var(--in-bad) 30%, transparent) !important;
+}
+html.ui-instrument .set-danger > .sc-label { font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-bad); }
+html.ui-instrument .set-danger .btn-danger, html.ui-instrument .set-danger button[type="submit"] {
+  background: transparent; color: var(--in-bad); border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--in-bad) 60%, transparent);
+}
+
+/* Neutral focus: a form field never shows the signal colour. */
+html.ui-instrument .input:focus, html.ui-instrument .otp-box:focus,
+html.ui-instrument select:focus, html.ui-instrument textarea:focus {
+  border-color: var(--in-tx-2); box-shadow: 0 0 0 1px var(--in-tx-2), 0 0 0 4px color-mix(in srgb, var(--in-tx) 14%, transparent); outline: none;
+}
+
+/* Phone: the section rail becomes a scrolling strip above the panels. */
+@media (max-width: 860px) {
+  html.ui-instrument .settings-grid { grid-template-columns: minmax(0, 1fr); }
+  html.ui-instrument .settings-grid > .grid { padding: 16px 0 0; max-width: none; }
+  html.ui-instrument .set-menu {
+    display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 0 10px; margin: 0 -16px; padding-inline: 16px;
+    border-right: 0; border-bottom: 1px solid var(--in-edge); position: static; background: transparent;
+  }
+  html.ui-instrument .set-menu::-webkit-scrollbar { display: none; }
+  html.ui-instrument .set-menu-item { flex: none; width: auto; white-space: nowrap; }
+}
+
+/* Sign-in (s10): the instrument at work on one side, one calm form on the
+   other. The paper build's ruled backdrop stays hidden. */
 html.ui-instrument .mathfield { display: none; }
 html.ui-instrument .auth-wrap { background: var(--in-base); }
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) {
+  display: grid; grid-template-columns: 1.05fr 0.95fr; place-items: stretch; padding: 0; min-height: 100dvh;
+}
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 32px;
+  background: var(--in-l1); box-shadow: inset 1px 0 0 var(--in-edge);
+}
+.in-signin-plot { position: relative; min-height: 100%; background: var(--in-void); overflow: hidden; }
+.in-signin-plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.in-signin-line {
+  position: absolute; left: 36px; right: 36px; bottom: 40px; margin: 0; max-width: 13em;
+  font: 500 clamp(26px, 2.6vw, 34px)/1.05 var(--in-ui); letter-spacing: -0.035em; color: var(--in-tx);
+}
+@media (max-width: 860px) {
+  html.ui-instrument .auth-wrap:has(> .in-signin-plot) { grid-template-columns: minmax(0, 1fr); }
+  html.ui-instrument .auth-wrap > .in-signin-plot { display: none; }
+  html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col { box-shadow: none; padding: 32px 16px; }
+}
 html.ui-instrument .auth-card,
-html.ui-instrument .signin-landing { border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }
-html.ui-instrument .signup-title { font: 500 26px/1.15 var(--in-ui); letter-spacing: -0.035em; }
+html.ui-instrument .signin-landing { border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }
+html.ui-instrument .auth-col > .signin-landing { box-shadow: none; padding-inline: 0; max-width: 304px; }
+html.ui-instrument .auth-col .hero-kicker { font: 500 11px var(--in-mono); letter-spacing: 0.1em; color: var(--in-tx-3); }
+html.ui-instrument .auth-col .hero-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; color: var(--in-tx); margin-top: 14px; }
+html.ui-instrument .auth-col .hero-sub { font-size: 13px; color: var(--in-tx-3); }
+html.ui-instrument .auth-col > p.muted { max-width: 304px; font-size: 12px !important; color: var(--in-tx-3); }
+html.ui-instrument .signup-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
+html.ui-instrument .signin-landing .input, html.ui-instrument .auth-card .input { height: 44px; border-radius: 4px; padding: 0 14px; font-size: 15px; background: var(--in-l1); }
+html.ui-instrument .signin-landing .btn, html.ui-instrument .auth-card .btn { border-radius: 4px; }
+html.ui-instrument .signin-landing .btn-ghost, html.ui-instrument .signin-landing .btn-quiet { border: 0; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2), 0 1px 0 var(--in-edge); }
 html.ui-instrument .signup-choice, html.ui-instrument .signup-back, html.ui-instrument .signup-cc { border-radius: 4px; border-color: var(--control-border); }
 html.ui-instrument .signup-choice.is-selected { border-color: var(--in-tx); background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-tx); }
 html.ui-instrument .otp-box { border-radius: 4px; font-family: var(--in-mono); }
-html.ui-instrument .input:focus, html.ui-instrument .otp-box:focus { border-color: var(--in-tx-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--in-signal) 22%, transparent); }
 
-/* States. Loading keeps the final geometry and breathes instead of sweeping a
+/* States (s11). Loading keeps the final geometry and sweeps a hairline
    gradient; offline says plainly what still works; empty points to a start. */
-html.ui-instrument .skeleton { background: var(--in-l2); animation: in-breathe 1.6s ease-in-out infinite; }
-@keyframes in-breathe { 50% { opacity: 0.55; } }
-@media (prefers-reduced-motion: reduce) { html.ui-instrument .skeleton { animation: none; } }
-html.ui-instrument .offline-entry {
-  display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px;
-  background: var(--in-l2); box-shadow: inset 2px 0 0 var(--in-c7), 0 0 0 1px var(--in-edge); color: var(--in-tx-2);
+html.ui-instrument .skeleton {
+  border-radius: 2px; background: linear-gradient(90deg, var(--in-l2), var(--in-l4), var(--in-l2));
+  background-size: 200% 100%; animation: in-sh 1.4s linear infinite;
 }
-html.ui-instrument .empty-state { border: 1px dashed var(--in-edge-3); border-radius: 8px; background: var(--in-l1); color: var(--in-tx-2); }
+@keyframes in-sh { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument .skeleton { animation: none; background: var(--in-l2); } }
+html.ui-instrument .offline-entry {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+  background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx-2);
+}
+html.ui-instrument .offline-entry::before {
+  content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--in-c7);
+}
+.in-state { display: grid; gap: 12px; justify-items: center; align-content: center; text-align: center; min-height: 250px; padding: 22px 18px; }
+.in-state-orb { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx-2); }
+.in-state-orb.is-good { color: var(--in-good); }
+.in-state-orb.is-warn { color: var(--in-c7); }
+.in-state-orb.is-bad { color: var(--in-bad); }
+.in-state-title { margin: 0; font: 500 17px var(--in-ui); letter-spacing: -0.01em; color: var(--in-tx); }
+.in-state-copy { margin: 0; max-width: 36em; font-size: 14px; line-height: 1.5; color: var(--in-tx-2); }
+html.ui-instrument .empty-state { border: 0; border-radius: 6px; background: var(--in-base); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx-2); }
+html.ui-instrument .error-box {
+  border: 0; border-radius: 6px; padding: 12px 16px; background: var(--in-l1); color: var(--in-tx);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px color-mix(in srgb, var(--in-bad) 30%, transparent);
+}
+html.ui-instrument [data-history-load-error] { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 28px 18px; }
+html.ui-instrument [data-history-load-error]::before {
+  content: '!'; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-bad); font: 500 22px var(--in-mono);
+}
+html.ui-instrument [data-history-load-error] p { margin: 0; font: 500 17px var(--in-ui); }
 html.ui-instrument .toast { border-radius: 6px; background: var(--in-l3); color: var(--in-tx); box-shadow: 0 0 0 1px var(--in-edge-2), 0 16px 40px -18px rgba(0, 0, 0, 0.6); border: 0; }
-html.ui-instrument .error-box { border-radius: 6px; }
+html.ui-instrument .crash-card { border: 0; border-radius: 6px; background: var(--in-base); box-shadow: 0 0 0 1px var(--in-edge-2); padding: 0 0 18px; overflow: hidden; }
+html.ui-instrument .crash-card > .card-title { margin: 0 0 18px; padding: 12px 16px; border-bottom: 1px solid var(--in-edge); font: 500 11.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+html.ui-instrument .crash-card > :not(.card-title) { margin-left: 18px; margin-right: 18px; }
+html.ui-instrument .crash-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
+
+/* Notes (s13, "two voices"): prose talks in the interface sans; Computer
+   Modern stays for mathematics, which KaTeX draws in its own faces. */
+html.ui-instrument .nt { --nt-serif: var(--in-ui); }
+html.ui-instrument .nt-title { font-weight: 500; letter-spacing: -0.035em; }
+html.ui-instrument .nt-lede { font-size: 16px; }
 
 /* iPad: the rail-less bar keeps the tabs; the Index plate and Practice use the
    width, and the writing area never shrinks (form-factor-check). */
