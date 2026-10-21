@@ -1068,3 +1068,13 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
   .in-flt.is-menu select { width: 100%; max-width: none; }
   .in-led-search { width: 100%; height: 44px; }
 }
+
+/* ── The bar's page slot (design s7, s8) ───────────────────────────────────── */
+.in-bar-slot { display: contents; }
+.in-bar-slot:empty { display: none; }
+/* While a page's controls are in the bar, they take the place of the ⌘K field
+   and the status, as the design's bar shows (⌘K itself still opens the bar). */
+.in-bar:has(.in-bar-slot:not(:empty)) .in-cmd,
+.in-bar:has(.in-bar-slot:not(:empty)) .in-status { display: none; }
+.in-bar-slot .in-led-search { width: min(330px, 30vw); min-width: 0; height: 32px; padding: 0 10px; }
+.in-bar-slot .in-segc button { min-height: 28px; }

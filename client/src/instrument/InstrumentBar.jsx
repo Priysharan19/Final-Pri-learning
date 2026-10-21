@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import CommandBar from './CommandBar.jsx';
 import Glyph from './Glyph.jsx';
+import { setBarSlot } from './BarSlot.jsx';
 
 // The v1.1 shell bar: the mark, five tabs, the command field and the online
 // state. It replaces the rail and the old top bar when the instrument flag is
@@ -79,6 +80,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
           ))}
         </nav>
         <span className="in-spacer" />
+        <div className="in-bar-slot" ref={setBarSlot} data-instrument-bar-slot />
         <button type="button" className="in-cmd" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={t('inst.cmdOpenLabel')}>
           <Glyph name="search" /><span>{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">⌘K</span>
         </button>

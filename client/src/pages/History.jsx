@@ -19,6 +19,7 @@ import { featureEnabled } from '../platform/features.js';
 import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
+import BarSlot from '../instrument/BarSlot.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = featureEnabled('instrument');
@@ -357,12 +358,14 @@ function HistoryForProfile() {
                 {SORTS.map(([k, key]) => <option key={k} value={k}>{t('history.sortPrefix', { sort: t(key) })}</option>)}
               </select>
             </label>
+            <BarSlot>
             <label className="in-led-search">
               <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M10.4 10.4 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
               <input ref={searchRef} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={t('history.searchPlaceholder')}
                 aria-label={t('history.searchPlaceholder')} aria-keyshortcuts="/" data-history-search />
               <kbd className="in-kbd" aria-hidden="true">/</kbd>
             </label>
+            </BarSlot>
           </div>
           {searching && data && <p className="in-note" role="status" data-history-search-count>{t('history.searchFound', { count: shown.length, n: formatNumber(shown.length, user) })}</p>}
         </div>
