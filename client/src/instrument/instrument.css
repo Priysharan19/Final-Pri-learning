@@ -235,7 +235,7 @@ html.ui-instrument .mnav-item.active::before { content: none; }
 .in-pal-foot > span:last-child { margin-left: auto; }
 .in-pal-foot { display: flex; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--in-edge); font: 400 12px var(--in-mono); color: var(--in-tx-3); }
 @media (prefers-reduced-motion: reduce) { .in-pal, .in-scrim { animation: none; } }
-@media (max-width: 760px) { .in-pal-meta { display: none; } }
+@media (max-width: 760px) { .in-pal-meta, .in-pal-foot > span:last-child { display: none; } }
 
 /* ── The Index ───────────────────────────────────────────────────────────── */
 .in-index { display: grid; grid-template-columns: minmax(330px, 420px) minmax(0, 1fr); min-height: calc(100vh - 55px); background: var(--in-base); overflow: hidden; }
@@ -338,6 +338,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
   .in-kpis small { font-size: 10.5px; }
 }
 .in-next { position: relative; margin-top: 16px; height: 250px; border-radius: 8px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); overflow: hidden; }
+.in-next .in-eqn, .in-next .in-readout-hint { display: none; }
 .in-next .in-scope { position: absolute; inset: 0; height: 100%; border-radius: 0; box-shadow: none; background: none; }
 .in-next-ghost { position: absolute; right: -6px; top: -40px; font: 500 170px/1 var(--in-ui); letter-spacing: -0.08em; color: color-mix(in srgb, var(--cc) 7%, transparent); pointer-events: none; }
 .in-next-label { position: absolute; left: 16px; bottom: 14px; right: 16px; pointer-events: none; }
@@ -634,6 +635,7 @@ html.ui-instrument .error-box { border-radius: 6px; }
   html.ui-instrument .in-plate { padding: 22px 22px 20px; }
   html.ui-instrument .in-cmd { width: min(260px, 28vw); }
   html.ui-instrument .in-plate-head { flex-wrap: nowrap; }
+  html.ui-instrument .in-plate { grid-template-rows: auto minmax(240px, 520px) auto auto; }
   html.ui-instrument .in-kpis div { min-width: 72px; padding: 10px 12px; }
 }
 
