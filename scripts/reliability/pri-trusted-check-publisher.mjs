@@ -33,6 +33,24 @@ export function webhookEvidence(raw,signature,secret,expectedNumber,expectedHead
     'WEBHOOK_PROVENANCE_MISMATCH');
   return {actor:event.sender.login,head:event.pull_request.head.sha,number:event.pull_request.number};
 }
+// Called only by the trusted webhook ingress, not by a PR/workflow caller.
+// The persistent unique-delivery insert is atomic and never overwrites history.
+export async function recordVerifiedWebhook({raw,signature,secret,deliveryId,eventName,
+    prNumber,head,store}) {
+  ensure(eventName==='pull_request' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deliveryId||''),
+    'WEBHOOK_DELIVERY_HEADER_INVALID');
+  ensure(store && typeof store.recordDeliveryOnce==='function',
+    'DURABLE_WEBHOOK_DELIVERY_STORE_MISSING');
+  const verified=webhookEvidence(raw,signature,secret,prNumber,head);
+  const record={delivery_id:deliveryId,trusted_signature:true,repository:REPO,
+    pr_number:verified.number,head_sha:verified.head,sender_type:'User',
+    sender_login:verified.actor,event_name:eventName};
+  ensure(await store.recordDeliveryOnce(record)===true,
+    'WEBHOOK_DELIVERY_REPLAY_DETECTED');
+  return record;
+}
+
 export function activationGate({appId,repositoryAppId,branch,head,mainSha}) {
   ensure(HEX40.test(head||'') && HEX40.test(mainSha||''),'SOURCE_SHA_REQUIRED');
   ensure(appId>0 && repositoryAppId===appId,'TRUSTED_APP_IDENTITY_MISMATCH');

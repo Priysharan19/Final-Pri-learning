@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,createHmac,createVerify} from 'node:crypto';
-import {appJWT,webhookEvidence,activationGate} from './pri-trusted-check-publisher.mjs';
+import {appJWT,webhookEvidence,recordVerifiedWebhook,activationGate} from './pri-trusted-check-publisher.mjs';
 const R='Priysharan19/Final-Pri-learning', head='c'.repeat(40);
 const key='a-sufficiently-long-secret-for-tests-with-independent-key-custody';
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
@@ -35,4 +35,18 @@ for(const mod of [{appId:99},{repositoryAppId:99},{branch:{...policy,enforce_adm
 }
 deny('even fully protected config fails pending actual serial merge interlock',/SERIAL_MERGE_AND_REVOCATION_INTERLOCK_NOT_ACTIVATED/,()=>activationGate(good));
 deny('invalid head sha',/SOURCE_SHA_REQUIRED/,()=>activationGate({...good,head:'short'}));
-console.log(`PASS: ${total} independent App JWT, webhook provenance, merge-activation fail-closed assertions`);
+const deliveries=new Map();
+const store={recordDeliveryOnce:async proof=>{
+ if(deliveries.has(proof.delivery_id))return false;
+ deliveries.set(proof.delivery_id,proof);return true;
+}};
+const envelope={raw:body,signature:sign(body),secret:key,
+ deliveryId:'123e4567-e89b-42d3-a456-426614174000',eventName:'pull_request',
+ prNumber:45,head,store};
+const persisted=await recordVerifiedWebhook(envelope);
+assert.equal(persisted.trusted_signature,true);assert.equal(deliveries.size,1);total++;
+await assert.rejects(()=>recordVerifiedWebhook(envelope),/WEBHOOK_DELIVERY_REPLAY_DETECTED/);total++;
+await assert.rejects(()=>recordVerifiedWebhook({...envelope,deliveryId:'not-a-valid-header'}),/WEBHOOK_DELIVERY_HEADER_INVALID/);total++;
+await assert.rejects(()=>recordVerifiedWebhook({...envelope,deliveryId:'123e4567-e89b-42d3-a456-426614174001',signature:'sha256='+'0'.repeat(64)}),/WEBHOOK_SIGNATURE_INVALID/);total++;
+assert.equal(deliveries.size,1);
+console.log(`PASS: ${total} independent App JWT, webhook provenance, durable replay-denial and activation fail-closed assertions`);
