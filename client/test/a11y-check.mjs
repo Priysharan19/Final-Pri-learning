@@ -1503,7 +1503,7 @@ async function run() {
 
     section('read on request');
     ok('an earlier answer being checked again after a relaunch is said on the writing surface in words, the page stays writable, and a stroke written meanwhile is kept and offered for reading',
-      refusals.replay?.held === 1 && /\p{L}/u.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
+      refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
         refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
       JSON.stringify(refusals.replay));
     ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',

@@ -397,8 +397,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [replaying, setReplaying] = useState(false);
   const replayingRef = useRef(false);
   // Strokes reported while a submission was in flight, reported again when it
-  // settles, so the draft never misses them.
-  const deferredInkRef = useRef(null);
+  // settles — for the question they were written on, never another.
+  const deferredInkRef = useRef(null);   // { questionId, strokes }
+  const onInkStrokesRef = useRef(null);
+  const questionIdRef = useRef(String(question.id));
+  questionIdRef.current = String(question.id);
   // A submission that has not had a definitive answer: an identical retry
   // reuses its idempotency key, so a timeout followed by a second tap is still
   // one attempt.
@@ -467,6 +470,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setJudged(null); setJudgedStale(false); setInkSignature(null);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
+    deferredInkRef.current = null;
     ++inkSaveRevision.current;
     setPeekOpen(false);
     startRef.current = Date.now();
@@ -1038,7 +1042,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // The page's content, whatever else is going on: an annotation of an
     // earlier revision must not outlive a single new stroke.
     setInkSignature(Array.isArray(strokes) && strokes.length ? strokeSignature(strokes) : null);
-    if (inFlightRef.current) { deferredInkRef.current = strokes; return; }
+    if (inFlightRef.current) {
+      deferredInkRef.current = { questionId: String(question.id), strokes };
+      // Written during a relaunch replay: kept on disk now, whatever the
+      // replay's answer (edit detection waits for the replay to settle).
+      if (replayingRef.current) { setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0); saveInk(strokes); }
+      return;
+    }
     if (attemptRef.current) return;
     // New pen strokes after a submission was pressed are an edit of it. The
     // first report after a mount is the kept page being restored, not an edit.
@@ -1051,6 +1061,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     saveInk(strokes);
   }, [question.id, question.subtopicName]); // eslint-disable-line react-hooks/exhaustive-deps
+  onInkStrokesRef.current = onInkStrokes;
   /**
    * Keep the page: the strokes, and with them the transcript and typed answer
    * of the moment (inkExtrasRef). "Saved" is said only after exactly that has
@@ -1526,7 +1537,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (mountedRef.current) setBusy(false);
       const deferred = deferredInkRef.current;
       deferredInkRef.current = null;
-      if (deferred && mountedRef.current) onInkStrokes(deferred);
+      if (deferred && mountedRef.current && deferred.questionId === questionIdRef.current) onInkStrokesRef.current?.(deferred.strokes);
     }
   }
 
@@ -1565,7 +1576,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
         submissionId: pending.submissionId
       }, { lines: pending.lines, recovering: true, sourceMode: pending.sourceMode });
-    }).finally(() => { replayingRef.current = false; if (mountedRef.current) setReplaying(false); });
+    }).catch(() => { }).finally(() => { replayingRef.current = false; if (mountedRef.current) setReplaying(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
