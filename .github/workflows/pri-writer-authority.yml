@@ -4,21 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Signed admission operation (approval required)
+        description: Signed writer grant/checkpoint/release/revoke or issue-only recovery (independent approval required)
         required: true
         type: choice
-        options: [GRANT, RENEW, REVOKE]
+        options: [GRANT, RENEW, RELEASE, REVOKE, RECONCILE]
       issue_number:
         description: Canonical open mission issue
         required: true
         type: number
       pr_number:
-        description: Exact mission source pull request
-        required: true
+        description: Exact mission source pull request (required for GRANT/RENEW/RELEASE)
+        required: false
         type: number
       head_sha:
-        description: Exact 40-character source PR commit
-        required: true
+        description: Exact 40-character source PR commit (required for GRANT/RENEW/RELEASE)
+        required: false
         type: string
 
 permissions:
