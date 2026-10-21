@@ -512,45 +512,61 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 /* ── The syllabus map (step 5) ─────────────────────────────────────────────── */
 .in-map { display: grid; gap: 18px; }
 .in-map-head h1 { margin: 0; font: 500 30px/1.1 var(--in-ui); letter-spacing: -0.04em; color: var(--in-tx); }
-.in-map-head p { margin: 6px 0 0; color: var(--in-tx-2); font-size: 15px; max-width: 60ch; }
-.in-map-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
-.in-map-graph { position: relative; border-radius: 8px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); padding: 10px; }
-.in-map-graph svg { display: block; width: 100%; height: auto; }
+.in-map-head p { margin: 4px 0 0; color: var(--in-tx-2); font-size: 14px; font-weight: 300; font-variant-numeric: tabular-nums; }
+.in-map-body { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; align-items: start; }
+/* The open constellation: no box, the drawing sits on the page itself. */
+.in-map-graph { position: relative; padding: 10px 10px 44px; }
+.in-map-graph svg { display: block; width: 100%; height: auto; overflow: visible; }
+.in-map-stars rect { fill: var(--in-tx-4); opacity: 0.5; animation: in-map-twinkle 6.3s ease-in-out infinite alternate; }
+@keyframes in-map-twinkle { from { opacity: 0.35; } to { opacity: 0.65; } }
 .in-map-edge { fill: none; stroke: var(--in-edge-3); stroke-width: 1.4; }
-.in-map-edge.is-earlier { stroke-dasharray: 2 4; stroke: var(--in-edge-2); }
-.in-map-row { stroke: var(--in-edge); stroke-width: 1; }
+.in-map-edge.is-earlier { stroke-dasharray: 2 4; }
 .in-map-strand { font: 500 10.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; fill: var(--in-tx-3); }
 .in-map-strand.is-col { fill: var(--in-tx-4); }
 .in-map-foundation circle { fill: var(--in-l4); stroke: var(--in-edge-3); stroke-width: 1; }
-.in-map-edge.is-toward { stroke: var(--in-signal); stroke-dasharray: 3 7; animation: in-map-flow 1.6s linear infinite; }
-@keyframes in-map-flow { to { stroke-dashoffset: -20; } }
+.in-map-pulse { fill: var(--cc); filter: drop-shadow(0 0 4px var(--cc)); }
 .in-map-dot { fill: var(--cc); }
-.in-map-ring { fill: none; stroke: var(--cc); stroke-opacity: 0.5; stroke-width: 1; }
-.in-map-node.is-on .in-map-ring { stroke-opacity: 1; stroke-width: 2; }
-.in-map-next { fill: none; stroke: var(--in-signal); stroke-width: 1.5; stroke-dasharray: 2 4; }
-.in-map-label { font: 500 11px var(--in-mono); fill: var(--in-tx-3); }
-.in-map-list { list-style: none; margin: 0; padding: 0; position: absolute; inset: 10px; }
+.in-map-ring { fill: none; stroke: var(--cc); stroke-opacity: 0.55; stroke-width: 1; transform-box: fill-box; transform-origin: center; }
+.in-map-node.is-on .in-map-ring { stroke-opacity: 1; stroke-width: 2; animation: in-map-breathe 2.1s ease-in-out infinite alternate; }
+@keyframes in-map-breathe { from { transform: scale(0.95); } to { transform: scale(1.05); } }
+.in-map-name { font: 500 14px var(--in-ui); fill: var(--in-tx); }
+.in-map-label { font: 400 12px var(--in-mono); fill: var(--in-tx-3); }
+.in-map-legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
+.in-map-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.in-map-legend i.is-secure { background: var(--in-tx); }
+.in-map-legend i.is-building { background: var(--in-tx-3); }
+.in-map-legend i.is-new { background: var(--in-tx-4); }
+.in-map-list { list-style: none; margin: 0; padding: 0; position: absolute; inset: 10px 10px 44px; }
 .in-map-list li { position: absolute; transform: translate(-50%, -50%); }
 .in-map-hit { display: block; width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; }
 .in-map-hit:focus-visible { outline: 2px solid var(--in-signal); outline-offset: 0; }
 .in-map-hit-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.in-map-hit-dot { display: none; }
 /* Narrow screens: the drawing would crowd the 44px targets, so the map becomes
-   the same chapters as a list (strand and order kept), each one a row. */
+   a list of the same buttons, each with its colour, fill and how secure it is. */
 @media (max-width: 640px) {
-  .in-map-graph { padding: 6px; }
-  .in-map-graph svg { display: none; }
+  .in-map-graph { padding: 0; }
+  .in-map-graph svg, .in-map-legend { display: none; }
   .in-map-list { position: static; display: grid; gap: 2px; }
   .in-map-list li { position: static; transform: none; }
   .in-map-hit { width: 100%; height: auto; min-height: 44px; border-radius: 4px; text-align: left; padding: 8px 10px; color: var(--in-tx); }
-  .in-map-hit[aria-current="true"] { background: var(--in-l3); }
-  .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: flex; gap: 10px; font: 500 14px var(--in-ui); white-space: normal; }
+  .in-map-hit[aria-current="true"] { background: var(--in-l3); box-shadow: inset 0 1px 0 var(--in-hi); }
+  .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: flex; align-items: baseline; gap: 10px; font: 500 14px var(--in-ui); white-space: normal; }
+  .in-map-hit-dot { display: inline-block; flex: none; align-self: center; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px var(--cc);
+    background: color-mix(in srgb, var(--cc) calc(var(--f) * 100%), transparent); }
   .in-map-hit-name b { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
-  .in-map-hit-name small { margin-left: auto; font: 500 11px var(--in-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-3); }
+  .in-map-hit-name em { margin-left: auto; font: 500 11.5px var(--in-mono); font-style: normal; color: var(--in-tx-2); font-variant-numeric: tabular-nums; }
+  .in-map-hit-name small { width: 92px; flex: none; text-align: right; font: 500 10.5px var(--in-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-3); }
 }
-.in-map-card { position: sticky; top: 72px; display: grid; gap: 12px; padding: 18px; border-radius: 8px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2); }
-.in-map-card small { font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--cc); }
-.in-map-card h2 { margin: 0; font: 500 21px/1.2 var(--in-ui); letter-spacing: -0.03em; color: var(--in-tx); }
-.in-map-facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--in-edge); }
+.in-map-card {
+  position: sticky; top: 72px; display: grid; gap: 12px; padding: 18px; border-radius: 6px; background: var(--in-l2);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2), 0 24px 60px -24px var(--in-shadow);
+}
+.in-map-card small { font: 500 11px var(--in-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--cc); }
+.in-map-card h2 { margin: -6px 0 -8px; font: 500 21px/1.2 var(--in-ui); letter-spacing: -0.03em; color: var(--in-tx); }
+.in-map-prose { margin: 0; color: var(--in-tx-2); font-size: 13.5px; line-height: 1.5; }
+.in-map-card .in-btn { justify-self: start; min-height: 34px; }
+.in-map-facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--in-edge); }
 .in-map-facts div { padding: 8px 10px; background: var(--in-l1); }
 .in-map-facts div + div { border-left: 1px solid var(--in-edge); }
 .in-map-facts dt { font-size: 11.5px; color: var(--in-tx-3); }
@@ -558,35 +574,42 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-map-pre span { font: 500 11px var(--in-mono); letter-spacing: 0.08em; color: var(--in-tx-3); }
 .in-map-pre ul { margin: 6px 0 0; padding-left: 16px; color: var(--in-tx-2); font-size: 13.5px; }
 .in-map-pre em { font-style: normal; color: var(--in-tx-3); }
-.in-map-foot { font-size: 12.5px; }
-@media (max-width: 980px) { .in-map-body { grid-template-columns: 1fr; } .in-map-card { position: static; } }
-@media (prefers-reduced-motion: reduce) { .in-map-edge.is-toward { animation: none; } }
+.in-map-foot { font-size: 12.5px; max-width: 72ch; }
+@media (max-width: 980px) { .in-map-body { grid-template-columns: 1fr; } .in-map-card { position: static; } .in-map-card .in-btn { justify-self: stretch; min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .in-map-stars rect, .in-map-node.is-on .in-map-ring { animation: none; } }
 
 /* ── Report and Scripts (step 6) ───────────────────────────────────────────── */
 .in-report { display: grid; gap: 16px; margin-bottom: 28px; }
 .in-report-title { margin: 0; font: 500 34px/1.05 var(--in-ui); letter-spacing: -0.045em; color: var(--in-tx); }
-.in-report-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.in-report-figs div { padding: 16px; border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
+.in-report-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.in-report-figs > div, .in-report-heat { border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+.in-report-figs > div { padding: 16px; }
 .in-report-figs b { display: block; font: 500 34px/1 var(--in-ui); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; color: var(--in-tx); }
-.in-report-figs b span { font-size: 18px; color: var(--in-tx-3); letter-spacing: -0.02em; }
+.in-report-figs b span { font-size: 20px; color: var(--in-tx-3); letter-spacing: -0.02em; }
 .in-report-figs small { color: var(--in-tx-3); font-size: 12.5px; }
-.in-report-row { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px; }
-.in-report-heat, .in-report-lost { padding: 16px; border-radius: 8px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
-.in-report-heat h2, .in-report-lost h2 { margin: 0 0 12px; font: 500 11.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
-.in-heat { display: grid; grid-template-columns: repeat(15, 16px); grid-auto-flow: column; grid-template-rows: repeat(7, 16px); gap: 5px; }
-.in-heat i { border-radius: 3px; background: var(--in-l3); }
+.in-report-figs em { font: 500 11.5px var(--in-mono); font-style: normal; color: var(--in-good); }
+.in-report-heat { padding: 16px; }
+.in-report-heat h2, .in-report-lost h3 { margin: 0 0 12px; font: 500 12px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-report-lost h3 { font-size: 11px; }
+/* The heat-map fills its column; where marks were lost sits beside it on a
+   wide screen and under it on a narrow one, in the same card. */
+.in-report-heat-body { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 16px 28px; align-items: start; }
+.in-heat { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: 4px; }
+.in-heat i { aspect-ratio: 1; border-radius: 2px; background: var(--in-l3); }
 .in-heat i.is-on { background: color-mix(in srgb, var(--in-tx) calc(var(--v) * 100%), var(--in-l3)); }
 .in-report-lost ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.in-report-lost li { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 6px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px; color: var(--in-tx); }
-.in-report-lost li i { width: 8px; height: 8px; border-radius: 2px; background: var(--cc); }
+.in-report-lost li { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 4px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px; color: var(--in-tx); }
+.in-report-lost li i { width: 8px; height: 8px; border-radius: 50%; background: var(--cc); }
 .in-report-lost li small { font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
-@media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } .in-report-row { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } .in-report-heat-body { grid-template-columns: 1fr; } }
+/* The Progress page under the Report shares its width and gives up the h1. */
+html.ui-instrument .pg { width: 100%; }
 
-.in-strip { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px var(--in-mono); color: var(--in-tx-2); }
+.in-strip { display: inline-flex; align-items: center; gap: 8px; font: 500 12px var(--in-mono); color: var(--in-tx-2); }
 .in-strip > span:first-child { display: inline-flex; gap: 2px; }
 .in-strip i { width: 8px; height: 8px; border-radius: 2px; }
 .in-strip i.is-earned { background: var(--in-good); }
-.in-strip i.is-lost { background: transparent; box-shadow: inset 0 0 0 1.25px var(--in-slip); }
+.in-strip i.is-lost { background: var(--in-slip); }
 
 /* ── The student's own equations, drawn (step 7) ───────────────────────────── */
 .in-reading-plot { margin: 12px 0 0; padding: 12px; border-radius: 6px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); max-width: 520px; }
@@ -796,3 +819,38 @@ html.ui-instrument .step-d .katex { font-size: 1.25em; color: var(--in-tx); }
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument .ink-line { animation: none; }
 }
+
+/* ── Scripts: the ledger (s8) ──────────────────────────────────────────────── */
+html.ui-instrument .pg-head .pg-title { margin: 0; font: 500 21px/1.2 var(--in-ui); letter-spacing: -0.03em; color: var(--in-tx); }
+html.ui-instrument .in-led-bar { padding-bottom: 14px; border-bottom: 1px solid var(--in-edge); }
+html.ui-instrument .in-led-bar .pill-opt { min-height: 30px; padding: 0 11px; border-radius: 3px; }
+html.ui-instrument .in-led-bar .pill-opt.on, html.ui-instrument .in-led-bar .pill-opt[aria-pressed="true"] { background: var(--in-l3); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument .card.in-led { padding: 4px 0; border: 0; border-radius: 0; background: transparent; }
+.in-led-dayh { display: flex; gap: 10px; margin: 0; padding: 14px 22px 6px; font: 500 11.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+html.ui-instrument .hist-row.in-led-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; padding: 0 8px 0 0; border-bottom: 1px solid var(--in-edge); }
+html.ui-instrument .hist-row.in-led-row.is-sel { background: var(--in-l2); }
+html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: absolute; left: 0; top: 10px; height: 32px; width: 2px; background: var(--in-signal); }
+.in-led-main {
+  display: grid; grid-template-columns: 10px 40px minmax(0, 1fr) 170px 112px 52px; gap: 16px; align-items: center;
+  min-height: 52px; padding: 0 0 0 22px; border: 0; background: none; color: var(--in-tx); text-align: left; cursor: pointer; font: inherit;
+}
+.in-led-main:focus-visible { outline: 2px solid var(--in-signal); outline-offset: -2px; border-radius: 2px; }
+.in-led-cc { width: 8px; height: 8px; border-radius: 2px; background: var(--cc); }
+.in-led-id, .in-led-tm { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+.in-led-tm { text-align: right; font-variant-numeric: tabular-nums; }
+.in-led-q { font: 400 16px var(--font-math); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-led-q * { white-space: nowrap; }
+.in-led-ch { color: var(--in-tx-2); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-led-res { display: flex; align-items: center; gap: 8px; font: 500 12px var(--in-mono); color: var(--in-tx-2); }
+.in-led-ic { display: inline-flex; color: var(--in-tx-3); }
+.in-led-open { grid-column: 1 / -1; padding: 4px 22px 16px 48px; display: grid; gap: 10px; }
+@media (hover: hover) { html.ui-instrument .hist-row.in-led-row:hover { background: var(--in-l1); } html.ui-instrument .hist-row.in-led-row.is-sel:hover { background: var(--in-l2); } }
+@media (max-width: 860px) {
+  .in-led-main { grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-areas: "cc q tm" "cc ch res"; gap: 4px 12px; padding: 10px 0 10px 14px; }
+  .in-led-cc { grid-area: cc; } .in-led-id { display: none; } .in-led-q { grid-area: q; } .in-led-ch { grid-area: ch; }
+  .in-led-res { grid-area: res; justify-content: flex-end; } .in-led-tm { grid-area: tm; }
+  .in-led-dayh { padding: 14px 14px 6px; }
+  .in-led-open { padding: 4px 14px 14px; }
+}
+/* The map holds still off-screen, in a hidden tab, or when motion is reduced. */
+.in-map-graph.is-still .in-map-stars rect, .in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
