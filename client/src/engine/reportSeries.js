@@ -169,11 +169,21 @@ export function reportSeries({ rows = [], activeDates = [], period = 'week', now
  */
 export const isSlip = r => !isRepeatRow(r) && (r.correct === false || (!!r.marks && r.marks.earned < r.marks.possible));
 
+const isCorrectRedo = c => !!c.answered && c.correct === true && !isRepeatRow(c) &&
+  (!c.marks || c.marks.earned === c.marks.possible);
+
 /**
  * "Needs another look": a slip that has not been correctly redone since. It is
  * redone when a later answered row reached from it through History's retry
  * (`retryOf`, or `repeatOf` for the server re-issuing the same question,
- * followed transitively) was marked correct.
+ * followed transitively) is a correct redo:
+ *   · marked correct, and
+ *   · not a repeat — a repeat is a question whose solution the student had
+ *     already been shown, so getting it right is not evidence the slip is
+ *     fixed. The chain still continues through a repeat to its own retries;
+ *   · and, when it carries a certified mark, full marks. A correct answer
+ *     whose certified mark is below its possible is itself a slip, so it does
+ *     not clear its parent (and needs another look itself).
  */
 export function needsAnotherLookIds(rows) {
   const children = new Map();
@@ -186,7 +196,7 @@ export function needsAnotherLookIds(rows) {
   const redone = (id, seen = new Set()) => {
     if (seen.has(id)) return false;
     seen.add(id);
-    return (children.get(id) || []).some(c => (c.answered && c.correct === true) || redone(c.id, seen));
+    return (children.get(id) || []).some(c => isCorrectRedo(c) || redone(c.id, seen));
   };
   return new Set(rows.filter(r => r.answered && isSlip(r) && !redone(r.id)).map(r => r.id));
 }

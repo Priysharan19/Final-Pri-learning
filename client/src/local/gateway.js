@@ -299,6 +299,8 @@ const BODY_RULES = [
   }],
   [/^POST \/history\/list$/, body => {
     requireObject(body, 'POST /history/list'); optionalString(body, 'filter', 30); optionalNumber(body, 'page'); optionalNumber(body, 'pageSize');
+    optionalString(body, 'subtopic', 120); optionalString(body, 'sort', 20);
+    if (body.sort !== undefined && !HISTORY_SORT_VALUES.has(body.sort)) throw apiError('sort must be newest, oldest or marks.', 400, 'INVALID_FIELD');
   }],
   [/^POST \/history\/[A-Za-z0-9._-]+\/retry$/, body => {
     requireObject(body, 'history retry'); optionalString(body, 'variant', 20);
@@ -323,6 +325,37 @@ const BODY_RULES = [
     if (body.answer !== undefined && !plainObject(body.answer)) throw apiError('answer must be an object.', 400, 'INVALID_FIELD');
   }]
 ];
+
+const HISTORY_SORT_VALUES = new Set(['newest', 'oldest', 'marks']);
+
+// The only GET routes that take a query string, and the one parameter each
+// takes. Any other query string is refused. The value is checked here, and the
+// path is passed on rebuilt from the checked value (never the raw text).
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const validDay = v => ISO_DAY.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+const QUERY_RULES = {
+  'GET /report/series': { period: v => ['week', 'month', 'term'].includes(v) },
+  'GET /marks/by-chapter': { since: validDay }
+};
+
+function splitQuery(verb, path) {
+  if (typeof path !== 'string' || !path.includes('?')) return { path, query: '' };
+  const at = path.indexOf('?');
+  const bare = path.slice(0, at);
+  const raw = path.slice(at + 1);
+  const rules = QUERY_RULES[`${verb} ${bare}`];
+  if (!rules || raw.includes('#') || raw.includes('?')) throw apiError('API path contains unsupported characters.', 400, 'INVALID_PATH');
+  const params = new URLSearchParams(raw);
+  const out = new URLSearchParams();
+  const seen = new Set();
+  for (const [k, v] of params) {
+    if (!Object.hasOwn(rules, k) || seen.has(k)) throw apiError(`Unsupported query parameter for ${verb} ${bare}.`, 400, 'INVALID_QUERY');
+    if (!rules[k](v)) throw apiError(`Invalid ${k}.`, 400, 'INVALID_QUERY');
+    seen.add(k); out.set(k, v);
+  }
+  const q = out.toString();
+  return { path: bare, query: q ? `?${q}` : '' };
+}
 
 function validatePath(path) {
   if (typeof path !== 'string' || !path.startsWith('/')) throw apiError('API path must start with /.', 400, 'INVALID_PATH');
@@ -388,7 +421,8 @@ function encodedBytes(value) {
 export function validateRequest(method, path, body) {
   const verb = String(method || '').toUpperCase();
   if (!METHODS.has(verb)) throw apiError('Unsupported API method.', 405, 'METHOD_NOT_ALLOWED');
-  const cleanPath = validatePath(path);
+  const split = splitQuery(verb, path);
+  const cleanPath = validatePath(split.path);
   if (verb === 'GET' && body !== undefined && body !== null) throw apiError('GET requests cannot carry a body.', 400, 'GET_BODY');
   if (body !== undefined && body !== null) {
     inspect(body, { nodes: 0, keys: 0 });
@@ -404,7 +438,7 @@ export function validateRequest(method, path, body) {
   // the value the check had just decided not to look at, and `body.targets` on
   // a null body is a TypeError the UI cannot turn into a message. What was
   // validated is what runs.
-  if (!contract) return { method: verb, path: cleanPath, body };
+  if (!contract) return { method: verb, path: cleanPath + split.query, body };
   const checked = body ?? {};
   contract[1](checked);
   return { method: verb, path: cleanPath, body: checked };

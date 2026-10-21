@@ -658,6 +658,12 @@ async function run() {
 
   const GET = (path, body) => call('GET', path, body);
   const POST = (path, body) => call('POST', path, body);
+  // The way the app sends a request: through the gateway's validateRequest
+  // (local/gateway.js), then to the backend with what it passed on.
+  const { validateRequest } = await import(`${SRC}local/gateway.js`);
+  const gated = async (method, path, body) => { const c = validateRequest(method, path, body); return call(c.method, c.path, c.body); };
+  const GATED_GET = path => gated('GET', path);
+  const GATED_POST = (path, body) => gated('POST', path, body);
   const PATCH = (path, body) => call('PATCH', path, body);
 
   // Bindings a later group needs from an earlier one. Declared here so that a
@@ -2084,34 +2090,36 @@ async function run() {
         ok('a repeat’s history row says it was a repeat', !stored.answered || listed?.repeat === true, show(listed && { repeat: listed.repeat, marks: listed.marksEarned }));
 
         // Report series, map-this-month and History counts/sort/chapter (v1.1 instrument).
-        const series = await GET('/report/series?period=week');
+        const series = await GATED_GET('/report/series?period=week');
         eq('report series names its rolling window', [series.period, series.window, series.series.length], ['week', 'rolling-7-days', 7]);
         ok('report series reads only certified receipts', series.source === 'server-certified-receipts' && series.current.marksEarned <= series.current.marksPossible, show(series.current));
         ok('report repeats are counted apart, never as questions', series.current.repeats >= (stored.answered ? 1 : 0), show(series.current));
         ok('a percentage under the evidence floor is null', series.current.certifiedQuestions >= series.floors.window || series.current.marksPct === null, show(series.current));
         eq('the question delta is current minus previous', series.delta.questions, series.current.questions - series.previous.questions);
-        await rejects('an unknown report period is refused', GET('/report/series?period=decade'), { status: 400 });
-        const monthMap = await GET(`/marks/by-chapter?since=${(await GET('/marks/by-chapter')).monthStart}`);
+        await rejects('an unknown report period is refused', GATED_GET('/report/series?period=decade'), { status: 400 });
+        eq('a month reaches the backend through the gateway', (await GATED_GET('/report/series?period=month')).series.length, 4);
+        eq('a term reaches the backend through the gateway', (await GATED_GET('/report/series?period=term')).window, 'rolling-13-weeks');
+        const monthMap = await GATED_GET(`/marks/by-chapter?since=${(await GET('/marks/by-chapter')).monthStart}`);
         const allMap = (await GET('/marks/by-chapter')).chapters;
         ok('this month’s map never exceeds all-time marks', Object.entries(monthMap.chapters).every(([k, c]) => c.possible <= allMap[k].possible), show(monthMap));
-        eq('a future since keeps nothing', Object.keys((await GET('/marks/by-chapter?since=2999-01-01')).chapters).length, 0);
-        await rejects('a malformed since is refused', GET('/marks/by-chapter?since=last-week'), { status: 400 });
+        eq('a future since keeps nothing', Object.keys((await GATED_GET('/marks/by-chapter?since=2999-01-01')).chapters).length, 0);
+        await rejects('a malformed since is refused', GATED_GET('/marks/by-chapter?since=last-week'), { status: 400 });
         ok('dot-point marks sum with the unattributed rest to the chapter', Object.values(allMap).every(c =>
-          Object.values(c.dotpoints).reduce((s, d) => s + d.possible, 0) + c.unattributed.possible === c.possible), show(allMap));
-        const everything = await POST('/history/list', { pageSize: 1000 });
+          ['earned', 'possible', 'questions'].every(k => Object.values(c.dotpoints).reduce((s, d) => s + d[k], 0) + c.unattributed[k] === c[k])), show(allMap));
+        const everything = await GATED_POST('/history/list', { pageSize: 1000 });
         const items = everything.items;
         eq('filter counts: all', everything.counts.all, items.length);
         eq('filter counts: incorrect', everything.counts.wrong, items.filter(i => i.correct === false).length);
         eq('filter counts: correct', everything.counts.correct, items.filter(i => i.correct === true).length);
         eq('filter counts: handwritten', everything.counts.ink, items.filter(i => i.hasInk || i.hasScribble || i.hasPhoto).length);
         eq('filter counts: needs another look', everything.counts.needsLook, items.filter(i => i.needsLook).length);
-        eq('the needs-another-look filter lists exactly those', (await POST('/history/list', { filter: 'needsLook', pageSize: 1000 })).total, everything.counts.needsLook);
-        const oldest = (await POST('/history/list', { sort: 'oldest', pageSize: 1000 })).items.map(i => i.answeredAt);
+        eq('the needs-another-look filter lists exactly those', (await GATED_POST('/history/list', { filter: 'needsLook', pageSize: 1000 })).total, everything.counts.needsLook);
+        const oldest = (await GATED_POST('/history/list', { sort: 'oldest', pageSize: 1000 })).items.map(i => i.answeredAt);
         ok('sort=oldest is ascending', oldest.every((t, i) => !i || oldest[i - 1] <= t), show(oldest));
         const chapter = items[0]?.subtopic;
-        const inChapter = await POST('/history/list', { subtopic: chapter, pageSize: 1000 });
+        const inChapter = await GATED_POST('/history/list', { subtopic: chapter, pageSize: 1000 });
         ok('subtopic keeps one chapter, and its counts are that chapter’s', inChapter.items.every(i => i.subtopic === chapter) && inChapter.counts.all === inChapter.total, show(inChapter.counts));
-        await rejects('an unknown sort is refused', POST('/history/list', { sort: 'random' }), { status: 400 });
+        await rejects('an unknown sort is refused', GATED_POST('/history/list', { sort: 'random' }), { status: 400 });
       }
     }
 

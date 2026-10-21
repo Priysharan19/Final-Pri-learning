@@ -101,14 +101,19 @@ eq('addDays crosses a year', addDays('2026-01-01', -1), '2025-12-31');
     { id: 'b2', answered: true, correct: true, retryOf: 'b', marks: null },
     { id: 'c', answered: true, correct: true, marks: { earned: 2, possible: 3 } },      // partial = slip
     { id: 'c2', answered: true, correct: false, retryOf: 'c', marks: null },            // redone wrong
-    { id: 'd', answered: true, correct: false, marks: null },                           // redone via a chain
-    { id: 'd2', answered: false, retryOf: 'd' },
-    { id: 'd3', answered: true, correct: true, repeatOf: 'd2' },
+    { id: 'd', answered: true, correct: false, marks: null },                           // only a repeat got it right
+    { id: 'd2', answered: true, correct: true, repeatOf: 'd', marks: { earned: 3, possible: 3, repeat: true } },
+    { id: 'g', answered: true, correct: false, marks: null },                           // chain continues through a repeat
+    { id: 'g2', answered: true, correct: true, repeatOf: 'g', marks: { earned: 3, possible: 3, repeat: true } },
+    { id: 'g3', answered: false, retryOf: 'g2' },
+    { id: 'g4', answered: true, correct: true, retryOf: 'g3', marks: { earned: 3, possible: 3 } },
+    { id: 'h', answered: true, correct: false, marks: null },                           // a partial redo does not clear
+    { id: 'h2', answered: true, correct: true, retryOf: 'h', marks: { earned: 2, possible: 3 } },
     { id: 'e', answered: true, correct: true, marks: { earned: 3, possible: 3 } },      // clean
     { id: 'f', answered: true, correct: false, repeatOf: 'z', marks: { earned: 0, possible: 3, repeat: true } } // a repeat is no slip
   ];
-  eq('needs another look: slips not correctly redone since', [...needsAnotherLookIds(rows)].sort(), ['a', 'c', 'c2']);
-  ok('a repeat is never a slip', !isSlip(rows[9]));
+  eq('needs another look: slips not correctly redone since', [...needsAnotherLookIds(rows)].sort(), ['a', 'c', 'c2', 'd', 'h', 'h2']);
+  ok('a repeat is never a slip', !isSlip(rows.find(r => r.id === 'f')));
 }
 
 // ── sorts ────────────────────────────────────────────────────────────────────
