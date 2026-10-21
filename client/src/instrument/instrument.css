@@ -759,7 +759,7 @@ html.ui-instrument .step-d .katex { font-size: 1.25em; color: var(--in-tx); }
 /* The inspector column (web and tablet). */
 @media (min-width: 900px) {
   html.ui-instrument .qpage.ws-split {
-    display: flow-root; isolation: isolate; padding-right: 336px; align-content: normal;
+    display: flow-root; isolation: isolate; padding-right: 360px; align-content: normal;
   }
   html.ui-instrument .qpage.ws-split::before {
     content: ""; position: absolute; z-index: -1; top: 0; right: 0; bottom: 0; width: 360px;
@@ -770,6 +770,11 @@ html.ui-instrument .step-d .katex { font-size: 1.25em; color: var(--in-tx); }
     padding: 22px 24px 4px 26px;
   }
   html.ui-instrument .ws-split .ws-work { display: block; padding: 4px 24px 0 26px; }
+  /* Every piece of the work floats left in its own row; the inspector pieces
+     float right, so each rises level with the work that precedes it rather
+     than below it. Neither moves in the DOM. */
+  html.ui-instrument .ws-split .ws-context > *,
+  html.ui-instrument .ws-split .ws-work > * { float: left; clear: left; box-sizing: border-box; width: 100%; }
   html.ui-instrument .ws-split .ws-work > * + * { margin-top: 14px; }
   html.ui-instrument .ws-split .ws-work > .ws-qpeek { display: none !important; }
   html.ui-instrument .ws-split .hints-block,
@@ -780,7 +785,7 @@ html.ui-instrument .step-d .katex { font-size: 1.25em; color: var(--in-tx); }
   html.ui-instrument .ws-split .ws-work > .ink-comments,
   html.ui-instrument .ws-split .ws-work > .eval-card,
   html.ui-instrument .ws-split .ws-work > .your-answer {
-    float: right; clear: right; box-sizing: border-box; width: 320px; margin: 0 -340px 12px 0;
+    float: right; clear: right; box-sizing: border-box; width: 320px; margin: 0 -364px 12px 0;
   }
   html.ui-instrument .ws-split .ws-context > .hints-block:first-of-type { margin-top: 0; }
   html.ui-instrument .ws-split .ws-actions { position: static; margin: 14px 0 0; padding: 14px 0 18px; background: transparent; }
