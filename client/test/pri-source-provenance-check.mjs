@@ -78,7 +78,7 @@ const afterExpiry={...e2,agent:'platform',timestamp_ms:now+13*H,expiry_ms:now+20
 ok('expired historical lease frees owner later',()=>assert.equal(inspectSignedLog({version:1,events:[g.events[0],signEvent(afterExpiry,privateKey)]},publicKey,now+14*H).live.length,1));
 // A loss of CAS by an emergency revoker must be explicit. A different
 // contender winning RELEASE never silently counts as a completed REVOKE.
-const memory={head:'1',log:renew}, attempts=[];
+const memory={head:'1',log:renew};
 const adapter={read:async()=>({head:memory.head,log:memory.log}),
   putIfFastForward:async(parent,next)=>{
     await new Promise(resolve=>setImmediate(resolve));

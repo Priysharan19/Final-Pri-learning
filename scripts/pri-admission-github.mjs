@@ -82,11 +82,6 @@ async function assertProtection() {
   ensure(branch.enforce_admins?.enabled===true && branch.allow_force_pushes?.enabled===false
     && branch.allow_deletions?.enabled===false,'AUTHORITY_REF_NOT_PROTECTED');
 }
-function replace(body,key,value) {
-  const lines=String(body).split('\n').filter(x=>!x.toLowerCase().startsWith((key+':').toLowerCase()));
-  if(value!==null) lines.push(key+': '+value);
-  return lines.join('\n').trim()+'\n';
-}
 function run(args) {
   const p=spawnSync(process.execPath,args,{encoding:'utf8'});
   return {ok:p.status===0,stdout:p.stdout,stderr:p.stderr};
