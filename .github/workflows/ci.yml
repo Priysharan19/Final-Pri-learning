@@ -403,6 +403,8 @@ jobs:
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs
+          node server/test/guardian-notice-version-check.mjs
+          node client/test/task03-guardian-notice-check.mjs
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and

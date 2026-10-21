@@ -8,9 +8,10 @@
 // WHERE THE LINE IS. A profile on the device is not ours to consent to: it
 // never reaches this server, and nothing about it is processed by anybody. A
 // cloud account is, so the consent gates the cloud account and nothing else.
-// That is what makes gating it acceptable rather than a wall — the whole app,
-// including every question, all the marking and all the handwriting, works with
-// no account at all.
+// Marking and reading handwriting happen on the server, so they are behind this
+// gate too. Setting the account up and reaching the guardian cannot be: the
+// learner's name, class and contact and the guardian's contact reach the server
+// before anyone has confirmed, and the notice says so.
 //
 // WHAT THIS ACTUALLY ESTABLISHES, said plainly because the privacy notice has
 // to repeat it: somebody with access to the guardian's mailbox followed a link.
@@ -40,7 +41,20 @@ import { timedMiddleware } from './requestTiming.js';
 // no consent was recorded), and its retention section changed.
 // 2026-10-19 (#284): the notice now says answers are marked online by the
 // server, handwriting and photos are read by OpenAI, and where data is stored.
-export const CONSENT_NOTICE_VERSION = '2026-10-19';
+// 2026-10-22 (#622): the notice no longer says nothing is sent before a
+// guardian confirms; it names what account setup sends. A clarification of
+// what already happened, not a change to what a confirmation permits.
+export const CONSENT_NOTICE_VERSION = '2026-10-22';
+
+/**
+ * The notice versions whose confirmation still stands. A confirmation given
+ * under any other version is treated as pending: it no longer opens the cloud
+ * account, the learner can ask again (the ordinary request flow), and the row
+ * keeps the version that was agreed so the history is not rewritten. Add a
+ * version here only when the change since it does not alter what a guardian
+ * agreed to; leave it out to require renewal.
+ */
+export const ACCEPTED_CONSENT_NOTICE_VERSIONS = Object.freeze(['2026-10-19', CONSENT_NOTICE_VERSION]);
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
@@ -196,7 +210,12 @@ export async function consentState(db, accountId, { lock = false } = {}) {
     // without weakening this gate.
     return { required: true, state: 'undeclared', row: null, ageBasis: basis };
   }
-  if (row.confirmed_at) return { required: true, state: 'given', row, ageBasis: basis };
+  if (row.confirmed_at && ACCEPTED_CONSENT_NOTICE_VERSIONS.includes(row.notice_version)) {
+    return { required: true, state: 'given', row, ageBasis: basis };
+  }
+  // A confirmation of a notice that has since changed materially is not
+  // consent to the current one: fail closed, as pending, until renewed.
+  if (row.confirmed_at) return { required: true, state: 'pending', renewal: true, row, ageBasis: basis };
   return { required: true, state: 'pending', row, ageBasis: basis };
 }
 
@@ -209,14 +228,24 @@ export function consentBlockerCode(state) {
   return 'GUARDIAN_CONSENT_UNAVAILABLE';
 }
 
-/** Mark a guardian's confirmation. Returns false when there was nothing to confirm. */
-export async function confirmConsent(db, accountId, now = Date.now()) {
+/** Did the guardian accept the notice this server shows now? */
+export const acceptsCurrentNotice = (body) =>
+  body?.approve === true && String(body?.noticeVersion || '') === CONSENT_NOTICE_VERSION;
+
+/**
+ * Mark a guardian's confirmation of the notice they were shown. Returns false
+ * when there was nothing to confirm, or the notice they saw is not the current
+ * one. One statement, so the version that is written is exactly the version
+ * that was checked: no deploy, re-request or withdrawal can land in between.
+ */
+export async function confirmConsent(db, accountId, noticeVersion, now = Date.now()) {
   db = asStore(db);
+  if (noticeVersion !== CONSENT_NOTICE_VERSION) return false;
   // Withdrawal is terminal for the current consent ceremony. Confirmation must
   // never clear a withdrawal or re-grant sync permission from the same bearer;
   // a future re-consent flow must create a new request/authority explicitly.
-  const changed = (await db.run(`UPDATE guardian_consents SET confirmed_at = ?
-    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`, [now, accountId])).changes;
+  const changed = (await db.run(`UPDATE guardian_consents SET confirmed_at = ?, notice_version = ?
+    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`, [now, noticeVersion, accountId])).changes;
   return changed > 0;
 }
 

@@ -77,7 +77,7 @@ export default function GuardianConsent({ linkToken = null }) {
   async function answerLink(choice) {
     setBusy(true); setError('');
     try {
-      if (choice === 'confirm') await cloud.guardianConfirm(linkToken);
+      if (choice === 'confirm') await cloud.guardianConfirm(linkToken, GUARDIAN_NOTICE_VERSION);
       else await cloud.guardianWithdraw(linkToken);
       setDone(choice === 'confirm' ? tLater('guardianPage.approved') : tLater('guardianPage.declined'));
     } catch (err) {
