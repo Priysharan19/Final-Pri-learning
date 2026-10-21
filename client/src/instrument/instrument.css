@@ -438,15 +438,15 @@ html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeri
    and opacity once, on one small layer; off under reduced motion (the
    existing rule hides it). */
 html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
-  inset: auto 0 auto 0; top: -64px; height: 64px; border-top: 0;
-  border-bottom: 1.5px solid var(--in-signal);
-  background: color-mix(in srgb, var(--in-signal) 7%, transparent);
-  animation: in-scan 1100ms cubic-bezier(.45, 0, .2, 1) 1 both;
+  inset: auto 0 auto 0; top: -90px; height: 90px; border-top: 0;
+  border-bottom: 1px solid var(--in-signal);
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--in-signal) 7%, transparent));
+  animation: in-scan 1200ms cubic-bezier(.45, 0, .2, 1) 1 both;
 }
 /* `top` rather than a transform, so the line reaches the foot of a page of
    any height (a tall iPad stage included); it is one small layer. */
 @keyframes in-scan {
-  0% { top: -64px; opacity: 1; }
+  0% { top: -90px; opacity: 1; }
   90% { opacity: 1; }
   100% { top: 100%; opacity: 0; }
 }
@@ -651,3 +651,148 @@ html.ui-instrument .error-box { border-radius: 6px; }
 @media (max-width: 980px) { .in-exs { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 420px) { .in-exs { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .in-ex { transition: none; } }
+
+/* ── Write & Check and Review, to the book's s4/s5 (step 11) ────────────────
+   Visual only: the same elements, roles, data-* hooks and reading order. The
+   inspector column is drawn with floats into the page's right padding, so the
+   verdict, the marks, the hints and the worked solution sit beside the work
+   without moving a node in the DOM. */
+
+/* The question header: pills on the left, the marks as a figure on the right. */
+html.ui-instrument .q-topmeta { align-items: center; gap: 8px; margin-bottom: 12px; }
+html.ui-instrument .q-topmeta .tag {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 3px;
+  background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); color: var(--in-tx-2); white-space: nowrap;
+}
+html.ui-instrument .q-topmeta .tag:first-of-type { color: var(--in-tx); box-shadow: 0 0 0 1px var(--in-edge-3); }
+html.ui-instrument .q-topmeta .tag + .tag::before,
+html.ui-instrument .q-topmeta > span + .tag::before { content: none; }
+html.ui-instrument .q-topmeta .q-marks {
+  order: 9; margin-left: auto; height: auto; padding: 0; background: none; box-shadow: none;
+  font: 500 12.5px var(--in-mono); color: var(--in-tx-3);
+}
+html.ui-instrument .ws .q-prompt { font-size: 21.5px; line-height: 1.55; }
+@media (max-width: 700px) { html.ui-instrument .ws .q-prompt { font-size: 19px; } }
+
+/* The page: the void with a dot grid. Dots fall every 24px, so every other
+   row sits on the 48px line pitch the canvas keeps; no ruled lines, no margin. */
+html.ui-instrument .ink-wrap.ink-ruled {
+  background-color: var(--in-void);
+  background-image: radial-gradient(circle, var(--in-edge-3) 0.7px, transparent 1px);
+  background-size: 24px 24px; background-position: 12px 11.5px;
+}
+html.ui-instrument .editor-shell { border-radius: 7px; box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+
+/* The pen floats above the page: a compact centred strip of icons. The labels
+   stay in the DOM as each tool's name, hidden only from sight. */
+@media (min-width: 701px) {
+  /* Room for the floating pen is made on the answer, never the stage: the
+     stage's overlays share the canvas's coordinates. */
+  html.ui-instrument .ink-answer { position: relative; padding-top: 66px; background: var(--in-void); }
+  html.ui-instrument .ink-toolbar {
+    position: absolute; z-index: 5; left: 50%; top: 10px; transform: translateX(-50%);
+    flex-wrap: nowrap; width: max-content; max-width: calc(100% - 24px);
+    gap: 2px; padding: 4px; border: 0; border-radius: 5px; background: var(--in-l3);
+    box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2), 0 14px 34px -12px var(--in-shadow);
+  }
+  html.ui-instrument .ink-toolbar .ink-tool { min-width: 44px; justify-content: center; padding: 0 10px; }
+  html.ui-instrument .ink-toolbar .ink-tool-label,
+  html.ui-instrument .ink-toolbar .ink-hint {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  html.ui-instrument .ink-toolbar .ink-pages { padding: 0 4px; }
+  html.ui-instrument .ink-stage { background: var(--in-void); }
+}
+
+/* Pri's reading: chips on the raised surface, set in Computer Modern size. */
+html.ui-instrument .ink-line-math { padding: 6px 10px; font-size: 15.5px; background: var(--in-l2); }
+html.ui-instrument .ink-line { animation: in-read 240ms cubic-bezier(.2, 0, 0, 1) both; }
+@keyframes in-read { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+
+/* The footer: a mono note on the left, quiet actions, one primary. */
+html.ui-instrument .ws-actions { background: var(--in-base); border-top: 1px solid var(--in-edge); }
+html.ui-instrument .ws-actions .status-line { font: 400 12.5px var(--in-mono); color: var(--in-tx-3); }
+html.ui-instrument .ws-actions .ws-answer-preview { font-family: var(--in-ui); }
+html.ui-instrument .ws-actions .btn-quiet { font: 500 14px var(--in-ui); color: var(--in-tx-2); }
+html.ui-instrument .ws-actions .btn-quiet:hover:not(:disabled) { color: var(--in-tx); }
+html.ui-instrument .ws-actions .btn-primary {
+  min-height: max(42px, var(--tap-min, 44px)); padding: 0 18px; border-radius: 4px; font: 500 14.5px var(--in-ui);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+html.ui-instrument[data-theme="dark"] .ws-actions .btn-primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.35); }
+
+/* The hint trigger is a quiet control, its figure in mono. */
+html.ui-instrument .hint-bulb { background: transparent; box-shadow: none; }
+
+/* The verdict: a score surface, the raised layer with a hairline and a 3px
+   state edge; never a tinted fill. */
+html.ui-instrument .verdict,
+html.ui-instrument .verdict-good, html.ui-instrument .verdict-bad,
+html.ui-instrument .verdict-technical, html.ui-instrument .verdict-previous { background: var(--in-l2); border: 0; }
+html.ui-instrument .verdict-title { font-weight: 500; }
+html.ui-instrument .eval-card { border-radius: 6px; border: 0; background: var(--in-l2); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+html.ui-instrument .eval-card [data-step-mark] {
+  padding: 8px 10px !important; margin-top: 4px; border-radius: 4px; border: 0;
+  background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px;
+}
+
+/* The hint ladder: rungs are cards with a lit numbered key; the body reads in
+   the interface face. */
+html.ui-instrument .hints-block { gap: 10px; }
+html.ui-instrument .hints-block-title { text-transform: uppercase; }
+html.ui-instrument .hintbox {
+  padding: 12px 14px 14px 46px; line-height: 1.55; font: 400 14px/1.55 var(--in-ui); color: var(--in-tx-2);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px color-mix(in srgb, var(--in-action) 45%, transparent);
+}
+html.ui-instrument .hintbox::before { left: 14px; top: 12px; font: 600 11px var(--in-mono); }
+html.ui-instrument .hintbox .h-n { display: block; margin-bottom: 2px; font: 500 14px var(--in-ui); color: var(--in-tx); }
+html.ui-instrument .hintbox > :not(.h-n) { font-family: var(--in-ui); }
+html.ui-instrument .hintbox .katex { font-size: 1.08em; }
+
+/* The path: square keys on a hairline spine, the equation in Computer Modern. */
+html.ui-instrument .step { gap: 14px; padding-bottom: 18px; }
+html.ui-instrument .step:not(:last-child)::before { left: 14px; top: 30px; bottom: 0; }
+html.ui-instrument .step-n { width: 30px; height: 30px; margin-top: 0; font: 600 12px var(--in-mono); color: var(--in-tx-2); }
+html.ui-instrument .step-h { font: 500 14px var(--in-ui); color: var(--in-tx); }
+html.ui-instrument .step-d { margin-top: 2px; font-size: 14px; color: var(--in-tx-2); }
+html.ui-instrument .step-d .katex { font-size: 1.25em; color: var(--in-tx); }
+
+/* The inspector column (web and tablet). */
+@media (min-width: 900px) {
+  html.ui-instrument .qpage.ws-split {
+    display: flow-root; isolation: isolate; padding-right: 360px; align-content: normal;
+  }
+  html.ui-instrument .qpage.ws-split::before {
+    content: ""; position: absolute; z-index: -1; top: 0; right: 0; bottom: 0; width: 360px;
+    border-left: 1px solid var(--in-edge); background: color-mix(in srgb, var(--in-l1) 70%, transparent);
+  }
+  html.ui-instrument .ws-split .ws-context {
+    position: static; max-height: none; min-height: 0; overflow: visible; border-right: 0;
+    padding: 22px 24px 4px 26px;
+  }
+  html.ui-instrument .ws-split .ws-work { display: block; padding: 4px 24px 0 26px; }
+  /* Every piece of the work floats left in its own row; the inspector pieces
+     float right, so each rises level with the work that precedes it rather
+     than below it. Neither moves in the DOM. */
+  html.ui-instrument .ws-split .ws-context > *,
+  html.ui-instrument .ws-split .ws-work > * { float: left; clear: left; box-sizing: border-box; width: 100%; }
+  html.ui-instrument .ws-split .ws-work > * + * { margin-top: 14px; }
+  html.ui-instrument .ws-split .ws-work > .ws-qpeek { display: none !important; }
+  html.ui-instrument .ws-split .hints-block,
+  html.ui-instrument .ws-split .ws-context > .solution-panel,
+  html.ui-instrument .ws-split .ws-context > details.solution-panel,
+  html.ui-instrument .ws-split .ws-work > .verdict-next,
+  html.ui-instrument .ws-split .ws-work > .verdict,
+  html.ui-instrument .ws-split .ws-work > .ink-comments,
+  html.ui-instrument .ws-split .ws-work > .eval-card,
+  html.ui-instrument .ws-split .ws-work > .your-answer {
+    float: right; clear: right; box-sizing: border-box; width: 320px; margin: 0 -364px 12px 0;
+  }
+  html.ui-instrument .ws-split .ws-context > .hints-block:first-of-type { margin-top: 0; }
+  html.ui-instrument .ws-split .ws-actions { position: static; margin: 14px 0 0; padding: 14px 0 18px; background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument .ink-line { animation: none; }
+}
