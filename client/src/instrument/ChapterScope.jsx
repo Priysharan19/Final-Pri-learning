@@ -14,7 +14,7 @@ const FN = {
   parabola: x => (2 * x * x - 7 * x + 3) / 3 - 1.2,
   progression: x => Math.floor(x + 6) * 0.45 - 2.4,
   triangle: x => 2.6 - Math.abs(x) * 0.95,
-  circle: x => Math.sqrt(Math.max(0, 9 - x * x)) - 0.6,
+  circle: x => (Math.abs(x) <= 3 ? Math.sqrt(9 - x * x) - 0.6 : NaN),
   coordinate: x => 0.6 * x + 0.4,
   bars: x => 1.6 * Math.exp(-(x * x) / 4) - 0.6,
   numberLine: x => Math.sin(x * 1.1) * 1.4,
