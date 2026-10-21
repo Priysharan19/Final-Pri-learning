@@ -494,7 +494,7 @@ try {
       const row = await h.db.get('SELECT token_id,token_ciphertext FROM auth_delivery_outbox WHERE account_id=? AND kind=? ORDER BY created_at DESC LIMIT 1', [childId, kind]);
       return decryptDeliveryToken(row.token_ciphertext, `${childId}:${kind}:${row.token_id}`);
     };
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: await guardianToken('guardian-consent') } })).status, 200, 'the guardian consents');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: await guardianToken('guardian-consent'), approve: true, noticeVersion: '2026-10-22' } })).status, 200, 'the guardian consents');
     const childQuestion = await issue(childJar);
     const childImage = picture('consent withdrawn');
     c.eq((await transcribe(childJar, childImage)).status, 200, 'the child\'s picture is read and kept');

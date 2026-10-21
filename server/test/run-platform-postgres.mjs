@@ -80,6 +80,7 @@ export const ENGINE_SUITES = [
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

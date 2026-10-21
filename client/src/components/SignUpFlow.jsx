@@ -58,7 +58,7 @@ const CODE_LIFETIME_MS = 10 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Must equal CONSENT_NOTICE_VERSION in server/platform/guardianConsent.js; the
 // server refuses an approval that names any other notice.
-export const GUARDIAN_NOTICE_VERSION = '2026-10-19';
+export const GUARDIAN_NOTICE_VERSION = '2026-10-22';
 
 /**
  * Read an SMS code where the platform offers it: the Android app through the
