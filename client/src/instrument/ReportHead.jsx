@@ -41,7 +41,7 @@ function Delta({ n, unit = '' }) {
 // The chart, drawn as SVG in a fixed 1000×300 frame (the design's .chart).
 const CW = 1000; const CH = 300; const PADX = 40; const PADB = 30; const PADT = 40;
 
-function Chart({ series, labels, t, spoken }) {
+function Chart({ series, labels, t, spoken, failed }) {
   const n = series.length;
   const X = i => (n <= 1 ? CW / 2 : PADX + (i * (CW - 2 * PADX)) / (n - 1));
   const Y = v => CH - PADB - ((Math.max(0, Math.min(100, v)) - 0) / 100) * (CH - PADB - PADT);
@@ -62,7 +62,7 @@ function Chart({ series, labels, t, spoken }) {
   const gridX = Array.from({ length: 33 }, (_, i) => i * (CW / 32));
   const gridY = Array.from({ length: 11 }, (_, i) => i * (CH / 10));
   return (
-    <div className="in-chart" data-report-chart={any ? 'drawn' : 'empty'}>
+    <div className="in-chart" data-report-chart={any ? 'drawn' : failed ? 'failed' : 'empty'}>
       <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" role="img" aria-label={spoken}>
         <g className="in-chart-grid" aria-hidden="true">
           {gridX.map(x => <line key={`x${x}`} x1={x} y1={0} x2={x} y2={CH} />)}
@@ -85,7 +85,7 @@ function Chart({ series, labels, t, spoken }) {
         {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
       </div>
       <div className="in-chart-lg" aria-hidden="true"><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></div>
-      {!any && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')}</p>}
+      {!any && !failed && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')}</p>}
     </div>
   );
 }
@@ -197,7 +197,7 @@ export default function ReportHead() {
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">
-        <Chart series={series} labels={labels} t={t} spoken={spoken} />
+        <Chart series={series} labels={labels} t={t} spoken={spoken} failed={failed} />
         <div className="in-report-heat">
           <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
           <div className="in-heat" role="img" aria-label={t('inst.reportHeatSpoken', { days: view.heatDays, n: WEEKS })}>
