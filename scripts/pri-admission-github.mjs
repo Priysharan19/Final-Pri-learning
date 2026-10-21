@@ -128,7 +128,7 @@ async function verifyOnly() {
     ensure(routed.ok,'WRITER_FILE_OWNER_UNKNOWN_'+filename);
     return JSON.parse(routed.stdout);
   });
-  console.log(JSON.stringify({decision:'EXACT_PR_SIGNED_GRANT_VERIFIED',pr_number:number,
+  console.log(JSON.stringify({decision:'SIGNED_REVIEW_PROVENANCE_ONLY_VERIFIED',pr_number:number,
     head_sha:head,issue_number:matching[0].number,mission:mission.mission,
     agent:mission.agent,risk:mission.risk,paths:mission.paths,
     review_provenance:proof.provenance_digest,authority_head:inspected.auth.head,
