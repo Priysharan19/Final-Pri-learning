@@ -214,7 +214,7 @@ async function requestCode(id, label, recipient, { path = '/v1/account/otp/reque
   const codeShownAccessibly = html.includes(`aria-label="Code ${code.split('').join(' ')}"`)
     && html.includes(`>${code.slice(0, 3)}&nbsp;${code.slice(3)}</div>`);
   check(`${id}d`, `${label}: subject and body are the expected ${purpose} message`,
-    codeMessage.message.subject === `${code}${subjectTail}` && text.startsWith(code + String.fromCharCode(10, 10))
+    codeMessage.message.subject === `${code}${subjectTail}` && new RegExp(`^${code}\\r?\\n\\r?\\n`).test(text)
       && bodyMarker.test(text) && codeShownAccessibly && /valid for 10 minutes/i.test(text),
     'subject/body shape differs from server/platform/otpEmail.js');
   check(`${id}e`, `${label}: addressed to exactly the one recipient`, Array.isArray(codeMessage.message.to) && codeMessage.message.to.length === 1 && String(codeMessage.message.to[0]).toLowerCase() === recipient,
