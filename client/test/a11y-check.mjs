@@ -894,18 +894,20 @@ async function run() {
         await route.continue().catch(() => { });
       };
       await page.route(REPLAY, holdReplay, { times: 1 });
-      await typedQuestion();
-      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
-      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
-      await writeTab.click();
-      // The question reopened here is the one "reconnect asked" left a held
-      // submission on, and relaunch recovery replays it as the card mounts.
-      // While that replay is in flight the writing surface is disabled
-      // (.ink-disabled: pointer-events none), so a stroke drawn then is never
-      // written and "Read my answer" never comes (#627; on a slow runner the
-      // replay outlasted the canvas appearing). Drawing waits until the surface
-      // accepts the pen, not merely until the canvas exists.
-      await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      try {
+        await typedQuestion();
+        const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+        if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+        await writeTab.click();
+        // The question reopened here is the one "reconnect asked" left a held
+        // submission on, and relaunch recovery replays it as the card mounts.
+        // While that replay is in flight the writing surface is disabled
+        // (.ink-disabled: pointer-events none), so a stroke drawn then is never
+        // written and "Read my answer" never comes (#627; on a slow runner the
+        // replay outlasted the canvas appearing). Drawing waits until the surface
+        // accepts the pen, not merely until the canvas exists.
+        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      } catch (err) { await page.unroute(REPLAY, holdReplay).catch(() => { }); throw err; }
       const box = await page.locator('.ink-canvas-live').boundingBox();
       const stroke = async (x) => {
         await page.mouse.move(box.x + x, box.y + 40);
