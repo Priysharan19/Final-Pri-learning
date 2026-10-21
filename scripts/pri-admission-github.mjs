@@ -217,7 +217,14 @@ async function transact() {
   const permission=await get('collaborators/'+encodeURIComponent(actor)+'/permission');
   ensure(['admin','maintain','write'].includes(permission.permission),'ACTOR_NOT_REPOSITORY_WRITER');
   await assertProtection();
-  const request=JSON.parse(readFileSync(process.argv[3],'utf8'));
+  // The request is an independently approved workflow_dispatch input, not
+  // arbitrarily loaded file contents eligible for outbound API transmission.
+  const request={
+    operation:process.env.PRI_REQUEST_OPERATION,
+    issue_number:Number(process.env.PRI_REQUEST_ISSUE_NUMBER),
+    pr_number:Number(process.env.PRI_REQUEST_PR_NUMBER),
+    head_sha:process.env.PRI_REQUEST_HEAD_SHA
+  };
   ensure(Number.isInteger(request.issue_number) && request.issue_number>0 &&
     ['GRANT','RENEW','REVOKE'].includes(request.operation) &&
     (request.operation==='REVOKE' ||
