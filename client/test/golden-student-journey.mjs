@@ -178,7 +178,7 @@ let ctx = null;
 const attemptRows = page => page.evaluate(() => new Promise(ok => {
   const r = indexedDB.open('pri-learning');
   r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
-    c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ server: a.serverAttemptId || null, remote: typeof a.remoteEventId === 'string' }))); };
+    c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ server: a.serverAttemptId || null, remote: typeof a.remoteEventId === 'string', subtopic: a.subtopic || null, repeat: a.repeat === true, item: a.contentId ? `${a.contentId}#${a.seed ?? ''}` : null }))); };
     c.onerror = () => { db.close(); ok(null); }; };
   r.onerror = () => ok(null);
 }));
@@ -367,7 +367,7 @@ try {
 
   const finalState = await snapshot(page, server.origin);
   assert.equal(finalState.history, 5);
-  assert.equal(finalState.topicAttempts, 5);
+  assert.equal(finalState.topicAttempts, 5, 'Progress must count every topic attempt: ' + JSON.stringify(await attemptRows(page)));
   assert.ok(finalState.mastery >= 0 && finalState.mastery <= 100);
   const rows = await attemptRows(page);
   assert.ok(rows.length === 5 && rows.every(a => typeof a.server === 'string') && new Set(rows.map(a => a.server)).size === 5,
