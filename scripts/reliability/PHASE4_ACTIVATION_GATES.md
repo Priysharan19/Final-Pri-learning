@@ -31,7 +31,8 @@ GitHub App and Postgres tests are engineering evidence, not live certification.
    issues, ordinary Actions artifacts, chat or PR comments.
 2. Signer: metadata/read, contents/write **only through admission-ref
    operations in its protected runtime**, issues/write only for signed-ledger
-   reconciliation, PR/read; independently protect Ed25519 signer key. Verify
+   reconciliation, PR/read, administration/read for actual main/authority
+   protection checks, actions/read to verify genuine approved workflow runs; independently protect Ed25519 signer key. Verify
    public-key correspondence; commit only the public key through QA review.
 3. Verifier: metadata/read, contents/read, PR/read, issues/read, checks/write,
    administration/read. It must run approved protected-main code and publish
@@ -87,7 +88,7 @@ GitHub App and Postgres tests are engineering evidence, not live certification.
 
 Protected QA PR #625 merged from independent-approved `e3bc0c0e2df092db37113cc24d216d7abd172844`
 via native GitHub merge commit `32dbed8e2ae70b90ee47bfa087713b84960b56b4`.
-PR #626 is now based directly on protected `main`; its only changed files are
+PR #626 is reconciled to protected `main`; its only changed files are
 reliability-owned (verified by `node scripts/pri-fleet.mjs guard reliability origin/main`).
 The merge does not activate a writer or App bypass. Do not use old PR #626
 checks for its new head; rerun CodeQL after a synchronize event, then require
@@ -97,7 +98,7 @@ fresh approval by Kalp-Bajpai.
 
 | Installed App | Exact least-privilege repository permissions (minimum for candidate transport) | Runtime-only credentials | Forbidden |
 | --- | --- | --- | --- |
-| Signer | Contents **read/write**; Issues **read/write**; Pull requests **read**; Metadata read (implicit) | `PRI_SIGNER_APP_ID`, `PRI_SIGNER_INSTALLATION_ID`, `PRI_SIGNER_APP_PRIVATE_KEY`, Ed25519 `PRI_ADMISSION_PRIVATE_KEY` | Checks:write, main update bypass, merger private key |
+| Signer | Contents **read/write**; Issues **read/write**; Pull requests **read**; Administration **read**; Actions **read**; Metadata read (implicit) | `PRI_SIGNER_APP_ID` (protected env variable), `PRI_SIGNER_APP_PRIVATE_KEY` and Ed25519 `PRI_ADMISSION_PRIVATE_KEY` (protected env secrets); record `PRI_SIGNER_INSTALLATION_ID` privately as nonsecret metadata | Checks:write, main update bypass, merger private key |
 | Verifier | Contents **read**; Issues **read**; Pull requests **read**; Checks **read/write**; Administration **read** (inspect protections/rulesets); Metadata implicit | `PRI_TRUSTED_APP_ID`, `PRI_TRUSTED_INSTALLATION_ID`, `PRI_TRUSTED_APP_PRIVATE_KEY`, `PRI_GITHUB_WEBHOOK_SECRET`, pinned `PRI_AUTHORITY_GENESIS_SHA` | Contents:write, GitHub main-update bypass, signer Ed25519 key |
 | Exclusive merger | Contents **read/write**; Pull requests **read/write**; Checks **read**; Issues **read**; Administration **read** (protection/rulesets); Metadata implicit | `PRI_MERGER_APP_ID`, `PRI_MERGER_INSTALLATION_ID`, `PRI_MERGER_APP_PRIVATE_KEY`, `PRI_CONTROL_DATABASE_URL` | Checks:write, Ed25519 signing key, verifier App credentials |
 
@@ -108,7 +109,7 @@ freeze `25542737`, without changing deletion and non-fast-forward rule
 `25078652`. Neither App gains broad ruleset administration permission unless
 an independently approved operator needs a one-time installation/setup action.
 
-The Ed25519 public key is a reviewed nonsecret file on protected `main` at
+The Ed25519 public key must become a reviewed nonsecret file on protected `main` at
 `.pri-os/admission-public-key.pem`, not the GitHub App's RSA public key.
 Do not deploy or enable signing until the corresponding public key and
 protected environment secrets exist and their cryptographic match is proven.
@@ -133,3 +134,95 @@ empty. `SERIAL_MERGE_AND_REVOCATION_INTERLOCK_NOT_ACTIVATED` must remain fail
 closed until real App identity, signed transactions and revocation-after-green
 denial have been demonstrated. Existing local and hosted tests are candidate
 contract evidence only, not live authority certification.
+
+
+## Phase 4D — canonical signer config and fail-closed staging
+
+The **only** authorized role-specific names in `.github/workflows/pri-writer-authority.yml` are:
+
+- Environment variable `PRI_SIGNER_APP_ID` (numeric nonsecret GitHub App ID);
+- Environment secret `PRI_SIGNER_APP_PRIVATE_KEY` (GitHub App RS256 PEM);
+- Environment secret `PRI_ADMISSION_PRIVATE_KEY` (independent Ed25519 signing key);
+- Repository variable `PRI_AUTHORITY_GENESIS_SHA` (existing immutable genesis SHA);
+- Environment variable `PRI_SIGNER_RUNTIME_CERTIFIED`: intentionally **unset**.
+
+No compatibility alias for the deprecated `PRI_GOVERNOR_APP_*` names exists.
+The workflow explicitly fails BEFORE token issuance; it first checks the
+independent `PRI_SIGNER_RUNTIME_CERTIFIED` flag and then has an **unconditional
+shutdown** until the signed authority CLI is genuinely wired to the same
+durable PostgreSQL transaction authority as the merger. Merely setting the
+variable cannot activate the signer. Removing that shutdown requires new
+independently reviewed protected-main source and real signed authority tests.
+
+The signer requires repository **Administration:read** (`GET branches/.../protection`)
+and **Actions:read** (`GET actions/runs/{id}/approvals`) in addition to Contents:write,
+Issues:write and Pull requests:read. Those two permissions are read-only and
+must not be silently omitted or promoted to write. The GitHub App installation
+must cover only `Priysharan19/Final-Pri-learning`, and protected production app
+runtime must not receive the signer private key. A GitHub App ID is **not** an
+installation ID; `actions/create-github-app-token` resolves installation scope
+from the owner and selected repository, while the operator verifies and retains
+the actual numeric installation ID out of band.
+
+**Registration contract (three Apps):**
+
+| Field | Signer | Trusted verifier | Exclusive merger |
+| --- | --- | --- | --- |
+| App display name | `pri-governor-signer` (choose available unique slug) | `pri-governor-verifier` | `pri-governor-merger` |
+| Installation | Only selected repo `Final-Pri-learning` | Same single repo | Same single repo |
+| Repository permissions | Contents RW, Issues RW, Pull requests R, Administration R, Actions R, Metadata R implicit | Contents R, Issues R, Pull requests R, Checks RW, Administration R, Metadata R implicit | Contents RW, Pull requests RW, Checks R, Issues R, Administration R, Metadata R implicit |
+| Org/account permissions | None beyond GitHub defaults | None beyond defaults | None beyond defaults |
+| Webhook | Disable until independently approved endpoint (workflow-dispatched signer requires none) | Enable only after trusted HTTPS ingress; subscribe `pull_request` (opened/synchronize supported by current candidate); independently review any expansion to `pull_request_review` | Disable until trusted HTTPS merger ingress exists; never accept unsigned issue/PR comment merge instructions |
+| Protected environment | `pri-writer-admission` | `pri-trusted-verifier` | `pri-exclusive-merger` |
+| Nonsecret numeric variables | `PRI_SIGNER_APP_ID`; retain installation id as controlled inventory | `PRI_TRUSTED_APP_ID`, `PRI_TRUSTED_INSTALLATION_ID` | `PRI_MERGER_APP_ID`, `PRI_MERGER_INSTALLATION_ID` |
+| Protected secrets | `PRI_SIGNER_APP_PRIVATE_KEY`, `PRI_ADMISSION_PRIVATE_KEY` | `PRI_TRUSTED_APP_PRIVATE_KEY`, `PRI_GITHUB_WEBHOOK_SECRET` | `PRI_MERGER_APP_PRIVATE_KEY`, `PRI_CONTROL_DATABASE_URL` |
+| Initial status | Inactive, runtime certification flag UNSET, admission ref frozen | Inactive, no required trusted check | Inactive, no main update bypass |
+
+Each App registration can be created now with the listed permissions and the
+**Only on this account** installation availability setting; do not install
+outside the selected repository. Do not guess App IDs, installation IDs, webhook
+URLs or keys. Capture actual IDs from GitHub *after creation* in protected
+variables/inventory, and generate/download each RSA private key directly into
+approved secret storage. Do not copy them into source, chat or CI logs.
+
+Verifier bootstrap obtains installation tokens with `checks:write`,
+`contents:read`, `issues:read`, `pull_requests:read`, `administration:read`.
+Merger bootstrap obtains `contents:write`, `pull_requests:write`, `checks:read`,
+`issues:read`, `administration:read`. The existing main branch still requires
+its four GitHub Actions checks; add the dedicated verifier App's fifth trusted
+check only AFTER real independent publication and a safe negative-merge proof.
+
+There is no production webhook URL, no production control-plane DB, and no
+positive trusted App ruleset bypass test. The original admission-ref freeze
+ruleset `25542737` and immutability ruleset `25078652` must stay active.
+
+
+## Phase 4D — isolated runtime artifacts now implemented, not deployed
+
+- `scripts/reliability/pri-webhook-ingress.mjs`: real Node HTTP server, bound to
+  loopback only; validates GitHub HMAC SHA-256 over the raw PR payload and
+  persists unique delivery metadata using the dedicated Postgres store. The
+  only write endpoint records deliveries. There are no grant, merge or
+  check-publication endpoints, and Railway environments are refused.
+- `scripts/reliability/pri-webhook-ingress-check.mjs`: tests real loopback HTTP
+  and disposable PostgreSQL, including correct HMAC, replay, tampering,
+  wrong repository/event, content-type, body limit, and deny-all authority.
+- `scripts/reliability/pri-github-app-transport.mjs`: real GitHub REST API
+  adapter for verifying the actual App and selected-repository installation,
+  minting a short-lived narrow installation token and read-only PR inspection.
+  Any merge write requires separately certified physical App exclusivity and
+  exact GitHub head/base checks; it has not been invoked against live GitHub.
+- `scripts/reliability/pri-github-app-transport-check.mjs`: isolated HTTP-mock
+  proof, including rejection of wrong App, installation, repository and
+  permission scope. Tests do not constitute live App certification.
+- `scripts/reliability/pri-signer-provisioning-check.mjs`: source-level check
+  that the signer workflow and this runbook use the same role-specific secret
+  names and the Actions/Admin read permissions proven by the real CLI calls.
+
+**Not yet wired:** a real signer adapter holding the *same* durable Postgres
+lock through signed grant/revoke CAS, an independently deployed external webhook
+receiver address, an actual installed GitHub App with credentials, a protected
+merger policy evaluator and the fifth trusted required check. The runtime
+remains intentionally not deployed and unauthorized. Do not set a public
+webhook endpoint or GitHub main/admission App bypass yet. Staging of private
+App credentials must occur through the GitHub environment UI, never this PR.

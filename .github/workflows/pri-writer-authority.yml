@@ -55,15 +55,31 @@ jobs:
           set -euo pipefail
           test "$DISPATCH_REF" = refs/heads/main
           test "$DISPATCH_SHA" = "$(git rev-parse HEAD)"
+      # A live signer transaction must use the SAME durable serial authority
+      # as the exclusive merger. A protected environment approval alone does
+      # not establish the revocation/merge interlock. Keep fail closed.
+      - name: Refuse signer activation without independent certification
+        env:
+          PRI_SIGNER_RUNTIME_CERTIFIED: ${{ vars.PRI_SIGNER_RUNTIME_CERTIFIED }}
+        run: |
+          set -euo pipefail
+          test "$PRI_SIGNER_RUNTIME_CERTIFIED" = approved-external-authority-v1 || {
+            echo 'SIGNER_BLOCKED: shared transaction runtime not certified'
+            exit 1
+          }
+          # Even a manually populated variable cannot activate this job until
+          # the signed authority CLI has the actual shared Postgres lock.
+          echo 'SIGNER_BLOCKED: shared-lock implementation not yet wired'
+          exit 1
       # App installation token is scoped to THIS repo. An approved GitHub
       # ruleset grants only this app narrow non-force ref update authority.
       # Never put this key/token into pull_request jobs.
-      - name: Obtain dedicated approved governor app identity
-        id: governor-app
+      - name: Obtain dedicated signer App identity
+        id: signer-app
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
-          app-id: ${{ vars.PRI_GOVERNOR_APP_ID }}
-          private-key: ${{ secrets.PRI_GOVERNOR_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.PRI_SIGNER_APP_ID }}
+          private-key: ${{ secrets.PRI_SIGNER_APP_PRIVATE_KEY }}
           owner: Priysharan19
           repositories: Final-Pri-learning
           permission-contents: write
@@ -75,7 +91,7 @@ jobs:
       - name: Apply signed non-fast-forward CAS, reconcile issue, verify ledger
         env:
           PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
-          GITHUB_TOKEN: ${{ steps.governor-app.outputs.token }}
+          GITHUB_TOKEN: ${{ steps.signer-app.outputs.token }}
           PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
           PRI_REQUEST_OPERATION: ${{ inputs.operation }}
           PRI_REQUEST_ISSUE_NUMBER: ${{ inputs.issue_number }}
