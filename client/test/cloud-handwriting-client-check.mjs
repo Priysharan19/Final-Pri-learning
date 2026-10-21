@@ -471,7 +471,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
   const { ACCOUNT_BLOCKED_KEYS, INK_READER_STATE, inkReaderUiState } = await import('../src/ink/cloudReader.js');
   ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian', 'ink.waitingMfa'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
-    'sign-in, verify-email and guardian blockers offer the way to Account settings; an outage does not');
+    'sign-in, verify-email, guardian and staff MFA blockers offer the way to Account settings; an outage does not');
 
   eq(inkReaderUiState({ kind: 'reading' }), { kind: INK_READER_STATE.READING }, 'in-flight recognition is READING');
   eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingGuardian' }),
