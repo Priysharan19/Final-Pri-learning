@@ -106,7 +106,7 @@ export function createPostgresControlStore(pool) {
             fail(r.rowCount===1,'DENIAL_RECEIPT_NOT_FOUND');
           },
           async audit(event) {
-            fail(event?.kind && /^(?:MERGE_|REVOCATION_)/.test(event.kind),
+            fail(event?.kind && /^(?:MERGE_|REVOCATION_|SIGNER_SIGNED_CAS_CONFIRMED$)/.test(event.kind),
               'AUDIT_KIND_MALFORMED');
             await query(`INSERT INTO pri_governor.audit_events(event_kind,payload_json)
               VALUES($1,$2::jsonb)`,[event.kind,JSON.stringify(event)]);
