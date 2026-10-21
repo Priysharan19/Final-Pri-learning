@@ -131,9 +131,15 @@ export default function AccountAction({ actionData }) {
     const answer = async (choice) => {
       setState('working');
       setMessage('');
+      // Confirming means agreeing to the notice, and this page does not show
+      // it, so a confirmation is taken on the parent page that does (#622).
+      // Saying no needs no notice and stays here.
+      if (choice === 'confirm') {
+        window.location.assign(`/guardian/consent#${new URLSearchParams({ action: 'guardian-consent', token })}`);
+        return;
+      }
       try {
-        if (choice === 'confirm') await cloud.guardianConfirm(token);
-        else await cloud.guardianWithdraw(token);
+        await cloud.guardianWithdraw(token);
         setState('done');
         setMessage(choice === 'confirm'
           ? tLater('accountAction.guardianConfirmed')

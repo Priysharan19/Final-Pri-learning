@@ -82,7 +82,7 @@ try {
     const consentMail = authEmailMessage('guardian-consent', buildAuthActionUrl('https://learn.pri.example', 'guardian-consent', 'tok'));
     c.ok(/1 hour/.test(consentMail.text) && /separate link/.test(consentMail.text) && /withdraw consent at any time/.test(consentMail.text), 'the consent email says this link lasts an hour and a separate withdrawal link follows');
     c.ok(!/this same link to withdraw/.test(consentMail.text), 'and no longer promises the one-hour link withdraws at any time');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: confirmToken } })).data.confirmed, true, 'the guardian confirms');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: confirmToken, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed, true, 'the guardian confirms');
     const withdrawToken = await outboxToken(child.id, 'guardian-withdraw');
     c.ok(withdrawToken && withdrawToken !== confirmToken, 'confirmation issues a separate withdrawal credential');
     const withdrawRow = await db.get("SELECT * FROM account_tokens WHERE account_id=? AND purpose='guardian-withdraw'", [child.id]);
@@ -103,8 +103,8 @@ try {
     c.ok(pass.tokens >= 1, 'housekeeping seven hours on purges the spent confirmation token');
     c.eq(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-consent'", [child.id]), undefined, 'the confirmation token is gone');
     c.ok(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-withdraw' AND consumed_at IS NULL", [child.id]), 'the withdrawal credential survives housekeeping');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: confirmToken } })).data.error.code, 'TOKEN_INVALID', 'the confirmation link is dead (still one hour, single use)');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: withdrawToken } })).data.error.code, 'TOKEN_INVALID', 'the withdrawal credential can never confirm');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: confirmToken, approve: true, noticeVersion: '2026-10-22' } })).data.error.code, 'TOKEN_INVALID', 'the confirmation link is dead (still one hour, single use)');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: withdrawToken, approve: true, noticeVersion: '2026-10-22' } })).data.error.code, 'TOKEN_INVALID', 'the withdrawal credential can never confirm');
     c.eq((await h.request('/v1/account/password/reset', { method: 'POST', body: { token: withdrawToken, password: 'guardian-takeover-pw-1' } })).data.error.code, 'TOKEN_INVALID', 'nor reset the child\'s password');
     c.eq((await h.request('/v1/sync/pull/0', { jar: child.jar })).status, 200, 'the child syncs while consent stands');
     const withdrawn = await h.request('/v1/account/guardian/withdraw', { method: 'POST', body: { token: withdrawToken } });
