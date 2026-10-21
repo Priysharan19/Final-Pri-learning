@@ -125,6 +125,10 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
       if (!current || current.mission !== p.mission || current.agent !== p.agent || current.branch !== p.branch || current.grant_id !== p.grant_id)
         throw new Error('UNMATCHED_RENEW_OR_REVOKE');
       if (p.operation === 'REVOKE') {
+        if (current.risk!==p.risk || current.base_sha!==p.base_sha ||
+          current.main_sha!==p.main_sha || current.head_sha!==p.head_sha ||
+          canonical(current.paths)!==canonical(p.paths))
+          throw new Error('REVOKE_IDENTITY_OR_SOURCE_DRIFT');
         active.delete(p.issue_number);
         released.delete(p.issue_number);
         invalidated.set(p.issue_number,p);
