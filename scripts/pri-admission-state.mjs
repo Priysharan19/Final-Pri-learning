@@ -308,12 +308,18 @@ export function reconcileIssueAuthority(issue, authority, nowMs = Date.now(), cu
     (current && (current.expiry_ms<=nowMs || (currentMainSha && current.main_sha!==currentMainSha)))
     ? 'BLOCKED_AUTOMATION' : released
       ? REVIEWING.has(id.status) ? id.status : 'REVIEW' : WRITERS.has(id.status) ? id.status : 'ACTIVE';
+  // Every live writer state carries the same signed lease identity. Reconciliation
+  // must not remove the grant marker merely because work progressed past ACTIVE.
+  // Expired, revoked and main-stale authority must still project fail-closed.
+  const authorizedWriter=WRITERS.has(target) && current &&
+    current.expiry_ms>nowMs && !authority.invalidated.has(id.issue_number) &&
+    (!currentMainSha || current.main_sha===currentMainSha);
   const markers=new Map([
     ['Pri-Mission-Status',target],
-    ['Pri-Lease-Grant-ID',target==='ACTIVE' ? eventDigest(current) : null],
-    ['Pri-Lease-Heartbeat-At',target==='ACTIVE' ? new Date(current.timestamp_ms).toISOString() : null],
-    ['Pri-Lease-Heartbeat-Ref',target==='ACTIVE' ? current.head_sha : null],
-    ['Pri-Lease-Heartbeat-By',target==='ACTIVE' ? current.agent : null],
+    ['Pri-Lease-Grant-ID',authorizedWriter ? eventDigest(current) : null],
+    ['Pri-Lease-Heartbeat-At',authorizedWriter ? new Date(current.timestamp_ms).toISOString() : null],
+    ['Pri-Lease-Heartbeat-Ref',authorizedWriter ? current.head_sha : null],
+    ['Pri-Lease-Heartbeat-By',authorizedWriter ? current.agent : null],
     ['Pri-Review-Head',released ? released.head_sha : null],
     ['Pri-Provenance-Event',released ? eventDigest(released) : null]
   ]);
