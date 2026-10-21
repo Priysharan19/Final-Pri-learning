@@ -665,8 +665,8 @@ html.ui-instrument .settings-grid .meter > i { background: var(--in-tx-2); }
 /* Switch skin for the on/off buttons (still a button with aria-pressed and its
    On/Off name; only the drawing changes). */
 html.ui-instrument .set-v > .btn[aria-pressed] {
-  position: relative; width: 38px; min-width: 38px; height: 22px; min-height: 22px; padding: 0; border: 0; border-radius: 4px;
-  background: var(--in-l5); box-shadow: none; color: transparent; overflow: hidden; font-size: 0; transition: background 160ms cubic-bezier(.2, 0, 0, 1);
+  position: relative; width: 38px; min-width: 38px; height: 22px; min-height: 22px !important; padding: 0; border: 0; border-radius: 4px;
+  background: var(--in-l5); box-shadow: none; color: transparent; font-size: 0; transition: background 160ms cubic-bezier(.2, 0, 0, 1);
 }
 html.ui-instrument .set-v > .btn[aria-pressed]::after {
   content: ''; position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%;
@@ -675,7 +675,8 @@ html.ui-instrument .set-v > .btn[aria-pressed]::after {
 html.ui-instrument .set-v > .btn[aria-pressed="true"] { background: var(--in-tx); }
 html.ui-instrument .set-v > .btn[aria-pressed="true"]::after { transform: translateX(16px); }
 html.ui-instrument .set-v > .btn[aria-pressed]:disabled { opacity: 0.45; }
-@media (pointer: coarse) { html.ui-instrument .set-v > .btn[aria-pressed] { outline: 11px solid transparent; } }
+/* On touch the switch keeps a 44px target: an invisible hit area around the drawing. */
+@media (pointer: coarse) { html.ui-instrument .set-v > .btn[aria-pressed]::before { content: ''; position: absolute; inset: -11px -3px; } }
 
 /* Segmented control (Appearance). */
 html.ui-instrument .seg { gap: 2px; padding: 3px; border: 0; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); }
@@ -688,8 +689,6 @@ html.ui-instrument .settings-grid .btn-ghost, html.ui-instrument .settings-grid 
 }
 
 /* Danger zone: last in its stack, a red hairline, a red caption. */
-html.ui-instrument .cs-stack { display: flex; flex-direction: column; }
-html.ui-instrument .cs-stack > .set-danger { order: 99; }
 html.ui-instrument .set-danger {
   border: 0 !important; border-radius: 6px; background: var(--in-l1);
   box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px color-mix(in srgb, var(--in-bad) 30%, transparent) !important;
