@@ -194,7 +194,7 @@ jobs:
             echo "::warning::attempt $attempt: $IMAGE did not install intact"
             grep -iE 'warning|error' "$log" | head -5 || true
             rm -rf "$img" "$sdk/.temp" "$sdk/.downloadIntermediates"
-            sleep $((attempt * 20))
+            [ "$attempt" -lt 4 ] && sleep $((attempt * 20))
           done
           echo "::error::INFRASTRUCTURE: $IMAGE could not be downloaded intact in 4 attempts (corrupt archive from the SDK repository). Not a product failure — re-run the job."
           exit 1
