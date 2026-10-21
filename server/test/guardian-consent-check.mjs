@@ -85,9 +85,9 @@ await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', ema
 eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
 eq((await consentState(db, 'acct-child')).row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
 eq((await consentState(db, 'acct-child')).row.method, CONSENT_METHOD, 'and how, so no later reader mistakes it for more');
-ok(await confirmConsent(db, 'acct-child', now), 'a guardian confirms');
+ok(await confirmConsent(db, 'acct-child', CONSENT_NOTICE_VERSION, now), 'a guardian confirms');
 eq((await consentState(db, 'acct-child')).state, 'given', 'and the account is permitted');
-ok(!(await confirmConsent(db, 'acct-child', now)), 'confirming twice changes nothing');
+ok(!(await confirmConsent(db, 'acct-child', CONSENT_NOTICE_VERSION, now)), 'confirming twice changes nothing');
 ok(await withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
 eq((await consentState(db, 'acct-child')).state, 'withdrawn', 'and the account is not permitted again');
 ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consentState(db, 'acct-child')).row.confirmed_at > 0,
@@ -130,7 +130,7 @@ try {
   ok(/stays on this device/i.test(pending.json?.error?.message || ''),
     'and the student is told their work is safe, because it is — nothing has been lost, it simply has not synced');
 
-  await confirmConsent(db, 'acct-child', now);
+  await confirmConsent(db, 'acct-child', CONSENT_NOTICE_VERSION, now);
   eq((await call('acct-child')).status, 200, 'once confirmed, it passes');
 
   // A write carrying the session cookie but no CSRF token never reaches the
