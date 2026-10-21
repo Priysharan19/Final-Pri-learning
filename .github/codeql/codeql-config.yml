@@ -9,3 +9,14 @@ paths-ignore:
   - client/dist
   - android/**/build
   - node_modules
+# js/missing-rate-limiting runs from the local pack below, which also models the
+# platform limiter rateLimit() (server/platform/security.js) — issue #569. The
+# stock copy is excluded and the local copy (same id, so alert history carries
+# over) is included back by its tag. Filters apply in order.
+queries:
+  - uses: ./.github/codeql/rate-limit
+query-filters:
+  - exclude:
+      id: js/missing-rate-limiting
+  - include:
+      tags contain: pri/rate-limit-model
