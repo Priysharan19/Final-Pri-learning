@@ -84,6 +84,18 @@ export default function IndexPage() {
     if (m) return `${m.earned}/${m.possible} ${t('inst.mapMarks')}`;
     return c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted');
   };
+  // "Covered": the share of the chapter's dot points with at least one
+  // server-certified answer filed under exactly that dot point
+  // (GET /marks/by-chapter dotpoints). A chapter with no dot point list has
+  // nothing to cover against, so it says "—".
+  const coveredOf = c => {
+    const total = Array.isArray(c.row.dotpoints) ? c.row.dotpoints.length : 0;
+    if (!total) return '—';
+    const keys = c.row.dotpoints.map((dp, i) => (typeof dp === 'object' && dp?.id ? String(dp.id) : String(i)));
+    const seen = marks[c.row.id]?.dotpoints || {};
+    const n = keys.filter(k => Number(seen[k]?.questions) > 0).length;
+    return `${Math.round((100 * n) / total)}%`;
+  };
   // The resume card's ten segments: the last attempt's own marks, nothing more.
   const resumeMarks = recent && Number.isInteger(recent.marksPossible) && recent.marksPossible > 0 && !recent.repeat
     ? { earned: Math.max(0, Math.min(recent.marksPossible, Number(recent.marksEarned) || 0)), possible: recent.marksPossible } : null;
@@ -178,9 +190,8 @@ export default function IndexPage() {
             </div>
             <div className="in-kpis">
               <div data-plate-marks><b>{marks[current.row.id]?.possible ? `${marks[current.row.id].earned}/${marks[current.row.id].possible}` : '—'}</b><small>{t('inst.mapMarks')}</small></div>
-              <div><b>{current.evidence.attempts}</b><small>{t('inst.kpiAnswered')}</small></div>
-              <div><b>{current.evidence.correct}</b><small>{t('inst.kpiCorrect')}</small></div>
-              <div><b>{current.evidence.accuracy == null ? '—' : `${current.evidence.accuracy}%`}</b><small>{t('inst.kpiAccuracy')}</small></div>
+              <div data-plate-questions><b>{current.evidence.attempts}</b><small>{t('inst.kpiQuestions')}</small></div>
+              <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
           {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}

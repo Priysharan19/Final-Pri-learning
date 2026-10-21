@@ -4,52 +4,41 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
-import { prerequisitesOf, mapStrandOf, MAP_STRANDS } from '../engine/prerequisites.js';
+import { prerequisitesOf, mapStrandOf } from '../engine/prerequisites.js';
 import { IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
+import { constellation, MAP_W } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
 
-// The syllabus map (v1.1 instrument): the student's chapters as a graph laid
-// out by strand (rows) and syllabus order (columns), joined by Pri's authored
-// prerequisite edges (engine/prerequisites.js — Pri's map, not an NCERT one).
-// A node's fill is mastery behind the evidence floor; its marks are the
-// server-certified totals (GET /marks/by-chapter). The recommended chapter is
-// the adaptive engine's own pick from /stats, shown only once there is history.
+// The syllabus map (v1.1 instrument, design s6): the student's chapters as a
+// free constellation (instrument/mapLayout.js — column by prerequisite depth,
+// syllabus order within it, no randomness, no overlapping labels), joined by
+// straight gradient links along Pri's authored prerequisite edges
+// (engine/prerequisites.js — Pri's map, not an NCERT one). A node's size and
+// fill are mastery behind the evidence floor; its marks are the server-
+// certified totals (GET /marks/by-chapter). The recommended chapter is the
+// adaptive engine's own pick from /stats, shown only once there is history.
 // Every node is a button, so the map is fully usable from the keyboard and by
 // a screen reader; the drawing is the same information, not extra.
 
-const W = 1000;
-const LEFT = 190;      // the foundations column and the strand labels sit left of this
-const TOP = 56;
-const LINE_H = 140;    // one line of chapters: the largest node, its ring and two label lines
-const PER_LINE = 5;    // more chapters than this in a strand wrap to a further line
 const STRAND_KEY = {
   number: 'inst.strand.number', algebra: 'inst.strand.algebra', geometry: 'inst.strand.geometry', trig: 'inst.strand.trig',
   coord: 'inst.strand.coord', calculus: 'inst.strand.calculus', data: 'inst.strand.data'
 };
+// The floating card's area at the top right, in map units (310px card, its
+// 24px inset and a gap; the map is drawn about 1:1 on a desktop). Nodes are
+// placed clear of it, so the card never covers one.
+const CARD_RESERVE = { w: 372, h: 340 };
+// "Most lost marks are in …" is said of a dot point only once it has at least
+// this many certified questions, so one slip is never called a pattern.
+const LOST_DOTPOINT_MIN_QUESTIONS = 3;
 
-// A node's radius and fill follow how secure the chapter is (mastery behind the
-// evidence floor, 0 until the floor is met), as the approved map draws them.
-const radiusOf = node => 10 + (node.evidence.mastery / 100) * 18;
 const fillOf = node => 0.14 + (node.evidence.mastery / 100) * 0.86;
 const secureOf = node => node.evidence.accuracy == null ? 0 : node.evidence.mastery / 100;
 
 // A faint fixed field of points behind the drawing (deterministic, decorative).
 const STARS = Array.from({ length: 90 }, (_, i) => ({ x: (Math.sin(i * 91.7) * 0.5 + 0.5), y: (Math.cos(i * 37.3) * 0.5 + 0.5), d: (i % 9) * 0.37 }));
-
-// Long chapter names wrap onto two lines under the node.
-function wrapName(name, max = 24) {
-  const words = String(name).split(/\s+/);
-  const lines = [''];
-  for (const w of words) {
-    const cur = lines[lines.length - 1];
-    if (cur && (cur + ' ' + w).length > max && lines.length < 2) lines.push(w);
-    else lines[lines.length - 1] = cur ? `${cur} ${w}` : w;
-  }
-  if (lines[1] && lines[1].length > max + 2) lines[1] = lines[1].slice(0, max).trimEnd() + '…';
-  return lines;
-}
 
 // Whether the map may move: the reduced-motion preference (followed live), the
 // map being on screen, and the tab being visible. Off-screen or hidden, every
@@ -87,6 +76,7 @@ export default function MapPage() {
   const t = useT();
   const [curriculum, setCurriculum] = useState(null);
   const [marks, setMarks] = useState({});
+  const [month, setMonth] = useState(null);
   const [pick, setPick] = useState(null);
   const [recommended, setRecommended] = useState(null);
   const graphRef = useRef(null);
@@ -95,7 +85,12 @@ export default function MapPage() {
   useEffect(() => {
     let live = true;
     api.get('/curriculum').then(c => live && setCurriculum(c)).catch(() => live && setCurriculum({}));
-    api.get('/marks/by-chapter').then(r => live && setMarks(r?.chapters || {})).catch(() => { });
+    api.get('/marks/by-chapter').then(r => {
+      if (!live) return;
+      setMarks(r?.chapters || {});
+      // This month's certified marks, for the title line.
+      if (r?.monthStart) api.get(`/marks/by-chapter?since=${r.monthStart}`).then(m => live && setMonth(m?.chapters || {})).catch(() => { });
+    }).catch(() => { });
     api.get('/stats').then(s => {
       if (!live) return;
       const hasHistory = Number(s?.totals?.attempts) > 0;
@@ -109,73 +104,30 @@ export default function MapPage() {
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
-    const strands = MAP_STRANDS.map(s => s.id);
-    const nodes = rows.map((row, i) => {
-      const strand = mapStrandOf(row.id) || 'algebra';
-      return {
-        row, index: i, colour: colourFor(i), strand,
-        evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy),
-        marks: marks[row.id] || null
-      };
-    });
-    // Foundations: chapters from earlier classes this syllabus builds on, one
-    // level back, drawn faint in the left column so the dependencies show.
-    const inScope = new Set(nodes.map(node => node.row.id));
-    const foundations = [];
-    const seenFoundation = new Set();
-    for (const node of nodes) for (const pre of prerequisitesOf(node.row.id)) {
-      if (inScope.has(pre.id) || seenFoundation.has(pre.id)) continue;
-      seenFoundation.add(pre.id);
-      const ch = IN_CHAPTER_BY_ID[pre.id];
-      foundations.push({ id: pre.id, name: ch?.name || pre.id, strand: mapStrandOf(pre.id) || node.strand });
-    }
-    const used = strands.filter(s => nodes.some(n => n.strand === s) || foundations.some(f => f.strand === s));
-    // Each strand is a band; its chapters sit along it in syllabus order, spread
-    // across the width, wrapping to a further line past PER_LINE.
-    const bands = [];
-    let y = TOP;
-    for (const id of used) {
-      const members = nodes.filter(node => node.strand === id);
-      const lines = Math.max(1, Math.ceil(members.length / PER_LINE));
-      members.forEach((node, k) => {
-        const line = Math.floor(k / PER_LINE);
-        const inLine = Math.min(PER_LINE, members.length - line * PER_LINE);
-        const slot = (W - LEFT - 40) / inLine;
-        node.x = LEFT + 40 + slot * (k % PER_LINE) + slot / 2 - (inLine === 1 ? slot / 2 - 60 : 0);
-        node.y = y + line * LINE_H;
-      });
-      bands.push({ id, y });
-      y += lines * LINE_H;
-    }
-    const bandY = new Map(bands.map(b => [b.id, b.y]));
-    const perRow = {};
-    foundations.forEach(f => {
-      const k = perRow[f.strand] = (perRow[f.strand] || 0) + 1;
-      // Packed three to a line between the labels and the first chapter.
-      const col = (k - 1) % 3; const line = Math.floor((k - 1) / 3);
-      f.x = LEFT - 20 - col * 20;
-      f.y = bandY.get(f.strand) - 14 + line * 14;
-    });
+    const nodes = rows.map((row, i) => ({
+      row, index: i, colour: colourFor(i), strand: mapStrandOf(row.id) || 'algebra',
+      evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy),
+      marks: marks[row.id] || null
+    }));
+    const placed = constellation(
+      nodes.map(n => ({ id: n.row.id, name: n.row.name, mastery: n.evidence.mastery })),
+      id => prerequisitesOf(id).map(p => p.id),
+      { card: CARD_RESERVE }
+    );
+    const at = new Map(placed.nodes.map(p => [p.id, p]));
+    nodes.forEach(n => Object.assign(n, { x: at.get(n.row.id).x, y: at.get(n.row.id).y, r: at.get(n.row.id).r, lines: at.get(n.row.id).lines }));
     const byId = new Map(nodes.map(node => [node.row.id, node]));
-    const foundationById = new Map(foundations.map(f => [f.id, f]));
     const edges = [];
-    for (const node of nodes) {
-      for (const pre of prerequisitesOf(node.row.id)) {
-        const from = byId.get(pre.id) || foundationById.get(pre.id);
-        if (!from) continue;
-        // Straight between bands; along a band the link arcs above the chapters between.
-        const d = from.y === node.y
-          ? `M${from.x} ${from.y} Q ${(from.x + node.x) / 2} ${from.y - 26 - Math.abs(node.x - from.x) * 0.08}, ${node.x} ${node.y}`
-          : `M${from.x} ${from.y} L ${node.x} ${node.y}`;
-        const earlier = !byId.has(pre.id);
-        edges.push({ from, to: node, skill: pre.skill, earlier, d, opacity: 0.16 + 0.55 * Math.min(earlier ? 0 : secureOf(from), secureOf(node)) });
-      }
+    for (const node of nodes) for (const pre of prerequisitesOf(node.row.id)) {
+      const from = byId.get(pre.id);
+      if (!from) continue;
+      edges.push({ from, to: node, skill: pre.skill, d: `M${from.x} ${from.y} L ${node.x} ${node.y}`, opacity: 0.16 + 0.55 * Math.min(secureOf(from), secureOf(node)) });
     }
     const started = nodes.filter(node => node.evidence.attempts > 0).length;
-    // Only the chapters drawn on this map count toward its total.
-    const certified = nodes.map(node => node.marks).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m?.earned) || 0), possible: a.possible + (Number(m?.possible) || 0) }), { earned: 0, possible: 0 });
-    return { nodes, edges, foundations, rows: bands, height: y - LINE_H + 128, byId, foundationById, started, certified };
-  }, [curriculum, marks, user]);
+    // Only the chapters drawn on this map count toward the month's total.
+    const monthly = month ? nodes.map(n => month[n.row.id]).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m.earned) || 0), possible: a.possible + (Number(m.possible) || 0) }), { earned: 0, possible: 0 }) : null;
+    return { nodes, edges, height: placed.height, byId, started, monthly };
+  }, [curriculum, marks, month, user]);
 
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
@@ -185,40 +137,52 @@ export default function MapPage() {
     : user?.indiaTrack === 'jee-advanced' ? 'JEE Advanced'
       : user?.year ? t('common.classNumber', { n: user.year }) : null;
   const percentOf = node => node.evidence.accuracy == null ? '—' : `${node.evidence.mastery}%`;
+  const H = layout.height;
+
+  // The card's prose: fixed sentences over the chapter's own figures.
+  const lostDotpoint = node => {
+    const dps = Object.values(node?.marks?.dotpoints || {})
+      .filter(d => d.text && Number(d.questions) >= LOST_DOTPOINT_MIN_QUESTIONS && d.possible - d.earned >= 1)
+      .sort((a, b) => (b.possible - b.earned) - (a.possible - a.earned) || String(a.text).localeCompare(String(b.text)));
+    return dps[0] || null;
+  };
+  const named = (key, vars, slot, text) => {
+    const [pre, post = ''] = t(key, { ...vars, [slot]: '\u0000' }).split('\u0000');
+    return <>{pre}<span lang="en"><TermGloss text={text} /></span>{post}</>;
+  };
+  const preNames = node => prerequisitesOf(node.row.id).map(p => layout.byId.get(p.id)?.row.name || IN_CHAPTER_BY_ID[p.id]?.name || p.id);
 
   if (!curriculum) return <div className="skeleton" style={{ height: 520 }} aria-hidden="true" />;
 
+  const lost = current ? lostDotpoint(current) : null;
+  const feeds = current ? preNames(current) : [];
+  const firstPre = current ? layout.byId.get(prerequisitesOf(current.row.id)[0]?.id) : null;
+
   return (
     <div className="in-map" data-instrument-map>
-      <header className="in-map-head">
-        <h1>{scopeName ? t('inst.mapTitleScope', { scope: scopeName }) : t('inst.mapTitle')}</h1>
-        <p>
-          {t('inst.mapStarted', { started: layout.started, total: layout.nodes.length })}
-          {layout.certified.possible > 0 && <> · {t('inst.mapCertified', { earned: layout.certified.earned, possible: layout.certified.possible })}</>}
-        </p>
-      </header>
-      <div className="in-map-body">
+      <div className="in-map-graph-wrap">
+        <header className="in-map-head">
+          <h1>{scopeName ? t('inst.mapTitleScope', { scope: scopeName }) : t('inst.mapTitle')}</h1>
+          <p data-map-subline>
+            {t('inst.mapStarted', { started: layout.started, total: layout.nodes.length })}
+            {layout.monthly && layout.monthly.possible > 0 && <> · {t('inst.mapMonth', { earned: layout.monthly.earned, possible: layout.monthly.possible })}</>}
+          </p>
+        </header>
         <div className={`in-map-graph${motion.running ? '' : ' is-still'}`} ref={graphRef}>
-          <svg viewBox={`0 0 ${W} ${layout.height}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+          <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
             <defs>
               {layout.edges.map((e, i) => (
                 <linearGradient key={i} id={`in-map-g${i}`} gradientUnits="userSpaceOnUse" x1={e.from.x} y1={e.from.y} x2={e.to.x} y2={e.to.y}>
-                  <stop offset="0" stopColor={`var(${e.earlier ? e.to.colour : e.from.colour})`} />
+                  <stop offset="0" stopColor={`var(${e.from.colour})`} />
                   <stop offset="1" stopColor={`var(${e.to.colour})`} />
                 </linearGradient>
               ))}
             </defs>
             <g className="in-map-stars">
-              {STARS.map((st, i) => <rect key={i} x={st.x * W} y={st.y * layout.height} width={1.3} height={1.3} style={{ animationDelay: `${-st.d}s` }} />)}
+              {STARS.map((st, i) => <rect key={i} x={st.x * MAP_W} y={st.y * H} width={1.3} height={1.3} style={{ animationDelay: `${-st.d}s` }} />)}
             </g>
-            {layout.rows.map(r => (
-              <g key={r.id}>
-                <text className="in-map-strand" x={8} y={r.y + 4}>{STRAND_KEY[r.id] ? t(STRAND_KEY[r.id]) : ''}</text>
-              </g>
-            ))}
-            <text className="in-map-strand is-col" x={LEFT - 40} y={16} textAnchor="middle">{t('inst.mapEarlier')}</text>
             {layout.edges.map((e, i) => (
-              <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}${e.earlier ? ' is-earlier' : ''}`}
+              <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}`}
                 d={e.d} style={{ stroke: `url(#in-map-g${i})`, strokeOpacity: e.opacity }} />
             ))}
             {pulse && layout.edges.filter(e => isRecommended(e.to)).map((e, i) => [0, 1].map(k => (
@@ -226,29 +190,22 @@ export default function MapPage() {
                 <animateMotion dur="2.4s" begin={`${-(k * 1.2 + i * 0.31)}s`} repeatCount="indefinite" path={e.d} />
               </circle>
             )))}
-            {layout.foundations.map(f => (
-              <g key={f.id} className="in-map-foundation"><circle cx={f.x} cy={f.y} r={5} /></g>
+            {layout.nodes.map(node => (
+              <g key={node.row.id} className={`in-map-node${current?.row.id === node.row.id ? ' is-on' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})` }} data-map-node={node.row.id}>
+                <circle className="in-map-dot" cx={node.x} cy={node.y} r={node.r} style={{ fillOpacity: fillOf(node) }} />
+                <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 7} />
+                <text x={node.x + node.r + 14} y={node.y + 3} className="in-map-name" lang="en">
+                  {node.lines.map((ln, k) => <tspan key={k} x={node.x + node.r + 14} dy={k ? 17 : 0}>{ln}</tspan>)}
+                </text>
+                <text x={node.x + node.r + 14} y={node.y + 3 + (node.lines.length - 1) * 17 + 17} className="in-map-label">
+                  {`${String(node.index + 1).padStart(2, '0')} · ${percentOf(node)}`}
+                </text>
+              </g>
             ))}
-            {layout.nodes.map(node => {
-              const r = radiusOf(node);
-              const name = wrapName(node.row.name);
-              return (
-                <g key={node.row.id} className={`in-map-node${current?.row.id === node.row.id ? ' is-on' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})` }}>
-                  <circle className="in-map-dot" cx={node.x} cy={node.y} r={r} style={{ fillOpacity: fillOf(node) }} />
-                  <circle className="in-map-ring" cx={node.x} cy={node.y} r={r + 7} />
-                  <text x={node.x} y={node.y + r + 7 + 16} textAnchor="middle" className="in-map-name" lang="en">
-                    {name.map((ln, k) => <tspan key={k} x={node.x} dy={k ? 16 : 0}>{ln}</tspan>)}
-                  </text>
-                  <text x={node.x} y={node.y + r + 7 + 16 + name.length * 16} textAnchor="middle" className="in-map-label">
-                    {`${String(node.index + 1).padStart(2, '0')} · ${percentOf(node)}`}
-                  </text>
-                </g>
-              );
-            })}
           </svg>
           <ol className="in-map-list" aria-label={t('inst.mapTitle')}>
             {layout.nodes.map(node => (
-              <li key={node.row.id} style={{ left: `${(node.x / W) * 100}%`, top: `${(node.y / layout.height) * 100}%` }}>
+              <li key={node.row.id} style={{ left: `${(node.x / MAP_W) * 100}%`, top: `${(node.y / H) * 100}%` }}>
                 <button type="button" className="in-map-hit" data-map-chapter={node.row.id}
                   aria-current={current?.row.id === node.row.id ? 'true' : undefined}
                   aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
@@ -278,21 +235,19 @@ export default function MapPage() {
           <aside className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
             <h2 lang="en"><TermGloss text={current.row.name} /></h2>
-            <p className="in-map-prose">{current.evidence.attempts === 0 ? t('inst.mapCardNew')
-              : current.evidence.accuracy == null ? t('inst.mapCardBuilding') : t('inst.mapCardSecure', { n: current.evidence.mastery })}</p>
-            <dl className="in-map-facts">
-              <div><dt>{t('inst.mapMarks')}</dt><dd>{current.marks ? `${current.marks.earned} / ${current.marks.possible}` : '—'}</dd></div>
-              <div><dt>{t('inst.kpiAnswered')}</dt><dd>{current.evidence.attempts}</dd></div>
-              <div><dt>{t('inst.kpiAccuracy')}</dt><dd>{current.evidence.accuracy == null ? '—' : `${current.evidence.accuracy}%`}</dd></div>
-            </dl>
-            {prerequisitesOf(current.row.id).length > 0 && (
-              <div className="in-map-pre">
-                <span>{t('inst.mapBuildsOn')}</span>
-                <ul>{prerequisitesOf(current.row.id).map(p => <li key={p.id} lang="en"><TermGloss text={layout.byId.get(p.id)?.row.name || layout.foundationById.get(p.id)?.name || p.id} /> <em>· {p.skill}</em></li>)}</ul>
-              </div>
-            )}
-            <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{t('inst.practise')}</Link>
-            {isRecommended(current) && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.mapNextWhy')}</p>}
+            <p className="in-map-prose">
+              {current.marks?.possible > 0
+                ? <span data-map-marks={`${current.marks.earned}/${current.marks.possible}`}>{t('inst.mapCardMarks', { earned: current.marks.earned, possible: current.marks.possible })} </span>
+                : <span data-map-marks="none" />}
+              {current.evidence.attempts === 0 ? t('inst.mapCardNew')
+                : current.evidence.accuracy == null ? t('inst.mapCardBuilding') : t('inst.mapCardSecure', { n: current.evidence.mastery })}
+              {lost && <> {named('inst.mapCardLost', {}, 'dotpoint', lost.text)}</>}
+              {feeds.length > 0 && <> {feeds.length === 1 && firstPre && firstPre.evidence.accuracy != null
+                ? named('inst.mapCardFeedsSecure', { n: firstPre.evidence.mastery }, 'chapter', feeds.join(', '))
+                : named('inst.mapCardFeeds', {}, 'chapter', feeds.join(', '))}</>}
+            </p>
+            <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</Link>
+            {isRecommended(current) && <p className="in-note">{t('inst.mapNextWhy')}</p>}
           </aside>
         )}
       </div>

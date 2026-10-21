@@ -90,8 +90,11 @@ export const flow = {
     await check('choosing a chapter opens its plate', await page.locator(`[data-instrument-plate="${id}"]`).count() === 1);
     await check('the plate is titled with that chapter', (await page.locator('#in-plate-title').textContent()).trim() === name, name);
     await check('the chosen chapter is announced as pressed', await second.getAttribute('aria-pressed') === 'true');
-    const kpis = await page.locator('.in-kpis b').allTextContents();
-    await check('a new student’s plate states 0 answers and withholds accuracy', kpis[1] === '0' && kpis[3] === '—', JSON.stringify(kpis));
+    // The plate's three figures (design s2): certified marks, questions, covered.
+    const kpis = (await page.locator('.in-kpis b').allTextContents()).map(x => x.trim());
+    await check('the plate has the three figures: marks, questions, covered', kpis.length === 3 && await page.locator('.in-kpis [data-plate-marks], .in-kpis [data-plate-questions], .in-kpis [data-plate-covered]').count() === 3, JSON.stringify(kpis));
+    await check('a new student’s plate states no certified marks, 0 questions and 0% covered', kpis[0] === '—' && kpis[1] === '0' && /^(0%|—)$/.test(kpis[2]), JSON.stringify(kpis));
+    await check('accuracy stays behind the floor: no topic states a percentage for a new student', !/\d%/.test(await page.locator('.in-exs').textContent().catch(() => '')));
     const drawn = await page.evaluate(() => {
       const c = document.querySelector('[data-instrument-scope] canvas'); if (!c || !c.width) return 0;
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0;
@@ -154,8 +157,27 @@ export const flow = {
     await third.focus();
     await check('focusing a node opens its card', await page.locator(`[data-map-card="${thirdId}"]`).count() === 1);
     await check('a node is a 44px target with a spoken name', await third.evaluate(el => el.getBoundingClientRect().width >= 43.5 && !!el.getAttribute('aria-label')));
-    await check('a new student’s card shows no certified marks yet', (await page.locator('.in-map-facts dd').first().textContent()).trim() === '—');
+    await check('a new student’s card shows no certified marks yet', await page.locator(`[data-map-card="${thirdId}"] [data-map-marks]`).getAttribute('data-map-marks') === 'none');
     await check('no chapter is recommended before there is any history', await page.locator('.in-map-node.is-next').count() === 0);
+    // The constellation at desktop width: no two nodes or labels overlap, and
+    // the floating card covers none of them.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(200);
+    const geo = await page.evaluate(() => {
+      const rects = [...document.querySelectorAll('[data-map-node]')].map(g => {
+        const r = g.getBoundingClientRect(); return { id: g.getAttribute('data-map-node'), l: r.left, t: r.top, r: r.right, b: r.bottom };
+      });
+      const c = document.querySelector('[data-map-card]')?.getBoundingClientRect();
+      const hit = (a, b) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+      const pairs = [];
+      for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (hit(rects[i], rects[j])) pairs.push(`${rects[i].id}×${rects[j].id}`);
+      const card = c ? { l: c.left, t: c.top, r: c.right, b: c.bottom } : null;
+      return { n: rects.length, pairs, covered: card ? rects.filter(r => hit(r, card)).map(r => r.id) : [], floating: !!c && getComputedStyle(document.querySelector('[data-map-card]')).position === 'absolute' };
+    });
+    await check('the map draws every chapter as a positioned node', geo.n === chapters, `${geo.n} nodes`);
+    await check('no two map nodes or labels overlap', geo.pairs.length === 0, geo.pairs.slice(0, 6).join(', '));
+    await check('the card floats over the map at desktop width and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
+    await check('the map links are straight lines', (await page.locator('.in-map-edge').evaluateAll(es => es.every(e => / L /.test(e.getAttribute('d')) && !/Q/.test(e.getAttribute('d'))))));
     writeFileSync(join(outDir, 'map-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     await page.locator('[data-map-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
@@ -315,6 +337,25 @@ export const writeFlow = {
       const strip = page.locator('[data-mark-strip]').first();
       await check('Scripts shows the certified mark strip on the attempt', await strip.count() === 1 && await strip.getAttribute('data-mark-strip') === `${reply.marksEarned}/${reply.marksPossible}`, await strip.getAttribute('data-mark-strip').catch(() => 'none'));
       await check('the strip has one square per mark', await strip.locator('i').count() === reply.marksPossible);
+      // The filters state their counts; the menus and search work on the rows.
+      await page.waitForSelector('[data-history-count="all"]', { timeout: 10000 });
+      const count = async k => (await page.locator(`[data-history-count="${k}"]`).textContent()).trim();
+      const rowsShown = await page.locator('.hist-row').count();
+      await check('“All” counts every script shown', await count('all') === String(rowsShown), `${await count('all')} vs ${rowsShown} rows`);
+      await check('the wrong answer is counted as incorrect and as needing another look', await count('wrong') === '1' && await count('needsLook') === '1', `${await count('wrong')} / ${await count('needsLook')}`);
+      await check('there is no “Not read” filter (nothing records it)', await page.locator('[data-history-filter="notRead"]').count() === 0);
+      await page.locator('[data-history-filter="needsLook"]').click();
+      await page.waitForFunction(() => document.querySelector('[data-history-filter="needsLook"]')?.getAttribute('aria-pressed') === 'true' && document.querySelectorAll('.hist-row').length === 1, null, { timeout: 10000 }).catch(() => {});
+      await check('“Needs another look” lists that script', await page.locator('.hist-row').count() === 1);
+      await page.locator('[data-history-filter="all"]').click();
+      await check('the chapter and sort menus are there', await page.locator('[data-history-chapter]').count() === 1 && await page.locator('[data-history-sort] option').count() === 3);
+      await page.keyboard.press('/');
+      await check('“/” focuses the search', await page.evaluate(() => document.activeElement?.hasAttribute('data-history-search')));
+      await page.keyboard.type('zzqx-no-such-question');
+      await page.waitForFunction(() => document.querySelectorAll('.hist-row').length === 0, null, { timeout: 10000 }).catch(() => {});
+      await check('a search with no match lists nothing', await page.locator('.hist-row').count() === 0 && await page.locator('[data-history-search-count]').count() === 1);
+      await page.locator('[data-history-search]').fill('');
+      await page.waitForSelector('.hist-row', { timeout: 10000 }).catch(() => {});
       writeFileSync(join(outDir, 'scripts-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
       // Report: the certified total is the receipts' total.
       await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
@@ -322,6 +363,19 @@ export const writeFlow = {
       const fig = (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '');
       await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
       await check('today’s practice is lit on the heat-map', await page.locator('.in-heat i.is-on').count() >= 1);
+      // One question is under every evidence floor: the chart draws no line,
+      // never a zero, and says why.
+      await check('below the floor the chart draws no point and says so', await page.locator('[data-report-chart="empty"] [data-chart-empty]').count() === 1 && await page.locator('[data-chart-line]').count() === 0);
+      await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === '—');
+      await check('the lede is the fixed template over the figures', /1 questions? answered|not enough/i.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
+      // The period switch refetches the series for that window.
+      const series = page.waitForResponse(r => /\/report\/series\?period=month/.test(r.url()) || false, { timeout: 5000 }).catch(() => null);
+      await page.locator('[data-report-period-btn="month"]').click();
+      await series;
+      await page.waitForSelector('[data-instrument-report][data-report-period="month"]', { timeout: 10000 }).catch(() => {});
+      await check('Month is pressed and the report shows the month', await page.locator('[data-report-period-btn="month"]').getAttribute('aria-pressed') === 'true' && await page.locator('[data-instrument-report]').getAttribute('data-report-period') === 'month');
+      await check('the month series loaded (the marks figure is still the receipts’ total)', (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '') === `${reply.marksEarned}/${reply.marksPossible}`);
+      await page.locator('[data-report-period-btn="week"]').click();
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     }
 
@@ -344,8 +398,8 @@ export const writeFlow = {
       const node = page.locator('[data-map-chapter="y7-integers"]');
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
-        const shownMarks = (await page.locator('[data-map-card="y7-integers"] .in-map-facts dd').first().textContent()).trim();
-        await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned} / ${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
+        const shownMarks = await page.locator('[data-map-card="y7-integers"] [data-map-marks]').getAttribute('data-map-marks');
+        await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
     }
     await page.emulateMedia({ colorScheme: 'light' });

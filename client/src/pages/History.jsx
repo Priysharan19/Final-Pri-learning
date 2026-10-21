@@ -31,6 +31,24 @@ const FILTERS = [
   ['ink', 'history.filterInk']
 ];
 
+// The instrument's Scripts filters (design s8), each with its count from the
+// server. "Needs another look" is a slip not yet correctly redone
+// (engine/reportSeries.js needsAnotherLookIds). There is no "not read" filter:
+// nothing records an unread reading, so it would have no honest count.
+const INSTRUMENT_FILTERS = [
+  ['all', 'history.filterAll'],
+  ['needsLook', 'history.filterNeedsLook'],
+  ['wrong', 'history.filterWrong'],
+  ['correct', 'history.filterCorrect'],
+  ['ink', 'history.filterInk'],
+  ['bookmarked', 'history.filterBookmarked']
+];
+const SORTS = [['newest', 'history.sortNewest'], ['oldest', 'history.sortOldest'], ['marks', 'history.sortMarks']];
+// Search runs over every row of the current filter, fetched in one page, so it
+// never silently misses rows on a later page.
+const SEARCH_PAGE = 5000;
+const normal = s => String(s || '').toLowerCase().replace(/[\\${}^_]/g, ' ').replace(/\s+/g, ' ');
+
 const MODE_KEY = {
   practice: 'history.modePractice', review: 'history.modeReview', exam: 'history.modeExam',
   rush: 'history.modeRush', match: 'history.modeMatch', task: 'history.modeTask'
@@ -73,7 +91,12 @@ function HistoryForProfile() {
   const t = useT();
   const [params, setParams] = useSearchParams();
   const requestedFilter = params.get('filter');
-  const filter = FILTERS.some(([key]) => key === requestedFilter) ? requestedFilter : 'all';
+  const filter = (INSTRUMENT_STRIP ? INSTRUMENT_FILTERS : FILTERS).some(([key]) => key === requestedFilter) ? requestedFilter : 'all';
+  const [subtopic, setSubtopic] = useState('');
+  const [sort, setSort] = useState('newest');
+  const [query, setQuery] = useState('');
+  const searchRef = useRef(null);
+  const searching = INSTRUMENT_STRIP && query.trim() !== '';
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -98,17 +121,33 @@ function HistoryForProfile() {
 
   const [activeRow, setActiveRow] = useState(null);
 
-  useEffect(() => { setPage(0); }, [filter]);
+  useEffect(() => { setPage(0); }, [filter, subtopic, sort, searching]);
+  // "/" focuses the search, as the design's key hint says (not while typing).
+  useEffect(() => {
+    if (!INSTRUMENT_STRIP) return undefined;
+    const onKey = e => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = e.target?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   useEffect(() => {
     const gate = createHistoryLoadGate();
     detailGate.current?.cancel();
     setData(null); setLoadFailed(false); setOpen(null);
-    api.post('/history/list', { filter, page }).then(
+    const body = INSTRUMENT_STRIP
+      ? { filter, sort, ...(subtopic ? { subtopic } : {}), ...(searching ? { page: 0, pageSize: SEARCH_PAGE } : { page }) }
+      : { filter, page };
+    api.post('/history/list', body).then(
       rows => { if (gate.current()) setData(rows); },
       () => { if (gate.current()) setLoadFailed(true); }
     );
     return () => gate.cancel();
-  }, [filter, page, refresh]);
+  }, [filter, page, refresh, subtopic, sort, searching]);
 
   async function toggleBookmark(id) {
     try {
@@ -269,7 +308,11 @@ function HistoryForProfile() {
     );
   }
 
-  const pages = data ? Math.ceil(data.total / data.pageSize) : 0;
+  const pages = data && !searching ? Math.ceil(data.total / data.pageSize) : 0;
+  const words = normal(query).trim().split(' ').filter(Boolean);
+  const shown = !data ? [] : !searching ? data.items
+    : data.items.filter(x => { const hay = normal(`${x.prompt} ${x.subtopicName} ${x.dotpointText || ''}`); return words.every(w => hay.includes(w)); });
+  const scopeRows = INSTRUMENT_STRIP ? (scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || []) : [];
 
   return (
     <div className="grid" style={{ gap: 18 }}>
@@ -284,12 +327,46 @@ function HistoryForProfile() {
 
       {!INSTRUMENT_STRIP && <ErrorNotebook />}
 
-      <div className={`row${INSTRUMENT_STRIP ? ' in-led-bar' : ''}`} role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
+      {INSTRUMENT_STRIP && (
+        <div className="in-led-tools">
+          <div className="in-led-bar in-hsb" role="group" aria-label={t('history.filterGroup')}>
+            {INSTRUMENT_FILTERS.map(([k, key]) => (
+              <button key={k} type="button" className="in-flt" aria-pressed={filter === k} data-history-filter={k}
+                onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>
+                {t(key)} <b data-history-count={k}>{data?.counts ? formatNumber(data.counts[k] ?? 0, user) : '·'}</b>
+              </button>
+            ))}
+          </div>
+          <div className="in-hsb is-right">
+            <label className="in-flt is-menu">
+              <span className="sr-only">{t('history.chapterLabel')}</span>
+              <select value={subtopic} onChange={e => setSubtopic(e.target.value)} data-history-chapter aria-label={t('history.chapterLabel')}>
+                <option value="">{t('history.chapterAll')}</option>
+                {scopeRows.map(r => <option key={r.id} value={r.id} lang="en">{r.name}</option>)}
+              </select>
+            </label>
+            <label className="in-flt is-menu">
+              <select value={sort} onChange={e => setSort(e.target.value)} data-history-sort aria-label={t('history.sortLabel')}>
+                {SORTS.map(([k, key]) => <option key={k} value={k}>{t('history.sortPrefix', { sort: t(key) })}</option>)}
+              </select>
+            </label>
+            <label className="in-led-search">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M10.4 10.4 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
+              <input ref={searchRef} type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={t('history.searchPlaceholder')}
+                aria-label={t('history.searchPlaceholder')} aria-keyshortcuts="/" data-history-search />
+              <kbd className="in-kbd" aria-hidden="true">/</kbd>
+            </label>
+          </div>
+          {searching && data && <p className="in-note" role="status" data-history-search-count>{t('history.searchFound', { n: shown.length })}</p>}
+        </div>
+      )}
+
+      {!INSTRUMENT_STRIP && <div className="row" role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
         {FILTERS.map(([k, key]) => (
           <button key={k} className={`pill-opt ${filter === k ? 'on' : ''}`} aria-pressed={filter === k}
             onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>{t(key)}</button>
         ))}
-      </div>
+      </div>}
 
       <div className={`card${INSTRUMENT_STRIP ? ' in-led' : ''}`} style={INSTRUMENT_STRIP ? undefined : { padding: 10 }}>
         {!data && !loadFailed && <div className="skeleton" style={{ height: 300 }} role="status" aria-label={t('common.loading')} />}
@@ -301,12 +378,12 @@ function HistoryForProfile() {
             </button>
           </div>
         )}
-        {INSTRUMENT_STRIP && data && !data.items.length && (
+        {INSTRUMENT_STRIP && data && !shown.length && (
           <div className="in-state" data-state="empty">
             <span className="in-state-orb is-good"><Glyph name="doc" size={20} /></span>
             <p className="in-state-title">{t('history.emptyTitle')}</p>
-            <p className="in-state-copy">{t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}</p>
-            {filter === 'all' && <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/practice')}>{t('history.startPractising')}</button>}
+            <p className="in-state-copy">{t(searching ? 'history.searchNone' : filter === 'all' && !subtopic ? 'history.emptyAll' : 'history.emptyFiltered')}</p>
+            {filter === 'all' && !subtopic && !searching && <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/practice')}>{t('history.startPractising')}</button>}
           </div>
         )}
         {!INSTRUMENT_STRIP && data && !data.items.length && (
@@ -314,7 +391,7 @@ function HistoryForProfile() {
             {t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}
           </p>
         )}
-        {INSTRUMENT_STRIP && data && renderLedger(data.items)}
+        {INSTRUMENT_STRIP && data && shown.length > 0 && renderLedger(shown)}
         {!INSTRUMENT_STRIP && data && data.items.map(item => (
           <div key={item.id} className="hist-row" data-question-id={item.id}>
             <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}

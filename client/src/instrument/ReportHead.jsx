@@ -3,27 +3,99 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { colourFor, scopeFor } from './chapters.js';
-import { dayKey, timezoneOf } from '../lib/locale.js';
+import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
 
-// The top of the v1.1 Report: four honest figures, the practice heat-map and
-// where marks were lost. Every figure states its count; marks are the server-
-// certified totals only. The existing Progress page follows unchanged.
+// The top of the v1.1 Report (design s7): the period, a fixed-template lede
+// built from the figures, four honest figures with their change against the
+// window before, the method/accuracy chart, the practice heat-map and where
+// marks were lost. Every figure is GET /report/series (server-certified
+// receipts only, engine/reportSeries.js) or GET /marks/by-chapter; a
+// percentage the evidence floor withholds is "—" and a chart point it
+// withholds is a gap, never a zero. The existing Progress page follows.
 
 const WEEKS = 15;
+const PERIODS = ['week', 'month', 'term'];
 
-// Activity is filed under the profile's own calendar day (dayKey with the
-// profile's timezone, local/backend.js), so the squares are built the same
-// way: today in that timezone, then one calendar date back at a time — never a
-// fixed 24-hour step, which skips or repeats a date across a clock change.
 function previousDate(date) {
   const [y, m, d] = String(date).split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d) - 86400000).toISOString().slice(0, 10);
 }
 
+const noon = key => `${key}T12:00:00Z`;
+// A calendar date's name (a month or a weekday) in the interface language.
+function dateName(key, user, options) {
+  try { return new Intl.DateTimeFormat(user?.language === 'hi' ? 'hi-IN' : localeOf(user), { timeZone: 'UTC', ...options }).format(new Date(noon(key))); } catch { return key; }
+}
+const fmtPct = v => (v == null ? '—' : `${Math.round(v)}%`);
+
+/** A signed change, or nothing when there is none to state. */
+function Delta({ n, unit = '' }) {
+  if (n == null || !Number.isFinite(n) || n === 0) return null;
+  const v = Math.round(n);
+  if (!v) return null;
+  const text = `${v > 0 ? '+' : '−'}${Math.abs(v)}${unit ? ` ${unit}` : ''}`;
+  return <> <em className={v < 0 ? 'is-down' : undefined} data-report-delta>{text}</em></>;
+}
+
+// The chart, drawn as SVG in a fixed 1000×300 frame (the design's .chart).
+const CW = 1000; const CH = 300; const PADX = 40; const PADB = 30; const PADT = 40;
+
+function Chart({ series, labels, t, spoken }) {
+  const n = series.length;
+  const X = i => (n <= 1 ? CW / 2 : PADX + (i * (CW - 2 * PADX)) / (n - 1));
+  const Y = v => CH - PADB - ((Math.max(0, Math.min(100, v)) - 0) / 100) * (CH - PADB - PADT);
+  // Runs of consecutive non-null points: a null is a gap in the line.
+  const runs = key => {
+    const out = []; let cur = [];
+    series.forEach((p, i) => { if (p[key] == null) { if (cur.length) out.push(cur); cur = []; } else cur.push(i); });
+    if (cur.length) out.push(cur);
+    return out;
+  };
+  const path = (run, key) => run.map((i, k) => `${k ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(series[i][key]).toFixed(1)}`).join(' ');
+  const area = run => `${path(run, 'methodPct')} L${X(run[run.length - 1]).toFixed(1)} ${CH - PADB} L${X(run[0]).toFixed(1)} ${CH - PADB} Z`;
+  const any = series.some(p => p.methodPct != null || p.accuracyPct != null);
+  const last = key => { for (let i = n - 1; i >= 0; i--) if (series[i][key] != null) return i; return -1; };
+  const lm = last('methodPct'); const la = last('accuracyPct');
+  // Label every tick when they fit, else every other one (13 term weeks).
+  const every = n > 8 ? 2 : 1;
+  const gridX = Array.from({ length: 33 }, (_, i) => i * (CW / 32));
+  const gridY = Array.from({ length: 11 }, (_, i) => i * (CH / 10));
+  return (
+    <div className="in-chart" data-report-chart={any ? 'drawn' : 'empty'}>
+      <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" role="img" aria-label={spoken}>
+        <g className="in-chart-grid" aria-hidden="true">
+          {gridX.map(x => <line key={`x${x}`} x1={x} y1={0} x2={x} y2={CH} />)}
+          {gridY.map(y => <line key={`y${y}`} x1={0} y1={y} x2={CW} y2={y} />)}
+        </g>
+        {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} />)}
+        {runs('methodPct').map((r, k) => r.length > 1
+          ? <path key={`m${k}`} className="in-chart-line is-method" d={path(r, 'methodPct')} pathLength="1" data-chart-line="method" />
+          : <circle key={`m${k}`} className="in-chart-pt is-method" cx={X(r[0])} cy={Y(series[r[0]].methodPct)} r={3.5} data-chart-line="method" />)}
+        {runs('accuracyPct').map((r, k) => r.length > 1
+          ? <path key={`c${k}`} className="in-chart-line is-accuracy" d={path(r, 'accuracyPct')} data-chart-line="accuracy" />
+          : <circle key={`c${k}`} className="in-chart-pt is-accuracy" cx={X(r[0])} cy={Y(series[r[0]].accuracyPct)} r={3} data-chart-line="accuracy" />)}
+        {lm >= 0 && <circle className="in-chart-end is-method" cx={X(lm)} cy={Y(series[lm].methodPct)} r={5} />}
+        {la >= 0 && <circle className="in-chart-end is-accuracy" cx={X(la)} cy={Y(series[la].accuracyPct)} r={4} />}
+      </svg>
+      {/* Text sits outside the stretched SVG so it is never distorted. */}
+      <div className="in-chart-text" aria-hidden="true">
+        {lm >= 0 && <span className="in-chart-val is-method" style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }}>{fmtPct(series[lm].methodPct)}</span>}
+        {la >= 0 && <span className="in-chart-val is-accuracy" style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }}>{fmtPct(series[la].accuracyPct)}</span>}
+        {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
+      </div>
+      <div className="in-chart-lg" aria-hidden="true"><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></div>
+      {!any && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')}</p>}
+    </div>
+  );
+}
+
 export default function ReportHead() {
   const { user } = useApp();
   const t = useT();
+  const [period, setPeriod] = useState('week');
+  const [report, setReport] = useState(null);
+  const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(null);
   const [marks, setMarks] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
@@ -36,17 +108,24 @@ export default function ReportHead() {
     return () => { live = false; };
   }, []);
 
+  useEffect(() => {
+    let live = true;
+    setFailed(false);
+    // Week is the route's default period, so it is asked for without a query.
+    api.get(period === 'week' ? '/report/series' : `/report/series?period=${period}`)
+      .then(r => { if (live) setReport(r && r.period === period ? r : null); if (live && !r) setFailed(true); })
+      .catch(() => { if (live) { setReport(null); setFailed(true); } });
+    return () => { live = false; };
+  }, [period]);
+
   const view = useMemo(() => {
     if (!stats || !marks) return null;
-    const certified = Object.values(marks).reduce((a, m) => ({ earned: a.earned + m.earned, possible: a.possible + m.possible }), { earned: 0, possible: 0 });
     const activity = Array.isArray(stats.activity) ? stats.activity : [];
     const byDay = new Map(activity.map(d => [d.date, Number(d.questions) || 0]));
     const keys = [dayKey(Date.now(), timezoneOf(user))];
     while (keys.length < WEEKS * 7) keys.push(previousDate(keys[keys.length - 1]));
     const cells = keys.reverse().map(key => ({ key, n: byDay.get(key) || 0 }));
-    // Days practised in the window the grid shows, so the figure, the grid and
-    // its spoken label all say the same thing.
-    const days = cells.filter(c => c.n > 0).length;
+    const heatDays = cells.filter(c => c.n > 0).length;
     const max = Math.max(1, ...cells.map(c => c.n));
     const rows = scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || [];
     const nameOf = id => rows.find(r => r.id === id)?.name || null;
@@ -55,33 +134,73 @@ export default function ReportHead() {
       .map(([id, m]) => ({ id, name: nameOf(id), lost: m.possible - m.earned, ...m }))
       .filter(c => c.name && c.lost > 0)
       .sort((a, b) => b.lost - a.lost || a.name.localeCompare(b.name)).slice(0, 3);
-    const streak = typeof stats.streak === 'number' ? stats.streak : Number(stats.streak?.current) || 0;
-    // Answers checked, without repeats (an answer to a question whose solution
-    // the student had already seen is not a new answer).
-    const answered = Math.max(0, (Number(stats.totals?.attempts) || 0) - (Number(stats.totals?.repeats) || 0));
-    return { certified, answered, days, streak, cells, max, lost, colourOf };
+    return { cells, heatDays, max, lost, colourOf };
   }, [stats, marks, curriculum, user]);
 
   if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true" />;
 
+  const cur = report?.current || null;
+  const series = Array.isArray(report?.series) ? report.series : [];
+  const title = period === 'week' ? t('inst.reportThisWeek')
+    : period === 'term' ? t('inst.reportThisTerm')
+      : cur ? dateName(cur.to, user, { month: 'long' }) : t('inst.periodMonth');
+  const labels = series.map((p, i) => (period === 'week'
+    ? dateName(p.from, user, { weekday: 'short' })
+    : t('inst.chartWk', { n: i + 1 })));
+  const spoken = `${t('inst.chartTitle')}. ` + series.map((p, i) => (p.methodPct == null && p.accuracyPct == null
+    ? t('inst.chartPointNone', { label: labels[i] })
+    : t('inst.chartPoint', { label: labels[i], m: fmtPct(p.methodPct), a: fmtPct(p.accuracyPct) }))).join('; ');
+
+  // The lede: a fixed template over the figures above, nothing generated.
+  const lede = [];
+  if (cur) {
+    if (cur.methodPct != null && cur.accuracyPct != null) {
+      lede.push(t('inst.ledeMethod', { m: Math.round(cur.methodPct), a: Math.round(cur.accuracyPct) }));
+      const methodLost = cur.methodMarksPossible - cur.methodMarksEarned;
+      const answerLost = cur.accuracyMarksPossible - cur.accuracyMarksEarned;
+      if (answerLost > methodLost) lede.push(t('inst.ledeLostAnswer'));
+      else if (methodLost > answerLost) lede.push(t('inst.ledeLostMethod'));
+    } else if (cur.questions > 0) lede.push(t('inst.ledeFew', { n: cur.questions }));
+    else lede.push(t('inst.ledeNone'));
+  }
+  const worst = view.lost[0];
+
   return (
-    <section className="in-report" aria-labelledby="in-report-title" data-instrument-report>
-      {/* The Progress page below carries the page's h1; this summary is its own
-          section heading so the page keeps one h1. */}
-      {/* For an India profile the Progress page below demotes its own heading
-          under the instrument, so this is the page's one h1. */}
-      {user?.course === 'in'
-        ? <h1 id="in-report-title" className="in-report-title">{t('inst.reportTitle')}</h1>
-        : <h2 id="in-report-title" className="in-report-title">{t('inst.reportTitle')}</h2>}
-      <div className="in-report-figs">
-        <div><b>{view.answered}</b><small>{t('inst.reportAnswered')}</small></div>
-        <div data-report-marks><b>{view.certified.possible ? `${view.certified.earned}` : '—'}{view.certified.possible ? <span>/{view.certified.possible}</span> : null}</b><small>{view.certified.possible ? t('inst.reportMarksPct', { p: Math.round((view.certified.earned / view.certified.possible) * 100) }) : t('inst.reportMarks')}</small></div>
-        <div><b>{view.days}</b><small>{t('inst.reportDays', { n: WEEKS })}</small>{view.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: view.streak })}</em></>}</div>
+    <section className="in-report" aria-labelledby="in-report-title" data-instrument-report data-report-period={period}>
+      <div className="in-report-head">
+        <div>
+          {user?.course === 'in'
+            ? <h1 id="in-report-title" className="in-report-title">{title}</h1>
+            : <h2 id="in-report-title" className="in-report-title">{title}</h2>}
+          {lede.length > 0 && (
+            <p className="in-report-lede" data-report-lede>
+              {lede.join(' ')}
+              {worst && (() => { const [pre, post = ''] = t('inst.ledeChapter', { chapter: '\u0000' }).split('\u0000'); return <> {pre}<span lang="en">{worst.name}</span>{post}</>; })()}
+            </p>
+          )}
+        </div>
+        <div className="in-segc" role="group" aria-label={t('inst.periodGroup')}>
+          {PERIODS.map(p => (
+            <button key={p} type="button" aria-pressed={period === p} data-report-period-btn={p} onClick={() => setPeriod(p)}>
+              {p === 'week' ? t('inst.periodWeek') : p === 'month' ? t('inst.periodMonth') : t('inst.periodTerm')}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="in-report-heat">
-        <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
-        <div className="in-report-heat-body">
-          <div className="in-heat" role="img" aria-label={t('inst.reportHeatSpoken', { days: view.days, n: WEEKS })}>
+      {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
+      <div className="in-report-figs">
+        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={report.delta?.questions} />}</div>
+        <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
+          <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
+          {cur?.marksPossible > 0 && <Delta n={report.delta?.marksEarned} />}</div>
+        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={report.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+        <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
+      </div>
+      <div className="in-rp">
+        <Chart series={series} labels={labels} t={t} spoken={spoken} />
+        <div className="in-report-heat">
+          <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
+          <div className="in-heat" role="img" aria-label={t('inst.reportHeatSpoken', { days: view.heatDays, n: WEEKS })}>
             {view.cells.map(c => <i key={c.key} style={{ '--v': c.n ? 0.25 + (c.n / view.max) * 0.75 : 0 }} className={c.n ? 'is-on' : ''} title={t('inst.reportHeatCell', { date: c.key, n: c.n })} />)}
           </div>
           <div className="in-report-lost">
@@ -89,7 +208,7 @@ export default function ReportHead() {
             {view.lost.length ? (
               <ul>{view.lost.map(c => (
                 <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
-                  <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned} / ${c.possible}`}</small>
+                  <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned}/${c.possible}`}</small>
                 </li>
               ))}</ul>
             ) : <p className="in-note">{t('inst.reportLostNone')}</p>}
