@@ -49,8 +49,8 @@ export const CONSENT_NOTICE_VERSION = '2026-10-22';
 /**
  * The notice versions whose confirmation still stands. A confirmation given
  * under any other version is treated as pending: it no longer opens the cloud
- * account, the learner can ask again (the ordinary request flow), and the row
- * keeps the version that was agreed so the history is not rewritten. Add a
+ * account, the learner can ask again (the ordinary request flow). Reading the state
+ * rewrites nothing; a new request resets the row, as every re-request does. Add a
  * version here only when the change since it does not alter what a guardian
  * agreed to; leave it out to require renewal.
  */
