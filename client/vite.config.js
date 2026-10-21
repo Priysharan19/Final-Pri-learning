@@ -192,6 +192,17 @@ export const ON_DEMAND = [
   // nothing, never a crash, if one cannot be fetched.
   [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
 
+  // The v1.1 instrument interface is behind the opt-in PRI_FEATURE_INSTRUMENT
+  // build flag (OPT_IN_FLAGS below). A build made with it off never imports
+  // these chunks: App.jsx and Login.jsx reach them only through import() calls
+  // guarded by featureEnabled('instrument'), which is false for the whole
+  // build. Warming them would spend the install on code no student of that
+  // build can run. A build made with the flag on warms them as usual, so the
+  // instrument stays offline-ready where it is the interface.
+  ...(process.env.PRI_FEATURE_INSTRUMENT === '1' ? [] : [
+    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
+  ]),
+
   // The previous-year archive is reached only by a student who asks for past
   // papers. It is behind an import() already; warming it spent 48 kB on the
   // majority who never open one.

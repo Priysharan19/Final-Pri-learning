@@ -4,6 +4,10 @@ import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { colourFor, practiceTrack, scopeFor } from './chapters.js';
+import { MathText } from '../lib/latex.jsx';
+import Glyph from './Glyph.jsx';
+
+const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress': 'chart', '/review': 'doc', '/history': 'doc' };
 
 // ⌘K / Ctrl+K anywhere, or the field in the bar: one list for chapters (in
 // their colours), pages and actions. Keyboard: ↑ ↓ move, ↵ opens, esc closes;
@@ -27,7 +31,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     api.get('/curriculum').then(c => {
       if (!live) return;
       const scope = scopeFor(c, user);
-      setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, colour: colourFor(i) })));
+      setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })));
     }).catch(() => { });
     api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
     // Focus goes back to whatever opened the bar (recorded by the opener,
@@ -37,23 +41,25 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   }, [open, user?.year, user?.indiaTrack, user?.country, user?.course]);
 
   const items = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    // A leading > narrows the bar to commands (actions) only.
+    const commands = q.trimStart().startsWith('>');
+    const needle = (commands ? q.trimStart().slice(1) : q).trim().toLowerCase();
     const match = s => !needle || String(s).toLowerCase().includes(needle);
     const track = practiceTrack(user);
     const groups = [
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
-        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour,
+        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, meta: t('inst.chapterN', { n: c.index + 1 }),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
-        id: `sc-${s.id}`, label: String(s.prompt || '').replace(/\$+/g, '').replace(/\\[a-z]+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || s.subtopicName,
+        id: `sc-${s.id}`, label: String(s.prompt || '').replace(/\s+/g, ' ').trim() || s.subtopicName, math: !!s.prompt, glyph: 'doc',
         hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
         run: () => nav('/review')
       })) },
-      { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, run: () => nav(p.to) })) },
-      { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, run: a.run })) }
+      { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, glyph: PAGE_GLYPH[p.to] || 'doc', run: () => nav(p.to) })) },
+      { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, glyph: 'gear', run: a.run })) }
     ];
-    return groups.filter(g => g.rows.length);
+    return groups.filter(g => g.rows.length && (!commands || g.key === 'actions'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, chapters, scripts, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
@@ -76,6 +82,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     <div className="in-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }} data-instrument-command>
       <div className="in-pal" role="dialog" aria-modal="true" aria-label={t('inst.cmdLabel')} onKeyDown={onKey}>
         <div className="in-pal-q">
+          <Glyph name="search" size={20} />
           {/* autoFocus: keys typed the moment the bar opens land in the field. */}
           <input ref={input} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
             placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
@@ -94,16 +101,22 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
                   <button key={row.id} id={`in-pal-${row.id}`} type="button" role="option" aria-selected={sel === mine}
                     className="in-pal-item" tabIndex={-1} onMouseMove={() => setSel(mine)} onClick={() => choose(row)}
                     style={row.colour ? { '--cc': `var(${row.colour})` } : undefined}>
-                    {row.colour && <i className="in-pal-swatch" aria-hidden="true" />}
-                    <b lang={row.colour || row.content ? 'en' : undefined}>{row.label}</b>
-                    {row.hint && <small>{row.hint}</small>}
+                    {row.colour ? <i className="in-pal-swatch" aria-hidden="true" /> : row.glyph && <Glyph name={row.glyph} />}
+                    <b lang={row.colour || row.content ? 'en' : undefined} className={row.math ? 'is-math' : undefined}>{row.math ? <MathText text={row.label} /> : row.label}</b>
+                    {row.meta && <span className="in-pal-meta">· {row.meta}</span>}
+                    <span className="in-pal-r">{row.hint && <small>{row.hint}</small>}<span className="in-kbd" aria-hidden="true">↵</span></span>
                   </button>
                 );
               })}
             </div>
           ))}
         </div>
-        <div className="in-pal-foot" aria-hidden="true"><span>↑ ↓ {t('inst.cmdMove')}</span><span>↵ {t('inst.cmdOpen')}</span><span>esc {t('inst.cmdClose')}</span></div>
+        <div className="in-pal-foot" aria-hidden="true">
+          <span><span className="in-kbd">↑</span><span className="in-kbd">↓</span>{t('inst.cmdMove')}</span>
+          <span><span className="in-kbd">↵</span>{t('inst.cmdOpen')}</span>
+          <span><span className="in-kbd">esc</span>{t('inst.cmdClose')}</span>
+          <span>{t('inst.cmdPrefixHint')}</span>
+        </div>
       </div>
     </div>
   );
