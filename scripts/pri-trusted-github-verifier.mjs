@@ -98,7 +98,8 @@ async function main(){
     demand(matching.length===1,'AMBIGUOUS_MISSION_ISSUE');
     missionIssue=matching[0];
   }
-  const verdict=verifyMergePolicy({pr,head,mainSha:GITHUB_SHA,files,missionIssue,authority,
+  const manualScopePolicy=JSON.parse(readFileSync('.pri-os/manual-owner-authorizations.json','utf8'));
+  const verdict=verifyMergePolicy({pr,head,mainSha:GITHUB_SHA,files,missionIssue,authority,manualScopePolicy,
     reviews,permissions,branchProtection,checks,routeOwner,lastPushActor:PRI_VERIFIER_LAST_PUSH_ACTOR});
   const latestMain=await get('branches/main');
   demand(latestMain.commit?.sha===GITHUB_SHA,'MAIN_MOVED_POST_VERIFICATION');

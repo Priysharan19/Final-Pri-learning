@@ -32,7 +32,7 @@ export function verifyIndependentReviews({pr,head,reviews,permissions,changedPat
   return {approvers:approvers.map(r=>r.user.login),head};
 }
 export function verifyMergePolicy({pr,head,mainSha,files,missionIssue,authority,
-    reviews,permissions,branchProtection,checks,routeOwner,lastPushActor}) {
+    reviews,permissions,branchProtection,checks,routeOwner,lastPushActor,manualScopePolicy=null,nowMs=Date.now()}) {
   requireRule(pr?.state==='open' && pr.head?.repo?.full_name===REPO &&
     pr.base?.repo?.full_name===REPO && pr.base?.ref==='main' &&
     pr.head?.sha===head && SHA.test(head) && SHA.test(mainSha) &&
@@ -66,7 +66,26 @@ export function verifyMergePolicy({pr,head,mainSha,files,missionIssue,authority,
       'MANUAL_BRANCH_NOT_REVIEWABLE');
     requireRule(pr.user?.type==='User' && eligible.has(permissions?.[pr.user.login]),
       'MANUAL_AUTHOR_LACKS_WRITE_PERMISSION');
-    source={manual:true,source_head:head,canonical_owners:[...owners].sort()};
+    // Cross-domain manual changes require a separately reviewed record from
+    // protected main, not a candidate-declared comment or PR body marker.
+    if(owners.size>1) {
+      requireRule(manualScopePolicy?.version===1 && manualScopePolicy.repository===REPO &&
+        Array.isArray(manualScopePolicy.authorizations), 'PROTECTED_MANUAL_SCOPE_POLICY_UNAVAILABLE');
+      const expectedOwners=[...owners].sort();
+      const expectedPaths=[...new Set(changedPaths)].sort();
+      const matching=manualScopePolicy.authorizations.filter(entry =>
+        entry.repository===REPO && entry.pr_number===pr.number &&
+        entry.head_sha===head && entry.main_sha===mainSha &&
+        entry.author===pr.user.login &&
+        Number.isSafeInteger(entry.expires_ms) && entry.expires_ms>nowMs &&
+        entry.expires_ms-nowMs<=24*3600*1000 &&
+        Array.isArray(entry.primary_owners) && Array.isArray(entry.changed_paths) &&
+        JSON.stringify([...new Set(entry.primary_owners)].sort())===JSON.stringify(expectedOwners) &&
+        JSON.stringify([...new Set(entry.changed_paths)].sort())===JSON.stringify(expectedPaths));
+      requireRule(matching.length===1,'MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED');
+    }
+    source={manual:true,source_head:head,canonical_owners:[...owners].sort(),
+      scope_authorized_by:owners.size>1?'protected-main-manual-owner-policy':'single-canonical-owner'};
   }
   const independent=verifyIndependentReviews({pr,head,reviews,permissions,
     changedPaths,lastPushActor,securityRequired:riskSensitive.length>0});

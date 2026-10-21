@@ -57,4 +57,18 @@ const manualP=p('task/legitimately-reviewed');
 pass('manual task branch with review works without autonomous lease',()=>assert.equal(verifyMergePolicy({...good,pr:manualP,missionIssue:null,authority:null}).source.manual,true));
 reject('manual task author without permission denied',/MANUAL_AUTHOR_LACKS_WRITE_PERMISSION/,{...good,pr:manualP,missionIssue:null,authority:null,permissions:{...permissions,'Priysharan19':'read'}});
 reject('manual task without independent security review denied',/SECURITY_OWNER_APPROVAL_MISSING/,{...good,pr:manualP,missionIssue:null,authority:null,reviews:[{...approvals[0],user:{login:'OtherReviewer',type:'User'}}]});
+const mixedFiles=[{filename:file,status:'modified'},{filename:'README.md',status:'modified'}];
+const mixedPr={...manualP,changed_files:2};
+const mixed={...good,pr:mixedPr,files:mixedFiles,authority:null,missionIssue:null};
+reject('mixed canonical-owner manual paths need external authorization',/PROTECTED_MANUAL_SCOPE_POLICY_UNAVAILABLE/,mixed);
+const protectedEntry={repository:'Priysharan19/Final-Pri-learning',pr_number:9,head_sha:head,main_sha:main,
+ author:'Priysharan19',primary_owners:['qa-release','platform'],changed_paths:['README.md',file],
+ expires_ms:Date.now()+3600000};
+const protectedScopePolicy={version:1,repository:'Priysharan19/Final-Pri-learning',authorizations:[protectedEntry]};
+pass('explicit protected exact-head mixed-owner grant',()=>assert.equal(verifyMergePolicy({...mixed,manualScopePolicy:protectedScopePolicy}).source.scope_authorized_by,'protected-main-manual-owner-policy'));
+reject('stale cross-owner scope expiration',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,expires_ms:Date.now()-1000}]}});
+reject('cross-owner grant cannot cover changed SHA',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,head_sha:changed}]}});
+reject('cross-owner grant cannot omit modified path',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,changed_paths:[file]}]}});
+reject('cross-owner grant cannot be reassigned to new PR',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,pr_number:999}]}});
+reject('cross-owner grant cannot use old main SHA',/MIXED_OWNER_MANUAL_SCOPE_NOT_AUTHORIZED/,{...mixed,manualScopePolicy:{...protectedScopePolicy,authorizations:[{...protectedEntry,main_sha:changed}]}});
 console.log('PASS: '+cases+' independent merge-policy and manual-authority cases');
