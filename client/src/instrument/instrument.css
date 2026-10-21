@@ -1111,3 +1111,6 @@ html.ui-instrument .stepcheck-line:has(.in-step-k) b { font: 500 12.5px var(--in
 @media (prefers-reduced-motion: reduce) {
   .in-read, .in-dial-v { animation: none; }
 }
+html.ui-instrument .in-ladder .hintbox.in-rung { display: block; }
+html.ui-instrument .in-ladder .hintbox .h-n { width: 100%; margin-bottom: 4px; }
+html.ui-instrument .q-topmeta:has(.in-qh) .q-marks::before { content: "·"; margin-right: 8px; }
