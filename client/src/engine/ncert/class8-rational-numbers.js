@@ -281,11 +281,17 @@ function propertyMcq(rng, prompt, correct, distractors, hints, steps) {
   };
 }
 
-function fractionNumeric(prompt, f, { hints = [], steps = [], traps = [], solutionText = '' } = {}) {
+// The sentence a prompt carries when the exercise is fraction arithmetic and
+// the answer must be written as a fraction. It travels with `requireFraction`
+// so the demand the marker enforces is the demand the student was shown: the
+// exact decimal (0.5 for 1/2) is refused only on a question that said so (#527).
+export const AS_FRACTION = 'Give your answer as a fraction in simplest form.';
+
+function fractionNumeric(prompt, f, { hints = [], steps = [], traps = [], solutionText = '', requireFraction = false } = {}) {
   return {
     prompt,
     answerType: 'numeric',
-    answer: fracAnswer(f),
+    answer: requireFraction ? { ...fracAnswer(f), requireFraction: true } : fracAnswer(f),
     inputHint: fracInput(f),
     hints,
     steps,
@@ -347,6 +353,7 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     if (diff === 3) {
       const ans = new Frac(3, 2);
       return fractionNumeric('Solve $2x=3$. Give the answer as a rational number in simplest form.', ans, {
+        requireFraction: true,
         hints: ['Divide both sides by 2.', '$x=3\\div2$.', 'Write the quotient as a fraction.'],
         steps: [
           { h: 'Start', d: '$2x=3$' },
@@ -393,7 +400,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     }
     if (diff === 2) {
       const ans = new Frac(-7, 40);
-      return fractionNumeric('NCERT Try These: compute $\\frac58-\\frac45$ and give the answer in simplest form.', ans, {
+      return fractionNumeric('NCERT Try These: compute $\\frac58-\\frac45$ and give the answer as a fraction in simplest form.', ans, {
+        requireFraction: true,
         hints: ['Use a common denominator.', 'LCM$(8,5)=40$.', '$\\frac58=\\frac{25}{40}$ and $\\frac45=\\frac{32}{40}$.'],
         steps: [
           { h: 'Common denominator', d: '$\\operatorname{LCM}(8,5)=40$' },
@@ -406,7 +414,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     }
     if (diff === 3) {
       const ans = new Frac(6, 35);
-      return fractionNumeric('NCERT division check: compute $\\frac27\\div\\frac53$.', ans, {
+      return fractionNumeric(`NCERT division check: compute $\\frac27\\div\\frac53$. ${AS_FRACTION}`, ans, {
+        requireFraction: true,
         hints: ['Division by a non-zero fraction means multiply by its reciprocal.', 'The reciprocal of $5/3$ is $3/5$.', 'Now multiply and simplify.'],
         steps: [
           { h: 'Reciprocal', d: '$\\frac53\\mapsto\\frac35$' },
@@ -565,9 +574,10 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     const a = signedFrac(rng), b = signedFrac(rng), c = signedFrac(rng);
     const ans = a.add(b).add(c);
     return fractionNumeric(
-      `Evaluate $${paren(a)}+(${paren(b)}+${paren(c)})$ and simplify. Your working should make clear why regrouping is allowed.`,
+      `Evaluate $${paren(a)}+(${paren(b)}+${paren(c)})$. ${AS_FRACTION} Your working should make clear why regrouping is allowed.`,
       ans,
       {
+        requireFraction: true,
         hints: ['Addition of rationals is associative.', 'You may regroup to make the easiest pair first.', 'Then reduce the final fraction.'],
         steps: [
           { h: 'Associativity', d: `$${paren(a)}+(${paren(b)}+${paren(c)})=(${paren(a)}+${paren(b)})+${paren(c)}$` },
@@ -665,7 +675,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     }
     if (diff === 2) {
       const ans = new Frac(7, 30);
-      return fractionNumeric('NCERT Try These: find $\\frac75(-\\frac3{12})+\\frac75(\\frac5{12})$ **using distributivity**.', ans, {
+      return fractionNumeric(`NCERT Try These: find $\\frac75(-\\frac3{12})+\\frac75(\\frac5{12})$ **using distributivity**. ${AS_FRACTION}`, ans, {
+        requireFraction: true,
         hints: ['Both terms have a common factor $7/5$.', 'Factor it out.', '$-3/12+5/12=2/12$.'],
         steps: [
           { h: 'Factor the common rational', d: '$\\frac75(-\\frac3{12}+\\frac5{12})$' },
@@ -691,9 +702,10 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     const c = signedFrac(rng);
     const ans = a.mul(b.sub(c));
     return fractionNumeric(
-      `Evaluate $${paren(a)}${paren(b)}-${paren(a)}${paren(c)}$ by factoring the common rational number.`,
+      `Evaluate $${paren(a)}${paren(b)}-${paren(a)}${paren(c)}$ by factoring the common rational number. ${AS_FRACTION}`,
       ans,
       {
+        requireFraction: true,
         hints: [`Both products contain $${a.latex()}$.`, 'Use $ab-ac=a(b-c)$.', `First calculate $${paren(b)}-${paren(c)}$.`],
         steps: [
           { h: 'Factor', d: `$${paren(a)}[${paren(b)}-${paren(c)}]$` },
@@ -708,7 +720,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
   'y8-ncert-rational-strategy': (rng, diff) => {
     if (diff === 1) {
       const ans = new Frac(-125, 462);
-      return fractionNumeric('NCERT Example 1: find $\\frac37-\\frac6{11}-\\frac8{21}+\\frac5{22}$.', ans, {
+      return fractionNumeric(`NCERT Example 1: find $\\frac37-\\frac6{11}-\\frac8{21}+\\frac5{22}$. ${AS_FRACTION}`, ans, {
+        requireFraction: true,
         hints: ['Do not rush to one four-denominator LCM.', 'Group $3/7$ with $-8/21$, and $-6/11$ with $5/22$.', 'Then combine the two simple results.'],
         steps: [
           { h: 'Regroup', d: '$(\\frac37-\\frac8{21})+(-\\frac6{11}+\\frac5{22})$' },
@@ -723,7 +736,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     }
     if (diff === 2) {
       const ans = new Frac(1, 2);
-      return fractionNumeric('NCERT Example 2: find $-\\frac45\\times\\frac37\\times\\frac{15}{16}\\times(-\\frac{14}{9})$.', ans, {
+      return fractionNumeric(`NCERT Example 2: find $-\\frac45\\times\\frac37\\times\\frac{15}{16}\\times(-\\frac{14}{9})$. ${AS_FRACTION}`, ans, {
+        requireFraction: true,
         hints: ['Two negative factors make the result positive.', 'Regroup so cancellation is visible.', 'Cancel before multiplying.'],
         steps: [
           { h: 'Sign', d: 'Two negatives $\\Rightarrow$ positive product' },
@@ -737,7 +751,8 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     }
     if (diff === 3) {
       const ans = new Frac(-1, 2);
-      return fractionNumeric('NCERT Example 3: find $\\frac25\\times(-\\frac37)-\\frac1{14}-\\frac37\\times\\frac35$.', ans, {
+      return fractionNumeric(`NCERT Example 3: find $\\frac25\\times(-\\frac37)-\\frac1{14}-\\frac37\\times\\frac35$. ${AS_FRACTION}`, ans, {
+        requireFraction: true,
         hints: ['Rewrite the last product so the same negative factor appears twice.', 'Factor out $-3/7$.', '$2/5+3/5=1$.'],
         steps: [
           { h: 'Reveal the common factor', d: '$(-\\frac37)(\\frac25)+(-\\frac37)(\\frac35)-\\frac1{14}$' },
@@ -754,9 +769,10 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     const a = new Frac(p, p + 1), b = new Frac(1, q), c = new Frac(p, p + 1), d = new Frac(q - 1, q);
     const ans = a;
     return fractionNumeric(
-      `Topper challenge: evaluate $${a.latex()}\\times${b.latex()}+${c.latex()}\\times${d.latex()}$ without multiplying the two products separately.`,
+      `Topper challenge: evaluate $${a.latex()}\\times${b.latex()}+${c.latex()}\\times${d.latex()}$ without multiplying the two products separately. ${AS_FRACTION}`,
       ans,
       {
+        requireFraction: true,
         hints: ['The same factor appears in both products.', `Factor out $${a.latex()}$.`, `Notice $${b.latex()}+${d.latex()}=1$.`],
         steps: [
           { h: 'Common factor', d: `$${a.latex()}[${b.latex()}+${d.latex()}]$` },

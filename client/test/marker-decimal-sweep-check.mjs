@@ -176,13 +176,14 @@ ok(acceptedDecimalGenerators.size >= Math.min(31, scaled(31) || 1), `generators 
 ok(tally.demanded >= scaled(1300), `exact decimals still refused where the prompt asks for a fraction (${tally.demanded}; floor ${scaled(1300)})`);
 ok(demandedGenerators.size >= Math.min(11, scaled(11) || 1), `generators that honestly demand the fraction (${demandedGenerators.size}; floor ${Math.min(11, scaled(11) || 1)})`);
 ok(tally.rounded >= scaled(13000), `rounded decimals of non-terminating fractions refused (${tally.rounded}; floor ${scaled(13000)})`);
-// No population floor for `tally.honest`: no live generator sets
-// `requireFraction: true` yet (measured 0 draws), so the class is empty and a
-// floor would be a fabricated number. The per-draw HONEST assertion above still
-// fires the moment a generator sets the flag without saying so in its prompt.
-// The Class 8 rational-numbers wording that populates this class is
-// india-curriculum's follow-up to #527; when it lands, measure `tally.honest`
-// and set the floor at three quarters of that count here.
+// `tally.honest` counts the draws whose generator sets `requireFraction: true`.
+// The Class 8 rational-numbers fraction-arithmetic forms set it with explicit
+// wording (#547): measured 1,494 draws and 2,148 demanded over 17 generators
+// at DEFAULT_DRAWS. The floors sit at three quarters, rounded down to the
+// hundred, so losing the wording or the flag cannot pass.
+ok(tally.honest >= scaled(1100), `requireFraction draws whose prompt asks for the fraction (${tally.honest}; floor ${scaled(1100)})`);
+ok(tally.demanded >= scaled(1600), `exact decimals refused where a fraction is demanded, after #547 (${tally.demanded}; floor ${scaled(1600)})`);
+ok(demandedGenerators.size >= Math.min(12, scaled(12) || 1), `generators that demand the fraction, after #547 (${demandedGenerators.size}; floor ${Math.min(12, scaled(12) || 1)})`);
 
 // The generators the issue named: each must now accept its exact decimal, or
 // must have been given explicit wording that demands the fraction.
