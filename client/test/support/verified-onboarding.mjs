@@ -179,7 +179,8 @@ export async function createVerifiedProfile(page, platform, {
   }
   if (landing === 'home') {
     await page.goto(`${platform.origin}/`, { waitUntil: 'domcontentloaded' });
-    await page.locator('.home-greet').waitFor({ timeout: 30000 });
+    // Home is the greeting, or — in a PRI_FEATURE_INSTRUMENT build — the Index.
+    await page.locator('.home-greet, [data-instrument-index]').first().waitFor({ timeout: 30000 });
   }
   return { email: address, accountId: String(me.data.account.id), year: course !== 'in' ? Number(year) || classOf : classOf, name, pending: false };
 }

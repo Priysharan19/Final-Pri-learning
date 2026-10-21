@@ -12,7 +12,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
-import { THEME_PREFS, cleanThemePref } from '../lib/theme.js';
+import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -3060,7 +3060,7 @@ const routes = {
       year: requestedYear,
       course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
-      avatar: body.avatar || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
+      avatar: body.avatar || '🙂', theme: DEFAULT_THEME_PREF, dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose
       // Hindi and then filled this form in Hindi has already told us what they
       // read; making them find the setting afterwards to say it a second time
@@ -4580,7 +4580,7 @@ const routes = {
         const course = COURSES[raw?.course] ? raw.course : rowTrack ? 'in' : defaultCourse;
         prof = {
           id: uuid(), name, year, course, role: 'student',
-          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
+          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: DEFAULT_THEME_PREF, dailyGoal: 10, xp: 0,
           pathway: course === 'nsw' ? (year >= 11 ? 'advanced' : null) : null,
           indiaTrack: course === 'in' ? cleanIndiaTrack(raw?.track ?? raw?.indiaTrack, year) : null,
           rosteredBy: teacher.id, createdAt: now, lastActiveAt: now
