@@ -243,7 +243,9 @@ jobs:
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
           grep -Fq 'LOST MARKS: PASS — 170/170 checks' suites.log
-          grep -Fq 'TOLERANCE POLICY: PASS — 178/178 checks' suites.log
+          grep -Fq 'TOLERANCE POLICY: PASS — 221/221 checks' suites.log
+          # Issue #518: a prompt that states a precision keys a tol or rounding.
+          grep -Fq 'PRECISION BAND: PASS — 2442 draws state a precision' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
