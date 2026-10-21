@@ -1,0 +1,1 @@
+import{l as e}from"./cloudSyncScheduler-DnWPd_Sw.js";export{e as installAutoSync};
