@@ -46,6 +46,10 @@ import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
+import { featureEnabled } from '../platform/features.js';
+import ReadingPlot from '../instrument/ReadingPlot.jsx';
+// v1.1 instrument: the student's own equations, drawn under the reading.
+const INSTRUMENT_PLOT = featureEnabled('instrument');
 
 // Engine names are for developers and evaluators, not students: shown in dev
 // builds, LAN research mode, or with ?inkdiag=1.
@@ -651,6 +655,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           {!disabled && !stale && lowConfidenceLines(rec).length > 0 && (
             <div className="ink-doubt-note" role="status">{t('ink.lowConfidenceLine', { n: lowConfidenceLines(rec)[0] + 1 })}</div>
           )}
+          {INSTRUMENT_PLOT && !stale && <ReadingPlot lines={rec.lines} />}
         </div>
       )}
     </div>

@@ -15,6 +15,11 @@ import Icon from '../components/Icon.jsx';
 import ErrorNotebook from '../components/ErrorNotebook.jsx';
 import { createHistoryLoadGate } from './historyLoadLifecycle.js';
 import { transcriptIsAnswer } from '../components/attemptEvidence.js';
+import { featureEnabled } from '../platform/features.js';
+import MarkStrip from '../instrument/MarkStrip.jsx';
+
+// v1.1 instrument: each row carries its certified mark as a strip.
+const INSTRUMENT_STRIP = featureEnabled('instrument');
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -177,6 +182,7 @@ function HistoryForProfile() {
                 <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
                 {item.viaInk && <span className="tag" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
                 {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
+                {INSTRUMENT_STRIP && !item.repeat && Number.isInteger(item.marksPossible) && <MarkStrip earned={item.marksEarned} possible={item.marksPossible} />}
                 <span className="muted" style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
                   {formatDate(item.answeredAt, user)}
                 </span>
