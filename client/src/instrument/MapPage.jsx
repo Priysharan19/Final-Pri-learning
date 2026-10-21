@@ -29,7 +29,11 @@ const STRAND_KEY = {
 // The floating card's area at the top right, in map units (310px card, its
 // 24px inset and a gap; the map is drawn about 1:1 on a desktop). Nodes are
 // placed clear of it, so the card never covers one.
-const CARD_RESERVE = { w: 372, h: 340 };
+// The card is 310px wide, inset 24px, with an 18px gap kept clear; its height
+// is measured. In map units this scales with the rendered map width, and the
+// card floats only while that reserve is a modest share of the map.
+const CARD_PX = { w: 310 + 24 + 18, pad: 24 + 18 };
+const FLOAT_MAX_SHARE = 0.4;
 // "Most lost marks are in …" is said of a dot point only once it has at least
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
@@ -80,6 +84,21 @@ export default function MapPage() {
   const [pick, setPick] = useState(null);
   const [recommended, setRecommended] = useState(null);
   const graphRef = useRef(null);
+  const wrapRef = useRef(null);
+  const cardRef = useRef(null);
+  const [wrapW, setWrapW] = useState(0);
+  const [cardH, setCardH] = useState(320);
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => {
+      setWrapW(Math.round(wrap.clientWidth));
+      if (cardRef.current) setCardH(Math.round(cardRef.current.offsetHeight));
+    });
+    ro.observe(wrap);
+    if (cardRef.current) ro.observe(cardRef.current);
+    return () => ro.disconnect();
+  }, [!!curriculum]);
   const motion = useMapMotion(graphRef, !!curriculum);
 
   useEffect(() => {
@@ -101,6 +120,10 @@ export default function MapPage() {
     return () => { live = false; };
   }, []);
 
+  const unit = wrapW > 0 ? MAP_W / wrapW : 1;
+  const floating = wrapW > 0 && CARD_PX.w * unit <= MAP_W * FLOAT_MAX_SHARE;
+  // Rounded to 10 map units so a pixel of resize does not re-lay the map.
+  const reserve = floating ? { w: Math.ceil((CARD_PX.w * unit) / 10) * 10, h: Math.ceil(((cardH + CARD_PX.pad) * unit) / 10) * 10 } : null;
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
@@ -112,7 +135,7 @@ export default function MapPage() {
     const placed = constellation(
       nodes.map(n => ({ id: n.row.id, name: n.row.name, mastery: n.evidence.mastery })),
       id => prerequisitesOf(id).map(p => p.id),
-      { card: CARD_RESERVE }
+      reserve ? { card: reserve } : {}
     );
     const at = new Map(placed.nodes.map(p => [p.id, p]));
     nodes.forEach(n => Object.assign(n, { x: at.get(n.row.id).x, y: at.get(n.row.id).y, r: at.get(n.row.id).r, lines: at.get(n.row.id).lines }));
@@ -127,7 +150,7 @@ export default function MapPage() {
     // Only the chapters drawn on this map count toward the month's total.
     const monthly = month ? nodes.map(n => month[n.row.id]).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m.earned) || 0), possible: a.possible + (Number(m.possible) || 0) }), { earned: 0, possible: 0 }) : null;
     return { nodes, edges, height: placed.height, byId, started, monthly };
-  }, [curriculum, marks, month, user]);
+  }, [curriculum, marks, month, user, reserve?.w, reserve?.h]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
@@ -160,7 +183,7 @@ export default function MapPage() {
 
   return (
     <div className="in-map" data-instrument-map>
-      <div className="in-map-graph-wrap">
+      <div className={`in-map-graph-wrap${floating ? ' is-floating' : ''}`} ref={wrapRef}>
         <header className="in-map-head">
           <h1>{scopeName ? t('inst.mapTitleScope', { scope: scopeName }) : t('inst.mapTitle')}</h1>
           <p data-map-subline>
@@ -232,7 +255,7 @@ export default function MapPage() {
         </div>
 
         {current && (
-          <aside className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
+          <aside ref={cardRef} className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
             <h2 lang="en"><TermGloss text={current.row.name} /></h2>
             <p className="in-map-prose">

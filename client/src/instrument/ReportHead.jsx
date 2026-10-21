@@ -75,15 +75,19 @@ function Chart({ series, labels, t, spoken, failed }) {
         {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} />)}
         {runs('methodPct').map((r, k) => r.length > 1
           ? <path key={`m${k}`} className="in-chart-line is-method" d={path(r, 'methodPct')} pathLength="1" data-chart-line="method" />
-          : <circle key={`m${k}`} className="in-chart-pt is-method" cx={X(r[0])} cy={Y(series[r[0]].methodPct)} r={3.5} data-chart-line="method" />)}
+          : null)}
         {runs('accuracyPct').map((r, k) => r.length > 1
           ? <path key={`c${k}`} className="in-chart-line is-accuracy" d={path(r, 'accuracyPct')} data-chart-line="accuracy" />
-          : <circle key={`c${k}`} className="in-chart-pt is-accuracy" cx={X(r[0])} cy={Y(series[r[0]].accuracyPct)} r={3} data-chart-line="accuracy" />)}
-        {lm >= 0 && <circle className="in-chart-end is-method" cx={X(lm)} cy={Y(series[lm].methodPct)} r={5} />}
-        {la >= 0 && <circle className="in-chart-end is-accuracy" cx={X(la)} cy={Y(series[la].accuracyPct)} r={4} />}
+          : null)}
       </svg>
-      {/* Text sits outside the stretched SVG so it is never distorted. */}
+      {/* Dots and text sit outside the stretched SVG so they stay round and
+          undistorted: a lone point (a run of one) and each line's end. */}
       <div className="in-chart-text" aria-hidden="true">
+        {['methodPct', 'accuracyPct'].flatMap(key => runs(key).filter(r => r.length === 1).map(r => (
+          <i key={`${key}${r[0]}`} className={`in-chart-dot is-pt ${key === 'methodPct' ? 'is-method' : 'is-accuracy'}`} data-chart-line={key === 'methodPct' ? 'method' : 'accuracy'}
+            style={{ left: `${(X(r[0]) / CW) * 100}%`, top: `${(Y(series[r[0]][key]) / CH) * 100}%` }} />)))}
+        {lm >= 0 && <i className="in-chart-dot is-end is-method" style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }} />}
+        {la >= 0 && <i className="in-chart-dot is-end is-accuracy" style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }} />}
         {lm >= 0 && <span className={`in-chart-val is-method${side(methodAbove)}`} style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }}>{fmtPct(series[lm].methodPct)}</span>}
         {la >= 0 && <span className={`in-chart-val is-accuracy${side(!methodAbove)}`} style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }}>{fmtPct(series[la].accuracyPct)}</span>}
         {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
@@ -115,6 +119,7 @@ export default function ReportHead() {
   useEffect(() => {
     let live = true;
     setFailed(false);
+    setReport(null);   // never the old period's figures under the new title
     // Week is the route's default period, so it is asked for without a query.
     api.get(period === 'week' ? '/report/series' : `/report/series?period=${period}`)
       .then(r => { if (live) setReport(r && r.period === period ? r : null); if (live && !r) setFailed(true); })
@@ -143,8 +148,10 @@ export default function ReportHead() {
 
   if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true" />;
 
-  const cur = report?.current || null;
-  const series = Array.isArray(report?.series) ? report.series : [];
+  // Only the series for the period on screen is ever shown.
+  const shown = report?.period === period ? report : null;
+  const cur = shown?.current || null;
+  const series = Array.isArray(shown?.series) ? shown.series : [];
   const title = period === 'week' ? t('inst.reportThisWeek')
     : period === 'term' ? t('inst.reportThisTerm')
       : cur ? dateName(cur.to, user, { month: 'long' }) : t('inst.periodMonth');
@@ -170,7 +177,7 @@ export default function ReportHead() {
   const worst = view.lost[0];
 
   return (
-    <section className="in-report" aria-labelledby="in-report-title" data-instrument-report data-report-period={period}>
+    <section className="in-report" aria-labelledby="in-report-title" data-instrument-report data-report-period={period} data-report-loaded={shown ? shown.period : 'none'}>
       <div className="in-report-head">
         <div>
           {user?.course === 'in'
@@ -193,11 +200,11 @@ export default function ReportHead() {
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
-        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={report.delta?.questions} />}</div>
+        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} />}</div>
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
-          {cur?.marksPossible > 0 && <Delta n={report.delta?.marksEarned} />}</div>
-        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={report.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
+        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">

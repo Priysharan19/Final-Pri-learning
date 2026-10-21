@@ -77,7 +77,8 @@ export function constellation(chapters, prereqOf, reserve = {}) {
   }
   const longest = Math.max(8, ...chapters.map(c => Math.max(...wrapLabel(c.name).map(l => l.length))));
   const lastW = 28 + 14 + longest * LABEL_CH + 20;
-  const colW = columns.length > 1 ? Math.max(120, (MAP_W - LEFT - lastW) / (columns.length - 1)) : 0;
+  // Columns always fit MAP_W: the last column keeps room for its label.
+  const colW = columns.length > 1 ? Math.max(0, (MAP_W - LEFT - lastW) / (columns.length - 1)) : 0;
   const blocked = [];
   if (reserve.card) blocked.push({ x1: MAP_W - reserve.card.w, y1: 0, x2: MAP_W + 1, y2: reserve.card.h });
   blocked.push({ x1: 0, y1: 0, x2: 560, y2: TOP - 40 });   // the title

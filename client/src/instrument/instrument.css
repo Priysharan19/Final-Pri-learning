@@ -514,7 +514,8 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 /* Desktop: one field, as the design draws it — the title over the top left,
    the card floating at the top right (the layout keeps nodes out of both). */
 .in-map-graph-wrap { position: relative; }
-.in-map-head { position: absolute; left: 24px; top: 22px; z-index: 1; pointer-events: none; }
+.in-map-head { padding: 0 0 12px; }
+.in-map-graph-wrap.is-floating .in-map-head { position: absolute; left: 24px; top: 22px; z-index: 1; pointer-events: none; padding: 0; }
 .in-map-head h1 { margin: 0; font: 500 30px/1.1 var(--in-ui); letter-spacing: -0.04em; color: var(--in-tx); }
 .in-map-head p { margin: 4px 0 0; color: var(--in-tx-2); font-size: 14px; font-weight: 300; font-variant-numeric: tabular-nums; }
 /* The open constellation: no box, the drawing sits on the page itself. */
@@ -578,7 +579,8 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-map-pre ul { margin: 6px 0 0; padding-left: 16px; color: var(--in-tx-2); font-size: 13.5px; }
 .in-map-pre em { font-style: normal; color: var(--in-tx-3); }
 .in-map-foot { font-size: 12.5px; max-width: 72ch; }
-@media (max-width: 1200px) { .in-map-head { position: static; padding: 0 0 12px; } .in-map-card { position: static; width: auto; margin-top: 18px; } .in-map-card .in-btn { justify-self: stretch; min-height: 44px; } }
+.in-map-graph-wrap:not(.is-floating) .in-map-card { position: static; width: auto; margin-top: 18px; }
+.in-map-graph-wrap:not(.is-floating) .in-map-card .in-btn { justify-self: stretch; min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .in-map-stars rect, .in-map-node.is-on .in-map-ring { animation: none; } }
 
 /* ── Report and Scripts (step 6) ───────────────────────────────────────────── */
@@ -606,9 +608,10 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 .in-chart-line { fill: none; stroke-width: 2.4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .in-chart-line.is-method { stroke: var(--in-tx); stroke-dasharray: 1; stroke-dashoffset: 0; animation: in-chart-draw 1.4s cubic-bezier(.2, 0, 0, 1) both; }
 .in-chart-line.is-accuracy { stroke: var(--in-slip); stroke-dasharray: 6 5; animation: in-chart-fade 1.4s cubic-bezier(.2, 0, 0, 1) both; }
-.in-chart-pt.is-method, .in-chart-end.is-method { fill: var(--in-tx); }
-.in-chart-pt.is-accuracy, .in-chart-end.is-accuracy { fill: var(--in-slip); }
-.in-chart-end { animation: in-chart-fade 0.3s 1.3s both; }
+.in-chart-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--in-tx); }
+.in-chart-dot.is-accuracy { background: var(--in-slip); }
+.in-chart-dot.is-end.is-method { width: 10px; height: 10px; }
+.in-chart-dot.is-end { animation: in-chart-fade 0.3s 1.3s both; }
 @keyframes in-chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes in-chart-fade { from { opacity: 0; } to { opacity: 1; } }
 .in-chart-text { position: absolute; inset: 0; pointer-events: none; font: 400 11.5px var(--in-mono); color: var(--in-tx-3); }
@@ -636,7 +639,7 @@ html.ui-instrument .tag { font: 500 11.5px var(--in-mono); border-radius: 3px; }
 @media (max-width: 1100px) { .in-rp { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .in-segc { width: 100%; } .in-segc button { flex: 1; min-height: 44px; } .in-chart { height: 240px; } }
-@media (prefers-reduced-motion: reduce) { .in-chart-area, .in-chart-line, .in-chart-end { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .in-chart-area, .in-chart-line, .in-chart-dot { animation: none; } }
 /* The Progress page under the Report shares its width and gives up the h1. */
 html.ui-instrument .pg { width: 100%; }
 

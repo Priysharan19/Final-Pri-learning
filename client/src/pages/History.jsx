@@ -263,7 +263,10 @@ function HistoryForProfile() {
     // Roving tabindex: one row button is in the Tab order; arrows move it.
     const activeId = items.some(x => x.id === activeRow) ? activeRow : items[0]?.id;
     const groups = [];
-    for (const item of items) {
+    // Sorted by marks lost, rows are not in date order: one flat list with no
+    // day headings (a day would otherwise repeat, with duplicate ids).
+    if (sort === 'marks') groups.push({ key: '', items: [...items] });
+    else for (const item of items) {
       const ms = new Date(item.answeredAt).getTime();
       const key = Number.isFinite(ms) ? dayKey(ms, tz) : '';
       if (!groups.length || groups[groups.length - 1].key !== key) groups.push({ key, items: [] });

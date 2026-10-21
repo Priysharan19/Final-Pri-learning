@@ -161,9 +161,7 @@ export const flow = {
     await check('no chapter is recommended before there is any history', await page.locator('.in-map-node.is-next').count() === 0);
     // The constellation at desktop width: no two nodes or labels overlap, and
     // the floating card covers none of them.
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(200);
-    const geo = await page.evaluate(() => {
+    const mapGeo = () => page.evaluate(() => {
       const rects = [...document.querySelectorAll('[data-map-node]')].map(g => {
         const r = g.getBoundingClientRect(); return { id: g.getAttribute('data-map-node'), l: r.left, t: r.top, r: r.right, b: r.bottom };
       });
@@ -174,6 +172,13 @@ export const flow = {
       const card = c ? { l: c.left, t: c.top, r: c.right, b: c.bottom } : null;
       return { n: rects.length, pairs, covered: card ? rects.filter(r => hit(r, card)).map(r => r.id) : [], floating: !!c && getComputedStyle(document.querySelector('[data-map-card]')).position === 'absolute' };
     });
+    await page.setViewportSize({ width: 1240, height: 900 });
+    await page.waitForTimeout(400);
+    const narrow = await mapGeo();
+    await check('at 1240px the card covers no node and no labels overlap', narrow.covered.length === 0 && narrow.pairs.length === 0, JSON.stringify({ floating: narrow.floating, covered: narrow.covered, pairs: narrow.pairs.slice(0, 4) }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(400);
+    const geo = await mapGeo();
     await check('the map draws every chapter as a positioned node', geo.n === chapters, `${geo.n} nodes`);
     await check('no two map nodes or labels overlap', geo.pairs.length === 0, geo.pairs.slice(0, 6).join(', '));
     await check('the card floats over the map at desktop width and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
@@ -349,6 +354,13 @@ export const writeFlow = {
       await check('“Needs another look” lists that script', await page.locator('.hist-row').count() === 1);
       await page.locator('[data-history-filter="all"]').click();
       await check('the chapter and sort menus are there', await page.locator('[data-history-chapter]').count() === 1 && await page.locator('[data-history-sort] option').count() === 3);
+      // Sorted by marks lost: one flat list, no repeated day headings, unique ids.
+      await page.locator('[data-history-sort]').selectOption('marks');
+      await page.waitForFunction(() => document.querySelectorAll('.hist-row').length > 0 && !document.querySelector('.in-led-dayh'), null, { timeout: 10000 }).catch(() => {});
+      const ids = await page.evaluate(() => [...document.querySelectorAll('[id]')].map(e => e.id));
+      await check('sorted by marks lost, the ledger has no day headings and every id is unique', await page.locator('.in-led-dayh').count() === 0 && new Set(ids).size === ids.length, `${ids.length} ids`);
+      await page.locator('[data-history-sort]').selectOption('newest');
+      await page.waitForSelector('.in-led-dayh', { timeout: 10000 }).catch(() => {});
       await page.keyboard.press('/');
       await check('“/” focuses the search', await page.evaluate(() => document.activeElement?.hasAttribute('data-history-search')));
       await page.keyboard.type('zzqx-no-such-question');
@@ -369,10 +381,21 @@ export const writeFlow = {
       await check('method marks are withheld below the floor', (await page.locator('[data-report-method] b').textContent()).trim() === '—');
       await check('the lede is the fixed template over the figures', /^1 question answered in this period/.test(await page.locator('[data-report-lede]').textContent().catch(() => '')), await page.locator('[data-report-lede]').textContent().catch(() => ''));
       // The period switch refetches the series for that window.
+      // The old period's figures never show under the new title: until the
+      // month arrives, the report holds no figures at all.
+      const stale = page.evaluate(() => new Promise(done => {
+        const el = document.querySelector('[data-instrument-report]');
+        const seen = [];
+        const mo = new MutationObserver(() => seen.push([el.getAttribute('data-report-period'), el.getAttribute('data-report-loaded')]));
+        mo.observe(el, { attributes: true });
+        setTimeout(() => { mo.disconnect(); done(seen); }, 2500);
+      }));
       const series = page.waitForResponse(r => /\/report\/series\?period=month/.test(r.url()) || false, { timeout: 5000 }).catch(() => null);
       await page.locator('[data-report-period-btn="month"]').click();
       await series;
       await page.waitForSelector('[data-instrument-report][data-report-period="month"]', { timeout: 10000 }).catch(() => {});
+      const seen = await stale;
+      await check('switching period never shows the old period’s figures under the new title', seen.every(([p, l]) => l === 'none' || l === p), JSON.stringify(seen));
       await check('Month is pressed and the report shows the month', await page.locator('[data-report-period-btn="month"]').getAttribute('aria-pressed') === 'true' && await page.locator('[data-instrument-report]').getAttribute('data-report-period') === 'month');
       await check('the month series loaded (the marks figure is still the receipts’ total)', (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '') === `${reply.marksEarned}/${reply.marksPossible}`);
       await check('the month chart has its four weekly points', await page.locator('.in-chart-tick').count() === 4, `${await page.locator('.in-chart-tick').count()} ticks`);
