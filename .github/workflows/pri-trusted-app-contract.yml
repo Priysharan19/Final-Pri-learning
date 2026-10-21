@@ -1,0 +1,37 @@
+name: Pri Trusted App Controller Contract (non-authoritative)
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/reliability/pri-trusted-check-publisher*.mjs'
+      - '.github/workflows/pri-trusted-app-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/reliability/pri-trusted-check-publisher*.mjs'
+      - '.github/workflows/pri-trusted-app-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # This is a candidate-source unit test, NEVER an independently trusted
+    # merge-authorization status. The production App has a different identity.
+    name: Trusted App unit contract (NOT merge authorization)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Validate syntax and cryptographic fail-closed controls
+        run: |
+          set -euo pipefail
+          node --check scripts/reliability/pri-trusted-check-publisher.mjs
+          node scripts/reliability/pri-trusted-check-publisher-check.mjs
+          node scripts/pri-fleet.mjs simulate-guard reliability \
+            scripts/reliability/pri-trusted-check-publisher.mjs \
+            scripts/reliability/pri-trusted-check-publisher-check.mjs \
+            .github/workflows/pri-trusted-app-contract.yml
