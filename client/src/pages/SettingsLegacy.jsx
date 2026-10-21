@@ -15,6 +15,13 @@ import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
 import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
+import { featureEnabled } from '../platform/features.js';
+import Glyph from '../instrument/Glyph.jsx';
+
+// The instrument build draws a glyph beside each section name (s9); the
+// flag-off build renders exactly what it did.
+const INSTRUMENT = featureEnabled('instrument');
+const SECTION_GLYPH = { plan: 'plan', profile: 'user', security: 'lock', handwriting: 'pen', language: 'globe', appearance: 'sun', courses: 'book', data: 'box', help: 'help' };
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -495,6 +502,7 @@ export default function Settings() {
         <div className="set-menu no-print">
           {SECTIONS.map(([k, , key]) => (
             <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} onClick={() => goto(k)}>
+              {INSTRUMENT && <Glyph name={SECTION_GLYPH[k]} />}
               {t(key)}
             </button>
           ))}

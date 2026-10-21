@@ -25,6 +25,7 @@ import {
   indiaPyqAlternatives
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } from '../engine/reportSeries.js';
 import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
@@ -4698,8 +4699,11 @@ const routes = {
   // ---- history: every answered question, revisitable ----
   'POST /history/list': async (body) => {
     const p = await requireProfile();
-    const { filter = 'all', page = 0, pageSize = 20 } = body || {};
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const { filter = 'all', page = 0, pageSize = 20, subtopic = null, sort = 'newest' } = body || {};
+    if (!Object.hasOwn(HISTORY_FILTERS, filter)) throw Object.assign(new Error('Unknown history filter'), { status: 400 });
+    if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
+    const allRows = await byIndex('questions', 'pid', p.id);
+    const rows = allRows.filter(r => r.answered);
     const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
     for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
@@ -4707,6 +4711,10 @@ const routes = {
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
     const inkById = Object.fromEntries(inkRows.map(r => [r.id, r]));
+    const needsLook = needsAnotherLookIds(allRows.map(r => ({
+      id: r.id, answered: !!r.answered, retryOf: r.retryOf, repeatOf: r.repeatOf,
+      correct: attemptByQ[r.id] ? !!attemptByQ[r.id].correct : null, marks: certifiedMarksOfRow(r)
+    })));
 
     let list = rows.map(r => {
       const q = r.payload;
@@ -4728,43 +4736,80 @@ const routes = {
         correct: a ? !!a.correct : null, answerGiven: a?.answerGiven ?? '',
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
+        needsLook: needsLook.has(r.id),
         canRetry: !q.custom && !q.multipart,
         answeredAt: a?.createdAt || r.createdAt,
         // The server-certified mark and its step rows, when the server sent one.
         ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
       };
-    }).sort((a, b) => b.answeredAt - a.answeredAt);
-
-    if (filter === 'wrong') list = list.filter(x => x.correct === false);
-    if (filter === 'correct') list = list.filter(x => x.correct === true);
-    if (filter === 'bookmarked') list = list.filter(x => x.bookmarked);
-    if (filter === 'ink') list = list.filter(x => x.hasInk || x.hasScribble || x.hasPhoto);
+    });
+    // Counts per filter, inside the chapter asked for (before paging).
+    if (subtopic) list = list.filter(x => x.subtopic === subtopic);
+    const counts = Object.fromEntries(Object.entries(HISTORY_FILTERS).map(([k, f]) => [k, list.filter(f).length]));
+    list = list.filter(HISTORY_FILTERS[filter]).sort(HISTORY_SORTS[sort]);
 
     const start = page * pageSize;
-    return { total: list.length, page, pageSize, items: list.slice(start, start + pageSize) };
+    return { total: list.length, page, pageSize, filter, sort, subtopic: subtopic || null, counts, items: list.slice(start, start + pageSize) };
   },
 
   // Marks per chapter, from server-certified receipts only (read-only; nothing
   // is stored or inferred). A repeat (a question whose solution the student
   // had already seen) is left out entirely — it earns nothing, and counting
   // its possible marks would read as marks lost; `repeats` says how many.
-  'GET /marks/by-chapter': async () => {
+  // `since` (YYYY-MM-DD) keeps only answers on or after that calendar day in
+  // the profile's timezone; `monthStart` is the first day of the current
+  // month there. Each chapter also carries `dotpoints`: marks per dot point,
+  // for answers whose stored question names exactly one dot point; the rest
+  // are counted in `unattributed` (a mark is never split across dot points).
+  'GET /marks/by-chapter': async (body) => {
     const p = await requireProfile();
+    const tz = timezoneOf(p);
+    const since = body?.since == null ? null : String(body.since);
+    if (since != null && !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw Object.assign(new Error('since must be a date, YYYY-MM-DD'), { status: 400 });
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const answeredAt = {};
+    for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const chapters = {};
     for (const r of rows) {
       const m = certifiedMarksOfRow(r);
       if (!m) continue;
+      if (since && dayKey(Number(answeredAt[r.id] || r.createdAt) || 0, tz) < since) continue;
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       const id = inChapter ? inChapter.id : r.subtopic;
       if (!id) continue;
-      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0, dotpoints: {}, unattributed: { earned: 0, possible: 0, questions: 0 } };
       if (m.repeat || r.repeatOf) { c.repeats += 1; continue; }
       c.earned += m.earned;
       c.possible += m.possible;
       c.questions += 1;
+      let dp = null;
+      if (inChapter && Number.isInteger(r.india?.dotpointIndex) && inChapter.dotpoints?.[r.india.dotpointIndex]) {
+        dp = { key: String(r.india.dotpointIndex), text: inChapter.dotpoints[r.india.dotpointIndex] };
+      } else if (!r.india) {
+        const ids = dotpointsCredited(r.payload);
+        if (ids.length === 1) dp = { key: ids[0], text: dotpointOf(r.subtopic, ids[0])?.text || null };
+      }
+      const bucket = dp ? (c.dotpoints[dp.key] ||= { text: dp.text, earned: 0, possible: 0, questions: 0 }) : c.unattributed;
+      bucket.earned += m.earned; bucket.possible += m.possible; bucket.questions += 1;
     }
-    return { chapters, source: 'server-certified-receipts' };
+    const today = dayKey(Date.now(), tz);
+    return { chapters, since, monthStart: `${today.slice(0, 7)}-01`, timezone: tz, source: 'server-certified-receipts' };
+  },
+
+  // Windowed report figures and their chart series (engine/reportSeries.js
+  // documents every definition). Read-only, this profile's rows only.
+  'GET /report/series': async (body) => {
+    const p = await requireProfile();
+    const period = String(body?.period || 'week');
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const answeredAt = {};
+    for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
+    const activity = await byIndex('activity', 'pid', p.id);
+    return reportSeries({
+      period, now: Date.now(), timezone: timezoneOf(p),
+      activeDates: activity.filter(a => a.questions > 0).map(a => a.date),
+      rows: rows.map(r => ({ answeredAt: answeredAt[r.id] || r.createdAt, mode: r.mode, repeatOf: r.repeatOf, marks: certifiedMarksOfRow(r) }))
+    });
   },
 
   'POST /history/:id/bookmark': async (body, params) => {
@@ -4816,7 +4861,7 @@ const routes = {
     }
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
-    const newRow = { id: uuid(), ...out.fields, pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: out.q, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    const newRow = { id: uuid(), ...out.fields, retryOf: row.id, pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: out.q, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
     await put('questions', newRow);
     return { question: sanitize(out.q, newRow), variant: out.same ? 'same' : 'fresh' };
   },
@@ -6211,6 +6256,14 @@ export async function dispatch(method, path, body) {
   // exact match first
   // Own keys only: a path such as "/constructor" must never resolve to a
   // property inherited from Object.prototype and be called as a handler.
+  // A GET may carry its parameters as a query string; they reach the handler
+  // as its body, the way a POST's do.
+  const qAt = typeof path === 'string' ? path.indexOf('?') : -1;
+  if (qAt >= 0) {
+    const query = Object.fromEntries(new URLSearchParams(path.slice(qAt + 1)));
+    path = path.slice(0, qAt);
+    body = method === 'GET' ? { ...query, ...(body || {}) } : body;
+  }
   const exactKey = `${method} ${path}`;
   const exact = Object.hasOwn(routes, exactKey) && typeof routes[exactKey] === 'function' ? routes[exactKey] : null;
   if (exact) return runGated(method, path, exact, body, {});

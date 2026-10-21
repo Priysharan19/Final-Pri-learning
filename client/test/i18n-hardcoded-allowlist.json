@@ -13,6 +13,8 @@
     "Extension 2": "the proper name of an NSW course, shown only on the Australian branch",
     "P": "the letter on the brand tile beside the full \"Pri Learning\" wordmark; decorative and hidden from assistive technology",
     "Standard": "the proper name of an NSW course, shown only on the Australian branch",
-    "Advanced": "the proper name of an NSW course, shown only on the Australian branch"
+    "Advanced": "the proper name of an NSW course, shown only on the Australian branch",
+    "Meta+Enter Control+Enter": "the ARIA aria-keyshortcuts value: machine syntax defined by WAI-ARIA, never shown or spoken as text",
+    "⌘/Ctrl ↵": "a keyboard chord drawn as the keys are printed on the keyboard (Command or Ctrl, then Return), the same in every language"
   }
 }
