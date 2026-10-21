@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {validRepoPath, pathMatches, validatedDiffPaths, verifyDiffOwnership} from '../../scripts/pri-admission-paths.mjs';
+import {validRepoPath, pathMatches, verifyDiffOwnership} from '../../scripts/pri-admission-paths.mjs';
 let cases=0;
 const yes=(label, fn)=>{fn();cases++;};
 const no=(label,re,fn)=>yes(label,()=>assert.throws(fn,re));

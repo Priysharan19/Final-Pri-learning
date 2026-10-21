@@ -24,11 +24,14 @@ const sorted = v => Array.isArray(v) ? v.map(sorted) :
   v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sorted(v[k])])) : v;
 const canonical = x => JSON.stringify(sorted(x));
 const hex40 = x => /^[0-9a-f]{40}$/i.test(String(x || ''));
+// Literal line-key matching avoids dynamically constructing regular expressions
+// from input-controlled marker names (and escaping ambiguities).
 const marker = (body, key) => {
-  const escaped = key.replace(/[.*+?^$()|[\]{}]/g, '\\$&');
-  const matches = [...String(body || '').matchAll(new RegExp('^' + escaped + ':[ \\t]*(.*)$', 'gmi'))];
-  if (matches.length !== 1 || !matches[0][1].trim()) throw new Error('MISSING_OR_DUPLICATE_' + key);
-  return matches[0][1].trim();
+  const prefix = `${key}:`.toLowerCase();
+  const values = String(body || '').split('\n').filter(line =>
+    line.toLowerCase().startsWith(prefix)).map(line => line.slice(prefix.length).trim());
+  if (values.length !== 1 || !values[0]) throw new Error('MISSING_OR_DUPLICATE_' + key);
+  return values[0];
 };
 const optionalMarker = (body,key) => {
   const matches = String(body || '').split('\n').filter(line => line.toLowerCase().startsWith((key+':').toLowerCase()));
