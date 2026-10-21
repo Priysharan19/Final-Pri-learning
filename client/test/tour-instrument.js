@@ -292,20 +292,18 @@ export const writeFlow = {
     const replies = [];
     page.on('response', async r => { if (/\/v1\/practice\/[^/]+\/submit$/.test(r.url())) { try { replies.push(await r.json()); } catch { /* not json */ } } });
     await page.getByRole('button', { name: /^Submit/ }).last().click();
-    await page.waitForSelector('[data-step-marks]', { timeout: 30000 }).catch(() => {});
+    // Main's marking-display rule (0b3712a74, rule A for train 12): the
+    // server's mark is shown as aggregate, server-verified credit — method
+    // credit as a count, the final answer accepted or not — never as invented
+    // per-step rows.
+    await page.waitForSelector('[data-verified-step-marks]', { timeout: 30000 }).catch(() => {});
     const reply = replies.at(-1) || null;
-    await check('the resolving reply carries step-mark rows', !!reply?.markRows?.rows?.length, JSON.stringify(reply?.markRows || null));
-    if (reply?.markRows?.rows) {
-      const sum = reply.markRows.rows.reduce((n, r) => n + r.earned, 0);
-      await check('the rows sum to the engine’s mark', sum === reply.marksEarned, `${sum} vs ${reply.marksEarned}/${reply.marksPossible}`);
-      await check('a wrong answer’s final-answer row earns nothing', reply.markRows.rows.at(-1).kind === 'answer' && reply.markRows.rows.at(-1).earned === 0);
-      await check('the rows are labelled Pri practice feedback, not an official scheme', reply.markRows.scheme === 'pri-practice-cbse-style');
-    }
-    const shown = await page.locator('[data-step-marks] [data-step-mark]').count();
-    await check('the card shows one row per mark', !!reply && shown === reply.marksPossible, `${shown} rows for ${reply?.marksPossible} marks`);
-    await check('no half marks are shown', !/½|0\.5/.test(await page.locator('[data-step-marks]').textContent().catch(() => '')));
-    const workingLabels = await page.locator('[data-step-marks] [data-step-mark="working"] .set-k').allTextContents();
-    await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
+    await check('the resolving reply carries the server\'s aggregate mark breakdown, with no per-step rows', !!reply?.markRows && !Array.isArray(reply.markRows.rows), JSON.stringify(reply?.markRows || null));
+    await check('the card shows the verified breakdown, labelled not official', await page.locator('[data-verified-step-marks]').count() === 1 &&
+      /official/i.test(await page.locator('[data-verified-step-marks]').textContent().catch(() => '')));
+    await check('a wrong answer\'s final answer is shown as not accepted', await page.locator('[data-verified-step-marks] [data-final-answer-credit="not-accepted"]').count() === 1);
+    await check('no per-step mark rows are invented', await page.locator('[data-step-marks], [data-step-mark]').count() === 0);
+    await check('no half marks are shown', !/½|0\.5/.test(await page.locator('[data-verified-step-marks]').textContent().catch(() => '')));
     writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
 
     // Scripts: the resolved attempt's row carries its certified mark strip.
