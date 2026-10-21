@@ -80,7 +80,7 @@ jobs:
         run: node client/test/simulator-fleet-check.mjs
       - name: Main Integrity retries the merged-PR lookup and still requires every PR workflow green
         run: node tools/main-integrity-lookup-check.mjs
-      - name: Android Shell installs the emulator system image intact (one retry on a corrupt download)
+      - name: Android Shell installs the emulator system image intact (verified cache, retried download)
         run: node tools/android-system-image-check.mjs
       - name: Native shells enforce the server Content-Security-Policy
         run: node client/test/native-shell-csp-check.mjs
