@@ -363,7 +363,7 @@ jobs:
           node server/test/security-hardening-check.mjs
           set -o pipefail
           node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
-          grep -Fq 'RLS FAIL-CLOSED: PASS — 134/134 checks' rls-fail-closed.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 141/141 checks' rls-fail-closed.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -576,7 +576,7 @@ jobs:
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
           grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
           grep -Fq '✓ rls-fail-closed-check.mjs' platform-postgres.log
-          grep -Fq 'RLS FAIL-CLOSED: PASS — 272/272 checks' platform-postgres.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 279/279 checks' platform-postgres.log
           grep -Fq 'DB ROUND TRIPS: PASS — 10/10 checks' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
