@@ -66,7 +66,12 @@ async function typedQuestion(page, origin, options = {}) {
   for (let i = 0; i < 12; i++) {
     if (await typeTab.count()) await typeTab.click();
     await page.waitForTimeout(80);
-    if (await input.count() === 1) {
+    // A question the server issued as a repeat (this account was already shown
+    // its solution) is said so above the card before it is answered. It is
+    // recorded but earns no rating, attempt count or mastery — so a question
+    // meant to count towards Progress skips it like any other ineligible one.
+    const repeat = options.fresh ? await page.locator('.notice[role="note"]').filter({ hasText: 'this one is a repeat' }).count() : 0;
+    if (await input.count() === 1 && !repeat) {
       return { prompt: clean(await page.locator('.q-prompt').textContent()), input };
     }
     await page.locator('.ctx-next').click();
@@ -76,7 +81,7 @@ async function typedQuestion(page, origin, options = {}) {
 }
 
 async function resolveWrong(page, options = {}) {
-  const found = await typedQuestion(page, null);
+  const found = await typedQuestion(page, null, { fresh: true });
   const prompt = found.prompt;
   const input = found.input;
   await input.fill(WRONG_A);
