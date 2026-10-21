@@ -55,7 +55,8 @@ const PATHS = {
   device: <><rect x="3.5" y="5" width="17" height="11.5" rx="1.5" /><path d="M9 20h6M12 16.5V20" /></>,
   chevronDown: ['m6 9 6 6 6-6'],
   search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>,
-  compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>
+  compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>,
+  scan: <path d="M3 7.5v-3A1.5 1.5 0 0 1 4.5 3h3M16.5 3h3A1.5 1.5 0 0 1 21 4.5v3M21 16.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M7.5 21h-3A1.5 1.5 0 0 1 3 19.5v-3M3 12h18" />
 };
 
 export const ICON_NAMES = Object.freeze(Object.keys(PATHS));

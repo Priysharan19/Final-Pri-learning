@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -14,6 +14,16 @@ import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from '
 // (answers, correct, accuracy only over enough answers) and its mathematics on
 // the scope. Every figure is the server's; nothing is estimated here.
 
+
+// The phone home is a different arrangement (and its own scope), so the
+// phone branch is chosen by the same 760px line the stylesheet uses.
+const PHONE = '(max-width: 760px)';
+const subscribePhone = notify => {
+  const mq = window.matchMedia?.(PHONE);
+  mq?.addEventListener?.('change', notify);
+  return () => mq?.removeEventListener?.('change', notify);
+};
+const isPhone = () => !!window.matchMedia?.(PHONE).matches;
 
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
 
@@ -66,7 +76,33 @@ export default function IndexPage() {
     return last || chapters[0];
   }, [chapters, pick, recent]);
 
+  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
   const name = (user.name || '').split(' ')[0];
+  const markOf = id => (marks[id]?.possible ? marks[id] : null);
+  const chapterSub = c => {
+    const m = markOf(c.row.id);
+    if (m) return `${m.earned}/${m.possible} ${t('inst.mapMarks')}`;
+    return c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted');
+  };
+  // "Covered": the share of the chapter's dot points with at least one answer
+  // — the dot point's own evidence from /curriculum (the figure its tile
+  // shows), or a server-certified answer filed under exactly that dot point
+  // (GET /marks/by-chapter dotpoints). A chapter with no dot point list has
+  // nothing to cover against, so it says "—".
+  const coveredOf = c => {
+    const dps = Array.isArray(c.row.dotpoints) ? c.row.dotpoints : [];
+    if (!dps.length) return '—';
+    const seen = marks[c.row.id]?.dotpoints || {};
+    const n = dps.filter((dp, i) => {
+      const own = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy).attempts : 0;
+      const key = typeof dp === 'object' && dp?.id ? String(dp.id) : String(i);
+      return own > 0 || Number(seen[key]?.questions) > 0 || Number(seen[String(i)]?.questions) > 0;
+    }).length;
+    return `${Math.round((100 * n) / dps.length)}%`;
+  };
+  // The resume card's ten segments: the last attempt's own marks, nothing more.
+  const resumeMarks = recent && Number.isInteger(recent.marksPossible) && recent.marksPossible > 0 && !recent.repeat
+    ? { earned: Math.max(0, Math.min(recent.marksPossible, Number(recent.marksEarned) || 0)), possible: recent.marksPossible } : null;
   const hour = new Date().getHours();
 
   if (error) return <div className="card" role="alert">{t('inst.indexError')} {error}</div>;
@@ -83,10 +119,35 @@ export default function IndexPage() {
           <div className="in-resume" data-instrument-resume>
             <div>
               <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
-              <small>{t('inst.resumeSub')}</small>
+              <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
             </div>
-            <Link className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')}</Link>
+            <Link className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></Link>
+            {resumeMarks && resumeMarks.possible <= 10 && (
+              <div className="in-seg10" aria-hidden="true">
+                {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
+              </div>
+            )}
           </div>
+        )}
+
+        {phone && current && (
+          <>
+            <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}>
+              <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
+              <span className="in-next-ghost" aria-hidden="true">{String(current.index + 1).padStart(2, '0')}</span>
+              <div className="in-next-label">
+                <small>{t('inst.chapterN', { n: current.index + 1 })}{markOf(current.row.id) ? ` · ${markOf(current.row.id).earned}/${markOf(current.row.id).possible}` : ''}</small>
+                <b lang="en"><TermGloss text={current.row.name} /></b>
+              </div>
+            </div>
+            <div className="in-strip" aria-hidden="true">
+              {chapters.map(c => (
+                <button key={c.row.id} type="button" tabIndex={-1} style={{ '--cc': `var(${c.colour})` }}
+                  className={c.evidence.attempts ? undefined : 'is-new'}
+                  aria-current={current.row.id === c.row.id ? 'true' : undefined} onClick={() => setPick(c.row.id)} />
+              ))}
+            </div>
+          </>
         )}
 
         {!curriculum && <div className="skeleton" style={{ height: 380, marginTop: 18 }} aria-hidden="true" />}
@@ -103,7 +164,7 @@ export default function IndexPage() {
                       onClick={() => setPick(c.row.id)} onFocus={() => setPick(c.row.id)}>
                       <span className="in-ch-n">{String(c.index + 1).padStart(2, '0')}</span>
                       <span className="in-ch-t"><span lang="en"><TermGloss text={c.row.name} /></span>
-                        <small>{c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted')}</small>
+                        <small>{chapterSub(c)}</small>
                       </span>
                       <Ring value={c.evidence.mastery} colourVar={c.colour} />
                     </button>
@@ -115,7 +176,7 @@ export default function IndexPage() {
               {chapters.map(c => (
                 <button key={c.row.id} type="button" tabIndex={-1} className="in-thumb" style={{ '--cc': `var(${c.colour})` }}
                   aria-current={current?.row.id === c.row.id ? 'true' : undefined}
-                  onMouseEnter={() => setPick(c.row.id)} onClick={() => setPick(c.row.id)} />
+                  onMouseEnter={() => setPick(c.row.id)} onClick={() => setPick(c.row.id)}><span>{c.index + 1}</span></button>
               ))}
             </div>
           </nav>
@@ -129,28 +190,28 @@ export default function IndexPage() {
             <div>
               <small>{t('inst.chapterN', { n: current.index + 1 })}</small>
               <h2 id="in-plate-title" lang="en"><TermGloss text={current.row.name} /></h2>
+              {current.row.strand && <p lang="en">{current.row.strand}</p>}
             </div>
             <div className="in-kpis">
               <div data-plate-marks><b>{marks[current.row.id]?.possible ? `${marks[current.row.id].earned}/${marks[current.row.id].possible}` : '—'}</b><small>{t('inst.mapMarks')}</small></div>
-              <div><b>{current.evidence.attempts}</b><small>{t('inst.kpiAnswered')}</small></div>
-              <div><b>{current.evidence.correct}</b><small>{t('inst.kpiCorrect')}</small></div>
-              <div><b>{current.evidence.accuracy == null ? '—' : `${current.evidence.accuracy}%`}</b><small>{t('inst.kpiAccuracy')}</small></div>
+              <div data-plate-questions><b>{current.evidence.attempts}</b><small>{t('inst.kpiQuestions')}</small></div>
+              <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
-          <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} />
+          {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
               {current.row.dotpoints.slice(0, 4).map((dp, i) => {
                 // A dot point is a string (India) or a row with its own evidence.
                 const text = typeof dp === 'string' ? dp : String(dp?.text || '');
                 const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
-                const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : t('inst.cmdPractise');
+                const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : '—';
                 return (
                   <li key={i}>
                     <Link className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
                       <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
                       <b lang="en"><TermGloss text={text} /></b>
-                      {ev?.accuracy != null && <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev.mastery}%` }} /></span>}
+                      <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev?.accuracy != null ? ev.mastery : 0}%` }} /></span>
                     </Link>
                   </li>
                 );
@@ -159,9 +220,7 @@ export default function IndexPage() {
           )}
           <div>
             <div className="in-plate-acts">
-              <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</Link>
-              <Link className="in-btn" to="/notes">{t('nav.notes')}</Link>
-              <Link className="in-btn is-quiet" to="/progress">{t('nav.progress')}</Link>
+              <Link className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</Link>
             </div>
             {current.evidence.attempts > 0 && current.evidence.accuracy == null && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.accuracyHeld')}</p>}
           </div>
