@@ -913,17 +913,21 @@ async function run() {
         await read.waitFor({ timeout: 15000 }).catch(async (err) => {
           // What the writing surface was showing when "Read my answer" never
           // came: enough to tell no ink, a known block and a missing button apart.
-          const state = await page.evaluate(() => {
+          const state = await page.evaluate((at) => {
             const ink = document.querySelector('.ink-answer');
             const live = document.querySelector('.ink-canvas-live');
+            const hit = document.elementFromPoint(at.x, at.y);
             return {
+              question: (document.querySelector('.q-prompt')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+              canvases: document.querySelectorAll('.ink-canvas-live').length,
+              hitAtStroke: hit ? `${hit.tagName.toLowerCase()}.${String(hit.className || '').split(' ').join('.')}` : null,
               online: navigator.onLine,
               inkClass: ink?.className || null,
               status: (ink?.querySelector('[role="status"]')?.textContent || '').trim().slice(0, 120),
               buttons: [...(ink?.querySelectorAll('button') || [])].map(b => (b.textContent || '').trim()).slice(0, 12),
               canvas: live ? { w: live.width, h: live.height, rect: live.getBoundingClientRect().toJSON() } : null
             };
-          }).catch(e => ({ error: String(e) }));
+          }, { x: box.x + 60, y: box.y + 40 }).catch(e => ({ error: String(e) }));
           throw new Error(`${String(err.message || err).split('\n')[0]} — ${JSON.stringify({ box, state })}`);
         });
         refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
