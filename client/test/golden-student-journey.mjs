@@ -66,7 +66,12 @@ async function typedQuestion(page, origin, options = {}) {
   for (let i = 0; i < 12; i++) {
     if (await typeTab.count()) await typeTab.click();
     await page.waitForTimeout(80);
-    if (await input.count() === 1) {
+    // A question the server issued as a repeat (this account was already shown
+    // its solution) is said so above the card before it is answered. It is
+    // recorded but earns no rating, attempt count or mastery — so a question
+    // meant to count towards Progress skips it like any other ineligible one.
+    const repeat = options.fresh ? await page.locator('.notice[role="note"]').filter({ hasText: 'this one is a repeat' }).count() : 0;
+    if (await input.count() === 1 && !repeat) {
       return { prompt: clean(await page.locator('.q-prompt').textContent()), input };
     }
     await page.locator('.ctx-next').click();
@@ -76,7 +81,7 @@ async function typedQuestion(page, origin, options = {}) {
 }
 
 async function resolveWrong(page, options = {}) {
-  const found = await typedQuestion(page, null);
+  const found = await typedQuestion(page, null, { fresh: true });
   const prompt = found.prompt;
   const input = found.input;
   await input.fill(WRONG_A);
@@ -178,7 +183,7 @@ let ctx = null;
 const attemptRows = page => page.evaluate(() => new Promise(ok => {
   const r = indexedDB.open('pri-learning');
   r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
-    c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ server: a.serverAttemptId || null, remote: typeof a.remoteEventId === 'string' }))); };
+    c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ server: a.serverAttemptId || null, remote: typeof a.remoteEventId === 'string', subtopic: a.subtopic || null, repeat: a.repeat === true, item: a.contentId ? `${a.contentId}#${a.seed ?? ''}` : null }))); };
     c.onerror = () => { db.close(); ok(null); }; };
   r.onerror = () => ok(null);
 }));
@@ -367,7 +372,7 @@ try {
 
   const finalState = await snapshot(page, server.origin);
   assert.equal(finalState.history, 5);
-  assert.equal(finalState.topicAttempts, 5);
+  assert.equal(finalState.topicAttempts, 5, 'Progress must count every topic attempt: ' + JSON.stringify(await attemptRows(page)));
   assert.ok(finalState.mastery >= 0 && finalState.mastery <= 100);
   const rows = await attemptRows(page);
   assert.ok(rows.length === 5 && rows.every(a => typeof a.server === 'string') && new Set(rows.map(a => a.server)).size === 5,
