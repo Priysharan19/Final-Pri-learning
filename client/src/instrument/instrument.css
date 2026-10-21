@@ -646,7 +646,13 @@ html.ui-instrument .settings-grid .card > .spread > h2 {
   margin: 0 !important; padding: 14px 16px 4px; font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3);
 }
 html.ui-instrument .settings-grid .card > .spread:has(> h2) { padding-right: 16px; }
-html.ui-instrument .settings-grid .card > :not(h2):not(.set-row):not(.spread:has(> h2)) { margin-left: 16px; margin-right: 16px; }
+html.ui-instrument .settings-grid .card > p,
+html.ui-instrument .settings-grid .card > .meter,
+html.ui-instrument .settings-grid .card > div:not(.set-row):not(.spread),
+html.ui-instrument .settings-grid .card > .spread:not(:has(> h2)) { margin-left: 16px !important; margin-right: 16px !important; }
+html.ui-instrument .settings-grid .card > div:not(.set-row) .set-row { padding-inline: 0; }
+html.ui-instrument .settings-grid .card > .spread:has(> h2) .btn { min-height: 30px; padding: 4px 10px; }
+html.ui-instrument .settings-grid .card > :last-child:not(.set-row) { margin-bottom: 12px; }
 html.ui-instrument .settings-grid .card > p.muted { font-size: 13px; color: var(--in-tx-3); }
 html.ui-instrument .set-row { padding: 13px 16px; border-bottom: 0; border-top: 1px solid var(--in-edge); border-radius: 0; font-size: 14px; gap: 16px; }
 html.ui-instrument .card > h2 + .set-row, html.ui-instrument .card > p + .set-row { border-top-color: var(--in-edge); }
