@@ -2923,7 +2923,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <span className="in-score-s1">{t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}</span>
                   <span className="in-score-s2">
                     {t('inst.scoreSub')}
-                    {helpUsed > 0 && <> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</>}
+                    {helpUsed > 0 && <> · {t('verifiedMarks.beforeHints')}</>}
                   </span>
                 </div>
               )}
