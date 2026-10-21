@@ -1001,3 +1001,113 @@ html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: 
 }
 /* The map holds still off-screen, in a hidden tab, or when motion is reduced. */
 .in-map-graph.is-still .in-map-stars rect, .in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
+
+/* ── Write & Check and Review, exact pass (step 14) ─────────────────────────
+   Everything here is a visual duplicate or a restyle: the reading list, the
+   eval head, the step report and the hint controls stay the accessible
+   source, in their own order. */
+
+/* Pri's reading beside each written line (s4 .read). */
+.in-read-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.in-read {
+  position: absolute; right: 14px; transform: translateY(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 4px;
+  background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge);
+  font: 400 15.5px var(--font-math); color: var(--in-tx); white-space: nowrap;
+  animation: in-chip 240ms cubic-bezier(.2, 0, 0, 1) both;
+}
+@keyframes in-chip { from { opacity: 0; transform: translate(10px, -50%); } to { opacity: 1; transform: translateY(-50%); } }
+.in-read .katex { font-size: 1.02em; }
+.in-read-cf { flex: none; width: 34px; height: 3px; border-radius: 2px; background: var(--in-l4); overflow: hidden; }
+.in-read-cf i { display: block; height: 100%; background: var(--in-tx-2); }
+.in-read.is-unc .in-read-cf i { background: var(--in-unc); }
+.in-read-tg { font: 500 10.5px var(--in-mono); }
+.in-read-tg.is-g { color: var(--in-good); }
+.in-read-tg.is-s { color: var(--in-slip); }
+.in-read-tg.is-u { color: var(--in-unc); }
+.in-read.is-slip { box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-slip) 55%, transparent); }
+.in-read.is-unc { box-shadow: 0 0 0 1px var(--in-unc); }
+/* An unsure line: hatched and outlined, never marked. */
+.in-read-unc {
+  position: absolute; border-radius: 4px;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--in-unc) 9%, transparent) 0 4px, transparent 4px 8px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--in-unc) 50%, transparent);
+}
+/* A slip: underlined in copper; the right lines carry no box. */
+html.ui-instrument .ink-underline { border-bottom: 1.5px solid var(--in-slip); transform: none; opacity: 1; }
+html.ui-instrument .ink-linebox.good { border-color: transparent; }
+/* A phone page is too narrow to set a chip beside the line: the list below carries it. */
+@media (max-width: 560px) { .in-read-layer { display: none; } }
+
+/* The question header's right side (s4 .qh). */
+.in-qh { order: 8; margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font: 500 12px var(--in-mono); color: var(--in-tx-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html.ui-instrument .q-topmeta:has(.in-qh) .q-marks { margin-left: 0; }
+.in-prog10 { display: flex; gap: 3px; }
+.in-prog10 i { width: 16px; height: 4px; border-radius: 2px; background: var(--in-l4); }
+.in-prog10 i.d { background: var(--in-good); }
+.in-prog10 i.n { background: var(--in-tx); }
+.in-qh-a::before { content: "·"; margin-right: 8px; }
+@media (max-width: 560px) { .in-prog10 { display: none; } }
+
+/* The score card (s4 .score). */
+.in-score {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center;
+  margin: 14px 14px 4px; padding: 14px; border-radius: 6px;
+  background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge);
+}
+.in-dial { position: relative; grid-row: span 2; width: 68px; height: 68px; }
+.in-dial svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.in-dial-tr { stroke: var(--in-l4); }
+.in-dial-v { stroke: var(--in-action); animation: in-dial 900ms cubic-bezier(.2, 0, 0, 1) both; }
+@keyframes in-dial { from { stroke-dashoffset: 100; } }
+.in-dial b { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; font: 500 21px/1 var(--in-ui); letter-spacing: -0.03em; color: var(--in-tx); }
+.in-dial b small { display: block; margin-top: 2px; font: 500 10.5px var(--in-mono); letter-spacing: 0; color: var(--in-tx-3); }
+.in-score-s1 { align-self: end; font: 500 14.5px var(--in-ui); color: var(--in-tx); }
+.in-score-s2 { align-self: start; font-size: 13px; line-height: 1.5; color: var(--in-tx-2); }
+html.ui-instrument .eval-card.in-has-score .eval-head {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+html.ui-instrument .eval-card.in-has-score { position: relative; }
+
+/* The hint ladder (s5 .ladder2): every rung, the locked ones closed. */
+html.ui-instrument .in-ladder .in-rung:not(.hintbox) {
+  counter-increment: in-rung; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0;
+  padding: 11px 14px; border: 0; border-radius: 5px; background: var(--in-l2);
+  box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge);
+  color: var(--in-tx); font: 400 14px var(--in-ui); text-align: left;
+}
+html.ui-instrument .in-ladder button.in-rung { cursor: pointer; }
+@media (hover: hover) { html.ui-instrument .in-ladder button.in-rung:hover:not(:disabled) { box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3); } }
+html.ui-instrument .in-ladder .in-rung.is-armed { box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-slip); }
+html.ui-instrument .in-ladder .in-rung.is-locked { color: var(--in-tx-2); }
+html.ui-instrument .in-ladder .in-rung b { flex: 1; font-weight: 500; }
+html.ui-instrument .in-ladder .in-rung small,
+html.ui-instrument .in-ladder .in-rung-cost { font: 500 11px var(--in-mono); color: var(--in-tx-3); white-space: nowrap; }
+.in-rung-k { flex: none; width: 22px; height: 22px; border-radius: 3px; display: grid; place-items: center; background: var(--in-l4); font: 600 11px var(--in-mono); color: var(--in-tx); }
+html.ui-instrument .in-ladder .hintbox .h-n { display: flex; align-items: baseline; gap: 10px; }
+html.ui-instrument .in-ladder .in-rung-cost { margin-left: auto; }
+
+/* The footer (s4 .wbar). */
+.in-wbar-note { font: 400 12.5px var(--in-mono); color: var(--in-tx-3); white-space: nowrap; }
+html.ui-instrument .ws-actions .btn-primary { gap: 8px; }
+html.ui-instrument .ws-actions .btn-primary .in-kbd { margin-left: 2px; background: transparent; color: inherit; box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-on-action) 30%, transparent); }
+html.ui-instrument .ws-actions .in-wbar-hint { gap: 6px; }
+@media (max-width: 700px), (hover: none) { .in-wbar-note, html.ui-instrument .ws-actions .btn-primary .in-kbd { display: none; } }
+
+/* The review path (s5 .step): numbered keys coloured from the engine's own status. */
+html.ui-instrument .stepcheck-line:has(.in-step-k) { align-items: center; gap: 14px; padding: 4px 0; font: 400 18px var(--font-math); color: var(--in-tx); }
+html.ui-instrument .stepcheck-line:has(.in-step-k) > span[aria-hidden="true"]:not(.in-step-k) { display: none; }
+html.ui-instrument .stepcheck-line:has(.in-step-k) b { font: 500 12.5px var(--in-ui); color: var(--in-tx-2); }
+.in-step-k { flex: none; width: 30px; height: 30px; border-radius: 4px; display: grid; place-items: center; font: 600 12px var(--in-mono); background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx-2); }
+.in-step-k.is-g { color: var(--in-good); box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 50%, transparent); }
+.in-step-k.is-s { color: var(--in-slip); box-shadow: 0 0 0 1px var(--in-slip); }
+.in-cmp { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 4px 44px; }
+.in-cmp > div { padding: 8px 12px; border-radius: 4px; font: 400 18px var(--font-math); color: var(--in-tx); }
+.in-cmp small { display: block; margin-bottom: 2px; font: 500 10.5px var(--in-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-cmp-yours { background: color-mix(in srgb, var(--in-slip) 10%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-slip) 45%, transparent); }
+.in-cmp-right { background: color-mix(in srgb, var(--in-good) 10%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--in-good) 45%, transparent); }
+.in-cmp-arrow { color: var(--in-tx-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .in-read, .in-dial-v { animation: none; }
+}

@@ -201,6 +201,22 @@ export const flow = {
 // hooks, roles and marks are the existing ones), with the reading as chips,
 // the verdict as a panel and the scan on Check. The reader's provider hop is
 // the scripted stand-in; the canvas, routes and every mark are real.
+// The exact-pass screens (s4/s5): one state at every size and both themes.
+const shootAll = async (page, outDir, state, sizes = SIZES) => {
+  const before = page.viewportSize();
+  for (const size of sizes) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    for (const scheme of ['dark', 'light']) {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.waitForTimeout(250);
+      writeFileSync(join(outDir, `write-${state}-${size.id}-${scheme}.png`), await page.screenshot({ animations: 'disabled' }));
+    }
+  }
+  if (before) await page.setViewportSize(before);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(250);
+};
+
 export const writeFlow = {
   id: 'instrument-write',
   name: 'Instrument · Write & Check — reading chips, verdict panel, scan, marks unchanged',
@@ -236,6 +252,23 @@ export const writeFlow = {
     if (await tab.count()) await tab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
 
+    // The question header: a real count in this visit and a live clock (display only).
+    const head = page.locator('[data-question-head]');
+    await check('the header numbers the question within this session', await head.count() === 1 && /^\d+$/.test(await head.getAttribute('data-question-head')), await head.getAttribute('data-question-head').catch(() => 'none'));
+    await check('open practice has no defined length, so no progress segments are drawn', await page.locator('.in-prog10').count() === 0);
+    const t0 = (await page.locator('[data-question-timer]').textContent()).trim();
+    await page.waitForTimeout(2100);
+    const t1 = (await page.locator('[data-question-timer]').textContent()).trim();
+    await check('the question clock runs (mm:ss) and is a labelled timer', /^\d{2}:\d{2}$/.test(t1) && t1 !== t0 && await page.locator('[data-question-timer][role=timer][aria-label]').count() === 1, `${t0} → ${t1}`);
+    // The ladder: every rung, locked ones closed, the charge stated.
+    const ladder = page.locator('[data-hint-ladder]');
+    await check('the hint ladder shows every rung before any is opened', await ladder.count() === 1 && await ladder.locator('.in-rung').count() === 4, await ladder.getAttribute('data-hint-ladder').catch(() => 'none'));
+    await check('the ladder header counts rungs used', /0\D+4/.test(await ladder.locator('.hints-block-title').first().textContent()));
+    await check('only the next rung can be opened; the rest are locked', await ladder.locator('[data-hint-rung-open]').count() === 1 && await ladder.locator('[data-hint-rung-locked]').count() === 3);
+    await check('each rung states its charge, and the last ends the attempt', /−10%/.test(await ladder.textContent()) && /ends the attempt/.test(await ladder.locator('.in-rung').last().textContent()));
+    await check('the footer carries Hint and a Check with its ⌘↵ chip', await page.locator('[data-wbar-hint]').count() === 1 && await page.locator('.ws-actions .btn-primary[aria-keyshortcuts] .in-kbd').count() === 1);
+    await shootAll(page, outDir, 'write');
+
     // The hint ladder: a rung opened is a numbered card, marked as a rung.
     await page.locator('.hint-bulb').click();
     await page.waitForSelector('.hintbox[data-hint-shown]', { timeout: 15000 }).catch(() => {});
@@ -246,6 +279,8 @@ export const writeFlow = {
       return { numbered: b.content !== 'none' && b.content !== '', bg: b.backgroundColor, action, radius: getComputedStyle(box).borderRadius };
     });
     await check('an opened hint is a numbered rung on the ladder', !!rung && rung.numbered && rung.bg === rung.action && rung.radius === '6px', JSON.stringify(rung));
+    await check('opening a rung moves the ladder on: 1 of 4 used, the next rung offered', /1\D+4/.test(await ladder.locator('.hints-block-title').first().textContent()) && await ladder.locator('[data-hint-shown]').count() === 1 && await ladder.locator('[data-hint-rung-open]').count() === 1 && await ladder.locator('[data-hint-rung-locked]').count() === 2);
+    await shootAll(page, outDir, 'hint');
     const shell = page.locator('.editor-shell').first();
     const look = sel => page.evaluate(q => { const el = document.querySelector(q); if (!el) return null; const s = getComputedStyle(el); return { bg: s.backgroundColor, radius: s.borderRadius, font: s.fontFamily }; }, sel);
     const stage = await look('.ink-stage');
@@ -257,7 +292,12 @@ export const writeFlow = {
     online.forgetKeptReads?.();
     online.reader.lines = [{ text: 'x + y = 35' }, { text: 'x - y = 13' }, { text: wrong }];
     const box = await page.locator('.ink-canvas-live').boundingBox();
-    await handwrite(page, box, '3' + wrong.replace('-', ''), { x: 40 });
+    // Three written lines, one per line read, so the reading can be set beside each.
+    const pitch = Math.max(96, Math.min(120, (box.height - 110) / 2));
+    await handwrite(page, box, '333333', { x: 40, y: 24 });
+    await handwrite(page, box, '111111', { x: 40, y: 24 + pitch });
+    await handwrite(page, box, '3' + wrong.replace('-', ''), { x: 40, y: 24 + 2 * pitch });
+    await check('nothing is set beside the lines before the page is read (no faked live reading)', await page.locator('[data-reading-chips]').count() === 0);
     await pressRead(page);
     await page.waitForFunction(n => document.querySelectorAll('.ink-line').length >= n, 2, { timeout: 20000 }).catch(() => {});
     const chips = await page.locator('.ink-line .ink-line-math').count();
@@ -268,10 +308,29 @@ export const writeFlow = {
     const drawn = page.locator('[data-reading-plot]');
     await check('the reading’s simultaneous pair is drawn as two lines', await drawn.count() === 1 && await drawn.getAttribute('data-reading-plot') === '2', await drawn.getAttribute('data-reading-plot').catch(() => 'none'));
     await check('the drawing says it is not a mark', /never sets a mark/i.test(await drawn.textContent().catch(() => '')));
+    // The chips on the page: a visual duplicate of the list, which keeps Edit.
+    const onPage = page.locator('[data-reading-chips]');
+    if (await check('Pri’s reading is set beside each written line', await onPage.count() === 1 && await onPage.locator('[data-read-chip]').count() === 3, await onPage.getAttribute('data-reading-chips').catch(() => 'none'))) {
+      await check('the chips are hidden from assistive tech (the list is the accessible reading)', await onPage.getAttribute('aria-hidden') === 'true');
+      const cf = await onPage.locator('[data-read-confidence]').evaluateAll(els => els.map(e => e.getAttribute('data-read-confidence')));
+      await check('each chip’s confidence bar is the reader’s own confidence', cf.length === 3 && cf.every(v => v === '97'), JSON.stringify(cf));
+      const chipFont = await onPage.locator('.in-read').first().evaluate(el => getComputedStyle(el).fontFamily);
+      await check('a chip is set in Computer Modern', /KaTeX|Latin Modern|Computer Modern|CMU/i.test(chipFont), chipFont);
+      const side = await page.evaluate(() => {
+        const c = document.querySelector('[data-read-chip="0"]')?.getBoundingClientRect(); const s = document.querySelector('.ink-stage')?.getBoundingClientRect();
+        return c && s ? { right: Math.round(s.right - c.right), inside: c.top >= s.top && c.bottom <= s.bottom } : null;
+      });
+      await check('the chip sits on the page beside its line', !!side && side.inside && side.right >= 0 && side.right <= 24, JSON.stringify(side));
+    }
+    await check('the reading list still offers Edit on every line', await page.locator('.ink-line .ink-correct-btn').count() === await page.locator('.ink-line').count());
     writeFileSync(join(outDir, 'write-read-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    await shootAll(page, outDir, 'read', SIZES.filter(sz => sz.id === 'web'));
 
-    await page.getByRole('button', { name: /^Submit/ }).last().click();
+    // ⌘↵ / Ctrl+↵ presses Check (the primary), with focus anywhere on the page.
+    await page.locator('.q-prompt').click();
+    await page.keyboard.press('Control+Enter');
     await page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
+    await check('Ctrl+↵ checks the working, as the primary does', await page.locator('.verdict, .eval-card').count() > 0);
     await check('Check marks the shell for the scan', await shell.getAttribute('data-marked') === 'yes');
     const scan = await page.evaluate(() => {
       const el = document.querySelector('.editor-shell[data-marked="yes"] .ink-stage');
@@ -286,6 +345,9 @@ export const writeFlow = {
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);
     writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    const slipChip = page.locator('[data-reading-chips] .in-read.is-slip');
+    await check('the slipped line’s chip carries the slip tag and the line is underlined', await slipChip.count() === 1 && await page.locator('.ink-verdict-layer .ink-underline').count() >= 1, `${await slipChip.count()} slip chips`);
+    await shootAll(page, outDir, 'marked', SIZES.filter(sz => sz.id === 'web'));
 
     // A second wrong try resolves the question: the reply now carries the
     // server's mark as CBSE-style step rows, which must agree with it.
@@ -307,6 +369,16 @@ export const writeFlow = {
     const workingLabels = await page.locator('[data-step-marks] [data-step-mark="working"] .set-k').allTextContents();
     await check('a wrong answer’s method marks are numbered, never named after a step', workingLabels.every(l => /Method mark \d/.test(l)), JSON.stringify(workingLabels));
     writeFileSync(join(outDir, 'write-resolved-step-marks-web-dark.png'), await page.screenshot({ fullPage: true, animations: 'disabled' }));
+    // The score card: the dial and figure are the server's receipt.
+    const dial = page.locator('[data-score-dial]');
+    await check('the score card shows the dial with the server’s marks', !!reply && await dial.count() === 1 && await dial.getAttribute('data-score-dial') === `${reply.marksEarned}/${reply.marksPossible}`, await dial.getAttribute('data-score-dial').catch(() => 'none'));
+    const dialBox = await dial.locator('.in-dial').boundingBox().catch(() => null);
+    const fig = await dial.locator('.in-dial b').evaluate(el => getComputedStyle(el).fontSize).catch(() => null);
+    await check('the dial is 68px and its figure 21px', !!dialBox && Math.round(dialBox.width) === 68 && fig === '21px', JSON.stringify({ w: dialBox?.width, fig }));
+    await check('the dial is a visual duplicate; the marks head stays for assistive tech', await dial.getAttribute('aria-hidden') === 'true' && await page.locator('.eval-card .eval-head .eval-marks').count() === 1);
+    await check('the clock stops once the question is resolved', await (async () => { const a = await page.locator('[data-question-timer]').textContent(); await page.waitForTimeout(1200); return a === await page.locator('[data-question-timer]').textContent(); })());
+    await check('a resolved question offers no Check shortcut', await page.locator('.ws-actions .btn-primary[aria-keyshortcuts]').count() === 0);
+    await shootAll(page, outDir, 'resolved');
 
     // Scripts: the resolved attempt's row carries its certified mark strip.
     if (reply) {

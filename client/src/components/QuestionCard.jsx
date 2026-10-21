@@ -38,7 +38,7 @@ import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconcepti
 import { strokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { HINT_RUNGS, markWeightAfter } from '../engine/hintLadder.js';
+import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
 
 // The hint ladder's rungs, as catalogue keys.
 const RUNG_KEY = { nudge: 'verdict.rung.nudge', method: 'verdict.rung.method', worked: 'verdict.rung.worked', solution: 'verdict.rung.solution' };
@@ -54,7 +54,11 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { featureEnabled } from '../platform/features.js';
 import StepMarks from '../instrument/StepMarks.jsx';
+import QuestionHead from '../instrument/QuestionHead.jsx';
 const INSTRUMENT_STEP_MARKS = featureEnabled('instrument');
+// v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
+const INSTRUMENT = INSTRUMENT_STEP_MARKS;
+const CHECK_KEY_GLYPH = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '') ? '⌘↵' : 'Ctrl ↵';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
 // the bundler folds only what it can see in this module, and that fold is what
@@ -285,7 +289,7 @@ const REASON_TAG_KEY = {
 // `diagnostic.submitPath`, it is marked once by the same deterministic marker,
 // and nothing that belongs to practice is offered — no hints, no favourite, no
 // reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null }) {
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0 }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const [answer, setAnswer] = useState('');
@@ -311,6 +315,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The hint ladder (engine/hintLadder.js): the rungs opened on this card,
   // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
+  const inkControlRef = useRef(null);
   const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
@@ -504,6 +509,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const ladderOffered = !diagnostic && question.hintLadder > 0;
   const nextRung = ladderOffered ? (HINT_RUNGS[hintLevel] || null) : null;
   const helpUsed = hintLevel + tutorUsed;
+  const rungLevelUsed = Math.min(HINT_RUNGS.length, hintLevel);
   const credit = hintLevel > 0
     ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed))
     : Math.max(0.55, 1 - 0.15 * tutorUsed);
@@ -1954,6 +1960,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // its verdict is shown without a marks figure rather than with a claim that
   // marks are missing.
   const shownGrade = committedGrade;
+  const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
+    && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -2108,6 +2116,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           run: () => submit(), disabled: busy || !canSubmit
         };
 
+  // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a
+  // check (never Next, never a confirmation the student has to read). No other
+  // shortcut in the app uses a modifier with Enter; Enter alone keeps its
+  // field behaviour.
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && checking);
+  const checkKeyRef = useRef(null);
+  checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
+  useEffect(() => {
+    if (!INSTRUMENT || diagnostic) return undefined;
+    const onKey = e => {
+      if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.isComposing || e.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const run = checkKeyRef.current;
+      if (!run) return;
+      e.preventDefault();
+      run();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [diagnostic]);
+
   const solutionBody = res?.solution?.steps ? (
     <div className="solution-block">
       {plotSpec && (
@@ -2187,7 +2216,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
           {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
           {/* Practice is untimed on screen: time on task is still measured for the
-              marker, but a running clock is pressure, not information. */}
+              marker, but a running clock is pressure, not information. (The
+              v1.1 instrument design shows one, owner-approved; display only.) */}
+          {INSTRUMENT && !diagnostic && (
+            <QuestionHead index={sessionIndex} length={sessionLength} answered={sessionAnswered}
+              startedAt={startRef.current} stopped={resolved} />
+          )}
         </div>
         {/* A practice question's marks are the server's alone to state, so the
             card promises no credit figure for it. */}
@@ -2203,7 +2237,48 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
 
-        {hints.length > 0 && (
+        {INSTRUMENT && ladderOffered && (!resolved || hints.length > 0) ? (
+          // v1.1 instrument: every rung of the ladder, the locked ones closed.
+          // Each states the charge the server's table makes (engine/hintLadder.js);
+          // opening the next rung is getHint(), exactly as the toolbar's bulb.
+          <section className="hints-block in-ladder" aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
+            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
+            {HINT_RUNGS.map((rung, i) => {
+              const cost = rung === 'solution' ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) });
+              const shown = hints.find(h => h.rung === rung);
+              if (shown) {
+                return (
+                  <div className="hintbox in-rung is-open" key={rung} data-hint-shown={rung}>
+                    <span className="h-n">{t(RUNG_KEY[rung])}<small className="in-rung-cost">{cost}</small></span>
+                    {shown.text ? <MathText text={shown.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
+                  </div>
+                );
+              }
+              if (!resolved && rung === nextRung) {
+                const label = rung === 'solution'
+                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                  : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                return (
+                  <button type="button" className={`in-rung is-next${solutionRungArmed && rung === 'solution' ? ' is-armed' : ''}`} key={rung}
+                    data-hint-rung-open={rung} disabled={busy} aria-label={label} onClick={getHint}>
+                    <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                    <b>{solutionRungArmed && rung === 'solution' ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[rung])}</b>
+                    <small>{cost}</small>
+                  </button>
+                );
+              }
+              return (
+                <div className={`in-rung ${i < hintLevel ? 'is-used' : 'is-locked'}`} key={rung} data-hint-rung-locked={i < hintLevel ? undefined : rung}>
+                  <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                  <b>{t(RUNG_KEY[rung])}</b>
+                  <small>{cost}</small>
+                  {i >= hintLevel && <span className="sr-only"> {t('inst.rungLocked')}</span>}
+                </div>
+              );
+            })}
+            {!resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
+          </section>
+        ) : hints.length > 0 && (
           <div className="hints-block">
             <div className="hints-block-title">{t('verdict.hints')}</div>
             {hints.map(h => (
@@ -2529,6 +2604,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
                   readExpired={inkExpiredCount}
+                  controlRef={INSTRUMENT ? inkControlRef : null}
                   draftSaved={saveState === 'saved'} />
               )}
               {/* The answer taken from handwritten working: shown, editable,
@@ -2827,7 +2903,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
             )}
 
-            <div className="eval-card" data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+            <div className={`eval-card${instrumentScore ? ' in-has-score' : ''}`} data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+              {/* v1.1 instrument: the score card (design s4 .score). A visual
+                  duplicate of the head below, which stays for assistive tech:
+                  the figure is the server's receipt, nothing else. */}
+              {instrumentScore && (
+                <div className="in-score" aria-hidden="true" data-score-dial={`${shownGrade.awarded}/${shownGrade.possible}`}>
+                  <span className="in-dial">
+                    <svg viewBox="0 0 68 68" focusable="false">
+                      <circle cx="34" cy="34" r="29" fill="none" className="in-dial-tr" strokeWidth="5" />
+                      <circle cx="34" cy="34" r="29" fill="none" className="in-dial-v" strokeWidth="5" strokeLinecap="round"
+                        pathLength="100" strokeDasharray="100 100" strokeDashoffset={100 - Math.round((shownGrade.awarded / shownGrade.possible) * 100)} />
+                    </svg>
+                    <b>{shownGrade.awarded}/{shownGrade.possible}<small>{t('inst.dialMarks')}</small></b>
+                  </span>
+                  <span className="in-score-s1">{t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}</span>
+                  <span className="in-score-s2">
+                    {t('inst.scoreSub')}
+                    {helpUsed > 0 && <> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</>}
+                  </span>
+                </div>
+              )}
               <div className="eval-head">
                 <span className="eval-title">
                   <Icon name={verdictGood ? 'check' : 'correction'} />
@@ -2865,7 +2961,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
-                {res.stepReport && <StepReport report={res.stepReport} />}
+                {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* v1.1 instrument: the server's mark as CBSE-style step rows. */}
                 {!boardAward && INSTRUMENT_STEP_MARKS && res.markRows && <StepMarks markRows={res.markRows} />}
                 {boardAward && (
@@ -2959,6 +3055,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
             )}
           </span>
+          {INSTRUMENT && writeMode && !resolved && (
+            <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote', { key: CHECK_KEY_GLYPH })}</span>
+          )}
           {submitReasonKey && (
             <span className="ws-submit-reason muted" id={`submit-reason-${question.id}`} role="status" data-submit-reason={submitReasonKey}>{t(submitReasonKey)}</span>
           )}
@@ -2968,6 +3067,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {workState === 'save-failed' && (
               <button type="button" className="btn btn-quiet" data-save-retry data-ink-save-retry={writeMode ? '' : undefined}
                 onClick={retrySave}>{t('verdict.saveRetry')}</button>
+            )}
+            {/* v1.1 instrument footer (design s4 .wbar): Hint opens the next
+                rung (getHint, as H and the bulb do); Reset is the page's Clear,
+                which the toolbar can still undo. */}
+            {INSTRUMENT && ladderOffered && nextRung && !resolved && (
+              <button type="button" className="btn btn-quiet in-wbar-hint" data-wbar-hint={nextRung} disabled={busy} aria-keyshortcuts="H" onClick={getHint}>
+                <Icon name="hint" size={16} />{t('inst.hint')}
+              </button>
+            )}
+            {INSTRUMENT && writeMode && !resolved && inkHasStrokes && (
+              <button type="button" className="btn btn-quiet in-wbar-reset" data-wbar-reset disabled={busy}
+                aria-label={t('ink.clearLabel')} onClick={() => inkControlRef.current?.clear?.()}>{t('inst.reset')}</button>
             )}
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
@@ -2984,8 +3095,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
             {!(diagnostic && resolved) && primary && (
               <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
-                aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}>
+                aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
+                aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
+                {instrumentCheckKey && <Icon name="scan" size={16} />}
                 {primary.label}
+                {instrumentCheckKey && <kbd className="in-kbd" aria-hidden="true">{CHECK_KEY_GLYPH}</kbd>}
               </button>
             )}
           </div>
@@ -3026,7 +3140,7 @@ function LostMarks({ lost, t }) {
   );
 }
 
-function StepReport({ report }) {
+function StepReport({ report, instrument = false, correctAnswer = null }) {
   const t = useT();
   if (!report?.lines?.length) return null;
   // The first meaningful break leads, with its diagnosis. Every other line is
@@ -3039,6 +3153,8 @@ function StepReport({ report }) {
     <React.Fragment key={i}>
       <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}
         data-stepcheck-line={i} data-stepcheck-status={l.status} data-stepcheck-ecf={l.status === 'ok' && l.ecf === true ? 'true' : undefined}>
+        {/* v1.1 instrument: the path's numbered key, coloured from the engine's own status. */}
+        {instrument && <span className={`in-step-k is-${l.status === 'ok' ? 'g' : l.status === 'break' ? 's' : 'n'}`} aria-hidden="true" data-step-badge={l.status}>{i + 1}</span>}
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
@@ -3046,6 +3162,17 @@ function StepReport({ report }) {
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
+      {/* Your line beside the correct one — only at the first break, only
+          when that break is the final line (the answer), and only from the
+          resolved reply's own answer, which this card already shows. The
+          engine does not state a correct value for a line mid-working. */}
+      {instrument && i === first && i === report.lines.length - 1 && typeof correctAnswer === 'string' && correctAnswer.trim() !== '' && (
+        <div className="in-cmp" data-step-compare>
+          <div className="in-cmp-yours"><small>{t('inst.yourLine')}</small><span className="in-cmp-e">{l.text}</span></div>
+          <span className="in-cmp-arrow" aria-hidden="true">↵</span>
+          <div className="in-cmp-right"><small>{t('inst.correctLine')}</small><MathText text={correctAnswer} /></div>
+        </div>
+      )}
     </React.Fragment>
   );
   if (first < 0) {
