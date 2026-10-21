@@ -200,7 +200,16 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
     }
   };
   walk(SERVER);
-  const SCOPE_WRITE = [/\b(?:re)?set\s+(?:session\s+|local\s+)?pri\./gi, /set_config\s*\(\s*['"`]pri\./gi];
+  // Quoted names ("pri".scope, pri."scope"), any set_config(…) — its name can be
+  // computed, so every call is counted, not only a literal 'pri.' — and the
+  // session-wide resets RESET ALL / DISCARD, which would drop the session's
+  // system scope (#524 review of #536).
+  const SCOPE_WRITE = [
+    /\b(?:re)?set\s+(?:session\s+|local\s+)?"?pri"?\s*\./gi,
+    /\bset_config\s*\(/gi,
+    /\breset\s+all\b/gi,
+    /\bdiscard\s+(?:all|plans|sequences|temp(?:orary)?)\b/gi
+  ];
   const code = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
   const found = {};
   for (const file of files) {
@@ -208,13 +217,15 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
     if (hits.length) found[file.slice(ROOT.length + 1)] = hits.length;
   }
   ok(files.length > 50 && files.some(f => f.endsWith(join('platform', 'store.js'))), `the scan covers the server sources (${files.length} files, store.js included)`);
-  // store.js: exactly the SET LOCAL pair in scopeStatement() and the session constant.
+  // store.js: exactly the SET LOCAL pair in scopeStatement(), the session constant and
+  // RESET_SESSION's DISCARD ALL (followed by sessionSetup()).
   // postgres-target-check.mjs (an operator tool on a raw client): one transaction-local set_config(…, true).
-  eq(found, { 'server/platform/store.js': 4, 'server/tools/postgres-target-check.mjs': 1 },
+  eq(found, { 'server/platform/store.js': 5, 'server/tools/postgres-target-check.mjs': 1 },
     'no server source outside store.js declares pri.scope or pri.account_id (the operator tool only transaction-locally)');
   ok(/BEGIN READ ONLY; SELECT set_config\('pri\.scope', 'system', true\)/.test(readFileSync(join(SERVER, 'tools', 'postgres-target-check.mjs'), 'utf8')), 'and the tool\'s one declaration is transaction-local (is_local = true) inside its own READ ONLY transaction');
   // The scan itself catches what it must: every spelling below is detected.
-  for (const probe of ["SET pri.scope = 'system'", "set session pri.account_id = 'x'", "RESET pri.scope", "SELECT set_config('pri.scope', 'system', false)", 'SELECT set_config( "pri.account_id", $1, false)', "SET LOCAL pri.scope = 'account'"]) {
+  for (const probe of ["SET pri.scope = 'system'", "set session pri.account_id = 'x'", "RESET pri.scope", "SELECT set_config('pri.scope', 'system', false)", 'SELECT set_config( "pri.account_id", $1, false)', "SET LOCAL pri.scope = 'account'",
+    'SET "pri".scope = \'system\'', 'set "pri"."account_id" = \'x\'', 'SELECT set_config($1, $2, false)', 'SELECT set_config(name, value, false)', 'RESET ALL', 'discard all', 'DISCARD PLANS']) {
     ok(SCOPE_WRITE.some(re => new RegExp(re.source, 'i').test(probe)), `the scan detects ${probe}`);
   }
 }
