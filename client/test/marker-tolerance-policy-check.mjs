@@ -167,6 +167,10 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   const tiny = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 3e-7 } };
   accept(tiny, '0.0000003'); accept(tiny, '3e-7'); reject(tiny, '0'); reject(tiny, '0.0000001'); reject(tiny, '0.000001');
   ok(!numsClose(0, 3e-7) && numsClose(3e-7, 3e-7), 'numsClose: no 1e-6 floor around a tiny target');
+  // The noise bound is a few ULPs, not relative 1e-9: a billion-scale target keeps its decimals.
+  ok(!numsClose(1234567890, 1234567890.25), 'numsClose: 1234567890 is not 1234567890.25');
+  const big = { answerType: 'numeric', prompt: 'Find the total.', answer: { value: 1234567890.25 } };
+  accept(big, '1234567890.25'); reject(big, '1234567890'); reject(big, '1234567890.3');
   // A ₹-priced question that asks for a percentage is not money: paise are a wrong unit.
   const pct = { answerType: 'numeric', prompt: 'A shopkeeper buys a toy for ₹100 and sells it for ₹120. Find the profit percent.', answerSuffix: '%', answer: { value: 20 } };
   accept(pct, '20'); reject(pct, '2000 paise'); reject(pct, '20 paise'); reject(pct, '0.2 paise');

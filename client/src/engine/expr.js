@@ -1060,7 +1060,7 @@ export function relativeBand(b) {
 // reproduce it to floating-point noise, so a computed 1357.9500000000003 is
 // two places, not sixteen. Infinity for anything longer (π, √2, 1/3).
 function decimalPlaces(b) {
-  for (let p = 0; p <= 12; p++) if (Math.abs(b - Number(b.toFixed(p))) <= 1e-9 * Math.max(1, Math.abs(b))) return p;
+  for (let p = 0; p <= 12; p++) if (Math.abs(b - Number(b.toFixed(p))) <= Math.abs(b) * 4 * Number.EPSILON + 1e-12) return p;
   return Infinity;
 }
 
