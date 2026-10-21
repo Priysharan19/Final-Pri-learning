@@ -82,3 +82,54 @@ GitHub App and Postgres tests are engineering evidence, not live certification.
   merge, retarget, fresh CI, and independent approval. Never bypass protection.
 * No Railway, `deploy/production`, student schema or App Store/Play release
   may be changed by this governor activation preparation.
+
+## Phase 4B — exact post-merge setup inventory (2026-10-21)
+
+Protected QA PR #625 merged from independent-approved `e3bc0c0e2df092db37113cc24d216d7abd172844`
+via native GitHub merge commit `32dbed8e2ae70b90ee47bfa087713b84960b56b4`.
+PR #626 is now based directly on protected `main`; its only changed files are
+reliability-owned (verified by `node scripts/pri-fleet.mjs guard reliability origin/main`).
+The merge does not activate a writer or App bypass. Do not use old PR #626
+checks for its new head; rerun CodeQL after a synchronize event, then require
+fresh approval by Kalp-Bajpai.
+
+### Three separate GitHub Apps — permissions and credential custody
+
+| Installed App | Exact least-privilege repository permissions (minimum for candidate transport) | Runtime-only credentials | Forbidden |
+| --- | --- | --- | --- |
+| Signer | Contents **read/write**; Issues **read/write**; Pull requests **read**; Metadata read (implicit) | `PRI_SIGNER_APP_ID`, `PRI_SIGNER_INSTALLATION_ID`, `PRI_SIGNER_APP_PRIVATE_KEY`, Ed25519 `PRI_ADMISSION_PRIVATE_KEY` | Checks:write, main update bypass, merger private key |
+| Verifier | Contents **read**; Issues **read**; Pull requests **read**; Checks **read/write**; Administration **read** (inspect protections/rulesets); Metadata implicit | `PRI_TRUSTED_APP_ID`, `PRI_TRUSTED_INSTALLATION_ID`, `PRI_TRUSTED_APP_PRIVATE_KEY`, `PRI_GITHUB_WEBHOOK_SECRET`, pinned `PRI_AUTHORITY_GENESIS_SHA` | Contents:write, GitHub main-update bypass, signer Ed25519 key |
+| Exclusive merger | Contents **read/write**; Pull requests **read/write**; Checks **read**; Issues **read**; Administration **read** (protection/rulesets); Metadata implicit | `PRI_MERGER_APP_ID`, `PRI_MERGER_INSTALLATION_ID`, `PRI_MERGER_APP_PRIVATE_KEY`, `PRI_CONTROL_DATABASE_URL` | Checks:write, Ed25519 signing key, verifier App credentials |
+
+Only the merger App ID may be the sole `Integration` bypass of the future main
+`Restrict updates` ruleset; never reuse GitHub Actions App `15368`. The signer
+App may be the *sole* separately validated ref-update bypass to the admission
+freeze `25542737`, without changing deletion and non-fast-forward rule
+`25078652`. Neither App gains broad ruleset administration permission unless
+an independently approved operator needs a one-time installation/setup action.
+
+The Ed25519 public key is a reviewed nonsecret file on protected `main` at
+`.pri-os/admission-public-key.pem`, not the GitHub App's RSA public key.
+Do not deploy or enable signing until the corresponding public key and
+protected environment secrets exist and their cryptographic match is proven.
+Use protected secret storage only; never commit `PRI_*PRIVATE_KEY`, print them
+in logs, or put them in PR comments. Key rotation requires independent approval,
+signer shutdown, migration of pinned verifier public key and tested refusal of
+old or unknown signatures. Disable App installations and the durable governor
+merge queue on emergency before restoring any authority.
+
+A dedicated PostgreSQL connection string goes **only** to the independently
+owned governor service, never the student backend, untrusted workflows or a
+pull request. Execute the included migration on a disposable control-plane DB
+first. Database roles must prevent developers and ordinary student-app tokens
+from modifying `pri_governor.*`. Owner must also provision authenticated
+independent webhook ingress with atomic delivery-ID persistence and verify the
+App installation ID belongs to the target repository before any status write.
+
+**Current external blockers:** these App IDs, installation IDs, protected keys,
+shared live signer/merger runtime and positive App bypass proof do not yet
+exist in verified evidence. The admission ref is intentionally frozen and
+empty. `SERIAL_MERGE_AND_REVOCATION_INTERLOCK_NOT_ACTIVATED` must remain fail
+closed until real App identity, signed transactions and revocation-after-green
+denial have been demonstrated. Existing local and hosted tests are candidate
+contract evidence only, not live authority certification.
