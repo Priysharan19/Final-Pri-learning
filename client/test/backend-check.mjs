@@ -541,6 +541,7 @@ function routeTable() {
 
 /** The route key a call lands on, or null when nothing in the table matches. */
 function resolveRoute(keys, method, path) {
+  path = String(path).split('?')[0];   // a GET's query string is its body, not its route
   const exact = `${method} ${path}`;
   if (keys.includes(exact)) return exact;
   for (const key of keys) {
@@ -2074,12 +2075,43 @@ async function run() {
           if (rec.repeat === true || q.repeatOf) { c.repeats += 1; continue; }
           c.earned += rec.marksEarned; c.possible += rec.marksPossible; c.questions += 1;
         }
-        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(byChapter).sort()), JSON.stringify(Object.entries(expected).sort()));
+        const core = o => Object.fromEntries(Object.entries(o).map(([k, c]) => [k, { earned: c.earned, possible: c.possible, questions: c.questions, repeats: c.repeats }]));
+        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(core(byChapter)).sort()), JSON.stringify(Object.entries(expected).sort()));
         const owner = row.india?.chapterId || row.subtopic;
         ok('the repeat is counted as a repeat, not as marks lost', byChapter[owner]?.repeats >= (stored.answered ? 1 : 0), show(byChapter[owner]));
         ok('no chapter claims more marks than it could have earned', Object.values(byChapter).every(c => c.earned <= c.possible && c.earned >= 0), show(byChapter));
         const listed = (await POST('/history/list', { pageSize: 100 })).items.find(i => i.id === again.value.question.id);
         ok('a repeat’s history row says it was a repeat', !stored.answered || listed?.repeat === true, show(listed && { repeat: listed.repeat, marks: listed.marksEarned }));
+
+        // Report series, map-this-month and History counts/sort/chapter (v1.1 instrument).
+        const series = await GET('/report/series?period=week');
+        eq('report series names its rolling window', [series.period, series.window, series.series.length], ['week', 'rolling-7-days', 7]);
+        ok('report series reads only certified receipts', series.source === 'server-certified-receipts' && series.current.marksEarned <= series.current.marksPossible, show(series.current));
+        ok('report repeats are counted apart, never as questions', series.current.repeats >= (stored.answered ? 1 : 0), show(series.current));
+        ok('a percentage under the evidence floor is null', series.current.certifiedQuestions >= series.floors.window || series.current.marksPct === null, show(series.current));
+        eq('the question delta is current minus previous', series.delta.questions, series.current.questions - series.previous.questions);
+        await rejects('an unknown report period is refused', GET('/report/series?period=decade'), { status: 400 });
+        const monthMap = await GET(`/marks/by-chapter?since=${(await GET('/marks/by-chapter')).monthStart}`);
+        const allMap = (await GET('/marks/by-chapter')).chapters;
+        ok('this month’s map never exceeds all-time marks', Object.entries(monthMap.chapters).every(([k, c]) => c.possible <= allMap[k].possible), show(monthMap));
+        eq('a future since keeps nothing', Object.keys((await GET('/marks/by-chapter?since=2999-01-01')).chapters).length, 0);
+        await rejects('a malformed since is refused', GET('/marks/by-chapter?since=last-week'), { status: 400 });
+        ok('dot-point marks sum with the unattributed rest to the chapter', Object.values(allMap).every(c =>
+          Object.values(c.dotpoints).reduce((s, d) => s + d.possible, 0) + c.unattributed.possible === c.possible), show(allMap));
+        const everything = await POST('/history/list', { pageSize: 1000 });
+        const items = everything.items;
+        eq('filter counts: all', everything.counts.all, items.length);
+        eq('filter counts: incorrect', everything.counts.wrong, items.filter(i => i.correct === false).length);
+        eq('filter counts: correct', everything.counts.correct, items.filter(i => i.correct === true).length);
+        eq('filter counts: handwritten', everything.counts.ink, items.filter(i => i.hasInk || i.hasScribble || i.hasPhoto).length);
+        eq('filter counts: needs another look', everything.counts.needsLook, items.filter(i => i.needsLook).length);
+        eq('the needs-another-look filter lists exactly those', (await POST('/history/list', { filter: 'needsLook', pageSize: 1000 })).total, everything.counts.needsLook);
+        const oldest = (await POST('/history/list', { sort: 'oldest', pageSize: 1000 })).items.map(i => i.answeredAt);
+        ok('sort=oldest is ascending', oldest.every((t, i) => !i || oldest[i - 1] <= t), show(oldest));
+        const chapter = items[0]?.subtopic;
+        const inChapter = await POST('/history/list', { subtopic: chapter, pageSize: 1000 });
+        ok('subtopic keeps one chapter, and its counts are that chapter’s', inChapter.items.every(i => i.subtopic === chapter) && inChapter.counts.all === inChapter.total, show(inChapter.counts));
+        await rejects('an unknown sort is refused', POST('/history/list', { sort: 'random' }), { status: 400 });
       }
     }
 
