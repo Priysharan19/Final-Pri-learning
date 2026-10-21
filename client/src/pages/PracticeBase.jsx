@@ -64,6 +64,9 @@ function ProfilePractice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  // v1.1 instrument: the question's number within this visit to Practice
+  // (each distinct question shown counts once). Display only.
+  const shownCount = useRef({ id: null, n: 0 });
   const currentQuestionRef = useRef(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
@@ -665,8 +668,15 @@ function ProfilePractice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {(() => {
+            if (shownCount.current.id !== serve.question.id) shownCount.current = { id: serve.question.id, n: shownCount.current.n + 1 };
+            return null;
+          })()}
           <QuestionCard
             key={`${user.id}:${serve.question.id}`}
+            sessionIndex={shownCount.current.n}
+            sessionLength={assignmentMode && Number.isInteger(assignmentTarget) && assignmentTarget > 0 ? assignmentTarget : null}
+            sessionAnswered={session.answered}
             question={serve.question}
             reason={serve.reason}
             reasonTag={serve.reasonTag || null}
