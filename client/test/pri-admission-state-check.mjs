@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
 import {appendGrant, inspectSignedLog, eventDigest, assertLedgerMatchesGrants,
-  authorizeCAS, revokeAuthoritativeGrant, assertAppendOnlyHistory, verifyAuthorityHistory, signEvent} from '../../scripts/pri-admission-state.mjs';
+  authorizeCAS, revokeAuthoritativeGrant, assertAppendOnlyHistory, verifyAuthorityHistory,
+  signEvent, reconcileIssueAuthority} from '../../scripts/pri-admission-state.mjs';
 const {publicKey, privateKey}=generateKeyPairSync('ed25519');
 const sha='ce8d4b06c91736c82a0e9920917914fe086de6d3';
 const head='90b5c405722807282c454592f6e6016397fd59a3';
@@ -142,3 +143,65 @@ const duplicateBranch={...secondIssue,body:body('TRIAGED').replace('Pri-Mission-
 denied('distinct open issues cannot reuse one mission branch',/DUPLICATE_MISSION_BRANCH_/,
  ()=>assertLedgerMatchesGrants([issue(),duplicateBranch],inspectSignedLog(empty,publicKey,now),sha,now));
 console.log('PASS: 2 extra managed-ledger identity conflict regressions');
+
+const liveAuthority=inspectSignedLog(grant,publicKey,now+500);
+for (const state of ['ACTIVE','IMPLEMENTING','TESTING','REPAIR']) {
+  ok('reconciliation preserves signed writer lease in '+state,()=>{
+    const original=issue(state,'Pri-Lease-Grant-ID: stale-projection');
+    const projection=reconcileIssueAuthority(original,liveAuthority,now+500,sha);
+    assert.equal(projection.status,state);
+    assert.match(projection.body,new RegExp('Pri-Lease-Grant-ID: '+grantId));
+    assert.match(projection.body,/Pri-Lease-Heartbeat-At:/);
+    assert.match(projection.body,/Pri-Lease-Heartbeat-Ref:/);
+    assert.match(projection.body,/Pri-Lease-Heartbeat-By:/);
+    const restored={...original,body:projection.body};
+    assert.equal(assertLedgerMatchesGrants([restored],liveAuthority,sha,now+500).live_writers,1);
+    const repeated=reconcileIssueAuthority(restored,liveAuthority,now+500,sha);
+    assert.equal(repeated.changed,false,'RECONCILE must be idempotent');
+  });
+}
+const renewalHead='c'.repeat(40);
+const renewalPr={...pr,head:{...pr.head,sha:renewalHead}};
+const renewalRequest={...request,operation:'RENEW',head_sha:renewalHead};
+const renewedLog=appendGrant(grant,renewalRequest,
+  [issue('IMPLEMENTING','Pri-Lease-Grant-ID: '+grantId)],renewalPr,sha,
+  'Priysharan19',123458,now+2000,privateKey,publicKey);
+const renewedAuthority=inspectSignedLog(renewedLog,publicKey,now+2001);
+ok('RENEW reconciliation replaces obsolete lease digest with signed new head',()=>{
+  const original=issue('IMPLEMENTING','Pri-Lease-Grant-ID: '+grantId);
+  const projected=reconcileIssueAuthority(original,renewedAuthority,now+2001,sha);
+  assert.match(projected.body,new RegExp('Pri-Lease-Grant-ID: '+eventDigest(renewedLog.events.at(-1).payload)));
+  assert.equal(assertLedgerMatchesGrants([{...original,body:projected.body}],renewedAuthority,sha,now+2001).live_writers,1);
+});
+const releaseLog=appendGrant(grant,{...request,operation:'RELEASE'},
+  [issue('TESTING','Pri-Lease-Grant-ID: '+grantId)],pr,sha,
+  'Priysharan19',123459,now+2000,privateKey,publicKey);
+const releasedAuthority=inspectSignedLog(releaseLog,publicKey,now+2001);
+ok('RELEASE reconciliation removes writer permission and retains signed review provenance',()=>{
+  const original=issue('TESTING','Pri-Lease-Grant-ID: '+grantId);
+  const projected=reconcileIssueAuthority(original,releasedAuthority,now+2001,sha);
+  assert.equal(projected.status,'REVIEW');
+  assert.doesNotMatch(projected.body,/Pri-Lease-Grant-ID:/);
+  assert.match(projected.body,new RegExp('Pri-Review-Head: '+head));
+  assert.equal(assertLedgerMatchesGrants([{...original,body:projected.body}],releasedAuthority,sha,now+2001).live_writers,0);
+});
+const revokedAuthority=inspectSignedLog(revoked,publicKey,now+2001);
+ok('REVOKE reconciliation blocks writer and clears lease markers',()=>{
+  const original=issue('REPAIR','Pri-Lease-Grant-ID: '+grantId);
+  const projected=reconcileIssueAuthority(original,revokedAuthority,now+2001,sha);
+  assert.equal(projected.status,'BLOCKED_AUTOMATION');
+  assert.doesNotMatch(projected.body,/Pri-Lease-Grant-ID:|Pri-Lease-Heartbeat-/);
+  const restored={...original,body:projected.body};
+  assert.equal(assertLedgerMatchesGrants([restored],revokedAuthority,sha,now+2001).live_writers,0);
+  assert.equal(reconcileIssueAuthority(restored,revokedAuthority,now+2001,sha).changed,false);
+});
+const expiredAuthority=inspectSignedLog(grant,publicKey,now+13*3600000);
+ok('expired writer reconciliation blocks without preserving lease authority',()=>{
+  const original=issue('IMPLEMENTING','Pri-Lease-Grant-ID: '+grantId);
+  const projected=reconcileIssueAuthority(original,expiredAuthority,now+13*3600000,sha);
+  assert.equal(projected.status,'BLOCKED_AUTOMATION');
+  assert.doesNotMatch(projected.body,/Pri-Lease-Grant-ID:|Pri-Lease-Heartbeat-/);
+  assert.equal(assertLedgerMatchesGrants([{...original,body:projected.body}],
+    expiredAuthority,sha,now+13*3600000).live_writers,0);
+});
+console.log('PASS: writer-state reconciliation, renewal, release, revocation and expiry regressions');
