@@ -158,11 +158,14 @@ jobs:
       # A verified image is cached per API/target and restored here; only a
       # cache miss downloads, and only an image that passed the integrity check
       # below is ever saved. The download itself retries with backoff.
+      - name: Locate the Android system image
+        id: image-path
+        run: echo "dir=${ANDROID_SDK_ROOT:-${ANDROID_HOME:?ANDROID_HOME is not set on this runner}}/system-images/android-${{ matrix.api }}/${{ matrix.target }}/x86_64" >> "$GITHUB_OUTPUT"
       - name: Restore the verified Android system image
         id: image-cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: /usr/local/lib/android/sdk/system-images/android-${{ matrix.api }}/${{ matrix.target }}/x86_64
+          path: ${{ steps.image-path.outputs.dir }}
           key: android-system-image-v1-${{ runner.os }}-${{ matrix.api }}-${{ matrix.target }}-x86_64
       - name: Android system image is intact (retried with backoff on a corrupt download)
         env:
@@ -175,8 +178,6 @@ jobs:
           mgr="$sdk/cmdline-tools/latest/bin/sdkmanager"
           [ -x "$mgr" ] || mgr="$(ls -d "$sdk"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)"
           img="$sdk/$IMAGE_DIR"
-          # The cache path above is the hosted runner's SDK; fail loudly if it moves.
-          [ "$sdk" = /usr/local/lib/android/sdk ] || { echo "::error::SDK moved to $sdk; update the image cache path"; exit 1; }
           intact() { [ -s "$img/system.img" ] && [ -s "$img/source.properties" ]; }
           if [ "${CACHE_HIT:-}" = "true" ] && intact; then
             echo "$IMAGE restored from the verified cache"
@@ -194,7 +195,7 @@ jobs:
             echo "::warning::attempt $attempt: $IMAGE did not install intact"
             grep -iE 'warning|error' "$log" | head -5 || true
             rm -rf "$img" "$sdk/.temp" "$sdk/.downloadIntermediates"
-            [ "$attempt" -lt 4 ] && sleep $((attempt * 20))
+            [ "$attempt" -lt 4 ] && sleep $((attempt * ${IMAGE_RETRY_BACKOFF_SECONDS:-20}))
           done
           echo "::error::INFRASTRUCTURE: $IMAGE could not be downloaded intact in 4 attempts (corrupt archive from the SDK repository). Not a product failure — re-run the job."
           exit 1
@@ -202,7 +203,7 @@ jobs:
         if: steps.image-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: /usr/local/lib/android/sdk/system-images/android-${{ matrix.api }}/${{ matrix.target }}/x86_64
+          path: ${{ steps.image-path.outputs.dir }}
           key: ${{ steps.image-cache.outputs.cache-primary-key }}
       - name: Emulator journey (real process death) and cloud journey against the real Pri server
         # ReactiveCircus/android-emulator-runner v2.38.0, pinned to its commit.
