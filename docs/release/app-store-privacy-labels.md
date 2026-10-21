@@ -89,7 +89,7 @@ assistants must be answered Yes, and `docs/legal/privacy.md` needs a paragraph b
 |---|---|---|
 | `NSPrivacyTracking = false`; no tracking domains | `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` (+ mirror) | `scripts/check-native-package-sync.mjs` (identity of the two copies only) |
 | Required-reason API: `UserDefaults` → `CA92.1` | same | same |
-| Collected types after this reconciliation: EmailAddress, PhoneNumber, Name, UserID, DeviceID, PurchaseHistory, PhotosorVideos, OtherUserContent, ProductInteraction, OtherUsageData, PerformanceData, OtherDiagnosticData, OtherDataTypes — all linked, none tracking | same | **No content check exists.** Earlier drafts cited `scripts/store-readiness-check.mjs`; that script is not in the repository. **Follow-up:** add a check that holds this table and the manifest together. |
+| Collected types after this reconciliation: EmailAddress, PhoneNumber, Name, UserID, DeviceID, PurchaseHistory, PhotosorVideos, OtherUserContent, ProductInteraction, OtherUsageData, PerformanceData, OtherDiagnosticData, OtherDataTypes — all linked, none tracking | same | Held together by `tools/store-readiness-check.mjs` (CI: Suites policy and contracts): the manifest's collected types must equal the set on this line, and each needs a row in the table above. |
 
 ## 4. Owner decisions before the label is entered
 
