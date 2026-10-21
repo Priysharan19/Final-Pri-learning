@@ -1,0 +1,1 @@
+import{r as e}from"./PriPlot-D1qUvY2g.js";import{n as t,t as n}from"./InkAnswer-BBYHeKlj.js";export{t as STILL_READING_MS,n as default,e as strokeSignature};
