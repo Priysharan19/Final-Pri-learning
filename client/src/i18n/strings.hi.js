@@ -3049,4 +3049,8 @@ export default {
   "inst.plotNote": "आपकी लिखावट से Pri ने जो पढ़ा, उसका चित्र। इससे कभी अंक तय नहीं होते।",
   "inst.dotpoints": "इस अध्याय के विषय",
   "inst.cmdScripts": "आपकी उत्तर-पुस्तिकाएँ",
+  "inst.resumeMarks": "पिछली बार {possible} में से {earned} अंक",
+  "inst.scopeTracer": "ट्रेसर · जाँचने के लिए पॉइंटर घुमाएँ",
+  "inst.scopeProbe": "जाँच",
+  "inst.cmdPrefixHint": "आदेशों के लिए > लिखें",
 };

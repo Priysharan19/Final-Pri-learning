@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
-import Icon from '../components/Icon.jsx';
 import CommandBar from './CommandBar.jsx';
+import Glyph from './Glyph.jsx';
 
 // The v1.1 shell bar: the mark, five tabs, the command field and the online
 // state. It replaces the rail and the old top bar when the instrument flag is
@@ -80,7 +80,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         </nav>
         <span className="in-spacer" />
         <button type="button" className="in-cmd" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={t('inst.cmdOpenLabel')}>
-          <Icon name="search" size={15} /><span>{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">⌘K</span>
+          <Glyph name="search" /><span>{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">⌘K</span>
         </button>
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" />{online ? t('inst.online') : t('inst.offline')}</span>
         {accountMenu}

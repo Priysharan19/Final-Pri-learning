@@ -2986,4 +2986,8 @@ export default {
   "inst.plotNote": "A drawing of what Pri read from your writing. It never sets a mark.",
   "inst.dotpoints": "Topics in this chapter",
   "inst.cmdScripts": "Your scripts",
+  "inst.resumeMarks": "{earned} of {possible} marks last time",
+  "inst.scopeTracer": "tracer · move to probe",
+  "inst.scopeProbe": "probe",
+  "inst.cmdPrefixHint": "type > for commands",
 };
