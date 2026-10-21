@@ -97,7 +97,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0 }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -456,6 +456,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setCleared(null);
   };
   const pageHeight = fittedHeight;
+  // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
+  useEffect(() => {
+    if (!controlRef) return undefined;
+    controlRef.current = { clear: () => act('clear')() };
+    return () => { controlRef.current = null; };
+  });
 
   // i18n-exempt-start: engine identifier for developers and evaluators, drawn only when inkDiagnosticsVisible(); students see t('verdict.readOnServer')
   const engineNote = rec.cloud === true ? `Read on the server · ${rec.engine || 'cloud'}` : null;
@@ -558,6 +564,41 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 );
               });
             })()}
+          </div>
+        )}
+        {/* v1.1 instrument: Pri's reading set beside each written line, as
+            the design's chips. A visual duplicate of the reading list below
+            (which stays the accessible source and keeps Edit / I wrote): only
+            on lines the geometry plausibly matched, the bar only from the
+            reader's own confidence, the tag only from the engine's verdict. */}
+        {INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
+          <div className="in-read-layer" aria-hidden="true" data-reading-chips={rec.lines.filter(l => l.box).length}>
+            {rec.lines.map((line, li) => {
+              if (!line.box) return null;
+              const b = line.box;
+              const low = isLowConfidence(line, lineConfidenceFloor);
+              const v = lineVerdicts ? lineVerdicts[li] : null;
+              const slip = !low && !!v && (v.status === 'break' || v.status === 'wrong');
+              const ok = !low && !!v && v.status === 'ok';
+              // toReading() writes 0 when the reader gave no confidence at all,
+              // so 0 is drawn as no bar rather than as an empty one.
+              const conf = line.conf == null || Number(line.conf) <= 0 ? NaN : Number(line.conf);
+              const tag = low ? t('inst.readUnsure') : slip ? t('inst.readSlip') : ok ? t('inst.readOk') : null;
+              return (
+                <React.Fragment key={li}>
+                  {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
+                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} style={{ top: b.y + b.h / 2 }}>
+                    <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+                    {Number.isFinite(conf) && (
+                      <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
+                        <i style={{ width: `${Math.round(Math.max(0, Math.min(1, conf)) * 100)}%` }} />
+                      </span>
+                    )}
+                    {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
+                  </span>
+                </React.Fragment>
+              );
+            })}
           </div>
         )}
       </div>

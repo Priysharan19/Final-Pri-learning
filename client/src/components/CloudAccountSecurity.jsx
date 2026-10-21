@@ -354,7 +354,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const providerLabel = useMemo(() => ({ password: t('cloudSecurity.providerPassword'), google: 'Google', apple: 'Apple' }), [t]);
 
   return (
-    <div style={{ marginTop: 14 }}>
+    <div className="cs-stack" style={{ marginTop: 14 }}>
       {!account?.emailVerified && <div className="card" style={{ boxShadow: 'none', marginBottom: 14 }}>
         <div className="sc-label">{t('cloudSecurity.emailVerification')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.verificationRequired')}</div>
@@ -511,7 +511,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
         </>}
       </form>}
 
-      <form className="card" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
+      <form className="card set-danger" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
         <div className="sc-label">{t('cloudSecurity.dangerZone')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.deleteTitle')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
