@@ -95,6 +95,8 @@ function HistoryForProfile() {
     return i >= 0 ? colourFor(i) : '--in-tx-4';
   }
 
+  const [activeRow, setActiveRow] = useState(null);
+
   useEffect(() => { setPage(0); }, [filter]);
   useEffect(() => {
     const gate = createHistoryLoadGate();
@@ -218,6 +220,8 @@ function HistoryForProfile() {
 
   function renderLedger(items) {
     const tz = timezoneOf(user);
+    // Roving tabindex: one row button is in the Tab order; arrows move it.
+    const activeId = items.some(x => x.id === activeRow) ? activeRow : items[0]?.id;
     const groups = [];
     for (const item of items) {
       const ms = new Date(item.answeredAt).getTime();
@@ -228,12 +232,13 @@ function HistoryForProfile() {
     return (
       <div className="in-led-list" onKeyDown={onLedgerKey}>
         {groups.map(g => (
-          <section key={g.key} className="in-led-day" aria-label={g.key ? dayLabel(g.key) : undefined}>
-            {g.key && <h3 className="in-led-dayh">{dayLabel(g.key)}</h3>}
+          <section key={g.key} className="in-led-day" aria-labelledby={g.key ? `in-led-day-${g.key}` : undefined}>
+            {g.key && <h3 className="in-led-dayh" id={`in-led-day-${g.key}`}>{dayLabel(g.key)}</h3>}
             {g.items.map(item => (
               <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}`} data-question-id={item.id}
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
-                <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} onClick={() => openDetail(item.id)}>
+                <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
+                  onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={item.prompt} /></span>

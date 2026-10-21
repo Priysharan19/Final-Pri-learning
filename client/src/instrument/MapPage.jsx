@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -51,7 +51,36 @@ function wrapName(name, max = 24) {
   return lines;
 }
 
-const reducedMotion = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+// Whether the map may move: the reduced-motion preference (followed live), the
+// map being on screen, and the tab being visible. Off-screen or hidden, every
+// map animation pauses and the pulse dots are not rendered.
+function useMapMotion(ref, ready) {
+  const query = '(prefers-reduced-motion: reduce)';
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
+  const [onScreen, setOnScreen] = useState(true);
+  const [tabVisible, setTabVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return undefined;
+    const change = () => setReduced(mq.matches);
+    change();
+    mq.addEventListener?.('change', change);
+    return () => mq.removeEventListener?.('change', change);
+  }, []);
+  useEffect(() => {
+    const change = () => setTabVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', change);
+    return () => document.removeEventListener('visibilitychange', change);
+  }, []);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(entries => setOnScreen(entries.some(e => e.isIntersecting)));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ready]);   // the graph mounts once the curriculum has loaded
+  return { reduced, running: !reduced && onScreen && tabVisible };
+}
 
 export default function MapPage() {
   const { user } = useApp();
@@ -60,6 +89,8 @@ export default function MapPage() {
   const [marks, setMarks] = useState({});
   const [pick, setPick] = useState(null);
   const [recommended, setRecommended] = useState(null);
+  const graphRef = useRef(null);
+  const motion = useMapMotion(graphRef, !!curriculum);
 
   useEffect(() => {
     let live = true;
@@ -141,14 +172,15 @@ export default function MapPage() {
       }
     }
     const started = nodes.filter(node => node.evidence.attempts > 0).length;
-    const certified = Object.values(marks).reduce((a, m) => ({ earned: a.earned + (Number(m?.earned) || 0), possible: a.possible + (Number(m?.possible) || 0) }), { earned: 0, possible: 0 });
+    // Only the chapters drawn on this map count toward its total.
+    const certified = nodes.map(node => node.marks).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m?.earned) || 0), possible: a.possible + (Number(m?.possible) || 0) }), { earned: 0, possible: 0 });
     return { nodes, edges, foundations, rows: bands, height: y - LINE_H + 128, byId, foundationById, started, certified };
   }, [curriculum, marks, user]);
 
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
   const isRecommended = node => !!recommended && node.row.id === recommended;
-  const pulse = !reducedMotion();
+  const pulse = motion.running;
   const scopeName = user?.indiaTrack === 'jee-main' ? 'JEE Main'
     : user?.indiaTrack === 'jee-advanced' ? 'JEE Advanced'
       : user?.year ? t('common.classNumber', { n: user.year }) : null;
@@ -166,7 +198,7 @@ export default function MapPage() {
         </p>
       </header>
       <div className="in-map-body">
-        <div className="in-map-graph">
+        <div className={`in-map-graph${motion.running ? '' : ' is-still'}`} ref={graphRef}>
           <svg viewBox={`0 0 ${W} ${layout.height}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
             <defs>
               {layout.edges.map((e, i) => (

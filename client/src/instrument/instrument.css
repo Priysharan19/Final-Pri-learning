@@ -165,7 +165,7 @@ html.ui-instrument :focus-visible { outline: 2px solid var(--in-signal); outline
 html.ui-instrument .content { max-width: 1320px; }
 html.ui-instrument .shell.is-focus .in-bar { display: none; }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .in-bar { height: 50px; padding-inline: 14px; gap: 10px; }
   .in-tabs, .in-status { display: none; }
   /* The phone has no search field: the glyph opens the same bar. */
@@ -235,7 +235,7 @@ html.ui-instrument .mnav-item.active::before { content: none; }
 .in-pal-foot > span:last-child { margin-left: auto; }
 .in-pal-foot { display: flex; gap: 16px; padding: 10px 16px; border-top: 1px solid var(--in-edge); font: 400 12px var(--in-mono); color: var(--in-tx-3); }
 @media (prefers-reduced-motion: reduce) { .in-pal, .in-scrim { animation: none; } }
-@media (max-width: 640px) { .in-pal-meta, .in-pal-foot > span:last-child { display: none; } }
+@media (max-width: 760px) { .in-pal-meta, .in-pal-foot > span:last-child { display: none; } }
 
 /* ── The Index ───────────────────────────────────────────────────────────── */
 .in-index { display: grid; grid-template-columns: minmax(330px, 420px) minmax(0, 1fr); min-height: calc(100vh - 55px); background: var(--in-base); overflow: hidden; }
@@ -321,7 +321,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 }
 /* Phone: the book's home. Greeting, the current chapter's card with its own
    scope, the chapter strip, the resume card, then the list and the plate. */
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .in-index { display: flex; flex-direction: column; padding: 0 16px 96px; }
   .in-spine { display: contents; }
   .in-greet { order: 1; padding-top: 6px; }
@@ -852,3 +852,5 @@ html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: 
   .in-led-dayh { padding: 14px 14px 6px; }
   .in-led-open { padding: 4px 14px 14px; }
 }
+/* The map holds still off-screen, in a hidden tab, or when motion is reduced. */
+.in-map-graph.is-still .in-map-stars rect, .in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
