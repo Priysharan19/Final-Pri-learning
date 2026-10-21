@@ -54,6 +54,7 @@ const PATHS = {
   moon: ['M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10Z'],
   device: <><rect x="3.5" y="5" width="17" height="11.5" rx="1.5" /><path d="M9 20h6M12 16.5V20" /></>,
   chevronDown: ['m6 9 6 6 6-6'],
+  search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>,
   compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>
 };
 

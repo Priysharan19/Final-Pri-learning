@@ -8,7 +8,10 @@
 // job died in the emulator runner's cleanup. .github/workflows/android-shell.yml
 // now installs the image itself before the emulator runner, with the log and
 // the image file as the verdict, one retry after a corrupt download, and an
-// "INFRASTRUCTURE:" label when both downloads are corrupt. This check extracts
+// "INFRASTRUCTURE:" label when every download is corrupt. Since #638 a verified
+// image is restored from the Actions cache per API/target, only a cache miss
+// downloads (four attempts with backoff), and only an image that passed this
+// step is saved. This check extracts
 // that step's script verbatim and runs it with a stub sdkmanager in a scratch
 // SDK, so the retry, the clean-up between attempts and the label are each
 // exercised deterministically. Needs bash (hosted ubuntu has it).
@@ -45,12 +48,21 @@ function extractStep(source, stepName) {
 const workflow = readFileSync(WORKFLOW, 'utf8');
 const script = extractStep(workflow, 'Android system image is intact');
 check(/set -euo pipefail/.test(script), 'the install step fails closed (set -euo pipefail)');
-check(/for attempt in 1 2; do/.test(script), 'the install is attempted at most twice');
+check(/for attempt in 1 2 3 4; do/.test(script), 'the install is attempted at most four times');
 check(/unknown archive/.test(script) && /system\.img/.test(script), 'a corrupt archive is detected from the log and the image file, not the exit code');
-check(/::error::INFRASTRUCTURE:/.test(script), 'two corrupt downloads are labelled an infrastructure failure');
+check(/::error::INFRASTRUCTURE:/.test(script), 'four corrupt downloads are labelled an infrastructure failure');
 const stepAt = workflow.indexOf('name: Android system image is intact');
 const emulatorAt = workflow.indexOf('uses: ReactiveCircus/android-emulator-runner@');
 check(stepAt > 0 && emulatorAt > 0 && stepAt < emulatorAt, 'the image is installed before the emulator runner starts');
+// The cache: exact-key restore before the check, save only after it passed, on a miss.
+const restoreAt = workflow.indexOf('uses: actions/cache/restore@');
+const saveAt = workflow.indexOf('uses: actions/cache/save@');
+check(restoreAt > 0 && restoreAt < stepAt, 'the verified image is restored from the cache before the integrity step');
+check(saveAt > stepAt && saveAt < emulatorAt, 'the image is saved only after the integrity step (a failed step skips the save)');
+const saveBlock = workflow.slice(workflow.lastIndexOf('- name:', saveAt), saveAt);
+check(/if: steps\.image-cache\.outputs\.cache-hit != 'true'/.test(saveBlock) && !/always\(\)|failure\(\)|continue-on-error/.test(saveBlock), 'the save runs only on a cache miss and never after a failure');
+check(!/restore-keys/.test(workflow), 'no restore-keys: a cache hit is an exact image match only');
+check(/key: android-system-image-v\d+-\$\{\{ runner\.os \}\}-\$\{\{ matrix\.api \}\}-\$\{\{ matrix\.target \}\}-x86_64/.test(workflow), 'the cache key names the OS, API level and target');
 
 // ── a stub SDK ───────────────────────────────────────────────────────────────
 // The stub sdkmanager reads a plan file: one line per call, "corrupt" (prints
@@ -60,8 +72,12 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'pri-android-image-'));
 const IMAGE = 'system-images;android-36;google_apis;x86_64';
 const IMAGE_DIR = 'system-images/android-36/google_apis/x86_64';
 
-function install(plan) {
+function install(plan, { cacheHit = '', cached = null } = {}) {
   const sdk = mkdtempSync(path.join(scratch, 'sdk-'));
+  if (cached) {
+    mkdirSync(path.join(sdk, IMAGE_DIR), { recursive: true });
+    for (const [name, body] of Object.entries(cached)) writeFileSync(path.join(sdk, IMAGE_DIR, name), body);
+  }
   const bin = path.join(sdk, 'cmdline-tools', 'latest', 'bin');
   mkdirSync(bin, { recursive: true });
   const state = mkdtempSync(path.join(scratch, 'state-'));
@@ -79,13 +95,14 @@ if [ "$step" = "corrupt" ]; then
 fi
 echo "[=======================================] 100% Unzipping..."
 printf 'img' > "$SDK/${IMAGE_DIR}/system.img"
+printf 'Pkg.Revision=1' > "$SDK/${IMAGE_DIR}/source.properties"
 exit 0
 `);
   chmodSync(path.join(bin, 'sdkmanager'), 0o755);
   const runnerTemp = mkdtempSync(path.join(scratch, 'runner-'));
   const result = spawnSync('bash', ['-c', script], {
     encoding: 'utf8',
-    env: { ...process.env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: '', RUNNER_TEMP: runnerTemp, STUB_STATE: state, SDK: sdk, IMAGE, IMAGE_DIR },
+    env: { ...process.env, ANDROID_HOME: sdk, ANDROID_SDK_ROOT: '', RUNNER_TEMP: runnerTemp, STUB_STATE: state, SDK: sdk, IMAGE, IMAGE_DIR, CACHE_HIT: cacheHit, IMAGE_RETRY_BACKOFF_SECONDS: '0' },
   });
   const read = f => (existsSync(path.join(state, f)) ? readFileSync(path.join(state, f), 'utf8').trim() : '');
   return {
@@ -114,12 +131,12 @@ exit 0
   check(r.imageInstalled && !r.leftovers, 'the half-written image directory from the corrupt download was removed before the retry');
 }
 
-// 3. Two corrupt downloads: fail fast with the infrastructure label, never a third attempt.
+// 3. Four corrupt downloads: fail with the infrastructure label, never a fifth attempt.
 {
-  const r = install(['corrupt', 'corrupt', 'ok']);
-  check(r.status === 1, `two corrupt downloads fail the step (exit ${r.status})`);
-  check(r.calls.length === 2, `there is no third attempt (${r.calls.length})`);
-  check(/::error::INFRASTRUCTURE: system-images;android-36;google_apis;x86_64 could not be downloaded intact in 2 attempts/.test(r.out),
+  const r = install(['corrupt', 'corrupt', 'corrupt', 'corrupt', 'ok']);
+  check(r.status === 1, `four corrupt downloads fail the step (exit ${r.status})`);
+  check(r.calls.length === 4, `there is no fifth attempt (${r.calls.length})`);
+  check(/::error::INFRASTRUCTURE: system-images;android-36;google_apis;x86_64 could not be downloaded intact in 4 attempts/.test(r.out),
     `the failure is labelled infrastructure and names the image: ${r.out.split('\n').find(l => /::error::/.test(l))}`);
   check(/Not a product failure/.test(r.out), 'and says it is not a product failure');
   check(!r.imageInstalled, 'no image is left behind to mislead the emulator runner');
@@ -131,6 +148,24 @@ exit 0
   check(sdkless.status === 0, 'control: an intact install passes');
 }
 
+// 5. A cache hit with an intact image: no download at all.
+{
+  const r = install(['corrupt'], { cacheHit: 'true', cached: { 'system.img': 'img', 'source.properties': 'Pkg.Revision=1' } });
+  check(r.status === 0 && r.calls.length === 0 && /restored from the verified cache/.test(r.out), `an intact cached image is used without contacting the SDK repository (${r.calls.length} calls)`);
+}
+
+// 6. A cache hit with a damaged image is not trusted: it is re-downloaded.
+{
+  const r = install(['ok'], { cacheHit: 'true', cached: { 'system.img': 'img' } });
+  check(r.status === 0 && r.calls.length === 1 && /installed intact \(attempt 1\)/.test(r.out), `a damaged cached image falls back to a fresh download (${r.calls.length} calls)`);
+}
+
+// 7. No cache hit: an image already on disk is not trusted without a download.
+{
+  const r = install(['ok'], { cached: { 'system.img': 'img', 'source.properties': 'Pkg.Revision=1' } });
+  check(r.calls.length === 1, `without a cache hit the image is always installed through sdkmanager (${r.calls.length} calls)`);
+}
+
 rmSync(scratch, { recursive: true, force: true });
 
 const total = passed + failures.length;
@@ -139,4 +174,4 @@ if (failures.length) {
   console.error(`ANDROID SYSTEM IMAGE: FAIL — ${passed}/${total} checks`);
   process.exit(1);
 }
-console.log(`ANDROID SYSTEM IMAGE: PASS — ${passed}/${total} checks — a corrupt system-image download is retried once and then labelled infrastructure, before the emulator runner starts.`);
+console.log(`ANDROID SYSTEM IMAGE: PASS — ${passed}/${total} checks — a verified system image comes from the cache; a corrupt download is retried with backoff and then labelled infrastructure, before the emulator runner starts.`);
