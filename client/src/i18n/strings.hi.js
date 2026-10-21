@@ -295,6 +295,8 @@ export default {
   'history.modeTask': 'कार्य',
   'history.emptyAll': 'अभी यहाँ कुछ नहीं — कुछ प्रश्न हल कीजिए, वे तुरंत यहाँ दिखने लगेंगे।',
   'history.emptyFiltered': 'इस फ़िल्टर से अभी कुछ नहीं मिला।',
+  'history.emptyTitle': 'अभी कोई स्क्रिप्ट नहीं',
+  'history.startPractising': 'अभ्यास शुरू करें',
   'history.addBookmark': 'इस प्रश्न को बुकमार्क करें',
   'history.removeBookmark': 'बुकमार्क हटाएँ',
   'history.addBookmarkOn': '{topic} के इस प्रश्न पर बुकमार्क लगाएँ',
@@ -2882,6 +2884,7 @@ export default {
   // ── एक साइन-इन कार्ड और सक्रियण द्वार (खाता पहले) ──
   'login.welcomeTitle': "Pri Learning में आपका स्वागत है",
   'login.welcomeSub': "आपकी गणित की यात्रा यहीं से शुरू होती है।",
+  'login.instrumentHeadline': 'हाथ से लिखिए। उसे जँचते हुए देखिए।',
   'login.existingDeviceProfile': "इस डिवाइस पर सहेजी गई प्रोफ़ाइल से जारी रखें",
   'login.createAnotherAccount': "एक और Pri खाता बनाएँ",
   'signup.inlineLead': "हम आपको ईमेल पर छह अंकों का कोड भेजेंगे। इस पृष्ठ पर सब कुछ जैसा है वैसा ही रहेगा।",
