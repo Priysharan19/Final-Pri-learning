@@ -24,7 +24,7 @@ html.ui-instrument {
     right: auto; inset-inline-end: 0; width: var(--wc-col); justify-content: space-between;
     padding: 0 10px; min-height: 44px; border-radius: 0; background: none; box-shadow: none;
     border-block-end: var(--c-line) solid var(--c-hair-2); animation: none;
-    font: 400 14px/1.2 var(--c-text); color: var(--c-ink);
+    font-size: 14px; color: var(--c-ink);   /* the maths stays in KaTeX's Computer Modern */
   }
   html.ui-instrument .in-read.is-slip { background: var(--c-copper-soft); box-shadow: none; }
   html.ui-instrument .in-read .katex { font-size: 1em; }
