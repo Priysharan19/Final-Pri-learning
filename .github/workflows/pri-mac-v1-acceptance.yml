@@ -1,7 +1,26 @@
 name: Pri Mac V1 Acceptance (trusted manual)
 
+# Owner-only, one-job, ephemeral self-hosted lane (GitHub issue #227).
+# The Pri Mac never listens for work on its own: the owner starts ONE just-in-time
+# runner with scripts/pri-mac-runner-once.sh under the non-admin pri-ci account,
+# which prints a fresh unpredictable label, and dispatches this workflow with that
+# label and an exact commit SHA on main. The label stays private until the Mac
+# job starts: the guard job never receives it and nothing here prints it. Procedure:
+# docs/operations/mac-trusted-runner.md. The contract is enforced on every PR by
+# tools/ci-self-hosted-runner-check.mjs, which pins the guard job and the Mac
+# job's first three steps verbatim (edit both together); never add pull_request,
+# pull_request_target, push, issue_comment, schedule or workflow_run here.
 on:
   workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact 40-hex commit SHA on main to validate
+        required: true
+        type: string
+      runner_label:
+        description: One-job runner label printed by scripts/pri-mac-runner-once.sh (pri-mac-<16 hex>)
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,36 +30,109 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  apple-v1:
-    name: iPhone + iPad native acceptance on Pri Mac
-    # Never allocate this personal machine for PRs, forks, branches, bots or schedules.
+  guard:
+    name: Trusted dispatch guard (owner, repository, SHA on main, runner label)
+    # Never allocate the Pri Mac for PRs, forks, branches, bots or schedules.
+    # This job deliberately never receives the runner label.
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'Priysharan19/Final-Pri-learning' &&
-      github.actor == 'Priysharan19' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
       github.ref == 'refs/heads/main'
-    runs-on: [pri-learning-mac-trusted-manual]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate inputs, owner, canonical repository and that the SHA is on main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_SHA: ${{ inputs.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EVENT_NAME" == 'workflow_dispatch' ]] || fail "only a manual dispatch may reach the Pri Mac"
+          [[ "$REPO" == 'Priysharan19/Final-Pri-learning' ]] || fail "refusing non-canonical repository $REPO (forks never reach the Pri Mac)"
+          [[ "$ACTOR" == "$REPO_OWNER" && "$TRIGGERING_ACTOR" == "$REPO_OWNER" ]] || fail "only the repository owner may dispatch the Pri Mac lane"
+          [[ "$DISPATCH_REF" == 'refs/heads/main' ]] || fail "dispatch from main only (got $DISPATCH_REF)"
+          [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "sha must be a full 40-hex lowercase commit SHA"
+          # compare/{sha}...main: "identical" or "ahead" with behind_by 0 means
+          # the SHA is main itself or an ancestor of main. A fork or unmerged
+          # branch commit is "diverged"/"behind" and is refused.
+          status="$(gh api "repos/$REPO/compare/$INPUT_SHA...main" --jq '.status + " " + (.behind_by | tostring)')"
+          [[ "$status" == 'identical 0' || "$status" == 'ahead 0' ]] || fail "sha $INPUT_SHA is not reachable from main ($status)"
+          echo "Trusted dispatch: $INPUT_SHA is on main"
+
+  apple-v1:
+    name: iPhone + iPad native acceptance on Pri Mac
+    needs: guard
+    # Defence in depth: the same owner/repository/ref gate as the guard job,
+    # plus a shape check of the label (the exact check is RUNNER_NAME below).
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Priysharan19/Final-Pri-learning' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(inputs.runner_label, 'pri-mac-')
+    # The per-run label exists only while the owner's one-job runner is up.
+    runs-on: [self-hosted, macOS, ARM64, '${{ inputs.runner_label }}']
     timeout-minutes: 90
     env:
       CI: 'true'
       HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
-      - name: Checkout protected main without persisting credentials
+      - name: Checkout the dispatched SHA without persisting credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
+          ref: ${{ inputs.sha }}
           persist-credentials: false
           clean: true
 
-      - name: Verify runner and clean release identity
+      - name: Assert HEAD is exactly the dispatched SHA before any repository code runs
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.sha }}
         run: |
           set -euo pipefail
-          test "$RUNNER_NAME" = 'pri-final-macbook-trusted'
+          if ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then
+            echo "::error::checked-out HEAD $(git rev-parse HEAD) is not the dispatched SHA $EXPECTED_SHA"
+            exit 1
+          fi
+          test -z "$(git status --porcelain)"
+
+      - name: Verify one-job runner isolation and clean release identity
+        shell: bash
+        env:
+          EXPECTED_LABEL: ${{ inputs.runner_label }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_LABEL" =~ ^pri-mac-[0-9a-f]{16}$ ]] || { echo "::error::runner_label is not a pri-mac-<16 hex> label"; exit 1; }
+          test "$RUNNER_NAME" = "$EXPECTED_LABEL"
           test "$RUNNER_OS" = 'macOS'
           test "$RUNNER_ARCH" = 'ARM64'
           test "$GITHUB_REF" = 'refs/heads/main'
           test "$GITHUB_REPOSITORY" = 'Priysharan19/Final-Pri-learning'
           test "$(uname -m)" = 'arm64'
+          # Isolation: never root, never a macOS admin, never inside the launcher clone.
+          test "$(id -u)" -ne 0
+          if id -Gn | tr ' ' '\n' | grep -qx 'admin'; then
+            echo "::error::runner account $(id -un) is a macOS admin; use the non-admin pri-ci account"
+            exit 1
+          fi
+          case "$GITHUB_WORKSPACE:$RUNNER_TEMP" in
+            *PriLearningLauncher*) echo "::error::job workspace is inside the PriLearningLauncher clone"; exit 1 ;;
+          esac
+          # The one-job runner credential must not leak into the job environment.
+          test -z "${ACTIONS_RUNNER_INPUT_JITCONFIG:-}"
+          test -z "${ACTIONS_RUNNER_INPUT_TOKEN:-}"
+          id -un
           test -f ios/PriLearning.swiftpm/Package.swift
           test -f scripts/iphone-journey.mjs
           node --version
