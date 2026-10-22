@@ -95,12 +95,12 @@
 .k-next .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
 
 /* Resume → Write. Only the Index block is named, and only on the old side: it
-   lingers 120ms where it was while the old page is gone at once and the new
+   lingers 60ms where it was while the old page is gone at once and the new
    page fades in over 160ms, so nothing ghosts and the prompt is in its final
    place from the first frame. */
 html[data-vt="question"]::view-transition-old(root) { animation: none; opacity: 0; }
 html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 160ms var(--c-ease-row) both; }
-html[data-vt="question"]::view-transition-old(pri-question) { animation: k-vt-out 120ms linear both; }
+html[data-vt="question"]::view-transition-old(pri-question) { animation: k-vt-out 60ms linear both; }
 @keyframes k-vt-in { from { opacity: 0; } }
 @keyframes k-vt-out { to { opacity: 0; } }
 
