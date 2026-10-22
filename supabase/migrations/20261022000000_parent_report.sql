@@ -31,7 +31,7 @@ create table pri.parent_report_links (
   requested_at bigint not null,
   confirmed_at bigint,
   stopped_at bigint,
-  stopped_by text check (stopped_by is null or stopped_by in ('recipient','account','consent'))
+  stopped_by text check (stopped_by in ('recipient','account','consent'))
 );
 create index idx_parent_report_links_confirm on pri.parent_report_links (confirm_token_hash);
 create index idx_parent_report_links_unsubscribe on pri.parent_report_links (unsubscribe_token_hash);

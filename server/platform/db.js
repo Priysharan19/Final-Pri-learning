@@ -521,7 +521,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     requested_at INTEGER NOT NULL,
     confirmed_at INTEGER,
     stopped_at INTEGER,
-    stopped_by TEXT CHECK(stopped_by IS NULL OR stopped_by IN ('recipient','account','consent'))
+    stopped_by TEXT CHECK(stopped_by IN ('recipient','account','consent'))
   );`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_confirm ON parent_report_links(confirm_token_hash);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_unsubscribe ON parent_report_links(unsubscribe_token_hash);`);

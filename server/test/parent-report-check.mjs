@@ -108,6 +108,19 @@ c.deq(report.plan, [
 ], 'the plan is built only from the week\'s facts');
 c.eq(JSON.stringify(buildWeeklyReport([...parsed].reverse(), W)), JSON.stringify(report), 'deterministic: input order does not change a byte');
 
+// A fix undone later in the week is not a fix; a mistake made this week and
+// put right this week is not an "earlier" mistake.
+const undone = buildWeeklyReport([
+  attempt(MONDAY - DAY, { item: 'u', correct: false }), attempt(MONDAY + MIN, { item: 'u', correct: true }), attempt(MONDAY + 2 * MIN, { item: 'u', correct: false }),
+  attempt(MONDAY + 3 * MIN, { item: 'v', correct: false }), attempt(MONDAY + 4 * MIN, { item: 'v', correct: true }),
+  ...['w1', 'w2', 'w3'].map((item, i) => attempt(MONDAY + (5 + i) * MIN, { item, correct: true }))
+].map(attemptFromEvent), W);
+c.deq(undone.mistakes, { fixed: 0, stillOpen: 1 }, 'a fix undone later in the week, or a same-week slip put right, is not counted as an earlier mistake fixed');
+
+// Chapters measured, none strong: the email must not say "not enough answers".
+const middling = buildWeeklyReport(['m1', 'm2', 'm3', 'm4', 'm5'].map((item, i) => attemptFromEvent(attempt(MONDAY + i * MIN, { item, correct: i < 3 }))), W);
+c.ok(parentReportLines(middling).some(([h, body]) => h === 'Going well' && body === 'No chapter reached 80% this week.'), 'measured chapters that fell short are described as such, not as missing data');
+
 const flat = buildWeeklyReport([...Array(6)].map((_, i) => attemptFromEvent(attempt(MONDAY + DAY + i * MIN, { item: `f${i}`, correct: i < 3 }))), W);
 c.eq(flat.accuracy.direction, 'not-enough-data', 'with no earlier week on record there is no trend to claim');
 
@@ -183,6 +196,8 @@ try {
   c.eq((await post('/v1/parent-report/confirm', { token: confirmToken })).data?.confirmed, true, 'the guardian confirms from their own device, with no session');
   c.eq((await post('/v1/parent-report/confirm', { token: confirmToken })).status, 410, 'the confirmation link is single-use');
 
+  c.ok(!!(await db.get('SELECT unsubscribe_token_envelope FROM parent_report_links WHERE account_id=?', [kid.id])).unsubscribe_token_envelope, 'confirmation writes the stop link in the same update: an active link always has one');
+
   // Some graded work this week.
   for (let i = 0; i < 6; i++) {
     await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
@@ -200,7 +215,7 @@ try {
   c.deq([weekly.to, weekly.category, weekly.idempotencyKey], ['parent@example.test', 'parent_report', `pri-parent-report/${kid.id}/${istWeekStart(now)}`], 'to the guardian, keyed by account and week');
   c.match(weekly.headers['List-Unsubscribe'], /^<https:\/\/pri\.example\.test\/v1\/parent-report\/unsubscribe\/one-click\?token=[A-Za-z0-9_-]+>$/, 'with a one-click List-Unsubscribe URL');
   c.eq(weekly.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click', 'and the RFC 8058 marker');
-  c.ok(weekly.message.text.includes('6 questions answered and marked'), 'the email carries the recorded counts');
+  c.ok(weekly.message.text.includes('6 answers marked'), 'the email carries the recorded counts');
   c.ok(!/Asha|Verma|kid@example|q-0|c-0/.test(weekly.message.text + weekly.message.html), 'and not the child\'s name, address or any question id');
   const again = await runParentReportJob(db, { send: transport, publicOrigin: ORIGIN, now: NEXT + 2 * 60 * MIN });
   c.deq([again.queued, again.sent, sent.filter(m => m.category === 'parent_report').length], [0, 0, 1], 'running again sends nothing more: idempotent');
@@ -234,6 +249,9 @@ try {
   const oneClick = new URL(weekly.headers['List-Unsubscribe'].slice(1, -1));
   const bad = await h.request(`/v1/parent-report/unsubscribe/one-click?token=forged`, { method: 'POST', body: { 'List-Unsubscribe': 'One-Click' } });
   c.eq(bad.status, 400, 'a forged one-click token stops nothing');
+  let limited = 0;
+  for (let i = 0; i < 40; i++) if ((await h.request('/v1/parent-report/unsubscribe/one-click?token=forged', { method: 'POST', body: {} })).status === 429) limited++;
+  c.eq(limited, 0, 'one-click has its own wide bucket: a mailbox provider sending many from one address is not refused');
   const stop = await h.request(`${oneClick.pathname}${oneClick.search}`, { method: 'POST', body: { 'List-Unsubscribe': 'One-Click' } });
   c.deq([stop.status, stop.data?.unsubscribed], [200, true], 'the mailbox provider\'s one-click POST unsubscribes with no Origin or cookie');
   c.eq((await h.request('/v1/parent-report/unsubscribe', { method: 'POST', body: { token: oneClick.searchParams.get('token') } })).status, 403, 'the page route still requires the product origin');
@@ -242,6 +260,17 @@ try {
   c.eq((await post('/v1/parent-report/unsubscribe', { token: oneClick.searchParams.get('token') })).data?.unsubscribed, true, 'unsubscribing twice is harmless');
 
   delete process.env.PRI_PUBLIC_ORIGIN;
+
+  // A run whose lease ran out cannot overwrite the outcome of the run that took over.
+  const fenced = await student('fenced@example.test', { child: true, guardian: 'fence@example.test' });
+  await post('/v1/parent-report/link', { email: 'fence@example.test' }, fenced.jar);
+  await post('/v1/parent-report/confirm', { token: tokenFrom(linkOf(sent.at(-1))) });
+  const slowNow = NEXT + 5 * WEEK;
+  await db.run('UPDATE entitlement_snapshots SET current_period_end=? WHERE account_id=?', [slowNow + WEEK, fenced.id]);
+  const slow = async (message) => { await db.run('UPDATE parent_report_sends SET claimed_until=? WHERE account_id=?', [slowNow + 999, fenced.id]); return transport(message); };
+  await runParentReportJob(db, { send: slow, publicOrigin: ORIGIN, now: slowNow });
+  c.deq(await db.get('SELECT status,claimed_until FROM parent_report_sends WHERE account_id=? AND week_start=?', [fenced.id, istWeekStart(slowNow) - WEEK]),
+    { status: 'pending', claimed_until: slowNow + 999 }, 'a stale lease holder\'s finish is fenced out (the newer claim stands)');
 
   // The account stops its own link.
   const adultLink = await post('/v1/parent-report/link', { email: 'dad@example.test' }, adult.jar);
@@ -259,6 +288,7 @@ try {
   await db.run('DELETE FROM accounts WHERE id=?', [kid.id]);
   c.deq([(await db.get('SELECT COUNT(*) AS n FROM parent_report_links WHERE account_id=?', [kid.id])).n, (await db.get('SELECT COUNT(*) AS n FROM parent_report_sends WHERE account_id=?', [kid.id])).n].map(Number), [0, 0], 'deleting the account deletes its link and send ledger');
 
+  console.log(`engine: ${h.engine}`);
   console.log(`parent-report-check (${h.engine}): ${c.count()} checks passed`);
 } finally {
   await h.close();

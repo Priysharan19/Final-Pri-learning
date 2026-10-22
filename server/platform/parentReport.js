@@ -178,10 +178,12 @@ export function buildWeeklyReport(attempts, { weekStart, weekEnd }) {
   const fixed = new Set();
   for (const a of all) {
     if (!a.item) continue;
-    if (a.correct && a.at >= weekStart && wrongBefore.has(a.item) && wrongBefore.get(a.item) < a.at) fixed.add(a.item);
+    if (a.correct && a.at >= weekStart && wrongBefore.has(a.item) && wrongBefore.get(a.item) < weekStart) fixed.add(a.item);
     if (!a.correct && !wrongBefore.has(a.item)) wrongBefore.set(a.item, a.at);
     latest.set(a.item, a.correct);
   }
+  // Fixed means it stayed fixed: a later wrong answer in the week undoes it.
+  for (const item of [...fixed]) if (!latest.get(item)) fixed.delete(item);
   const stillOpen = [...latest.values()].filter(correct => !correct).length;
 
   // Next week: a plan built only from the above. It never promises a result.
@@ -315,7 +317,7 @@ export function parentReportLines(report) {
       : `No marked answers were recorded this week, so there is nothing to report yet.`]);
   }
   if (p.questionsAttempted) {
-    lines.push(['Practice', `${p.questionsAttempted} questions answered and marked, ${p.questionsCorrect} fully right, on ${p.activeDays} ${p.activeDays === 1 ? 'day' : 'days'}.`]);
+    lines.push(['Practice', `${p.questionsAttempted} ${p.questionsAttempted === 1 ? 'answer' : 'answers'} marked, ${p.questionsCorrect} fully right, on ${p.activeDays} ${p.activeDays === 1 ? 'day' : 'days'}.`]);
     lines.push(['Time practised', p.minutesAtLeast === null
       ? 'Not enough answers to measure.'
       : `At least ${p.minutesAtLeast} ${p.minutesAtLeast === 1 ? 'minute' : 'minutes'} over ${p.sittings} ${p.sittings === 1 ? 'sitting' : 'sittings'} (measured from the first to the last marked answer of each sitting, so real time is higher).`]);
@@ -325,9 +327,9 @@ export function parentReportLines(report) {
     const trend = { up: 'higher than the weeks before', down: 'lower than the weeks before', steady: 'about the same as the weeks before', 'not-enough-data': 'not enough earlier weeks to compare' }[a.direction];
     lines.push(['Marks earned', `${pct(a.thisWeek)} of available marks — ${trend}.`]);
     const t = report.topics;
-    lines.push(['Going well', t.strong.length ? t.strong.map(x => `${x.name} (${pct(x.accuracy)})`).join(', ') : 'No chapter had enough answers to say yet.']);
+    lines.push(['Going well', t.strong.length ? t.strong.map(x => `${x.name} (${pct(x.accuracy)})`).join(', ') : (t.measured ? 'No chapter reached 80% this week.' : 'No chapter had enough answers to say yet.')]);
     lines.push(['Needs another look', t.weak.length ? t.weak.map(x => `${x.name} (${pct(x.accuracy)})`).join(', ') : (t.measured ? 'None this week.' : 'No chapter had enough answers to say yet.')]);
-    lines.push(['Mistakes fixed', `${report.mistakes.fixed} earlier ${report.mistakes.fixed === 1 ? 'mistake was' : 'mistakes were'} answered correctly this week; ${report.mistakes.stillOpen} still to fix.`]);
+    lines.push(['Mistakes fixed', `${report.mistakes.fixed} ${report.mistakes.fixed === 1 ? 'question' : 'questions'} answered wrongly before this week ${report.mistakes.fixed === 1 ? 'was' : 'were'} answered correctly this week; ${report.mistakes.stillOpen} ${report.mistakes.stillOpen === 1 ? 'question' : 'questions'} from the last 90 days still to fix.`]);
   }
   const plan = report.plan.map(step => {
     if (step.kind === 'start-practising') return `Answer at least ${step.minimumAttempts} questions so next week's report has something to show.`;
@@ -375,10 +377,9 @@ export function createParentReportTransportFromEnv({ env = process.env, fetchImp
 
 // ── Recipient actions (no session: the token is the authority) ─────────────
 
-async function issueUnsubscribeToken(db, accountId) {
+function unsubscribeCredential(accountId) {
   const raw = opaqueToken();
-  await db.run('UPDATE parent_report_links SET unsubscribe_token_hash=?, unsubscribe_token_envelope=? WHERE account_id=?',
-    [sha256(raw), encryptDeliveryToken(raw, `parent-report-unsubscribe:${accountId}`), accountId]);
+  return { hash: sha256(raw), envelope: encryptDeliveryToken(raw, `parent-report-unsubscribe:${accountId}`) };
 }
 
 /** Stop by unsubscribe token. Permission-reducing only; idempotent. */
@@ -488,10 +489,13 @@ export function createParentReportRecipientRouter(db) {
     // The rule is re-checked here: consent can be withdrawn while the email waits.
     const decision = await recipientDecision(db, row.account_id, row.recipient_email);
     if (!decision.ok) return reject(res, 409, decision.code, 'Reports cannot be sent to this address now.');
-    const done = await db.run("UPDATE parent_report_links SET status='active', confirmed_at=?, confirm_token_hash=NULL, confirm_expires_at=NULL WHERE account_id=? AND confirm_token_hash=? AND status='pending'",
-      [now, row.account_id, sha256(raw)]);
+    // Activation and the unsubscribe credential are one write: an active link
+    // can never exist without its stop link.
+    const unsubscribe = unsubscribeCredential(row.account_id);
+    const done = await db.run(`UPDATE parent_report_links SET status='active', confirmed_at=?, confirm_token_hash=NULL, confirm_expires_at=NULL,
+        unsubscribe_token_hash=?, unsubscribe_token_envelope=? WHERE account_id=? AND confirm_token_hash=? AND status='pending'`,
+      [now, unsubscribe.hash, unsubscribe.envelope, row.account_id, sha256(raw)]);
     if (!done.changes) return reject(res, 410, 'PARENT_REPORT_TOKEN_EXPIRED', 'This link has expired or was already used.');
-    await issueUnsubscribeToken(db, row.account_id);
     res.json({ confirmed: true });
   });
 
@@ -505,7 +509,11 @@ export function createParentReportRecipientRouter(db) {
   // URL in the List-Unsubscribe header. It has no Origin and no cookie, so it
   // is exempt from the origin guard (router.js); the token is its only
   // authority and it can only ever stop reports.
-  router.post('/unsubscribe/one-click', rateLimit(db, 'parent-report-unsubscribe', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  // Its own, wide per-IP bucket: mailbox providers send every one-click from
+  // a few shared addresses, and a refused unsubscribe would be a promise
+  // broken. The route only ever stops reports, a repeat is harmless, and a
+  // guess needs a 256-bit token; the bucket only bounds abuse of the database.
+  router.post('/unsubscribe/one-click', rateLimit(db, 'parent-report-one-click', { limit: 2000, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const result = await unsubscribeByToken(db, req.query?.token);
     if (!result.ok) return reject(res, 400, 'PARENT_REPORT_TOKEN_INVALID', 'This link is not valid.');
     res.json({ unsubscribed: true });
@@ -515,6 +523,10 @@ export function createParentReportRecipientRouter(db) {
 }
 
 // ── The weekly job ───────────────────────────────────────────────────────────
+// Only the last complete week is ever queued: if the job cannot run at all
+// across a week boundary, that week's report is not sent late (a stale report
+// is worse than none). A row that fails MAX_SEND_ATTEMPTS times stays 'failed'
+// and is counted in parent_report_failed log lines.
 
 /**
  * Queue and send the last complete week's reports. Safe to run as often as
@@ -542,16 +554,20 @@ export async function runParentReportJob(db, { send, publicOrigin = process.env.
     const claim = await db.run(`UPDATE parent_report_sends SET claimed_until=?, updated_at=? WHERE account_id=? AND week_start=?
       AND status IN ('pending','failed') AND (claimed_until IS NULL OR claimed_until < ?)`, [now + CLAIM_LEASE_MS, now, row.account_id, row.week_start, now]);
     if (!claim.changes) continue;
-    const outcome = await sendOne(db, row, { send, publicOrigin, now });
+    const outcome = await sendOne(db, { ...row, lease: now + CLAIM_LEASE_MS }, { send, publicOrigin, now });
     result[outcome]++;
   }
   return result;
 }
 
-async function finish(db, row, now, fields) {
-  const sets = Object.keys(fields).map(k => `${k}=?`).join(',');
-  await db.run(`UPDATE parent_report_sends SET ${sets}, claimed_until=NULL, updated_at=? WHERE account_id=? AND week_start=?`,
-    [...Object.values(fields), now, row.account_id, row.week_start]);
+// Fenced by the lease this run took: a run whose lease ran out (another run
+// has since claimed the row) cannot overwrite that run's outcome. The provider
+// call is bounded well inside the lease (authDelivery.js REQUEST_TIMEOUT_MS,
+// 10 s, against CLAIM_LEASE_MS) and carries the row's idempotency key besides.
+async function finish(db, row, now, { status, skip_reason = null, attempts = Number(row.attempts), sent_at = null, provider_message_id = null, last_error_code = null, next_attempt_at = null }) {
+  await db.run(`UPDATE parent_report_sends SET status=?, skip_reason=?, attempts=?, sent_at=?, provider_message_id=?, last_error_code=?, next_attempt_at=?,
+      claimed_until=NULL, updated_at=? WHERE account_id=? AND week_start=? AND claimed_until=?`,
+    [status, skip_reason, attempts, sent_at, provider_message_id, last_error_code, next_attempt_at, now, row.account_id, row.week_start, row.lease]);
 }
 
 async function sendOne(db, row, { send, publicOrigin, now }) {

@@ -79,7 +79,7 @@ function PlanStep({ step, t }) {
   return null;
 }
 
-function Report({ report, t, locale }) {
+export function Report({ report, t, locale }) {
   const p = report.practice;
   const a = report.accuracy;
   const range = weekRange(report.weekStart, locale);
@@ -115,7 +115,7 @@ function Report({ report, t, locale }) {
         <div className="parent-columns">
           <div>
             <h3>{t('parent.strong')}</h3>
-            <TopicList topics={report.topics.strong} t={t} empty={t('parent.topicsNone')} />
+            <TopicList topics={report.topics.strong} t={t} empty={report.topics.measured ? t('parent.strongNone') : t('parent.topicsNone')} />
           </div>
           <div>
             <h3>{t('parent.weak')}</h3>
