@@ -179,16 +179,16 @@ export default function MapPage() {
 
   // The map arrives once, from the chapter it opens on; later picks only move
   // the inspector. Hops are fixed at arrival so a re-layout never replays it.
-  const origin = useRef(null);
+  const [origin, setOrigin] = useState(null);
   const [arrived, setArrived] = useState(false);
-  if (!origin.current && current && curriculum) origin.current = current.row.id;
+  const opening = current && curriculum ? current.row.id : null;
+  useEffect(() => { if (!origin && opening) setOrigin(opening); }, [origin, opening]);
   useEffect(() => {
-    if (!origin.current || arrived) return undefined;
+    if (!origin || arrived) return undefined;
     const id = setTimeout(() => setArrived(true), motion.reduced ? 0 : ARRIVE_MS);
     return () => clearTimeout(id);
-  }, [!!origin.current, arrived, motion.reduced]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const hops = useMemo(() => (origin.current ? hopsFrom(origin.current, layout.nodes, layout.edges) : new Map()), [layout, !!origin.current]);  // eslint-disable-line react-hooks/exhaustive-deps
-  // Chapters with no drawn link arrive with the third ring, not last.
+  }, [origin, arrived, motion.reduced]);
+  const hops = useMemo(() => (origin ? hopsFrom(origin, layout.nodes, layout.edges) : new Map()), [layout, origin]);
   const hopOf = id => Math.min(4, hops.has(id) ? hops.get(id) : 3);
   // An edge is drawn from its end nearer the origin, so the lines grow outward.
   const outward = e => (hopOf(e.to.row.id) < hopOf(e.from.row.id) ? `M${e.to.x} ${e.to.y} L ${e.from.x} ${e.from.y}` : e.d);

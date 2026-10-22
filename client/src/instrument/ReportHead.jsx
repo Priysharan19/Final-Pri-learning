@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -75,6 +75,7 @@ function Delta({ n, unit = '' }) {
 const CW = 1000; const CH = 300; const PADX = 40; const PADB = 30; const PADT = 40;
 
 function Chart({ series, labels, t, spoken, failed }) {
+  const hatch = `lux-hatch-${useId().replace(/:/g, '')}`;
   const n = series.length;
   const X = i => (n <= 1 ? CW / 2 : PADX + (i * (CW - 2 * PADX)) / (n - 1));
   const Y = v => CH - PADB - ((Math.max(0, Math.min(100, v)) - 0) / 100) * (CH - PADB - PADT);
@@ -101,12 +102,12 @@ function Chart({ series, labels, t, spoken, failed }) {
   return (
     <div className="in-chart" data-report-chart={any ? 'drawn' : failed ? 'failed' : 'empty'}>
       <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" role="img" aria-label={spoken}>
-        <defs><pattern id="lux-chart-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" /></pattern></defs>
+        <defs><pattern id={hatch} width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" /></pattern></defs>
         <g className="in-chart-grid" aria-hidden="true">
           {gridX.map(x => <line key={`x${x}`} x1={x} y1={0} x2={x} y2={CH} />)}
           {gridY.map(y => <line key={`y${y}`} x1={0} y1={y} x2={CW} y2={y} />)}
         </g>
-        {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} />)}
+        {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} fill={`url(#${hatch})`} />)}
         {runs('methodPct').map((r, k) => r.length > 1
           ? <path key={`m${k}`} className="in-chart-line is-method" d={path(r, 'methodPct')} pathLength="1" data-chart-line="method" />
           : null)}

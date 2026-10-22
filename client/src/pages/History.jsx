@@ -94,6 +94,7 @@ const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
 // the runtime flag) is false elsewhere, so the component tree-shakes out.
 /* global __PRI_FEATURE_INSTRUMENT__ */
 const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
+const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
 const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index }) {
   const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
   const wantsInk = !!item.viaInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
@@ -118,7 +119,7 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
     if (ref.current) io.observe(ref.current);
     return () => { live = false; io.disconnect(); };
   }, [item.id, wantsInk]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const scored = !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
+  const scored = scoredOf(item);
   const full = scored && item.marksEarned === item.marksPossible;
   let box = null;
   if (ink.state === 'ok') {
@@ -348,7 +349,7 @@ function HistoryForProfile() {
           <section key={g.key} className="in-led-day" aria-labelledby={g.key ? `in-led-day-${g.key}` : undefined}>
             {g.key && <h3 className="in-led-dayh" id={`in-led-day-${g.key}`}>{dayLabel(g.key)}</h3>}
             {g.items.map(item => (
-              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}${!item.repeat && item.marksPossible > 0 ? ' has-score' : ''}`} data-question-id={item.id}
+              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}${ScriptThumb && scoredOf(item) ? ' has-score' : ''}`} data-question-id={item.id}
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
