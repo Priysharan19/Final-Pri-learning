@@ -127,9 +127,10 @@ ok(!sure.needsConfirmation, 'above it, it stands');
     ok(out?.needsConfirmation === true && out.confidence === 0, `a confidence of ${label} is no confidence: the judgement is only a second opinion (${out?.confidence})`);
   }
   eq(WORKING_SCHEMA.properties.lines.maxItems, MAX_LINES, 'the judgement limit is the schema\'s own constant');
+  eq(MAX_LINES, 40, 'pinned: at most 40 lines of working, and 40 judgements');
   const tooMany = settle(reply({ lines: Array.from({ length: MAX_LINES + 1 }, (_, i) => ({ index: i % 2, status: 'ok', carried: false, why: '' })) }));
-  eq([tooMany.error?.code, tooMany.error?.status, tooMany.error?.retryable, !!tooMany.result], ['WORKING_MALFORMED', 502, true, false],
-    `more than ${MAX_LINES} judgements is refused as a malformed reply, never shown`);
+  eq([tooMany.error?.code, tooMany.error?.status, tooMany.error?.retryable, !!tooMany.result], ['WORKING_MALFORMED', 422, false, false],
+    `more than ${MAX_LINES} judgements is refused as a malformed reply, never shown, and not resent by itself`);
   const stringIndex = settle(reply({ lines: [{ index: '1', status: 'break', carried: false, why: 'x' }] })).result;
   eq([stringIndex.firstBreak, stringIndex.lines.map(l => l.status)], [-1, ['note', 'note']],
     'a judgement whose index is not an integer lands on no line: no cross is placed by a guess');
