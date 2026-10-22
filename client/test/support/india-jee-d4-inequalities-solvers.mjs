@@ -10,10 +10,13 @@
 //     each value the inequality is tested at every point of a fine grid of x
 //     (containment), at every natural number (exact count), or at every integer
 //     x (systems);
-//   · the canteen price is found by trying every whole rupee against every day;
+//   · the parameter-dependent coefficient (k − p)x is tested the same way, with
+//     no case split;
 //   · lattice points are enumerated over a box;
 //   · an area is found by clipping a large square by each half-plane in exact
-//     BigInt rationals and applying the shoelace formula.
+//     BigInt rationals and applying the shoelace formula; for a stated area the
+//     keyed k is substituted, the clipped area must equal it exactly, and the
+//     area must be strictly increasing through k, so that k is the only one.
 // Where an extreme value is asked for, the scan also checks that the set of
 // good values really is bounded on that side inside the scanned range.
 // NEAR_MISS lists answers a student could plausibly write that must be marked WRONG.
@@ -98,7 +101,7 @@ const sgn = x => (x[0] > 0n ? 1 : x[0] < 0n ? -1 : 0);
 
 /** Keep the part of a polygon where A·x + B·y ≤ C (Sutherland–Hodgman). */
 function clip(poly, A, B, C) {
-  const f = P => qs(qa(qm(Q(A), P[0]), qm(Q(B), P[1])), Q(C));
+  const f = P => qs(qa(qm(Q(A), P[0]), qm(Q(B), P[1])), Array.isArray(C) ? C : Q(C));
   const out = [];
   for (let i = 0; i < poly.length; i++) {
     const P = poly[i], R = poly[(i + 1) % poly.length];
@@ -149,20 +152,23 @@ export const SOLVE = {
       const r = pickBounded(good, -400, 400, ask);
       return r.problem ? [r.problem] : keyInt(q, r.value, 'count of natural solutions for each k');
     }
-    m = p.match(/costs ₹\$(\d+(?:\.\d{1,2})?)\$ to make, the canteen has a fixed cost of ₹\$(\d+)\$ a day, and every day \$(\d+)\$ samosas are given free to the staff\. On any day the canteen sells some whole number of samosas from \$(\d+)\$ to \$(\d+)\$\. Find the least whole-rupee selling price per samosa for which the canteen (makes a profit|makes no loss)/);
+    m = p.match(/^(?:For how many integers \$k\$ does|Find the (least|greatest) integer \$k\$ for which) the inequality \$\(k ([+-]) (\d+)\)x (<|\\le|>|\\ge) ([^$]+)\$ holds? for every real number \$x\$ with \$(-?\d+) \\le x \\le (-?\d+)\$[?.]$/);
     if (!m) return ['could not read the prompt'];
-    const costPaise = Math.round(Number(m[1]) * 100), F = Number(m[2]), g = Number(m[3]), n1 = Number(m[4]), n2 = Number(m[5]);
-    const strictProfit = m[6] === 'makes a profit';
-    // Try every whole-rupee price against every possible day, in paise.
-    for (let price = 1; price <= 2000; price++) {
-      let everyDay = true;
-      for (let n = n1; n <= n2 && everyDay; n++) {
-        const income = 100 * price * n, cost = costPaise * (n + g) + 100 * F;
-        everyDay = strictProfit ? income > cost : income >= cost;
-      }
-      if (everyDay) return keyInt(q, price, 'least price that works on every day');
+    const pk = (m[2] === '-' ? 1 : -1) * Number(m[3]);              // (k − pk)
+    const op = OPMAP[m[4]], rhs = parseLin(m[5]), lo = Number(m[6]), hi = Number(m[7]), ask = askOf(p);
+    if (!rhs || !ask || rhs.x || rhs.y || rhs.a || !(lo < hi)) return ['could not read the inequality'];
+    // Every k from −300 to 300 against every x = X/120 on [lo, hi], in integers:
+    // (k − pk)·X op 120·(rhs at k).
+    const cmp = (l, r) => (op === '<' ? l < r : op === '<=' ? l <= r : op === '>' ? l > r : l >= r);
+    const good = [];
+    for (let k = -300; k <= 300; k++) {
+      let all = true;
+      for (let X = lo * 120; X <= hi * 120 && all; X++) all = cmp((k - pk) * X, 120 * (rhs.k * k + rhs.c));
+      if (all) good.push(k);
     }
-    return ['no price up to ₹2000 works'];
+    if (good.length && good[good.length - 1] - good[0] + 1 !== good.length) return ['the good values of k are not consecutive'];
+    const r = pickBounded(good, -300, 300, ask);
+    return r.problem ? [r.problem] : keyInt(q, r.value, 'grid scan over x for each k');
   },
 
   'c11-inequality-system-jee-reasoning'(q) {
@@ -241,6 +247,31 @@ export const SOLVE = {
       if (!key) return [`key ${keyed(q)} is not exact`];
       if (area[0] !== key[0] || area[1] !== key[1]) return [`clipped area ${area[0]}/${area[1]} vs keyed ${key[0]}/${key[1]}`];
       if (Math.abs(Number(area[0]) / Number(area[1]) - keyed(q)) > 1e-9 * Math.max(1, keyed(q))) return ['the keyed decimal does not match the fraction'];
+      return [];
+    }
+    m = p.match(/^The region of the plane given by \$0 \\le x \\le (\d+)\$, \$0 \\le y \\le (\d+)\$ and \$([^$]+) \\le k\$, where \$k\$ is a positive constant, has area \$(\d+(?:\.\d{1,2})?)\$ square units\. Find \$k\$\.$/);
+    if (m) {
+      const P = Number(m[1]), Qh = Number(m[2]), L = parseLin(m[3]), A = Q(Math.round(Number(m[4]) * 100), 100);
+      if (!L || L.k || L.a || L.c || L.x <= 0 || L.y <= 0) return ['could not read the line'];
+      const sf = q.answer.simplestFraction;
+      const key = sf ? Q(sf.n, sf.d) : Number.isInteger(keyed(q)) ? Q(keyed(q)) : null;
+      if (!key) return [`key ${keyed(q)} is not exact`];
+      // Clip the rectangle by L ≤ k (exact BigInt) and take the shoelace area.
+      const areaAt = k => {
+        let poly = [[0, 0], [P, 0], [P, Qh], [0, Qh]].map(([x, y]) => [Q(x), Q(y)]);
+        poly = clip(poly, L.x, L.y, k);
+        let twice = Q(0);
+        for (let i = 0; i < poly.length; i++) { const U = poly[i], V = poly[(i + 1) % poly.length]; twice = qa(twice, qs(qm(U[0], V[1]), qm(V[0], U[1]))); }
+        return Q(twice[0] < 0n ? -twice[0] : twice[0], twice[1] * 2n);
+      };
+      if (!(sgn(key) > 0 && sgn(qs(Q(L.x * P + L.y * Qh), key)) > 0)) return ['k is not strictly between 0 and the far corner'];
+      const at = areaAt(key);
+      if (at[0] !== A[0] || at[1] !== A[1]) return [`clipped area at the keyed k is ${at[0]}/${at[1]}, not ${A[0]}/${A[1]}`];
+      // The area never decreases in k; strictly below A just before the key and above just after makes the key the only k.
+      const eps = Q(1, 1000000);
+      const before = areaAt(qs(key, eps)), after = areaAt(qa(key, eps));
+      if (!(sgn(qs(A, before)) > 0 && sgn(qs(after, A)) > 0)) return ['the area is not strictly increasing through the keyed k'];
+      if (Math.abs(Number(key[0]) / Number(key[1]) - keyed(q)) > 1e-12 * Math.max(1, keyed(q))) return ['the keyed decimal does not match the fraction'];
       return [];
     }
     m = p.match(/^(?:For how many integers \$k\$ does the point|Find the (?:least|greatest) integer \$k\$ for which the point) \$\(([^,]+), ([^)]+)\)\$ lies? in the region given by (.+)[?.]$/);

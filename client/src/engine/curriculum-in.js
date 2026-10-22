@@ -217,6 +217,18 @@ installHardestCovers(INDIA_JEE_HARDEST_COVERS);
 // a rung the chapter does not have, or would leave the dot point with no form
 // at that rung, or when the named replacement is not what now serves it.
 const retiredLog = [];
+// Covers of one generator at the same rungs are one cover: splitting must not
+// leave a generator listed once per dot point, which would multiply its weight
+// wherever a chapter's covers are drawn from as a pool.
+function coalesce(covers) {
+  const out = [];
+  for (const c of covers) {
+    const same = out.find(o => o.gen === c.gen && o.diff.join() === c.diff.join());
+    if (same) same.dp = [...new Set([...same.dp, ...c.dp])].sort((a, b) => a - b);
+    else out.push({ ...c, dp: [...c.dp], diff: [...c.diff] });
+  }
+  return out;
+}
 function retireRungs(table) {
   for (const [chapterId, retirements] of Object.entries(table)) {
     const views = new Set([
@@ -235,7 +247,7 @@ function retireRungs(table) {
         const here = { gen, dp: [dp], diff: cover.diff.filter(d => d !== diff) };
         const others = { gen, dp: cover.dp.filter(i => i !== dp), diff: [...cover.diff] };
         const split = [here, others].filter(c => c.dp.length && c.diff.length);
-        chapter.covers = [...chapter.covers.slice(0, at), ...split, ...chapter.covers.slice(at + 1)];
+        chapter.covers = coalesce([...chapter.covers.slice(0, at), ...split, ...chapter.covers.slice(at + 1)]);
         const still = chapter.covers.filter(c => c.dp.includes(dp) && (c.diff || []).includes(diff)).map(c => c.gen);
         if (!still.length) throw new Error(`${chapterId}: retiring ${gen} D${diff} would leave dot point ${dp} with no form at D${diff}`);
         if (!still.includes(replacedBy)) throw new Error(`${chapterId}: ${replacedBy} does not serve dot point ${dp} at D${diff}`);

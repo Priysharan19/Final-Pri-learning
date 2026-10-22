@@ -7,33 +7,40 @@
 // and each dot point below gets its own form instead. Each form joins at least
 // two separate ideas, never one formula with bigger numbers:
 //
-//   · circle (dot point 0)
-//       three-points — the circle through three lattice points (a linear
-//         system in g, f, c), THEN its second crossing of an axis from the sum
-//         of the roots of the axis quadratic;
-//       chord — the centre and radius read from the general form, THEN the
-//         perpendicular from the centre bisecting a chord (r² = d² + ℓ²) to
-//         recover the constant term or the chord's length;
+//   · circle (dot point 0) — weighted 45 / 30 / 25
 //       tangent — distance-from-centre = radius gives two values of k, THEN a
-//         side-of-a-line sign test keeps exactly one.
-//   · parabola (dot point 1)
-//       focal-distance — completing the square to find the vertex and a, THEN
-//         the focal distance as the distance to the directrix (or the triangle
-//         on the latus rectum);
+//         side-of-a-line sign test keeps exactly one;
+//       three-points — the circle through three lattice points (a linear
+//         system in g, f, c), THEN the chord it cuts on a given line from the
+//         perpendicular distance of the centre and r² = d² + (ℓ/2)²;
+//       chord — the centre read from the general form, THEN the perpendicular
+//         from the centre bisecting a chord of given length to recover r² and
+//         the constant term.
+//   · parabola (dot point 1) — weighted 35 / 35 / 30
 //       opening — the focus written in terms of an unknown coefficient gives a
 //         quadratic in t, THEN the direction the parabola opens rejects a root;
 //       focal-chord — completing the square, THEN the other end of a chord
 //         through the focus from the product of the roots (−4a²), and its
-//         length as the sum of two focal distances.
-//   · ellipse and hyperbola (dot point 2)
+//         length as the sum of two focal distances;
+//       focal-distance — the focal distance of P is GIVEN: the directrix
+//         property run backwards places P along the axis, THEN the equation
+//         fixes its distance from the axis, for an area or a distance from the
+//         vertex that is the same for both such points.
+//   · ellipse and hyperbola (dot point 2) — weighted 40 / 35 / 25
+//       confocal — c² read from an ellipse, THEN a hyperbola with the same
+//         foci through a point (a quadratic with one root rejected because
+//         it makes q negative) or with a given product of eccentricities;
 //       focal-definition — 2a from the sum (ellipse) or difference
 //         (hyperbola) of the focal distances of a given point, THEN b² from
 //         a and c, then the axis, eccentricity or latus rectum asked;
-//       lr-ratio — the latus rectum compared with an axis fixes b/a (or
-//         b²/a²), THEN the foci fix the scale;
-//       confocal — c² read from an ellipse, THEN a hyperbola with the same
-//         foci through a point (a quadratic with one root rejected because
-//         it makes β negative) or with a given product of eccentricities.
+//       lr-ratio — the latus rectum compared with an axis fixes b²/a², THEN
+//         a point on the curve fixes a², and c² = a² ∓ b² gives the distance
+//         between the foci.
+//
+// An independent maths review (2026-10-22) judged three earlier archetypes D3
+// (the second axis crossing of a circle through three points, the focal
+// distance of a point with a given coordinate, and a² from foci plus a
+// latus-rectum ratio); each was replaced by the two-step version above.
 //
 // Scope is the NCERT Class 11 chapter as JEE Main and Advanced examine it:
 // standard positions, shifts by completing the square, the focal-distance
@@ -103,6 +110,10 @@ function substTex(a, x, b, y, c) {
 }
 /** "|x - y|", or "|x|" when y is zero. */
 const gapTex = (x, y) => (y === 0 ? `|${x}|` : `|${x} - ${par(y)}|`);
+/** n/d as computed, before reducing: 7 when d is 1, else \dfrac{n}{d}. */
+const frRaw = (n, d) => (d === 1 ? String(n) : `\\dfrac{${n}}{${d}}`);
+/** "A = B = C", with a part equal to the one before it written once. */
+const chain = (...parts) => parts.filter((x, i) => i === 0 || x !== parts[i - 1]).join(' = ');
 const isSquare = n => n >= 0 && Math.round(Math.sqrt(n)) ** 2 === n;
 
 const FALLBACK_SEED = 0x434f4e49;   // "CONI"
@@ -112,93 +123,89 @@ const FALLBACK_SEED = 0x434f4e49;   // "CONI"
 // ═════════════════════════════════════════════════════════════════════════════
 
 /**
- * Circles with an integer centre (h, k), k ≠ 0, that cross the x-axis at two
- * integer points h ± s, with every lattice point on them off the x-axis
- * listed. A second axis crossing is then a whole number.
+ * Circles with an integer centre (h, k) and integer r² that carry at least
+ * three lattice points (all listed, |coordinates| ≤ 12): the circle through
+ * three of them is then found from whole-number data.
  */
-const THREE_POINT_CIRCLES = Object.freeze((() => {
+const LATTICE_CIRCLES = Object.freeze((() => {
   const out = [];
-  for (let h = -5; h <= 5; h++) for (let k = -6; k <= 6; k++) {
-    if (k === 0) continue;
-    for (let r2 = 2; r2 <= 85; r2++) {
-      const s2 = r2 - k * k;
-      if (s2 <= 0 || !isSquare(s2)) continue;
-      const s = Math.round(Math.sqrt(s2));
+  for (let h = -5; h <= 5; h++) for (let k = -5; k <= 5; k++) {
+    for (let r2 = 5; r2 <= 65; r2++) {
       const pts = [];
       const top = Math.floor(Math.sqrt(r2));
       for (let dx = -top; dx <= top; dx++) {
         const dy2 = r2 - dx * dx;
         if (!isSquare(dy2)) continue;
         const dy = Math.round(Math.sqrt(dy2));
-        for (const y of dy === 0 ? [k] : [k + dy, k - dy]) if (y !== 0) pts.push([h + dx, y]);
+        for (const y of dy === 0 ? [k] : [k + dy, k - dy]) {
+          if (Math.abs(h + dx) <= 12 && Math.abs(y) <= 12) pts.push([h + dx, y]);
+        }
       }
-      if (pts.length >= 2) out.push(Object.freeze({ h, k, r2, s, pts: Object.freeze(pts) }));
+      if (pts.length >= 3) out.push(Object.freeze({ h, k, r2, pts: Object.freeze(pts) }));
     }
   }
   return out;
 })());
 
-/** Line normals (a, b) with √(a² + b²) whole, and some without. */
+/** Line normals (a, b) with √(a² + b²) whole. */
 const PYTHAGOREAN_NORMALS = [[3, 4], [4, 3], [3, -4], [4, -3], [5, 12], [12, 5], [5, -12], [12, -5]];
 const AXIS_NORMALS = [[1, 0], [0, 1]];
-const SLANT_NORMALS = [[1, 2], [2, 1], [1, -2], [2, -1], [1, 1], [1, -1], [1, 3], [3, 1], [1, -3], [3, -1], [2, 3], [3, -2]];
 const lineTex = (a, b, c, k = '') => `${termsTex([[a, 'x'], [b, 'y']])}${k ? ` + ${k}` : c === 0 ? '' : ` ${sg(c)}`} = 0`;
 const circleTex = (h, k, p) => `${termsTex([[1, 'x^2'], [1, 'y^2'], [-2 * h, 'x'], [-2 * k, 'y']])}${p === 'p' ? ' + p' : p === 0 ? '' : ` ${sg(p)}`} = 0`;
 const centreForm = (h, k, r2) => `${sqTex('x', h)} + ${sqTex('y', k)} = ${r2}`;
 
 function circleReasoning(rng) {
-  const kind = rc(rng, ['three-points', 'chord', 'tangent']);
+  // Weighted towards the tangent form (two roots, one rejected by a side test).
+  const roll = rng();
+  const kind = roll < 0.45 ? 'tangent' : roll < 0.75 ? 'three-points' : 'chord';
   for (let guard = 0; guard < 400; guard++) {
     if (kind === 'three-points') {
-      const e = rc(rng, THREE_POINT_CIRCLES);
-      const lower = rng() < 0.5;
-      const p = lower ? e.h - e.s : e.h + e.s, q = lower ? e.h + e.s : e.h - e.s;
-      if (q === 0) continue;
-      const cand = e.pts.filter(([x, y]) => Math.abs(x) <= 12 && Math.abs(y) <= 12);
-      if (cand.length < 2) continue;
-      const i = ri(rng, 0, cand.length - 1);
-      let j = ri(rng, 0, cand.length - 2);
-      if (j >= i) j++;
-      const B0 = cand[i], C0 = cand[j];
-      // A horizontal chord BC hands over the centre's abscissa at once.
-      if (B0[1] === C0[1] && rng() < 0.75) continue;
-      const onX = rng() < 0.5;
-      const ax = onX ? 'x' : 'y', other = onX ? 'y' : 'x';
-      const flip = ([x, y]) => (onX ? [x, y] : [y, x]);
-      const A = flip([p, 0]), B = flip(B0), C = flip(C0);
-      const [H, K] = flip([e.h, e.k]);
-      const g = -H, f = -K, c = H * H + K * K - e.r2;
-      const coefAx = onX ? g : f;            // the axis quadratic is t² + 2(coef)t + c
+      // The circle through three lattice points, THEN the chord it cuts on a line.
+      const e = rc(rng, LATTICE_CIRCLES);
+      const idx = [];
+      while (idx.length < 3) { const t = ri(rng, 0, e.pts.length - 1); if (!idx.includes(t)) idx.push(t); }
+      const [A, B, C] = idx.map(t => e.pts[t]);
+      // A diameter among the three points hands over the centre at once.
+      const diam = (P, Q) => P[0] + Q[0] === 2 * e.h && P[1] + Q[1] === 2 * e.k;
+      if ((diam(A, B) || diam(A, C) || diam(B, C)) && rng() < 0.8) continue;
+      const [a, b] = rc(rng, rng() < 0.8 ? PYTHAGOREAN_NORMALS : AXIS_NORMALS);
+      const n = Math.round(Math.hypot(a, b));
+      const dMax = Math.floor(Math.sqrt(e.r2 - 1));
+      if (dMax < 1) continue;
+      const d = ri(rng, 1, dMax);
+      const c = (rng() < 0.5 ? 1 : -1) * d * n - (a * e.h + b * e.k);
+      if (Math.abs(c) > 90) continue;
+      const half2 = e.r2 - d * d, value = 4 * half2;
+      const g = -e.h, f = -e.k, cc = e.h * e.h + e.k * e.k - e.r2;
       const eqFor = ([x, y]) => `${termsTex([[2 * x, 'g'], [2 * y, 'f'], [1, 'c']])} = ${-(x * x + y * y)}`;
       return {
-        prompt: `A circle passes through the points $A${pt(...A)}$, $B${pt(...B)}$ and $C${pt(...C)}$. It meets the $${ax}$-axis again at a point $D$ other than $A$. Find the $${ax}$-coordinate of $D$.`,
-        answerType: 'numeric', answer: { value: q },
-        traps: traps(q, [
-          { value: e.h, why: `That is the $${ax}$-coordinate of the centre, which is the midpoint of $AD$, not $D$ itself.` },
-          { value: p * q, why: `That is the product of the two $${ax}$-intercepts (the constant term of the circle's equation), not the second intercept.` },
-          { value: 2 * e.h + p, why: 'The two roots add up to the sum read off the equation; the known root is subtracted from that sum, not added to it.' },
-          { value: -q, why: 'Check the sign: the sum of the roots of $t^2 + Bt + C = 0$ is $-B$.' }
-        ]).slice(0, 3),
+        prompt: `A circle passes through the points $A${pt(...A)}$, $B${pt(...B)}$ and $C${pt(...C)}$. Find the square of the length of the chord that the line $${lineTex(a, b, c)}$ cuts off from this circle.`,
+        answerType: 'numeric', answer: { value },
+        traps: traps(value, [
+          { value: half2, why: 'That is the square of HALF the chord; the chord is twice the half-chord, so its square is four times as large.' },
+          { value: 4 * e.r2, why: 'That is the square of the diameter; the line does not pass through the centre.' },
+          { value: 4 * (e.r2 + d * d), why: 'The radius is the hypotenuse: the square of the half-chord is $r^2 - d^2$, not $r^2 + d^2$.' }
+        ]),
         hints: [
-          'Write the circle as $x^2 + y^2 + 2gx + 2fy + c = 0$ and substitute each of the three points: that gives three linear equations in $g$, $f$ and $c$.',
-          'Subtracting the equations in pairs removes $c$ and leaves two equations in $g$ and $f$.',
-          `On the $${ax}$-axis put $${other} = 0$: the two crossings are the roots of a quadratic, and one root is already known, so use the sum of the roots.`
+          'Write the circle as $x^2 + y^2 + 2gx + 2fy + c = 0$ and substitute the three points; subtracting the equations in pairs removes $c$.',
+          'Read off the centre and the square of the radius, then find the perpendicular distance of the centre from the line.',
+          'The perpendicular from the centre bisects the chord: the half-chord, that distance and the radius form a right triangle.'
         ],
         steps: [
-          { h: 'General form', d: 'Let the circle be $x^2 + y^2 + 2gx + 2fy + c = 0$.' },
-          { h: 'Substitute A, B, C', d: `$${eqFor(A)}$, $\\;${eqFor(B)}$, $\\;${eqFor(C)}$` },
-          { h: 'Solve', d: `Subtracting in pairs and solving: $g = ${g}$, $f = ${f}$, $c = ${c}$; the centre is $${pt(H, K)}$ and $r^2 = ${e.r2}$.` },
-          { h: `On the ${ax}-axis`, d: `Put $${other} = 0$: $${termsTex([[1, `${ax}^2`], [2 * coefAx, ax], [c, '']])} = 0$. Its roots add up to $${-2 * coefAx}$, and one of them is $${p}$ (the point $A$).` },
-          { h: 'Answer', d: `The other root is $${p === 0 ? q : `${-2 * coefAx} - ${par(p)} = ${q}`}$, so $D = ${pt(...flip([q, 0]))}$.` }
+          { h: 'Substitute A, B, C', d: `With $x^2 + y^2 + 2gx + 2fy + c = 0$: $${eqFor(A)}$, $\\;${eqFor(B)}$, $\\;${eqFor(C)}$` },
+          { h: 'The circle', d: `Solving: $g = ${g}$, $f = ${f}$, $c = ${cc}$; the centre is $${pt(e.h, e.k)}$ and $r^2 = g^2 + f^2 - c = ${e.r2}$.` },
+          { h: 'Distance of the centre from the line', d: n === 1 ? `$d = |${substTex(a, e.h, b, e.k, c)}| = ${d}$` : `$d = \\dfrac{|${substTex(a, e.h, b, e.k, c)}|}{\\sqrt{${a * a} + ${b * b}}} = \\dfrac{${d * n}}{${n}} = ${d}$` },
+          { h: 'Half the chord', d: `$\\left(\\tfrac{\\ell}{2}\\right)^2 = r^2 - d^2 = ${e.r2} - ${d * d} = ${half2}$` },
+          { h: 'Answer', d: `$\\ell^2 = 4 \\times ${half2} = ${value}$` }
         ],
-        reasoning: 'circle-three-points'
+        reasoning: 'circle-three-points-chord'
       };
     }
     if (kind === 'chord') {
       const h = ri(rng, -6, 6), k = ri(rng, -6, 6);
       if (h === 0 && k === 0) continue;
       if ((h === 0 || k === 0) && rng() < 0.6) continue;
-      if (rng() < 0.65) {
+      {
         // Find the constant term p from the chord's length.
         const [a, b] = rc(rng, rng() < 0.85 ? PYTHAGOREAN_NORMALS : AXIS_NORMALS);
         const n = Math.round(Math.hypot(a, b));
@@ -232,38 +239,6 @@ function circleReasoning(rng) {
           reasoning: 'circle-chord-constant'
         };
       }
-      // The chord's length², with a normal whose length is a surd.
-      const [a, b] = rc(rng, SLANT_NORMALS);
-      const n2 = a * a + b * b;
-      const c = ri(rng, -12, 12);
-      const N = a * h + b * k + c;
-      if (N === 0) continue;
-      const r2 = Math.floor((N * N) / n2) + ri(rng, 1, 30);
-      const pConst = h * h + k * k - r2;
-      const value = R(4 * (r2 * n2 - N * N), n2);
-      if (value.n <= 0) continue;
-      const half2 = R(r2 * n2 - N * N, n2), d2 = R(N * N, n2);
-      return {
-        prompt: `Find the square of the length of the chord that the line $${lineTex(a, b, c)}$ cuts off from the circle $${circleTex(h, k, pConst)}$.`,
-        answerType: 'numeric', ...exact(value),
-        traps: traps(value.value, [
-          { value: half2.value, why: 'That is the square of HALF the chord; the chord is twice the half-chord, so its square is four times as large.' },
-          { value: 4 * (r2 - N * N), why: 'The distance of the centre from the line has $\\sqrt{a^2 + b^2}$ in its denominator, so its square is divided by $a^2 + b^2$.' },
-          { value: addR(R(4 * r2), mulR(R(4), d2)).value, why: 'The radius is the hypotenuse: the square of the half-chord is $r^2 - d^2$, not $r^2 + d^2$.' }
-        ]),
-        hints: [
-          'Complete the squares to read off the centre and the square of the radius.',
-          'Find the square of the perpendicular distance of the centre from the line.',
-          'The perpendicular from the centre bisects the chord: the half-chord, that distance and the radius form a right triangle.'
-        ],
-        steps: [
-          { h: 'Centre and radius', d: `$${centreForm(h, k, r2)}$: centre $${pt(h, k)}$, $r^2 = ${r2}$.` },
-          { h: 'Distance squared', d: `$d^2 = \\dfrac{(${substTex(a, h, b, k, c)})^2}{${a * a} + ${b * b}} = ${rTex(d2)}$` },
-          { h: 'Half the chord', d: `$\\left(\\tfrac{\\ell}{2}\\right)^2 = r^2 - d^2 = ${r2} - ${rTex(d2)} = ${rTex(half2)}$` },
-          { h: 'Answer', d: `$\\ell^2 = 4 \\times ${rTex(half2)} = ${rTex(value)}$` }
-        ],
-        reasoning: 'circle-chord-length'
-      };
     }
     // Tangent: distance = radius gives two k; a side condition keeps one.
     const h = ri(rng, -6, 6), k = ri(rng, -6, 6), r = ri(rng, 1, 6);
@@ -327,49 +302,53 @@ function standardTex(orient, a, u0, w0) {
   const { across, along } = frame(orient);
   return `${sqTex(across, w0)} = ${u0 === 0 ? `${4 * a}${along}` : `${4 * a}(${less(along, u0)})`}`;
 }
+/** The shifted standard form as a hint writes it, vertex (h, k). */
+const stdHint = orient => (orient === 'y2' ? '$(y - k)^2 = 4a(x - h)$' : '$(x - h)^2 = 4a(y - k)$');
 /** A point given by (along, across) values as a rendered pair of rationals. */
 const placed = (orient, u, w) => { const [x, y] = frame(orient).point(u, w); return ptR(x, y); };
 
 function parabolaReasoning(rng) {
-  const kind = rc(rng, ['focal-distance', 'opening', 'focal-chord']);
+  // Weighted towards the two forms with a rejected root or a second intersection.
+  const roll = rng();
+  const kind = roll < 0.35 ? 'opening' : roll < 0.7 ? 'focal-chord' : 'focal-distance';
   for (let guard = 0; guard < 400; guard++) {
     const orient = rng() < 0.5 ? 'y2' : 'x2';
     const { across, along } = frame(orient);
     if (kind === 'focal-distance') {
+      // The focal distance of P is GIVEN: the directrix property, run backwards,
+      // places P along the axis, and the equation then fixes its offset across it.
       const a = nz(rng, -4, 4), u0 = ri(rng, -6, 6), w0 = ri(rng, -6, 6);
-      const t = nz(rng, -14, 14);
-      if ((t * t) % (4 * Math.abs(a)) !== 0 || t * t === 4 * a * a) continue;
-      const off = (t * t) / (4 * a);                       // u_P − u₀, same sign as a
-      const uP = u0 + off, wP = w0 + t;
-      const A = Math.abs(a);
-      const askArea = rng() < 0.45;
-      const value = askArea ? 2 * A * Math.abs(Math.abs(off) - A) : Math.abs(off) + A;
+      const t = ri(rng, 1, 14);
+      if ((t * t) % (4 * Math.abs(a)) !== 0) continue;
+      const A = Math.abs(a), off = (t * t) / (4 * a), dist = Math.abs(off) + A;
+      const askArea = rng() < 0.5;
+      const value = askArea ? R(A * t, 2) : R(off * off + t * t);
+      if (!askArea && value.n > 3000) continue;
       const eq = parabolaTex(orient, a, u0, w0);
       return {
-        prompt: `The point $P$ on the parabola $${eq}$ has $${across}$-coordinate $${wP}$. ${askArea ? 'Find the area of the triangle whose vertices are $P$ and the two end points of the latus rectum of the parabola.' : 'Find the distance of $P$ from the focus of the parabola.'}`,
-        answerType: 'numeric', answer: { value },
-        traps: traps(value, askArea
-          ? [{ value: 2 * value, why: 'The area of a triangle is half the base times the height.' },
-            { value: 2 * A * Math.abs(off), why: 'The height is the distance of $P$ from the latus rectum, which passes through the focus, not through the vertex.' }]
-          : [{ value: Math.abs(off), why: 'That is the distance of $P$ from the line through the vertex parallel to the directrix; the directrix is a further $|a|$ beyond the vertex.' },
-            { value: Math.abs(uP) + A, why: 'That treats the vertex as the origin; this parabola is shifted, so measure from its own directrix.' },
-            { value: Math.abs(off) + 4 * A, why: '$4|a|$ is the length of the latus rectum; the directrix is only $|a|$ from the vertex.' }]),
+        prompt: `A point $P$ on the parabola $${eq}$ is at a distance $${dist}$ from its focus. ${askArea ? 'Find the area of the triangle whose vertices are $P$, the focus and the vertex of the parabola.' : 'Find the square of the distance of $P$ from the vertex of the parabola.'}`,
+        answerType: 'numeric', ...exact(value),
+        traps: traps(value.value, askArea
+          ? [{ value: A * t, why: 'The area of a triangle is half the base times the height.' },
+            { value: (dist * t) / 2, why: 'The base is the segment from the vertex to the focus, of length $|a|$, not the focal distance of $P$.' },
+            { value: A * Math.sqrt(A * dist), why: 'The focal distance is measured from the directrix, not from the vertex: the distance of $P$ from the vertex along the axis is the focal distance less $|a|$.' }]
+          : [{ value: dist * dist, why: 'That is the square of the focal distance $PS$; the question measures from the vertex.' },
+            { value: off * off, why: 'That counts only the distance along the axis; add the square of the distance of $P$ from the axis.' },
+            { value: dist * dist + 4 * A * dist, why: 'The focal distance is measured from the directrix, not from the vertex: the distance of $P$ from the vertex along the axis is the focal distance less $|a|$.' }]),
         hints: [
-          `Complete the square in $${across}$ to write the equation as $(${across} - k)^2 = 4a(${along} - h)$; read off the vertex and $a$.`,
-          askArea
-            ? 'The latus rectum is the chord through the focus perpendicular to the axis, of length $4|a|$; it is the base of the triangle.'
-            : 'Every point of a parabola is as far from the focus as from the directrix.',
-          `Find the other coordinate of $P$ from the equation, then measure ${askArea ? 'its distance from the latus rectum' : 'its distance from the directrix'}.`
+          `Complete the square in $${across}$ to write the equation as ${stdHint(orient)}; read off the vertex, $a$ and the focus.`,
+          'Every point of a parabola is as far from the focus as from the directrix, and the directrix is $|a|$ behind the vertex: this tells you how far $P$ is from the vertex along the axis.',
+          `The equation then gives the distance of $P$ from the axis; ${askArea ? 'the triangle has its base from the vertex to the focus, on the axis' : 'combine the two distances by Pythagoras'}.`
         ],
         steps: [
-          { h: 'Complete the square', d: `$${standardTex(orient, a, u0, w0)}$: vertex $${placed(orient, R(u0), R(w0))}$ and $4a = ${4 * a}$, so $a = ${a}$.` },
-          { h: 'Focus and directrix', d: `Focus $${placed(orient, R(u0 + a), R(w0))}$; directrix $${along} = ${u0 - a}$; the latus rectum lies on $${along} = ${u0 + a}$ with ends $${placed(orient, R(u0 + a), R(w0 + 2 * a))}$ and $${placed(orient, R(u0 + a), R(w0 - 2 * a))}$.` },
-          { h: 'The point P', d: `$${across} = ${wP}$ gives $${w0 === 0 ? par(wP) : `(${wP} ${sg(-w0)})`}^2 = ${4 * a}(${less(along, u0)})$, so $${along} = ${uP}$ and $P = ${placed(orient, R(uP), R(wP))}$.` },
+          { h: 'Complete the square', d: `$${standardTex(orient, a, u0, w0)}$: vertex $V${placed(orient, R(u0), R(w0))}$, $a = ${a}$, focus $S${placed(orient, R(u0 + a), R(w0))}$, directrix $${along} = ${u0 - a}$.` },
+          { h: 'Along the axis', d: `$PS$ equals the distance of $P$ from the directrix, so $P$ is $${dist} - ${A} = ${Math.abs(off)}$ from the vertex along the axis: $${along} = ${u0 + off}$.` },
+          { h: 'Across the axis', d: `$${sqTex(across, w0)} = ${4 * a} \\times ${par(off)} = ${t * t}$, so $P$ is $${t}$ from the axis: $P = ${placed(orient, R(u0 + off), R(w0 + t))}$ or $${placed(orient, R(u0 + off), R(w0 - t))}$.` },
           askArea
-            ? { h: 'Area', d: `Base $= 4|a| = ${4 * A}$, height $= ${gapTex(uP, u0 + a)} = ${Math.abs(uP - u0 - a)}$, area $= \\dfrac{1}{2} \\times ${4 * A} \\times ${Math.abs(uP - u0 - a)} = ${value}$` }
-            : { h: 'Focal distance', d: `$PS$ = distance of $P$ from the directrix $= ${gapTex(uP, u0 - a)} = ${value}$` }
+            ? { h: 'Area', d: `Base $VS = ${A}$, height $${t}$: area $= \\dfrac{1}{2} \\times ${A} \\times ${t} = ${rTex(value)}$ for either point.` }
+            : { h: 'Pythagoras', d: `$VP^2 = ${Math.abs(off)}^2 + ${t}^2 = ${rTex(value)}$ for either point.` }
         ],
-        reasoning: askArea ? 'parabola-latus-triangle' : 'parabola-focal-distance'
+        reasoning: askArea ? 'parabola-focal-area' : 'parabola-focal-vertex-distance'
       };
     }
     if (kind === 'opening') {
@@ -385,16 +364,17 @@ function parabolaReasoning(rng) {
       const eq = `${termsTex([[1, `${across}^2`], [D, across]])} + t${along}${F === 0 ? '' : ` ${sg(F)}`} = 0`;
       const lineText = `the line $${along} = ${c0}$`;
       const half = -D / 2;
+      // No "subtract a" trap: that slip gives T² − 4c₀T + 4K = 0, whose roots (when
+      // real) share a sign since their product 4K > 0, so it never names one value.
       return {
         prompt: `For a non-zero real number $t$, the parabola $${eq}$ ${dir} and its focus lies on ${lineText}. Find $t$.`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
           { value: rejected, why: `That value also puts the focus on ${lineText}, but then $a = -\\dfrac{t}{4}$ has the other sign and the parabola opens the other way.` },
-          { value: -value, why: 'Moving the $t$ term to the other side changes its sign: here $4a = -t$.' },
-          { value: -rejected, why: 'The focus is $a$ beyond the vertex in the direction the parabola opens: add $a$ to the vertex coordinate, do not subtract it.' }
+          { value: -value, why: 'Moving the $t$ term to the other side changes its sign: here $4a = -t$.' }
         ]),
         hints: [
-          `Complete the square in $${across}$ and write the equation as $(${across} - k)^2 = 4a(${along} - h)$, with $a$ and $h$ in terms of $t$.`,
+          `Complete the square in $${across}$ and write the equation as ${stdHint(orient)}, with $a$ and the vertex in terms of $t$.`,
           `The focus is $a$ beyond the vertex along the axis; setting its $${along}$-coordinate gives a quadratic in $t$.`,
           'Of the two roots, keep the one whose sign of $a$ matches the direction in which the parabola opens.'
         ],
@@ -497,7 +477,9 @@ const RATIO_ANY = [...RATIO_FRACTIONS, [2, 1], [3, 1], [3, 2], [4, 3], [5, 2], [
 const ratioText = ([p, q]) => (q === 1 ? `$${p}$ times` : `$\\dfrac{${p}}{${q}}$ of`);
 
 function ellipseHyperbolaReasoning(rng) {
-  const kind = rc(rng, ['focal-definition', 'lr-ratio', 'confocal']);
+  // Weighted towards the confocal form (a rejected root, or two eccentricities).
+  const roll = rng();
+  const kind = roll < 0.4 ? 'confocal' : roll < 0.75 ? 'focal-definition' : 'lr-ratio';
   const throughPoint = rng() < 0.55;
   for (let guard = 0; guard < 400; guard++) {
     if (kind === 'focal-definition') {
@@ -519,18 +501,19 @@ function ellipseHyperbolaReasoning(rng) {
       const askText = ask === 'axis' ? `the square of the length of its ${axisName}` : ask === 'e' ? 'its eccentricity' : 'the length of its latus rectum';
       const trapList = ask === 'axis'
         ? [{ value: b2x4 / 4, why: `That is $b^2$; the ${axisName} has length $2b$, so its square is $4b^2$.` },
-          hyper ? { value: S * S - 4 * c * c, why: 'For a hyperbola $b^2 = c^2 - a^2$; $a^2 - c^2$ is the ellipse\'s relation and comes out negative here.' }
+          hyper ? { value: 4 * c * c + S * S, why: 'For a hyperbola $b^2 = c^2 - a^2$, not $c^2 + a^2$.' }
             : { value: S * S + 4 * c * c, why: 'For an ellipse $b^2 = a^2 - c^2$; adding $c^2$ is the hyperbola\'s relation turned around.' }]
         : ask === 'e'
           ? [{ value: c / S, why: `The ${hyper ? 'difference' : 'sum'} of the focal distances is $2a$, not $a$.` },
             { value: S / (2 * c), why: 'Eccentricity is $\\dfrac{c}{a}$, not $\\dfrac{a}{c}$.' }]
           : [{ value: b2x4 / (2 * S), why: 'The latus rectum has length $\\dfrac{2b^2}{a}$; the factor $2$ has been lost.' },
             { value: b2x4 / 4, why: 'That is $b^2$; the latus rectum has length $\\dfrac{2b^2}{a}$.' },
-            { value: b2x4 / (4 * c), why: 'The latus rectum is $\\dfrac{2b^2}{a}$, with $a$ (not $c$) in the denominator.' }];
+            { value: b2x4 / (2 * c), why: 'The latus rectum is $\\dfrac{2b^2}{a}$, with $a$ (not $c$) in the denominator.' },
+            { value: (S * S + 4 * c * c) / S, why: hyper ? 'For a hyperbola $b^2 = c^2 - a^2$, not $c^2 + a^2$.' : 'For an ellipse $b^2 = a^2 - c^2$, not $a^2 + c^2$.' }];
       return {
         prompt: `A${hyper ? '' : 'n'} ${conic} has its foci at $F_1${pt(...F1)}$ and $F_2${pt(...F2)}$ and passes through the point $P${pt(...P)}$. Find ${askText}.`,
         answerType: 'numeric', ...exact(value),
-        traps: traps(value.value, trapList),
+        traps: traps(value.value, trapList).slice(0, 3),
         hints: [
           'The centre is the midpoint of the foci, and the distance between the foci is $2c$.',
           hyper ? 'For every point of a hyperbola the DIFFERENCE of its distances from the foci is $2a$.' : 'For every point of an ellipse the SUM of its distances from the foci is $2a$.',
@@ -541,64 +524,65 @@ function ellipseHyperbolaReasoning(rng) {
           { h: 'Focal distances', d: `$PF_1 = ${e.d1}$ and $PF_2 = ${e.d2}$.` },
           { h: hyper ? 'Difference' : 'Sum', d: `$2a = ${hyper ? `|${e.d1} - ${e.d2}|` : `${e.d1} + ${e.d2}`} = ${S}$, so $a = ${rTex(R(S, 2))}$ and $a^2 = ${rTex(R(S * S, 4))}$.` },
           { h: 'b²', d: `$b^2 = ${hyper ? `${c * c} - ${rTex(R(S * S, 4))}` : `${rTex(R(S * S, 4))} - ${c * c}`} = ${rTex(R(b2x4, 4))}$` },
-          { h: 'Answer', d: ask === 'axis' ? `$(2b)^2 = 4b^2 = ${rTex(value)}$` : ask === 'e' ? `$e = \\dfrac{c}{a} = \\dfrac{${c}}{${rTex(R(S, 2))}} = ${rTex(value)}$` : `$\\dfrac{2b^2}{a} = \\dfrac{2 \\times ${rTex(R(b2x4, 4))}}{${rTex(R(S, 2))}} = ${rTex(value)}$` }
+          { h: 'Answer', d: ask === 'axis' ? `$(2b)^2 = 4b^2 = ${rTex(value)}$` : ask === 'e' ? `$e = ${chain('\\dfrac{c}{a}', '\\dfrac{2c}{2a}', frRaw(2 * c, S), rTex(value))}$` : `$\\dfrac{2b^2}{a} = ${chain('\\dfrac{4b^2}{2a}', frRaw(b2x4, S), rTex(value))}$` }
         ],
         reasoning: hyper ? 'hyperbola-focal-difference' : 'ellipse-focal-sum'
       };
     }
     if (kind === 'lr-ratio') {
+      // The latus rectum against an axis fixes b²/a², THEN a point on the curve fixes a².
       const hyper = rng() < 0.5;
       const vsMinor = rng() < 0.5;                 // compare with the minor/conjugate axis, else the major/transverse
       const [p, q] = rc(rng, hyper ? RATIO_ANY : RATIO_FRACTIONS);
-      const c = ri(rng, 2, 12);
-      const vertical = rng() < 0.4;
-      // k = b²/a²: ρ² against the minor/conjugate axis (b/a = ρ), ρ against the major/transverse.
+      const x0 = ri(rng, 1, 9), y0 = ri(rng, 1, 9);
+      const askFoci = rng() < 0.6;
+      // From k = b²/a²: a² = x₀² ± y₀²/k, b² = k·a², c² = a² ∓ b².
+      const solveWith = k => {
+        const y2k = R(y0 * y0 * k.d, k.n);
+        const a2 = addR(R(x0 * x0), hyper ? R(-y2k.n, y2k.d) : y2k);
+        if (a2.n <= 0) return null;
+        const b2 = mulR(k, a2);
+        const c2 = addR(a2, hyper ? b2 : R(-b2.n, b2.d));
+        const wrongC2 = addR(a2, hyper ? R(-b2.n, b2.d) : b2);
+        return { y2k, a2, b2, c2, wrongC2, value: askFoci ? mulR(R(4), c2) : b2 };
+      };
       const kRatio = vsMinor ? R(p * p, q * q) : R(p, q);
-      const oneMinus = hyper ? R(kRatio.d + kRatio.n, kRatio.d) : R(kRatio.d - kRatio.n, kRatio.d);   // e² = 1 ± k
-      const a2 = R(c * c * oneMinus.d, oneMinus.n);
-      const b2 = mulR(kRatio, a2);
-      const askA = rng() < 0.5;
-      const value = askA ? a2 : b2;
-      if (value.d > 1 && rng() < 0.75) continue;
+      const sol = solveWith(kRatio);
+      if (!sol) continue;
+      const { y2k, a2, b2, c2, value } = sol;
+      if (value.d > 1 && rng() < 0.7) continue;
       if (value.d > 40 || Math.abs(value.n) > 5000) continue;
-      // Trap: the ratio read the other way (b/a against b²/a²).
-      const kAlt = vsMinor ? R(p, q) : R(p * p, q * q);
-      const altOne = hyper ? R(kAlt.d + kAlt.n, kAlt.d) : R(kAlt.d - kAlt.n, kAlt.d);
-      const a2Alt = altOne.n > 0 ? R(c * c * altOne.d, altOne.n) : null;
-      const altValue = a2Alt ? (askA ? a2Alt : mulR(kAlt, a2Alt)) : null;
-      // Trap: the other conic's relation between a, b, c.
-      const wrongOne = hyper ? R(kRatio.d - kRatio.n, kRatio.d) : R(kRatio.d + kRatio.n, kRatio.d);
-      const a2Wrong = wrongOne.n > 0 ? R(c * c * wrongOne.d, wrongOne.n) : null;
-      const wrongValue = a2Wrong ? (askA ? a2Wrong : mulR(kRatio, a2Wrong)) : null;
-      const conicTex = hyper
-        ? (vertical ? '\\dfrac{y^2}{a^2} - \\dfrac{x^2}{b^2} = 1' : '\\dfrac{x^2}{a^2} - \\dfrac{y^2}{b^2} = 1')
-        : (vertical ? '\\dfrac{x^2}{b^2} + \\dfrac{y^2}{a^2} = 1' : '\\dfrac{x^2}{a^2} + \\dfrac{y^2}{b^2} = 1');
+      const alt = solveWith(vsMinor ? R(p, q) : R(p * p, q * q));
+      const xs = rng() < 0.5 ? 1 : -1, ys = rng() < 0.5 ? 1 : -1;
+      const conicTex = hyper ? '\\dfrac{x^2}{a^2} - \\dfrac{y^2}{b^2} = 1' : '\\dfrac{x^2}{a^2} + \\dfrac{y^2}{b^2} = 1';
       const cond = hyper ? '$(a > 0,\\ b > 0)$' : '$(a > b > 0)$';
-      const foci = vertical ? `(0, \\pm ${c})` : `(\\pm ${c}, 0)`;
       const axisName = hyper ? (vsMinor ? 'conjugate axis' : 'transverse axis') : (vsMinor ? 'minor axis' : 'major axis');
       const axisLen = vsMinor ? '2b' : '2a';
-      const rho = rTex(R(p, q));
+      const pm = hyper ? '-' : '+', mp = hyper ? '+' : '-';
       return {
-        prompt: `The ${hyper ? 'hyperbola' : 'ellipse'} $${conicTex}$ ${cond} has its foci at $${foci}$, and the length of its latus rectum is ${ratioText([p, q])} the length of its ${axisName}. Find $${askA ? 'a^2' : 'b^2'}$.`,
+        prompt: `The ${hyper ? 'hyperbola' : 'ellipse'} $${conicTex}$ ${cond} passes through the point $${pt(xs * x0, ys * y0)}$, and the length of its latus rectum is ${ratioText([p, q])} the length of its ${axisName}. Find ${askFoci ? 'the square of the distance between its foci' : '$b^2$'}.`,
         answerType: 'numeric', ...exact(value),
         traps: traps(value.value, [
-          ...(altValue ? [{ value: altValue.value, why: vsMinor ? 'Comparing $\\dfrac{2b^2}{a}$ with $2b$ gives $\\dfrac{b}{a}$, not $\\dfrac{b^2}{a^2}$.' : 'Comparing $\\dfrac{2b^2}{a}$ with $2a$ gives $\\dfrac{b^2}{a^2}$, not $\\dfrac{b}{a}$.' }] : []),
-          ...(wrongValue ? [{ value: wrongValue.value, why: hyper ? 'For a hyperbola $c^2 = a^2 + b^2$; $a^2 - b^2$ is the ellipse\'s relation.' : 'For an ellipse $c^2 = a^2 - b^2$; $a^2 + b^2$ is the hyperbola\'s relation.' }] : []),
-          { value: (askA ? b2 : a2).value, why: `That is $${askA ? 'b^2' : 'a^2'}$, not $${askA ? 'a^2' : 'b^2'}$.` },
-          { value: c * c, why: `That is $c^2 = a^2 ${hyper ? '+' : '-'} b^2$, the square of the distance from the centre to a focus.` }
+          ...(alt ? [{ value: alt.value.value, why: vsMinor ? 'Comparing $\\dfrac{2b^2}{a}$ with $2b$ gives $\\dfrac{b}{a}$, not $\\dfrac{b^2}{a^2}$.' : 'Comparing $\\dfrac{2b^2}{a}$ with $2a$ gives $\\dfrac{b^2}{a^2}$, not $\\dfrac{b}{a}$.' }] : []),
+          ...(askFoci
+            ? [{ value: c2.value, why: 'That is $c^2$; the foci are $2c$ apart, so the square of their distance is $4c^2$.' },
+              { value: 4 * a2.value, why: 'That is $4a^2$, the square of the distance between the vertices; the foci are $2c$ apart.' },
+              ...(sol.wrongC2.n > 0 ? [{ value: 4 * sol.wrongC2.value, why: hyper ? 'For a hyperbola $c^2 = a^2 + b^2$; $a^2 - b^2$ is the ellipse\'s relation.' : 'For an ellipse $c^2 = a^2 - b^2$; $a^2 + b^2$ is the hyperbola\'s relation.' }] : [])]
+            : [{ value: a2.value, why: 'That is $a^2$, not $b^2$.' },
+              { value: c2.value, why: `That is $c^2 = a^2 ${mp} b^2$, the square of the distance from the centre to a focus.` }])
         ]).slice(0, 3),
         hints: [
           `The latus rectum has length $\\dfrac{2b^2}{a}$ and the ${axisName} has length $${axisLen}$; their ratio fixes ${vsMinor ? '$\\dfrac{b}{a}$' : '$\\dfrac{b^2}{a^2}$'}.`,
-          hyper ? 'For a hyperbola the foci give $c^2 = a^2 + b^2$.' : 'For an ellipse the foci give $c^2 = a^2 - b^2$.',
-          'Write $b^2$ as a multiple of $a^2$ and substitute into the relation for $c^2$.'
+          'Write $b^2$ as a multiple of $a^2$ and substitute the point into the equation: that fixes $a^2$.',
+          hyper ? 'For a hyperbola $c^2 = a^2 + b^2$, and the foci are $2c$ apart.' : 'For an ellipse $c^2 = a^2 - b^2$, and the foci are $2c$ apart.'
         ],
         steps: [
-          { h: 'Ratio', d: `$\\dfrac{2b^2/a}{${axisLen}} = ${vsMinor ? '\\dfrac{b}{a}' : '\\dfrac{b^2}{a^2}'} = ${rho}$, so $b^2 = ${rTex(kRatio)}a^2$.` },
-          { h: 'Foci', d: `$c = ${c}$ and $c^2 = a^2 ${hyper ? '+' : '-'} b^2 = ${rTex(oneMinus)}a^2$, so $${c * c} = ${rTex(oneMinus)}a^2$.` },
-          { h: 'a² and b²', d: `$a^2 = ${rTex(a2)}$ and $b^2 = ${rTex(kRatio)} \\times ${rTex(a2)} = ${rTex(b2)}$` },
-          { h: 'Answer', d: `$${askA ? 'a^2' : 'b^2'} = ${rTex(value)}$` }
+          { h: 'Ratio', d: `$\\dfrac{2b^2/a}{${axisLen}} = ${vsMinor ? '\\dfrac{b}{a}' : '\\dfrac{b^2}{a^2}'} = ${rTex(R(p, q))}$, so $b^2 = ${rTex(kRatio)}a^2$.` },
+          { h: 'The point', d: `Substituting $${pt(xs * x0, ys * y0)}$ with $b^2 = ${rTex(kRatio)}a^2$: $\\dfrac{${x0 * x0}}{a^2} ${pm} \\dfrac{${y0 * y0}}{b^2} = 1$ gives $a^2 = ${chain(`${x0 * x0} ${pm} ${rTex(y2k)}`, rTex(a2))}$.` },
+          { h: 'b² and c²', d: `$b^2 = ${chain(`${rTex(kRatio)} \\times ${rTex(a2)}`, rTex(b2))}$ and $c^2 = a^2 ${mp} b^2 = ${rTex(c2)}$.` },
+          { h: 'Answer', d: askFoci ? `$(2c)^2 = 4c^2 = ${rTex(value)}$` : `$b^2 = ${rTex(value)}$` }
         ],
-        reasoning: hyper ? 'hyperbola-latus-ratio' : 'ellipse-latus-ratio'
+        reasoning: hyper ? 'hyperbola-latus-point' : 'ellipse-latus-point'
       };
     }
     // Confocal: c² from an ellipse, then a hyperbola with the same foci.
@@ -639,6 +623,7 @@ function ellipseHyperbolaReasoning(rng) {
     const nice = [];
     for (let A0 = c2 + 1; A0 <= c2 + 40; A0++) if ((c2 * c2) % (m * m * A0) === 0) nice.push(A0);
     const A = nice.length && rng() < 0.6 ? rc(rng, nice) : c2 + ri(rng, 1, 40), B = A - c2;
+    if (m * m * A === 2 * c2) continue;              // p = q = c²/2 would leave the traps no room
     const alpha = R(c2 * c2, m * m * A), beta = R(c2 * A * m * m - c2 * c2, m * m * A);
     const value = askBeta ? beta : alpha;
     if (value.d > 60 || value.n > 6000) continue;
@@ -649,8 +634,9 @@ function ellipseHyperbolaReasoning(rng) {
       traps: traps(value.value, [
         { value: (askBeta ? alpha : beta).value, why: `That is $${askBeta ? 'p' : 'q'}$, not $${askBeta ? 'q' : 'p'}$.` },
         { value: c2, why: 'That is $c^2 = p + q$, shared by the two curves, not one of the two denominators.' },
-        { value: askBeta ? c2 - m * m * A : m * m * A, why: 'For the hyperbola $e^2 = \\dfrac{c^2}{p}$, so $p = \\dfrac{c^2}{e^2}$, not $c^2e^2$.' }
-      ]),
+        { value: askBeta ? B : A, why: `That is the ellipse's own denominator under $${askBeta ? 'y^2' : 'x^2'}$; the hyperbola has its own, with $p + q = c^2$.` },
+        ...(askBeta && c2 - m * m * A <= 0 ? [] : [{ value: askBeta ? c2 - m * m * A : m * m * A, why: 'For the hyperbola $e^2 = \\dfrac{c^2}{p}$, so $p = \\dfrac{c^2}{e^2}$, not $c^2e^2$.' }])
+      ]).slice(0, 3),
       hints: [
         'For the ellipse, $c^2$ is the larger denominator minus the smaller, and its eccentricity is $c$ divided by the square root of the larger denominator.',
         'The product condition gives the hyperbola\'s eccentricity; for the hyperbola $e^2 = \\dfrac{c^2}{p}$.',
@@ -659,7 +645,7 @@ function ellipseHyperbolaReasoning(rng) {
       steps: [
         { h: 'Ellipse', d: `$c^2 = ${A} - ${B} = ${c2}$ and $e_1^2 = ${rTex(R(c2, A))}$.` },
         { h: 'Hyperbola eccentricity', d: `$e_1 e_2 = ${m} \\Rightarrow e_2^2 = \\dfrac{${m * m}}{e_1^2} = ${rTex(R(m * m * A, c2))}$` },
-        { h: 'p', d: `$p = \\dfrac{c^2}{e_2^2} = \\dfrac{${c2}}{${rTex(R(m * m * A, c2))}} = ${rTex(alpha)}$` },
+        { h: 'p', d: `$p = \\dfrac{c^2}{e_2^2} = ${chain(frRaw(c2 * c2, m * m * A), rTex(alpha))}$` },
         { h: 'q', d: `$q = c^2 - p = ${c2} - ${rTex(alpha)} = ${rTex(beta)}$` },
         { h: 'Answer', d: `$${askBeta ? 'q' : 'p'} = ${rTex(value)}$` }
       ],
@@ -681,4 +667,4 @@ export const forms = Object.freeze({
 });
 
 // Exposed for the independent check, which asserts the tables are non-empty.
-export const CONICS_TABLES_FOR_CHECK = Object.freeze({ THREE_POINT_CIRCLES, FOCAL_POINTS, CONFOCAL_POINTS });
+export const CONICS_TABLES_FOR_CHECK = Object.freeze({ LATTICE_CIRCLES, FOCAL_POINTS, CONFOCAL_POINTS });

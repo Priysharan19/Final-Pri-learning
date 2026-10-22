@@ -26,8 +26,10 @@
 //                          equations), THEN the middle coefficient evaluated.
 //       two-case         — the coefficient of xᵏ in (p + q·xᵗ)(xᵃ + c/xᵇ)ⁿ:
 //                          the power condition on the general term, solved
-//                          twice (once per term of the first factor), and the
-//                          two contributions added.
+//                          twice (once per term of the first factor); in about
+//                          half the draws one case has no partner (r is not a
+//                          whole number, or lies outside 0..n) and must be
+//                          rejected, otherwise the two contributions are added.
 //       rational-terms   — the number of rational (or irrational) terms of
 //                          (p^{1/a} + q^{1/b})ⁿ: rationality of the general term
 //                          becomes two divisibility conditions on r, THEN the
@@ -40,9 +42,13 @@
 //       parameter-then-coefficient — k found from the value of the term
 //                          independent of x (a sign argument when the power
 //                          of k is odd), THEN reused for another coefficient.
-//       middle-from-sum  — n found from the sum of all coefficients, THEN the
-//                          parity of n decides whether there is one middle
-//                          term or two.
+//       middle-from-ratio — n found from the ratio of the coefficients of two
+//                          consecutive terms, a ratio that carries the
+//                          constant c as well as binomial coefficients, THEN
+//                          the parity of n decides whether there is one middle
+//                          term or two. (An earlier version found n from the
+//                          sum of the coefficients, 3ⁿ = 6561; review judged
+//                          that D3 and it was replaced.)
 //
 // Scope is the NCERT Class 11 chapter as JEE Main 2026 and JEE Advanced 2026
 // examine it: positive integral indices only, the general term, the middle
@@ -59,7 +65,7 @@
 // Asked for any rung other than D4, each generator returns its D4 form.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
-import { traps } from './india-native-helpers.js';
+import { traps, fracTex } from './india-native-helpers.js';
 
 const FALLBACK_SEED = 0x42494e4f;   // "BINO"
 
@@ -91,8 +97,14 @@ const bracket = (alpha, a, c, b, n) => `\\left(${lead(alpha, a)}${recip(c, b)}\\
 const linX = (a, b) => `${a === 1 ? '' : a}x ${b < 0 ? '-' : '+'} ${Math.abs(b)}`;
 /** \sqrt{p}, \sqrt[3]{p}. */
 const root = (p, a) => (a === 2 ? `\\sqrt{${p}}` : `\\sqrt[${a}]{${p}}`);
+/** base^{e} as a factor, written as read: nothing for e = 0, base for e = 1. */
+const powTex = (base, e) => (e === 0 ? '' : e === 1 ? base : `${base}^{${e}}`);
 /** c^{r} as a factor: nothing for c = 1, (−2)^{r} for a negative c. */
-const cPow = (c, r) => (c === 1 ? '' : `${par(c)}^{${r}}`);
+const cPow = (c, r) => (c === 1 ? '' : powTex(par(c), r));
+/** c·v written the way it is read: n, -n, 3n. */
+const cx = (c, v) => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
+/** 1st, 2nd, 3rd, 4th, 11th, 12th, 13th, 21st. */
+const ord = k => `${k}${k % 100 >= 11 && k % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][k % 10] || 'th'}`;
 /** A list of numbers joined by +, with negatives written as "- 5". */
 function sumTex(values) {
   let out = '';
@@ -132,7 +144,7 @@ function expansionReasoning(rng) {
       const floor = rng() < 0.6;
       const value = floor ? I - 1 : I;
       const u = `${a} + \\sqrt{${b}}`, v = `${a} - \\sqrt{${b}}`;
-      return {
+      const out = {
         prompt: floor
           ? `Find the greatest integer less than or equal to $\\left(${u}\\right)^{${n}}$.`
           : `Find the least integer greater than or equal to $\\left(${u}\\right)^{${n}}$.`,
@@ -158,6 +170,8 @@ function expansionReasoning(rng) {
         ],
         reasoning: 'integer-part'
       };
+      if (out.traps.length >= 2) return out;
+      continue;
     }
     if (kind === 'product-coefficient') {
       const alpha = rc(rng, [1, 1, 2, 3]);
@@ -178,7 +192,7 @@ function expansionReasoning(rng) {
       const sum = nCr(m, k) * alpha ** k + nCr(n, k) * (-alpha) ** k;
       const allPlus = nCr(m + n, k) * alpha ** k;
       const left = `(1 ${sgn > 0 ? '+' : '-'} ${ax})^{${q}}`;
-      return {
+      const out = {
         prompt: `Find the coefficient of $${pw(k)}$ in the expansion of $(1 + ${ax})^{${m}}(1 - ${ax})^{${n}}$.`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
@@ -200,6 +214,8 @@ function expansionReasoning(rng) {
         ],
         reasoning: 'product-coefficient'
       };
+      if (out.traps.length >= 2) return out;
+      continue;
     }
     // parity-sum: (ax + b)^n with a known sum of coefficients.
     const a = ri(rng, 1, 4), b = nz(rng, -3, 5);
@@ -212,12 +228,14 @@ function expansionReasoning(rng) {
     if (value === 0 || Math.abs(value) > 100000 || Math.abs(value) < 10) continue;
     const other = even ? (S - D) / 2 : (S + D) / 2;
     const flipped = even ? (S + (a - b) ** n) / 2 : (S - (a - b) ** n) / 2;
-    return {
+    const out = {
       prompt: `In the expansion of $(${linX(a, b)})^{n}$ in powers of $x$, the sum of all the coefficients is $${S}$. Find the sum of the coefficients of the ${even ? 'even powers of $x$ (the constant term included)' : 'odd powers of $x$'}.`,
       answerType: 'numeric', answer: { value },
       traps: traps(value, [
-        { value: S / 2, why: 'Halving the total assumes the even and odd parts are equal; the value at $x = -1$ says how they differ.' },
+        // Half the total is a whole number only when the total is even.
+        ...(S % 2 === 0 ? [{ value: S / 2, why: 'Halving the total assumes the even and odd parts are equal; the value at $x = -1$ says how they differ.' }] : []),
         { value: other, why: `That is the sum for the ${even ? 'odd' : 'even'} powers of $x$.` },
+        { value: even ? S + D : S - D, why: `That is $f(1) ${even ? '+' : '-'} f(-1)$, which counts each ${even ? 'even' : 'odd'}-power coefficient twice; halve it.` },
         ...(n % 2 === 1 ? [{ value: flipped, why: `At $x = -1$ the binomial is $${par(b - a)}$, not $${par(a - b)}$; with $n$ odd the sign matters.` }] : [])
       ]),
       hints: [
@@ -233,6 +251,8 @@ function expansionReasoning(rng) {
       ],
       reasoning: even ? 'parity-sum-even' : 'parity-sum-odd'
     };
+    if (out.traps.length >= 2) return out;
+    continue;
   }
   return expansionReasoning(makeRng(FALLBACK_SEED));
 }
@@ -253,7 +273,7 @@ function generalTermReasoning(rng) {
       const [p, q, s] = [c0 / g, c1 / g, c2 / g];
       if (c1 > 100000 || Math.max(p, q, s) > 400 || p === q || q === s) continue;
       const value = c1;
-      return {
+      const out = {
         prompt: `Three consecutive coefficients in the expansion of $(1 + x)^{n}$ are in the ratio $${p} : ${q} : ${s}$, in that order. Find the middle one of these three coefficients.`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
@@ -268,50 +288,92 @@ function generalTermReasoning(rng) {
         ],
         steps: [
           { h: 'Neighbour ratios', d: '$\\dfrac{\\binom{n}{r}}{\\binom{n}{r-1}} = \\dfrac{n - r + 1}{r}$ and $\\dfrac{\\binom{n}{r+1}}{\\binom{n}{r}} = \\dfrac{n - r}{r + 1}$' },
-          { h: 'Two equations', d: `$\\dfrac{n - r + 1}{r} = \\dfrac{${q}}{${p}}$ and $\\dfrac{n - r}{r + 1} = \\dfrac{${s}}{${q}}$, that is $${p}n - ${p + q}r = -${p}$ and $${q}n - ${q + s}r = ${s}$` },
+          { h: 'Two equations', d: `$\\dfrac{n - r + 1}{r} = ${fracTex(q, p)}$ and $\\dfrac{n - r}{r + 1} = ${fracTex(s, q)}$, that is $${cx(p, 'n')} - ${cx(p + q, 'r')} = -${p}$ and $${cx(q, 'n')} - ${cx(q + s, 'r')} = ${s}$` },
           { h: 'Solve', d: `$n = ${n}$ and $r = ${r}$: the coefficients are $\\binom{${n}}{${r - 1}}$, $\\binom{${n}}{${r}}$, $\\binom{${n}}{${r + 1}}$` },
           { h: 'Check', d: `$${c0} : ${c1} : ${c2} = ${p} : ${q} : ${s}$` },
           { h: 'Answer', d: `$\\binom{${n}}{${r}} = ${value}$` }
         ],
         reasoning: 'consecutive-ratio'
       };
+      if (out.traps.length >= 2) return out;
+      continue;
     }
     if (kind === 'two-case') {
+      // (p + q·xᵗ)(xᵃ + c/xᵇ)ⁿ. Each term of the first factor needs a partner
+      // whose power is fixed; that partner exists only when its r is a whole
+      // number in 0..n. About half the draws reject one of the two cases, so
+      // neither "always add both" nor "only one counts" is a safe habit.
       const a = ri(rng, 1, 3), b = ri(rng, 1, 3), c = rc(rng, [-2, -1, 1, 2]);
-      const n = ri(rng, 5, 10);
-      const step = rc(rng, [1, 1, 2]);
-      const t = step * (a + b);
+      const n = ri(rng, 5, 10), L = a + b;
+      const bothLikely = rng() < 0.5;
+      const t = bothLikely ? L * rc(rng, [1, 1, 2]) : ri(rng, 1, 2 * L + 1);
+      if (!bothLikely && t % L === 0) continue;
       const p = ri(rng, 1, 4), q = nz(rng, -4, 4);
-      const r1 = ri(rng, 0, n - step), r2 = r1 + step;
-      const e = r => a * n - (a + b) * r;
-      const k = e(r1);
-      if (k === 0 || e(r2) !== k - t) continue;
-      const A = nCr(n, r1) * c ** r1, B = nCr(n, r2) * c ** r2;
+      const e = r => a * n - L * r;
+      const k = rng() < 0.5 ? e(ri(rng, 0, n)) : e(ri(rng, 0, n)) + t;
+      if (k === 0) continue;
+      /** The r whose term has power `target`, or why there is none. */
+      const rOf = target => {
+        const num = a * n - target;
+        if (num % L !== 0) return { ok: false, num };
+        const r = num / L;
+        return r >= 0 && r <= n ? { ok: true, r } : { ok: false, r };
+      };
+      const coefAt = target => { const x = rOf(target); return x.ok ? nCr(n, x.r) * c ** x.r : 0; };
+      const c1 = rOf(k), c2 = rOf(k - t);
+      if (!c1.ok && !c2.ok) continue;
+      // When one case is rejected, the survivor's multiplier must show: ±1 would
+      // make the answer, the bare coefficient and its negative indistinguishable.
+      if (c1.ok !== c2.ok && Math.abs(c1.ok ? p : q) === 1) continue;
+      const A = coefAt(k), B = coefAt(k - t);
       const value = p * A + q * B;
       if (value === 0 || Math.abs(value) > 100000 || Math.abs(value) < 10) continue;
-      const first = `${p} ${q < 0 ? '-' : '+'} ${Math.abs(q) === 1 ? '' : Math.abs(q)}${pw(t)}`;
+      const wrongWay = coefAt(k + t);
       const qTex = q === 1 ? '' : q === -1 ? '-' : String(q);
+      const qx = `${qTex}${pw(t)}`;
+      const first = `${p} ${q < 0 ? '-' : '+'} ${Math.abs(q) === 1 ? '' : Math.abs(q)}${pw(t)}`;
+      const both = c1.ok && c2.ok;
+      const list = both ? [
+        { value: p * A, why: `That counts only the products with the constant $${p}$; the term $${qx}$ also meets a term of the expansion to make $${xPow(k)}$.` },
+        { value: q * B, why: `That counts only the products with $${qx}$; the constant $${p}$ also meets a term of the expansion with exactly $${xPow(k)}$.` },
+        { value: A + B, why: 'That adds the two coefficients from the expansion without multiplying each by its partner in the first factor.' }
+      ] : c1.ok ? [
+        ...(p !== 1 ? [{ value: A, why: `That is the coefficient from the expansion alone; it must still be multiplied by the constant $${p}$.` }] : []),
+        { value: (p + q) * A, why: `That multiplies the one partner by $${p} ${q < 0 ? '-' : '+'} ${Math.abs(q)}$, as if both terms of the first factor met it; $${qx}$ needs a partner with a different power, and there is none.` }
+      ] : [
+        { value: B, why: `That is the coefficient from the expansion alone; it must still be multiplied by $${q}$, the coefficient of $${pw(t)}$.` },
+        { value: (p + q) * B, why: `That multiplies the one partner by $${p} ${q < 0 ? '-' : '+'} ${Math.abs(q)}$, as if both terms of the first factor met it; the constant $${p}$ needs a partner in $${xPow(k)}$, and there is none.` }
+      ];
+      if (wrongWay !== 0) list.push({ value: (c1.ok ? p * A : 0) + q * wrongWay, why: `That pairs $${qx}$ with the term in $${xPow(k + t)}$; for the product to have $${xPow(k)}$ its partner needs $${xPow(k - t)}$.` });
+      const tq = traps(value, list);
+      if (tq.length < 2) continue;
+      const caseLine = (target, x, label) => x.ok
+        ? `$${a * n} - ${cx(L, 'r')} = ${target}$ gives $r = ${x.r}$; coefficient $\\binom{${n}}{${x.r}}${cPow(c, x.r)} = ${nCr(n, x.r) * c ** x.r}$`
+        : x.num !== undefined
+          ? `$${a * n} - ${cx(L, 'r')} = ${target}$ gives $r = ${fracTex(x.num, L)}$, not a whole number: ${label} has no partner`
+          : `$${a * n} - ${cx(L, 'r')} = ${target}$ gives $r = ${x.r}$, outside $0 \\le r \\le ${n}$: ${label} has no partner`;
+      // p·A ± |q|·B with the surviving cases only; a multiplier of 1 is not written.
+      const mult = (m, v) => `${m === 1 ? '' : m}(${v})`;
+      const used = c1.ok
+        ? `${mult(p, A)}${c2.ok ? ` ${q < 0 ? '-' : '+'} ${mult(Math.abs(q), B)}` : ''}`
+        : `${q < 0 ? '-' : ''}${mult(Math.abs(q), B)}`;
       return {
         prompt: `Find the coefficient of $${xPow(k)}$ in the expansion of $(${first})${bracket(1, a, c, b, n)}$.`,
         answerType: 'numeric', answer: { value },
-        traps: traps(value, [
-          { value: p * A, why: `That counts only the products with the constant $${p}$; the term $${qTex}${pw(t)}$ also meets a term of the expansion to make $${xPow(k)}$.` },
-          { value: q * B, why: `That counts only the products with $${qTex}${pw(t)}$; the constant $${p}$ also meets a term of the expansion with exactly $${xPow(k)}$.` },
-          { value: A + B, why: 'That adds the two coefficients from the expansion without multiplying each by its partner in the first factor.' }
-        ]),
+        traps: tq,
         hints: [
           'Write the general term of the bracketed power and collect its power of $x$ as a single expression in $r$.',
           'Each term of the first factor needs its own partner: the constant needs the power asked for, the other term needs that power lowered by its own exponent.',
-          'Solve for $r$ in each case, keep only whole-number values in range, and add the two contributions with their multipliers.'
+          'Solve for $r$ in each case. A case whose $r$ is not a whole number from $0$ to $n$ contributes nothing; add the contributions that survive, each times its multiplier.'
         ],
         steps: [
-          { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r}${a === 1 ? `x^{${n} - r}` : `\\left(${pw(a)}\\right)^{${n} - r}`}\\left(\\dfrac{${c}}{${pw(b)}}\\right)^{r} = \\binom{${n}}{r}${cPow(c, 'r')}x^{${a * n} - ${a + b}r}$` },
-          { h: `With the constant ${p}`, d: `$${a * n} - ${a + b}r = ${k}$ gives $r = ${r1}$; coefficient $\\binom{${n}}{${r1}}${cPow(c, r1)} = ${A}$` },
-          { h: `With $${qTex}${pw(t)}$`, d: `$${a * n} - ${a + b}r = ${k - t}$ gives $r = ${r2}$; coefficient $\\binom{${n}}{${r2}}${cPow(c, r2)} = ${B}$` },
-          { h: 'Add', d: `$${p}(${A}) ${q < 0 ? '-' : '+'} ${Math.abs(q)}(${B}) = ${value}$` },
+          { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r}${a === 1 ? `x^{${n} - r}` : `\\left(${pw(a)}\\right)^{${n} - r}`}\\left(\\dfrac{${c}}{${pw(b)}}\\right)^{r} = \\binom{${n}}{r}${cPow(c, 'r')}x^{${a * n} - ${cx(L, 'r')}}$` },
+          { h: `With the constant ${p}`, d: caseLine(k, c1, `the constant $${p}$`) },
+          { h: `With $${qx}$`, d: caseLine(k - t, c2, `$${qx}$`) },
+          { h: both ? 'Add' : 'One case survives', d: `$${used} = ${value}$` },
           { h: 'Answer', d: `$${value}$` }
         ],
-        reasoning: 'two-case'
+        reasoning: both ? 'two-case' : 'two-case-reject'
       };
     }
     // rational-terms: (p^{1/a} + q^{1/b})^n, p ≠ q primes.
@@ -334,7 +396,7 @@ function generalTermReasoning(rng) {
     if (a === b || naive === rational) continue;
     const rs = []; for (let r = r0; r <= n; r += L) rs.push(r);
     const shown = rs.length <= 8 ? rs.join(', ') : `${rs.slice(0, 3).join(', ')}, \\ldots, ${rs[rs.length - 1]}`;
-    return {
+    const out = {
       prompt: `How many terms of the expansion of $\\left(${root(P, a)} + ${root(Q, b)}\\right)^{${n}}$ are ${askRational ? 'rational' : 'irrational'} numbers?`,
       answerType: 'numeric', answer: { value },
       traps: traps(value, askRational ? [
@@ -360,6 +422,8 @@ function generalTermReasoning(rng) {
       ],
       reasoning: askRational ? 'rational-terms' : 'irrational-terms'
     };
+    if (out.traps.length >= 2) return out;
+    continue;
   }
   return generalTermReasoning(makeRng(FALLBACK_SEED));
 }
@@ -369,7 +433,7 @@ function generalTermReasoning(rng) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function middleTermReasoning(rng) {
-  const kind = rc(rng, ['least-n', 'parameter-then-coefficient', 'middle-from-sum']);
+  const kind = rc(rng, ['least-n', 'parameter-then-coefficient', 'middle-from-ratio']);
   for (let guard = 0; guard < 400; guard++) {
     if (kind === 'least-n') {
       const a = ri(rng, 1, 6), b = ri(rng, 1, 6);
@@ -382,32 +446,36 @@ function middleTermReasoning(rng) {
       if (above && N0 <= n0) continue;
       const n = above ? n0 * (Math.floor(N0 / n0) + 1) : n0;
       const r = (ar * n) / n0;
-      const value = nCr(n, r) * alpha ** (n - r) * c ** r;
+      const termAt = (nn, rr) => nCr(nn, rr) * alpha ** (nn - rr) * c ** rr;
+      const value = termAt(n, r);
       if (Math.abs(value) > 100000 || Math.abs(value) < 10 || n > 16) continue;
       const wrongN = above ? (a + b) * (Math.floor(N0 / (a + b)) + 1) : a + b;
-      const wrongR = (a * wrongN) / (a + b);
-      const wrongVal = nCr(wrongN, wrongR) * alpha ** (wrongN - wrongR) * c ** wrongR;
+      const wrongVal = termAt(wrongN, (a * wrongN) / (a + b));
       const expr = bracket(alpha, a, c, b, 'n');
+      const tq = traps(value, [
+        ...(g > 1 ? [{ value: wrongVal, why: `That takes $${a + b}$ as the step for $n$; $\\gcd(${a}, ${b}) = ${g}$ cancels, so $n$ need only be a multiple of $${n0}$.` }] : []),
+        ...(above ? [{ value: termAt(n0, ar), why: `That is the term for the least $n$ overall, $n = ${n0}$; the question asks for the least $n$ greater than $${N0}$.` }] : []),
+        ...(c < 0 && r % 2 === 1 ? [{ value: -value, why: `The constant $${c}$ is raised to an odd power here, so the term is negative.` }] : []),
+        { value: nCr(n, r), why: 'That is the binomial coefficient alone; the powers of the constants in both terms belong to the term as well.' },
+        { value: n, why: 'That is the least $n$; the question asks for the term itself.' }
+      ]);
+      if (tq.length < 2) continue;
       return {
         prompt: above
           ? `Let $n$ be the least integer greater than $${N0}$ for which the expansion of $${expr}$ has a term independent of $x$. Find that term.`
           : `Let $n$ be the least positive integer for which the expansion of $${expr}$ has a term independent of $x$. Find that term.`,
         answerType: 'numeric', answer: { value },
-        traps: traps(value, [
-          ...(g > 1 ? [{ value: wrongVal, why: `That takes $${a + b}$ as the step for $n$; $\\gcd(${a}, ${b}) = ${g}$ cancels, so $n$ need only be a multiple of $${n0}$.` }] : []),
-          { value: nCr(n, r), why: 'That is the binomial coefficient alone; the powers of the constants in both terms belong to the term as well.' },
-          { value: n, why: 'That is the least $n$; the question asks for the term itself.' }
-        ]),
+        traps: tq,
         hints: [
           'Write the general term and collect its power of $x$; independence of $x$ means that power is zero.',
           'That equation gives $r$ as a fraction times $n$. Cancel the common factor of the two exponents first: $r$ is a whole number exactly when the reduced denominator divides $n$.',
           'Take the least admissible $n$ allowed by the question, find $r$, and evaluate the whole term, constants and signs included.'
         ],
         steps: [
-          { h: 'General term', d: `$T_{r+1} = \\binom{n}{r}${alpha === 1 ? '' : `${alpha}^{n-r}`}${cPow(c, 'r')}x^{${a === 1 ? 'n - r' : `${a}(n - r)`} - ${b === 1 ? '' : b}r}$` },
-          { h: 'Power zero', d: `$${a === 1 ? 'n - r' : `${a}(n - r)`} = ${b === 1 ? '' : b}r \\Rightarrow r = \\dfrac{${a === 1 ? '' : a}n}{${a + b}}${g > 1 ? ` = \\dfrac{${ar === 1 ? '' : ar}n}{${n0}}` : ''}$, and since $\\gcd(${ar}, ${n0}) = 1$, $${n0} \\mid n$` },
+          { h: 'General term', d: `$T_{r+1} = \\binom{n}{r}${alpha === 1 ? '' : `${alpha}^{n-r}`}${cPow(c, 'r')}x^{${cx(a, 'n')} - ${cx(a + b, 'r')}}$` },
+          { h: 'Power zero', d: `$${a === 1 ? 'n - r' : `${a}(n - r)`} = ${cx(b, 'r')} \\Rightarrow r = \\dfrac{${cx(a, 'n')}}{${a + b}}${g > 1 ? ` = \\dfrac{${cx(ar, 'n')}}{${n0}}` : ''}$, and since $\\gcd(${ar}, ${n0}) = 1$, $${n0} \\mid n$` },
           { h: 'Least n', d: above ? `The least multiple of $${n0}$ greater than $${N0}$ is $n = ${n}$, so $r = ${r}$` : `$n = ${n}$, so $r = ${r}$` },
-          { h: 'The term', d: `$\\binom{${n}}{${r}}${alpha === 1 ? '' : ` \\cdot ${alpha}^{${n - r}}`}${c === 1 ? '' : ` \\cdot ${par(c)}^{${r}}`} = ${value}$` },
+          { h: 'The term', d: `$\\binom{${n}}{${r}}${alpha === 1 || n === r ? '' : ` \\cdot ${powTex(alpha, n - r)}`}${c === 1 ? '' : ` \\cdot ${powTex(par(c), r)}`} = ${value}$` },
           { h: 'Answer', d: `$${value}$` }
         ],
         reasoning: above ? 'least-n-above' : 'least-n'
@@ -416,9 +484,9 @@ function middleTermReasoning(rng) {
     if (kind === 'parameter-then-coefficient') {
       const a = ri(rng, 1, 3), b = ri(rng, 1, 3);
       if (a === b && rng() < 0.6) continue;
-      const n = ri(rng, 4, 12);
-      if ((a * n) % (a + b) !== 0) continue;
-      const r = (a * n) / (a + b);
+      const n = ri(rng, 4, 12), L = a + b;
+      if ((a * n) % L !== 0) continue;
+      const r = (a * n) / L;
       if (r < 1 || r > n - 1) continue;
       const k = rc(rng, [-3, -2, 2, 3]);
       if (r % 2 === 0 && k < 0) continue;     // r even: k > 0 is stated, so k is positive
@@ -426,47 +494,59 @@ function middleTermReasoning(rng) {
       if (Math.abs(V) > 1000000) continue;
       const s = ri(rng, 0, n);
       if (s === r) continue;
-      const e = a * n - (a + b) * s;
+      const e = a * n - L * s;
       const value = nCr(n, s) * k ** s;
       if (Math.abs(value) > 100000 || Math.abs(value) < 10) continue;
+      // The power with its sign lost: x^{−e}, when the expansion has such a term.
+      const sNeg = (a * n + e) % L === 0 ? (a * n + e) / L : -1;
       const kTex = r % 2 === 0 ? 'k > 0' : 'k \\text{ real}';
       const expr = `\\left(${pw(a)} + \\dfrac{k}{${pw(b)}}\\right)^{${n}}`;
+      const tq = traps(value, [
+        { value: nCr(n, s), why: `That is the binomial coefficient alone; the term also carries $${powTex('k', s)}$.` },
+        ...(s % 2 === 1 && r % 2 === 1 ? [{ value: -value, why: 'That takes $k$ with the wrong sign: the independent term carries an odd power of $k$, so its sign is the sign of $k$.' }] : []),
+        ...(s % 2 === 1 && r % 2 === 0 ? [{ value: -value, why: 'That uses the negative root of the power equation; the question says $k$ is positive.' }] : []),
+        ...(s !== n - s ? [{ value: nCr(n, n - s) * k ** (n - s), why: `That puts the power on the wrong factor: in $T_{r+1}$, $r$ counts the factors $\\dfrac{k}{${pw(b)}}$, not the factors $${pw(a)}$.` }] : []),
+        ...(e !== 0 && sNeg >= 0 && sNeg <= n && sNeg !== s ? [{ value: nCr(n, sNeg) * k ** sNeg, why: `That is the coefficient of $${xPow(-e)}$; the sign of the power asked for was lost.` }] : [])
+      ]);
+      if (tq.length < 2) continue;
       return {
         prompt: `The term independent of $x$ in the expansion of $${expr}$, where ${r % 2 === 0 ? '$k$ is a positive real number' : '$k$ is a real number'}, is $${V}$. Find the coefficient of $${xPow(e)}$ in the same expansion.`,
         answerType: 'numeric', answer: { value },
-        traps: traps(value, [
-          { value: nCr(n, s), why: `That is the binomial coefficient alone; the term also carries $k^{${s}}$.` },
-          ...(s % 2 === 1 && r % 2 === 1 ? [{ value: -value, why: `That takes $k$ with the wrong sign: the independent term carries an odd power of $k$, so its sign is the sign of $k$.` }] : []),
-          ...(s !== n - s ? [{ value: nCr(n, n - s) * k ** (n - s), why: `That puts the power on the wrong factor: in $T_{r+1}$, $r$ counts the factors $\\dfrac{k}{${pw(b)}}$, not the factors $${pw(a)}$.` }] : [])
-        ]),
+        traps: tq,
         hints: [
           'Write the general term and set its power of $x$ to zero to find which term is independent of $x$.',
           `Equate that term to the given value and solve for $k$; a power equation needs care with the sign ($${kTex}$).`,
           'With $k$ known, set the power of $x$ in the general term equal to the power asked for, find that $r$, and evaluate.'
         ],
         steps: [
-          { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r}k^{r}x^{${a * n} - ${a + b}r}$` },
-          { h: 'Independent term', d: `$${a * n} - ${a + b}r = 0 \\Rightarrow r = ${r}$, so $\\binom{${n}}{${r}}k^{${r}} = ${V}$` },
-          { h: 'Find k', d: `$k^{${r}} = \\dfrac{${V}}{${nCr(n, r)}} = ${k ** r}$, so $k = ${k}$${r % 2 === 0 ? ' (positive)' : ' (an odd power keeps the sign)'}` },
-          { h: 'Target power', d: `$${a * n} - ${a + b}r = ${e}$ gives $r = ${s}$` },
-          { h: 'Coefficient', d: `$\\binom{${n}}{${s}}${par(k)}^{${s}} = ${nCr(n, s)} \\times ${par(k ** s)} = ${value}$` }
+          { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r}k^{r}x^{${a * n} - ${cx(L, 'r')}}$` },
+          { h: 'Independent term', d: `$${a * n} - ${cx(L, 'r')} = 0 \\Rightarrow r = ${r}$, so $\\binom{${n}}{${r}}${powTex('k', r)} = ${V}$` },
+          { h: 'Find k', d: `$${powTex('k', r)} = \\dfrac{${V}}{${nCr(n, r)}} = ${k ** r}$, so $k = ${k}$${r === 1 ? '' : r % 2 === 0 ? ' (the positive root)' : ' (an odd power keeps the sign)'}` },
+          { h: 'Target power', d: `$${a * n} - ${cx(L, 'r')} = ${e}$ gives $r = ${s}$` },
+          { h: 'Coefficient', d: `$\\binom{${n}}{${s}}${powTex(par(k), s)} = ${nCr(n, s)} \\times ${par(k ** s)} = ${value}$` },
+          { h: 'Answer', d: `$${value}$` }
         ],
         reasoning: 'parameter-then-coefficient'
       };
     }
-    // middle-from-sum: (x^a + c/x^b)^n with the sum of the coefficients given.
-    const a = ri(rng, 1, 3), b = ri(rng, 1, 3), c = rc(rng, [2, 3, 4, -3]);
-    const n = ri(rng, 5, 12);
-    const S = (1 + c) ** n;
-    if (Math.abs(S) > 2000000) continue;
+    // middle-from-ratio: n recovered from the ratio of two consecutive
+    // coefficients — which carries the constant c, not just binomial
+    // coefficients — THEN the parity of n decides the middle term or terms.
+    const a = ri(rng, 1, 3), b = ri(rng, 1, 3), c = rc(rng, [2, 3, 4]);
+    const n = ri(rng, 5, 13);
+    const j = ri(rng, 2, n - 1);                  // the jth and (j+1)th terms
+    // coefficient of T_j : T_{j+1} = C(n, j−1)c^{j−1} : C(n, j)c^{j} = j : c(n − j + 1)
+    const g = gcd(j, c * (n - j + 1)), P = j / g, Q = (c * (n - j + 1)) / g;
+    if (P === Q || Math.max(P, Q) > 60) continue;
     const coef = r => nCr(n, r) * c ** r;
     const odd = n % 2 === 1, m = Math.floor(n / 2);
     const value = odd ? coef(m) + coef(m + 1) : coef(m);
-    if (value === 0 || Math.abs(value) > 100000 || Math.abs(value) < 10) continue;
-    return {
-      prompt: `The sum of all the coefficients in the expansion of $${bracket(1, a, c, b, 'n')}$ is $${S}$. Find the coefficient of its middle term; if the expansion has two middle terms, give the sum of their coefficients.`,
-      answerType: 'numeric', answer: { value },
-      traps: traps(value, odd ? [
+    if (Math.abs(value) > 100000 || Math.abs(value) < 10) continue;
+    // A student who forgets c solves (n − j + 1)/j = Q/P instead.
+    const nNoC = (j * Q) % P === 0 ? (j * Q) / P + j - 1 : null;
+    const middleOf = nn => { const mm = Math.floor(nn / 2), f = r => nCr(nn, r) * c ** r; return nn % 2 ? f(mm) + f(mm + 1) : f(mm); };
+    const tq = traps(value, [
+      ...(odd ? [
         { value: coef(m), why: `With $n$ odd there are two middle terms, $T_{${m + 1}}$ and $T_{${m + 2}}$; that is the coefficient of only the first.` },
         { value: coef(m + 1), why: `With $n$ odd there are two middle terms, $T_{${m + 1}}$ and $T_{${m + 2}}$; that is the coefficient of only the second.` },
         { value: 2 * nCr(n, m), why: 'That adds the binomial coefficients alone; each term also carries a power of the constant in the second term.' }
@@ -475,21 +555,28 @@ function middleTermReasoning(rng) {
         { value: coef(m - 1), why: `That is $T_{${m}}$; with $${n + 1}$ terms the middle one is $T_{${m + 1}}$.` },
         { value: nCr(n, m), why: 'That is the binomial coefficient alone; the term also carries a power of the constant in the second term.' }
       ]),
+      ...(nNoC && nNoC >= 2 && nNoC !== n && nNoC <= 20 && Math.abs(middleOf(nNoC)) <= 1000000 ? [{ value: middleOf(nNoC), why: `That solves the ratio as if it were a ratio of binomial coefficients alone, which gives $n = ${nNoC}$; each step along the expansion also multiplies by $${c}$.` }] : [])
+    ]);
+    if (tq.length < 2) continue;
+    return {
+      prompt: `In the expansion of $${bracket(1, a, c, b, 'n')}$, the coefficients of the ${ord(j)} and ${ord(j + 1)} terms are in the ratio $${P} : ${Q}$. Find the coefficient of its middle term; if the expansion has two middle terms, give the sum of their coefficients.`,
+      answerType: 'numeric', answer: { value },
+      traps: tq,
       hints: [
-        'Putting $x = 1$ adds up every coefficient of the expansion; that equation fixes $n$.',
-        'An expansion of power $n$ has $n + 1$ terms: one middle term when $n$ is even, two when $n$ is odd.',
-        'Write the general term, read off the coefficient at the middle position or positions, and include the power of the constant.'
+        'The coefficient of $T_{r+1}$ carries a power of the constant as well as a binomial coefficient. Divide the coefficient of one term by that of the term before it and simplify.',
+        'That ratio is linear in $n$, so the given ratio fixes $n$.',
+        'An expansion of power $n$ has $n + 1$ terms: one middle term when $n$ is even, two when $n$ is odd. Evaluate the middle coefficient or coefficients, constants included.'
       ],
       steps: [
-        { h: 'Find n', d: `At $x = 1$: $${par(1 + c)}^{n} = ${S}$, so $n = ${n}$` },
-        { h: 'Count the terms', d: `$${n + 1}$ terms, so ${odd ? `two middle terms, $T_{${m + 1}}$ and $T_{${m + 2}}$ ($r = ${m}$ and $r = ${m + 1}$)` : `one middle term, $T_{${m + 1}}$ ($r = ${m}$)`}` },
-        { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r}${cPow(c, 'r')}x^{${a * n} - ${a + b}r}$` },
-        { h: 'Middle coefficient' + (odd ? 's' : ''), d: odd
-          ? `$\\binom{${n}}{${m}}${cPow(c, m)} + \\binom{${n}}{${m + 1}}${cPow(c, m + 1)} = ${coef(m)} ${coef(m + 1) < 0 ? '-' : '+'} ${Math.abs(coef(m + 1))} = ${value}$`
-          : `$\\binom{${n}}{${m}}${cPow(c, m)} = ${value}$` },
+        { h: 'General term', d: `$T_{r+1} = \\binom{n}{r}${c}^{r}x^{${cx(a, 'n')} - ${cx(a + b, 'r')}}$, so $T_{${j}}$ has $r = ${j - 1}$ and $T_{${j + 1}}$ has $r = ${j}$` },
+        { h: 'Ratio of the coefficients', d: `$\\dfrac{\\binom{n}{${j - 1}}${powTex(c, j - 1)}}{\\binom{n}{${j}}${powTex(c, j)}} = \\dfrac{${j}}{${c}(n - ${j - 1})} = ${fracTex(P, Q)}$` },
+        { h: 'Find n', d: `$${cx(c * P, 'n')} - ${c * P * (j - 1)} = ${j * Q}$, so $n = ${n}$` },
+        { h: 'Middle term' + (odd ? 's' : ''), d: odd
+          ? `$${n + 1}$ terms, so two middle terms, $T_{${m + 1}}$ and $T_{${m + 2}}$: $\\binom{${n}}{${m}}${powTex(c, m)} + \\binom{${n}}{${m + 1}}${powTex(c, m + 1)} = ${coef(m)} + ${coef(m + 1)}$`
+          : `$${n + 1}$ terms, so one middle term, $T_{${m + 1}}$: $\\binom{${n}}{${m}}${powTex(c, m)}$` },
         { h: 'Answer', d: `$${value}$` }
       ],
-      reasoning: odd ? 'middle-from-sum-odd' : 'middle-from-sum-even'
+      reasoning: odd ? 'middle-from-ratio-odd' : 'middle-from-ratio-even'
     };
   }
   return middleTermReasoning(makeRng(FALLBACK_SEED));

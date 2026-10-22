@@ -13,15 +13,22 @@
 //   0 · Notation, subsets, power sets — the sets are given in set-builder
 //       form and must be listed first; then
 //       · sandwich: A ⊆ X ⊆ B is a free choice of a subset of B − A, joined
-//         to a size condition, a parity split with A and B themselves
+//         to a size condition AND "at least one element with a property A
+//         lacks" (by complement), a parity split with A and B themselves
 //         excluded, or "exactly j elements with a property" where the ones
 //         inside A are forced in;
 //       · pairs: ordered pairs (X, Y) of subsets with X ⊆ Y or X ∩ Y = ∅ —
-//         three states per element — joined to a size condition or to the
-//         removal of empty members;
-//       · collections: subsets of P(A) whose members obey a condition — count
-//         the qualifying members of P(A) first, then take the power set of
-//         that collection (or force members in, or choose exactly k).
+//         three states per element — joined to casework on n(X) + n(Y), a
+//         size condition on n(Y − X), or the removal of empty members or of
+//         X = Y;
+//       · collections: subsets 𝒮 of P(A) — the allowed members counted
+//         first, then collections of them with at least two members; P(A)
+//         split into complementary pairs {X, A − X} with three choices per
+//         pair; or exactly k members whose union is A, by inclusion–exclusion
+//         over the elements missed.
+//       An independent review (2026-10-22) judged three earlier variants
+//       single-formula D3 — ∅ and A forced into 𝒮, k non-empty members, and
+//       X ⊆ Y with n(Y) = k — and they were replaced by the ones above.
 //   1 · Operations — two archetypes:
 //       · extremal: given n(U), n(A), n(B) and a condition on n((A ∪ B)′),
 //         every region is a function of the overlap n(A ∩ B); the condition
@@ -98,6 +105,8 @@ const PROPS = {
   odd: { one: 'odd', many: 'odd', test: x => Math.abs(x % 2) === 1 },
   prime: { one: 'prime', many: 'prime', test: isPrime },
   mult3: { one: 'a multiple of $3$', many: 'multiples of $3$', test: x => x % 3 === 0 },
+  mult4: { one: 'a multiple of $4$', many: 'multiples of $4$', test: x => x % 4 === 0 },
+  mult5: { one: 'a multiple of $5$', many: 'multiples of $5$', test: x => x % 5 === 0 },
   negative: { one: 'negative', many: 'negative', test: x => x < 0 },
   positive: { one: 'positive', many: 'positive', test: x => x > 0 }
 };
@@ -130,6 +139,7 @@ function sandwichPair(rng) {
 }
 
 function sandwich(rng) {
+  const cond = rc(rng, ['size', 'parity', 'prop']);
   for (let guard = 0; guard < 400; guard++) {
     const { A, B, natural } = sandwichPair(rng);
     const nA = A.els.length, nB = B.els.length;
@@ -145,27 +155,38 @@ function sandwich(rng) {
       'Write both sets in roster form first and check that every element of $A$ is in $B$.',
       'A set $X$ with $A \\subseteq X \\subseteq B$ must contain all of $A$; the only choice is which elements of $B - A$ to add.'
     ];
-    const cond = rc(rng, ['size', 'parity', 'prop']);
     const head = `Let $A = ${A.tex}$ and $B = ${B.tex}$.`;
     if (cond === 'size') {
-      const k = nA + ri(rng, 1, m - 1);
-      const value = nCr(m, k - nA);
+      // n(X) = k AND X has at least one element with a property that A lacks:
+      // all the k-element choices minus those drawn from the elements without it.
+      const lacking = (natural ? ['even', 'odd', 'prime', 'mult3', 'mult4', 'mult5'] : ['negative', 'positive'])
+        .filter(key => !A.els.some(PROPS[key].test) && free.some(PROPS[key].test));
+      if (!lacking.length) continue;
+      const P = PROPS[rc(rng, lacking)];
+      const p = free.filter(P.test).length;
+      const r = ri(rng, 1, Math.min(m - 1, m - p)), k = nA + r;
+      if (p < 1 || m - p < 1) continue;                  // the complement must be non-empty
+      const all = nCr(m, r), none = nCr(m - p, r), value = all - none;
       if (value < 6) continue;
+      const allB = B.els.filter(P.test).length;
       return {
-        prompt: `${head} How many sets $X$ satisfy $A \\subseteq X \\subseteq B$ and $n(X) = ${k}$?`,
+        prompt: `${head} How many sets $X$ with $A \\subseteq X \\subseteq B$ and $n(X) = ${k}$ contain at least one element that is ${P.one}?`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
-          { value: nCr(nB, k), why: `That counts every subset of $B$ with $${k}$ elements; $X$ must also contain every element of $A$.` },
-          { value: nCr(m, k), why: `$n(X)$ includes the $${nA}$ element${nA === 1 ? '' : 's'} forced in from $A$; only the rest are chosen from $B - A$.` },
-          { value: 2 ** m, why: 'That counts every set between $A$ and $B$, with no condition on $n(X)$.' }
+          { value: all, why: `That counts every such $X$ with $n(X) = ${k}$, including those with no element that is ${P.one}; none of the elements of $A$ is ${P.one}, so those sets must be removed.` },
+          { value: nCr(nB, k) - nCr(nB - allB, k), why: `That counts subsets of $B$ with $${k}$ elements and at least one that is ${P.one}, without requiring $A \\subseteq X$.` },
+          { value: p * nCr(m - 1, r - 1), why: 'Choosing one such element first and then any others counts a set with several such elements more than once.' },
+          { value: nCr(m, k) - nCr(m - p, k), why: `$n(X)$ includes the $${nA}$ element${nA === 1 ? '' : 's'} forced in from $A$; only $${r}$ ${pl(r, 'is', 'are')} chosen from $B - A$.` }
         ]),
-        hints: [...hints, 'Subtract the elements already forced in from the size wanted, then choose the rest from $B - A$.'],
+        hints: [...hints, '"At least one" is easiest by complement: count all the sets of the right size, then remove those with no element of the required kind.'],
         steps: [
           ...listSteps,
-          { h: 'Size condition', d: `$n(X) = ${k}$ means $Y$ has $${k} - ${nA} = ${k - nA}$ element${k - nA === 1 ? '' : 's'} of the $${m}$: $\\binom{${m}}{${k - nA}}$` },
+          { h: 'Right size', d: `$n(X) = ${k}$ means $Y$ has $${k} - ${nA} = ${r}$ of the $${m}$ free elements: $\\binom{${m}}{${r}} = ${all}$` },
+          { h: 'Complement', d: `No element of $A$ is ${P.one}, and $${p}$ of the free elements ${pl(p, 'is', 'are')}; the sets with none of them choose all $${r}$ from the other $${m - p}$: $\\binom{${m - p}}{${r}} = ${none}$` },
+          { h: 'Subtract', d: `$${all} - ${none} = ${value}$` },
           { h: 'Answer', d: `$${value}$` }
         ],
-        reasoning: 'sandwich-size'
+        reasoning: 'sandwich-size-at-least-one'
       };
     }
     if (cond === 'parity') {
@@ -208,13 +229,16 @@ function sandwich(rng) {
       traps: traps(value, [
         { value: nCr(pFree, j) * 2 ** rest, why: `The ${pl(forced, `element of $A$ that is ${P.one} is`, `$${forced}$ elements of $A$ that are ${P.many} are`)} already in every $X$, so fewer have to be chosen from $B - A$.` },
         { value: nCr(allB, j) * 2 ** (nB - allB), why: 'That counts subsets of $B$ with the right number of such elements, without requiring $A \\subseteq X$.' },
-        { value: nCr(pFree, j - forced), why: `The elements of $B - A$ that are not ${P.many} may be put in $X$ or left out freely.` }
+        { value: nCr(pFree, j - forced), why: `The elements of $B - A$ that are not ${P.many} may be put in $X$ or left out freely.` },
+        { value: nCr(m, j - forced), why: `Only the free elements that are ${P.many} change how many such elements $X$ has; the others are free and do not use up the count.` }
       ]),
       hints: [...hints, 'Split $B - A$ into elements with the property and elements without it; count how many with the property $A$ already supplies.'],
       steps: [
         ...listSteps,
         { h: 'Forced and free', d: `$A$ already gives $${forced}$ element${forced === 1 ? '' : 's'} with the property; $B - A$ has $${pFree}$ with it and $${rest}$ without it` },
-        { h: 'Choose', d: `Pick $${j} - ${forced} = ${j - forced}$ of the $${pFree}$, and any subset of the other $${rest}$: $\\binom{${pFree}}{${j - forced}} \\times 2^{${rest}}$` },
+        { h: 'Choose', d: rest === 0
+          ? `Pick $${j} - ${forced} = ${j - forced}$ of the $${pFree}$; every free element has the property, so nothing else is left to choose: $\\binom{${pFree}}{${j - forced}}$`
+          : `Pick $${j} - ${forced} = ${j - forced}$ of the $${pFree}$, and any subset of the other $${rest}$ ${pl(rest, 'element', 'elements')}: $\\binom{${pFree}}{${j - forced}} \\times 2^{${rest}}$` },
         { h: 'Answer', d: `$${value}$` }
       ],
       reasoning: 'sandwich-property'
@@ -237,7 +261,7 @@ function pairs(rng) {
     const S = mediumSet(rng);
     const n = S.els.length;
     if (n < 4 || n > 7) continue;
-    const kind = rc(rng, ['sub-size', 'sub-gap', 'disjoint-nonempty', 'proper', 'disjoint-size']);
+    const kind = rc(rng, ['sub-sum', 'sub-gap', 'disjoint-nonempty', 'proper', 'disjoint-size']);
     const k = ri(rng, 2, n - 1);
     const head = `Let $S = ${S.tex}$. How many ordered pairs $(X, Y)$ of subsets of $S$ satisfy`;
     const list = { h: 'List S', d: `$S = ${rosterTex(S.els)}$, so $n(S) = ${n}$` };
@@ -251,25 +275,35 @@ function pairs(rng) {
         : 'When $X \\subseteq Y$, an element can be in both, in $Y$ only, or in neither, but never in $X$ alone.'
     ];
     let value, prompt, tr, steps, reasoning;
-    if (kind === 'sub-size') {
-      value = nCr(n, k) * 2 ** k;
-      prompt = `${head} $X \\subseteq Y$ and $n(Y) = ${k}$?`;
+    if (kind === 'sub-sum') {
+      // X ⊆ Y: an element in both adds 2 to n(X) + n(Y), one in Y only adds 1.
+      // Casework on the number b of elements in both.
+      const K = ri(rng, 3, 2 * n - 3);
+      const cases = [];
+      for (let bb = 0; 2 * bb <= K; bb++) if (K - 2 * bb <= n - bb) cases.push({ bb, c: nCr(n, bb) * nCr(n - bb, K - 2 * bb) });
+      value = cases.reduce((acc, c) => acc + c.c, 0);
+      if (cases.length < 2) continue;
+      prompt = `${head} $X \\subseteq Y$ and $n(X) + n(Y) = ${K}$?`;
       tr = [
-        { value: nCr(n, k), why: `That counts the choices of $Y$ alone; for each $Y$, $X$ can be any of its $2^{${k}}$ subsets.` },
-        { value: 3 ** n, why: `That counts every pair with $X \\subseteq Y$, without the condition $n(Y) = ${k}$.` },
-        { value: nCr(n, k) * 2 ** n, why: `$X$ must lie inside $Y$, so it is a subset of a ${k}-element set, not of $S$.` }
+        { value: nCr(2 * n, K), why: `That treats $X$ and $Y$ as two unrelated subsets of $S$; here $X$ must lie inside $Y$.` },
+        { value: nCr(n, K), why: 'That is only the case with no element in both sets, i.e. $X = \\emptyset$; elements in both sets count twice.' },
+        { value: 3 ** n, why: `That counts every pair with $X \\subseteq Y$, without the condition $n(X) + n(Y) = ${K}$.` }
       ];
-      steps = [list, { h: 'Choose Y', d: `$\\binom{${n}}{${k}} = ${nCr(n, k)}$ ways` }, { h: 'Choose X inside Y', d: `$2^{${k}} = ${2 ** k}$ ways for each $Y$` }, { h: 'Answer', d: `$${nCr(n, k)} \\times ${2 ** k} = ${value}$` }];
-      reasoning = 'pairs-subset-size';
+      steps = [list,
+        { h: 'Three states', d: `${three}. An element in both adds $2$ to $n(X) + n(Y)$, one in $Y$ only adds $1$, one in neither adds $0$` },
+        { h: 'Cases', d: `With $b$ elements in both and $${K} - 2b$ in $Y$ only: ${cases.map(c => `$b = ${c.bb}$: $\\binom{${n}}{${c.bb}}\\binom{${n - c.bb}}{${K - 2 * c.bb}} = ${c.c}$`).join('; ')}` },
+        { h: 'Add', d: `$${cases.map(c => c.c).join(' + ')} = ${value}$` },
+        { h: 'Answer', d: `$${value}$` }];
+      reasoning = 'pairs-subset-sum';
     } else if (kind === 'sub-gap') {
       value = nCr(n, k) * 2 ** (n - k);
       prompt = `${head} $X \\subseteq Y$ and $n(Y - X) = ${k}$?`;
       tr = [
-        { value: nCr(n, k) * 2 ** k, why: `The $${k}$ elements of $Y - X$ are fixed once chosen; it is each of the other $${n - k}$ elements that has two options (in both $X$ and $Y$, or in neither).` },
-        { value: nCr(n, k), why: `Once $Y - X$ is chosen, each of the other $${n - k}$ elements can still be in both sets or in neither.` },
+        { value: nCr(n, k) * 2 ** k, why: `The $${k}$ elements of $Y - X$ are fixed once chosen; it is each of the other $${n - k}$ ${pl(n - k, 'element', 'elements')} that has two options (in both $X$ and $Y$, or in neither).` },
+        { value: nCr(n, k), why: `Once $Y - X$ is chosen, each of the other $${n - k}$ ${pl(n - k, 'element', 'elements')} can still be in both sets or in neither.` },
         { value: 3 ** n, why: `That counts every pair with $X \\subseteq Y$, without the condition $n(Y - X) = ${k}$.` }
       ];
-      steps = [list, { h: 'Three states', d: three }, { h: 'Fix Y − X', d: `Choose the $${k}$ elements that are in $Y$ only: $\\binom{${n}}{${k}} = ${nCr(n, k)}$; each of the other $${n - k}$ is in both or in neither: $2^{${n - k}}$` }, { h: 'Answer', d: `$${nCr(n, k)} \\times ${2 ** (n - k)} = ${value}$` }];
+      steps = [list, { h: 'Three states', d: three }, { h: 'Fix Y − X', d: `Choose the $${k}$ elements that are in $Y$ only: $\\binom{${n}}{${k}} = ${nCr(n, k)}$; each of the other $${n - k}$ ${pl(n - k, 'element', 'elements')} is in both or in neither: $2^{${n - k}}$` }, { h: 'Answer', d: `$${nCr(n, k)} \\times ${2 ** (n - k)} = ${value}$` }];
       reasoning = 'pairs-subset-gap';
     } else if (kind === 'disjoint-nonempty') {
       value = 3 ** n - 2 * 2 ** n + 1;
@@ -331,62 +365,86 @@ function collections(rng) {
     const A = smallSet(rng);
     const n = A.els.length;
     if (n < 3 || n > 4) continue;
-    const kind = rc(rng, ['size', 'contains', 'forced', 'count']);
+    const kind = rc(rng, ['size', 'contains', 'no-complements', 'cover']);
     const head = `Let $A = ${A.tex}$ and let $P(A)$ be its power set. How many sets $\\mathcal{S}$ with $\\mathcal{S} \\subseteq P(A)$ are there such that`;
     const list = { h: 'List A', d: `$A = ${rosterTex(A.els)}$, so $n(A) = ${n}$ and $P(A)$ has $2^{${n}} = ${2 ** n}$ members` };
     const hints = [
       'Write $A$ in roster form and count the members of $P(A)$.',
       'A set $\\mathcal{S} \\subseteq P(A)$ is a collection of subsets of $A$: decide, for each member of $P(A)$, whether it is in $\\mathcal{S}$.',
-      'First count the members of $P(A)$ that are allowed, then count the collections that can be built from them.'
+      kind === 'cover'
+        ? 'Count the collections whose union misses a given element of $A$, and combine those counts by inclusion–exclusion.'
+        : 'First sort out which members of $P(A)$ may appear and how they constrain one another, then count the collections.'
     ];
     let value, prompt, tr, steps, reasoning;
-    if (kind === 'size') {
-      const j = ri(rng, 1, n - 1);
-      const q = nCr(n, j);
-      value = 2 ** q - 1;
-      prompt = `${head} $\\mathcal{S} \\ne \\emptyset$ and every member of $\\mathcal{S}$ has exactly $${j}$ element${j === 1 ? '' : 's'}?`;
+    if (kind === 'size' || kind === 'contains') {
+      // Allowed members, then collections of them with at least two members.
+      let q, what, allowedStep;
+      if (kind === 'size') {
+        const j = ri(rng, 1, n - 1);
+        q = nCr(n, j);
+        what = `every member of $\\mathcal{S}$ has exactly $${j}$ element${j === 1 ? '' : 's'}`;
+        allowedStep = `Subsets of $A$ with $${j}$ element${j === 1 ? '' : 's'}: $\\binom{${n}}{${j}} = ${q}$`;
+      } else {
+        const e = rc(rng, A.els);
+        q = 2 ** (n - 1);
+        what = `every member of $\\mathcal{S}$ contains the element $${e}$`;
+        allowedStep = `Subsets of $A$ containing $${e}$: choose freely among the other $${n - 1}$ elements, $2^{${n - 1}} = ${q}$`;
+      }
+      if (q < 4) continue;
+      value = 2 ** q - q - 1;
+      prompt = `${head} ${what} and $\\mathcal{S}$ has at least two members?`;
       tr = [
-        { value: 2 ** q, why: 'That includes the empty collection, which the question excludes.' },
-        { value: q, why: `That counts the subsets of $A$ with $${j}$ element${j === 1 ? '' : 's'}; $\\mathcal{S}$ is any non-empty collection of them.` },
-        { value: 2 ** (2 ** n) - 1, why: 'Every member of $\\mathcal{S}$ must have the stated size, so only those members of $P(A)$ may be used.' }
+        { value: 2 ** q - 1, why: `That still includes the $${q}$ collections with exactly one member.` },
+        { value: 2 ** q - q, why: 'The empty collection also has fewer than two members; remove it too.' },
+        { value: 2 ** q, why: 'That counts every collection of the allowed subsets, including the empty one and those with one member.' },
+        { value: 2 ** (2 ** n) - 2 ** n - 1, why: 'Only the subsets of $A$ that meet the condition may be members, not every member of $P(A)$.' }
       ];
-      steps = [list, { h: 'Allowed members', d: `Subsets of $A$ with $${j}$ element${j === 1 ? '' : 's'}: $\\binom{${n}}{${j}} = ${q}$` }, { h: 'Collections of them', d: `Any subset of these $${q}$, except the empty one: $2^{${q}} - 1$` }, { h: 'Answer', d: `$${value}$` }];
-      reasoning = 'collections-size';
-    } else if (kind === 'contains') {
-      const e = rc(rng, A.els);
-      const q = 2 ** (n - 1);
-      value = 2 ** q - 1;
-      prompt = `${head} $\\mathcal{S} \\ne \\emptyset$ and every member of $\\mathcal{S}$ contains the element $${e}$?`;
+      steps = [list,
+        { h: 'Allowed members', d: allowedStep },
+        { h: 'Collections of them', d: `Any of the $2^{${q}}$ subsets of these $${q}$, except the empty collection and the $${q}$ one-member collections: $2^{${q}} - ${q} - 1$` },
+        { h: 'Answer', d: `$${value}$` }];
+      reasoning = kind === 'size' ? 'collections-size' : 'collections-contains';
+    } else if (kind === 'no-complements') {
+      // P(A) splits into 2^(n−1) pairs {X, A − X}; each pair gives 3 choices,
+      // except the pair {∅, A} when ∅ is barred (2 choices).
+      const h = 2 ** (n - 1);
+      const noEmpty = rng() < 0.5;
+      value = noEmpty ? 2 * 3 ** (h - 1) - 1 : 3 ** h - 1;
+      prompt = `${head} $\\mathcal{S} \\ne \\emptyset$${noEmpty ? ', $\\emptyset \\notin \\mathcal{S}$' : ''} and there is no $X \\in \\mathcal{S}$ with $A - X \\in \\mathcal{S}$?`;
       tr = [
-        { value: 2 ** q, why: 'That includes the empty collection, which the question excludes.' },
-        { value: q, why: `That counts the subsets of $A$ containing $${e}$; $\\mathcal{S}$ is any non-empty collection of them.` },
-        { value: 2 ** (2 ** n - 1), why: `Only the subsets of $A$ that contain $${e}$ may be members of $\\mathcal{S}$; half of the members of $P(A)$ do not.` }
+        { value: value + 1, why: 'That includes the empty collection, which the question excludes.' },
+        { value: noEmpty ? 2 ** (h - 1) - 1 : 2 ** h - 1, why: 'From each complementary pair, $\\mathcal{S}$ may take one member or neither; a pair is not limited to exactly one choice.' },
+        noEmpty
+          ? { value: 3 ** h - 1, why: 'That still allows $\\emptyset$ as a member; in the pair $\\{\\emptyset, A\\}$ only $A$ or neither may be taken.' }
+          : { value: 2 ** (2 ** n) - 1, why: 'That ignores the complement condition: every non-empty collection is counted.' },
+        { value: noEmpty ? 2 ** (h - 1) : 2 ** h, why: `That only takes exactly one member from each of the $${h}$ pairs.` }
       ];
-      steps = [list, { h: 'Allowed members', d: `Subsets of $A$ containing $${e}$: choose freely among the other $${n - 1}$ elements, $2^{${n - 1}} = ${q}$` }, { h: 'Collections of them', d: `Any subset of these $${q}$, except the empty one: $2^{${q}} - 1$` }, { h: 'Answer', d: `$${value}$` }];
-      reasoning = 'collections-contains';
-    } else if (kind === 'forced') {
-      const N = 2 ** n;
-      value = 2 ** (N - 2);
-      prompt = `${head} $\\emptyset \\in \\mathcal{S}$ and $A \\in \\mathcal{S}$?`;
-      tr = [
-        { value: 2 ** N, why: 'That counts every collection, without forcing $\\emptyset$ and $A$ in.' },
-        { value: 2 ** (N - 1), why: 'Both $\\emptyset$ and $A$ are forced in; that leaves two fewer free members of $P(A)$, not one.' },
-        { value: 2 ** (N - 2) - 1, why: '$\\mathcal{S}$ already contains $\\emptyset$ and $A$, so no collection here is empty — nothing to subtract.' }
-      ];
-      steps = [list, { h: 'Forced members', d: `$\\emptyset$ and $A$ are two different members of $P(A)$, both in every such $\\mathcal{S}$` }, { h: 'Free members', d: `Each of the other $${N} - 2 = ${N - 2}$ members is in or out: $2^{${N - 2}}$` }, { h: 'Answer', d: `$${value}$` }];
-      reasoning = 'collections-forced';
+      steps = [list,
+        { h: 'Complementary pairs', d: `$X \\ne A - X$ for every $X \\subseteq A$, so the $${2 ** n}$ members of $P(A)$ fall into $${h}$ pairs $\\{X, A - X\\}$` },
+        { h: 'Each pair', d: noEmpty
+          ? `From the pair $\\{\\emptyset, A\\}$, $\\mathcal{S}$ may hold $A$ or neither: $2$ choices; from each of the other $${h - 1}$ pairs, neither, the first or the second: $3$ choices — $2 \\times 3^{${h - 1}}$ collections`
+          : `$\\mathcal{S}$ may hold neither member, the first, or the second, but not both: $3$ choices, so $3^{${h}}$ collections` },
+        { h: 'Non-empty', d: noEmpty ? `$2 \\times 3^{${h - 1}} - 1$` : `$3^{${h}} - 1$` },
+        { h: 'Answer', d: `$${value}$` }];
+      reasoning = 'collections-no-complements';
     } else {
-      const N = 2 ** n;
-      const k = ri(rng, 2, n === 3 ? 5 : 7);
-      value = nCr(N - 1, k);
-      prompt = `${head} $\\mathcal{S}$ has exactly $${k}$ members and $\\emptyset \\notin \\mathcal{S}$?`;
+      // Exactly k members whose union is A: inclusion–exclusion over the elements missed.
+      const k = rc(rng, [2, 3]);
+      const terms = range(0, n).map(i => ({ i, c: nCr(n, i), t: nCr(2 ** (n - i), k) }));
+      value = terms.reduce((acc, x) => acc + (x.i % 2 ? -1 : 1) * x.c * x.t, 0);
+      const live = terms.filter(x => x.t > 0);
+      prompt = `${head} $\\mathcal{S}$ has exactly $${k}$ members and the union of the members of $\\mathcal{S}$ is $A$?`;
       tr = [
-        { value: nCr(N, k), why: 'That allows $\\emptyset$ as a member, which the question excludes.' },
-        { value: nCr(N - 2, k), why: 'Only $\\emptyset$ is excluded; $A$ itself is a non-empty subset of $A$ and may be a member.' },
-        { value: 2 ** (N - 1), why: `That counts every collection of non-empty subsets, of any size; $\\mathcal{S}$ must have exactly $${k}$ members.` }
+        { value: nCr(2 ** n, k), why: 'That counts every collection with this many members, whether or not their union is all of $A$.' },
+        { value: nCr(2 ** n, k) - n * nCr(2 ** (n - 1), k), why: 'The collections whose union misses two elements were subtracted twice; add them back.' },
+        { value: nCr(2 ** n - 1, k), why: 'That only removes $\\emptyset$ as a member; a collection of non-empty subsets can still fail to cover $A$.' }
       ];
-      steps = [list, { h: 'Allowed members', d: `The non-empty subsets of $A$: $2^{${n}} - 1 = ${N - 1}$` }, { h: 'Choose', d: `Pick $${k}$ different ones: $\\binom{${N - 1}}{${k}}$` }, { h: 'Answer', d: `$${value}$` }];
-      reasoning = 'collections-count';
+      steps = [list,
+        { h: 'All collections', d: `Choosing $${k}$ different members of $P(A)$: $\\binom{${2 ** n}}{${k}} = ${nCr(2 ** n, k)}$` },
+        { h: 'Missing an element', d: `If the union misses $i$ given elements, every member is a subset of the other $${n} - i$ elements: $\\binom{2^{${n} - i}}{${k}}$ collections` },
+        { h: 'Inclusion–exclusion', d: `$${live.map(x => `${x.i === 0 ? '' : x.i % 2 ? '- ' : '+ '}\\binom{${n}}{${x.i}}\\binom{${2 ** (n - x.i)}}{${k}}`).join(' ')} = ${live.map(x => `${x.i === 0 ? '' : x.i % 2 ? '- ' : '+ '}${x.c * x.t}`).join(' ')}$` },
+        { h: 'Answer', d: `$${value}$` }];
+      reasoning = 'collections-cover';
     }
     if (value < 4 || value > 100000) continue;
     return { prompt, answerType: 'numeric', answer: { value }, traps: traps(value, tr), hints, steps, reasoning };
@@ -460,18 +518,20 @@ function extremal(rng) {
       prompt: `Of the $${u}$ students in a ${place} in ${city}, $${a}$ play ${g1} and $${b}$ play ${g2}. ${condText} What is the ${t.ask} possible number of students who ${t.text}?`,
       answerType: 'numeric', answer: { value },
       traps: traps(value, [
-        { value: t.f(free), why: `That ignores the condition on the students who play neither game; it is ${side === 'atLeast' ? 'the overlap forced by the class size alone' : 'the overlap allowed by the two numbers alone'}.` },
+        { value: t.f(free), why: `That ignores the condition on the students who play neither game: it uses ${side === 'atLeast' ? 'the least overlap that the class size alone forces' : 'the greatest overlap that the two numbers alone allow'}.` },
         { value: t.f(other), why: `That puts the number who play both games at its other extreme; this quantity is ${t.ask} at the opposite end.` },
+        { value: w, why: 'That is the number who play neither game at the extreme, not the number asked for.' },
         side === 'atLeast'
           ? { value: t.f(lo - 1), why: `With one student fewer in both games, only $${w - 1}$ would play neither game, breaking the condition.` }
           : { value: t.f(hi + 1), why: `With one student more in both games, $${w + 1}$ would play neither, breaking the condition.` }
       ]),
       hints: [
-        'Let $x = n(A \\cap B)$ and write every region of the Venn diagram — only the first game, only the second, both, neither — in terms of $x$.',
+        'Call the sets of players of the two games $A$ and $B$, let $x = n(A \\cap B)$, and write every region of the Venn diagram — only the first game, only the second, both, neither — in terms of $x$.',
         'Each region must be a whole number, at least $0$, and the condition on "neither" is one more inequality in $x$.',
         'Write the quantity asked for in terms of $x$, decide whether it rises or falls with $x$, and check that the end value of $x$ can really occur.'
       ],
       steps: [
+        { h: 'Name the sets', d: `Let $A$ be the set of students who play ${g1} and $B$ the set who play ${g2}, so $n(U) = ${u}$, $n(A) = ${a}$, $n(B) = ${b}$` },
         { h: 'Regions in terms of x', d: `With $x = n(A \\cap B)$: only ${g1} $${a} - x$, only ${g2} $${b} - x$, neither $${u} - ${a} - ${b} + x${a + b === u ? '' : ` = x ${a + b - u > 0 ? `- ${a + b - u}` : `+ ${u - a - b}`}`}$` },
         { h: 'Range of x', d: side === 'atLeast'
           ? `Neither $\\ge ${w}$ gives $x \\ge ${lo}$; also $x \\le \\min(${a}, ${b}) = ${hi}$`
@@ -533,7 +593,7 @@ function subsetCount(rng) {
         { value: 2 ** N - 2 ** (N - a), why: 'That counts every $X$ that meets $A$, without requiring $X \\cap B = \\emptyset$.' },
         { value: (2 ** a - 1) * 2 ** (N - a - b + AB.length), why: '$X$ must avoid $B$, so the elements of $A \\cap B$ cannot be used to meet $A$; only $A - B$ can.' }
       ];
-      steps = [list, { h: 'Avoid B', d: `$X \\cap B = \\emptyset$ means $X \\subseteq U - B$, which has $${out}$ elements: $2^{${out}}$ sets` }, { h: 'Meet A', d: `Inside $U - B$, the only elements of $A$ are $A - B = ${rosterTex(AmB)}$; the sets that miss them lie in $U - (A \\cup B)$, which has $${out2}$ elements: $2^{${out2}}$` }, { h: 'Subtract', d: `$2^{${out}} - 2^{${out2}}$` }, { h: 'Answer', d: `$${value}$` }];
+      steps = [list, { h: 'Avoid B', d: `$X \\cap B = \\emptyset$ means $X \\subseteq U - B$, which has $${out}$ ${pl(out, 'element', 'elements')}: $2^{${out}}$ sets` }, { h: 'Meet A', d: `Inside $U - B$, the only elements of $A$ are $A - B = ${rosterTex(AmB)}$; the sets that miss them lie in $U - (A \\cup B)$, which has $${out2}$ ${pl(out2, 'element', 'elements')}: $2^{${out2}}$` }, { h: 'Subtract', d: `$2^{${out}} - 2^{${out2}}$` }, { h: 'Answer', d: `$${value}$` }];
       reasoning = 'subsets-meet-avoid';
     } else if (cond === 'equal-cap') {
       if (D.length < 2 || AB.length < 1) continue;
@@ -618,8 +678,8 @@ function exactly(rng) {
     const variant = rc(rng, ['none-all', 'one-two', 'none-two']);
     const noneText = s.none === 0 ? 'Every student is in at least one of the three clubs' : `Exactly $${s.none}$ ${pl(s.none, 'student is', 'students are')} in none of the three clubs`;
     let facts, target, value, tr, steps, reasoning;
-    const mult = { h: 'Count with multiplicity', d: `$n(A) + n(B) + n(C) = ${s.a} + ${s.b} + ${s.c} = ${s.S}$ counts a student in exactly one club once, in exactly two clubs twice and in all three three times: $${s.S} = E_1 + 2E_2 + 3E_3$` };
-    const total = { h: 'At least one club', d: `$E_1 + E_2 + E_3 = ${s.N} - ${s.none} = ${s.T}$` };
+    const mult = { h: 'Count with multiplicity', d: `Let $A$, $B$, $C$ be the sets of students in the ${c1}, ${c2} and ${c3} clubs. $n(A) + n(B) + n(C) = ${s.a} + ${s.b} + ${s.c} = ${s.S}$ counts a student in exactly one club once, in exactly two clubs twice and in all three three times: $${s.S} = E_1 + 2E_2 + 3E_3$` };
+    const total = { h: 'At least one club', d: s.none ? `$E_1 + E_2 + E_3 = ${s.N} - ${s.none} = ${s.T}$` : `Every student is in a club: $E_1 + E_2 + E_3 = ${s.T}$` };
     if (variant === 'none-all') {
       facts = `${noneText}, and $${s.E3}$ ${pl(s.E3, 'is', 'are')} in all three.`;
       const askTwo = rng() < 0.5;
@@ -640,7 +700,7 @@ function exactly(rng) {
         ...(askTwo ? [] : [{ h: 'Exactly one', d: `$E_1 = ${s.T} - ${s.E2} - ${s.E3} = ${s.E1}$` }]), { h: 'Answer', d: `$${value}$` }];
       reasoning = askTwo ? 'exactly-two' : 'exactly-one';
     } else if (variant === 'one-two') {
-      facts = `Of these, $${s.E1}$ are in exactly one club and $${s.E2}$ in exactly two.`;
+      facts = `Altogether, $${s.E1}$ students are in exactly one of the clubs and $${s.E2}$ in exactly two.`;
       const askNone = rng() < 0.6;
       target = askNone ? 'none of the three clubs' : 'all three clubs';
       value = askNone ? s.none : s.E3;
@@ -648,7 +708,9 @@ function exactly(rng) {
       tr = askNone
         ? [
           { value: s.N - s.E1 - s.E2, why: 'That forgets the students in all three clubs, who are in at least one club.' },
-          { value: s.N - s.E1 - s.E2 - (s.S - s.E1 - 2 * s.E2), why: '$n(A) + n(B) + n(C) - E_1 - 2E_2$ counts each student in all three clubs three times; divide by $3$.' }
+          { value: s.N - s.E1 - s.E2 - (s.S - s.E1 - 2 * s.E2), why: '$n(A) + n(B) + n(C) - E_1 - 2E_2$ counts each student in all three clubs three times; divide by $3$.' },
+          { value: s.E3, why: 'That is the number in all three clubs, a middle step; the question asks for the number in no club.' },
+          { value: s.N - (s.S - s.E2 + s.E3), why: 'The pairwise intersections do not add up to $E_2$: a student in all three clubs lies in all three of them, so their sum is $E_2 + 3E_3$.' }
         ]
         : [
           { value: s.S - s.E1 - 2 * s.E2, why: '$n(A) + n(B) + n(C) - E_1 - 2E_2$ is $3E_3$; divide by $3$.' },

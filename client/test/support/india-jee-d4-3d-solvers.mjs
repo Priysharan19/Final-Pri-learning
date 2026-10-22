@@ -4,18 +4,18 @@
 //
 // Nothing here imports the generator. Each solver reads the numbers back out of
 // the rendered prompt and re-solves by a different route from the generator:
-//   · axis distances — a brute-force search of the integer lattice for every
-//     point with those three distances in that octant (uniqueness checked);
+//   · the parallelogram — a search of the integer lattice for every fourth
+//     vertex that pairs the four points into diagonals with a common midpoint,
+//     keeping those strictly inside the named octant (exactly one must remain);
 //   · octant lattice counts — enumeration of every lattice point in a box;
 //   · reflection triangles — images built from the mirror's geometry, then
 //     Heron's formula on the three side lengths in floating point;
-//   · the equidistant point — the 2 × 2 linear system solved by Cramer's rule
-//     in exact rationals (unique when the determinant is non-zero);
+//   · the two-condition point — a walk round the circle about O on the plane,
+//     finding every sign change of PA² − PB² by bisection (exactly two);
 //   · the right angle at C(k) — a numeric scan of CA² + CB² − AB² over k with
 //     bisection, rejecting roots where C meets A or B;
 //   · section-formula forms — the parametric line A + t(B − A) in exact
-//     rationals, and for the tetrahedron an explicit face with the given
-//     centroid.
+//     rationals (for the equidistant point, PC² − PD² is linear in t).
 // A prompt it cannot read is a problem. NEAR_MISS lists answers a student could
 // plausibly write that must be marked WRONG.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,22 +99,28 @@ const MIRROR_RE = '(the \\$xy\\$-plane|the \\$yz\\$-plane|the \\$zx\\$-plane|the
 
 function analysePoint(q) {
   const p = q.prompt;
-  let m = p.match(/^A point \$P\$ lies in the octant \$([^$]+)\$\. Its distances from the \$x\$-axis, the \$y\$-axis and the \$z\$-axis are \$([^$]+)\$, \$([^$]+)\$ and \$([^$]+)\$ respectively\. Find (the sum of the coordinates of \$P\$|the \$([xyz])\$-coordinate of \$P\$)\.$/);
+  let m = p.match(/^Three of the vertices of a parallelogram are \$A\(([^)]*)\)\$, \$B\(([^)]*)\)\$ and \$C\(([^)]*)\)\$, and its fourth vertex lies in the octant \$([^$]+)\$\. Find (the sum of the coordinates of the fourth vertex|the square of the distance of the fourth vertex from the \$([xyz])\$-axis)\.$/);
   if (m) {
-    const s = octantSigns(m[1]);
-    const [dx, dy, dz] = [m[2], m[3], m[4]].map(surdSq);
-    if (!s || [dx, dy, dz].some(v => v === null)) return { problems: ['could not read the octant or the distances'] };
-    const found = [];
-    for (let x = -30; x <= 30; x++) for (let y = -30; y <= 30; y++) for (let z = -30; z <= 30; z++) {
-      if (Math.sign(x) !== s[0] || Math.sign(y) !== s[1] || Math.sign(z) !== s[2]) continue;
-      if (y * y + z * z === dx && z * z + x * x === dy && x * x + y * y === dz) found.push([x, y, z]);
+    const [A, B, C] = [m[1], m[2], m[3]].map(triple);
+    const s = octantSigns(m[4]);
+    if (!A || !B || !C || !s) return { problems: ['could not read the vertices or the octant'] };
+    const u = B.map((b, i) => b - A[i]), v = C.map((c, i) => c - A[i]);
+    if (u[1] * v[2] - u[2] * v[1] === 0 && u[2] * v[0] - u[0] * v[2] === 0 && u[0] * v[1] - u[1] * v[0] === 0) return { problems: ['A, B and C are collinear'] };
+    // Every lattice D that makes {A, B, C, D} a parallelogram: some pairing of
+    // the four points into two diagonals with a common midpoint.
+    const same = (X, Y, Z, W) => X.every((x, i) => x + Y[i] === Z[i] + W[i]);
+    const all = [], inOct = [];
+    for (let x = -25; x <= 25; x++) for (let y = -25; y <= 25; y++) for (let z = -25; z <= 25; z++) {
+      const D = [x, y, z];
+      if (!(same(A, B, C, D) || same(A, C, B, D) || same(A, D, B, C))) continue;
+      all.push(D);
+      if (D.every((t, i) => Math.sign(t) === s[i])) inOct.push(D);
     }
-    if (found.length !== 1) return { problems: [`${found.length} lattice points fit the distances and the octant`] };
-    const [x, y, z] = found[0];
-    const c = m[6] === undefined ? -1 : AXES[m[6]];
-    const value = c < 0 ? x + y + z : found[0][c];
-    const abs = c < 0 ? Math.abs(x) + Math.abs(y) + Math.abs(z) : Math.abs(value);
-    return { problems: keyInt(q, value, 'lattice search'), misses: [abs, -value, x * x + y * y + z * z, dx + dy + dz] };
+    if (inOct.length !== 1) return { problems: [`${inOct.length} possible fourth vertices lie in the octant`] };
+    const skip = m[6] === undefined ? -1 : AXES[m[6]];
+    const meas = D => (skip < 0 ? D[0] + D[1] + D[2] : D.reduce((acc, t, i) => (i === skip ? acc : acc + t * t), 0));
+    const D = inOct[0];
+    return { problems: keyInt(q, meas(D), 'lattice search for the fourth vertex'), misses: [...all.map(meas), D.reduce((acc, t) => acc + t * t, 0), -meas(D)] };
   }
   m = p.match(/^How many points with integer coordinates lie in the octant \$([^$]+)\$, are at a distance (less than|of at most) \$(\d+)\$ from the \$([xyz])\$-axis, and are at a distance of at most \$(\d+)\$ from the \$(xy|yz|zx)\$-plane\?$/);
   if (m) {
@@ -161,27 +167,35 @@ function analysePoint(q) {
 
 function analyseDistance(q) {
   const p = q.prompt;
-  let m = p.match(/^Find the point in the \$(xy|yz|zx)\$-plane that is equidistant from \$A\(([^)]*)\)\$, \$B\(([^)]*)\)\$ and \$C\(([^)]*)\)\$\. Give (the square of its distance from \$A\$|the sum of its coordinates)\.$/);
+  let m = p.match(/^Find every point \$P\$ of the \$(xy|yz|zx)\$-plane that is equidistant from \$A\(([^)]*)\)\$ and \$B\(([^)]*)\)\$ and is at a distance \$([^$]+)\$ from the origin\. Give (the sum of the values of \$PA\^2\$ over all such points \$P\$|the sum of the \$([xyz])\$-coordinates of all such points \$P\$)\.$/);
   if (m) {
     const z = planeZero(m[1]);
-    const [A, B, C] = [m[2], m[3], m[4]].map(triple);
-    if (!A || !B || !C) return { problems: ['could not read the points'] };
+    const A = triple(m[2]), B = triple(m[3]), N = surdSq(m[4]);
+    if (!A || !B || N === null) return { problems: ['could not read the points or the distance'] };
     const [i, j] = [0, 1, 2].filter(t => t !== z);
-    // |X − U|² = |X − V|² with X on the plane: 2(V − U)·X = |V|² − |U|².
-    const row = (U, V) => [2 * (V[i] - U[i]), 2 * (V[j] - U[j]), V.reduce((s, v) => s + v * v, 0) - U.reduce((s, v) => s + v * v, 0)];
-    const [a1, b1, c1] = row(A, B), [a2, b2, c2] = row(B, C);
-    const det = a1 * b2 - a2 * b1;
-    if (det === 0) return { problems: ['the point is not unique (zero determinant)'] };
-    const X = [0, 0, 0].map(() => Q(0));
-    X[i] = Q(c1 * b2 - c2 * b1, det); X[j] = Q(a1 * c2 - a2 * c1, det);
-    const d2q = U => U.reduce((s, u, t) => qadd(s, qmul(qsub(X[t], Q(u)), qsub(X[t], Q(u)))), Q(0));
-    const dA = d2q(A), dB = d2q(B), dC = d2q(C);
-    if (fmtQ(dA) !== fmtQ(dB) || fmtQ(dA) !== fmtQ(dC)) return { problems: ['Cramer solution is not equidistant'] };
-    const sum = qadd(X[i], X[j]);
-    const askDist = /square of its distance/.test(m[5]);
-    const value = askDist ? dA : sum;
-    const origin2 = X.reduce((s, x) => qadd(s, qmul(x, x)), Q(0));
-    return { problems: keyIs(q, value, "Cramer's rule"), misses: [askDist ? qv(origin2) : qv(dA), askDist ? qv(sum) : -qv(sum), askDist ? Math.sqrt(qv(dA)) : qv(origin2)] };
+    // Walk round the circle of radius √N on the plane and find every point
+    // where PA² − PB² changes sign, by bisection.
+    const r = Math.sqrt(N);
+    const at = th => { const P = [0, 0, 0]; P[i] = r * Math.cos(th); P[j] = r * Math.sin(th); return P; };
+    const g = th => { const P = at(th); return dist2(P, A) - dist2(P, B); };
+    const sols = [];
+    const STEPS = 200000, h = (2 * Math.PI) / STEPS;
+    for (let k = 0; k < STEPS; k++) {
+      const a = k * h, b = (k + 1) * h, ga = g(a), gb = g(b);
+      if (ga === 0) { sols.push(a); continue; }
+      if (ga * gb < 0) {
+        let lo = a, hi = b;
+        for (let t = 0; t < 100; t++) { const mid = (lo + hi) / 2; if (g(lo) * g(mid) <= 0) hi = mid; else lo = mid; }
+        sols.push((lo + hi) / 2);
+      }
+    }
+    if (sols.length !== 2) return { problems: [`${sols.length} points satisfy both conditions`] };
+    const pts = sols.map(at);
+    const c = m[6] === undefined ? -1 : AXES[m[6]];
+    const each = pts.map(P => (c < 0 ? dist2(P, A) : P[c]));
+    const value = each[0] + each[1];
+    if (c >= 0 && (c === z)) return { problems: ['asked for the coordinate that is zero on the plane'] };
+    return { problems: keyNear(q, value, 'scan round the circle'), misses: [...each.map(v => Number(v.toFixed(9))), c < 0 ? 2 * N : -value] };
   }
   m = p.match(/^Let \$A\(([^)]*)\)\$ and \$B\(([^)]*)\)\$ be fixed points, and let \$C\(([^$]*)\)\$, where \$k\$ is real\. Find the sum of all values of \$k\$ for which \$A\$, \$B\$ and \$C\$ are the vertices of a triangle with a right angle at \$C\$\.$/);
   if (!m) return { problems: ['could not read the prompt'] };
@@ -253,29 +267,19 @@ function analyseSection(q) {
     const value = qadd(C1[c], C2[c]);
     return { problems: keyIs(q, value, 'parametric line'), misses: [qv(C1[c]), qv(C2[c]), qv(value) / 2] };
   }
-  m = p.match(/^In the tetrahedron \$ABCD\$, \$A\(([^)]*)\)\$, \$B\(([^)]*)\)\$, \$C\(([^)]*)\)\$, and the centroid of the tetrahedron is \$G\(([^)]*)\)\$\. Find the square of the distance of \$D\$ from (the origin|the \$([xyz])\$-axis)\.$/);
-  if (m) {
-    const [A, B, C, G] = [m[1], m[2], m[3], m[4]].map(triple);
-    if (!A || !B || !C || !G) return { problems: ['could not read the points'] };
-    // G divides D G1 in 3 : 1, so D = G + 3(G − G1), with G1 the centroid of face ABC.
-    const G1 = A.map((a, i) => Q(a + B[i] + C[i], 3));
-    const D = G.map((g, i) => qadd(Q(g), qmul(Q(3), qsub(Q(g), G1[i]))));
-    const skip = m[6] === undefined ? -1 : AXES[m[6]];
-    const meas = X => X.reduce((s, x, i) => (i === skip ? s : qadd(s, qmul(x, x))), Q(0));
-    const D3 = G.map((g, i) => Q(3 * g - A[i] - B[i] - C[i]));
-    const all = D.reduce((s, x) => qadd(s, qmul(x, x)), Q(0));
-    return { problems: keyIs(q, meas(D), 'median from D'), misses: [qv(meas(D3)), qv(all), Math.sqrt(qv(meas(D)))] };
-  }
-  m = p.match(/^In the tetrahedron \$ABCD\$, the vertex \$D\$ is \$D\(([^)]*)\)\$ and the centroid of the face \$ABC\$ is \$G_1\(([^)]*)\)\$\. If \$G\$ is the centroid of the tetrahedron, find \$DG\^2\$\.$/);
+  m = p.match(/^The point \$P\$ lies on the line through \$A\(([^)]*)\)\$ and \$B\(([^)]*)\)\$, and \$P\$ is equidistant from \$C\(([^)]*)\)\$ and \$D\(([^)]*)\)\$\. Find \$\\dfrac\{AP\}\{PB\}\$\.$/);
   if (!m) return { problems: ['could not read the prompt'] };
-  const D = triple(m[1]), G1 = triple(m[2]);
-  if (!D || !G1) return { problems: ['could not read the points'] };
-  // An explicit face with centroid G1, then the average of the four vertices.
-  const A = G1.map((g, i) => g + [1, 0, 0][i]), B = G1.map((g, i) => g + [0, 1, 0][i]), C = G1.map((g, i) => g - [1, 1, 0][i]);
-  const G = D.map((d, i) => Q(A[i] + B[i] + C[i] + d, 4));
-  const value = D.reduce((s, d, i) => qadd(s, qmul(qsub(Q(d), G[i]), qsub(Q(d), G[i]))), Q(0));
-  const L = dist2(D, G1);
-  return { problems: keyIs(q, value, 'explicit face'), misses: [L, (4 * L) / 9, L / 16, (3 * L) / 4] };
+  const [A, B, C, D] = [m[1], m[2], m[3], m[4]].map(triple);
+  if (!A || !B || !C || !D) return { problems: ['could not read the points'] };
+  // On A + t(B − A), f(t) = PC² − PD² is linear in t (the t² terms cancel).
+  const f = t => { const P = A.map((a, i) => a + t * (B[i] - a)); return dist2(P, C) - dist2(P, D); };
+  const f0 = f(0), f1 = f(1);
+  if (f0 === f1) return { problems: ['no unique point on the line'] };
+  if (f(2) - 2 * f1 + f0 !== 0) return { problems: ['PC² − PD² is not linear along the line'] };
+  const t = Q(f0, f0 - f1);
+  if (t[0] === t[1]) return { problems: ['P coincides with B'] };
+  const value = Q(Math.abs(t[0]), Math.abs(t[1] - t[0]));
+  return { problems: keyIs(q, value, 'parametric line'), misses: [qv(value) ? 1 / qv(value) : null, Math.abs(qv(t)), -qv(value)].filter(v => v !== null) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

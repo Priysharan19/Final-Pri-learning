@@ -8,18 +8,23 @@
 // dot point, and each archetype joins at least two separate ideas:
 //
 //   dot point 0 · locating a point
-//     axis-distances     distances from the three axes give a system in x², y², z²
-//                        (idea 1), and the named octant fixes the signs (idea 2);
-//     lattice-octant     an octant named X'OY'Z… fixes strict signs, so points on
-//                        the coordinate planes are out (idea 1), and the distance
-//                        from an axis is √(sum of the other two squares) while the
-//                        distance from a plane is one |coordinate| (idea 2);
 //     reflection-triangle images in planes, axes or the origin — chained or
 //                        separate (idea 1) — then the right angle found by
-//                        Pythagoras on the three sides gives the area (idea 2).
+//                        Pythagoras on the three sides gives the area (idea 2);
+//     parallelogram-octant three given vertices complete a parallelogram in
+//                        three ways, since the diagonals bisect each other
+//                        (idea 1); the named octant's strict signs pick exactly
+//                        one, then a coordinate sum or an axis distance (idea 2);
+//     lattice-octant     (minor share, small radii) an octant named X'OY'Z…
+//                        fixes strict signs, so points on the coordinate planes
+//                        are out (idea 1), and the distance from an axis is
+//                        √(sum of the other two squares) while the distance
+//                        from a plane is one |coordinate| (idea 2).
 //   dot point 1 · the distance formula
-//     equidistant-plane  PA = PB and PA = PC are each linear once the squares
-//                        cancel (idea 1), solved on a coordinate plane (idea 2);
+//     equidistant-circle points of a coordinate plane equidistant from A and B
+//                        lie on a line (idea 1); a given distance from O adds a
+//                        quadratic, so there are two such points, both counted
+//                        (idea 2);
 //     right-angle-k      a right angle at C(k) is CA² + CB² = AB², a quadratic in
 //                        k (idea 1), and a root that puts C on A or B gives no
 //                        triangle and must be rejected (idea 2).
@@ -30,9 +35,9 @@
 //     two-positions      AC : CB = m : n on the LINE AB has an internal and an
 //                        external solution (idea 1), each by the section formula,
 //                        then a coordinate sum or the AC² values added (idea 2);
-//     tetrahedron        the centroid of a tetrahedron averages four vertices and
-//                        divides the line from a vertex to the centroid of the
-//                        opposite face in 3 : 1 (idea 1), then a distance (idea 2).
+//     ratio-equidistant  P divides AB in an unknown ratio λ : 1 (idea 1) and is
+//                        equidistant from C and D, which is linear in P and fixes
+//                        λ; its sign says internal or external (idea 2).
 //
 // Scope is the NCERT Class 11 chapter as JEE Main and Advanced examine it:
 // coordinates and octants, the distance formula and the section formula. No
@@ -107,8 +112,8 @@ const AX = ['x', 'y', 'z'];
 const sqTerm = f => (f.d === 1 ? `${par(f.n)}^2` : `\\left(${rTex(f)}\\right)^2`);
 /** A rational written after "+": 3, (-6), \left(-\dfrac{9}{2}\right). */
 const addend = f => (f.n >= 0 ? rTex(f) : f.d === 1 ? `(${f.n})` : `\\left(${rTex(f)}\\right)`);
-/** "a + bλ" with b ≠ 0. */
-const lamLin = (a, b) => `${a} ${b < 0 ? '-' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}\\lambda`;
+/** "a + bλ", with a zero term left out. */
+const lamLin = (a, b) => (b === 0 ? String(a) : a === 0 ? cx(b, '\\lambda') : `${a} ${b < 0 ? '-' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}\\lambda`);
 const sumSq = p => p.reduce((s, v) => s + v * v, 0);
 const d2 = (p, q) => p.reduce((s, v, i) => s + (v - q[i]) ** 2, 0);
 
@@ -152,52 +157,65 @@ function pointReasoning(rng) {
 }
 
 function pointCore(rng) {
-  const kind = rc(rng, ['axis-distances', 'lattice-octant', 'reflection-triangle']);
+  // Mostly the two genuinely two-idea archetypes; the lattice count, which is
+  // tedious for large radii, keeps small radii and a minor share.
+  const u0 = rng();
+  const kind = u0 < 0.4 ? 'reflection-triangle' : u0 < 0.8 ? 'parallelogram-octant' : 'lattice-octant';
   for (let guard = 0; guard < 2000; guard++) {
-    if (kind === 'axis-distances') {
-      const oct = rc(rng, OCTANTS);
-      const mag = [ri(rng, 1, 9), ri(rng, 1, 9), ri(rng, 1, 9)];
-      if (mag[0] === mag[1] && mag[1] === mag[2]) continue;
-      const P = mag.map((v, i) => v * oct.s[i]);
-      const [x, y, z] = P;
-      const m = y * y + z * z, n = z * z + x * x, p = x * x + y * y;
-      const askSum = rng() < 0.6;
-      const c = ri(rng, 0, 2);                   // the coordinate asked for otherwise
-      const value = askSum ? x + y + z : P[c];
+    if (kind === 'parallelogram-octant') {
+      const A = [ri(rng, -6, 6), ri(rng, -6, 6), ri(rng, -6, 6)];
+      const B = [ri(rng, -6, 6), ri(rng, -6, 6), ri(rng, -6, 6)];
+      const C = [ri(rng, -6, 6), ri(rng, -6, 6), ri(rng, -6, 6)];
+      const u = B.map((b, t) => b - A[t]), v = C.map((c, t) => c - A[t]);
+      const cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      if (cross.every(t => t === 0)) continue;              // collinear: no parallelogram
+      // The diagonals bisect each other, so the fourth vertex is the sum of the
+      // ends of a diagonal minus the opposite vertex — three possibilities.
+      const cand = [
+        { tex: 'A + B - C', D: A.map((a, t) => a + B[t] - C[t]), diag: 'AB' },
+        { tex: 'A + C - B', D: A.map((a, t) => a + C[t] - B[t]), diag: 'AC' },
+        { tex: 'B + C - A', D: B.map((b, t) => b + C[t] - A[t]), diag: 'BC' }
+      ];
+      const ti = ri(rng, 0, 2), T = cand[ti].D;
+      if (T.some(t => t === 0)) continue;
+      const s = T.map(Math.sign);
+      const oct = OCTANTS.find(o => o.s.every((x, k) => x === s[k]));
+      const inOct = X => X.every((t, k) => Math.sign(t) === s[k]);
+      const others = cand.filter((_, k) => k !== ti);
+      if (others.some(c => inOct(c.D))) continue;
+      // Prefer a decoy that misses the octant by one sign or by a zero coordinate.
+      const near = others.some(c => c.D.filter((t, k) => Math.sign(t) === s[k]).length === 2);
+      if (!near && rng() < 0.75) continue;
+      const target = rc(rng, ['sum', 0, 1, 2]);
+      const meas = X => (target === 'sum' ? X[0] + X[1] + X[2] : sumSq(X) - X[target] ** 2);
+      const value = meas(T);
       if (value === 0) continue;
-      const absVal = askSum ? mag[0] + mag[1] + mag[2] : mag[c];
-      const wrongOct = OCTANTS.find(o => o.s.every((s, i) => s === -oct.s[i]));
-      // Pairing each distance with its own axis (|x| from √(n + p − m)… taken as √(m + n − p)…).
-      const pm = [mag[2], mag[0], mag[1]].map((v, i) => v * oct.s[i]);
-      const pairSlip = askSum ? pm[0] + pm[1] + pm[2] : pm[c];
+      const asked = target === 'sum' ? 'the sum of the coordinates of the fourth vertex' : `the square of the distance of the fourth vertex from the $${AX[target]}$-axis`;
       return {
-        prompt: `A point $P$ lies in the octant $${oct.name}$. Its distances from the $x$-axis, the $y$-axis and the $z$-axis are $${surdTex(m)}$, $${surdTex(n)}$ and $${surdTex(p)}$ respectively. Find ${askSum ? 'the sum of the coordinates of $P$' : `the $${AX[c]}$-coordinate of $P$`}.`,
+        prompt: `Three of the vertices of a parallelogram are $${pt('A', A)}$, $${pt('B', B)}$ and $${pt('C', C)}$, and its fourth vertex lies in the octant $${oct.name}$. Find ${asked}.`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
-          { value: absVal, why: `In the octant $${oct.name}$ the coordinates are ${oct.s.map((s, i) => `$${AX[i]}$ ${signWord(s)}`).join(', ')}; the signs cannot all be taken as positive unless the octant is $XOYZ$.` },
-          { value: pairSlip, why: 'The squares are matched to the wrong coordinates: the distance from the $x$-axis involves $y$ and $z$ only, so $x^2$ is half of (the squares of the distances from the $y$- and $z$-axes, minus the square of the distance from the $x$-axis).' },
-          { value: (m + n + p) / 2, why: `That is $OP^2 = x^2 + y^2 + z^2$, the square of the distance from the origin, not ${askSum ? 'the sum of the coordinates' : `the $${AX[c]}$-coordinate`}.` },
-          { value: -value, why: `That is the point in the opposite octant $${wrongOct.name}$; recheck which of the axes are the negative ones.` }
+          ...others.map(c => ({ value: meas(c.D), why: `That is $${c.tex}$, the fourth vertex when $${c.diag}$ is a diagonal, and that point does not lie in the octant $${oct.name}$.` })),
+          ...(target === 'sum' ? [] : [{ value: sumSq(T), why: `That is the square of the distance from the origin; the distance from the $${AX[target]}$-axis leaves out the $${AX[target]}$-coordinate.` }])
         ]),
         hints: [
-          'The distance of $(x, y, z)$ from the $x$-axis is $\\sqrt{y^2 + z^2}$; the other two axes are alike.',
-          'Square the three distances and add: each of $x^2$, $y^2$, $z^2$ appears twice.',
-          'Each square gives a coordinate up to sign; the octant decides the sign.'
+          'The three given vertices need not be consecutive in the order they are named.',
+          'The diagonals of a parallelogram bisect each other, so the fourth vertex is (one end of a diagonal) + (the other end) − (the opposite vertex). There are three ways to choose the diagonal.',
+          'Read the signs of the coordinates off the name of the octant, and keep the one candidate that fits; a point with a zero coordinate lies in no octant.'
         ],
         steps: [
-          { h: 'Three equations', d: `$y^2 + z^2 = ${m}$, $z^2 + x^2 = ${n}$, $x^2 + y^2 = ${p}$` },
-          { h: 'Add them', d: `$2(x^2 + y^2 + z^2) = ${m + n + p}$, so $x^2 + y^2 + z^2 = ${(m + n + p) / 2}$` },
-          { h: 'Each square', d: `$x^2 = ${x * x}$, $y^2 = ${y * y}$, $z^2 = ${z * z}$` },
-          { h: 'Signs from the octant', d: `In $${oct.name}$: ${oct.s.map((s, i) => `$${AX[i]}$ ${signWord(s)}`).join(', ')}, so $${pt('P', P)}$` },
-          { h: 'Answer', d: askSum ? `$${x} ${sg(y)} ${sg(z)} = ${value}$` : `$${AX[c]} = ${value}$` }
+          { h: 'Three parallelograms', d: 'The fourth vertex is $A + B - C$, $A + C - B$ or $B + C - A$, coordinate by coordinate, according as $AB$, $AC$ or $BC$ is a diagonal' },
+          { h: 'Candidates', d: cand.map(c => `$${c.tex} = (${c.D.join(', ')})$`).join(', ') },
+          { h: 'The octant', d: `In $${oct.name}$: ${oct.s.map((x, k) => `$${AX[k]}$ ${signWord(x)}`).join(', ')}; only $(${T.join(', ')})$ fits` },
+          { h: 'Answer', d: target === 'sum' ? `$${T[0]} ${sg(T[1])} ${sg(T[2])} = ${value}$` : `$${T.filter((_, k) => k !== target).map(t => `${par(t)}^2`).join(' + ')} = ${value}$` }
         ],
-        reasoning: 'axis-distances'
+        reasoning: 'parallelogram-octant'
       };
     }
     if (kind === 'lattice-octant') {
       const oct = rc(rng, OCTANTS);
       const ax = ri(rng, 0, 2);
-      const r = ri(rng, 4, 9), h = ri(rng, 2, 7);
+      const r = ri(rng, 3, 5), h = ri(rng, 2, 6);
       const strict = rng() < 0.5;
       const ok2 = (a, b) => (strict ? a * a + b * b < r * r : a * a + b * b <= r * r);
       let pairs = 0, pairs0 = 0;
@@ -300,10 +318,11 @@ function pointCore(rng) {
 // Dot point 1 · Find the distance between two points in space
 // ═════════════════════════════════════════════════════════════════════════════
 
-const NORMS = [9, 11, 14, 17, 18, 21, 22, 26, 27, 29, 30, 33, 34, 35, 38, 41];
-const VECS = Object.fromEntries(NORMS.map(N => {
+/** Radii² with several lattice points on the circle u² + v² = N. */
+const CIRCLE_NORMS = [5, 10, 13, 17, 25, 26, 29, 34, 37, 41, 50, 65, 85];
+const CIRCLE_PTS = Object.fromEntries(CIRCLE_NORMS.map(N => {
   const out = [];
-  for (let a = -6; a <= 6; a++) for (let b = -6; b <= 6; b++) for (let c = -6; c <= 6; c++) if (a * a + b * b + c * c === N) out.push([a, b, c]);
+  for (let a = -10; a <= 10; a++) for (let b = -10; b <= 10; b++) if (a * a + b * b === N) out.push([a, b]);
   return [N, out];
 }));
 const PLANES = [{ tex: '$yz$-plane', zero: 0 }, { tex: '$zx$-plane', zero: 1 }, { tex: '$xy$-plane', zero: 2 }];
@@ -319,53 +338,80 @@ function distanceReasoning(rng) {
 }
 
 function distanceCore(rng) {
-  const kind = rc(rng, ['equidistant-plane', 'right-angle-k']);
+  // The right angle with a rejected root and the two-condition point carry the
+  // form in equal shares.
+  const kind = rng() < 0.5 ? 'equidistant-circle' : 'right-angle-k';
   for (let guard = 0; guard < 2000; guard++) {
-    if (kind === 'equidistant-plane') {
+    if (kind === 'equidistant-circle') {
+      // Points of a coordinate plane equidistant from A and B lie on a line
+      // there (idea 1); a given distance from O adds a circle, so there are two
+      // such points (idea 2). Built from two lattice points P1, P2 of the circle.
       const plane = rc(rng, PLANES);
       const [i, j] = [0, 1, 2].filter(t => t !== plane.zero);
-      const P = [0, 0, 0];
-      P[i] = ri(rng, -5, 5); P[j] = ri(rng, -5, 5);
-      const N = rc(rng, NORMS);
-      const vs = VECS[N];
-      const pick = [rc(rng, vs), rc(rng, vs), rc(rng, vs)];
-      const [A, B, C] = pick.map(d => d.map((v, t) => v + P[t]));
-      if (new Set([A, B, C].map(String)).size < 3) continue;
-      if ([A, B, C].some(X => X.every(v => v === 0))) continue;
-      // PA² = PB²  ⇔  2(B − A)·X = |B|² − |A|², with X on the plane.
-      const eq = (U, V) => [2 * (V[i] - U[i]), 2 * (V[j] - U[j]), sumSq(V) - sumSq(U)];
-      const e1 = eq(A, B), e2 = eq(A, C);
-      const det = e1[0] * e2[1] - e1[1] * e2[0];
-      if (det === 0) continue;
-      const askDist = rng() < 0.5;
-      const value = askDist ? N : P[i] + P[j];
+      const N = rc(rng, CIRCLE_NORMS);
+      const q1 = rc(rng, CIRCLE_PTS[N]), q2 = rc(rng, CIRCLE_PTS[N]);
+      if (q1[0] === q2[0] && q1[1] === q2[1]) continue;
+      const P1 = [0, 0, 0], P2 = [0, 0, 0];
+      P1[i] = q1[0]; P1[j] = q1[1]; P2[i] = q2[0]; P2[j] = q2[1];
+      // w = B − A: its in-plane part is perpendicular to P1P2.
+      const dx = q1[0] - q2[0], dy = q1[1] - q2[1], g0 = gcd(dx, dy);
+      const sc = rc(rng, [1, -1, 2, -2]);
+      const w = [0, 0, 0];
+      w[i] = (-dy / g0) * sc; w[j] = (dx / g0) * sc; w[plane.zero] = ri(rng, -3, 3);
+      if (w.some(t => Math.abs(t) > 6)) continue;
+      const W2 = sumSq(w);
+      if (W2 % 2) continue;
+      // PA = PB at P1: A·w = P1·w − |w|²/2.
+      const rhs = P1.reduce((acc, p, t) => acc + p * w[t], 0) - W2 / 2;
+      const ts = rc(rng, [0, 1, 2].filter(t => w[t] !== 0));
+      const A = [ri(rng, -8, 8), ri(rng, -8, 8), ri(rng, -8, 8)];
+      const rest = A.reduce((acc, a, t) => (t === ts ? acc : acc + a * w[t]), 0);
+      if ((rhs - rest) % w[ts] !== 0) continue;
+      A[ts] = (rhs - rest) / w[ts];
+      const B = A.map((a, t) => a + w[t]);
+      if ([...A, ...B].some(t => Math.abs(t) > 12)) continue;
+      const askPA = rng() < 0.5;
+      const c = rc(rng, [i, j]);
+      const value = askPA ? d2(P1, A) + d2(P2, A) : P1[c] + P2[c];
       if (value === 0) continue;
-      const red = e => { const g = gcd(gcd(e[0], e[1]), e[2]) * ((e[0] || e[1]) < 0 ? -1 : 1); return e.map(v => v / g); };
-      const r1 = red(e1), r2 = red(e2);
+      // The line on the plane: a·u + b·v = e, reduced.
+      let a = 2 * w[i], b = 2 * w[j], e = sumSq(B) - sumSq(A);
+      const g1 = gcd(gcd(a, b), e) * ((a || b) < 0 ? -1 : 1);
+      a /= g1; b /= g1; e /= g1;
       const vi = AX[i], vj = AX[j];
-      const cen = [i, j].map(t => R(A[t] + B[t] + C[t], 3));
-      const linStep = (e, r) => `$${lin2(e[0], vi, e[1], vj)} = ${e[2]}$${r[0] === e[0] && r[1] === e[1] ? '' : `, i.e. $${lin2(r[0], vi, r[1], vj)} = ${r[2]}$`}`;
+      // Eliminate v (or u when b = 0) and show the quadratic.
+      let elim;
+      if (b !== 0) {
+        const Qc = [a * a + b * b, -2 * a * e, e * e - b * b * N];
+        const gq = gcd(gcd(Qc[0], Qc[1]), Qc[2]);
+        const vSub = Math.abs(b) === 1 ? lin(-a * b, e * b, vi) : `\\dfrac{${lin(-a, e, vi)}}{${b}}`;
+        elim = `Substituting $${vj} = ${vSub}$: $${polyTex(Qc.map(t => t / gq), vi)} = 0$, so $${vi} = ${P1[i]}$ or $${vi} = ${P2[i]}$`;
+      } else {
+        elim = `$${vi} = ${rTex(R(e, a))}$, so $${vj}^2 = ${N - (e / a) ** 2}$ and $${vj} = ${P1[j]}$ or $${vj} = ${P2[j]}$`;
+      }
+      const asked = askPA ? 'the sum of the values of $PA^2$ over all such points $P$' : `the sum of the $${AX[c]}$-coordinates of all such points $P$`;
       return {
-        prompt: `Find the point in the ${plane.tex} that is equidistant from $${pt('A', A)}$, $${pt('B', B)}$ and $${pt('C', C)}$. Give ${askDist ? 'the square of its distance from $A$' : 'the sum of its coordinates'}.`,
+        prompt: `Find every point $P$ of the ${plane.tex} that is equidistant from $${pt('A', A)}$ and $${pt('B', B)}$ and is at a distance $${surdTex(N)}$ from the origin. Give ${asked}.`,
         answerType: 'numeric', answer: { value },
-        traps: traps(value, askDist
-          ? [{ value: sumSq(P), why: 'That is the square of its distance from the origin, not from $A$.' },
-            { value: P[i] + P[j], why: 'That is the sum of the coordinates of the point, not the square of its distance from $A$.' }]
-          : [{ value: add(cen[0], cen[1]).value, why: 'That is the projection of the centroid of triangle $ABC$; the centroid is not, in general, equidistant from the three vertices.' },
-            { value: N, why: 'That is the square of the common distance, not the sum of the coordinates.' },
-            { value: sumSq(P), why: 'That is the square of the distance of the point from the origin, not the sum of its coordinates.' }]),
+        traps: traps(value, [
+          { value: askPA ? d2(P1, A) : P1[c], why: 'That counts only one point: the points equidistant from $A$ and $B$ form a line on the plane, and it meets the circle about $O$ twice.' },
+          { value: askPA ? d2(P2, A) : P2[c], why: 'That counts only one point: there are two points satisfying both conditions.' },
+          askPA ? { value: 2 * N, why: 'That adds $OP^2$ for the two points, not $PA^2$.' }
+            : { value: P1[i] + P1[j] + P2[i] + P2[j], why: `That adds every coordinate of both points; the question asks only for the $${AX[c]}$-coordinates.` }
+        ]),
         hints: [
-          `On the ${plane.tex} the point is $P$ with $${AX[plane.zero]} = 0$; call its other coordinates $${vi}$ and $${vj}$.`,
-          '$PA = PB$ is the same as $PA^2 = PB^2$; the squared terms in the unknowns cancel and a linear equation is left.',
-          'Do the same with $PA = PC$, and solve the two linear equations together.'
+          `On the ${plane.tex}, $${AX[plane.zero]} = 0$; write $P$ with its other two coordinates unknown.`,
+          '$PA = PB$ is the same as $PA^2 = PB^2$; the squared terms cancel, leaving a linear equation.',
+          'The distance from the origin gives a second, quadratic, equation; solve the two together and keep every solution.'
         ],
         steps: [
-          { h: 'PA² = PB²', d: linStep(e1, r1) },
-          { h: 'PA² = PC²', d: linStep(e2, r2) },
-          { h: 'Solve', d: `$${vi} = ${P[i]}$, $${vj} = ${P[j]}$, so the point is $${pt('P', P)}$` },
-          { h: 'Answer', d: askDist ? `$PA^2 = ${A.map((v, t) => `${par(v - P[t])}^2`).join(' + ')} = ${N}$` : `$${P[i]} ${sg(P[j])} = ${value}$` }
+          { h: 'PA² = PB²', d: `$${lin2(a, vi, b, vj)} = ${e}$` },
+          { h: 'Distance from O', d: `$${vi}^2 + ${vj}^2 = ${N}$` },
+          { h: 'Solve together', d: elim },
+          { h: 'The points', d: `$${pt('P_1', P1)}$ and $${pt('P_2', P2)}$` },
+          { h: 'Answer', d: askPA ? `$${d2(P1, A)} + ${d2(P2, A)} = ${value}$` : `$${P1[c]} ${sg(P2[c])} = ${value}$` }
         ],
-        reasoning: 'equidistant-plane'
+        reasoning: 'equidistant-circle'
       };
     }
     // right-angle-k. A right angle at C puts C on the sphere with diameter AB,
@@ -467,7 +513,8 @@ function sectionReasoning(rng) {
 }
 
 function sectionCore(rng) {
-  const kind = rc(rng, ['planes-meet', 'two-positions', 'tetrahedron']);
+  const u0 = rng();
+  const kind = u0 < 0.3 ? 'planes-meet' : u0 < 0.7 ? 'two-positions' : 'ratio-equidistant';
   for (let guard = 0; guard < 2000; guard++) {
     if (kind === 'planes-meet') {
       const A = [nz(rng, -8, 8), nz(rng, -8, 8), nz(rng, -8, 8)];
@@ -552,66 +599,57 @@ function sectionCore(rng) {
         reasoning: askGap ? 'two-positions-ac' : 'two-positions-sum'
       };
     }
-    // tetrahedron
-    if (rng() < 0.5) {
-      const A = [ri(rng, -9, 9), ri(rng, -9, 9), ri(rng, -9, 9)];
-      const B = [ri(rng, -9, 9), ri(rng, -9, 9), ri(rng, -9, 9)];
-      const C = [ri(rng, -9, 9), ri(rng, -9, 9), ri(rng, -9, 9)];
-      const G = [ri(rng, -4, 4), ri(rng, -4, 4), ri(rng, -4, 4)];
-      const D = G.map((g, t) => 4 * g - A[t] - B[t] - C[t]);
-      if (D.some(d => Math.abs(d) > 20 || d === 0)) continue;
-      if (new Set([A, B, C, D].map(String)).size < 4) continue;
-      const target = rc(rng, ['origin', 0, 1, 2]);
-      const meas = X => (target === 'origin' ? sumSq(X) : sumSq(X) - X[target] ** 2);
-      const value = meas(D);
-      const D3 = G.map((g, t) => 3 * g - A[t] - B[t] - C[t]);
-      const what = target === 'origin' ? 'the origin' : `the $${AX[target]}$-axis`;
-      return {
-        prompt: `In the tetrahedron $ABCD$, $${pt('A', A)}$, $${pt('B', B)}$, $${pt('C', C)}$, and the centroid of the tetrahedron is $${pt('G', G)}$. Find the square of the distance of $D$ from ${what}.`,
-        answerType: 'numeric', answer: { value },
-        traps: traps(value, [
-          { value: meas(D3), why: 'That treats $G$ as the centroid of a triangle; the centroid of a tetrahedron is the average of its FOUR vertices.' },
-          { value: meas(G), why: 'That measures the centroid $G$, not the vertex $D$.' },
-          ...(target === 'origin' ? [] : [{ value: sumSq(D), why: `That is the distance from the origin; the distance from the $${AX[target]}$-axis leaves out the $${AX[target]}$-coordinate.` }])
-        ]),
-        hints: [
-          'The centroid of a tetrahedron is $\\left(\\dfrac{x_1 + x_2 + x_3 + x_4}{4}, \\ldots\\right)$, the average of all four vertices.',
-          'Use it backwards to find each coordinate of $D$.',
-          target === 'origin' ? 'Then use the distance formula from $(0, 0, 0)$.' : `The distance of $(x, y, z)$ from the $${AX[target]}$-axis is the square root of the sum of the squares of the OTHER two coordinates.`
-        ],
-        steps: [
-          { h: 'Centroid', d: `$G = \\dfrac{A + B + C + D}{4}$ coordinate by coordinate, so $D = 4G - A - B - C$` },
-          { h: 'D', d: `$${pt('D', D)}$` },
-          { h: 'Answer', d: target === 'origin' ? `$OD^2 = ${D.map(d => `${par(d)}^2`).join(' + ')} = ${value}$` : `$${D.filter((_, t) => t !== target).map(d => `${par(d)}^2`).join(' + ')} = ${value}$` }
-        ],
-        reasoning: 'tetrahedron-vertex'
-      };
-    }
-    const G1 = [ri(rng, -7, 7), ri(rng, -7, 7), ri(rng, -7, 7)];
-    const D = [ri(rng, -9, 9), ri(rng, -9, 9), ri(rng, -9, 9)];
-    const L = d2(D, G1);
-    if (L === 0) continue;
-    const value = R(9 * L, 16);
+    // ratio-equidistant: P divides AB in λ : 1 (idea 1, section formula with
+    // an unknown ratio); PC = PD is linear in P's coordinates and fixes λ
+    // (idea 2); the sign of λ says internal or external.
+    const A = [ri(rng, -7, 7), ri(rng, -7, 7), ri(rng, -7, 7)];
+    const B = [ri(rng, -7, 7), ri(rng, -7, 7), ri(rng, -7, 7)];
+    const C = [ri(rng, -7, 7), ri(rng, -7, 7), ri(rng, -7, 7)];
+    const D = [ri(rng, -7, 7), ri(rng, -7, 7), ri(rng, -7, 7)];
+    if (d2(A, B) === 0 || d2(C, D) === 0) continue;
+    const w = D.map((d, t) => d - C[t]);
+    const cc = sumSq(D) - sumSq(C);
+    const wA = 2 * w.reduce((acc, wt, t) => acc + wt * A[t], 0), wB = 2 * w.reduce((acc, wt, t) => acc + wt * B[t], 0);
+    // 2w·(A + λB) = cc(1 + λ)  ⇔  λ(wB − cc) = cc − wA.
+    const num = cc - wA, den = wB - cc;
+    if (den === 0 || num === 0 || num === -den) continue;   // no point, P = A, or the line is parallel
+    const lam = R(num, den);
+    const value = R(Math.abs(lam.n), lam.d);
+    if (value.d > 9 || value.n > 30) continue;
+    if (lam.n > 0 && rng() < 0.4) continue;                 // external division in about half the draws
+    const P = divide(A, B, lam.n, lam.d);
+    const tA = R(Math.abs(lam.n), Math.abs(lam.n + lam.d));  // AP/AB
+    const gEq = gcd(gcd(gcd(2 * w[0], 2 * w[1]), 2 * w[2]), cc);
+    const eqTex = (() => {
+      const co = w.map(t => (2 * t) / gEq);
+      let out = '';
+      co.forEach((k, t) => {
+        if (k === 0) return;
+        const body = `${Math.abs(k) === 1 ? '' : Math.abs(k)}${AX[t]}`;
+        out += out ? ` ${k < 0 ? '-' : '+'} ${body}` : `${k < 0 ? '-' : ''}${body}`;
+      });
+      return `${out} = ${cc / gEq}`;
+    })();
     return {
-      prompt: `In the tetrahedron $ABCD$, the vertex $D$ is $${pt('D', D)}$ and the centroid of the face $ABC$ is $${pt('G_1', G1)}$. If $G$ is the centroid of the tetrahedron, find $DG^2$.`,
+      prompt: `The point $P$ lies on the line through $${pt('A', A)}$ and $${pt('B', B)}$, and $P$ is equidistant from $${pt('C', C)}$ and $${pt('D', D)}$. Find $\\dfrac{AP}{PB}$.`,
       answerType: 'numeric', ...exact(value),
       traps: traps(value.value, [
-        { value: L, why: 'That is $DG_1^2$; $G$ lies on $DG_1$ but only three quarters of the way from $D$.' },
-        { value: R(4 * L, 9).value, why: 'Two-thirds of the way along a median is the rule for a triangle; for a tetrahedron the centroid is three quarters of the way from the vertex.' },
-        { value: R(L, 16).value, why: 'That is $GG_1^2$, from the centroid to the face, not from $D$.' }
+        { value: R(value.d, value.n).value, why: 'That is $\\dfrac{PB}{AP}$: if $P$ divides $AB$ in the ratio $\\lambda : 1$, then $AP : PB = \\lambda : 1$.' },
+        { value: tA.value, why: 'That is $\\dfrac{AP}{AB}$, the fraction of the whole of $AB$, not $\\dfrac{AP}{PB}$.' },
+        ...(lam.n < 0 ? [{ value: lam.value, why: 'A ratio of lengths is positive; a negative $\\lambda$ only records that $P$ lies outside the segment $AB$.' }] : [])
       ]),
       hints: [
-        'The centroid of a tetrahedron averages its four vertices; write $A + B + C$ in terms of $G_1$.',
-        'This shows $G$ divides $DG_1$ in a fixed ratio — find it by the section formula.',
-        'Then $DG$ is a fixed fraction of $DG_1$; square it.'
+        'Let $P$ divide $AB$ in the ratio $\\lambda : 1$ and write its coordinates by the section formula.',
+        '$PC = PD$ is the same as $PC^2 = PD^2$; the squares of the coordinates of $P$ cancel and a linear equation is left.',
+        'Substitute the coordinates of $P$ and solve for $\\lambda$; a negative $\\lambda$ means external division, and the ratio of lengths is $|\\lambda|$.'
       ],
       steps: [
-        { h: 'Face centroid', d: '$A + B + C = 3G_1$ coordinate by coordinate' },
-        { h: 'Tetrahedron centroid', d: '$G = \\dfrac{A + B + C + D}{4} = \\dfrac{3G_1 + 1 \\cdot D}{3 + 1}$, so $G$ divides $DG_1$ internally in the ratio $3 : 1$' },
-        { h: 'Length', d: `$DG = \\dfrac{3}{4} DG_1$ and $DG_1^2 = ${D.map((d, t) => `${par(d - G1[t])}^2`).join(' + ')} = ${L}$` },
-        { h: 'Answer', d: `$DG^2 = \\dfrac{9}{16} \\times ${L} = ${rTex(value)}$` }
+        { h: 'Section formula', d: `$P = \\left(${A.map((a, t) => `\\dfrac{${lamLin(a, B[t])}}{\\lambda + 1}`).join(', ')}\\right)$` },
+        { h: 'PC² = PD²', d: `With $P = (x, y, z)$ the squares cancel: $${eqTex}$` },
+        { h: 'Solve for λ', d: `Clearing $\\lambda + 1$: $${lin(den / gEq, 0, '\\lambda')} = ${num / gEq}$, so $\\lambda = ${rTex(lam)}$ and $${ptR('P', P)}$` },
+        { h: 'Answer', d: `$P$ divides $AB$ ${lam.n > 0 ? 'internally' : 'externally'}, and $\\dfrac{AP}{PB} = |\\lambda| = ${rTex(value)}$` }
       ],
-      reasoning: 'tetrahedron-median'
+      reasoning: lam.n > 0 ? 'ratio-equidistant-internal' : 'ratio-equidistant-external'
     };
   }
   return sectionCore(makeRng(FALLBACK_SEED));

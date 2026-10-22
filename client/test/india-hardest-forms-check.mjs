@@ -45,6 +45,8 @@ const { inspect } = await import('../../server/test/selfcheck.mjs');
 const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
 const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
+const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
+const BASE_SOURCE = (await import('node:fs')).readFileSync(new URL('../src/engine/curriculum-in-base.js', import.meta.url), 'utf8');
 const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_COVERS, INDIA_JEE_REPLACEMENT_PROVENANCE, INDIA_RETIRED_RUNGS } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
 const { SOLVE_JEE_C11 } = await import('./india-hardest-solvers-jee-c11.mjs');
 const { SOLVE_JEE_C12 } = await import('./india-hardest-solvers-jee-c12.mjs');
@@ -787,9 +789,15 @@ for (const r of retirements) {
   if (!ok(`${where}: a live chapter`, !!chapter)) continue;
   const grade = indiaChapterGrade(chapter);
   ok(`${where}: the retirement gives a reason`, typeof r.reason === 'string' && r.reason.length > 20);
-  // It was really there: the load-time log records the cover as claimed before the rung went.
+  // It was really there, by evidence independent of the retirement code: the
+  // native coverage table claims it, or the chapter is declared `native: true`
+  // in curriculum-in-base.js (its own generator at every dot point, D1–D4).
+  const declaredNative = (INDIA_NATIVE_COVERS[r.chapterId] || []).some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff));
+  const declaredWhole = r.gen === r.chapterId && new RegExp(`C\\('${r.chapterId}',[^)]*\\][^)]*\\{\\s*native:\\s*true\\s*\\}\\)`).test(BASE_SOURCE) && !INDIA_NATIVE_COVERS[r.chapterId];
+  ok(`${where}: a declared coverage source claimed the rung`, declaredNative || declaredWhole);
+  // …and the load-time log records the cover as it stood when the rung went.
   const logged = INDIA_RETIRED_LOG.find(l => l.chapterId === r.chapterId && l.gen === r.gen && l.dp === r.dp && l.diff === r.diff);
-  ok(`${where}: the chapter claimed the rung before it was retired`, !!logged && logged.claimed.dp.includes(r.dp) && logged.claimed.diff.includes(r.diff), JSON.stringify(logged));
+  ok(`${where}: the retirement is logged with the cover it split`, !!logged && logged.claimed.dp.includes(r.dp) && logged.claimed.diff.includes(r.diff), JSON.stringify(logged));
   // It is gone from the live chapter, and only that rung: the generator's other covers stay.
   ok(`${where}: no live cover claims the rung`, !chapter.covers.some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff)));
   ok(`${where}: the generator still serves the chapter's other covers`, chapter.covers.some(c => c.gen === r.gen));

@@ -38,6 +38,7 @@ const primeTest = x => { if (x < 2) return false; for (let d = 2; d < x; d++) if
 const PROPERTY = {
   even: x => x % 2 === 0, odd: x => x % 2 !== 0, prime: primeTest,
   'a multiple of $3$': x => x % 3 === 0, 'multiples of $3$': x => x % 3 === 0,
+  'a multiple of $4$': x => x % 4 === 0, 'a multiple of $5$': x => x % 5 === 0,
   negative: x => x < 0, positive: x => x > 0
 };
 const U_PROPERTY = {
@@ -52,7 +53,19 @@ function result(value, relaxed = []) { return { value, relaxed }; }
 
 // ── 0 · Notation, subsets, power sets ────────────────────────────────────────
 function analyseNotation(p) {
-  let m = p.match(/^Let \$A = ([^$]+)\$ and \$B = ([^$]+)\$\. How many sets \$X\$ satisfy (.+)\?$/);
+  let m = p.match(/^Let \$A = ([^$]+)\$ and \$B = ([^$]+)\$\. How many sets \$X\$ with \$A \\subseteq X \\subseteq B\$ and \$n\(X\) = (\d+)\$ contain at least one element that is (.+)\?$/);
+  if (m) {
+    const A = readSet(m[1]), B = readSet(m[2]), k = Number(m[3]), test = PROPERTY[m[4]];
+    if (!A || !B) return 'could not read A or B';
+    if (!test) return `unknown property ${m[4]}`;
+    if (!A.every(x => B.includes(x))) return 'A is not a subset of B';
+    const full = (1 << B.length) - 1, maskA = B.reduce((acc, x, i) => (A.includes(x) ? acc | (1 << i) : acc), 0);
+    const has = X => B.some((x, i) => (X >> i) & 1 && test(x));
+    const out = countSandwich(maskA, full, X => popcount(X) === k && has(X), [X => popcount(X) === k, X => has(X)]);
+    let loose = 0; for (let X = 0; X <= full; X++) if (popcount(X) === k && has(X)) loose++;
+    return result(out.value, [...out.relaxed, loose]);
+  }
+  m = p.match(/^Let \$A = ([^$]+)\$ and \$B = ([^$]+)\$\. How many sets \$X\$ satisfy (.+)\?$/);
   if (m) {
     const A = readSet(m[1]), B = readSet(m[2]);
     if (!A || !B) return 'could not read A or B';
@@ -61,15 +74,6 @@ function analyseNotation(p) {
     const rest = m[3];
     let cond, relaxedConds = [];
     let c;
-    if ((c = rest.match(/^\$A \\subseteq X \\subseteq B\$ and \$n\(X\) = (\d+)\$$/))) {
-      const k = Number(c[1]);
-      cond = X => popcount(X) === k;
-      relaxedConds = [() => true];
-      // A k-element subset of B with no A ⊆ X condition.
-      let loose = 0; for (let X = 0; X <= full; X++) if (popcount(X) === k) loose++;
-      const out = countSandwich(maskA, full, cond, relaxedConds);
-      return result(out.value, [...out.relaxed, loose]);
-    }
     if ((c = rest.match(/^\$A \\subsetneq X \\subsetneq B\$ \(that is, \$X\$ is different from both \$A\$ and \$B\$\) and have \$n\(X\)\$ (odd|even)$/))) {
       const par = c[1] === 'odd' ? 1 : 0;
       cond = X => X !== maskA && X !== full && popcount(X) % 2 === par;
@@ -95,9 +99,10 @@ function analyseNotation(p) {
     const sub = (X, Y) => (X & ~Y) === 0;
     const dis = (X, Y) => (X & Y) === 0;
     let c, cond, loose;
-    if ((c = rest.match(/^\$X \\subseteq Y\$ and \$n\(Y\) = (\d+)\$$/))) {
+    if ((c = rest.match(/^\$X \\subseteq Y\$ and \$n\(X\) \+ n\(Y\) = (\d+)\$$/))) {
       const k = Number(c[1]);
-      cond = (X, Y) => sub(X, Y) && popcount(Y) === k; loose = [(X, Y) => sub(X, Y), (X, Y) => popcount(Y) === k];
+      cond = (X, Y) => sub(X, Y) && popcount(X) + popcount(Y) === k;
+      loose = [(X, Y) => sub(X, Y), (X, Y) => popcount(X) + popcount(Y) === k, (X, Y) => sub(X, Y) && popcount(Y) === k];
     } else if ((c = rest.match(/^\$X \\subseteq Y\$ and \$n\(Y - X\) = (\d+)\$$/))) {
       const k = Number(c[1]);
       cond = (X, Y) => sub(X, Y) && popcount(Y & ~X) === k; loose = [(X, Y) => sub(X, Y), (X, Y) => popcount(Y & ~X) === k];
@@ -124,20 +129,23 @@ function analyseNotation(p) {
     const rest = m[2];
     let c, allowed, cond;
     const inside = (coll, ok) => { for (let i = 0; i < members; i++) if ((coll >> i) & 1 && !ok(i)) return false; return true; };
-    if ((c = rest.match(/^\$\\mathcal\{S\} \\ne \\emptyset\$ and every member of \$\\mathcal\{S\}\$ has exactly \$(\d+)\$ elements?$/))) {
+    const fullA = members - 1;
+    if ((c = rest.match(/^every member of \$\\mathcal\{S\}\$ has exactly \$(\d+)\$ elements? and \$\\mathcal\{S\}\$ has at least two members$/))) {
       const j = Number(c[1]);
       allowed = i => popcount(i) === j;
-      cond = coll => coll !== 0 && inside(coll, allowed);
-    } else if ((c = rest.match(/^\$\\mathcal\{S\} \\ne \\emptyset\$ and every member of \$\\mathcal\{S\}\$ contains the element \$(-?\d+)\$$/))) {
+      cond = coll => popcount(coll) >= 2 && inside(coll, allowed);
+    } else if ((c = rest.match(/^every member of \$\\mathcal\{S\}\$ contains the element \$(-?\d+)\$ and \$\\mathcal\{S\}\$ has at least two members$/))) {
       const e = A.indexOf(Number(c[1]));
       if (e < 0) return 'the element named is not in A';
       allowed = i => (i >> e) & 1;
-      cond = coll => coll !== 0 && inside(coll, allowed);
-    } else if (rest === '$\\emptyset \\in \\mathcal{S}$ and $A \\in \\mathcal{S}$') {
-      cond = coll => (coll & 1) && ((coll >> (members - 1)) & 1);
-    } else if ((c = rest.match(/^\$\\mathcal\{S\}\$ has exactly \$(\d+)\$ members and \$\\emptyset \\notin \\mathcal\{S\}\$$/))) {
+      cond = coll => popcount(coll) >= 2 && inside(coll, allowed);
+    } else if ((c = rest.match(/^\$\\mathcal\{S\} \\ne \\emptyset\$(, \$\\emptyset \\notin \\mathcal\{S\}\$)? and there is no \$X \\in \\mathcal\{S\}\$ with \$A - X \\in \\mathcal\{S\}\$$/))) {
+      const noEmpty = !!c[1];
+      cond = coll => { if (!coll || (noEmpty && (coll & 1))) return false; for (let i = 0; i < members; i++) if ((coll >> i) & 1 && (coll >> (fullA ^ i)) & 1) return false; return true; };
+      allowed = () => true;
+    } else if ((c = rest.match(/^\$\\mathcal\{S\}\$ has exactly \$(\d+)\$ members and the union of the members of \$\\mathcal\{S\}\$ is \$A\$$/))) {
       const k = Number(c[1]);
-      cond = coll => popcount(coll) === k && !(coll & 1);
+      cond = coll => { if (popcount(coll) !== k) return false; let u = 0; for (let i = 0; i < members; i++) if ((coll >> i) & 1) u |= i; return u === fullA; };
       allowed = () => true;
     } else return 'could not read the condition on the collection';
     let value = 0, withEmpty = 0, anyMember = 0;
@@ -245,7 +253,7 @@ function analyseInclusion(p) {
     const NONE = '(Every student is in at least one of the three clubs|Exactly \\$(\\d+)\\$ students? (?:is|are) in none of the three clubs)';
     let f, known = {};
     if ((f = facts.match(new RegExp(`^${NONE}, and \\$(\\d+)\\$ (?:is|are) in all three\\.$`)))) known = { none: f[2] ? Number(f[2]) : 0, E3: Number(f[3]) };
-    else if ((f = facts.match(/^Of these, \$(\d+)\$ are in exactly one club and \$(\d+)\$ in exactly two\.$/))) known = { E1: Number(f[1]), E2: Number(f[2]) };
+    else if ((f = facts.match(/^Altogether, \$(\d+)\$ students are in exactly one of the clubs and \$(\d+)\$ in exactly two\.$/))) known = { E1: Number(f[1]), E2: Number(f[2]) };
     else if ((f = facts.match(new RegExp(`^${NONE}, and \\$(\\d+)\\$ are in exactly two of the clubs\\.$`)))) known = { none: f[2] ? Number(f[2]) : 0, E2: Number(f[3]) };
     else return 'could not read the survey facts';
     if (f[1] && f[1].startsWith('Exactly') && known.none === 0) return 'a zero count is written as a number';

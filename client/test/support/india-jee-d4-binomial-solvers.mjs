@@ -133,16 +133,17 @@ function readGeneralTerm(q) {
     const h = hits[0];
     return { value: h.y, near: [h.n, h.r, Number(h.x), Number(h.z), Number(B)] };
   }
-  m = p.match(/^Find the coefficient of \$x(?:\^\{(-?\d+)\})?\$ in the expansion of \$\((\d+) ([+-]) (\d*)x\^\{(\d+)\}\)\\left\(x(?:\^\{(\d+)\})? ([+-]) \\dfrac\{(\d+)\}\{x(?:\^\{(\d+)\})?\}\\right\)\^\{(\d+)\}\$\.$/);
+  m = p.match(/^Find the coefficient of \$x(?:\^\{(-?\d+)\})?\$ in the expansion of \$\((\d+) ([+-]) (\d*)x(?:\^\{(\d+)\})?\)\\left\(x(?:\^\{(\d+)\})? ([+-]) \\dfrac\{(\d+)\}\{x(?:\^\{(\d+)\})?\}\\right\)\^\{(\d+)\}\$\.$/);
   if (m) {
     const k = expOf(m[1]);
-    const P0 = big(m[2]), Q0 = (m[3] === '-' ? -1n : 1n) * big(m[4] === '' ? 1 : m[4]), t = Number(m[5]);
+    const P0 = big(m[2]), Q0 = (m[3] === '-' ? -1n : 1n) * big(m[4] === '' ? 1 : m[4]), t = expOf(m[5]);
     const a = expOf(m[6]), c = (m[7] === '-' ? -1n : 1n) * big(m[8]), b = expOf(m[9]), n = Number(m[10]);
     const F = lpow(new Map([[a, 1n], [-b, c]]), n);
     const whole = lmul(new Map([[0, P0], [t, Q0]]), F);
     const value = coeffOf(whole, k);
     const A = coeffOf(F, k), B = coeffOf(F, k - t);
-    return { value, near: [Number(P0 * A), Number(Q0 * B), Number(A + B), Number(-value), Number(P0 * A - Q0 * B)] };
+    return { value, near: [Number(P0 * A), Number(Q0 * B), Number(A + B), Number(-value), Number(P0 * A - Q0 * B),
+      Number(A), Number(B), Number((P0 + Q0) * (A + B))] };
   }
   m = p.match(/^How many terms of the expansion of \$\\left\(\\sqrt(?:\[(\d+)\])?\{(\d+)\} \+ \\sqrt(?:\[(\d+)\])?\{(\d+)\}\\right\)\^\{(\d+)\}\$ are (rational|irrational) numbers\?$/);
   if (m) {
@@ -218,23 +219,25 @@ function readMiddleTerm(q) {
     const mirror = [...E].map(([key, c]) => ({ ...split(key), c })).find(t => t.j === n - S);
     return { value, near: [Number(CS), Number(-value), Number(kr), Number(K), ...(mirror ? [Number(mirror.c * K ** BigInt(n - S))] : [])] };
   }
-  m = p.match(/^The sum of all the coefficients in the expansion of \$\\left\(x(?:\^\{(\d+)\})? ([+-]) \\dfrac\{(\d+)\}\{x(?:\^\{(\d+)\})?\}\\right\)\^\{n\}\$ is \$(-?\d+)\$\. Find the coefficient of its middle term; if the expansion has two middle terms, give the sum of their coefficients\.$/);
+  m = p.match(/^In the expansion of \$\\left\(x(?:\^\{(\d+)\})? \+ \\dfrac\{(\d+)\}\{x(?:\^\{(\d+)\})?\}\\right\)\^\{n\}\$, the coefficients of the (\d+)(?:st|nd|rd|th) and (\d+)(?:st|nd|rd|th) terms are in the ratio \$(\d+) : (\d+)\$\. Find the coefficient of its middle term; if the expansion has two middle terms, give the sum of their coefficients\.$/);
   if (m) {
-    const a = expOf(m[1]), c = (m[2] === '-' ? -1n : 1n) * big(m[3]), b = expOf(m[4]), S = big(m[5]);
+    const a = expOf(m[1]), c = big(m[2]), b = expOf(m[3]);
+    const j = Number(m[4]), j2 = Number(m[5]), P = big(m[6]), Q = big(m[7]);
+    if (j2 !== j + 1) return { problems: ['the two terms are not consecutive'] };
     const base = new Map([[a, 1n], [-b, c]]);
-    const ns = [];
+    // Expand for every n and read the jth and (j+1)th terms in descending powers of x.
+    const ordered = E => [...E].sort((u, v) => v[0] - u[0]).map(([, v]) => v);
+    const hits = [];
     let E = new Map([[0, 1n]]);
-    for (let n = 1; n <= 60; n++) {
+    for (let n = 1; n <= 80; n++) {
       E = lmul(E, base);
-      let total = 0n;
-      for (const v of E.values()) total += v;
-      if (total === S) ns.push({ n, E: new Map(E) });
+      const terms = ordered(E);
+      if (terms.length !== n + 1) return { problems: ['terms merged in the expansion'] };
+      if (terms.length < j + 1) continue;
+      if (terms[j - 1] * Q === terms[j] * P) hits.push({ n, terms });
     }
-    if (ns.length !== 1) return { problems: [`${ns.length} values of n give the sum`] };
-    const { n, E: X } = ns[0];
-    // Terms in descending powers of x; there are n + 1 of them, all non-zero.
-    const terms = [...X].sort((u, v) => v[0] - u[0]).map(([, v]) => v);
-    if (terms.length !== n + 1) return { problems: ['terms merged in the expansion'] };
+    if (hits.length !== 1) return { problems: [`${hits.length} values of n give that ratio`] };
+    const { n, terms } = hits[0];
     const mids = terms.length % 2 === 1 ? [terms[(terms.length - 1) / 2]] : [terms[terms.length / 2 - 1], terms[terms.length / 2]];
     const value = mids.reduce((s, v) => s + v, 0n);
     const near = mids.length === 2 ? [Number(mids[0]), Number(mids[1]), Number(-value), Number(mids[0] - mids[1])]

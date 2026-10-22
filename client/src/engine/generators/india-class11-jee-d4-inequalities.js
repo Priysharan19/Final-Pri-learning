@@ -18,9 +18,11 @@
 //      natural-count — solve for x (with the reversal), THEN turn "exactly N
 //        natural-number solutions" into a unit window for the end point, and
 //        count (or take the extreme of) the integers k that land in it.
-//      canteen-price — a ₹ profit inequality that must hold on EVERY day of a
-//        range of sales: divide by the (positive) number sold, find the worst
-//        day, THEN the least whole-rupee price, strict or not.
+//      sign-casework — (k − p)x op uk + w for every x in an interval: the
+//        coefficient of x changes sign with k, so the cases k > p, k = p and
+//        k < p are solved separately (the direction reverses in the last), THEN
+//        in each case only one end of the interval binds; the cases combine
+//        into one interval of k.
 //  · c11-inequality-system-jee-reasoning (dot point 1, systems)
 //      exact-count — a fixed inequality and one with a parameter a: solve both
 //        (one may reverse), THEN translate "exactly N integer solutions" into a
@@ -32,8 +34,12 @@
 //      lattice-count — four half-planes; read off which side of each line is
 //        kept, THEN count lattice points column by column with strict lines
 //        excluded.
-//      region-area — find the corner points (which line binds where), THEN the
-//        exact area of the polygon.
+//      region-area — find the corner points (which line binds where, one of the
+//        listed constraints sometimes redundant), THEN the exact area.
+//      area-parameter — a rectangle cut by ax + by ≤ k has a given area: decide
+//        from the areas at the corner values of k whether the region is a
+//        triangle, a trapezium or the rectangle with a corner cut off, THEN solve
+//        that piece's equation for k, rejecting the root outside the piece.
 //      moving-point — a point depending on k lies in a region given by three
 //        half-planes: substituting turns the region into a system in k (with
 //        reversals), THEN count / take the extreme of the integers k.
@@ -53,7 +59,7 @@
 // Asked for any rung other than D4, each generator returns its D4 form.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
-import { exact as exactForm, frac, fracTex, traps, IN_CITIES, IN_NAMES } from './india-native-helpers.js';
+import { exact as exactForm, frac, fracTex, traps } from './india-native-helpers.js';
 
 /** An exact answer that also accepts its exact decimal (see india-class11-jee-hardest.js). */
 function exact(f, suffix) {
@@ -77,6 +83,7 @@ const TEX = { '<': '<', '<=': '\\le', '>': '>', '>=': '\\ge' };
 const FLIP = { '<': '>', '<=': '>=', '>': '<', '>=': '<=' };
 const strict = op => op === '<' || op === '>';
 const upward = op => op === '>' || op === '>=';     // "x > …" is a lower bound on x
+const holdsOp = (l, op, r) => (op === '<' ? l < r : op === '<=' ? l <= r : op === '>' ? l > r : l >= r);
 
 /** The extreme integer k with k OP K: greatest for < and ≤, least for > and ≥. */
 function extremal(K, OP) {
@@ -115,6 +122,8 @@ function linOver(c, d, den, v) {
   return over(lin(c / g, d / g, v), den / g);
 }
 const ineqTex = (A, B, op, C) => `${linXY(A, B)} ${TEX[op]} ${C}`;
+/** Consecutive integers a … b inside $…$: "a", "a$ and $b", "a$, $a+1$ and $b", or "a, \ldots, b". */
+const run = (a, b) => (b === a ? `${a}` : b - a === 1 ? `${a}$ and $${b}` : b - a === 2 ? `${a}$, $${a + 1}$ and $${b}` : `${a}, \\ldots, ${b}`);
 const andList = items => (items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 
 const FALLBACK_SEED = 0x494e4551;   // "INEQ"
@@ -124,7 +133,8 @@ const FALLBACK_SEED = 0x494e4551;   // "INEQ"
 // ═════════════════════════════════════════════════════════════════════════════
 
 function linearInequalityReasoning(rng) {
-  const kind = rc(rng, ['interval-containment', 'natural-count', 'canteen-price']);
+  const kind = rc(rng, ['interval-containment', 'natural-count', 'sign-casework']);
+  const askOnce = rc(rng, ['count', 'count', 'greatest', 'least']);   // drawn once so retries keep it
   for (let guard = 0; guard < 600; guard++) {
     if (kind === 'interval-containment') {
       // (ax ± k)/m  op  (bx + c)/n  for every x in [α, β].
@@ -157,7 +167,7 @@ function linearInequalityReasoning(rng) {
       ];
       if (isInt(K) && strict(OP)) trapList.push({ value: K.n, why: `At $k = ${K.n}$ the two sides are equal at $x = ${worst}$, and the inequality is strict.` });
       if (!isInt(K)) trapList.push({ value: upward(OP) ? floorQ(K) : ceilQ(K), why: `That value is on the wrong side of the bound on $k$, so the inequality fails at $x = ${worst}$.` });
-      if (!traps(value, trapList).length) continue;
+      trapList.push({ value: upward(OP) ? value - 1 : value + 1, why: `With that $k$ the inequality fails at $x = ${worst}$.` });
       return {
         prompt: `Find the ${word} integer $k$ such that every real number $x$ with $${alpha} \\le x \\le ${beta}$ satisfies $${ineq}$.`,
         answerType: 'numeric', answer: { value },
@@ -201,8 +211,10 @@ function linearInequalityReasoning(rng) {
       const W = kWindow(N);
       const ks = intsIn(W.lo, W.loClosed, W.hi, W.hiClosed);
       if (ks.count < 1 || Math.abs(ks.first) > 80 || Math.abs(ks.last) > 80) continue;
-      const ask = rc(rng, ['count', 'count', 'greatest', 'least']);
+      const ask = askOnce;
       if (ask === 'count' && ks.count < 2) continue;
+      // Integer ends make the open/closed decision matter; prefer them.
+      if (!isInt(W.lo) && !isInt(W.hi) && rng() < 0.75) continue;
       const pick = I => (ask === 'count' ? I.count : ask === 'greatest' ? I.last : I.first);
       const value = pick(ks);
       const Wz = kWindow(N - 1);                              // N among 0, 1, 2, … = N − 1 naturals
@@ -219,7 +231,7 @@ function linearInequalityReasoning(rng) {
         if (!end.closed && isInt(end.q)) trapList.push({ value: end.q.n, why: `At $k = ${end.q.n}$ the number of natural-number solutions is not $${N}$.` });
         trapList.push({ value: ask === 'greatest' ? ks.first : ks.last, why: `That value works, but it is the ${ask === 'greatest' ? 'least' : 'greatest'} such $k$, not the ${ask}.` });
       }
-      if (!traps(value, trapList).length) continue;                // keep draws that have a misconception to offer
+      if (traps(value, trapList).length < 2) continue;             // keep draws with two misconceptions to offer
       const ineq = `\\dfrac{${lin(a, c)}}{${m}} ${TEX[op]} \\dfrac{${lin(b, 0)} + k}{${n}}`;
       const question = ask === 'count'
         ? `For how many integers $k$ does the inequality $${ineq}$ have exactly $${N}$ solutions in natural numbers $x$?`
@@ -238,49 +250,76 @@ function linearInequalityReasoning(rng) {
         steps: [
           { h: 'Clear the denominators', d: `$${n}(${lin(a, c)}) ${TEX[op]} ${m}(${lin(b, 0)} + k)$, so $${cx(e)} ${TEX[op]} ${lin(m, -n * c, 'k')}$` },
           { h: 'Solve for x', d: `${e < 0 ? `Dividing by $${e}$ reverses the inequality: ` : ''}$x ${TEX[xOp]} ${U}$` },
-          { h: `Exactly ${N} natural solutions`, d: `They must be $1, 2, \\ldots, ${N}$ and not $${N + 1}$: $${uRange}$` },
-          { h: 'Interval for k', d: `$${rTex(W.lo)} ${W.loClosed ? '\\le' : '<'} k ${W.hiClosed ? '\\le' : '<'} ${rTex(W.hi)}$, whose integers are $${ks.first}$${ks.count > 1 ? ` to $${ks.last}$` : ''}` },
+          { h: `Exactly ${N} natural solutions`, d: `They must be $${run(1, N)}$ and not $${N + 1}$: $${uRange}$` },
+          { h: 'Interval for k', d: `$${rTex(W.lo)} ${W.loClosed ? '\\le' : '<'} k ${W.hiClosed ? '\\le' : '<'} ${rTex(W.hi)}$, whose integers are $${run(ks.first, ks.last)}$` },
           { h: 'Answer', d: ask === 'count' ? `$${value}$ integer value${value === 1 ? '' : 's'} of $k$` : `$k = ${value}$` }
         ],
         reasoning: ask === 'count' ? 'natural-count' : 'natural-count-extreme'
       };
     }
-    // canteen-price: p·n − c·(n + g) − F (op) 0 for every whole n from n1 to n2.
-    const n1 = ri(rng, 20, 60), n2 = n1 + ri(rng, 15, 80);
-    const cP = ri(rng, 24, 48) * 25;                    // cost per samosa in paise: ₹6 to ₹12 in steps of 25 paise
-    const F = ri(rng, 4, 20) * 50, g = ri(rng, 2, 12);
-    const profit = rng() < 0.6;                          // strict profit, or "no loss"
-    const bound = (n, gg) => R(cP * (n + gg) + 100 * F, 100 * n);   // p must exceed (or reach) this
-    const least = (n, gg) => { const B = bound(n, gg); return profit ? floorQ(B) + 1 : ceilQ(B); };
-    const value = least(n1, g);
-    if (value > 45) continue;
-    const B = bound(n1, g);
-    const rupees = p => (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2));
-    const city = rc(rng, IN_CITIES), name = rc(rng, IN_NAMES);
-    const goal = profit ? 'makes a profit (income strictly more than total cost)' : 'makes no loss (income at least the total cost)';
-    const trapList = [
-      { value: least(n2, g), why: `That price is enough on a day when $${n2}$ samosas are sold, but on a day with only $${n1}$ sold the income ${profit ? 'does not exceed' : 'falls short of'} the cost.` },
-      { value: least(n1, 0), why: `That leaves out the cost of the $${g}$ free samosas, which is paid every day.` }
-    ];
-    if (!isInt(B)) trapList.push({ value: floorQ(B), why: `That rounds the bound down: at that price the income ${profit ? 'does not exceed' : 'falls short of'} the cost on a day with $${n1}$ sold.` });
-    if (profit && isInt(B)) trapList.push({ value: B.n, why: `At ₹$${B.n}$ the income exactly equals the cost on a day with $${n1}$ sold, which is not a profit.` });
+    // sign-casework: (k − p)x op u·k + w for every x in [α, β], with α < u < β.
+    const p = nz(rng, -5, 6);
+    const alpha = ri(rng, -4, 3), beta = alpha + ri(rng, 2, 6);
+    const u = ri(rng, alpha + 1, beta - 1), w = nz(rng, -12, 12);
+    const op = rc(rng, OPS);
+    // At an end x the condition is (x − u)k op w + p·x; x − u < 0 at α and > 0 at β.
+    const endCond = x => ({ x, coef: x - u, rhs: w + p * x, K: R(w + p * x, x - u), D: x - u > 0 ? op : FLIP[op] });
+    const cA = endCond(alpha), cB = endCond(beta);
+    const lower = upward(cA.D) ? cA : cB, upper = lower === cA ? cB : cA;
+    const ks = intsIn(lower.K, !strict(lower.D), upper.K, !strict(upper.D));
+    if (ks.count < 3 || ks.count > 30 || Math.abs(ks.first) > 60 || Math.abs(ks.last) > 60) continue;
+    if (!(ks.first < p && p < ks.last) && rng() < 0.85) continue;      // both signs of the coefficient usually occur
+    const zeroOk = holdsOp(0, op, u * p + w);
+    if (zeroOk !== (ks.first <= p && p <= ks.last)) continue;         // cannot happen; kept as a guard
+    const ask = rc(rng, ['count', 'count', 'least', 'greatest']);
+    const pick = I => (ask === 'count' ? I.count : ask === 'least' ? I.first : I.last);
+    const value = pick(ks);
+    const above = Math.max(ks.first, p + 1) <= ks.last ? { first: Math.max(ks.first, p + 1), last: ks.last } : null;
+    const below = ks.first <= Math.min(ks.last, p - 1) ? { first: ks.first, last: Math.min(ks.last, p - 1) } : null;
+    const trapList = [];
+    if (ask === 'count') {
+      if (zeroOk) trapList.push({ value: value - 1, why: `That leaves out $k = ${p}$: there the coefficient of $x$ is zero and the inequality reads $0 ${TEX[op]} ${u * p + w}$, which is true.` });
+      if (above && below) {
+        trapList.push({ value: above.last - above.first + 1, why: `That counts only values of $k$ greater than $${p}$; for $k < ${p}$ the inequality reverses on dividing by $k ${sg(-p)}$, and some of those values work too.` });
+        trapList.push({ value: below.last - below.first + 1, why: `That counts only values of $k$ less than $${p}$; some values greater than $${p}$ work too.` });
+      }
+      if (strict(op)) trapList.push({ value: intsIn(lower.K, true, upper.K, true).count, why: 'That includes a value of $k$ at which the two sides are equal at an end of the interval, but the inequality is strict.' });
+    } else {
+      const bind = ask === 'least' ? lower : upper;
+      trapList.push({ value: ask === 'least' ? ks.first - 1 : ks.last + 1, why: `With that $k$ the inequality fails at $x = ${bind.x}$.` });
+      trapList.push({ value: ask === 'least' ? ks.last : ks.first, why: `That value works, but it is the ${ask === 'least' ? 'greatest' : 'least'} such $k$, not the ${ask}.` });
+      if (ask === 'least' && above && ks.first < p) trapList.push({ value: above.first, why: `That is the least value above $${p}$, but values of $k$ below $${p}$, where the inequality reverses, also work.` });
+      if (ask === 'greatest' && below && ks.last > p) trapList.push({ value: below.last, why: `That is the greatest value below $${p}$, but values of $k$ above $${p}$ also work.` });
+    }
+    if (!traps(value, trapList).length) continue;
+    const coefTex = `(k ${sg(-p)})`;
+    const rhsTex = lin(u, w, 'k');
+    const ineq = `${coefTex}x ${TEX[op]} ${rhsTex}`;
+    const interval = `$${alpha} \\le x \\le ${beta}$`;
+    const question = ask === 'count'
+      ? `For how many integers $k$ does the inequality $${ineq}$ hold for every real number $x$ with ${interval}?`
+      : `Find the ${ask} integer $k$ for which the inequality $${ineq}$ holds for every real number $x$ with ${interval}.`;
+    // For k > p the ray keeps the direction of op; for k < p it reverses.
+    const posEnd = upward(op) ? cA : cB, negEnd = posEnd === cA ? cB : cA;
+    const times = x => (x === 0 ? '0' : x === 1 ? coefTex : x === -1 ? `-${coefTex}` : `${x}${coefTex}`);
+    const caseLine = c => `the interval lies inside the ray exactly when $x = ${c.x}$ does: $${times(c.x)} ${TEX[op]} ${rhsTex}$, ${c.coef === 1 ? '' : `i.e. $${cx(c.coef, 'k')} ${TEX[op]} ${c.rhs}$, `}so $k ${TEX[c.D]} ${rTex(c.K)}$`;
     return {
-      prompt: `${name} runs a school canteen in ${city}. Each samosa costs ₹$${rupees(cP)}$ to make, the canteen has a fixed cost of ₹$${F}$ a day, and every day $${g}$ samosas are given free to the staff. On any day the canteen sells some whole number of samosas from $${n1}$ to $${n2}$. Find the least whole-rupee selling price per samosa for which the canteen ${goal} on every such day.`,
+      prompt: question,
       answerType: 'numeric', answer: { value },
       traps: traps(value, trapList),
       hints: [
-        'Write the day\'s income and total cost for a day on which $n$ samosas are sold; remember the free ones are made too.',
-        'Divide by $n$, which is positive, so the direction stays. The price must beat a bound that changes with $n$.',
-        'The bound must hold on every day at once, so find the day on which it is largest; then take the least whole rupee that satisfies it, minding whether equality is allowed.'
+        'The coefficient of $x$ depends on $k$. Treat separately the values of $k$ that make it positive, zero and negative.',
+        'For each sign, solve for $x$ (reversing when the coefficient is negative) and ask when the whole interval lies in the solution set: in each case only one end of the interval matters.',
+        'Do not forget the value of $k$ that makes the coefficient zero. Then combine the cases, keeping strict ends open.'
       ],
       steps: [
-        { h: 'Inequality for one day', d: `Selling $n$ at ₹$p$: $pn ${profit ? '>' : '\\ge'} ${rupees(cP)}(n + ${g}) + ${F}$` },
-        { h: 'Solve for p', d: `$p ${profit ? '>' : '\\ge'} ${rupees(cP)} + \\dfrac{${rupees(cP * g + 100 * F)}}{n}$ — dividing by $n > 0$ keeps the direction` },
-        { h: 'Worst day', d: `The bound is largest when $n$ is smallest, $n = ${n1}$: $p ${profit ? '>' : '\\ge'} ${rTex(B)}$${isInt(B) ? '' : ` $\\approx ${(B.n / B.d).toFixed(2)}$`}` },
-        { h: 'Least whole rupee', d: `₹$${value}$ satisfies it on that day, hence on every day` },
-        { h: 'Answer', d: `₹$${value}$` }
+        { h: `Case k = ${p}`, d: `The inequality reads $0 ${TEX[op]} ${u * p + w}$, which is ${zeroOk ? 'true for every $x$' : 'false'}` },
+        { h: `Case k > ${p}`, d: `Dividing by $k ${sg(-p)} > 0$ keeps the direction: $x ${TEX[op]} \\dfrac{${rhsTex}}{k ${sg(-p)}}$; ${caseLine(posEnd)}` },
+        { h: `Case k < ${p}`, d: `Dividing by $k ${sg(-p)} < 0$ reverses it: $x ${TEX[FLIP[op]]} \\dfrac{${rhsTex}}{k ${sg(-p)}}$; multiplying back by the negative $k ${sg(-p)}$, ${caseLine(negEnd)}` },
+        { h: 'Combine', d: `With the case ranges, $${rTex(lower.K)} ${strict(lower.D) ? '<' : '\\le'} k ${strict(upper.D) ? '<' : '\\le'} ${rTex(upper.K)}$: the integers $${run(ks.first, ks.last)}$` },
+        { h: 'Answer', d: ask === 'count' ? `$${value}$ integers` : `$k = ${value}$` }
       ],
-      reasoning: profit ? 'canteen-price-profit' : 'canteen-price-no-loss'
+      reasoning: ask === 'count' ? 'sign-casework' : 'sign-casework-extreme'
     };
   }
   return linearInequalityReasoning(makeRng(FALLBACK_SEED));
@@ -373,8 +412,8 @@ function inequalitySystemReasoning(rng) {
           { h: 'First inequality', d: first.work },
           { h: 'Least integer solution', d: `$x = ${x0}$` },
           { h: 'Second inequality', d: `$${cx(e2)} ${TEX[op2]} ${lin(1, -Q, 'a')}$, so ${e2 < 0 ? 'reversing, ' : ''}$x ${TEX[xOp2]} ${Utex}$` },
-          { h: `Exactly ${N} integers`, d: `The solutions must be $${x0}, \\ldots, ${x0 + N - 1}$ and not $${x0 + N}$: $${x0 + N - 1} ${uWin.loClosed ? '\\le' : '<'} ${Utex} ${uWin.hiClosed ? '\\le' : '<'} ${x0 + N}$` },
-          { h: 'Range of a', d: `$${W.lo.n} ${W.loClosed ? '\\le' : '<'} a ${W.hiClosed ? '\\le' : '<'} ${W.hi.n}$: the integers $${as.first}$${as.count > 1 ? ` to $${as.last}$` : ''}` },
+          { h: `Exactly ${N} integers`, d: `The solutions must be $${run(x0, x0 + N - 1)}$ and not $${x0 + N}$: $${x0 + N - 1} ${uWin.loClosed ? '\\le' : '<'} ${Utex} ${uWin.hiClosed ? '\\le' : '<'} ${x0 + N}$` },
+          { h: 'Range of a', d: `$${W.lo.n} ${W.loClosed ? '\\le' : '<'} a ${W.hiClosed ? '\\le' : '<'} ${W.hi.n}$: the integers $${run(as.first, as.last)}$` },
           { h: 'Answer', d: ask === 'count' ? `$${value}$ integer value${value === 1 ? '' : 's'} of $a$` : `$a = ${value}$` }
         ],
         reasoning: ask === 'count' ? 'exact-count' : 'exact-count-extreme'
@@ -425,7 +464,7 @@ function inequalitySystemReasoning(rng) {
       steps: [
         { h: 'First inequality', d: first.work },
         { h: 'Second inequality', d: `$${cx(e2)} ${TEX[op2]} ${S - Q}$, so ${e2 < 0 ? 'reversing, ' : ''}$x ${TEX[xOp2]} ${rTex(B)}$` },
-        { h: 'Integer solutions of the two', d: `$x = ${M - x0 <= 2 ? Array.from({ length: M - x0 + 1 }, (_, i) => x0 + i).join(', ') : `${x0}, \\ldots, ${M}`}$` },
+        { h: 'Integer solutions of the two', d: `$x = ${run(x0, M)}$` },
         { h: 'Third inequality', d: `$${lin(t, -c3)} ${TEX[op3]} k$ must hold for some such $x$; $${lin(t, -c3)}$ is ${wantGreatest ? 'largest' : 'smallest'} at $x = ${atX}$, where it is $${best}$` },
         { h: 'Answer', d: `$k ${TEX[FLIP[op3]]} ${best}$, so the ${word} integer is $k = ${value}$` }
       ],
@@ -452,7 +491,9 @@ function columnBound(A, B, op, C, x) {
 }
 
 function inequalityRegionReasoning(rng) {
-  const kind = rc(rng, ['lattice-count', 'region-area', 'moving-point']);
+  const kind = rc(rng, ['lattice-count', 'lattice-count', 'region-area', 'area-parameter', 'area-parameter', 'moving-point', 'moving-point']);
+  const shape = rc(rng, ['triangle', 'trapezium', 'cut-rectangle']);     // for area-parameter, drawn once so retries keep it
+  const askOnce = rc(rng, ['count', 'count', 'least', 'greatest']);     // for moving-point, likewise
   for (let guard = 0; guard < 800; guard++) {
     if (kind === 'lattice-count') {
       const xl = rc(rng, [0, 0, 1, -1, -2]), yl = rc(rng, [0, 0, 1, -1]);
@@ -545,18 +586,20 @@ function inequalityRegionReasoning(rng) {
         ];
       } else if (shape === 'between-left') {
         area = mulQ(R(Y1 - Y2, 2), Px);
-        items = [`$x \\ge ${p0}$`, `$${ineqTex(A1, B1, '<=', C1)}$`, `$${ineqTex(A2, B2, '>=', C2)}$`];
+        items = [`$x \\ge ${p0}$`, `$y \\ge ${q0}$`, `$${ineqTex(A1, B1, '<=', C1)}$`, `$${ineqTex(A2, B2, '>=', C2)}$`];   // y ≥ q0 is redundant
         corners = [pt(R(0), R(Y2)), pt(R(0), R(Y1)), pt(Px, Py)];
         trapList = [
           { value: (Y1 - Y2) * Px.n / Px.d, why: 'That is the base times the height; the area of a triangle is half of that.' },
+          { value: (Y1 - Y2) * X1 / 2, why: `That runs the triangle out to where $${linXY(A1, B1)} = ${C1}$ meets $y = ${q0}$, but the region ends where the two slanted lines meet, at $x = ${rTex(add(Px, R(p0)))}$; the condition $y \\ge ${q0}$ never binds.` },
           ...(p0 === 0 ? [] : [{ value: Math.abs((Y1 - Y2) * (Px.n / Px.d + p0) / 2), why: `That takes the width as the $x$-coordinate of the corner where the lines meet, but the vertical side lies on $x = ${p0}$, so the width is measured from there.` }])
         ];
       } else {
         area = mulQ(R(X2 - X1, 2), Py);
-        items = [`$y \\ge ${q0}$`, `$${ineqTex(A1, B1, '>=', C1)}$`, `$${ineqTex(A2, B2, '<=', C2)}$`];
+        items = [`$x \\ge ${p0}$`, `$y \\ge ${q0}$`, `$${ineqTex(A1, B1, '>=', C1)}$`, `$${ineqTex(A2, B2, '<=', C2)}$`];   // x ≥ p0 is redundant
         corners = [pt(R(X1), R(0)), pt(R(X2), R(0)), pt(Px, Py)];
         trapList = [
           { value: (X2 - X1) * Py.n / Py.d, why: 'That is the base times the height; the area of a triangle is half of that.' },
+          { value: (X2 - X1) * Y2 / 2, why: `That takes the height where $${linXY(A2, B2)} = ${C2}$ meets $x = ${p0}$, but the region's top corner is where the two slanted lines meet, at $y = ${rTex(add(Py, R(q0)))}$; the condition $x \\ge ${p0}$ never binds.` },
           ...(q0 === 0 ? [] : [{ value: Math.abs((X2 - X1) * (Py.n / Py.d + q0) / 2), why: `That takes the height as the $y$-coordinate of the corner where the lines meet, but the base lies on $y = ${q0}$, so the height is measured from there.` }])
         ];
       }
@@ -580,6 +623,68 @@ function inequalityRegionReasoning(rng) {
           { h: 'Answer', d: `$${rTex(area)}$ square units` }
         ],
         reasoning: `region-area-${shape}`
+      };
+    }
+    if (kind === 'area-parameter') {
+      // 0 ≤ x ≤ P, 0 ≤ y ≤ Q, ax + by ≤ k. The line passes (P, 0) at k = aP, (0, Q)
+      // at k = bQ and (P, Q) at k = aP + bQ; the area is piecewise in k.
+      const P = ri(rng, 2, 8), Qh = ri(rng, 2, 8), a = ri(rng, 1, 4), b = ri(rng, 1, 4);
+      if (gcd(a, b) > 1) continue;
+      const kx = a * P, ky = b * Qh, k3 = kx + ky, k1 = Math.min(kx, ky), k2 = Math.max(kx, ky);
+      const xFirst = kx <= ky;                                       // the line reaches (P, 0) first
+      // Pick the shape first, then a half-integer k strictly inside its range.
+      const piece = shape;
+      if (piece === 'trapezium' && k1 === k2) continue;
+      const [kLo, kHi] = piece === 'triangle' ? [0, k1] : piece === 'trapezium' ? [k1, k2] : [k2, k3];
+      if (kHi - kLo < 1) continue;
+      const kq = R(ri(rng, 2 * kLo + 1, 2 * kHi - 1), 2);
+      const kv = kq.n / kq.d;
+      if (kv < 2) continue;
+      const ab2 = 2 * a * b;
+      const t = R(k3 * kq.d - kq.n, kq.d);                           // k3 − k
+      const A = piece === 'triangle' ? R(kq.n * kq.n, kq.d * kq.d * ab2)
+        : piece === 'trapezium' ? (xFirst ? R(2 * P * kq.n - a * P * P * kq.d, 2 * b * kq.d) : R(2 * Qh * kq.n - b * Qh * Qh * kq.d, 2 * a * kq.d))
+          : R(P * Qh * ab2 * t.d * t.d - t.n * t.n, ab2 * t.d * t.d);
+      if (100 % A.d !== 0 || A.n <= 0) continue;
+      const Av = A.n / A.d;
+      const areaAt = k => (k <= k1 ? k * k / ab2 : k <= k2 ? (xFirst ? (2 * P * k - a * P * P) / (2 * b) : (2 * Qh * k - b * Qh * Qh) / (2 * a)) : P * Qh - (k3 - k) ** 2 / ab2);
+      const corner = which => (kx === ky ? `$(${P}, 0)$ and $(0, ${Qh})$` : (which === 1) === xFirst ? `$(${P}, 0)$` : `$(0, ${Qh})$`);
+      const triK = Math.sqrt(ab2 * Av);
+      const trapK = xFirst ? (2 * b * Av + a * P * P) / (2 * P) : (2 * a * Av + b * Qh * Qh) / (2 * Qh);
+      const cutK = k3 - Math.sqrt(ab2 * (P * Qh - Av));
+      const trapList = [];
+      if (piece !== 'triangle') trapList.push({ value: triK, why: `That treats the region as a triangle cut off by the line, but at that $k$ the line has already passed ${corner(1)}, so the region is not a triangle.` });
+      if (piece === 'triangle' && k1 < k2) trapList.push({ value: trapK, why: `That uses the trapezium formula, but at that $k$ the line has not yet reached ${corner(1)}, so the region is still a triangle.` });
+      if (piece === 'cut-rectangle' && k1 < k2) trapList.push({ value: trapK, why: `That uses the trapezium formula, but at that $k$ the line has already passed ${corner(2)} as well, so a corner of the rectangle is cut off instead.` });
+      if (piece !== 'cut-rectangle') trapList.push({ value: cutK, why: `That treats the region as the rectangle with one corner cut off, but at that $k$ the line has not yet passed ${corner(2)}.` });
+      if (piece === 'cut-rectangle') trapList.push({ value: k3 + Math.sqrt(ab2 * (P * Qh - Av)), why: `That root is larger than $${k3}$, where the line lies beyond $(${P}, ${Qh})$ and the region would be the whole rectangle.` });
+      if (piece === 'triangle') trapList.push({ value: -kv, why: 'That is the negative root; $k$ is a positive constant.' });
+      const triTex = `\\dfrac{k^2}{${ab2}}`;
+      const trapTex = xFirst ? linOver(2 * P, -a * P * P, 2 * b, 'k') : linOver(2 * Qh, -b * Qh * Qh, 2 * a, 'k');
+      const cutTex = `${P * Qh} - \\dfrac{(${k3} - k)^2}{${ab2}}`;
+      const fmtA = v => String(Number(v.toFixed(4)));
+      const stages = [`for $0 < k \\le ${k1}$ it is a triangle of area $${triTex}$, at most $${fmtA(areaAt(k1))}$`];
+      if (k1 < k2) stages.push(`for $${k1} \\le k \\le ${k2}$ a trapezium of area $${trapTex}$, at most $${fmtA(areaAt(k2))}$`);
+      stages.push(`for $${k2} \\le k \\le ${k3}$ the rectangle with a corner cut off, area $${cutTex}$`);
+      const solveLine = piece === 'triangle' ? `$${triTex} = ${Av}$ gives $k^2 = ${fmtA(ab2 * Av)}$, so $k = ${rTex(kq)}$ (the root $-${rTex(kq)}$ is not positive)`
+        : piece === 'trapezium' ? `$${trapTex} = ${Av}$ gives $k = ${rTex(kq)}$, which is between $${k1}$ and $${k2}$`
+          : `$(${k3} - k)^2 = ${fmtA(ab2 * (P * Qh - Av))}$, so $k = ${k3} \\pm ${rTex(t)}$; only $k = ${rTex(kq)}$ lies between $${k2}$ and $${k3}$`;
+      return {
+        prompt: `The region of the plane given by $0 \\le x \\le ${P}$, $0 \\le y \\le ${Qh}$ and $${linXY(a, b)} \\le k$, where $k$ is a positive constant, has area $${Av}$ square units. Find $k$.`,
+        answerType: 'numeric', ...exact(kq),
+        traps: traps(kv, trapList),
+        hints: [
+          'As $k$ grows the line moves across the rectangle. Find the values of $k$ at which it passes the corners of the rectangle.',
+          'Between those values the region has one shape: a triangle, a trapezium, or the rectangle with one corner cut off. Work out the area at each corner value to see which shape gives the stated area.',
+          'Write the area of that shape in terms of $k$ and solve; keep only a root that lies in the range of $k$ for that shape.'
+        ],
+        steps: [
+          { h: 'Corner values of k', d: `$${linXY(a, b)} = k$ passes through $(${P}, 0)$ at $k = ${kx}$, through $(0, ${Qh})$ at $k = ${ky}$ and through $(${P}, ${Qh})$ at $k = ${k3}$` },
+          { h: 'The shape', d: `${stages.join('; ')}. The area $${Av}$ falls in the ${piece === 'triangle' ? 'first' : piece === 'trapezium' ? 'middle' : 'last'} range, so the region is ${piece === 'triangle' ? 'a triangle' : piece === 'trapezium' ? 'a trapezium' : 'the rectangle with a corner cut off'}` },
+          { h: 'Solve for k', d: solveLine },
+          { h: 'Answer', d: `$k = ${rTex(kq)}$` }
+        ],
+        reasoning: `area-parameter-${piece}`
       };
     }
     // moving-point: (u1·k + v1, u2·k + v2) in the region of three half-planes.
@@ -615,7 +720,7 @@ function inequalityRegionReasoning(rng) {
     if (!sol || sol.count < 2 || sol.count > 14) continue;
     const binding = halves.filter((h, i) => { const s = solve(halves.filter((_, j) => j !== i)); return !s || s.count !== sol.count; });
     if (binding.length < 2) continue;
-    const ask = rc(rng, ['count', 'count', 'least', 'greatest']);
+    const ask = askOnce;
     const pick = I => (ask === 'count' ? I.count : ask === 'least' ? I.first : I.last);
     const value = pick(sol);
     const relaxed = solve(halves, true);
@@ -626,6 +731,10 @@ function inequalityRegionReasoning(rng) {
       if (s) trapList.push({ value: pick(s), why: `That ignores the condition $${ineqTex(h.A, h.B, h.op, h.C)}$.` });
     }
     const unreversed = solve(halves.map(h => ({ ...h, kOp: h.gk < 0 ? FLIP[h.kOp] : h.kOp })));
+    for (const h of halves.filter(x => x.gk < 0)) {
+      const one = solve(halves.map(x => (x === h ? { ...x, kOp: FLIP[x.kOp] } : x)));
+      if (one && one.count > 0) trapList.push({ value: pick(one), why: `That keeps the direction of $${ineqTex(h.A, h.B, h.op, h.C)}$ after dividing by the negative coefficient of $k$.` });
+    }
     if (unreversed && unreversed.count > 0) trapList.push({ value: pick(unreversed), why: 'That keeps the direction of an inequality after dividing it by a negative coefficient of $k$.' });
     if (ask !== 'count') trapList.push({ value: ask === 'least' ? sol.first - 1 : sol.last + 1, why: 'That value of $k$ puts the point outside the region.' });
     if (ask === 'count') {
@@ -637,6 +746,7 @@ function inequalityRegionReasoning(rng) {
       if (!isInt(width)) trapList.push({ value: value === floorQ(width) ? ceilQ(width) : floorQ(width), why: 'That goes by the length of the interval for $k$; the number of integers in it depends on where its ends fall.' });
     }
     if (ask !== 'count') trapList.push({ value: ask === 'least' ? sol.last : sol.first, why: `That value works, but it is the ${ask === 'least' ? 'greatest' : 'least'} such $k$, not the ${ask}.` });
+    if (traps(value, trapList).length < 2) continue;
     const point = `(${lin(u1, v1, 'k')}, ${lin(u2, v2, 'k')})`;
     const region = andList(halves.map(h => `$${ineqTex(h.A, h.B, h.op, h.C)}$`));
     const question = ask === 'count'
@@ -656,7 +766,7 @@ function inequalityRegionReasoning(rng) {
           h: `Substitute into $${ineqTex(h.A, h.B, h.op, h.C)}$`,
           d: h.gk === 1 ? `$k ${TEX[h.op]} ${h.K.n}$` : `$${cx(h.gk, 'k')} ${TEX[h.op]} ${h.C - h.A * v1 - h.B * v2}$, so ${h.gk < 0 ? 'reversing, ' : ''}$k ${TEX[h.kOp]} ${rTex(h.K)}$`
         })),
-        { h: 'Intersect', d: `The integers allowed by all three are $k = ${sol.first}$ to $${sol.last}$` },
+        { h: 'Intersect', d: `The integers allowed by all three are $k = ${run(sol.first, sol.last)}$` },
         { h: 'Answer', d: ask === 'count' ? `$${value}$ integer${value === 1 ? '' : 's'}` : `$k = ${value}$` }
       ],
       reasoning: ask === 'count' ? 'moving-point' : 'moving-point-extreme'

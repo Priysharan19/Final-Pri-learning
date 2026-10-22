@@ -7,22 +7,25 @@
 // generator and its worked steps use:
 //
 //   · circle through three points — the circumcentre by Cramer's rule on the
-//     perpendicular-bisector equations, then BOTH axis crossings by the
-//     quadratic formula (not the sum of the roots);
+//     perpendicular-bisector equations, checked against all three points,
+//     then the chord by substituting the line into the circle;
 //   · chords and tangents — the line substituted into the circle, the chord
 //     from the discriminant of the resulting quadratic; the unknown constant
 //     found by an integer scan (which also shows it is unique); the tangent
 //     values of k as the roots of the discriminant, itself a quadratic in k
 //     recovered by interpolation, then the side test on each;
 //   · parabolas — a from the curvature (how far the curve moves one unit
-//     either side of the vertex), the focal distance as a Euclidean distance,
-//     the triangle by the shoelace formula, the focal chord's other end by
-//     substituting the line through P and the focus into the general equation,
-//     and the unknown coefficient by a numeric scan with bisection over t;
+//     either side of the vertex); every point at the given focal distance
+//     found by a scan along the curve, with the area (shoelace) or the
+//     distance from the vertex required to agree across them; the focal
+//     chord's other end by substituting the line through P and the focus into
+//     the general equation; the unknown coefficient by a numeric scan with
+//     bisection over t;
 //   · ellipses and hyperbolas — a² as the root of the standard-form equation
-//     through the given point (bisection, not the focal-distance definition),
-//     latus-rectum ratios by a scan over a², confocal curves by bisection on
-//     p or by floating-point eccentricities.
+//     through the given point (bisection, not the focal-distance definition);
+//     for the latus-rectum ratio, a scan over a² with b² fixed by the point
+//     and the latus rectum measured as the chord through a focus; confocal
+//     curves by bisection on p or by floating-point eccentricities.
 //
 // Each solver checks that the answer is unique where uniqueness is at stake.
 // NEAR_MISS lists answers a student could plausibly write that must be marked
@@ -123,12 +126,11 @@ function parabolaOf(P, orient) {
 
 function analyseCircle(q) {
   const p = q.prompt;
-  let m = p.match(/^A circle passes through the points \$A\((-?\d+), (-?\d+)\)\$, \$B\((-?\d+), (-?\d+)\)\$ and \$C\((-?\d+), (-?\d+)\)\$\. It meets the \$([xy])\$-axis again at a point \$D\$ other than \$A\$\. Find the \$([xy])\$-coordinate of \$D\$\.$/);
+  let m = p.match(/^A circle passes through the points \$A\((-?\d+), (-?\d+)\)\$, \$B\((-?\d+), (-?\d+)\)\$ and \$C\((-?\d+), (-?\d+)\)\$\. Find the square of the length of the chord that the line \$(.+?) = 0\$ cuts off from this circle\.$/);
   if (m) {
     const [xa, ya, xb, yb, xc, yc] = m.slice(1, 7).map(Number);
-    if (m[7] !== m[8]) return { problems: ['the axis is named two ways'] };
-    const onX = m[7] === 'x';
-    if ((onX ? ya : xa) !== 0) return { problems: ['A is not on the named axis'] };
+    const L = parseTerms(m[7]);
+    if (!L || L.xx || L.yy) return { problems: ['could not read the line'] };
     // Perpendicular bisectors of AB and AC, by Cramer's rule.
     const a1 = 2 * (xb - xa), b1 = 2 * (yb - ya), c1 = xb * xb + yb * yb - xa * xa - ya * ya;
     const a2 = 2 * (xc - xa), b2 = 2 * (yc - ya), c2 = xc * xc + yc * yc - xa * xa - ya * ya;
@@ -136,15 +138,11 @@ function analyseCircle(q) {
     if (det === 0) return { problems: ['the three points are collinear'] };
     const X = (c1 * b2 - c2 * b1) / det, Y = (a1 * c2 - a2 * c1) / det;
     const r2 = (xa - X) ** 2 + (ya - Y) ** 2;
-    // Both crossings of the axis by the quadratic formula.
-    const along = onX ? X : Y, across = onX ? Y : X;
-    const disc = r2 - across * across;
-    if (disc <= 0) return { problems: ['the circle does not cross the axis twice'] };
-    const roots = [along + Math.sqrt(disc), along - Math.sqrt(disc)];
-    const known = onX ? xa : ya;
-    const other = roots.filter(t => !close(t, known, 1e-9));
-    if (other.length !== 1) return { problems: [`${other.length} other crossings`] };
-    return { value: other[0], int: true, alts: [along, known, roots[0] * roots[1]] };
+    if (!close((xb - X) ** 2 + (yb - Y) ** 2, r2) || !close((xc - X) ** 2 + (yc - Y) ** 2, r2)) return { problems: ['circumcentre check failed'] };
+    // The chord by substituting the line into x² + y² − 2Xx − 2Yy + (X² + Y² − r²) = 0.
+    const ch = chordSquared(-2 * X, -2 * Y, X * X + Y * Y - r2, L.x, L.y, L.c);
+    if (!Number.isFinite(ch) || ch <= 0) return { problems: ['the line misses the circle'] };
+    return { value: ch, int: true, alts: [ch / 4, 4 * r2, Math.sqrt(ch)] };
   }
   m = p.match(/^The line \$(.+?) = 0\$ cuts off a chord of length \$(\d+)\$ from the circle \$(.+?) = 0\$\. Find \$p\$\.$/);
   if (m) {
@@ -161,14 +159,6 @@ function analyseCircle(q) {
     if (!(before > len * len && (after < len * len || Number.isNaN(after)))) return { problems: ['the chord is not monotone in p near the root'] };
     const g2f2 = (C.x * C.x + C.y * C.y) / 4;
     return { value: hits[0], int: true, alts: [2 * g2f2 - hits[0]] };
-  }
-  m = p.match(/^Find the square of the length of the chord that the line \$(.+?) = 0\$ cuts off from the circle \$(.+?) = 0\$\.$/);
-  if (m) {
-    const L = parseTerms(m[1]), C = parseTerms(m[2]);
-    if (!L || !C || C.xx !== 1 || C.yy !== 1) return { problems: ['could not read the line or circle'] };
-    const ch = chordSquared(C.x, C.y, C.c, L.x, L.y, L.c);
-    if (!Number.isFinite(ch) || ch <= 0) return { problems: ['the line misses the circle'] };
-    return { value: ch, int: false, alts: [Math.sqrt(ch), ch / 4] };
   }
   m = p.match(/^The line \$(.+?) \+ k = 0\$ touches the circle \$(.+?) = 0\$, and the origin and the centre of the circle lie (on the same side|on opposite sides) of the line\. Find \$k\$\.$/);
   if (m) {
@@ -200,29 +190,26 @@ function analyseCircle(q) {
 
 function analyseParabola(q) {
   const p = q.prompt;
-  let m = p.match(/^The point \$P\$ on the parabola \$(.+?) = 0\$ has \$([xy])\$-coordinate \$(-?\d+)\$\. (Find the distance of \$P\$ from the focus of the parabola\.|Find the area of the triangle whose vertices are \$P\$ and the two end points of the latus rectum of the parabola\.)$/);
+  let m = p.match(/^A point \$P\$ on the parabola \$(.+?) = 0\$ is at a distance \$(\d+)\$ from its focus\. (Find the area of the triangle whose vertices are \$P\$, the focus and the vertex of the parabola\.|Find the square of the distance of \$P\$ from the vertex of the parabola\.)$/);
   if (m) {
     const T = parseTerms(m[1]);
     if (!T) return { problems: ['could not read the parabola'] };
     const orient = T.yy === 1 ? 'y2' : 'x2';
-    if ((orient === 'y2') !== (m[2] === 'y')) return { problems: ['the given coordinate is not the squared variable'] };
     const par = parabolaOf(T, orient);
     if (!par) return { problems: ['not a parabola of the expected shape'] };
-    const w = Number(m[3]), uP = par.u(w);
-    const [px, py] = par.toXY(uP, w), [fx, fy] = par.toXY(...par.focus);
-    // Sanity: the focus found by curvature satisfies the focus–directrix property at a few points.
-    for (const t of [-5, 2, 7]) {
-      const [x, y] = par.toXY(par.u(par.wv + t), par.wv + t);
-      const toDir = Math.abs(par.u(par.wv + t) - (par.uv - par.a));
-      if (!close(Math.hypot(x - fx, y - fy), toDir, 1e-9)) return { problems: ['focus–directrix check failed'] };
-    }
-    if (m[4].startsWith('Find the distance')) {
-      return { value: Math.hypot(px - fx, py - fy), int: true, alts: [Math.abs(uP - par.uv), Math.abs(uP) + Math.abs(par.a), Math.hypot(px, py)] };
-    }
-    const [l1x, l1y] = par.toXY(par.uv + par.a, par.wv + 2 * par.a), [l2x, l2y] = par.toXY(par.uv + par.a, par.wv - 2 * par.a);
-    const area = Math.abs((l1x - px) * (l2y - py) - (l2x - px) * (l1y - py)) / 2;
-    if (area === 0) return { problems: ['P is on the latus rectum'] };
-    return { value: area, int: true, alts: [2 * area, Math.abs(par.a) * 2 * Math.abs(uP - par.uv)] };
+    const ell = Number(m[2]);
+    const [fx, fy] = par.toXY(...par.focus), [vx, vy] = par.toXY(par.uv, par.wv);
+    // Every point of the curve at distance ℓ from the focus, by a scan along the curve.
+    const at = w => par.toXY(par.u(w), w);
+    const f = w => { const [x, y] = at(w); return Math.hypot(x - fx, y - fy) - ell; };
+    const ws = scanRoots(f, par.wv - 150.0001, par.wv + 150.0003, 300000);
+    if (!ws.length) return { problems: ['no point of the parabola is at that distance from the focus'] };
+    const area = w => { const [x, y] = at(w); return Math.abs((fx - vx) * (y - vy) - (x - vx) * (fy - vy)) / 2; };
+    const vp2 = w => { const [x, y] = at(w); return (x - vx) ** 2 + (y - vy) ** 2; };
+    const measure = m[3].startsWith('Find the area') ? area : vp2;
+    const vals = ws.map(measure);
+    if (vals.some(v => !close(v, vals[0], 1e-7))) return { problems: [`the points give different answers: ${vals.join(', ')}`] };
+    return { value: vals[0], int: false, alts: measure === area ? [2 * vals[0], ell * ell] : [ell * ell, Math.sqrt(vals[0])] };
   }
   m = p.match(/^For a non-zero real number \$t\$, the parabola \$(.+?) = 0\$ (opens to the right|opens to the left|opens upwards|opens downwards) and its focus lies on (?:the \$([xy])\$-axis|the line \$([xy]) = (-?\d+)\$)\. Find \$t\$\.$/);
   if (m) {
@@ -310,45 +297,42 @@ function analyseEllipseHyperbola(q) {
     if (what === 'its eccentricity') return { value: c / a, int: false, alts: [c / (2 * a), a / c, c2 / A] };
     return { value: (2 * b2) / a, int: false, alts: [b2 / a, b2, (2 * b2) / (2 * a)] };
   }
-  m = p.match(/^The (ellipse|hyperbola) \$(.+?)\$ \$\((.+?)\)\$ has its foci at \$\((.+?)\)\$, and the length of its latus rectum is (equal to|\$(\d+)\$ times|\$\\dfrac\{(\d+)\}\{(\d+)\}\$ of) the length of its (minor|major|conjugate|transverse) axis\. Find \$([ab])\^2\$\.$/);
+  m = p.match(/^The (ellipse|hyperbola) \$(.+?)\$ \$\((.+?)\)\$ passes through the point \$\((-?\d+), (-?\d+)\)\$, and the length of its latus rectum is (\$(\d+)\$ times|\$\\dfrac\{(\d+)\}\{(\d+)\}\$ of) the length of its (minor|major|conjugate|transverse) axis\. Find (the square of the distance between its foci|\$b\^2\$)\.$/);
   if (m) {
     const hyper = m[1] === 'hyperbola';
     const eq = m[2].replace(/\s+/g, '');
-    const shapes = hyper
-      ? { '\\dfrac{x^2}{a^2}-\\dfrac{y^2}{b^2}=1': 'x', '\\dfrac{y^2}{a^2}-\\dfrac{x^2}{b^2}=1': 'y' }
-      : { '\\dfrac{x^2}{a^2}+\\dfrac{y^2}{b^2}=1': 'x', '\\dfrac{x^2}{b^2}+\\dfrac{y^2}{a^2}=1': 'y' };
-    const axis = shapes[eq];
-    if (!axis) return { problems: ['could not read the equation'] };
-    const fm = m[4].replace(/\s+/g, '').match(/^(?:\\pm(\d+),0|0,\\pm(\d+))$/);
-    if (!fm || (axis === 'x') !== !!fm[1]) return { problems: ['foci not on the major/transverse axis'] };
-    const c = Number(fm[1] || fm[2]), c2 = c * c;
-    const rho = m[5] === 'equal to' ? 1 : m[6] ? Number(m[6]) : Number(m[7]) / Number(m[8]);
-    const vsB = m[9] === 'minor' || m[9] === 'conjugate';
-    if (['minor', 'major'].includes(m[9]) === hyper) return { problems: ['axis name does not match the conic'] };
-    // For each candidate a², the latus rectum is the chord through the focus perpendicular
-    // to the axis: at distance c from the centre the curve's half-width is |y|.
-    const lr = A => {
-      const B = hyper ? c2 - A : A - c2;
-      if (!(B > 0)) return NaN;
+    if (eq !== (hyper ? '\\dfrac{x^2}{a^2}-\\dfrac{y^2}{b^2}=1' : '\\dfrac{x^2}{a^2}+\\dfrac{y^2}{b^2}=1')) return { problems: ['could not read the equation'] };
+    if (['minor', 'major'].includes(m[10]) === hyper) return { problems: ['axis name does not match the conic'] };
+    const x0 = Number(m[4]), y0 = Number(m[5]);
+    if (x0 === 0 || y0 === 0) return { problems: ['the point is on an axis'] };
+    const rho = m[7] ? Number(m[7]) : Number(m[8]) / Number(m[9]);
+    const vsB = m[10] === 'minor' || m[10] === 'conjugate';
+    // For a candidate a² = A, the point fixes b² = B; the latus rectum is the chord
+    // through a focus perpendicular to the axis, found from the curve at x = c.
+    const Bof = A => (hyper ? y0 * y0 / (x0 * x0 / A - 1) : y0 * y0 / (1 - x0 * x0 / A));
+    const shape = A => {
+      const B = Bof(A);
+      if (!(B > 0)) return null;
+      const c2 = hyper ? A + B : A - B;
+      if (!(c2 > 0)) return null;
       const y2 = hyper ? B * (c2 / A - 1) : B * (1 - c2 / A);
-      return 2 * Math.sqrt(y2);
+      return { A, B, c2, lr: 2 * Math.sqrt(y2) };
     };
-    const g = A => { const B = hyper ? c2 - A : A - c2; return lr(A) / (vsB ? 2 * Math.sqrt(B) : 2 * Math.sqrt(A)) - rho; };
-    const lo = hyper ? 1e-9 : c2 + 1e-9, hi = hyper ? c2 - 1e-9 : c2 * 1e4;
-    // A log-spaced scan so very large a² are covered.
-    const roots = [];
-    const N = 40000;
-    let prevA = lo, prevG = g(lo);
-    for (let i = 1; i <= N; i++) {
-      const A = hyper ? lo + (hi - lo) * (i / N) : lo * (hi / lo) ** (i / N);
+    const g = A => { const sh = shape(A); return sh ? sh.lr / (vsB ? 2 * Math.sqrt(sh.B) : 2 * Math.sqrt(sh.A)) - rho : NaN; };
+    const X2 = x0 * x0, roots = [];
+    const N = 60000;
+    let prevA = null, prevG = NaN;
+    for (let i = 0; i <= N; i++) {
+      // Hyperbola: a² in (0, x₀²). Ellipse: a² − x₀² log-spaced in (1e-9, 1e5).
+      const A = hyper ? X2 * (i + 0.5) / (N + 1) : X2 + 1e-9 * (1e14) ** (i / N);
       const gA = g(A);
-      if (Number.isFinite(prevG) && Number.isFinite(gA) && prevG * gA < 0) roots.push(bisect(g, prevA, A));
-      else if (gA === 0) roots.push(A);
+      if (prevA !== null && Number.isFinite(prevG) && Number.isFinite(gA) && prevG * gA < 0) roots.push(bisect(g, prevA, A));
       prevA = A; prevG = gA;
     }
-    if (roots.length !== 1) return { problems: [`${roots.length} values of a² fit the ratio`] };
-    const A = roots[0], B = hyper ? c2 - A : A - c2;
-    return { value: m[10] === 'a' ? A : B, int: false, alts: [m[10] === 'a' ? B : A, Math.sqrt(m[10] === 'a' ? A : B), c2] };
+    if (roots.length !== 1) return { problems: [`${roots.length} values of a² fit`] };
+    const sh = shape(roots[0]);
+    const foci = m[11].startsWith('the square');
+    return { value: foci ? 4 * sh.c2 : sh.B, int: false, alts: foci ? [sh.c2, 2 * Math.sqrt(sh.c2), 4 * sh.A] : [sh.A, sh.c2, Math.sqrt(sh.B)] };
   }
   m = p.match(/^The hyperbola \$\\dfrac\{x\^2\}\{p\} - \\dfrac\{y\^2\}\{q\} = 1\$, where \$p > 0\$ and \$q > 0\$, has the same foci as the ellipse \$\\dfrac\{x\^2\}\{(\d+)\} \+ \\dfrac\{y\^2\}\{(\d+)\} = 1\$(?: and passes through the point \$\((-?\d+), (-?\d+)\)\$|, and the product of the eccentricities of the two curves is \$(\d+)\$)\. Find \$([pq])\$\.$/);
   if (m) {
