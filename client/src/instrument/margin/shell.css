@@ -39,7 +39,7 @@
 .m-flip > span { grid-area: 1 / 1; backface-visibility: hidden; }
 .m-dial-cap { display: grid; justify-content: center; gap: 2px; margin: 12px 0 0; font: 400 15px/20px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
 .m-dial-cap span { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); margin-right: 8px; }
-@media (max-width: 760px) { .m-dial-box { max-width: 340px; } .m-dial-cap span { letter-spacing: .06em; margin-right: 6px; } .m-dial-cap div { white-space: nowrap; } }
+@media (max-width: 760px) { .m-dial-box { max-width: 340px; } .m-dial-cap span { letter-spacing: .06em; margin-right: 6px; } .m-dial-cap div { white-space: nowrap; } .ui-instrument :lang(hi) .m-dial-cap div { white-space: normal; } }
 
 /* The ledger: three figures that roll like an odometer. */
 /* Whole-pixel columns, so the engraved dividers never straddle a device pixel. */
