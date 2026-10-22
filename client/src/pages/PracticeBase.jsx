@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { featureEnabled } from '../platform/features.js';
@@ -541,7 +542,7 @@ function ProfilePractice() {
             <strong>{t('practice.emptyTitle')}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <Link className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
               {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
               )}
@@ -574,7 +575,7 @@ function ProfilePractice() {
                   {t('practice.levelLetPriChoose')}
                 </button>
               )}
-              <Link className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
             </div>
           </div>
         )}
@@ -592,10 +593,10 @@ function ProfilePractice() {
                   <p className="muted" style={{ margin: '0 0 8px' }}>{t('practice.pyqNearestTitle')}</p>
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     {pyqAlternatives.map(alt => (
-                      <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                      <PageLink key={alt.subtopic} className="btn btn-ghost btn-sm"
                         to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
                         {t('practice.pyqNearestCta', { name: alt.name })}
-                      </Link>
+                      </PageLink>
                     ))}
                   </div>
                 </div>

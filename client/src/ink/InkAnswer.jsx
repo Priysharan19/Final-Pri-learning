@@ -32,7 +32,8 @@ import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { retryClock } from './readerFailure.js';
-import { Link, useInRouterContext } from 'react-router-dom';
+import { useInRouterContext } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
@@ -97,7 +98,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -352,7 +353,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // the note goes and "Read my answer" is there to be pressed.
   useEffect(() => {
     const clearIf = kinds => setStatus(prev => (prev?.kind === 'waiting' && kinds.includes(prev.block?.kind) ? null : prev));
-    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'not-allowed']));
+    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'mfa', 'not-allowed']));
     const onOnline = () => { setOnline(true); clearIf(['offline']); };
     const onOffline = () => setOnline(false);
     if (typeof window !== 'undefined') {
@@ -372,7 +373,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
-    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
+    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'mfa', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
   }, [user]);
 
   // Submit found the server no longer holds this page's read (readExpired is
@@ -476,10 +477,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language) })
         : shownStatus?.kind === 'waiting'
           ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language) })
-          : null;
+          : checkingEarlier
+            // An earlier submission of this question is being checked again
+            // (after the app was closed mid-check). The page stays writable;
+            // a read waits until that check has its answer.
+            ? t('ink.checkingEarlier')
+            : null;
   // "Read my answer": offered whenever there is ink that has not been read as
   // it now stands and nothing is known to stop a read. One press, one read.
-  const canAskToRead = hasInk && !disabled && !shownStatus && (!rec.lines.length || stale);
+  const canAskToRead = hasInk && !disabled && !shownStatus && !checkingEarlier && (!rec.lines.length || stale);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -640,7 +646,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       {shownStatus?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(shownStatus.key) && (
         <div className="ink-status-action">
           {inRouter
-            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</Link>
+            ? <PageLink className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</PageLink>
             : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
       )}
