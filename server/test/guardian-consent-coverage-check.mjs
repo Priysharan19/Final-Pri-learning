@@ -65,6 +65,18 @@ try {
   await verifyEmail(h, childId);
   c.eq((await h.request('/v1/account/guardian/state', { jar: childJar })).data?.state, 'pending', 'and starts with consent pending');
 
+  // A second child, with a guardian of their own, whose consent is never given:
+  // the first child's consent must not open anything for them.
+  await resetLimits();
+  const secondJar = {};
+  const reg2 = await h.request('/v1/account/register', { method: 'POST', jar: secondJar, body: {
+    name: 'Second Child', email: 'coverage.child2@example.test', password: 'correct-horse-battery', deviceId: 'ipad-child-2',
+    isAdult: false, year: '8', guardianName: 'Other Guardian', guardianEmail: 'coverage.guardian2@example.test'
+  } });
+  c.eq(reg2.status, 201, 'a second child (Class 8) registers with a different guardian');
+  const secondId = reg2.data.account.id;
+  await verifyEmail(h, secondId);
+
   await resetLimits();
   const adult = await registerAccount(h, { name: 'Adult Learner', email: 'coverage.adult@example.test', deviceId: 'ipad-adult' });
   await verifyEmail(h, adult.account.id);
@@ -122,12 +134,23 @@ try {
   const token = await guardianToken(childId);
   c.ok(token, 'the guardian email carries a confirmation token');
   await resetLimits();
-  c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion: CONSENT_NOTICE_VERSION } })).data?.confirmed, true, 'the guardian confirms');
+  // A confirmation sent from a page showing an older notice is refused before
+  // the link is spent, and grants nothing.
+  const stale = await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion: '2000-01-01' } });
+  c.deq([stale.status, stale.data?.error?.code], [400, 'GUARDIAN_NOTICE_REQUIRED'], 'a confirmation bound to a stale notice version is refused');
+  c.eq((await h.request('/v1/account/guardian/state', { jar: childJar })).data?.state, 'pending', 'and consent stays pending');
+  c.deq(refusedWith(await run(childJar), 'GUARDIAN_CONSENT_PENDING'), [], 'and every gated call is still refused');
+  await resetLimits();
+  c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion: CONSENT_NOTICE_VERSION } })).data?.confirmed, true, 'the guardian confirms against the current notice, with the same link');
   const given = await run(childJar);
   c.deq(notRefused(given), [], 'with consent given, nothing is refused by the guardian gate');
   c.deq(given.filter(r => r.status >= 400).map(r => `${r.label} → ${r.status} ${r.code}`), [], 'and every request succeeds');
   const afterGiven = await written(childId);
   c.deq(afterGiven, { telemetry: 1, reports: 1, memberships: 1, submissions: 1 }, 'and the child\'s telemetry, report, membership and submission are stored');
+  // One child's consent is that child's alone.
+  c.eq((await h.request('/v1/account/guardian/state', { jar: secondJar })).data?.state, 'pending', 'the second child\'s consent is still pending');
+  c.deq(refusedWith(await run(secondJar), 'GUARDIAN_CONSENT_PENDING'), [], 'and every gated call is still refused for them');
+  c.deq(await written(secondId), { telemetry: 0, reports: 0, memberships: 0, submissions: 0 }, 'and nothing of the second child is written');
 
   // ── 5 · Withdrawn: stopped again, at once ──────────────────────────────────
   await resetLimits();
