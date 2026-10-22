@@ -133,8 +133,11 @@ function numericProbes(q, a) {
   // order — are not one answer. "0, -2" once read as 0 − 2 (issue #408 review).
   const beside = [0, ...(q.traps || []).map(t => t?.value)].filter(x => typeof x === 'number' && Number.isFinite(x) && differs(x, v));
   for (const t of new Set(beside)) {
-    for (const input of [`${fmt(t)}, ${fmt(v)}`, `${fmt(v)}, ${fmt(t)}`, `${fmt(t)},${fmt(v)}`, `${fmt(t)}\n${fmt(v)}`]) out.push({ input, why: 'two numbers written as a list' });
+    for (const input of [`${fmt(t)}, ${fmt(v)}`, `${fmt(v)}, ${fmt(t)}`, `${fmt(t)},${fmt(v)}`, `${fmt(t)}\n${fmt(v)}`, `${fmt(t)}\t${fmt(v)}`]) out.push({ input, why: 'two numbers written as a list' });
   }
+  // The same with a bracket, a dash or a sign the digit runs cannot see: "0, -(2)", "0, —2", "0, +(5)".
+  if (v < 0) out.push({ input: `0, -(${fmt(-v)})`, why: 'a list with a bracketed negative' }, { input: `0, —${fmt(-v)}`, why: 'a list with an em-dash minus' });
+  if (v > 0) out.push({ input: `0, +(${fmt(v)})`, why: 'a list with a bracketed signed value' });
   return out;
 }
 
@@ -402,7 +405,18 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
     expect(`list: "${input.replace(/\n/g, '⏎')}" is not -2`, !verdict(neg, input).correct);
   expect('list: -2 itself is accepted', verdict(neg, '-2').correct);
   expect('list: k = -2 is accepted', verdict(neg, 'k = -2').correct);
-  expect('list: 3 - 5 written as arithmetic is unchanged', verdict(neg, '3 - 5').correct === verdict({ ...neg, answer: { value: -2 } }, '3-5').correct);
+  expect('list: 3 - 5 written as arithmetic is still read as -2', verdict(neg, '3 - 5').correct && verdict(neg, '3-5').correct);
+  // Any separator between two things is a list, not only before a signed digit (re-review of #667).
+  for (const input of ['0, —2', '0\t-2', '0\u2028-2', '0, -(2)', '0., -2']) expect(`list: "${JSON.stringify(input)}" is not -2`, !verdict(neg, input).correct);
+  const root6 = { answerType: 'numeric', prompt: 'Find the product of the roots.', answer: { value: Math.sqrt(6) } };
+  for (const input of ['√2, √3', 'sqrt(2), sqrt(3)']) expect(`list: "${input}" is not √6`, !verdict(root6, input).correct);
+  const zero = { answerType: 'numeric', prompt: 'Find the sum of the roots.', answer: { value: 0 } };
+  for (const input of ['sqrt(2), -sqrt(2)', 'π, -π']) expect(`list: "${input}" is not 0`, !verdict(zero, input).correct);
+  const six = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 6 } };
+  expect('list: "2, (3)" is not 6', !verdict(six, '2, (3)').correct);
+  const sum = { answerType: 'numeric', prompt: 'Find the sum.', answer: { value: -15 } };
+  expect('a counting call keeps its argument commas: sum(k, k, -5, -1) is -15', verdict(sum, 'sum(k, k, -5, -1)').correct);
+  expect('a trailing comma separates nothing: "-2," is -2', verdict(neg, '-2,').correct);
   const big = { answerType: 'numeric', prompt: 'Find the number.', answer: { value: -1234 } };
   expect('list: grouped -1,234 is still one number', verdict(big, '-1,234').correct);
   // A digit group led by 0 is no written number: "0,240" is the list 0 and 240.

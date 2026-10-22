@@ -234,7 +234,20 @@ function brokenDigitGroups(s) {
   }
   if (call) pieces.push(...splitArguments(call.text));
   pieces.push(top);
-  return pieces.some(brokenRun);
+  return pieces.some(brokenRun) || separatesTwoThings(top);
+}
+
+// A comma, semicolon, tab or line break between two things is a list, whatever
+// the two things are: "0, -2", "0, —2", "0⇥-2", "0, -(2)", "√2, √3", "π, 2" and
+// "2, (3)" are each two answers, never 0 − 2, √6, 2π or 6. Only a separator
+// inside one grouped number (1,234 · 12,34,567) is part of a number, and one at
+// either end ("-2,", a leading line break) separates nothing. The arguments of
+// a counting call are read apart before this, so "nCr(5, 2)" is untouched.
+const SEPARATOR = /[,;\t\n\r\v\f\u2028\u2029]/;
+function separatesTwoThings(piece) {
+  const hidden = piece.replace(/\d[\d,\s]*\d/g, run => (/,/.test(run) && GROUPED.test(run.replace(/ +/g, ' ')) ? '0' : run));
+  const inner = hidden.replace(/^[\s,;]+|[\s,;]+$/g, '');
+  return SEPARATOR.test(inner);
 }
 
 /** The arguments of a call, split at the commas that are not inside a bracket. */
@@ -277,10 +290,6 @@ export function parseNumericInput(raw) {
   // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
   // lists, not 123.
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
-  // A comma, semicolon or line break before a signed number separates two
-  // numbers: "0, -2" and "3,-5" are lists, never 0 − 2 or 3 − 5. (The digit
-  // runs above stop at the sign, so they cannot see this.)
-  if (/\d\s*[,;\n\r]\s*[-+−–]\s*\.?\d/.test(s)) throw new Error('Not a single number');
   const meta ={ isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"

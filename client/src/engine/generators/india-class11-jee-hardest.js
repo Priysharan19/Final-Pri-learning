@@ -2181,14 +2181,19 @@ function complexQuadraticReasoning(rng) {
     const kept = between.filter(k => B(k) ** 2 < 4 * C(k));
     if (!kept.length || kept.length === between.length) continue;
     const value = kept.length;
-    const ends = [k1, k2].filter(k => B(k) ** 2 < 4 * C(k)).length;   // on the circle, not inside
+    // At k₁ and k₂ the product is r²: where those roots are non-real they lie ON the circle.
+    const onCircle = [k1, k2].filter(k => B(k) ** 2 < 4 * C(k));
+    const realCount = between.length - value;
+    const endsWhy = `At ${onCircle.map(k => `$k = ${k}$`).join(' and ')} the roots are non-real but lie ON the circle, not strictly inside it.`;
+    const realWhy = 'That counts the values of $k$ that give real roots.';
     return {
       prompt: `For how many integers $k$ are the roots of $${quad}$ non-real and both strictly inside the circle $|z| = ${r}$?`,
       answerType: 'numeric', answer: { value },
       traps: traps(value, [
         { value: between.length, why: 'That counts every $k$ that makes the product of the roots less than the square of the radius, but some of those give real roots.' },
-        ...(ends ? [{ value: value + ends, why: `The end values $k = ${k1}$ and $k = ${k2}$ put the roots ON the circle, not strictly inside it.` }] : []),
-        { value: between.length - value, why: 'That counts the values of $k$ that give real roots.' }
+        // When two mistakes give the same number, the explanation names both.
+        ...(onCircle.length ? [{ value: value + onCircle.length, why: value + onCircle.length === realCount ? `${endsWhy} Or: ${realWhy.charAt(0).toLowerCase()}${realWhy.slice(1)}` : endsWhy }] : []),
+        { value: realCount, why: realWhy }
       ]),
       hints: [hints[0], hints[1], `Inside means $|\\alpha| < ${r}$, which bounds $k$ to an interval; then keep only the integers that give a negative discriminant.`],
       steps: [
