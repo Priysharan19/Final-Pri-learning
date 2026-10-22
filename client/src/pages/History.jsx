@@ -23,6 +23,9 @@ import BarSlot from '../instrument/BarSlot.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = featureEnabled('instrument');
+// The ledger's styles, only where the instrument is the interface: a build with
+// the flag off never fetches them (ON_DEMAND in vite.config.js).
+if (INSTRUMENT_STRIP) void import('../instrument/ledger.css').catch(() => { });
 
 const FILTERS = [
   ['all', 'history.filterAll'],
