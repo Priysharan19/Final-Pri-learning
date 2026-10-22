@@ -65,8 +65,12 @@ export function useCheckCeremony(stageRef, key) {
       if (box.top < 0 || box.bottom > innerHeight) focus.scrollIntoView?.({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     }
     running++;
+    // While marks are struck, the card's verdict waits (write.css): it is
+    // said once, after the score is in the window.
+    const html = document.documentElement;
+    html.classList.add('wc-marking');
     let on = true;
-    const stop = () => { if (on) { on = false; running--; } };
+    const stop = () => { if (on) { on = false; running--; if (!running) html.classList.remove('wc-marking'); } };
     // Only a ceremony that ran to its end lets the score into the window.
     const end = () => { if (on) { stop(); root.classList.add('wc-done'); window.dispatchEvent(new Event('pri:check-marked')); } };
     const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;

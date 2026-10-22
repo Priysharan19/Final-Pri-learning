@@ -125,7 +125,7 @@ export const flow = {
     await check('hint-weighted credit is distinct from the original mark',
       grade.creditedMarks > 0 && grade.creditedMarks < grade.marksEarned &&
       grade.markRows?.totals?.creditedAfterHints === grade.creditedMarks &&
-      panelText.includes(`Account credit after hints: ${grade.creditedMarks}`) &&
+      panelText.includes(`With hints used: ${grade.creditedMarks} of ${grade.marksEarned}`) &&
       /before hint deductions/i.test(header),
       `credited ${grade.creditedMarks}; header ${header}; panel ${panelText}`);
     await check('completed row belongs to the submitted attempt and question',
