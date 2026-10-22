@@ -69,7 +69,9 @@ const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
 const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
-  import('./instrument/instrument.css');
+  // The luxury layer remaps the instrument's tokens, so it must land after
+  // instrument.css in the cascade.
+  import('./instrument/instrument.css').then(() => import('./instrument/margin/margin.css'));
   // The Map, Report and Scripts tabs are on demand in this build; after an
   // online launch, at idle and only on a cheap link, fetch them so the service
   // worker keeps them for offline (local/offlineWarm.js, issue #658).
