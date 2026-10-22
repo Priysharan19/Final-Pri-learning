@@ -144,3 +144,19 @@ html.ui-instrument:root .settings-grid .meter { display: none; }
   html.ui-instrument:root .set-row .set-v { margin-left: 0; text-align: left; }
   html.ui-instrument:root .settings-grid .card .spread { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Jury round 3 ── initials ring, SC text Edit, C chips ────────────────── */
+html.ui-instrument:root .c-initials {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  border: var(--c-line) solid var(--c-hair); font: var(--c-t-label); letter-spacing: 0.06em; color: var(--c-ink);
+}
+html.ui-instrument:root .settings-grid .set-edit {
+  min-height: 44px; padding: 0 4px; border: 0 !important; background: transparent !important; box-shadow: none !important;
+  font: var(--c-t-button); letter-spacing: 0.12em; color: var(--c-teal); text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px;
+}
+html.ui-instrument:root .settings-grid .c-chip { width: auto !important; min-height: 44px; padding: 0 18px; font: var(--c-t-label); letter-spacing: 0.12em; background: var(--c-sheet); color: var(--c-ink-2); border: var(--c-line) solid var(--c-hair); box-shadow: none; }
+html.ui-instrument:root .settings-grid .c-chip:lang(hi) { font-family: var(--c-text); letter-spacing: 0; }
+html.ui-instrument:root .settings-grid .c-chip[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+html.ui-instrument:root .settings-grid .c-chip svg { display: none; }
+html.ui-instrument:root .settings-grid .theme-seg { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; background: transparent; }
+html.ui-instrument:root .settings-grid .row[role="group"]:has(> .c-chip) { gap: 8px; }

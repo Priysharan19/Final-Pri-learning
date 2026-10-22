@@ -40,3 +40,14 @@ html.ui-instrument:has([data-offline-banner]) .offline-entry {
 }
 /* The empty state's one line, under the KPI row: STIX italic, quiet ink. */
 html.ui-instrument .c-empty-plot.k-slot { background: none; min-height: 0; }
+/* Jury round 3: the banner is one line; the list opens on demand. */
+html.ui-instrument .c-offline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; padding: 8px 16px; }
+html.ui-instrument .c-offline-more { font-size: 14px; color: var(--c-ink-2); }
+html.ui-instrument .c-offline-more > summary {
+  display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none;
+  font: var(--c-t-label); letter-spacing: 0.12em; color: var(--c-ink-2); text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px; text-decoration-color: var(--c-hair);
+}
+html.ui-instrument .c-offline-more > summary::-webkit-details-marker { display: none; }
+html.ui-instrument .c-offline-more > summary:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument .c-offline-more[open] { flex: 1 0 100%; }
+html.ui-instrument .c-offline-more[open] > ul { margin: 2px 0 6px; }

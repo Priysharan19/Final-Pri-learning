@@ -143,7 +143,7 @@ function LanguageSection() {
       <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
         {LANGUAGES.map(l => (
-          <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
+          <button key={l.id} type="button" className={`gen-opt c-chip ${chosen === l.id ? 'on' : ''}`}
             style={{ width: 160 }} lang={l.htmlLang} disabled={busy}
             aria-pressed={chosen === l.id} aria-label={t('lang.switchTo', { language: l.english })}
             onClick={() => pick(l.id)}>{l.label}</button>
@@ -280,6 +280,9 @@ function CrashReportsCard({ t }) {
 }
 
 // Order: what a student comes to Settings for first ("You"), then the account.
+/** Up to two initials, for the instrument build's avatar ring. */
+const initialsOf = name => String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => [...w][0].toUpperCase()).join('') || '·';
+
 const SECTIONS = [
   ['profile', '☺', 'settings.secProfile'],
   ['language', '◍', 'settings.secLanguage'],
@@ -515,12 +518,16 @@ export default function Settings() {
           <div className="card" ref={el => secRefs.current.profile = el}>
             <div className="spread">
               <h2>{t('settings.profileInfo')}</h2>
-              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}><Icon name="pen" size={15} />{t('common.edit')}</button>}
+              {!editing && <button className="btn btn-ghost btn-sm set-edit" onClick={() => setEditing(true)}>{!INSTRUMENT && <Icon name="pen" size={15} />}{t('common.edit')}</button>}
             </div>
             {!editing ? (
               <div style={{ marginTop: 8 }}>
                 <div className="set-row"><span className="set-k">{t('settings.fullName')}</span><span className="set-v">{user.name}</span></div>
-                <div className="set-row"><span className="set-k">{t('settings.avatar')}</span><span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span></div>
+                <div className="set-row"><span className="set-k">{t('settings.avatar')}</span>{INSTRUMENT
+                  // Instrument build: initials in a hairline ring, never the
+                  // stored emoji (the stored avatar value is untouched).
+                  ? <span className="set-v"><span className="c-initials" role="img" aria-label={user.name}>{initialsOf(user.name)}</span></span>
+                  : <span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span>}</div>
                 {user.role !== 'teacher' && <div className="set-row"><span className="set-k">{t(user.course === 'in' ? 'settings.classLevel' : 'settings.yearLevel')}</span><span className="set-v">{t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: user.year })}</span></div>}
                 <div className="set-row"><span className="set-k">{t('settings.course')}</span><span className="set-v">{user.courseLabel}</span></div>
                 <div className="set-row"><span className="set-k">{t('settings.dailyGoal')}</span><span className="set-v">{t('settings.dailyGoalValue', { count: user.dailyGoal, n: user.dailyGoal })}</span></div>
@@ -531,7 +538,7 @@ export default function Settings() {
                   <label className="label" htmlFor="set-name">{t('settings.name')}</label>
                   <input className="input" id="set-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
-                <div className="field">
+                {!INSTRUMENT && <div className="field">
                   <div className="label" id="set-avatar">{t('settings.avatar')}</div>
                   <div className="avatar-row" role="group" aria-labelledby="set-avatar">
                     {AVATARS.map(a => (
@@ -540,7 +547,7 @@ export default function Settings() {
                         onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                     ))}
                   </div>
-                </div>
+                </div>}
                 {user.role !== 'teacher' && (
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
@@ -605,7 +612,7 @@ export default function Settings() {
             <h2 style={{ marginBottom: 12 }}>{t('settings.appearance')}</h2>
             <div className="seg theme-seg" role="group" aria-label={t('settings.appearance')}>
               {[['light', 'sun', 'settings.themeLight'], ['dark', 'moon', 'settings.themeDark'], ['system', 'device', 'settings.themeSystem']].map(([value, icon, label]) => (
-                <button key={value} type="button" className={user.theme === value ? 'on' : ''} aria-pressed={user.theme === value}
+                <button key={value} type="button" className={`c-chip${user.theme === value ? ' on' : ''}`} aria-pressed={user.theme === value}
                   onClick={() => setTheme(value)}><Icon name={icon} size={16} />{t(label)}</button>
               ))}
             </div>

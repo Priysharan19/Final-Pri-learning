@@ -5,7 +5,7 @@ import { startLight } from './margin/light.js';
 
 // The sign-in's left half: C's own object at rest, the P′ bezel large on the
 // desk, lit by the one key light (.c-rim; light.js runs on this element only,
-// never on <html>) with the register's hairline hands resting at 10:10.
+// never on <html>) with the register's hairline hands resting at 10:10, clear of the glyph.
 // Decorative (aria-hidden). Instrument build only.
 export default function SignInPlot() {
   const t = useT();
@@ -20,10 +20,10 @@ export default function SignInPlot() {
       <div className="c-signin-object c-rim" ref={lit}>
         <PMark size={320} engrave />
         <svg className="c-signin-hands" viewBox="0 0 48 48">
-          {/* 10:10 — hour hand at 305°, minute hand at 60°, from the centre. */}
-          <line x1="24" y1="24" x2={24 + 9 * Math.sin(-55 * Math.PI / 180)} y2={24 - 9 * Math.cos(-55 * Math.PI / 180)} />
-          <line x1="24" y1="24" x2={24 + 14 * Math.sin(60 * Math.PI / 180)} y2={24 - 14 * Math.cos(60 * Math.PI / 180)} />
-          <circle cx="24" cy="24" r="0.9" />
+          {/* 10:10, drawn only outside the glyph's circle (r > 12.8) so no
+              hand ever crosses the P′: hour at 305°, minute at 60°. */}
+          <line x1="13.51" y1="16.66" x2="10.48" y2="14.54" />
+          <line x1="35.09" y1="17.60" x2="40.45" y2="14.50" />
         </svg>
       </div>
       <p className="in-signin-line">{t('login.instrumentHeadline')}</p>

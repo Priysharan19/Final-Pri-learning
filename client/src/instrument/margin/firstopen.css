@@ -54,3 +54,5 @@ html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transfor
   html.ui-instrument .fo-line, html.ui-instrument .fo-ask { animation: none; opacity: 1; }
   html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transform: none; }
 }
+/* Optical centre: the stack sits a little above the geometric centre. */
+@media (min-width: 700px) { html.ui-instrument .fo { padding-bottom: 10vh; } }

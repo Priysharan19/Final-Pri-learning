@@ -152,13 +152,18 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
           /assets/ rule keeps any notes chunk opened online. */}
       {!online && (
         <aside className="c-offline" aria-labelledby="c-offline-h" data-offline-banner>
-          <p className="c-offline-h" id="c-offline-h"><b>{t('inst.offline')}</b>{t('inst.offlineBanner')}</p>
-          <ul aria-label={t('inst.offlineStill')}>
-            <li>{t('inst.offlineItemHistory')}</li>
-            <li>{t('inst.offlineItemProgress')}</li>
-            <li>{t('inst.offlineItemNotes')}</li>
-          </ul>
-          <p className="c-offline-kept">{t('inst.offlineKept')}</p>
+          <p className="c-offline-h" id="c-offline-h"><b>{t('inst.offline')}</b>{t('inst.offlineOneLine')}</p>
+          {/* One line; what still works opens on demand (a native disclosure:
+              keyboard and screen readers get it for free). */}
+          <details className="c-offline-more">
+            <summary>{t('inst.offlineStill')}</summary>
+            <ul>
+              <li>{t('inst.offlineItemHistory')}</li>
+              <li>{t('inst.offlineItemProgress')}</li>
+              <li>{t('inst.offlineItemNotes')}</li>
+            </ul>
+            <p className="c-offline-kept">{t('inst.offlineKept')}</p>
+          </details>
         </aside>
       )}
       {/* Phone: the floating dock replaces the bottom bar. The five tabs, and
