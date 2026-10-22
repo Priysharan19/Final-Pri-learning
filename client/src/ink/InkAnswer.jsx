@@ -688,6 +688,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           </div>
           {rec.lines.map((line, li) => (
             <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
+              data-wc-row={INSTRUMENT_PLOT && !stale && engineMark(lineVerdicts?.[li]) ? li : undefined}
               data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
               data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -697,6 +698,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
+                  {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark. */}
+                  {INSTRUMENT_PLOT && !stale && engineMark(lineVerdicts[li]) && <span className="wc-list-stamp"><React.Suspense fallback={null}><MarkStamp kind={engineMark(lineVerdicts[li])} /></React.Suspense></span>}
                   <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}

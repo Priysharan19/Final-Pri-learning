@@ -75,3 +75,11 @@ html.ui-instrument .in-strip i.is-lost {
   .wc-stamp text { fill: CanvasText; }
   .wc-datewin { border-color: CanvasText; }
 }
+
+/* Phone: the reading list is the margin (the chips beside the ink are hidden
+   at this width), so its rows carry the struck mark instead of the badge. */
+.wc-list-stamp { display: none; }
+@media (max-width: 560px) {
+  html.ui-instrument .ink-line-verdict:has(.wc-list-stamp) > svg { display: none; }
+  html.ui-instrument .wc-list-stamp { display: inline-flex; perspective: 1400px; }
+}

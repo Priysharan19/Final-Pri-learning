@@ -22,6 +22,11 @@ export function MarkStamp({ kind }) {
 
 // Timings from the C reference (section 5): a row is set, its mark is struck,
 // 220ms rest, the next row. The rise is A's plane spring (k 170, c 22).
+// How many ceremonies are striking marks right now. The date window waits for
+// `pri:check-marked` only while one is; otherwise the score lands at once.
+let running = 0;
+export const ceremonyRunning = () => running > 0;
+
 export const CEREMONY = Object.freeze({ row: 260, rowGap: 40, stamp: 340, between: 220, rise: 36, underline: 320 });
 
 /**
@@ -36,22 +41,32 @@ export const CEREMONY = Object.freeze({ row: 260, rowGap: 40, stamp: 340, betwee
  */
 export function useCheckCeremony(sheetRef, key) {
   useLayoutEffect(() => {
-    const sheet = sheetRef.current;
-    if (!sheet || !key) return undefined;
+    const stage = sheetRef.current;
+    if (!stage || !key) return undefined;
+    // The stage and the reading list under it share the InkAnswer root.
+    const sheet = stage.parentElement || stage;
     const announce = () => window.dispatchEvent(new CustomEvent('pri:check-marked', { detail: { key } }));
-    const rows = [...sheet.querySelectorAll('[data-wc-row]')];
+    // Only the rows whose stamp is on screen: the chips beside the ink on a
+    // tablet, the reading list on a phone (write.css shows one or the other).
+    const rows = [...sheet.querySelectorAll('[data-wc-row]')].filter(r => {
+      const st = r.querySelector('.wc-plane');
+      return st && st.getClientRects().length > 0;
+    });
+    running += 1;
+    let ended = false;
+    const end = () => { if (!ended) { ended = true; running -= 1; announce(); } };
     const planes = rows.map(r => r.querySelector('.wc-plane')).filter(Boolean);
     const setZ = (el, z) => { el.style.transform = `translateZ(${z.toFixed(2)}px)`; };
     if (reduced() || typeof Element === 'undefined' || !Element.prototype.animate || !rows.length) {
       planes.forEach(p => setZ(p, CEREMONY.rise));
-      announce();
+      end();
       return undefined;
     }
     const handles = [];
     const per = CEREMONY.row + CEREMONY.rowGap + CEREMONY.stamp + CEREMONY.between;
     rows.forEach((row, i) => {
       const t0 = i * per;
-      const text = row.querySelector('.in-read-m');
+      const text = row.querySelector('.in-read-m, .ink-line-math');
       if (text) handles.push(rowReveal([text], { delay: t0 }));
       const ts = t0 + CEREMONY.row + CEREMONY.rowGap;
       const stamp = row.querySelector('.wc-stamp');
@@ -69,9 +84,10 @@ export function useCheckCeremony(sheetRef, key) {
         { duration: CEREMONY.underline, delay: tUnder, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
       handles.push({ finish: () => a.finish() });
     });
-    const timer = setTimeout(announce, tUnder + CEREMONY.underline);
+    const timer = setTimeout(end, tUnder + CEREMONY.underline);
     return () => {
       clearTimeout(timer);
+      end();
       // Interrupted: jump every mark to its final frame rather than leave one half struck.
       for (const h of handles) { try { h.finish(); } catch { /* element gone */ } }
     };
@@ -97,9 +113,11 @@ export function DateWindow({ score, outOf }) {
     window.addEventListener('pri:check-marked', onMarked);
     // No margin ceremony is coming (nothing was written, or it already ran):
     // the figure lands after the longest ceremony could take, never before.
-    const hasRows = typeof document !== 'undefined' && document.querySelector('[data-wc-row]');
-    const fallback = setTimeout(go, hasRows && !reduced() ? 6000 : 0);
-    return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); };
+    // A ceremony may still be on its way in this commit (its layout effect
+    // runs first): look on the next frame, and never wait more than 6s.
+    const look = requestAnimationFrame(() => { if (!ceremonyRunning()) go(); });
+    const fallback = setTimeout(go, reduced() ? 0 : 6000);
+    return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); cancelAnimationFrame(look); };
   }, [score]);
   // The window's faces are owned by flip() (motion.js): React renders the
   // empty frame and never reconciles inside it.
