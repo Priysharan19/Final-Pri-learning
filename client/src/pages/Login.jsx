@@ -24,6 +24,7 @@ import { firstOpenSeen } from '../instrument/firstOpenSeen.js';
 // the flag-off build never loads it.
 const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
 // The first-open moment (instrument build only), shown once before sign-in.
+const SignInMark = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInMark.jsx')) : null;
 const FirstOpen = featureEnabled('instrument') ? React.lazy(() => import('../instrument/FirstOpen.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
@@ -568,7 +569,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         {FirstOpen && firstOpen && <React.Suspense fallback={null}><FirstOpen onDone={() => setFirstOpen(false)} /></React.Suspense>}
         <div className="auth-col fade-in">
-          <Logo large />
+          {SignInMark ? <React.Suspense fallback={<div className="c-signin-mark" aria-hidden="true" />}><SignInMark /></React.Suspense> : <Logo large />}
           {atStart && (
             <>
               <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>

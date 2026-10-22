@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { markFirstOpenSeen } from './firstOpenSeen.js';
+import PMark from './margin/PMark.jsx';
 import { useT } from '../i18n/index.js';
 
 // The first-open moment (instrument build only, shown once, before sign-in):
-// the bezel engraves, the P′ mark writes itself, one line fades in, then a
+// the one brand mark (PMark) engraves its bezel from the first frame, the P′
+// settles in, one line fades in, then a
 // small pad asks for any digit. The pad does NOT read the digit: the
 // handwriting reader is a large module that needs a signed-in profile and, for
 // checking, a connection, so loading it before sign-in is not cheap. The pad
@@ -80,12 +82,7 @@ export default function FirstOpen({ onDone }) {
   }, []);
   return createPortal(
     <section ref={root} className="fo" role="dialog" aria-modal="true" aria-labelledby="fo-line" data-first-open>
-      <svg className="fo-mark" viewBox="0 0 120 120" aria-hidden="true">
-        <circle className="fo-bezel" cx="60" cy="60" r="56" pathLength="1" />
-        <circle className="fo-bezel-in" cx="60" cy="60" r="50" />
-        <path className="fo-p" pathLength="1" d="M44 86 V34 H62 a13 13 0 0 1 0 26 H44" />
-        <path className="fo-prime" pathLength="1" d="M84 30 L78 46" />
-      </svg>
+      <PMark size={120} engrave className="fo-pmark" />
       <p className="fo-line" id="fo-line">{t('first.line')}</p>
       <div className="fo-ask">
         <p className="c-label" id="fo-prompt">{t('first.prompt')}</p>

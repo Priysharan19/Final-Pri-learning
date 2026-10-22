@@ -664,6 +664,7 @@ export default {
   'settings.questionBankValue': '13,29,679+ अलग-अलग — गिने हुए, और बढ़ रहे हैं',
   'settings.status': 'स्थिति',
   'settings.active': 'चालू',
+  'settings.included': 'शामिल',
   'settings.allDifficulties': 'सभी कठिनाई स्तर (D1–D4)',
   'settings.freeCourses': 'CBSE / NCERT और JEE Main',
   'settings.premiumAdds': 'Premium रोज़ के अभ्यास और परीक्षा सिमुलेशन की सीमाएँ हटाता है, और JEE Advanced, उन्नत Pri Explain और उन्नत विश्लेषण जोड़ता है। Premium ख़त्म होने पर भी आपका काम, इतिहास और प्रगति बनी रहती है।',
@@ -2886,7 +2887,7 @@ export default {
 
   // ── एक साइन-इन कार्ड और सक्रियण द्वार (खाता पहले) ──
   'login.welcomeTitle': "Pri Learning में आपका स्वागत है",
-  'login.welcomeSub': "आपकी गणित की यात्रा यहीं से शुरू होती है।",
+  'login.welcomeSub': "अपना हल हाथ से लिखिए। Pri का सर्वर उसे पंक्ति दर पंक्ति जाँचता है।",
   'login.instrumentHeadline': 'हाथ से लिखिए। उसे जँचते हुए देखिए।',
   'login.existingDeviceProfile': "इस डिवाइस पर सहेजी गई प्रोफ़ाइल से जारी रखें",
   'login.createAnotherAccount': "एक और Pri खाता बनाएँ",

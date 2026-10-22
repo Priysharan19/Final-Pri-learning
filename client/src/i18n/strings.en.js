@@ -598,6 +598,7 @@ export default {
   'settings.questionBankValue': '1,329,679+ distinct — measured, still growing',
   'settings.status': 'Status',
   'settings.active': 'Active',
+  'settings.included': 'Included',
   'settings.allDifficulties': 'All difficulties (D1–D4)',
   'settings.freeCourses': 'CBSE / NCERT and JEE Main',
   'settings.premiumAdds': 'Premium removes the daily practice and exam-simulation limits, and adds JEE Advanced, advanced Pri Explain and advanced analytics. Your work, history and progress are kept if Premium ends.',
@@ -2823,7 +2824,7 @@ export default {
 
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to Pri Learning",
-  'login.welcomeSub': "Your mathematics journey starts here.",
+  'login.welcomeSub': "Write your working by hand. Pri’s server marks it line by line.",
   'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",

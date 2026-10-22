@@ -518,8 +518,8 @@ export default function Settings() {
             </div>
             <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
             <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">✓</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">{t('settings.included')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">{t('settings.included')}</span></div>
             {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
             <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
           </div>

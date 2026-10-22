@@ -229,7 +229,7 @@ export const ON_DEMAND = [
     [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
     [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
   ] : [
-    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|FirstOpen|EmptyPlot|settings|signin|firstopen|states|CommandBar|ledger|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
+    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|SignInMark|FirstOpen|EmptyPlot|settings|signin|firstopen|states|CommandBar|ledger|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
 
   // The previous-year archive is reached only by a student who asks for past
