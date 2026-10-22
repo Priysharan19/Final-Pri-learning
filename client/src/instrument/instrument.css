@@ -283,7 +283,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 .in-ch[aria-pressed="true"] .in-ch-n, .in-ch:hover .in-ch-n { color: var(--c-teal); }
 .in-ch-t { font: 400 16px/21px var(--c-text); min-width: 0; }
 .in-ch-t small { display: block; margin-top: 2px; font: 600 12px/16px var(--c-sc); letter-spacing: .12em; text-transform: uppercase; color: var(--c-ink-2); }
-.in-plate { position: sticky; top: 55px; display: grid; grid-template-rows: auto clamp(300px, 52vh, 520px) auto auto; align-content: start; gap: 16px; padding: 26px 30px 24px; overflow: hidden; min-width: 0; }
+.in-plate { position: sticky; top: 55px; display: grid; align-content: start; gap: 16px; padding: 26px 30px 24px; overflow: hidden; min-width: 0; }
 .in-plate-head { position: relative; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
 .in-plate-head p { margin: 8px 0 0; color: var(--c-ink-2); font: 400 16px/22px var(--c-text); }
 .in-plate-head small, .in-kpis small { font: var(--c-t-label); line-height: 16px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); }
@@ -291,13 +291,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 .in-kpis { display: flex; gap: 28px; }
 .in-kpis div { display: flex; flex-direction: column-reverse; gap: 2px; }
 .in-kpis b { display: block; font: 400 34px/38px var(--c-serif); font-variant-numeric: tabular-nums; color: var(--c-ink); }
-.in-scope { position: relative; height: 100%; min-height: 240px; border-radius: 8px; background: var(--c-sheet); box-shadow: inset 0 0 0 1px var(--c-hair); overflow: hidden; cursor: crosshair; }
-.in-eqn { position: absolute; right: 14px; top: 12px; font-size: 18px; padding: 6px 10px; border-radius: 4px; background: color-mix(in srgb, var(--c-paper-2) 70%, transparent); box-shadow: 0 0 0 1px var(--c-hair-2); color: var(--c-ink); pointer-events: none; }
-.in-eqn .katex { font-size: 1em; }
-.in-scope canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.in-readout { position: absolute; left: 14px; top: 12px; display: grid; gap: 2px; font: 400 13px/18px var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink-2); pointer-events: none; }
-.in-readout b { color: var(--c-lume); font-weight: 400; }
-.in-readout .in-readout-hint { color: var(--c-ink-3); }
+.in-scope { position: relative; min-height: 240px; border-radius: 8px; background: var(--c-sheet); box-shadow: inset 0 0 0 1px var(--c-hair); overflow: hidden; }
 .in-plate-acts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .in-note { color: var(--c-ink-3); font-size: 13px; margin: 0; }
 .in-empty { padding: 40px 0; color: var(--c-ink-3); }
@@ -308,8 +302,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
   .k-hero { padding: 20px 16px; justify-items: center; }
   .k-hero > div { justify-self: stretch; }
   .in-spine { border-right: 0; padding: 8px 16px 0; }
-  .in-plate { position: static; padding: 18px 16px 0; grid-template-rows: auto auto auto auto; }
-  .in-plate .in-scope { height: clamp(240px, 44vh, 400px); }
+  .in-plate { position: static; padding: 18px 16px 0; }
 }
 @media (max-width: 760px) {
   .in-index { padding-bottom: 112px; }
@@ -684,20 +677,15 @@ html.ui-instrument .nt-lede { font-size: 16px; }
   html.ui-instrument .in-plate { padding: 22px 22px 20px; }
   html.ui-instrument .in-cmd { width: min(260px, 28vw); }
   html.ui-instrument .in-plate-head { flex-wrap: nowrap; }
-  html.ui-instrument .in-plate { grid-template-rows: auto minmax(240px, 520px) auto auto; }
 }
 
 /* The plate's dot points: the design's exercise row, each one a way in. */
-.in-exs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.in-exs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
 .in-exs > li { min-width: 0; }
-.in-ex { display: grid; gap: 8px; align-content: start; height: 100%; padding: 12px; border-radius: 6px; background: var(--c-sheet); box-shadow: 0 0 0 1px var(--c-hair-2); color: var(--c-ink); text-decoration: none; transition: box-shadow 160ms cubic-bezier(.2, 0, 0, 1); }
+.in-ex { display: grid; grid-template-columns: 40px 1fr; gap: 4px 12px; align-items: center; height: 100%; padding: 12px; border-radius: 6px; background: var(--c-sheet); box-shadow: 0 0 0 1px var(--c-hair-2); color: var(--c-ink); text-decoration: none; transition: box-shadow 160ms cubic-bezier(.2, 0, 0, 1); }
 @media (hover: hover) { .in-ex:hover { box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--c-hair); } }
 .in-ex-h { display: flex; justify-content: space-between; font: 400 13px/16px var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink-3); }
-.in-ex-bar { height: 3px; border-radius: 2px; background: var(--c-hair-2); overflow: hidden; }
-.in-ex-bar i { display: block; height: 100%; background: var(--c-lume); }
 .in-ex b { font: 400 15px/20px var(--c-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-@media (max-width: 980px) { .in-exs { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 420px) { .in-exs { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .in-ex { transition: none; } }
 
 /* ── Write & Check and Review, to the book's s4/s5 (step 11) ────────────────
@@ -1043,10 +1031,9 @@ html.ui-instrument {
 
 /* Depth: one scale. Figures and panels sit at 1, floating tools at 2. */
 .in-plate-head { z-index: 1; }
-.in-eqn { box-shadow: var(--in-sh-2); }
 
 /* Type rhythm: figures are tabular everywhere; eyebrows share one voice. */
-html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pal-r) { font-variant-numeric: tabular-nums; }
+html.ui-instrument :is(.in-kpis, .in-report-figs, .in-flt b, .in-pal-r) { font-variant-numeric: tabular-nums; }
 .in-plate-head h2 { text-wrap: balance; }
 .in-greet h1 { text-wrap: balance; }
 .in-plate-head p, .in-note { text-wrap: pretty; }

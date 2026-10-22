@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
@@ -8,11 +8,9 @@ import { useApp } from '../App.jsx';
 import { useT, tLater } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
-import ChapterScope from './ChapterScope.jsx';
 import EmptyPlot from './EmptyPlot.jsx';
 import TermGloss from '../components/TermGloss.jsx';
-import { MathText } from '../lib/latex.jsx';
-import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
+import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
 import IndexDial from './margin/IndexDial.jsx';
 import { registerOf } from './margin/register.js';
 import { noteCurriculum } from './CommandBar.jsx';
@@ -22,20 +20,21 @@ import './margin/shell.css';
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
 // the coloured tabs choose a chapter; its plate shows what the evidence says
 // (answers, correct, accuracy only over enough answers) and its mathematics on
-// the scope. Every figure is the server's; nothing is estimated here.
+// its topic register. Every figure is the server's; nothing is estimated here.
 
-
-// The phone home is a different arrangement (and its own scope), so the
-// phone branch is chosen by the same 760px line the stylesheet uses.
-const PHONE = '(max-width: 760px)';
-const subscribePhone = notify => {
-  const mq = window.matchMedia?.(PHONE);
-  mq?.addEventListener?.('change', notify);
-  return () => mq?.removeEventListener?.('change', notify);
-};
-const isPhone = () => !!window.matchMedia?.(PHONE).matches;
 
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
+
+// The chapter register (C): one engraved sub-dial per topic, its arc the
+// topic's mastery, drawn only where accuracy may be stated (else a bare track).
+function SubDial({ value }) {
+  return (
+    <svg className="k-sub" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r="17" />
+      {value > 0 && <circle className="on" cx="20" cy="20" r="17" pathLength="100" strokeDasharray={`${value} 100`} transform="rotate(-90 20 20)" />}
+    </svg>
+  );
+}
 
 // A chapter's mastery as a ten-tick meter (only where accuracy may be stated:
 // chapterEvidence already holds mastery at 0 below the floor).
@@ -113,7 +112,7 @@ export default function IndexPage() {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
     return rows.map((row, i) => ({
-      row, index: i, colour: colourFor(i), figure: figureFor(row.name),
+      row, index: i, colour: colourFor(i),
       evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy)
     }));
   }, [curriculum, user]);
@@ -127,7 +126,6 @@ export default function IndexPage() {
     return last || chapters[0];
   }, [chapters, pick, recent]);
 
-  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
   const nav = useNavigate();
   const root = useRef(null);
   const resumeCard = useRef(null);
@@ -192,7 +190,7 @@ export default function IndexPage() {
       <header className="k-hero">
         {curriculum && chapters.length > 0 ? (
           <IndexDial accuracy={register.accuracy} covered={register.covered} label={t('inst.dialLabel')}
-            caption={<><span>{t('inst.dialLong')}</span>{register.accuracy == null ? '—' : `${register.accuracy}%`}<span>{t('inst.dialShort')}</span>{`${register.covered}%`}</>}
+            caption={<><div><span>{t('inst.dialLong')}</span>{register.accuracy == null ? '—' : `${register.accuracy}%`}</div><div><span>{t('inst.dialShort')}</span>{`${register.covered}%`}</div></>}
             ariaLabel={register.accuracy == null
               ? t('inst.dialAriaHeld', { started: register.started, total: register.total })
               : t('inst.dialAria', { accuracy: register.accuracy, started: register.started, total: register.total })} />
@@ -206,8 +204,11 @@ export default function IndexPage() {
           {recent === undefined && <div className="k-next k-wait" aria-hidden="true"><i /><i /></div>}
           {recent && (
             <div className="k-next" data-instrument-resume ref={resumeCard}>
-              <small>{t('inst.resumePrefix')} · <span lang="en">{recent.subtopicName || ''}</span></small>
-              {recent.prompt ? <p className="k-q" lang="en"><MathText text={recent.prompt} /></p> : <p className="k-q" lang="en"><TermGloss text={recent.subtopicName || ''} /></p>}
+              {/* Resume opens a fresh question in this chapter, so the block names
+                  the chapter, never the last question's numbers: it promises only
+                  what the next page delivers. */}
+              <small>{t('inst.resumePrefix')}</small>
+              <p className="k-q" lang="en"><TermGloss text={recent.subtopicName || ''} /></p>
               {resumeMarks && <small>{t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible })}</small>}
               {resumeMarks && resumeMarks.possible <= 10 && (
                 <div className="in-seg10" aria-hidden="true">
@@ -219,7 +220,7 @@ export default function IndexPage() {
                   if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
                   e.preventDefault();
                   const to = practiceHref({ subtopic: recent.subtopic, track });
-                  morphTo(resumeCard.current?.querySelector('.k-q'), () => nav(to, { replace: isCurrentUrl(to) }));
+                  morphTo(resumeCard.current, () => nav(to, { replace: isCurrentUrl(to) }));
                 }}>{t('inst.resume')}</PageLink>
             </div>
           )}
@@ -283,15 +284,12 @@ export default function IndexPage() {
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
-          {/* Evidence only: a chapter with no answers has nothing to plot, so it
-              gets a clean ruled frame (the slot PR5's empty plot fills), never an
-              invented curve. */}
-          {current.evidence.attempts > 0
-            ? !phone && <ChapterScope figure={current.figure} colourVar="--c-lume" label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
-            : <EmptyPlot className="in-scope k-slot" />}
+          {/* Evidence only: a chapter with no answers has nothing to show, so it
+              gets PR5's empty ruled plot, captioned on the plot. */}
+          {current.evidence.attempts === 0 && <EmptyPlot className="in-scope k-slot" />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
-              {current.row.dotpoints.slice(0, 4).map((dp, i) => {
+              {current.row.dotpoints.map((dp, i) => {
                 // A dot point is a string (India) or a row with its own evidence.
                 const text = typeof dp === 'string' ? dp : String(dp?.text || '');
                 const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
@@ -299,9 +297,9 @@ export default function IndexPage() {
                 return (
                   <li key={i}>
                     <PageLink className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
+                      <SubDial value={ev?.accuracy != null ? ev.mastery : 0} />
                       <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
                       <b lang="en"><TermGloss text={text} /></b>
-                      <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev?.accuracy != null ? ev.mastery : 0}%` }} /></span>
                     </PageLink>
                   </li>
                 );

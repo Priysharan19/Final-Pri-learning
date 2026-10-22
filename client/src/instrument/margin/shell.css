@@ -37,9 +37,9 @@
 .m-datewin { position: absolute; left: 66.5%; top: 47%; width: 13.5%; height: 6%; display: flex; align-items: center; justify-content: center; background: var(--c-sheet); border: 1px solid var(--c-dial-line); box-shadow: var(--c-deboss); font: 400 clamp(11px, 1.3vw, 16px)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); perspective: 200px; overflow: hidden; }
 .m-flip { display: inline-grid; }
 .m-flip > span { grid-area: 1 / 1; backface-visibility: hidden; }
-.m-dial-cap { display: flex; justify-content: center; gap: 18px; margin: 12px 0 0; font: 400 15px/20px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
-.m-dial-cap span { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); margin-right: 6px; }
-@media (max-width: 760px) { .m-dial-box { max-width: 340px; } }
+.m-dial-cap { display: grid; justify-content: center; gap: 2px; margin: 12px 0 0; font: 400 15px/20px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.m-dial-cap span { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); margin-right: 8px; }
+@media (max-width: 760px) { .m-dial-box { max-width: 340px; } .m-dial-cap span { letter-spacing: .06em; margin-right: 6px; } .m-dial-cap div { white-space: nowrap; } .ui-instrument :lang(hi) .m-dial-cap div { white-space: normal; } }
 
 /* The ledger: three figures that roll like an odometer. */
 /* Whole-pixel columns, so the engraved dividers never straddle a device pixel. */
@@ -54,7 +54,7 @@
    for the dial's hands to settle; it plays once per page load. */
 .k-odo > span > span { display: flex; flex-direction: column; transform: translateY(calc(var(--d) * -38px)); animation: k-roll 480ms var(--c-ease-sweep) 1300ms backwards; }
 .k-ledger.k-still .k-odo > span > span { animation: none; }
-.k-odo i { font-style: normal; height: 38px; line-height: 38px; text-align: center; }
+.k-odo i { flex: none; font-style: normal; height: 38px; line-height: 38px; text-align: center; }
 @keyframes k-roll { from { transform: translateY(0); } }
 /* The lock-up never wraps; on a portrait iPad the bar's command field and
    lamp step down to their icons so the six tabs keep one line. */
@@ -67,6 +67,15 @@
   .in-cmd { width: 44px; padding: 0; justify-content: center; background: none; box-shadow: none; }
   .in-cmd > span, .in-status-t { display: none; }
 }
+/* Below the hero, the long list and the plate skip rendering work while off
+   screen, so a forced style pass (the ⌘K field taking focus) stays cheap. */
+.k-body { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
+/* The chapter register: one sub-dial per topic. */
+.k-sub { grid-row: span 2; width: 40px; height: 40px; }
+.k-sub circle { fill: none; stroke: var(--c-hair); stroke-width: 1.5; }
+.k-sub .on { stroke: var(--c-lume); stroke-width: 3; stroke-linecap: round; }
+.ui-instrument :lang(hi) .k-next small { text-transform: none; letter-spacing: 0; }
+.ui-instrument .in-pal-meta { font: 600 12px var(--c-sc); letter-spacing: .1em; font-variant-numeric: lining-nums tabular-nums; }
 /* A chapter with no answers: a clean ruled frame, nothing plotted. */
 .k-slot { min-height: 240px; background: repeating-linear-gradient(to bottom, transparent 0 31px, var(--c-hair-2) 31px 32px), var(--c-sheet); }
 /* The account: initials in Cormorant SC on paper-2, ringed by a hairline. */
@@ -88,6 +97,10 @@
 html[data-vt="question"] .q-prompt { view-transition-name: pri-question; }
 /* No double exposure: the old page holds still underneath, the new one fades in over 120ms. */
 html[data-vt="question"]::view-transition-old(root) { animation: none; }
+/* Only the block's box morphs: its old text is gone in 80ms, the prompt arrives as the box lands. */
+html[data-vt="question"]::view-transition-old(pri-question) { animation: k-vt-out 80ms linear both; }
+html[data-vt="question"]::view-transition-new(pri-question) { animation: k-vt-in 160ms var(--c-ease-row) 220ms both; }
+@keyframes k-vt-out { to { opacity: 0; } }
 html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 120ms var(--c-ease-row) both; }
 @keyframes k-vt-in { from { opacity: 0; } }
 ::view-transition-group(pri-question) { animation-duration: 380ms; animation-timing-function: var(--c-ease-sweep); }
@@ -96,7 +109,6 @@ html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 120ms v
    Disabled: engraved but unlit (40% ink, no press). Loading: the outline
    holds its place, quiet text, never a shimmer. */
 .ui-instrument :is(.in-tab, .in-mark, .in-cmd, .k-dock > *):focus-visible { outline-offset: 3px; border-radius: 4px; }
-.ui-instrument .in-tab:focus-visible { outline-offset: -3px; }
 :is(.in-tab, .k-dock > *, .in-pal-item, .c-btn-primary):is(:disabled, [aria-disabled="true"]) { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none; }
 .k-next.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
 .k-next.k-wait i + i { width: 38%; }

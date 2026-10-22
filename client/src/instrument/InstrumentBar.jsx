@@ -9,7 +9,6 @@ import Glyph from './Glyph.jsx';
 import { setBarSlot } from './BarSlot.jsx';
 import MarginIcon from './margin/MarginIcon.jsx';
 import PMark from './margin/PMark.jsx';
-import { startLight } from './margin/light.js';
 import { optionalWarmAllowed, studentBusy } from '../local/offlineWarm.js';
 import './margin/shell.css';
 import './margin/states.css';
@@ -54,8 +53,6 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   };
   const online = useSyncExternalStore(subscribeOnline, () => navigator.onLine, () => true);
   useEffect(() => { setOpen(false); }, [loc.pathname]);
-  // A's one key light for the rim highlights, once for the whole shell.
-  useEffect(() => startLight(), []);
   // The command sheet's lists, fetched in idle time so it opens complete; the
   // same rules as the offline warm: never offline, on Save-Data or a slow or
   // unknown link, and never while the student is writing or a Check runs (or

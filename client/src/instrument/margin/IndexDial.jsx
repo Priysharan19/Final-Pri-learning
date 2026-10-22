@@ -1,13 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { detent, flip, reduced, rot } from './motion.js';
+import { startLight } from './light.js';
 
-async function flipSeq(win, values, gap = 60, alive = () => true) {
-  for (const v of values) {
-    if (!alive() || !win.isConnected) return;
-    await flip(win, v).finished;
-    if (!reduced()) await new Promise(r => setTimeout(r, gap * 0.4));
-  }
-}
 
 // The Index centrepiece (direction C, "Examiner's Chronograph"): an engraved
 // register dial whose two hands are the student's own evidence, nothing else.
@@ -69,6 +63,10 @@ let playedThisPageLoad = false;
 
 export default function IndexDial({ accuracy, covered, label, caption, ariaLabel }) {
   const svg = useRef(null);
+  const lit = useRef(null);
+  // A's key light, scoped to the dial: written on the whole document, every
+  // pointer move restyled the page (traced: the cause of ⌘K's first-open drops).
+  useLayoutEffect(() => startLight(lit.current), []);
   const bezel = useRef(null);
   const minute = useRef(null);
   const hour = useRef(null);
@@ -92,12 +90,10 @@ export default function IndexDial({ accuracy, covered, label, caption, ariaLabel
     ticks.forEach((t, i) => t.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 90, delay: 150 + i * 8, fill: 'backwards' }));
     rot(minute.current, -300, toMin, { dur: 1300, delay: 300, overshoot: 3 });
     rot(hour.current, -200, toHour, { dur: 1200, delay: 400, overshoot: 2 });
-    // The window counts up to the reading by calendar flip, in five steps.
-    if (accuracy == null) win.current.replaceChildren(Object.assign(document.createElement('span'), { textContent: '—' }));
-    else {
-      const steps = [0.17, 0.41, 0.65, 0.82, 0.93].map(f => String(Math.round(accuracy * f))).concat(reading);
-      timer = setTimeout(() => { if (live) flipSeq(win.current, steps, 60, () => live && prev.current.reading === reading); }, 700);
-    }
+    // The window shows only the engine's number: it holds — and flips once to
+    // the reading as the hands arrive (no count-up through invented values).
+    win.current.replaceChildren(Object.assign(document.createElement('span'), { textContent: '—' }));
+    if (accuracy != null) timer = setTimeout(() => { if (live && prev.current.reading === reading) flip(win.current, reading); }, 1100);
     return () => { live = false; clearTimeout(timer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -112,14 +108,14 @@ export default function IndexDial({ accuracy, covered, label, caption, ariaLabel
     }
     if (p.toMin !== toMin) detent(minute.current, p.toMin, toMin, 4);
     if (p.toHour !== toHour) detent(hour.current, p.toHour, toHour, 4);
-    if (p.reading !== reading) flipSeq(win.current, [reading]);
+    if (p.reading !== reading) flip(win.current, reading);
     prev.current = { toMin, toHour, reading };
   }, [toMin, toHour, reading]);
 
   return (
     <figure className="m-dial" data-instrument-dial>
       <p className="sr-only">{ariaLabel}</p>
-      <div className="m-dial-box c-rim">
+      <div className="m-dial-box c-rim" ref={lit}>
         <svg ref={svg} viewBox="0 0 400 400" aria-hidden="true" focusable="false">
           <circle cx="200" cy="200" r="197" fill="var(--c-bezel)" stroke="var(--c-bezel-2)" strokeWidth="1" />
           <circle ref={bezel} cx="200" cy="200" r="190" fill="none" stroke="var(--c-dial-line)" strokeWidth=".5" pathLength="1" strokeDasharray="1" />
