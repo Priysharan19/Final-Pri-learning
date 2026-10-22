@@ -1,0 +1,62 @@
+import { chromium } from '@playwright/test';
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
+const out = join(root, 'screenshots', 'three-agent');
+mkdirSync(out, { recursive: true });
+const server = spawn('npm', ['run','dev'], {cwd:root,stdio:['ignore','pipe','pipe']});
+let log = '';
+for (const s of [server.stdout,server.stderr]) s.on('data',c=>{ log=(log+String(c)).slice(-3500); });
+let count=0;
+function check(label,ok,detail='') {if (!ok) throw new Error('FAIL '+label+' '+detail);console.log('PASS '+label);count++;}
+async function wait() {for(let i=0;i<80;i++){try {const r=await fetch('http://127.0.0.1:4391/');if(r.ok)return;}catch{} await new Promise(r=>setTimeout(r,150));}throw new Error('No Vite: '+log);}
+try {
+ await wait();
+ const browser = await chromium.launch({headless:true});
+ try {
+  for(const viewport of [{name:'desktop',width:1440,height:900},{name:'tablet',width:820,height:1180},{name:'phone',width:390,height:844}]){
+   const context=await browser.newContext({viewport, reducedMotion:'reduce'});
+   const page=await context.newPage();
+   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.goto('http://127.0.0.1:4391/');
+   await page.waitForSelector('.command-page');
+   check(viewport.name+' Command visible',await page.locator('.command-page').count()===1);
+   await page.locator('.feature-card').first().click();
+   await page.waitForURL(/\/atlas/);
+   await page.waitForSelector('[data-atlas-agent2]');
+   await page.locator('.pa2-concept-list button').filter({hasText:/pair of linear equations/i}).first().focus();
+   await page.keyboard.press('Enter');
+   await page.waitForURL(u => new URL(u).searchParams.get('concept') === 'c10-pair-linear-equations');
+   check(viewport.name+' real Agent2 Atlas mounted',await page.locator('[data-atlas-agent2]').count()===1);
+   await page.getByRole('button',{name:/Open lines laboratory/}).click();
+   await page.waitForURL(/\/laboratory/);
+   await page.waitForSelector('[data-laboratory-agent2]');
+   check(viewport.name+' Agent2 interactive Lab mounted',await page.locator('[data-laboratory-agent2] input[type=range]').count()>=3);
+   await page.getByRole('button',{name:/Open practice question/}).click();
+   await page.waitForURL(/\/paper/);
+   await page.waitForSelector('[data-atlas-paper]');
+   check(viewport.name+' Agent3 Paper matches Lab concept',
+     (await page.locator('.pa3-sheet-head h1').innerText()).includes('Where two lines meet'));
+   await page.getByLabel('Your working and reasoning').fill('y=x-2\n2x+(x-2)=7\n3x=9\nx=3 and y=1');
+   await page.locator('[data-atlas-submit]').click();
+   await page.waitForURL(/\/insight/, {timeout:8000});
+   await page.waitForSelector('[data-atlas-insight]');
+   check(viewport.name+' navigated to named Insight route',await page.locator('[data-atlas-no-diagnosis]').count()===1);
+   const focusInfo=await page.evaluate(()=>({active:document.activeElement?.outerHTML.slice(0,180),skipFocus:document.querySelector('.skip-link')?.matches(':focus'),skipTop:document.querySelector('.skip-link')?.getBoundingClientRect().top}));
+   console.log('FOCUS REVIEW', viewport.name, JSON.stringify(focusInfo));
+   const info=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,w:innerWidth,main:document.querySelectorAll('main').length}));
+   check(viewport.name+' no overflow',info.scroll<=info.w+2,JSON.stringify(info));
+   check(viewport.name+' one semantic main',info.main===1,JSON.stringify(info));
+   await page.screenshot({path:join(out,viewport.name+'-insight.png'),fullPage:true,animations:'disabled'});
+   await page.locator('[data-atlas-return]').click();
+   await page.waitForURL(/\/atlas/);
+   check(viewport.name+' exact concept preserved at Atlas',new URL(page.url()).searchParams.get('concept')==='c10-pair-linear-equations');
+   check(viewport.name+' no browser errors',errors.length===0,errors.join('; '));
+   await page.screenshot({path:join(out,viewport.name+'-atlas-return.png'),fullPage:true,animations:'disabled'});
+   await context.close();
+  }
+ } finally {await browser.close();}
+ console.log('THREE AGENT COMPATIBILITY',count,'PASS');
+} finally {server.kill('SIGTERM');}

@@ -8,9 +8,10 @@ import {
 let checks = 0;
 const test = (label, run) => { run(); checks++; process.stdout.write('PASS ' + label + '\n'); };
 
-test('isolated synthetic fixture contains two authored questions', () => {
-  assert.equal(QUESTIONS.length, 2);
-  assert(QUESTIONS.every(q => q.conceptId === 'linear-equations'));
+test('synthetic fixtures distinguish single equations from simultaneous pairs', () => {
+  assert.equal(QUESTIONS.length, 3);
+  assert.equal(QUESTIONS[0].conceptId, 'linear-equations');
+  assert.equal(QUESTIONS[2].conceptId, 'c10-pair-linear-equations');
 });
 test('no progress inferred for a fresh student', () => {
   const s = initialDemoState();
@@ -40,7 +41,7 @@ test('safe restore clamps arbitrary injected content and navigation', () => {
   s.outcome = 'not-a-state';
   s.drafts = { [QUESTIONS[0].id]: { working: 'a'.repeat(9000), answer: 3, strokes: [[[1,2],[3,4]], [[NaN,1]]] }, other: { answer: 'untrusted' } };
   const got = restoreDemo(storageEnvelope(s));
-  assert.equal(got.questionIndex, 1);
+  assert.equal(got.questionIndex, QUESTIONS.length - 1);
   assert.equal(got.outcome, 'result');
   assert.equal(Object.keys(got.drafts).length, 1);
   assert.equal(got.drafts[QUESTIONS[0].id].working.length, 1800);

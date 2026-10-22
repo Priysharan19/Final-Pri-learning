@@ -349,3 +349,11 @@
   .pa3-app *, .pa3-app *::before, .pa3-app *::after { animation-duration: .01ms !important;
     animation-iteration-count:1 !important; transition-duration: .01ms !important; scroll-behavior:auto !important; }
 }
+
+/* Embedded mode: Agent 1 owns the navigation shell and named routes. */
+.pa3-app.pa3-embedded { background: transparent; min-height:0; }
+.pa3-embedded .pa3-shellbar, .pa3-embedded .pa3-rail,
+.pa3-embedded .pa3-global-foot { display:none; }
+.pa3-embedded .pa3-body { display:block; min-height:0; }
+.pa3-embedded .pa3-content { padding: 12px 0 50px; }
+.pa3-embedded[data-focus=true] .pa3-content { padding-top:12px; }

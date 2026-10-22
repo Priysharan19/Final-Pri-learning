@@ -235,6 +235,27 @@ async function browserTour(browserType, name) {
     check('blocked browser storage never claims durable draft saving',
       (await blockedPage.locator('[data-atlas-state="unsubmitted"]').innerText()).includes('may be lost on refresh'));
     await blockedContext.close();
+    const pairContext = await browser.newContext({ viewport: { width: 820, height: 1180 } });
+    const pairPage = await pairContext.newPage();
+    await pairPage.goto(url + '?concept=c10-pair-linear-equations');
+    await pairPage.waitForSelector('[data-atlas-paper]');
+    check('Agent 2 canonical concept ID selects a mathematically relevant pair',
+      (await pairPage.locator('.pa3-sheet-head h1').innerText()).includes('Where two lines meet'));
+    check('pair fixture discloses it is not the same laboratory equation',
+      (await pairPage.locator('.pa3-question-note').innerText()).includes('separate authored practice'));
+    await pairPage.getByLabel('Your working and reasoning').fill('y=x-2\n3x=9\nx=3 and y=1');
+    await submit(pairPage);
+    check('paired equations remain unassessed without verified service',
+      await pairPage.locator('[data-atlas-no-diagnosis]').count() === 1);
+    await shot(pairPage, 'atlas-agent3-pair-concept');
+    await pairPage.locator('[data-atlas-return]').click();
+    check('Atlas return preserves Agent 2 exact concept ID',
+      (await pairPage.locator('[data-atlas-handoff] code').innerText()) === 'c10-pair-linear-equations');
+    await pairPage.goto(url + '?concept=quadratics');
+    await pairPage.waitForSelector('[data-atlas-unmapped]');
+    check('unmapped Agent 1 concept fails closed instead of substituting unrelated maths',
+      (await pairPage.locator('[data-atlas-unmapped]').innerText()).includes('No authored demo paper'));
+    await pairContext.close();
   } finally {
     await browser.close();
   }

@@ -231,8 +231,11 @@ export default function AtlasPaper({ question, draft, state, storageAvailable = 
       </div>
       {!state.focus && (
         <div className="pa3-paper-side">
-          <div className="pa3-context"><div className="pa3-overline">CURRENT CONCEPT</div><h3>Linear equations</h3>
-            <p>Equality is preserved when the same operation is applied to both sides.</p>
+          <div className="pa3-context"><div className="pa3-overline">CURRENT CONCEPT</div>
+            <h3>{question.conceptId === 'c10-pair-linear-equations' ? 'Pairs of linear equations' : 'Linear equations'}</h3>
+            <p>{question.conceptId === 'c10-pair-linear-equations'
+              ? 'The intersection solves both linear equations simultaneously.'
+              : 'Equality is preserved when the same operation is applied to both sides.'}</p>
             <div className="pa3-context-rule"><span>01</span><span>EXPAND</span><span>→</span><span>02</span><span>BALANCE</span></div>
             <button type="button" className="pa3-link-button" onClick={onAtlas}>Locate in Atlas <span aria-hidden="true">↗</span></button>
           </div>

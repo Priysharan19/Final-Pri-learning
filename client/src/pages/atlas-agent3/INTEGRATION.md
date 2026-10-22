@@ -24,7 +24,7 @@ import AtlasAgent3Demo, {
 <AtlasAgent3Demo
   onNavigate={(destination, context) => {
     // destination: 'atlas'
-    // context: { conceptId: 'linear-equations', source: 'paper' | 'insight' }
+    // context: { conceptId: 'linear-equations' | 'c10-pair-linear-equations', source: 'paper' | 'insight' }
     // Route into the Agent 2 atlas graph, preserving the concept selection.
   }}
 />
@@ -79,7 +79,7 @@ The browser tour starts an isolated Vite process on port 5189 and closes it on c
 | P1 / governance | Independent Agent 1 review and governed release acceptance not yet performed | OPEN: complete independent diff review, exact-head CI; **do not merge** |
 | P2 / access | No physical iPad, PencilKit, or assistive-technology field evidence | UNVERIFIED, not a tested pass |
 | P2 / durability | Synthetic \`sessionStorage\` drafts survive refresh in one tab only | INTENTIONAL demo limitation; never adapt into production persistence |
-| P3 / content | Two authored algebra fixtures are a demonstration, not syllabus coverage | INTENTIONAL fixture limitation |
+| P3 / content | Three authored algebra fixtures are a demonstration, not syllabus coverage | INTENTIONAL fixture limitation |
 | P3 / input | Sketching is stored and replayed but never transcribed | INTENTIONAL prototype safety boundary |
 
 A prior touch assertion tapped a canvas below the mobile viewport and failed to exercise the actual target. Scrolling the surface into view corrected the browser test; a real touch tap then passed. No product touch-repair claim is based on that test correction.
@@ -91,3 +91,13 @@ A prior touch assertion tapped a canvas below the mobile viewport and failed to 
 **Agent 2**: accept \`linear-equations\` as a synthetic concept identifier or provide a single mapping adapter; verify bidirectional Atlas → Paper → Insight → Atlas selection. No graph connections should be drawn from these fixtures as authoritative curriculum evidence.
 
 **QA/Release**: inspect ownership (\`student-experience\`, R2), synthetic isolation, branch/mission markers, no protected-main mutation, CI evidence, screenshot changes and accessibility. Reject any production-ready or mathematically verified claim. No author may self-certify.
+
+## Cross-agent browser proof (22 October 2026)
+
+The independently staged **temporary compatibility worktree** combines the existing Agent 1 Command shell, Agent 2 real Atlas and Laboratory components, and Agent 3 Paper/Insight. A contiguous browser tour passed **27/27 assertions on desktop, tablet and phone**, including Agent 1 route synchronization, keyboard concept selection, a separate mathematically relevant paired-equations fixture, an explicit unassessed Insight result, and return to the exact selected chapter identity.
+
+The proof adapter and replayable test source live in [compatibility/README.md](compatibility/README.md). Screenshots are under [evidence/three-agent](evidence/three-agent). These files are not imported by production and no actual student data, backend or grading path was exercised. **The copy-only integration has not been accepted or merged**.
+
+**Open P1 (truthful combined copy):** Agent 1's original global banner says “NOTHING HERE IS GRADED OR SAVED” whereas Agent 3 retains same-tab synthetic drafts. Agree replacement copy prior to release. **Open P1 (contract mismatch):** Agent 1 abstract concept IDs do not equal Agent 2 canonical curriculum chapter IDs. The proof adapter defaults to a curated Agent 2 topic but does not claim an identity mapping. **Open P2 (continuity):** Lab's adjustable current-coefficient prompt is not the same as the deliberately new Paper example. The UI says so and Insight only explains that authored example.
+
+Agent 3 orchestrator supports optional props: `embedded` (hide duplicate shell), `initialConceptId`, `initialView`, `onDestinationChange`, and `onNavigate`. Unknown concepts render an explicit unavailable-fixture state instead of substituting an unrelated question. The canonical Agent 2 ID `c10-pair-linear-equations` selects a separately authored simultaneous-equations fixture; Agent 1's `linear-equations` ID selects a single-variable fixture. **They must never be conflated.**

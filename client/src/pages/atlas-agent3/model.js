@@ -48,6 +48,26 @@ export const QUESTIONS = Object.freeze([
     ],
     errorExample: null,
     nextId: 'atlas-linear-01'
+  }),
+  Object.freeze({
+    id: 'atlas-pair-01',
+    conceptId: 'c10-pair-linear-equations',
+    chapter: 'Class X / Pairs of linear equations',
+    title: 'Where two lines meet',
+    prompt: 'Transfer from the laboratory to a **new illustrative pair**: solve $2x+y=7$ and $x-y=2$. Explain how you know the solution satisfies both equations.',
+    marks: 4,
+    instructions: 'This is a separate authored practice example, not the exact equations from your laboratory controls.',
+    hints: [
+      'Use $x-y=2$ to express one variable in terms of the other.',
+      'Rearrange to $y=x-2$, then substitute into $2x+y=7$.'
+    ],
+    steps: [
+      { label: 'Rearrange', math: '$x-y=2$', nextMath: '$y=x-2$', why: 'Move the y term and then isolate y.' },
+      { label: 'Substitute', math: '$2x+(x-2)=7$', nextMath: '$3x=9$', why: 'Replace y and add 2 to both sides.' },
+      { label: 'Solve and verify', math: '$x=3,\\;y=1$', nextMath: '$2(3)+1=7,\\quad 3-1=2$', why: 'The pair satisfies both original equations.' }
+    ],
+    errorExample: null,
+    nextId: 'atlas-linear-01'
   })
 ]);
 
