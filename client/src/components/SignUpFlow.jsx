@@ -514,6 +514,8 @@ export default function SignUpFlow({
               {t(isSms ? 'signup.useEmail' : 'signup.usePhone')}
             </button>
           )}
+          {/* The parent door sits in the same row as the other side doors. */}
+          {!inline && <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>}
         </div>
         {/* Inside a page the terms are not otherwise on screen; the landing
             screen already carries them in its footer, once. */}
@@ -525,11 +527,7 @@ export default function SignUpFlow({
             })}
           </p>
         )}
-        {!inline && (
-          <div className="signup-alt signup-alt-quiet">
-            <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>
-          </div>
-        )}
+
       </>
     );
   } else if (step === 'password') {

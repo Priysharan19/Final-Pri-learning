@@ -96,3 +96,12 @@ html.ui-instrument:root .auth-col > p.muted { max-width: 34em; margin: 4px auto 
 html.ui-instrument:root .auth-col > p.muted:has(+ p.muted) { margin-top: 22px !important; padding-top: 14px; border-top: var(--c-line) solid var(--c-hair-2); }
 html.ui-instrument:root .auth-col > .signin-landing { max-width: 380px; width: 100%; }
 @media (max-width: 860px) { html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { box-shadow: none; } }
+
+/* The side doors read as one deliberate row: hairline dots between them. */
+html.ui-instrument:root .signin-landing .signup-alt .linklike + .linklike::before { content: '\00B7'; margin-right: 14px; color: var(--c-hair); }
+html.ui-instrument:root .signin-landing .signup-alt { gap: 0 14px; }
+/* Language: C chips, the chosen one inked. */
+html.ui-instrument:root .auth-col .pill-opt.c-chip { font: var(--c-t-label); letter-spacing: 0.12em; background: var(--c-sheet); color: var(--c-ink-2); border: var(--c-line) solid var(--c-hair); box-shadow: none; }
+html.ui-instrument:root .auth-col .pill-opt.c-chip:lang(hi) { font-family: var(--c-text); letter-spacing: 0; }
+html.ui-instrument:root .auth-col .pill-opt.c-chip[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+html.ui-instrument:root .auth-col .pill-opt.c-chip:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }

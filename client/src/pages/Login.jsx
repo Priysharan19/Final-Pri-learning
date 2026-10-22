@@ -252,7 +252,7 @@ function LanguagePicker() {
     <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
       role="group" aria-label={t('login.chooseLanguage')}>
       {LANGUAGES.map(l => (
-        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+        <button key={l.id} type="button" className={`pill-opt c-chip ${chosen === l.id ? 'on' : ''}`}
           lang={l.htmlLang} aria-pressed={chosen === l.id}
           aria-label={t('lang.switchTo', { language: l.english })}
           onClick={() => pick(l.id)}>{l.label}</button>
