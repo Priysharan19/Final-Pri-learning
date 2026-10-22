@@ -61,7 +61,7 @@ const fake = createServer((req, res) => {
     const sent = JSON.parse(raw);
     const image = sent.input[1].content.find(part => part.type === 'input_image').image_url;
     const [, text] = Buffer.from(image.split(',')[1], 'base64').toString('utf8').split('|');
-    const lines = String(JSON.parse(text)).split('\n').map(line => ({ text: line, latex: '', confidence: 0.97 }));
+    const lines = String(JSON.parse(text)).split('\n').map(line => ({ text: line, latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }));
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({
       model: sent.model,

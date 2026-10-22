@@ -72,7 +72,7 @@ ok(tooBig, 'an oversized image is refused by size, before the request');
 
 // ── 4 · Confidence is never inflated above the worst line ────────────────────
 const mixed = normalizeResult(
-  { lines: [{ text: '2x + 8', confidence: 0.99 }, { text: 'x = 4', confidence: 0.41 }], confidence: 0.97, needs_confirmation: false },
+  { lines: [{ text: '2x + 8', confidence: 0.99, uncertain: false, doubt: '', gap_before: false }, { text: 'x = 4', confidence: 0.41, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false },
   { model: 'test', confidenceFloor: 0.82 }
 );
 ok(mixed.confidence <= 0.41, `a page is only as confident as its worst line (${mixed.confidence})`);
@@ -80,13 +80,13 @@ ok(mixed.needsConfirmation, 'and below the floor it asks for confirmation');
 eq([mixed.confidenceFloor, mixed.providerNeedsConfirmation], [0.82, false],
   'normalization preserves the configured floor and distinguishes floor doubt from provider-declared ambiguity');
 const providerAmbiguous = normalizeResult(
-  { lines: [{ text: 'x = 4', confidence: 0.96 }], confidence: 0.96, needs_confirmation: true },
+  { lines: [{ text: 'x = 4', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }], confidence: 0.96, needs_confirmation: true },
   { model: 'test', confidenceFloor: 0.9 }
 );
 eq([providerAmbiguous.needsConfirmation, providerAmbiguous.providerNeedsConfirmation, providerAmbiguous.confidenceFloor], [true, true, 0.9],
   'provider-declared ambiguity remains explicit even when all line confidences exceed the configured floor');
 const clean = normalizeResult(
-  { lines: [{ text: '6 <= 2x + 8 <= 16', confidence: 0.96 }], confidence: 0.95, needs_confirmation: false },
+  { lines: [{ text: '6 <= 2x + 8 <= 16', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }], confidence: 0.95, needs_confirmation: false },
   { model: 'test', confidenceFloor: 0.82 }
 );
 ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line is usable');
@@ -109,7 +109,11 @@ ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line
   eq(doubted.text, 'f(x) = (x+3)^2 + 6\n(x+3)^2 > 0\nleast value => 6.', 'and no line is rewritten: a doubted ">" stays ">", a sentence keeps its full stop');
   eq([doubted.providerNeedsConfirmation, doubted.needsConfirmation], [true, true], 'a line the reader doubts makes the page one to confirm, even when the page-level flag was not raised');
   const legacy = normalizeResult({ confidence: 0.95, needs_confirmation: false, lines: [{ text: '7', latex: '', confidence: 0.95 }] }, { model: 'test', confidenceFloor: 0.82 });
-  eq([legacy.lines[0].uncertain, legacy.lines[0].doubt, legacy.lines[0].gapBefore, legacy.needsConfirmation], [false, null, false, false], 'a reply without the new fields reads as no doubt');
+  // #196 D2: this used to read a line with no `uncertain` flag as "no doubt".
+  // The strict schema requires the flag, so a reply without it has broken its
+  // own contract — and a broken contract fails closed, as a doubt.
+  eq([legacy.lines[0].uncertain, legacy.lines[0].doubt, legacy.lines[0].gapBefore, legacy.needsConfirmation], [true, null, false, true],
+    'a line missing its required `uncertain` flag is a doubt to confirm, never "no doubt"');
   const line = TRANSCRIPTION_SCHEMA.properties.lines.items;
   eq([...line.required].sort(), ['confidence', 'doubt', 'gap_before', 'latex', 'text', 'uncertain'], 'the strict schema requires every per-line field');
   ok(line.additionalProperties === false && line.properties.uncertain.type === 'boolean' && line.properties.doubt.maxLength === 120 && line.properties.gap_before.type === 'boolean', 'and nothing beyond them');
@@ -121,6 +125,70 @@ ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line
 eq(normalizeResult({ lines: [], confidence: 1, needs_confirmation: false }, { model: 'test', confidenceFloor: 0.5 }).needsConfirmation,
   true, 'a transcription with no lines always needs confirmation');
 
+// ── 4c · A reply that breaks its own schema fails closed (#196 D1/D2) ───────
+// The schema is the contract the provider's strict mode is asked to keep. The
+// server does not rely on that: a custom PRI_HANDWRITING_ENDPOINT, or a
+// provider that drifts, can return anything. Whatever comes back, a reply
+// outside the contract is never returned as a confident reading.
+{
+  const provider = await import('../platform/handwritingProvider.js');
+  const LIMIT = TRANSCRIPTION_SCHEMA.properties.lines.maxItems;
+  const FLOOR = { model: 'test', confidenceFloor: 0.82 };
+  const goodLine = (text = 'x = 4') => ({ text, latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false });
+  const goodReply = (lines = [goodLine()]) => ({ lines, confidence: 0.97, needs_confirmation: false });
+  const settle = reply => { try { return { result: normalizeResult(reply, FLOOR) }; } catch (error) { return { error }; } };
+
+  // The positive control: a conforming confident reply IS usable, so every
+  // refusal below is caused by the one thing each case breaks.
+  const control = settle(goodReply());
+  eq([control.error?.code ?? null, control.result?.needsConfirmation, control.result?.providerNeedsConfirmation], [null, false, false],
+    'a reply that keeps the schema is a confident reading (the control every case below departs from)');
+  eq(provider.MAX_TRANSCRIPTION_LINES, LIMIT, 'the line limit the server enforces is the schema\'s own constant, not a second copy');
+
+  // D1 — more lines than the schema allows.
+  const atLimit = settle(goodReply(Array.from({ length: LIMIT }, (_, i) => goodLine(`x = ${i}`))));
+  eq([atLimit.error?.code ?? null, atLimit.result?.lines.length, atLimit.result?.needsConfirmation], [null, LIMIT, false],
+    `exactly ${LIMIT} lines is inside the contract and reads normally`);
+  for (const count of [LIMIT + 1, 500]) {
+    const over = settle(goodReply(Array.from({ length: count }, (_, i) => goodLine(`x = ${i}`))));
+    ok(!over.result, `${count} lines is never returned as a reading, confident or otherwise`);
+    eq([over.error?.code, over.error?.status, over.error?.retryable], ['HANDWRITING_MALFORMED', 502, true],
+      `${count} lines is refused through the existing malformed-reply code`);
+  }
+  for (const [label, bad] of [['a number', 7], ['an object', { toString: () => 'x = 4' }], ['missing', undefined], ['null', null]]) {
+    const reply = goodReply([{ ...goodLine(), text: bad }]);
+    eq(settle(reply).error?.code, 'HANDWRITING_MALFORMED', `a line whose text is ${label} is refused, not coerced or silently dropped`);
+  }
+  eq(settle(goodReply(['x = 4'])).error?.code, 'HANDWRITING_MALFORMED', 'a line that is not an object is refused');
+
+  // D2 — a doubt flag that is not exactly false is a doubt.
+  for (const [label, value] of [['the string "true"', 'true'], ['the string "false"', 'false'], ['1', 1], ['0', 0], ['null', null], ['missing', undefined]]) {
+    const page = { ...goodReply() };
+    if (value === undefined) delete page.needs_confirmation; else page.needs_confirmation = value;
+    const r = settle(page).result;
+    eq([r?.needsConfirmation, r?.providerNeedsConfirmation], [true, true], `needs_confirmation ${label} is a doubt, never "no doubt"`);
+    const line = goodLine();
+    if (value === undefined) delete line.uncertain; else line.uncertain = value;
+    const l = settle(goodReply([line])).result;
+    eq([l?.lines[0].uncertain, l?.needsConfirmation, l?.providerNeedsConfirmation], [true, true, true], `a line's uncertain ${label} is a doubt on that line and the page`);
+  }
+
+  // D2 — a confidence that is not a finite number in [0, 1] is low confidence.
+  for (const [label, value] of [['the string "0.99"', '0.99'], ['NaN', NaN], ['Infinity', Infinity], ['1.5', 1.5], ['-0.1', -0.1], ['null', null], ['missing', undefined], ['a boolean', true]]) {
+    const page = { ...goodReply() };
+    if (value === undefined) delete page.confidence; else page.confidence = value;
+    const r = settle(page).result;
+    ok(r?.needsConfirmation === true && r.confidence < FLOOR.confidenceFloor, `a page confidence of ${label} is below the floor and needs confirmation (${r?.confidence})`);
+    const line = goodLine();
+    if (value === undefined) delete line.confidence; else line.confidence = value;
+    const l = settle(goodReply([line])).result;
+    ok(l?.needsConfirmation === true && l.confidence < FLOOR.confidenceFloor && l.lines[0].confidence === 0,
+      `a line confidence of ${label} counts as 0, so the page needs confirmation`);
+  }
+  eq([settle(goodReply()).result.confidence, settle({ ...goodReply(), confidence: 1 }).result.confidence, settle({ ...goodReply([{ ...goodLine(), confidence: 0 }]) }).result.confidence],
+    [0.97, 0.97, 0], 'genuine values at and inside the bounds are kept exactly; nothing here moves the floor');
+}
+
 // ── 5 · What is actually sent to the provider ────────────────────────────────
 let sent = null;
 const recordingFetch = async (url, init) => {
@@ -128,7 +196,7 @@ const recordingFetch = async (url, init) => {
   return {
     ok: true,
     status: 200,
-    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], confidence: 0.95, needs_confirmation: false }) })
+    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95, uncertain: false, doubt: '', gap_before: false }], confidence: 0.95, needs_confirmation: false }) })
   };
 };
 const env = { PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback', PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000', PRI_RELEASE_SHA: '1111111111111111111111111111111111111111' };
@@ -153,7 +221,7 @@ const unsureThenSure = async (url, init) => {
   const confidence = model === 'test-fallback' ? 0.94 : 0.4;
   return {
     ok: true, status: 200,
-    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = 4', confidence }], confidence, needs_confirmation: confidence < 0.8 }) })
+    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = 4', confidence, uncertain: false, doubt: '', gap_before: false }], confidence, needs_confirmation: confidence < 0.8 }) })
   };
 };
 const escalated = await transcribeHandwriting(PNG, { env, fetchImpl: unsureThenSure });
@@ -250,7 +318,7 @@ ok(providerStaticStatus({ PRI_HANDWRITING_API_KEY: 'k', PRI_HANDWRITING_REASONIN
         if (init.signal.aborted) fail(); else init.signal.addEventListener('abort', fail, { once: true });
       });
     }
-    return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = 4', confidence: 0.97 }], confidence: 0.97, needs_confirmation: false }) }) };
+    return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = 4', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }) }) };
   };
   const started = Date.now();
   const rescued = await transcribeHandwriting(PNG, {
@@ -314,7 +382,7 @@ const fallbackFailureFetch = async (_url, init) => {
   return {
     ok: true, status: 200,
     json: async () => ({ output_text: JSON.stringify({
-      lines: [{ text: 'x = ?', confidence: 0.4 }],
+      lines: [{ text: 'x = ?', confidence: 0.4, uncertain: false, doubt: '', gap_before: false }],
       confidence: 0.4,
       needs_confirmation: true
     }) })
@@ -332,7 +400,7 @@ const alwaysUnsure = async (_url, init) => {
   budgetedFetches += 1;
   return {
     ok: true, status: 200,
-    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = ?', confidence: 0.4 }], confidence: 0.4, needs_confirmation: true }) })
+    json: async () => ({ output_text: JSON.stringify({ lines: [{ text: 'x = ?', confidence: 0.4, uncertain: false, doubt: '', gap_before: false }], confidence: 0.4, needs_confirmation: true }) })
   };
 };
 let fallbackRefused = null;
@@ -592,8 +660,10 @@ try {
     VALUES (?,?,?,?,?,?,?)`).run('acct-boundary', 'practice-question', QID, '{}', null, now, now + 86400000);
 
   const bodies = [];
+  let scripted = null;   // a reply to send instead of the hostile one below
   const hostileReader = async (_url, init) => {
     bodies.push(String(init?.body ?? ''));
+    if (scripted) return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify(scripted) }) };
     return {
       ok: true, status: 200,
       json: async () => ({ output_text: JSON.stringify({
@@ -641,6 +711,35 @@ try {
       ok(!wireReply.includes(leak), `a model-supplied ${leak} never reaches the student's device`);
     }
     eq(json?.transcription?.text, 'x = 4', 'the transcription itself comes through unchanged');
+
+    // #196 D1/D2 through the real route: a reply outside its schema is never
+    // served to the device as a confident reading, and none is kept or receipted.
+    const post = async (label, body = {}) => {
+      const r = await fetch(`${boundaryBase}/handwriting/transcribe`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-boundary` },
+        body: JSON.stringify({ image: PNG + Buffer.from(`boundary-${label}`.padEnd(24, '.')).toString('base64'), questionId: QID, ...body })
+      });
+      return { status: r.status, json: await r.json().catch(() => null) };
+    };
+    const conforming = { text: 'x = 4', latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false };
+    scripted = { lines: Array.from({ length: TRANSCRIPTION_SCHEMA.properties.lines.maxItems + 1 }, (_, i) => ({ ...conforming, text: `x = ${i}` })), confidence: 0.97, needs_confirmation: false };
+    const tooMany = await post('too-many-lines');
+    eq([tooMany.status, tooMany.json?.error?.code, tooMany.json?.error?.retryable], [502, 'HANDWRITING_MALFORMED', true],
+      'over the line limit the route answers the existing coded malformed-reply refusal');
+    ok(!tooMany.json?.transcription && !tooMany.json?.receipt, 'with no transcription and no read receipt');
+    for (const [label, reply] of [
+      ['string-doubt', { lines: [conforming], confidence: 0.97, needs_confirmation: 'true' }],
+      ['string-uncertain', { lines: [{ ...conforming, uncertain: 'true', doubt: '4 or 9' }], confidence: 0.97, needs_confirmation: false }],
+      ['string-confidence', { lines: [{ ...conforming, confidence: '0.99' }], confidence: '0.99', needs_confirmation: false }],
+      ['out-of-range', { lines: [{ ...conforming, confidence: 1.5 }], confidence: 1.5, needs_confirmation: false }],
+      ['missing-fields', { lines: [{ text: 'x = 4' }] }]
+    ]) {
+      scripted = reply;
+      const r = await post(label);
+      eq([r.status, r.json?.transcription?.needsConfirmation], [200, true], `through the route, a reply with ${label} is a reading to confirm, never a confident one`);
+    }
+    scripted = null;
   } finally {
     await new Promise(resolve => boundaryServer.close(resolve));
   }

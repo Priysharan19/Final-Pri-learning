@@ -57,9 +57,9 @@ const fake = createServer((req, res) => {
     provider.total += 1;
     provider.calls.set(label, callsFor(label) + 1);
     provider.models.push(sent.model);
-    const read = { lines: [{ text: label, latex: '', confidence: 0.96 }], confidence: 0.96, needs_confirmation: false };
+    const read = { lines: [{ text: label, latex: '', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }], confidence: 0.96, needs_confirmation: false };
     const blank = { lines: [], confidence: 0, needs_confirmation: true };
-    const unsure = { lines: [{ text: label, latex: '', confidence: 0.4 }], confidence: 0.4, needs_confirmation: true };
+    const unsure = { lines: [{ text: label, latex: '', confidence: 0.4, uncertain: false, doubt: '', gap_before: false }], confidence: 0.4, needs_confirmation: true };
     if (behaviour === 'blank') return reply(res, { model: sent.model, reading: blank });
     if (behaviour === 'failonce' && !provider.failedOnce.has(label)) {
       provider.failedOnce.add(label);

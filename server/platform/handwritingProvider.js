@@ -69,6 +69,13 @@ function safeEndpointParts(endpoint) {
   }
 }
 
+/**
+ * The most lines one transcription may hold. The response schema states it and
+ * normalizeResult enforces it: the provider's strict mode is not the only
+ * thing standing between a non-conforming reply and the student.
+ */
+export const MAX_TRANSCRIPTION_LINES = 40;
+
 /** Deliberately small: a schema the model cannot wander outside. */
 export const TRANSCRIPTION_SCHEMA = Object.freeze({
   type: 'object',
@@ -77,7 +84,7 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
   properties: {
     lines: {
       type: 'array',
-      maxItems: 40,
+      maxItems: MAX_TRANSCRIPTION_LINES,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -322,38 +329,66 @@ export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   return { mime: `image/${match[1]}`, bytes };
 }
 
+// The reply is untrusted model output, checked here against the same contract
+// the schema states rather than trusted to the provider's strict mode (a custom
+// PRI_HANDWRITING_ENDPOINT, or a provider that drifts, may not enforce it).
+// Every check fails closed:
+//   · more lines than the schema allows is not a transcription this reader can
+//     produce — the reply is refused as malformed (the same coded failure as a
+//     reply that is not JSON), so nothing of it is shown, kept or marked;
+//   · a line whose `text` is not a string is refused the same way, rather than
+//     coerced or silently dropped from what the student wrote;
+//   · a doubt flag (`needs_confirmation`, a line's `uncertain`) that is not
+//     exactly `false` is a doubt: a string "true", a 1, null or a missing flag
+//     never reads as "no doubt";
+//   · a confidence that is not a finite number in [0, 1] — a string, NaN,
+//     Infinity, 1.5, -0.1, missing — counts as 0, which is below every floor,
+//     so the reading is offered for confirmation and never used as it stands.
+function malformedReply(reason) {
+  return new HandwritingProviderError(`The transcription did not match its response format (${reason}).`, {
+    code: 'HANDWRITING_MALFORMED', status: 502, retryable: true
+  });
+}
+
+/** Only an explicit `false` is "no doubt". */
+const doubtFlag = value => value !== false;
+
+/** A stated confidence, or 0 when it is not a finite number in [0, 1]. */
+const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
+
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
+  if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`);
   return raw
-    .map(line => ({
-      text: String(line?.text ?? '').slice(0, 400).trim(),
-      latex: line?.latex ? String(line.latex).slice(0, 600).trim() : null,
-      confidence: Number.isFinite(Number(line?.confidence))
-        ? Math.min(1, Math.max(0, Number(line.confidence)))
-        : 0,
-      // The reader's own per-line doubt, passed on exactly as it was given.
-      // Nothing here re-reads or repairs the line: the text is never changed.
-      uncertain: line?.uncertain === true,
-      doubt: line?.uncertain === true && typeof line?.doubt === 'string' && line.doubt.trim()
-        ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
-        : null,
-      gapBefore: line?.gap_before === true
-    }))
+    .map(line => {
+      if (!line || typeof line !== 'object' || typeof line.text !== 'string') throw malformedReply('a line without text');
+      const uncertain = doubtFlag(line.uncertain);
+      return {
+        text: line.text.slice(0, 400).trim(),
+        latex: typeof line.latex === 'string' && line.latex ? line.latex.slice(0, 600).trim() : null,
+        confidence: unitConfidence(line.confidence),
+        // The reader's own per-line doubt, passed on exactly as it was given.
+        // Nothing here re-reads or repairs the line: the text is never changed.
+        uncertain,
+        doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
+          ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
+          : null,
+        gapBefore: line.gap_before === true
+      };
+    })
     .filter(line => line.text.length > 0);
 }
 
 export function normalizeResult(parsed, { model, confidenceFloor }) {
   const lines = normalizeLines(parsed?.lines);
-  const stated = Number.isFinite(Number(parsed?.confidence))
-    ? Math.min(1, Math.max(0, Number(parsed.confidence)))
-    : 0;
+  const stated = unitConfidence(parsed?.confidence);
   // The overall confidence is never allowed to exceed the least confident line:
   // a page is only as readable as its worst line, and the marker reads them all.
   const worstLine = lines.length ? Math.min(...lines.map(l => l.confidence)) : 0;
   const confidence = lines.length ? Math.min(stated, worstLine) : 0;
   // A line the reader marked as uncertain is a doubt about the page, whether
   // or not the reader also raised the page-level flag.
-  const providerNeedsConfirmation = parsed?.needs_confirmation === true || lines.some(line => line.uncertain);
+  const providerNeedsConfirmation = doubtFlag(parsed?.needs_confirmation) || lines.some(line => line.uncertain);
   const needsConfirmation = providerNeedsConfirmation
     || !lines.length
     || confidence < confidenceFloor;

@@ -14,6 +14,11 @@
 // working should end approves anything ending there and punishes the student
 // who took another road.
 //
+// What comes back is a judgement for display, never a mark: every mark is
+// decided by the server's deterministic engine (server/platform/markerOps.js)
+// on the question it issued (ADR-0001), and nothing this route returns is an
+// input to it.
+//
 // Reasoning costs more than transcription, so the hourly allowance is lower.
 // ─────────────────────────────────────────────────────────────────────────────
 import { asyncRouter } from './asyncRouter.js';
