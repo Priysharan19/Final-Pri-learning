@@ -93,6 +93,8 @@ jobs:
       # real platform server in-process (client/test/support/online-authority.mjs).
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Sign-in email template matches what the real-provider acceptance asserts
+        run: node tools/acceptance/auth-email-template-check.mjs
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs client
       - name: Person 2 India + commercial contracts
@@ -182,7 +184,7 @@ jobs:
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133330 wrong answers marked correct across 17304 questions' suites.log
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -227,7 +229,7 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
           grep -Fq 'TRUTHFUL FEEDBACK: PASS — 101/101 checks' suites.log
@@ -242,16 +244,19 @@ jobs:
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 69 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 70 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
           grep -Fq 'LOST MARKS: PASS — 170/170 checks' suites.log
-          grep -Fq 'TOLERANCE POLICY: PASS — 178/178 checks' suites.log
+          grep -Fq 'TOLERANCE POLICY: PASS — 221/221 checks' suites.log
+          # Issue #518: a prompt that states a precision keys a tol or rounding.
+          grep -Fq 'PRECISION BAND: PASS — 2442 draws state a precision' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'ACCOUNT DELETION LINK: PASS — 111/111 checks' suites.log
@@ -366,7 +371,7 @@ jobs:
           node server/test/security-hardening-check.mjs
           set -o pipefail
           node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
-          grep -Fq 'RLS FAIL-CLOSED: PASS — 134/134 checks' rls-fail-closed.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 141/141 checks' rls-fail-closed.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -402,10 +407,12 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 830/830 checks' photo-pipeline.log
+          grep -Fq 'PHOTO PIPELINE: PASS — 860/860 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs
+          node server/test/guardian-notice-version-check.mjs
+          node client/test/task03-guardian-notice-check.mjs
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
@@ -548,7 +555,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 60/60 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -579,7 +586,7 @@ jobs:
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
           grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
           grep -Fq '✓ rls-fail-closed-check.mjs' platform-postgres.log
-          grep -Fq 'RLS FAIL-CLOSED: PASS — 272/272 checks' platform-postgres.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 279/279 checks' platform-postgres.log
           grep -Fq 'DB ROUND TRIPS: PASS — 10/10 checks' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs

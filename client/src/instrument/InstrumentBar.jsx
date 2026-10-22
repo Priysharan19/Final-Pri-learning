@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
+import { isCurrentUrl } from '../platform/pageLink.js';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import CommandBar from './CommandBar.jsx';
@@ -72,12 +74,12 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   return (
     <>
       <header className="in-bar no-print" data-instrument-bar>
-        <button type="button" className="in-mark" onClick={() => nav('/')} aria-label={t('inst.home')}>
+        <button type="button" className="in-mark" onClick={() => nav('/', { replace: isCurrentUrl('/') })} aria-label={t('inst.home')}>
           <span className="in-mark-glyph" aria-hidden="true">P<em>′</em></span>Pri
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')}>
           {TABS.map(tab => (
-            <Link key={tab.to} to={tab.to} className="in-tab" aria-current={tab.match(loc.pathname) ? 'page' : undefined}>{t(tab.key)}</Link>
+            <PageLink key={tab.to} to={tab.to} className="in-tab" aria-current={tab.match(loc.pathname) ? 'page' : undefined}>{t(tab.key)}</PageLink>
           ))}
         </nav>
         <span className="in-spacer" />

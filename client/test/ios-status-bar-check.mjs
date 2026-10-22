@@ -42,6 +42,15 @@ check('the web shell observes the page\'s theme-color and reports its tone (iPho
     && /userInterfaceIdiom == \.phone \{ attachPageTone\(to: webView\) \}/.test(shell));
 check('the web view keeps the device\'s appearance, so "follow the device" never reads the shell\'s choice',
   /webView\.overrideUserInterfaceStyle = device/.test(shell) && /didBecomeActiveNotification/.test(shell));
+// #533: preferredColorScheme overrides the window scene's appearance on
+// iPhone, so a scene trait registration never hears the device switch (seen in
+// the iOS 27 simulator). The screen is watched while active, stopped inactive.
+check('a device light/dark switch while Pri stays in the foreground re-pins the web view (screen watched while active, never through the overridden scene)',
+  /watchDeviceAppearance\(webView\)/.test(shell)
+    && /Timer\(timeInterval: 1, repeats: true\)/.test(shell)
+    && /willResignActiveNotification[\s\S]{0,200}deviceAppearanceWatch\?\.invalidate\(\)/.test(shell)
+    && /\.screen \?\? UIScreen\.main\)\.traitCollection\.userInterfaceStyle/.test(shell)
+    && !/windowScene[^\n]*registerForTraitChanges|scene\.registerForTraitChanges/.test(shell));
 
 // Every page the app can paint: preference × device appearance → theme-color.
 const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);

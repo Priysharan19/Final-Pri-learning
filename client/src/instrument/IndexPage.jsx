@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT, tLater } from '../i18n/index.js';
@@ -121,7 +121,7 @@ export default function IndexPage() {
               <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
             </div>
-            <Link className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></Link>
+            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
             {resumeMarks && resumeMarks.possible <= 10 && (
               <div className="in-seg10" aria-hidden="true">
                 {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
@@ -208,11 +208,11 @@ export default function IndexPage() {
                 const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : '—';
                 return (
                   <li key={i}>
-                    <Link className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
+                    <PageLink className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
                       <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
                       <b lang="en"><TermGloss text={text} /></b>
                       <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev?.accuracy != null ? ev.mastery : 0}%` }} /></span>
-                    </Link>
+                    </PageLink>
                   </li>
                 );
               })}
@@ -220,7 +220,7 @@ export default function IndexPage() {
           )}
           <div>
             <div className="in-plate-acts">
-              <Link className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</Link>
+              <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
             </div>
             {current.evidence.attempts > 0 && current.evidence.accuracy == null && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.accuracyHeld')}</p>}
           </div>
