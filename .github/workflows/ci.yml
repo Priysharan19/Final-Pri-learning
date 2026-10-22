@@ -416,7 +416,9 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 860/860 checks' photo-pipeline.log
+          # 860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED)
+          # is offered as one Try again and never resent by itself; a garbled 502 may be.
+          grep -Fq 'PHOTO PIPELINE: PASS — 880/880 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs

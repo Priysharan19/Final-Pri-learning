@@ -160,8 +160,9 @@ export function validateWorking(lines) {
 
 // The reply is untrusted model output, held to the schema here rather than
 // trusted to the provider's strict mode, and every check fails closed: more
-// judgements than the schema allows is a malformed reply (the same coded
-// failure as one that is not JSON); an index that is not an integer lands on
+// judgements than the schema allows is a malformed reply (WORKING_MALFORMED,
+// 422 and not retryable: the same working would be judged the same way, so it
+// must not be resent and paid for again by itself); an index that is not an integer lands on
 // no line; feedback that is not a string is dropped, never stringified; and a
 // confidence that is not a finite number in [0, 1] counts as 0, so the
 // judgement is a second opinion that puts no cross on any line.
@@ -180,7 +181,7 @@ export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
   const judgements = Array.isArray(parsed?.lines) ? parsed.lines : [];
   if (judgements.length > MAX_LINES) {
     throw new WorkingProviderError(`The step check did not match its response format (${judgements.length} judgements, at most ${MAX_LINES}).`, {
-      code: 'WORKING_MALFORMED', status: 502, retryable: true
+      code: 'WORKING_MALFORMED', status: 422, retryable: false
     });
   }
   const byIndex = new Map();

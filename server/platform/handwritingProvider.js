@@ -75,6 +75,12 @@ function safeEndpointParts(endpoint) {
  * thing standing between a non-conforming reply and the student.
  */
 export const MAX_TRANSCRIPTION_LINES = 40;
+/** The longest `text` one line may hold (schema maxLength; enforced, never cut). */
+export const MAX_LINE_TEXT_CHARS = 400;
+/** The longest display-only `latex` one line may hold (schema maxLength). */
+export const MAX_LINE_LATEX_CHARS = 600;
+/** The longest `doubt` label one line may hold (schema maxLength). */
+export const MAX_LINE_DOUBT_CHARS = 120;
 
 /** Deliberately small: a schema the model cannot wander outside. */
 export const TRANSCRIPTION_SCHEMA = Object.freeze({
@@ -90,14 +96,14 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
         additionalProperties: false,
         required: ['text', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before'],
         properties: {
-          text: { type: 'string', maxLength: 400 },
-          latex: { type: 'string', maxLength: 600 },
+          text: { type: 'string', maxLength: MAX_LINE_TEXT_CHARS },
+          latex: { type: 'string', maxLength: MAX_LINE_LATEX_CHARS },
           confidence: { type: 'number', minimum: 0, maximum: 1 },
           // A symbol on this line could be one of two things. The reader says
           // so here instead of quietly picking one; the student is shown the
           // line as one to check. `doubt` names the two readings.
           uncertain: { type: 'boolean' },
-          doubt: { type: 'string', maxLength: 120 },
+          doubt: { type: 'string', maxLength: MAX_LINE_DOUBT_CHARS },
           // A clearly larger vertical gap above this line than between the
           // other lines: layout only, so a page holding more than one piece
           // of work can be shown to the student in its pieces.
@@ -333,20 +339,27 @@ export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
 // the schema states rather than trusted to the provider's strict mode (a custom
 // PRI_HANDWRITING_ENDPOINT, or a provider that drifts, may not enforce it).
 // Every check fails closed:
-//   · more lines than the schema allows is not a transcription this reader can
-//     produce — the reply is refused as malformed (the same coded failure as a
-//     reply that is not JSON), so nothing of it is shown, kept or marked;
-//   · a line whose `text` is not a string is refused the same way, rather than
-//     coerced or silently dropped from what the student wrote;
+//   · more lines than the schema allows, or a line whose `text` is longer than
+//     the schema allows, is not a transcription this reader can produce — the
+//     reply is refused as malformed (HANDWRITING_MALFORMED), so nothing of it is
+//     shown, kept or marked. A line is never cut short: truncated text would be
+//     marked as if the student had written it. These refusals are 422 and not
+//     retryable — the same page would be read the same way again, so the device
+//     must not keep paying to resend it (the student may still press Try again);
+//   · a line whose `text` is not a string is refused as malformed too (502,
+//     retryable: a garbled reply may not recur), rather than coerced or
+//     silently dropped from what the student wrote;
+//   · `latex` is display-only: one longer than the schema allows is dropped
+//     (the line shows its text), never cut into broken mathematics;
 //   · a doubt flag (`needs_confirmation`, a line's `uncertain`) that is not
 //     exactly `false` is a doubt: a string "true", a 1, null or a missing flag
 //     never reads as "no doubt";
 //   · a confidence that is not a finite number in [0, 1] — a string, NaN,
 //     Infinity, 1.5, -0.1, missing — counts as 0, which is below every floor,
 //     so the reading is offered for confirmation and never used as it stands.
-function malformedReply(reason) {
+function malformedReply(reason, { overLimit = false } = {}) {
   return new HandwritingProviderError(`The transcription did not match its response format (${reason}).`, {
-    code: 'HANDWRITING_MALFORMED', status: 502, retryable: true
+    code: 'HANDWRITING_MALFORMED', status: overLimit ? 422 : 502, retryable: !overLimit
   });
 }
 
@@ -358,20 +371,21 @@ const unitConfidence = value => (typeof value === 'number' && Number.isFinite(va
 
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
-  if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`);
+  if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`, { overLimit: true });
   return raw
     .map(line => {
       if (!line || typeof line !== 'object' || typeof line.text !== 'string') throw malformedReply('a line without text');
+      if (line.text.length > MAX_LINE_TEXT_CHARS) throw malformedReply(`a line of ${line.text.length} characters, at most ${MAX_LINE_TEXT_CHARS}`, { overLimit: true });
       const uncertain = doubtFlag(line.uncertain);
       return {
-        text: line.text.slice(0, 400).trim(),
-        latex: typeof line.latex === 'string' && line.latex ? line.latex.slice(0, 600).trim() : null,
+        text: line.text.trim(),
+        latex: typeof line.latex === 'string' && line.latex && line.latex.length <= MAX_LINE_LATEX_CHARS ? line.latex.trim() : null,
         confidence: unitConfidence(line.confidence),
         // The reader's own per-line doubt, passed on exactly as it was given.
         // Nothing here re-reads or repairs the line: the text is never changed.
         uncertain,
         doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
-          ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
+          ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, MAX_LINE_DOUBT_CHARS)
           : null,
         gapBefore: line.gap_before === true
       };
