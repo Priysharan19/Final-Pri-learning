@@ -104,7 +104,7 @@ html.ui-instrument .lux-report-hero em { font-size: 16px; }
 /* Chart: paper, engraved grid, a teal pen line, hatched area. */
 html.ui-instrument .in-chart { background: var(--c-sheet); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--c-hair); }
 html.ui-instrument .in-chart-grid line { stroke: var(--c-hair-2); }
-html.ui-instrument #lux-chart-hatch line { stroke: var(--c-teal); stroke-width: .5; opacity: .45; }
+html.ui-instrument #lux-chart-hatch line { stroke: var(--c-teal); stroke-width: .5; opacity: .28; }
 html.ui-instrument .in-chart-area { fill: url(#lux-chart-hatch); fill-opacity: 1; animation: in-chart-fade 700ms cubic-bezier(.2, .8, .2, 1) 700ms both; }
 html.ui-instrument .in-chart-line { stroke-width: 1.5; }
 html.ui-instrument .in-chart-line.is-method { stroke: var(--c-teal); animation: in-chart-draw 1100ms cubic-bezier(.5, 0, .2, 1) 120ms both; }
@@ -188,3 +188,7 @@ html.ui-instrument .pg .btn { border-radius: 4px; font: 600 14px var(--c-sc); le
 html.ui-instrument .pg .btn-ghost, html.ui-instrument .pg .btn-quiet { background: none; box-shadow: inset 0 0 0 1px var(--c-hair); color: var(--c-ink); }
 html.ui-instrument .pg .set-row { border-color: var(--c-hair-2); }
 html.ui-instrument .pg [role="tablist"] button, html.ui-instrument .pg .tabs button { font: 600 14px var(--c-sc); letter-spacing: .12em; }
+html.ui-instrument .pg .pg-sheet, html.ui-instrument .pg .table-scroll { background: none; border: 0; border-top: 1px solid var(--c-hair); border-radius: 0; box-shadow: none; padding-left: 0; padding-right: 0; }
+html.ui-instrument .pg .pg-sheet .sc-label { margin: 0; }
+html.ui-instrument .pg .pg-priorities > *, html.ui-instrument .pg .pg-priorities li { background: none; border-color: var(--c-hair-2); }
+html.ui-instrument .pg .syl-table td:first-child, html.ui-instrument .pg .syl-table th:first-child { padding-left: 0; }

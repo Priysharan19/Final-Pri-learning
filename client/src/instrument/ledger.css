@@ -130,7 +130,7 @@ html.ui-instrument .in-hist > .spread .chip { border-radius: 4px; background: no
    chapter and result rows line up across it. */
 html.ui-instrument .hist-row.in-led-row { display: flex; flex-direction: column; }
 html.ui-instrument .hist-row.in-led-row > .in-led-main { flex: 1; grid-template-rows: auto auto auto 1fr; align-content: start; }
-html.ui-instrument .in-led-q { line-height: 1.4; height: calc(1.4em + 10px); }
+html.ui-instrument .in-led-q { line-height: 1.4; min-height: calc(1.4em + 10px); }
 html.ui-instrument .in-led-q * { line-height: inherit; }
 html.ui-instrument .in-led-res { align-self: end; }
 
