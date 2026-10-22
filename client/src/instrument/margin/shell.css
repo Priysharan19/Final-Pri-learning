@@ -101,7 +101,12 @@
 html[data-vt="question"]::view-transition-old(root), html[data-vt="question"]::view-transition-old(pri-question) { animation: none; opacity: 0; }
 html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 160ms var(--c-ease-row) both; }
 html[data-vt="question"] .ws-bar .ctx-pill-name { view-transition-name: pri-chapter; }
-::view-transition-group(pri-chapter) { animation-duration: 380ms; animation-timing-function: var(--c-ease-sweep); }
+::view-transition-group(pri-chapter) { animation-duration: 280ms; animation-timing-function: var(--c-ease-sweep); }
+/* The large title gives way within 120ms and the crumb fades in for the last
+   stretch, so the travelling text never sits over the prompt as a double image. */
+html[data-vt="question"]::view-transition-old(pri-chapter) { animation: k-vt-out 120ms linear both; }
+html[data-vt="question"]::view-transition-new(pri-chapter) { animation: k-vt-in 140ms linear 140ms both; }
+@keyframes k-vt-out { to { opacity: 0; } }
 @keyframes k-vt-in { from { opacity: 0; } }
 
 
