@@ -168,6 +168,55 @@ eq(undecodable.reason, 'unreadable', 'a photo that could not be prepared is neve
   ok(!takeCloudReadingNotice({ cloudHandwriting: true }, { getItem: () => null, setItem: () => {} }), 'a student who chose it themselves is not told again');
 }
 
+// ── 8 · The camera file itself never leaves the device (#196) ───────────────
+// Reconciliation of the #192 photo authority on current main. A phone photo
+// carries EXIF — often the GPS position of the child's home. What protects it
+// is that the camera file is never what is sent: every photo is redrawn onto a
+// canvas and the canvas's own JPEG encoding of those pixels is sent instead.
+// The tempting shortcut ("already small enough and already a JPEG — send it as
+// it is") would forward the EXIF untouched, so it is pinned here.
+// What this does NOT prove: that a browser's canvas encoder writes no metadata.
+// That is a property of the platform, not of this code, and needs a device run.
+{
+  const exif = Buffer.concat([
+    Buffer.from([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x48]),
+    Buffer.from('Exif\0\0MM\0*GPSLatitude=-33.8688;GPSLongitude=151.2093;'),
+    Buffer.alloc(24, 0x20),
+    Buffer.from([0xff, 0xd9])
+  ]);
+  const camera = 'data:image/jpeg;base64,' + exif.toString('base64');
+  const smallPhoto = async () => ({ naturalWidth: 640, naturalHeight: 480 });
+  const drawn = [];
+  const encoded = [];
+  const pixelsOnly = (w, h, q) => 'data:image/jpeg;base64,' + Buffer.from(`pixels-only ${w}x${h} q${q}`).toString('base64');
+  const reencode = (width, height) => ({
+    width, height,
+    getContext: () => ({ fillStyle: '', fillRect: () => {}, drawImage: (_img, ...at) => drawn.push(at) }),
+    toDataURL: (type, quality) => { encoded.push([type, quality]); return pixelsOnly(width, height, quality); }
+  });
+  const decodedHas = (dataUrl, needle) => Buffer.from(String(dataUrl).split(',')[1] || '', 'base64').includes(needle);
+
+  const small = await preparePhoto(camera, { loadImage: smallPhoto, createCanvas: reencode });
+  ok(small && small.dataUrl !== camera, 'a JPEG already inside the budget is still re-encoded, never forwarded as the camera file');
+  ok(!decodedHas(small.dataUrl, 'Exif') && !decodedHas(small.dataUrl, 'GPSLatitude'), 'no EXIF or GPS bytes of the original are in what would be sent');
+  eq(encoded[0], ['image/jpeg', 0.85], 'what is sent is the canvas\'s own JPEG encoding of the redrawn pixels');
+  eq(drawn.length, 1, 'the pixels are drawn onto a fresh canvas once');
+  eq(small.dataUrl, pixelsOnly(640, 480, 0.85), 'byte for byte, the output is the canvas encoding and nothing of the input');
+  eq(await preparePhoto(camera, { loadImage: smallPhoto, createCanvas: () => null }), null,
+    'with no canvas to re-encode on, nothing is produced — the original is never the fallback');
+  eq(await preparePhoto(camera, { loadImage: smallPhoto, createCanvas: (w, h) => ({ width: w, height: h, getContext: () => null, toDataURL: () => camera }) }), null,
+    'nor when the canvas has no 2-D context to redraw with');
+
+  let wire = null;
+  const reader = { transcribeHandwriting: async (image) => { wire = image; return { transcription: { lines: [{ text: 'x = 4', confidence: 0.9 }], text: 'x = 4', confidence: 0.9, needsConfirmation: false, engine: 'cloud-test' } }; } };
+  await readPhotoWithCloud(camera, {
+    user: { cloudHandwriting: true }, transport: reader, available: there, readiness: ready,
+    prepare: dataUrl => preparePhoto(dataUrl, { loadImage: smallPhoto, createCanvas: reencode })
+  });
+  ok(typeof wire === 'string' && wire !== camera && !decodedHas(wire, 'GPSLatitude'),
+    'end to end, the reader is sent the redrawn picture, not the camera file with its location');
+}
+
 console.log(failures.length
   ? `CLOUD PHOTO CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `CLOUD PHOTO CLIENT: PASS — ${pass}/${pass} checks — paper working is scaled to fit, sent only on the same opt-in, and a failure falls back.`);

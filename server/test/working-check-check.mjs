@@ -106,6 +106,43 @@ const sure = normalizeResult({ lines: [{ index: 0, status: 'break', carried: fal
   { lineCount: 1, model: 'test', confidenceFloor: 0.75 });
 ok(!sure.needsConfirmation, 'above it, it stands');
 
+// ── 4b · A judgement that breaks its own schema fails closed (#196) ─────────
+// The same contract as the transcription reply: the schema is not trusted to
+// the provider's strict mode. A confidence that is not a finite number in
+// [0, 1] is no confidence, so the judgement is a second opinion that puts no
+// cross on any line; a reply with more judgements than the schema allows is
+// refused through the existing malformed-reply code.
+{
+  const FLOOR = { lineCount: 2, model: 'test', confidenceFloor: 0.75 };
+  const judged = [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'the sign flipped' }];
+  const reply = (patch = {}) => ({ lines: judged, first_break: 1, hint: 'check the sign', confidence: 0.92, misconception_id: null, ...patch });
+  const settle = r => { try { return { result: normalizeResult(r, FLOOR) }; } catch (error) { return { error }; } };
+  const control = settle(reply());
+  eq([control.error?.code ?? null, control.result?.needsConfirmation, control.result?.firstBreak], [null, false, 1],
+    'a conforming confident judgement stands (the control every case below departs from)');
+  for (const [label, value] of [['the string "0.92"', '0.92'], ['NaN', NaN], ['Infinity', Infinity], ['1.5', 1.5], ['-0.1', -0.1], ['null', null], ['true', true], ['missing', undefined]]) {
+    const r = reply();
+    if (value === undefined) delete r.confidence; else r.confidence = value;
+    const out = settle(r).result;
+    ok(out?.needsConfirmation === true && out.confidence === 0, `a confidence of ${label} is no confidence: the judgement is only a second opinion (${out?.confidence})`);
+  }
+  eq(WORKING_SCHEMA.properties.lines.maxItems, MAX_LINES, 'the judgement limit is the schema\'s own constant');
+  eq(MAX_LINES, 40, 'pinned: at most 40 lines of working, and 40 judgements');
+  const tooMany = settle(reply({ lines: Array.from({ length: MAX_LINES + 1 }, (_, i) => ({ index: i % 2, status: 'ok', carried: false, why: '' })) }));
+  eq([tooMany.error?.code, tooMany.error?.status, tooMany.error?.retryable, !!tooMany.result], ['WORKING_MALFORMED', 422, false, false],
+    `more than ${MAX_LINES} judgements is refused as a malformed reply, never shown, and not resent by itself`);
+  const stringIndex = settle(reply({ lines: [{ index: '1', status: 'break', carried: false, why: 'x' }] })).result;
+  eq([stringIndex.firstBreak, stringIndex.lines.map(l => l.status)], [-1, ['note', 'note']],
+    'a judgement whose index is not an integer lands on no line: no cross is placed by a guess');
+  const objectWhy = settle(reply({ lines: [{ index: 1, status: 'break', carried: false, why: { toString: () => 'injected' } }], hint: { toString: () => 'injected hint' } })).result;
+  eq([objectWhy.lines[1].why, objectWhy.hint], ['', ''], 'feedback that is not a string is dropped, never stringified');
+  const astral = n => '\u{1D465}'.repeat(n);
+  const longWhy = settle(reply({ lines: [{ index: 1, status: 'break', carried: false, why: astral(300) }], hint: astral(400) })).result;
+  eq([[...longWhy.lines[1].why].length, [...longWhy.hint].length, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(longWhy.lines[1].why + longWhy.hint)],
+    [WORKING_SCHEMA.properties.lines.items.properties.why.maxLength, WORKING_SCHEMA.properties.hint.maxLength, false],
+    'feedback is bounded by code points, as the schema counts them, and never left with half a surrogate pair');
+}
+
 // ── 5 · Bounds on what may be sent ───────────────────────────────────────────
 eq(validateWorking([' 2x = 8 ', '', '   ', 'x = 4']), ['2x = 8', 'x = 4'], 'blank lines are dropped and the rest trimmed');
 let empty = null;

@@ -547,7 +547,9 @@ export const cloud = Object.freeze({
   guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   // Every session of this account, on every device, this one included.
-  logoutAll: () => cloudRequest('/v1/account/logout-all', { method: 'POST', body: {} }),
+  // `accountId` names the account meant: the server refuses a session for any
+  // other one (409 ACCOUNT_MISMATCH) before revoking anything (#481, as #521).
+  logoutAll: ({ accountId = null } = {}) => cloudRequest('/v1/account/logout-all', { method: 'POST', body: accountId != null ? { accountId: String(accountId) } : {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),

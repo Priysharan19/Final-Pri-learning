@@ -1,5 +1,6 @@
 // Pri Learning · E2E flows — account deletion for a code-only account, in the
-// app and from the public web page.
+// app and from the public web page; and "Sign out everywhere" in Settings
+// (#481), which ends every session of the account and returns to the card.
 //
 // Apple App Store Review Guideline 5.1.1(v) and Google Play's "Delete account"
 // requirement: an account made with a one-time code (no password, no Apple or
@@ -35,15 +36,26 @@ function proxyTo(h, seen = []) {
     for (const name of ['cookie', 'content-type', 'x-pri-csrf', 'x-pri-client', 'x-pri-request-id', 'idempotency-key']) {
       if (incoming[name]) headers[name] = incoming[name];
     }
-    const response = await fetch(`${h.origin}${url.pathname}${url.search}`, {
-      method: request.method(), headers, body: ['GET', 'HEAD'].includes(request.method()) ? undefined : request.postData() ?? undefined
-    });
+    // A request still in flight when a flow closes the server (its page's
+    // own background calls) must not reject here: an unhandled rejection in a
+    // route handler kills the whole run before any result is printed. The
+    // browser sees the connection reset, as it would from a real server.
+    let response;
+    let body;
+    try {
+      response = await fetch(`${h.origin}${url.pathname}${url.search}`, {
+        method: request.method(), headers, body: ['GET', 'HEAD'].includes(request.method()) ? undefined : request.postData() ?? undefined
+      });
+      body = Buffer.from(await response.arrayBuffer());
+    } catch {
+      return route.abort('connectionreset').catch(() => {});
+    }
     const outHeaders = { 'content-type': response.headers.get('content-type') || 'application/json' };
     const cookies = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
     if (cookies.length) outHeaders['set-cookie'] = cookies.join('\n');
     const retry = response.headers.get('retry-after');
     if (retry) outHeaders['retry-after'] = retry;
-    return route.fulfill({ status: response.status, headers: outHeaders, body: Buffer.from(await response.arrayBuffer()) });
+    return route.fulfill({ status: response.status, headers: outHeaders, body }).catch(() => {});
   };
 }
 
@@ -269,6 +281,91 @@ export const flows = [
           && await page.getByText('You’ve been signed out', { exact: false }).count() === 0 && await page.locator('.shell').count() === 0);
         await shot('relaunched');
       } finally {
+        await h.close();
+      }
+    }
+  },
+  {
+    id: 'account-sign-out-everywhere',
+    name: 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card',
+
+    async run({ page, ctx, base, check, goto, shot }) {
+      const { h, sms } = await startPlatform();
+      try {
+        await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
+        const seen = [];
+        await ctx.route('**/v1/**', proxyTo(h, seen));
+        const email = 'meera.everywhere@example.test';
+
+        // Sign up as an adult with an email code, through the shipped flow.
+        await goto('/');
+        await page.locator('[data-signin-card="page"] #signup-destination').waitFor({ timeout: 15000 });
+        await page.locator('#signup-destination').fill(email);
+        sms.clearTestOutbox();
+        await page.getByTestId('signup-send-code').click();
+        await page.locator('#signup-code-0').waitFor({ timeout: 15000 });
+        await typeCode(page, 'signup-code-0', lastCode(sms, email));
+        await page.locator('#signup-flow-name').waitFor({ timeout: 15000 });
+        await page.locator('#signup-flow-name').fill('Meera');
+        await page.getByTestId('signup-age-18').click();
+        await page.getByTestId('signup-agree').check();
+        await page.getByTestId('signup-age-next').click();
+        await page.getByTestId('signup-class-12').waitFor({ timeout: 15000 });
+        await page.getByTestId('signup-class-12').click();
+        await page.getByTestId('signup-class-next').click();
+        await page.waitForSelector('.shell', { timeout: 60000 });
+        const account = h.db.prepare('SELECT id FROM accounts WHERE email=?').get(email);
+
+        // A second device: the same account signed in with its own code.
+        h.db.prepare('DELETE FROM rate_limits').run();
+        sms.clearTestOutbox();
+        const phone = {};
+        const otp = (path, body) => h.request(`/v1/account/otp${path}`, { method: 'POST', body, jar: phone, headers: { Origin: SERVER_ORIGIN_SEEN } });
+        const sent = await otp('/request', { channel: 'email', destination: email });
+        const signedIn = await otp('/verify', { channel: 'email', destination: email, challengeId: sent.data?.challengeId, code: lastCode(sms, email) });
+        const phoneMe = () => h.request('/v1/account/me', { jar: phone, headers: { Origin: SERVER_ORIGIN_SEEN } }).then(r => r.status);
+        const liveSessions = () => h.db.prepare('SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=? AND revoked_at IS NULL').get(account.id).n;
+        await check('the account is signed in on two devices: this browser and a second one',
+          signedIn.data?.status === 'signed-in' && await phoneMe() === 200 && liveSessions() === 2, `verify ${JSON.stringify(signedIn.data).slice(0, 120)}, live ${liveSessions()}`);
+
+        // Settings → Account: the control asks before it acts.
+        await page.goto(`${base}/settings#cloud-account-title`, { waitUntil: 'domcontentloaded' });
+        await page.getByTestId('cloud-sign-out-everywhere').waitFor({ timeout: 30000 });
+        await page.getByTestId('cloud-sign-out-everywhere').click();
+        const confirm = page.getByTestId('cloud-sign-out-everywhere-confirm');
+        await confirm.waitFor({ timeout: 10000 });
+        await check('the first press only asks, naming this device too',
+          await confirm.getByText('including this one', { exact: false }).isVisible() && liveSessions() === 2 && !seen.includes('POST /v1/account/logout-all'));
+        const focused = () => page.evaluate(() => document.activeElement?.getAttribute('data-testid') || document.activeElement?.tagName || null);
+        await check('opening the confirmation moves focus to Cancel, the safe default', await focused() === 'cloud-sign-out-everywhere-cancel', `focus on ${await focused()}`);
+        await shot('confirm');
+        await page.keyboard.press('Enter');
+        await confirm.waitFor({ state: 'detached', timeout: 10000 });
+        await check('cancel ends nothing: both sessions still work and the shell is still open',
+          await confirm.count() === 0 && liveSessions() === 2 && await phoneMe() === 200 && await page.locator('.shell').count() === 1);
+        await check('and focus returns to the button that opened it', await focused() === 'cloud-sign-out-everywhere', `focus on ${await focused()}`);
+
+        await page.getByTestId('cloud-sign-out-everywhere').click();
+        await page.getByTestId('cloud-sign-out-everywhere-yes').click();
+        await page.locator('[data-testid="account-activation-gate"]').waitFor({ timeout: 20000 });
+        await page.locator('[data-testid="account-activation-gate"]:not([data-activation-status="checking"])').waitFor({ timeout: 20000 }).catch(() => {});
+        await check('confirmed, the server ended every session of the account, through POST /v1/account/logout-all',
+          seen.includes('POST /v1/account/logout-all') && liveSessions() === 0);
+        await check('the other device is signed out too', await phoneMe() === 401);
+        await check('this device is back on the sign-in card: the shell is gone and the gate asks for sign-in',
+          await page.locator('.shell').count() === 0
+            && await page.locator('[data-testid="account-activation-gate"]').getAttribute('data-activation-status') === 'signin'
+            && await page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]').count() === 1);
+        await check('this device forgot its link to the account', (await accountLinkRows(page)).length === 0);
+        await shot('signed-out');
+        await page.goto(`${base}/practice?subtopic=c12-relations-functions`, { waitUntil: 'domcontentloaded' });
+        await page.locator('[data-testid="account-activation-gate"]').waitFor({ timeout: 20000 });
+        await check('a deep link after it is the gate, not the page', await page.locator('.shell').count() === 0);
+      } finally {
+        // The gate's own requests from that last deep link may still be in
+        // flight: stop routing and leave the page before the server closes.
+        await ctx.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+        await page.goto('about:blank').catch(() => {});
         await h.close();
       }
     }
