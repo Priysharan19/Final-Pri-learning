@@ -116,3 +116,36 @@ html.ui-instrument:root .auth-col .pill-opt.c-chip:focus-visible { outline: 2px 
   html.ui-instrument:root .signin-landing .signup-alt .linklike + .linklike::before { content: none; }
   html.ui-instrument:root .signin-landing .signup-alt { gap: 0 18px; }
 }
+
+/* ── Jury round 1 ─────────────────────────────────────────────────────────
+   One lock-up (PMark with wordmark), C's own object as the hero (the P′
+   bezel at rest on the desk: no curves, no graph paper), one left axis in a
+   440px column, the primary always a pill (40% while it waits), and the code
+   cells across the full column. */
+html.ui-instrument:root .c-signin-desk { display: grid; place-items: center; background: var(--c-paper-2); }
+html.ui-instrument:root .c-signin-object { width: min(320px, 60%); aspect-ratio: 1; }
+html.ui-instrument:root .c-signin-object .c-pmark { width: 100%; height: 100%; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 18px 30px rgba(0, 0, 0, 0.12)); }
+html.ui-instrument:root .c-signin-desk .in-signin-line { left: 48px; right: 48px; bottom: 48px; }
+html.ui-instrument:root .c-signin-mark { min-height: 40px; display: flex; align-items: center; }
+
+html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { align-items: stretch; }
+html.ui-instrument:root .auth-col > * { width: 100%; max-width: 440px; margin-inline: auto; text-align: left; }
+html.ui-instrument:root .auth-col .hero-kicker, html.ui-instrument:root .auth-col .hero-title, html.ui-instrument:root .auth-col .hero-sub { text-align: left; }
+html.ui-instrument:root .auth-col .hero-sub { text-wrap: balance; }
+html.ui-instrument:root .auth-col > p.muted { text-align: left; margin-inline: auto !important; }
+html.ui-instrument:root .signin-landing .signup-alt { justify-content: flex-start; }
+html.ui-instrument:root .auth-col .row[role="group"] { justify-content: flex-start !important; }
+@media (min-width: 861px) { html.ui-instrument:root .auth-col > .signin-landing { max-width: 440px; } }
+
+html.ui-instrument:root .signin-landing .btn-primary.c-btn-primary:disabled,
+html.ui-instrument:root .auth-card .btn-primary.c-btn-primary:disabled {
+  background: var(--c-teal); color: var(--c-on-teal, var(--c-paper)); border: 0; border-radius: var(--radius-pill); opacity: 0.4;
+}
+
+html.ui-instrument:root .signin-landing .otp-boxes { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; }
+html.ui-instrument:root .signin-landing .otp-box { width: 100%; }
+
+/* iPad portrait and phone: the stack sits in the upper-middle, not low. */
+@media (max-width: 860px) {
+  html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { justify-content: center; min-height: 100dvh; }
+}
