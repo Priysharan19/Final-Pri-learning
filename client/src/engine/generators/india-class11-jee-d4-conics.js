@@ -331,10 +331,13 @@ function parabolaReasoning(rng) {
         traps: traps(value.value, askArea
           ? [{ value: A * t, why: 'The area of a triangle is half the base times the height.' },
             { value: (dist * t) / 2, why: 'The base is the segment from the vertex to the focus, of length $|a|$, not the focal distance of $P$.' },
-            { value: A * Math.sqrt(A * dist), why: 'The focal distance is measured from the directrix, not from the vertex: the distance of $P$ from the vertex along the axis is the focal distance less $|a|$.' }]
+            { value: (A * Math.abs(off)) / 2, why: 'The height of the triangle on the base $VS$ is the distance of $P$ from the axis, not its distance from the vertex along the axis.' },
+            { value: 2 * A * t, why: 'The base $VS$ runs from the vertex to the focus and has length $|a|$; $4|a|$ is the length of the latus rectum.' }]
+            // A distractor within 5% (or 0.5) of the key is too close to tell apart.
+            .filter(x => Math.abs(x.value - (A * t) / 2) > Math.max(0.5, 0.05 * (A * t) / 2))
           : [{ value: dist * dist, why: 'That is the square of the focal distance $PS$; the question measures from the vertex.' },
             { value: off * off, why: 'That counts only the distance along the axis; add the square of the distance of $P$ from the axis.' },
-            { value: dist * dist + 4 * A * dist, why: 'The focal distance is measured from the directrix, not from the vertex: the distance of $P$ from the vertex along the axis is the focal distance less $|a|$.' }]),
+            { value: dist * dist + 4 * A * dist, why: 'The focal distance is measured from the directrix, not from the vertex: the distance of $P$ from the vertex along the axis is the focal distance less $|a|$.' }]).slice(0, 3),
         hints: [
           `Complete the square in $${across}$ to write the equation as ${stdHint(orient)}; read off the vertex, $a$ and the focus.`,
           'Every point of a parabola is as far from the focus as from the directrix, and the directrix is $|a|$ behind the vertex: this tells you how far $P$ is from the vertex along the axis.',

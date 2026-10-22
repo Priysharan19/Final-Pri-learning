@@ -112,6 +112,13 @@ const AX = ['x', 'y', 'z'];
 const sqTerm = f => (f.d === 1 ? `${par(f.n)}^2` : `\\left(${rTex(f)}\\right)^2`);
 /** A rational written after "+": 3, (-6), \left(-\dfrac{9}{2}\right). */
 const addend = f => (f.n >= 0 ? rTex(f) : f.d === 1 ? `(${f.n})` : `\\left(${rTex(f)}\\right)`);
+/**
+ * "a + b = s" for two exact rationals, written without a zero term: when one
+ * of them is 0 the step names both values and states the sum.
+ */
+const sumOfTwo = (x, y, what) => (x.n === 0 || y.n === 0
+  ? `The ${what} are $${rTex(x)}$ and $${rTex(y)}$, with sum $${rTex(add(x, y))}$`
+  : `$${rTex(x)} + ${addend(y)} = ${rTex(add(x, y))}$`);
 /** "a + bλ", with a zero term left out. */
 const lamLin = (a, b) => (b === 0 ? String(a) : a === 0 ? cx(b, '\\lambda') : `${a} ${b < 0 ? '-' : '+'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}\\lambda`);
 const sumSq = p => p.reduce((s, v) => s + v * v, 0);
@@ -190,6 +197,8 @@ function pointCore(rng) {
       const meas = X => (target === 'sum' ? X[0] + X[1] + X[2] : sumSq(X) - X[target] ** 2);
       const value = meas(T);
       if (value === 0) continue;
+      // The octant must decide the answer: no other candidate may give the same value.
+      if (others.some(c => meas(c.D) === value)) continue;
       const asked = target === 'sum' ? 'the sum of the coordinates of the fourth vertex' : `the square of the distance of the fourth vertex from the $${AX[target]}$-axis`;
       return {
         prompt: `Three of the vertices of a parallelogram are $${pt('A', A)}$, $${pt('B', B)}$ and $${pt('C', C)}$, and its fourth vertex lies in the octant $${oct.name}$. Find ${asked}.`,
@@ -409,7 +418,7 @@ function distanceCore(rng) {
           { h: 'Distance from O', d: `$${vi}^2 + ${vj}^2 = ${N}$` },
           { h: 'Solve together', d: elim },
           { h: 'The points', d: `$${pt('P_1', P1)}$ and $${pt('P_2', P2)}$` },
-          { h: 'Answer', d: askPA ? `$${d2(P1, A)} + ${d2(P2, A)} = ${value}$` : `$${P1[c]} ${sg(P2[c])} = ${value}$` }
+          { h: 'Answer', d: askPA ? sumOfTwo(R(d2(P1, A)), R(d2(P2, A)), 'values of $PA^2$') : sumOfTwo(R(P1[c]), R(P2[c]), `$${AX[c]}$-coordinates`) }
         ],
         reasoning: 'equidistant-circle'
       };
@@ -486,7 +495,7 @@ function distanceCore(rng) {
         { h: 'Pythagoras at C', d: `$CA^2 + CB^2 = AB^2 \\iff ${polyTex([2 * U, qA[1] + qB[1], qA[2] + qB[2] - AB2], 'k')} = 0 \\iff ${polyTex([U, V, W], 'k')} = 0$` },
         { h: 'Roots', d: `$k = ${roots[0]}$ or $k = ${roots[1]}$` },
         { h: 'Reject degenerate', d: bad.length ? `At $k = ${bad[0]}$, $C = ${onVertex(bad[0])}$ — no triangle; keep $k = ${valid[0]}$` : `Neither root puts $C$ on $A$ or $B$; both give a triangle` },
-        { h: 'Answer', d: valid.length === 2 ? `$${valid[0]} ${sg(valid[1])} = ${value}$` : `$${value}$` }
+        { h: 'Answer', d: valid.length === 2 ? sumOfTwo(R(valid[0]), R(valid[1]), 'two values of $k$') : `$${value}$` }
       ],
       reasoning: bad.length ? 'right-angle-reject' : 'right-angle-k'
     };
@@ -594,7 +603,7 @@ function sectionCore(rng) {
           { h: 'Internal', d: `$${ptR('C_1', Ci)}$` },
           { h: 'External', d: `$${ptR('C_2', Ce)}$` },
           ...(askGap ? [{ h: 'Distances from A', d: `$AC_1^2 = ${Ci.map((x, t) => sqTerm(sub(x, Ar[t]))).join(' + ')} = ${rTex(ACi)}$ and $AC_2^2 = ${Ce.map((x, t) => sqTerm(sub(x, Ar[t]))).join(' + ')} = ${rTex(ACe)}$` }] : []),
-          { h: 'Answer', d: askGap ? `$${rTex(ACi)} + ${rTex(ACe)} = ${rTex(value)}$` : `$${rTex(Ci[c])} + ${addend(Ce[c])} = ${rTex(value)}$` }
+          { h: 'Answer', d: askGap ? sumOfTwo(ACi, ACe, 'values of $AC^2$') : sumOfTwo(Ci[c], Ce[c], `$${AX[c]}$-coordinates`) }
         ],
         reasoning: askGap ? 'two-positions-ac' : 'two-positions-sum'
       };

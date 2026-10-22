@@ -249,7 +249,7 @@ export const SOLVE = {
       if (Math.abs(Number(area[0]) / Number(area[1]) - keyed(q)) > 1e-9 * Math.max(1, keyed(q))) return ['the keyed decimal does not match the fraction'];
       return [];
     }
-    m = p.match(/^The region of the plane given by \$0 \\le x \\le (\d+)\$, \$0 \\le y \\le (\d+)\$ and \$([^$]+) \\le k\$, where \$k\$ is a positive constant, has area \$(\d+(?:\.\d{1,2})?)\$ square units\. Find \$k\$\.$/);
+    m = p.match(/^The region of the plane given by \$0 \\le x \\le (\d+)\$, \$0 \\le y \\le (\d+)\$ and \$([^$]+) \\le k\$, where \$k\$ is a positive constant, has area \$(\d+(?:\.\d{1,2})?)\$ square units?\. Find \$k\$\.$/);
     if (m) {
       const P = Number(m[1]), Qh = Number(m[2]), L = parseLin(m[3]), A = Q(Math.round(Number(m[4]) * 100), 100);
       if (!L || L.k || L.a || L.c || L.x <= 0 || L.y <= 0) return ['could not read the line'];

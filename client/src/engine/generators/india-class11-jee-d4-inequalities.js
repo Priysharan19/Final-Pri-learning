@@ -283,7 +283,12 @@ function linearInequalityReasoning(rng) {
         trapList.push({ value: above.last - above.first + 1, why: `That counts only values of $k$ greater than $${p}$; for $k < ${p}$ the inequality reverses on dividing by $k ${sg(-p)}$, and some of those values work too.` });
         trapList.push({ value: below.last - below.first + 1, why: `That counts only values of $k$ less than $${p}$; some values greater than $${p}$ work too.` });
       }
-      if (strict(op)) trapList.push({ value: intsIn(lower.K, true, upper.K, true).count, why: 'That includes a value of $k$ at which the two sides are equal at an end of the interval, but the inequality is strict.' });
+      if (strict(op)) {
+        const closed = intsIn(lower.K, true, upper.K, true).count, extra = closed - value;
+        trapList.push({ value: closed, why: extra === 1
+          ? 'That includes a value of $k$ at which the two sides are equal at an end of the interval, but the inequality is strict.'
+          : 'That includes the values of $k$ at which the two sides are equal at an end of the interval, but the inequality is strict.' });
+      }
     } else {
       const bind = ask === 'least' ? lower : upper;
       trapList.push({ value: ask === 'least' ? ks.first - 1 : ks.last + 1, why: `With that $k$ the inequality fails at $x = ${bind.x}$.` });
@@ -659,6 +664,14 @@ function inequalityRegionReasoning(rng) {
       if (piece !== 'cut-rectangle') trapList.push({ value: cutK, why: `That treats the region as the rectangle with one corner cut off, but at that $k$ the line has not yet passed ${corner(2)}.` });
       if (piece === 'cut-rectangle') trapList.push({ value: k3 + Math.sqrt(ab2 * (P * Qh - Av)), why: `That root is larger than $${k3}$, where the line lies beyond $(${P}, ${Qh})$ and the region would be the whole rectangle.` });
       if (piece === 'triangle') trapList.push({ value: -kv, why: 'That is the negative root; $k$ is a positive constant.' });
+      if (piece === 'trapezium') {
+        // Rational slips: the trapezium stood on the wrong pair of sides, and the ½ dropped.
+        const [side, other] = xFirst ? [['x = 0', `x = ${P}`], ['y = 0', `y = ${Qh}`]] : [['y = 0', `y = ${Qh}`], ['x = 0', `x = ${P}`]];
+        const wrongSides = xFirst ? R(2 * a * A.n + b * Qh * Qh * A.d, 2 * Qh * A.d) : R(2 * b * A.n + a * P * P * A.d, 2 * P * A.d);
+        trapList.push({ value: wrongSides.n / wrongSides.d, why: `That takes the parallel sides of the trapezium on $${other[0]}$ and $${other[1]}$, but the line meets $${side[0]}$ and $${side[1]}$, so those are the parallel sides.` });
+        const noHalf = xFirst ? R(b * A.n + a * P * P * A.d, 2 * P * A.d) : R(a * A.n + b * Qh * Qh * A.d, 2 * Qh * A.d);
+        trapList.push({ value: noHalf.n / noHalf.d, why: 'That leaves out the $\\tfrac12$ in the area of a trapezium.' });
+      }
       const triTex = `\\dfrac{k^2}{${ab2}}`;
       const trapTex = xFirst ? linOver(2 * P, -a * P * P, 2 * b, 'k') : linOver(2 * Qh, -b * Qh * Qh, 2 * a, 'k');
       const cutTex = `${P * Qh} - \\dfrac{(${k3} - k)^2}{${ab2}}`;
@@ -670,9 +683,10 @@ function inequalityRegionReasoning(rng) {
         : piece === 'trapezium' ? `$${trapTex} = ${Av}$ gives $k = ${rTex(kq)}$, which is between $${k1}$ and $${k2}$`
           : `$(${k3} - k)^2 = ${fmtA(ab2 * (P * Qh - Av))}$, so $k = ${k3} \\pm ${rTex(t)}$; only $k = ${rTex(kq)}$ lies between $${k2}$ and $${k3}$`;
       return {
-        prompt: `The region of the plane given by $0 \\le x \\le ${P}$, $0 \\le y \\le ${Qh}$ and $${linXY(a, b)} \\le k$, where $k$ is a positive constant, has area $${Av}$ square units. Find $k$.`,
+        prompt: `The region of the plane given by $0 \\le x \\le ${P}$, $0 \\le y \\le ${Qh}$ and $${linXY(a, b)} \\le k$, where $k$ is a positive constant, has area $${Av}$ square unit${Av === 1 ? '' : 's'}. Find $k$.`,
         answerType: 'numeric', ...exact(kq),
-        traps: traps(kv, trapList),
+        // A wrong-shape value can land very near the key; offer only those clearly apart from it.
+        traps: traps(kv, trapList.filter(tr => Math.abs(tr.value - kv) > Math.max(0.05 * kv, 0.5))),
         hints: [
           'As $k$ grows the line moves across the rectangle. Find the values of $k$ at which it passes the corners of the rectangle.',
           'Between those values the region has one shape: a triangle, a trapezium, or the rectangle with one corner cut off. Work out the area at each corner value to see which shape gives the stated area.',
