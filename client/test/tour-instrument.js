@@ -217,6 +217,17 @@ export const flow = {
     }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+    // Nothing on any instrument route is wider than the screen: the bar and the
+    // page fit a portrait iPad (820) and a phone (390) with no sideways scroll.
+    for (const width of [820, 390]) {
+      await page.setViewportSize({ width, height: width === 820 ? 1180 : 844 });
+      for (const route of ['/', '/practice', '/map', '/progress', '/review', '/notes', '/settings']) {
+        await goto(route); await settle();
+        const fit = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
+        await check(`${route}@${width}: no horizontal overflow`, fit.sw === fit.iw, JSON.stringify(fit));
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
   }
 };
 
