@@ -150,3 +150,6 @@ html.ui-instrument .in-reading-plot figcaption { font: 600 13px var(--c-sc); let
 /* The roll's own spans keep the headline's size (the figures' "b span" rule
    is for the "/62" suffix only). */
 html.ui-instrument .in-report-figs b .lux-roll, html.ui-instrument .in-report-figs b .lux-roll span { font-size: inherit; color: inherit; letter-spacing: 0; }
+/* C's chart is ruled, not graph paper: the 33 vertical grid lines (drawn
+   first) go, and every other horizontal rule is kept as an engraved hair. */
+html.ui-instrument .in-chart-grid line:nth-child(-n+33), html.ui-instrument .in-chart-grid line:nth-child(even) { display: none; }
