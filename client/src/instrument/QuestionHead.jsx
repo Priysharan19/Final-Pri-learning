@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import { clockText, msToNextSecond } from './questionClock.js';
 
@@ -16,9 +16,10 @@ export default function QuestionHead({ index, length = null, answered = 0, start
   // The tick only asks for a render; the time shown is read from the wall
   // clock at render (see questionClock.js), so a late tick shows the right time.
   const [, setBeat] = useState(0);
-  const stoppedAt = useRef(null);
-  if (!stopped) stoppedAt.current = null;
-  else if (stoppedAt.current === null) stoppedAt.current = Date.now();
+  // When the question resolves the clock freezes at that moment (set before
+  // paint, so the frozen value is the one first shown).
+  const [stoppedAt, setStoppedAt] = useState(null);
+  useLayoutEffect(() => { setStoppedAt(stopped ? Date.now() : null); }, [stopped]);
   useEffect(() => {
     if (stopped || !Number.isFinite(startedAt)) return undefined;
     let timer;
@@ -28,7 +29,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
     arm();
     return () => clearTimeout(timer);
   }, [stopped, startedAt]);
-  const now = stoppedAt.current ?? Date.now();
+  const now = stopped && stoppedAt !== null ? stoppedAt : Date.now();
   if (!Number.isInteger(index) || index < 1 || !Number.isFinite(startedAt)) return null;
   const bounded = Number.isInteger(length) && length > 0;
   const n = bounded ? Math.min(length, answered + 1) : index;
@@ -46,7 +47,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
       </span>
       {!bounded && answered > 0 && <span className="in-qh-a">{t('inst.answeredSession', { n: answered })}</span>}
       <span className="in-qh-sep" aria-hidden="true">·</span>
-      <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer>{clockText(now - startedAt)}</span>
+      <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer data-clock-stopped={stopped ? "true" : "false"}>{clockText(now - startedAt)}</span>
     </span>
   );
 }

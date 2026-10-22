@@ -11,6 +11,7 @@
 // aimed a margin past the next boundary, so every tick that fires moves it.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { clockText, msToNextSecond, CLOCK_TICK_MARGIN_MS } from '../src/instrument/questionClock.js';
 
 let pass = 0;
@@ -91,5 +92,90 @@ ok('QuestionHead derives the time at render and has no free-running interval', (
   assert.ok(/msToNextSecond\(/.test(src) && /clockText\(now - startedAt\)/.test(src));
   assert.ok(/\[stopped, startedAt\]/.test(src), 'a new start time must re-aim the tick');
 });
+
+// ---- The real component, its real effects, on fake timers ------------------
+// QuestionHead.jsx is loaded through Vite with 'react' replaced by a minimal
+// hooks runtime (support/hook-harness.mjs). Timers and Date.now are simulated:
+// every timer fires late by a jitter, and the render it causes lands later
+// still, as under load. CLOCK_COMPONENT=<path> runs this against another copy
+// (e.g. main's setInterval version, which fails here).
+const { createServer } = await import('vite');
+const reactPlugin = (await import('@vitejs/plugin-react')).default;
+const harnessPath = fileURLToPath(new URL('./support/hook-harness.mjs', import.meta.url));
+const server = await createServer({
+  root: fileURLToPath(new URL('..', import.meta.url)), logLevel: 'error', configFile: false, appType: 'custom',
+  server: { middlewareMode: true, hmr: false, ws: false },
+  resolve: { alias: [{ find: /^react$/, replacement: harnessPath }] },
+  plugins: [reactPlugin()], define: { __PRI_FEATURE_TUTOR__: 'false', __PRI_PRODUCTION_BUILD__: 'false' }
+});
+try {
+  const harness = await server.ssrLoadModule(harnessPath);
+  const { default: QuestionHead } = await server.ssrLoadModule(process.env.CLOCK_COMPONENT || '/src/instrument/QuestionHead.jsx');
+
+  const fake = () => {
+    const realNow = Date.now; const saved = { setTimeout, clearTimeout, setInterval, clearInterval };
+    const clock = { now: 1_800_000_000_000, timers: new Map(), seq: 0 };
+    Date.now = () => clock.now;
+    const add = (fn, ms, every) => { const id = ++clock.seq; clock.timers.set(id, { fn, due: clock.now + Math.max(0, ms || 0), every: every ? ms : 0 }); return id; };
+    Object.assign(globalThis, { setTimeout: (fn, ms) => add(fn, ms, false), setInterval: (fn, ms) => add(fn, ms, true),
+      clearTimeout: id => clock.timers.delete(id), clearInterval: id => clock.timers.delete(id) });
+    clock.restore = () => { Date.now = realNow; Object.assign(globalThis, saved); };
+    // Fire the next timer `late` ms after it was due, render `renderDelay` later.
+    clock.step = (inst, late, renderDelay) => {
+      const [id, t] = [...clock.timers].sort((a, b) => a[1].due - b[1].due)[0] || [];
+      if (!t) return false;
+      clock.now = Math.max(clock.now, t.due + late);
+      if (t.every) t.due = clock.now + t.every; else clock.timers.delete(id);
+      t.fn();
+      clock.now += renderDelay; inst.render();
+      return true;
+    };
+    return clock;
+  };
+  const timerText = node => {
+    if (!node || typeof node !== 'object') return null;
+    if (Array.isArray(node)) { for (const n of node) { const v = timerText(n); if (v !== null) return v; } return null; }
+    const p = node.props || {};
+    if (p['data-question-timer'] !== undefined) return [].concat(p.children).join('');
+    return timerText(p.children);
+  };
+
+  ok('real QuestionHead: every tick shows floor(elapsed) at render; under ordinary jitter every tick moves it; late ticks and renders still show the true time', () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const r = lcg(seed); const clock = fake(); const lateRun = seed > 60;   // seeds 1–60: ordinary jitter only
+      try {
+        const start = clock.now - Math.floor(r() * 3);   // start set a moment around mount, as in the card
+        const inst = harness.mount(QuestionHead, { index: 1, startedAt: start, stopped: false });
+        let last = timerText(inst.out);
+        for (let k = 0; k < 25; k++) {
+          clock.step(inst, Math.floor(r() * 4) + (lateRun && r() < 0.15 ? 400 + Math.floor(r() * 500) : 0), lateRun ? Math.floor(r() * 120) : 0);
+          const text = timerText(inst.out);
+          assert.equal(text, clockText(clock.now - start), `seed ${seed} tick ${k}: shows ${text} at ${clock.now - start} ms`);
+          // A tick may only leave the text alone if a late render already showed this second.
+          if (!lateRun) assert.notEqual(text, last, `seed ${seed} tick ${k}: the tick left the clock at ${text}`);
+          last = text;
+        }
+        inst.unmount();
+      } finally { clock.restore(); }
+    }
+  });
+
+  ok('real QuestionHead: freezes when the question resolves, and a later re-render does not move it', () => {
+    const clock = fake();
+    try {
+      const start = clock.now;
+      const inst = harness.mount(QuestionHead, { index: 1, startedAt: start, stopped: false });
+      for (let k = 0; k < 3; k++) clock.step(inst, 2, 0);
+      clock.now += 300;
+      inst.update({ stopped: true });
+      const frozen = timerText(inst.out);
+      assert.equal(frozen, clockText(clock.now - start));
+      assert.equal(clock.timers.size, 0, 'no tick is left running once stopped');
+      clock.now += 5_000; inst.update({ answered: 1 });
+      assert.equal(timerText(inst.out), frozen);
+      inst.unmount();
+    } finally { clock.restore(); }
+  });
+} finally { await server.close(); }
 
 console.log(`\n${pass} question clock checks passed`);
