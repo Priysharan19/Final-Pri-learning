@@ -33,8 +33,10 @@ export const flow = {
           candidates: [{ chapterId: 'c10-quadratic-equations', chapterName: 'Quadratic Equations', grade: 10, skillId: 'c10-quadratic-discriminant', dotpoint: 2, confidence: 0.91 }]
         } });
       }
-      // Accounts, the gate and grading are the real server's; only the
-      // question-photo identification route is scripted here.
+      // Accounts, the gate and grading are the real server's. The
+      // /v1/question-photo/identify endpoint itself — its server-side auth,
+      // quota and validation as well as the provider — is synthetic in this
+      // tour and is not certified by it.
       return route.continue();
     });
 
