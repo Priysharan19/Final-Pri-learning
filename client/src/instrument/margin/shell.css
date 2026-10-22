@@ -67,6 +67,9 @@
   .in-cmd { width: 44px; padding: 0; justify-content: center; background: none; box-shadow: none; }
   .in-cmd > span, .in-status-t { display: none; }
 }
+/* Below the hero, the long list and the plate skip rendering work while off
+   screen, so a forced style pass (the ⌘K field taking focus) stays cheap. */
+.k-body { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
 /* A chapter with no answers: a clean ruled frame, nothing plotted. */
 .k-slot { min-height: 240px; background: repeating-linear-gradient(to bottom, transparent 0 31px, var(--c-hair-2) 31px 32px), var(--c-sheet); }
 /* The account: initials in Cormorant SC on paper-2, ringed by a hairline. */
