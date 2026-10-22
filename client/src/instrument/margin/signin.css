@@ -153,3 +153,18 @@ html.ui-instrument:root .auth-col > p.muted { text-align: left !important; }
 html.ui-instrument:root .signin-landing .signup-alt { flex-wrap: wrap !important; gap: 0 14px; }
 html.ui-instrument:root .signin-landing .signup-alt .linklike + .linklike::before { content: none; }
 @media (max-width: 860px) { html.ui-instrument:root .auth-wrap > .c-signin-desk { display: none; } }
+
+/* ── Jury round 2 ─────────────────────────────────────────────────────────
+   The hero is an instrument at rest: the bezel lit by the key light (.c-rim
+   on this object only), hairline hands at 10:10 over the dial. */
+html.ui-instrument:root .c-signin-object { position: relative; border-radius: 50%; }
+html.ui-instrument:root .c-signin-hands { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+html.ui-instrument:root .c-signin-hands line { stroke: var(--c-hand-2); stroke-width: 0.35; stroke-linecap: round; }
+html.ui-instrument:root .c-signin-hands line:last-of-type { stroke: var(--c-hand); }
+html.ui-instrument:root .c-signin-hands circle { fill: var(--c-lume); }
+/* Code cells: six equal columns across the whole column. */
+html.ui-instrument:root .signin-landing .otp-boxes { grid-template-columns: repeat(6, 1fr); gap: 8px; max-width: none; }
+/* Fine print: one quiet line under one engraved rule, then the links. */
+html.ui-instrument:root .auth-col > p.muted { margin-top: 6px !important; padding-top: 0; border-top: 0; }
+html.ui-instrument:root .auth-col > .signin-landing ~ p.muted:not(:last-child):first-of-type,
+html.ui-instrument:root .auth-col > .signin-landing + p.muted { margin-top: 22px !important; padding-top: 14px; border-top: var(--c-line) solid var(--c-hair-2); }

@@ -128,3 +128,19 @@ html.ui-instrument:root .set-row .set-v[style*="--warn"] {
   html.ui-instrument:root .set-row .set-k { padding-block: 0; }
   html.ui-instrument:root .set-row .set-v { margin-left: 0; text-align: left; }
 }
+
+/* ── Jury round 2: two groups, "You" then "Account" ───────────────────── */
+html.ui-instrument:root .settings-grid .set-group { margin: 6px 0 -6px; }
+html.ui-instrument:root .settings-grid .set-group:not(:first-child) { margin-top: 22px; padding-top: 18px; border-top: var(--c-line) solid var(--c-hair); }
+/* The question-bank figure is a quiet fact: no full-width meter beside it. */
+html.ui-instrument:root .settings-grid .meter { display: none; }
+@media (max-width: 860px) {
+  /* Clear of the floating dock. */
+  html.ui-instrument:root div:has(> .settings-grid) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 480px) {
+  html.ui-instrument:root .set-row { flex-direction: column; align-items: flex-start; gap: 2px; padding-block: 10px; }
+  html.ui-instrument:root .set-row .set-k { padding-block: 0; }
+  html.ui-instrument:root .set-row .set-v { margin-left: 0; text-align: left; }
+  html.ui-instrument:root .settings-grid .card .spread { flex-direction: column; align-items: flex-start; }
+}

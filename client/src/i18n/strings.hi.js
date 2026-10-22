@@ -661,10 +661,12 @@ export default {
   'settings.localPlan': 'लोकल प्लान',
   'settings.localPlanSub': 'मुफ़्त प्लान — रोज़ {limit} अभ्यास प्रश्न, हर {days} दिन में {exams} परीक्षा सिमुलेशन और बुनियादी Pri Explain। उत्तर जाँचने के लिए Pri खाता और कनेक्शन चाहिए।',
   'settings.questionBank': 'प्रश्न बैंक',
-  'settings.questionBankValue': '13,29,679+ अलग-अलग — गिने हुए, और बढ़ रहे हैं',
+  'settings.questionBankValue': '13 लाख से अधिक',
   'settings.status': 'स्थिति',
   'settings.active': 'चालू',
   'settings.included': 'शामिल',
+  'settings.groupYou': 'आप',
+  'settings.groupAccount': 'खाता',
   'settings.allDifficulties': 'सभी कठिनाई स्तर (D1–D4)',
   'settings.freeCourses': 'CBSE / NCERT और JEE Main',
   'settings.premiumAdds': 'Premium रोज़ के अभ्यास और परीक्षा सिमुलेशन की सीमाएँ हटाता है, और JEE Advanced, उन्नत Pri Explain और उन्नत विश्लेषण जोड़ता है। Premium ख़त्म होने पर भी आपका काम, इतिहास और प्रगति बनी रहती है।',
@@ -778,8 +780,7 @@ export default {
   // ── साइन-इन ────────────────────────────────────────────────────────────────
   // {br} is a slot, not a fixed line break: the English sentence breaks after
   // "by hand", and the Hindi one breaks where the Hindi sentence breaks.
-  'login.heroSub': 'NCERT कक्षा 7–12, JEE Main और Advanced तथा ओलंपियाड का गणित — आपका हल पंक्ति दर पंक्ति जाँचा जाता है, और साथ में विस्तृत हल मिलता है। उत्तर Pri का सर्वर जाँचता है, इसलिए जाँच के लिए Pri खाता और कनेक्शन चाहिए।',
-  'login.heroPrivacy': 'निजी: प्रोफ़ाइल, ड्राफ़्ट और हैंडराइटिंग इसी डिवाइस पर रहती हैं, और कोई विज्ञापन नहीं है।',
+  'login.heroPrivacy': 'डिफ़ॉल्ट रूप से निजी, कोई विज्ञापन नहीं। जाँच के लिए Pri खाता और कनेक्शन चाहिए।',
   'login.cloudSignIn': 'अपने Pri क्लाउड खाते में लॉग इन करें',
   'login.cloudIntent': 'Pri क्लाउड खाता — पहले इस डिवाइस पर वह प्रोफ़ाइल खोलिए या बनाइए जिसे यह खाता सिंक करेगा। उसके बाद आप लॉग इन करने के लिए खाता सेटिंग्स पर पहुँचेंगे।',
   'login.privacy': 'निजता',
@@ -3042,7 +3043,7 @@ export default {
   "first.line": "मार्क्स आपके हल से मिलते हैं, पंक्ति दर पंक्ति।",
   "first.prompt": "0 से 9 तक कोई भी अंक लिखिए",
   "first.padLabel": "लिखने के लिए एक छोटा पैड",
-  "first.ack": "यह आपकी लिखावट है। यहाँ कुछ पढ़ा या जाँचा नहीं जाता; लिखावट साइन इन के बाद पढ़ी जाती है।",
+  "first.ack": "यह आपकी लिखावट है। साइन इन करते ही Pri इसे पढ़ना शुरू करता है।",
   "first.clear": "मिटाएँ",
   "first.continue": "आगे बढ़ें",
   "first.skip": "छोड़ें",

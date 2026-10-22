@@ -154,12 +154,12 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   ok(/could not reach the server/.test(en['check.reconnectTitle']), 'reconnect is stated plainly');
   // Copy that used to promise marking with no account or no connection.
   const promised = /marked on your device|Typed practice works|works offline|Offline practice continues|marking happens entirely on this device|marking and handwriting all run on this device|use Pri fully on this device|Offline-first|type your answer/i;
-  for (const key of ['login.heroSub', 'login.heroPrivacy', 'login.point4', 'login.localOnlySub', 'login.authFoot', 'cloud.created', 'cloud.offlineNote', 'cloud.intro', 'cloud.disabled', 'cloud.under18', 'signup.cloudUnavailable', 'signup.parentLead', 'settings.cloudMarkingUnavailable', 'home.cloudUnavailable', 'home.reason.practiceOffline', 'ink.waitingSignIn', 'ink.waitingOffline', 'ink.waitingGuardian', 'ink.waitingVerifyEmail', 'ink.waitingMfa', 'verdict.photoReadingSignIn', 'verdict.photoReadingOffline', 'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingMfa']) {
+  for (const key of ['login.heroPrivacy', 'login.point4', 'login.localOnlySub', 'login.authFoot', 'cloud.created', 'cloud.offlineNote', 'cloud.intro', 'cloud.disabled', 'cloud.under18', 'signup.cloudUnavailable', 'signup.parentLead', 'settings.cloudMarkingUnavailable', 'home.cloudUnavailable', 'home.reason.practiceOffline', 'ink.waitingSignIn', 'ink.waitingOffline', 'ink.waitingGuardian', 'ink.waitingVerifyEmail', 'ink.waitingMfa', 'verdict.photoReadingSignIn', 'verdict.photoReadingOffline', 'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingMfa']) {
     ok(typeof en[key] === 'string' && !promised.test(en[key]), `${key} no longer promises checking without an account or a connection`);
   }
   // The sign-in footnote: the requirement is said once, in the welcome line.
-  ok(/Pri account and a connection/.test(en['login.heroSub']) && en['login.heroPrivacy'] === 'Private: profiles, drafts and handwriting stay on this device, and there are no ads.',
-    'the sign-in footnote says the account-and-connection requirement once, in the welcome line');
+  ok(en['login.heroPrivacy'] === 'Private by default, no ads. Checking needs a Pri account and a connection.',
+    'the sign-in fine print is one line that says checking needs a Pri account and a connection');
   // Issue #477: there is no device-only mode any more. A device profile says
   // that nothing opens until it is signed in to a Pri account.
   ok(/Pri account/.test(en['login.localOnlySub']) && /Before anything opens/.test(en['login.localOnlySub']) && !/[Dd]evice-only mode/.test(en['login.localOnlySub']),

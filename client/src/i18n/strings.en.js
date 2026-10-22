@@ -595,10 +595,12 @@ export default {
   'settings.localPlan': 'Local Plan',
   'settings.localPlanSub': 'Free plan — {limit} practice questions a day, {exams} exam simulation every {days} days and basic Pri Explain. Checking answers needs a Pri account and a connection.',
   'settings.questionBank': 'Question bank',
-  'settings.questionBankValue': '1,329,679+ distinct — measured, still growing',
+  'settings.questionBankValue': 'Over 1.3 million',
   'settings.status': 'Status',
   'settings.active': 'Active',
   'settings.included': 'Included',
+  'settings.groupYou': 'You',
+  'settings.groupAccount': 'Account',
   'settings.allDifficulties': 'All difficulties (D1–D4)',
   'settings.freeCourses': 'CBSE / NCERT and JEE Main',
   'settings.premiumAdds': 'Premium removes the daily practice and exam-simulation limits, and adds JEE Advanced, advanced Pri Explain and advanced analytics. Your work, history and progress are kept if Premium ends.',
@@ -715,8 +717,7 @@ export default {
 
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
   // Public account entry and explicit offline entry are load-bearing browser contracts.
-  'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
-  'login.heroPrivacy': 'Private: profiles, drafts and handwriting stay on this device, and there are no ads.',
+  'login.heroPrivacy': 'Private by default, no ads. Checking needs a Pri account and a connection.',
   'login.cloudSignIn': 'Sign in to your Pri cloud account',
   'login.cloudIntent': 'Pri cloud account — first open or create the profile on this device that the account will sync. You’ll land in Account settings to sign in.',
   'login.privacy': 'Privacy',
@@ -2979,7 +2980,7 @@ export default {
   "first.line": "Marks come from your working, line by line.",
   "first.prompt": "Write any digit",
   "first.padLabel": "A small pad to write on",
-  "first.ack": "That is your ink. Nothing here is read or checked; handwriting is read after you sign in.",
+  "first.ack": "That’s your hand. Pri starts reading it as soon as you’re signed in.",
   "first.clear": "Clear",
   "first.continue": "Continue",
   "first.skip": "Skip",
