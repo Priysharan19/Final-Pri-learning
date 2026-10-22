@@ -36,7 +36,7 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { strokeSignature } from '../ink/strokeSignature.js';
-import { tagEngineVerdicts } from '../instrument/margin/engineMark.js';
+import { engineLineVerdicts, withoutModelTicks } from '../instrument/margin/engineMark.js';
 import { annotationsLive, inkLineVerdicts, reportForLines, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
@@ -1807,16 +1807,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       outcome: verdictOutcome, res: state.res, submitted: judged, shownLines: inkResult?.lines || [],
       live: judgedLive && inkResult?.stale !== true, answeredByWorking: isWorking
     });
-    if (!base) return null;
     // Display boundary: these are the deterministic engine's verdicts, so they
     // carry that provenance (and its ecf credit) for the margin's stamps.
     // Presentation only; no status changes.
-    return tagEngineVerdicts(base, reportForLines(state.res?.stepReport, judged?.lines || [])).map(v => (v.noteKind ? {
-      status: v.status, source: v.source,
-      note: v.noteKind === 'conclude' && res?.solution?.answerText
-        ? `this line should conclude ${String(res.solution.answerText)}`
-        : 'this line doesn’t reach the right answer — rework it'
-    } : v));
+    return engineLineVerdicts(base, reportForLines(state.res?.stepReport, judged?.lines || []), res?.solution?.answerText);
   }, [verdictOutcome, state.res, judged, inkResult, judgedLive, isWorking, res]);
 
   // ── A second read of the working ───────────────────────────────────────────
@@ -1885,8 +1879,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // A tick is the engine's. The second read is a model's opinion: where it
     // says the working breaks is shown, hedged, as before; where it finds
     // nothing wrong it earns no tick on the page.
-    const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
-    return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
+    return withoutModelTicks(merged, CLOUD_WORKING_ENGINE);
   }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
   // What the server established about the working that was submitted, for a
   // reading-based submission (handwriting or a photo), where the lines came

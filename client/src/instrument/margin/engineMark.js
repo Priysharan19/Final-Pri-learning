@@ -25,3 +25,27 @@ export function engineMark(v) {
   if (v.status === 'ok') return 'ok';
   return v.status === 'break' || v.status === 'wrong' ? 'x' : null;
 }
+
+/**
+ * QuestionCard's display mapping for the on-device engine's ink line
+ * verdicts (pure, so it can be tested): tag provenance and ecf against the
+ * step report aligned to the submitted lines, then write the generated
+ * notes. A rebuilt note keeps its provenance. Presentation only.
+ */
+export function engineLineVerdicts(base, alignedReport, answerText) {
+  if (!base) return null;
+  return tagEngineVerdicts(base, alignedReport).map(v => (v.noteKind ? {
+    status: v.status, source: v.source,
+    note: v.noteKind === 'conclude' && answerText
+      ? `this line should conclude ${String(answerText)}`
+      : 'this line doesn’t reach the right answer — rework it'
+  } : v));
+}
+
+/** After the merge with the second read: a model's "ok" earns no tick, so it
+ *  becomes unknown (and loses any source); everything else stands. */
+export function withoutModelTicks(merged, cloudSource) {
+  if (!merged) return null;
+  const out = merged.map(v => (!v || (v.status === 'ok' && v.source === cloudSource) ? { status: 'unknown' } : v));
+  return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
+}

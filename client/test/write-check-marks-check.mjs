@@ -1,6 +1,7 @@
 // Write & Check marks: provenance is positive and ecf credit reaches the
 // margin. Deterministic, no browser. Presentation only: no status changes.
-import { engineMark, tagEngineVerdicts } from '../src/instrument/margin/engineMark.js';
+import { engineMark, tagEngineVerdicts, engineLineVerdicts, withoutModelTicks } from '../src/instrument/margin/engineMark.js';
+import { reportForLines } from '../src/components/attemptEvidence.js';
 import { mergeVerdicts, CLOUD_WORKING_ENGINE } from '../src/ink/cloudWorking.js';
 
 let pass = 0, fail = 0;
@@ -33,6 +34,26 @@ check('an engine status of ecf is the capsule too', engineMark({ status: 'ecf', 
 const merged = mergeVerdicts(tagged, { firstBreak: 3, lines: [{ index: 3, status: 'break', why: 'w' }] }, { lineCount: 4 });
 check('merging with the second read keeps engine provenance', merged.slice(0, 3).every(v => v.source === 'engine'), merged);
 check('the model line merged in is never stamped', engineMark(merged[3]) === null);
+
+// QuestionCard's display mapping, composed as the card composes it.
+{
+  const lines = ['a = 2', 'b = 3', '5'];
+  const stepReport = { lines: [{ text: 'a = 2', status: 'ok' }, { text: 'b = 3', status: 'ok', ecf: true }, { text: '5', status: 'break' }] };
+  const aligned = reportForLines(stepReport, lines);
+  const baseV = [{ status: 'ok' }, { status: 'ok' }, { status: 'wrong', noteKind: 'conclude' }];
+  const shown = engineLineVerdicts(baseV, aligned, '6');
+  check('the mapping aligns the report and carries ecf to its line', shown[1].ecf === true && !shown[0].ecf, shown);
+  check('a generated note keeps the engine provenance', shown[2].source === 'engine' && /conclude 6/.test(shown[2].note) && shown[2].status === 'wrong', shown[2]);
+  check('the generated rework note keeps provenance too', engineLineVerdicts([{ status: 'wrong', noteKind: 'rework' }], null, null)[0].source === 'engine');
+  check('stamps from the mapping', shown.map(engineMark).join() === 'ok,ecf,x', shown.map(engineMark));
+  check('a report for other lines is not aligned, so no ecf is carried', engineLineVerdicts(baseV, reportForLines(stepReport, ['a = 2', 'x', '5']), '6').every(v => !v.ecf));
+  check('no base, no verdicts', engineLineVerdicts(null, aligned, '6') === null);
+  const merged = mergeVerdicts([{ status: 'unknown' }, ...shown.slice(1)], { firstBreak: 2, lines: [{ index: 0, status: 'ok' }] }, { lineCount: 3 });
+  const final = withoutModelTicks(merged, CLOUD_WORKING_ENGINE);
+  check('a model "ok" becomes unknown and drops its source', final[0].status === 'unknown' && final[0].source === undefined && engineMark(final[0]) === null, final[0]);
+  check('engine lines survive the rebuild with their marker', final[1].source === 'engine' && final[2].source === 'engine', final);
+  check('nothing left to show is null', withoutModelTicks([{ status: 'ok', source: CLOUD_WORKING_ENGINE }], CLOUD_WORKING_ENGINE) === null);
+}
 
 console.log(`WRITE & CHECK MARKS: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks — stamps only for the deterministic engine; ecf credit shown as the capsule.`);
 process.exit(fail ? 1 : 0);

@@ -577,9 +577,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                         style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
                     ))}
                     {showNote && (
-                      <span className="ink-note" style={{ left: Math.max(4, b.x - 2),
-                        // Kept on the sheet: near its foot the note sits above the line.
-                        top: b.y + b.h + 16 + 64 > pageHeight * pages ? Math.max(4, b.y - 64) : b.y + b.h + 16 }}>
+                      <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
                         <b>{t('ink.mistakeHere')}</b>{v.note ? <> — {v.note}</> : null}
                       </span>
                     )}

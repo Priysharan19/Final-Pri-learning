@@ -40,6 +40,9 @@ html.ui-instrument[data-theme="dark"] { --wc-glaze: #fff; --wc-glaze-a: .3; }
   html.ui-instrument .in-read:not(.is-unc) .in-read-cf { display: none; }
   [data-wc-row] .in-read-tg { display: none; }   /* the stamp says it */
   .ink-line > .wc-plane { display: none; }        /* the list keeps its badge */
+  /* The "Look here" note never sits over handwriting: it moves into the
+     margin column, under its line's row. */
+  html.ui-instrument .ink-verdict-layer .ink-note { left: auto !important; inset-inline-end: 0; width: var(--wc-col); max-width: none; z-index: 2; }
   .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: inline; }
 }
 
@@ -70,6 +73,9 @@ html.ui-instrument[data-theme="dark"] { --wc-glaze: #fff; --wc-glaze-a: .3; }
 .wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
 @keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
 
+/* Phone: no column, so the note is not drawn on the sheet at all; the reading
+   list under the sheet carries the same words beside the line it is about. */
+@media (max-width: 560px) { html.ui-instrument .ink-verdict-layer .ink-note { display: none; } }
 @media (forced-colors: active) { .wc-stamp { filter: none; } .wc-stamp * { stroke: CanvasText; } .wc-datewin { box-shadow: none; } html.ui-instrument .ink-stage::before { border-color: CanvasText; } html.ui-instrument .ink-toolbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: Canvas; } }
 @media (prefers-reduced-motion: reduce) { .wc-go *, .wc-datewin span { animation: none !important; } }
 
