@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
-import { deleteCloudAccount, disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { deleteCloudAccount, disconnectCloudAccount, signOutCloudAccountEverywhere } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
@@ -20,6 +20,8 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [deletePassword, setDeletePassword] = useState('');
   const [deletePhrase, setDeletePhrase] = useState('');
   const [busy, setBusy] = useState('');
+  // "Sign out everywhere" asks once more before it ends every session.
+  const [confirmEverywhere, setConfirmEverywhere] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   // The export asks for fresh proof of the credential (401 REAUTH_REQUIRED
@@ -196,6 +198,26 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       await reload();
     } catch (err) { setError(err.message || tLater('cloudSecurity.revokeFailed')); }
     finally { setBusy(''); }
+  }
+
+  /**
+   * Sign out everywhere (#481), after the inline confirmation: the server ends
+   * every session of this account on every device, this one included, and
+   * only then does this device forget its link, so the gate shows the sign-in
+   * card. A refusal or an outage keeps everything as it was and says so.
+   */
+  async function signOutEverywhere() {
+    if (busy) return;
+    start('logout-all');
+    try {
+      await signOutCloudAccountEverywhere(pid);
+      setConfirmEverywhere(false);
+      setMessage(tLater('cloudSecurity.signedOutEverywhere'));
+      await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
+    } catch (err) {
+      setConfirmEverywhere(false);
+      setError(cloudErrorText(err, tLater, tLater('cloudSecurity.signOutEverywhereFailed')));
+    } finally { setBusy(''); }
   }
 
   function resetExportProof() {
@@ -447,6 +469,24 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
               </button>
             </div>
           )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.noSessions')}</div>}
+        </div>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+          {!confirmEverywhere
+            ? <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere" onClick={() => { setConfirmEverywhere(true); setMessage(''); setError(''); }} disabled={!!busy}>
+              {t('cloudSecurity.signOutEverywhere')}
+            </button>
+            : <div role="group" aria-labelledby="cloud-sign-out-everywhere-ask" data-testid="cloud-sign-out-everywhere-confirm">
+              <p id="cloud-sign-out-everywhere-ask" style={{ fontWeight: 600, margin: '0 0 8px' }}>{t('cloudSecurity.signOutEverywhereAsk')}</p>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-sign-out-everywhere-yes" onClick={signOutEverywhere} disabled={!!busy}>
+                  {busy === 'logout-all' ? t('cloudSecurity.signingOutEverywhere') : t('cloudSecurity.signOutEverywhereYes')}
+                </button>
+                <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere-cancel" onClick={() => setConfirmEverywhere(false)} disabled={!!busy}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>}
+          <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>{t('cloudSecurity.signOutEverywhereHelp')}</p>
         </div>
       </div>
 

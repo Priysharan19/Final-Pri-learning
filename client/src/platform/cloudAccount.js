@@ -292,6 +292,20 @@ export async function disconnectCloudAccount(pid) {
 }
 
 /**
+ * Sign out everywhere (#481): the server ends every session of this account,
+ * on every device, this one included (POST /v1/account/logout-all, which needs
+ * the live session and its CSRF pair). Only once the server has said so does
+ * this device forget its own link, which relocks the activation gate onto the
+ * sign-in card. A refusal or an outage throws and forgets nothing: the panel
+ * must never say "signed out on every device" when the server was not told.
+ */
+export async function signOutCloudAccountEverywhere(pid) {
+  const result = await cloud.logoutAll();
+  await forgetCloudAccountLocally(pid);
+  return { connected: false, revoked: Number.isFinite(Number(result?.revoked)) ? Number(result.revoked) : null };
+}
+
+/**
  * A deleted account is forgotten on every profile of this device: `pid` first,
  * then every other local profile whose link names the same account (#521 item
  * 2) — a second profile would otherwise keep a link to an account that no
