@@ -10,6 +10,7 @@ try {
   const page = await browser.newPage({viewport: {width:1440,height:1000},deviceScaleFactor:1});
   const errors=[];
   page.on('pageerror',err => errors.push(String(err)));
+  page.on('console',msg => { if (msg.type() === 'error') errors.push(msg.text()); });
   await page.goto('http://127.0.0.1:4217/atlas-agent2.html',{waitUntil:'networkidle'});
   await page.getByRole('heading',{name:'Knowledge Atlas'}).waitFor();
   assert.ok(await page.getByText('SYNTHETIC DEMONSTRATION').count());
@@ -17,6 +18,19 @@ try {
   assert.ok((await page.locator('.pa2-concept-list button').count()) >= 15);
   checks+=3;
   await page.screenshot({path:out+'/atlas-desktop.png',fullPage:true});
+  const beforeZoom = await page.locator('.pa2-map-controls span').innerText();
+  await page.locator('.pa2-graph').hover({position:{x:200,y:110}});
+  await page.mouse.wheel(0,-180);
+  const afterZoom = await page.locator('.pa2-map-controls span').innerText();
+  assert.notEqual(afterZoom,beforeZoom,'Wheel must change scale');
+  const beforePan = await page.locator('.pa2-camera').getAttribute('transform');
+  const box = await page.locator('.pa2-graph').boundingBox();
+  await page.mouse.move(box.x+12,box.y+12);
+  await page.mouse.down();
+  await page.mouse.move(box.x+90,box.y+65,{steps:5});
+  await page.mouse.up();
+  assert.notEqual(await page.locator('.pa2-camera').getAttribute('transform'),beforePan,'Pointer drag must pan');
+  checks+=2;
   await page.getByRole('button',{name:'Conceptual',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'Conceptual',exact:true}).getAttribute('aria-pressed'),'true');
   await page.getByRole('button',{name:'Learning evidence',exact:true}).click();
@@ -68,5 +82,5 @@ try {
   checks+=2;
   await mobile.screenshot({path:out+'/laboratory-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS PRI ATLAS Agent 2 browser: '+checks+' interactions/accessibility/responsive checks; five screenshots; no page errors');
+  console.log('PASS PRI ATLAS Agent 2 browser: '+checks+' interactions/accessibility/responsive checks; five screenshots; no page/console errors');
 } finally { await browser.close(); }

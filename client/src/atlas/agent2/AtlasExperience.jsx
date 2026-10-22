@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ATLAS_SUBJECTS, syntheticAtlas } from './graphModel.js';
 import './atlas.css';
 
@@ -90,6 +90,18 @@ export default function AtlasExperience({
       return { x: cursor.x - wx * scale, y: cursor.y - wy * scale, scale };
     });
   };
+  // React delegates wheel passively. Attach directly with passive:false so
+  // zooming the atlas does not also scroll its containing page.
+  useEffect(() => {
+    const element = svg.current;
+    if (!element) return undefined;
+    const handleWheel = event => {
+      event.preventDefault();
+      zoomAt(Math.exp(-event.deltaY * 0.0012), toSvg(event));
+    };
+    element.addEventListener('wheel', handleWheel, { passive: false });
+    return () => element.removeEventListener('wheel', handleWheel);
+  }, []);
   const centre = () => {
     if (!current) return;
     setView(frameConcept(data, current.id, layer, focus));
@@ -171,7 +183,7 @@ export default function AtlasExperience({
             <svg ref={svg} viewBox={'0 0 ' + W + ' ' + H} className="pa2-graph"
               aria-label="Concept relationship graph. Drag empty space to pan, use zoom buttons or mouse wheel; select nodes with keyboard or pointer."
               role="group" onPointerDown={panStart} onPointerMove={panMove} onPointerUp={panEnd}
-              onPointerCancel={panEnd} onWheel={e => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0012), toSvg(e)); }}>
+              onPointerCancel={panEnd}>
               <defs><pattern id="pa2-grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0 H0 V36" fill="none" stroke="#323842" strokeWidth="0.7" /></pattern></defs>
               <rect width={W} height={H} fill="url(#pa2-grid)" />
               <g className={'pa2-camera' + (isPanning ? ' is-dragging' : '')} transform={'translate(' + view.x + ' ' + view.y + ') scale(' + view.scale + ')'}>

@@ -68,7 +68,7 @@ SVG was selected for precise labels, accessible focusable nodes, straightforward
 ## Verified checks — 22 October 2026
 
 - 15,635 exhaustive integer coefficient-pair checks including determinant and point residual invariants plus special-case classifications; graph typed links, stable positions and no unverified evidence checks: PASS.
-- Browser: 20 desktop/mobile interaction, keyboard, routing and overflow checks on headless Chromium: PASS; no page errors. Browser checks are **not** a WCAG or screen-reader audit.
+- Browser: 22 desktop/mobile interaction, wheel zoom, pointer pan, keyboard, routing and overflow checks on headless Chromium: PASS; no page errors. Browser checks are **not** a WCAG or screen-reader audit.
 - Local Node 24 graph/model-only timings on the connected Mac, 20 samples after 4 warmups. These are NOT rendering FPS, physical device results or real student outcomes.
 
 | Chapters | Median construction | Observed p95 |
