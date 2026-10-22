@@ -178,6 +178,9 @@ const CANONICAL_MAC_JOB_HEAD = `  apple-v1:
 
 // ---------------------------------------------------------------- YAML-ish ---
 const indentOf = line => line.match(/^ */)[0].length;
+// The one mapping-key grammar used by every parser here (quoted or plain key,
+// optional inline value or trailing comment).
+const KEY_LINE = /^(\s*)(['"]?)([A-Za-z0-9_.-]+)\2:(?:\s+(.*))?$/;
 const isBlank = line => /^\s*(#.*)?$/.test(line);
 
 function stripComment(value) {
@@ -210,34 +213,47 @@ function entries(lines) {
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
     if (isBlank(line) || indentOf(line) !== level) continue;
-    const m = line.match(/^\s*(['"]?)([A-Za-z0-9_.-]+)\1:(?:\s+(.*))?$/);
+    const m = line.match(KEY_LINE);
     if (!m) continue;
     const sub = [];
     for (let j = i + 1; j < lines.length; j += 1) {
       if (!isBlank(lines[j]) && indentOf(lines[j]) <= level) break;
       sub.push(lines[j]);
     }
-    out.push({ key: m[2], value: m[3] ?? '', sub });
+    out.push({ key: m[3], value: m[4] ?? '', sub });
   }
   return out;
 }
 
 const get = (list, key) => list.find(e => e.key === key);
 
-// Raw lines of each job (key line included), keyed by job id.
+// Raw lines of each job (key line included), keyed by job id, using the same
+// key grammar and indentation rule as entries(), so every job the parser sees
+// has a block. `order` lists job ids as they appear; `keyLine` keeps the raw
+// key line so the checker can require it verbatim.
 function jobBlocks(lines) {
   const out = new Map();
-  const start = lines.findIndex(l => /^jobs:\s*$/.test(l));
-  if (start === -1) return out;
-  let id = null;
+  const order = [];
+  const start = lines.findIndex(l => { const m = l.match(KEY_LINE); return m && m[1] === '' && m[3] === 'jobs'; });
+  if (start === -1) return { blocks: out, order, jobsLine: null };
+  const body = [];
   for (let i = start + 1; i < lines.length; i += 1) {
-    const l = lines[i];
-    if (/^\S/.test(l) && !/^#/.test(l)) break;
-    const m = l.match(/^  ([A-Za-z0-9_-]+):\s*$/);
-    if (m) { id = m[1]; out.set(id, []); }
-    if (id) out.get(id).push(l);
+    if (!isBlank(lines[i]) && indentOf(lines[i]) === 0) break;
+    body.push(lines[i]);
   }
-  return out;
+  const content = body.filter(l => !isBlank(l));
+  const level = content.length ? Math.min(...content.map(indentOf)) : 0;
+  let id = null;
+  for (const l of body) {
+    const m = !isBlank(l) && indentOf(l) === level ? l.match(KEY_LINE) : null;
+    if (m) {
+      id = m[3];
+      order.push(id);
+      out.set(id, { keyLine: l, lines: [] });
+    }
+    if (id) out.get(id).lines.push(l);
+  }
+  return { blocks: out, order, jobsLine: lines[start] };
 }
 
 // Every mapping key that appears twice at the same level, anywhere outside
@@ -354,9 +370,22 @@ export function analyzeWorkflow(name, source) {
     }
     return 'identical';
   };
-  const blocks = jobBlocks(wf.lines);
-  const guardBlock = blocks.get('guard');
-  const macBlock = blocks.get('apple-v1');
+  const { blocks, order, jobsLine } = jobBlocks(wf.lines);
+  // Never skip a comparison silently: every parsed job must have a raw block,
+  // and the layout must be exactly `jobs:`, `  guard:` then `  apple-v1:`.
+  if (jobsLine !== 'jobs:') fail(`the jobs key line must be exactly "jobs:" (got ${JSON.stringify(jobsLine)})`);
+  for (const job of wf.jobs) {
+    if (!blocks.has(job.id)) fail(`job ${job.id}: could not locate its raw block; refusing to skip the canonical comparison`);
+  }
+  for (const [id, want] of [['guard', '  guard:'], ['apple-v1', '  apple-v1:']]) {
+    const b = blocks.get(id);
+    if (b && b.keyLine !== want) fail(`job ${id}: its key line must be exactly ${JSON.stringify(want)} (got ${JSON.stringify(b.keyLine)})`);
+  }
+  if (order.indexOf('guard') !== 0 || order.indexOf('apple-v1') !== 1) {
+    fail(`jobs must start with guard then apple-v1, in that order (got ${order.join(', ')})`);
+  }
+  const guardBlock = blocks.get('guard')?.lines;
+  const macBlock = blocks.get('apple-v1')?.lines;
   if (selfHosted.map(j => j.id).join(',') !== 'apple-v1') {
     fail(`the only self-hosted job allowed is apple-v1 (got ${selfHosted.map(j => j.id).join(', ')}); a new self-hosted lane needs a reviewed change to this checker`);
   }
@@ -365,7 +394,9 @@ export function analyzeWorkflow(name, source) {
   } else if (normText(guardBlock.join('\n')) !== normText(CANONICAL_GUARD_JOB)) {
     fail(`the guard job must match the reviewed canonical text exactly (${firstDiff(normText(guardBlock.join('\n')), normText(CANONICAL_GUARD_JOB))})`);
   }
-  if (macBlock) {
+  if (!macBlock) {
+    fail('the apple-v1 job is missing');
+  } else {
     const stepStarts = macBlock.map((l, i) => (/^      - /.test(l) ? i : -1)).filter(i => i >= 0);
     const head = normText(macBlock.slice(0, stepStarts[3] ?? macBlock.length).join('\n'));
     if (head !== normText(CANONICAL_MAC_JOB_HEAD)) {
@@ -913,6 +944,23 @@ if (existsSync(macPath)) {
   mutate('flow mapping', 'concurrency:\n  group: pri-mac-v1-${{ github.ref }}\n  cancel-in-progress: false\n', 'concurrency: {group: a, group: b}\n', /flow mapping/);
   mutate('top-level env (BASH_ENV)', 'permissions:\n  contents: read\n', 'permissions:\n  contents: read\n\nenv:\n  BASH_ENV: ./evil.sh\n', /top-level keys other than/);
   mutate('a second self-hosted job name', '  apple-v1:\n', '  apple-v2:\n', /only self-hosted job allowed is apple-v1/);
+
+  // Round 4: the raw job layout must be exactly what the parser sees.
+  const macFirst = (src, macKey = '  apple-v1:', guardKey = '  guard:') => {
+    const g = src.indexOf('\n  guard:\n') + 1;
+    const m = src.indexOf('\n  apple-v1:\n') + 1;
+    const guardText = src.slice(g, m).replace(/^  guard:\n/, `${guardKey}\n`);
+    const macText = src.slice(m).replace(/^  apple-v1:\n/, `${macKey}\n`);
+    return `${src.slice(0, g)}${macText.endsWith('\n') ? macText : `${macText}\n`}${guardText}`;
+  };
+  const headBypass = s => s.replace('if ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then', 'if false && ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then');
+  mutate('"apple-v1": placed before guard, with the HEAD bypass', s => macFirst(headBypass(s), '  "apple-v1":'), null, /key line must be exactly "  apple-v1:"|canonical/);
+  mutate('"apple-v1": before guard (layout only)', s => macFirst(s, '  "apple-v1":'), null, /key line must be exactly "  apple-v1:"/);
+  mutate('apple-v1: with a trailing comment', '  apple-v1:\n', '  apple-v1: # x\n', /key line must be exactly "  apple-v1:"/);
+  mutate('apple-v1: with a trailing comment and the HEAD bypass', s => headBypass(s).replace('  apple-v1:\n', '  apple-v1: # mac\n'), null, /key line must be exactly "  apple-v1:"/);
+  mutate("'guard': quoted", '  guard:\n', "  'guard':\n", /key line must be exactly "  guard:"/);
+  mutate('Mac job placed first', s => macFirst(s), null, /must start with guard then apple-v1/);
+  mutate('jobs: with a trailing comment', '\njobs:\n', '\njobs: # all\n', /jobs key line must be exactly/);
 }
 
 // 3. Classification fixtures: hosted workflows are out of scope; any other
