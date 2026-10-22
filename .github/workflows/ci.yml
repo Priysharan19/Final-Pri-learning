@@ -772,6 +772,10 @@ jobs:
             # v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): builds with the
             # flag on, so it runs last in this group.
             node client/test/tour-instrument.js 2>&1 | tee -a browser.log
+            # On that instrument build: the once-only first-open moment, and the
+            # activation gate with the flag on (first open once hid its sign-in).
+            node client/test/tour-first-open.js --no-build 2>&1 | tee -a browser.log
+            npm run test:activation-gate:instrument 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log

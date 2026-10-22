@@ -18,10 +18,14 @@ import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
+import { firstOpenSeen } from '../instrument/firstOpenSeen.js';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
 const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+// The first-open moment (instrument build only), shown once before sign-in.
+const SignInMark = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInMark.jsx')) : null;
+const FirstOpen = featureEnabled('instrument') ? React.lazy(() => import('../instrument/FirstOpen.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -249,7 +253,7 @@ function LanguagePicker() {
     <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
       role="group" aria-label={t('login.chooseLanguage')}>
       {LANGUAGES.map(l => (
-        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+        <button key={l.id} type="button" className={`pill-opt c-chip ${chosen === l.id ? 'on' : ''}`}
           lang={l.htmlLang} aria-pressed={chosen === l.id}
           aria-label={t('lang.switchTo', { language: l.english })}
           onClick={() => pick(l.id)}>{l.label}</button>
@@ -274,6 +278,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState(initialStage);   // hero | pick | create
+  const [firstOpen, setFirstOpen] = useState(() => !!FirstOpen && !firstOpenSeen());
   const [cardStep, setCardStep] = useState('method');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
@@ -562,8 +567,9 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
       <div className="auth-wrap">
         <MathField />
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
+        {FirstOpen && firstOpen && <React.Suspense fallback={null}><FirstOpen onDone={() => setFirstOpen(false)} /></React.Suspense>}
         <div className="auth-col fade-in">
-          <Logo large />
+          {SignInMark ? <React.Suspense fallback={<div className="c-signin-mark" aria-hidden="true" />}><SignInMark /></React.Suspense> : <Logo large />}
           {atStart && (
             <>
               <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
@@ -587,7 +593,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
               <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for

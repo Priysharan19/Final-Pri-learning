@@ -1,0 +1,162 @@
+/* Settings in direction C: cotton paper, grouped lists ruled with one engraved
+   hairline, Cormorant SC captions, 52px rows, and switches that land on the
+   C's detent step (cubic-bezier(.6,0,.2,1.5)), the one place besides the
+   score stamp where a detent is allowed. Loaded only by the instrument build (Settings.jsx, behind the
+   flag), and every rule is scoped to html.ui-instrument. ":root" lifts each
+   rule one step above instrument.css so the order of the two files never
+   matters. */
+
+html.ui-instrument:root .settings-grid { background: transparent; }
+html.ui-instrument:root .set-menu { border-right: var(--c-line) solid var(--c-hair); }
+html.ui-instrument:root .set-menu-item {
+  min-height: 44px; border-radius: 4px; font-family: var(--c-sc); font-weight: 600; font-size: 14px;
+  letter-spacing: 0.12em; color: var(--c-ink-3); background: transparent; box-shadow: none;
+}
+html.ui-instrument:root .set-menu-item { position: relative; }
+html.ui-instrument:root .set-menu-item.on { color: var(--c-ink); background: transparent; box-shadow: none; }
+html.ui-instrument:root .set-menu-item.on::before { content: ''; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--c-ink); }
+@media (hover: hover) { html.ui-instrument:root .set-menu-item:not(.on):hover { background: var(--c-paper-2); color: var(--c-ink); } }
+html.ui-instrument:root .set-menu-item:focus-visible { box-shadow: none; outline: 2px solid var(--c-teal); outline-offset: 2px; }
+
+/* A group: a small-caps caption over a sheet ruled by engraved hairlines. No
+   shadow and no radius above 6px: the sheet sits flat on the paper. */
+html.ui-instrument:root .settings-grid .card,
+html.ui-instrument:root .settings-grid ~ .card,
+html.ui-instrument:root .content > [data-reminders-panel] {
+  background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); border-radius: 6px; box-shadow: none;
+}
+html.ui-instrument:root .settings-grid .card > h2,
+html.ui-instrument:root .settings-grid .card > .spread > h2 {
+  padding: 16px 16px 8px; font-family: var(--c-sc); font-weight: 600; font-size: 13px; letter-spacing: 0.14em;
+  text-transform: none; color: var(--c-ink-2);
+}
+html.ui-instrument:root .settings-grid .card > p.muted { color: var(--c-ink-3); font-family: var(--c-text); }
+html.ui-instrument:root .set-row {
+  min-height: 52px; padding: 0 16px; display: flex; align-items: center;
+  border-top: var(--c-line) solid var(--c-hair-2); font-family: var(--c-text); font-size: 16px; line-height: 1.35;
+}
+html.ui-instrument:root .set-row .set-k { color: var(--c-ink); font-weight: 400; padding-block: 14px; }
+html.ui-instrument:root .set-row .set-k .muted { color: var(--c-ink-3); font-size: 13px !important; }
+html.ui-instrument:root .set-row .set-v,
+html.ui-instrument:root .settings-grid .card .spread > span,
+html.ui-instrument:root .settings-grid .card > div > span { font-family: var(--c-text); font-size: 16px; color: var(--c-ink-2); font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum", "lnum"; }
+/* The meter: an engraved hairline groove with a teal hairline fill, not a bar. */
+html.ui-instrument:root .settings-grid .meter {
+  height: 3px; margin-top: 10px; border-radius: 0; background: transparent; overflow: visible; position: relative;
+  border-top: var(--c-line) solid var(--c-hair); border-bottom: var(--c-line) solid var(--c-emboss-hi);
+}
+html.ui-instrument:root .settings-grid .meter > i { height: var(--c-line); margin-top: -1px; border-radius: 0; background: var(--c-teal); transition: none; }
+
+/* The switch: still the button with aria-pressed and its On/Off name. A
+   recessed track (deboss shadow from the emboss pair) and a lit knob. The knob
+   travels on transform only, on the detent step. */
+html.ui-instrument:root .set-v > .btn[aria-pressed] {
+  width: 46px; min-width: 46px; height: 28px; min-height: 28px !important; border-radius: 6px;
+  background: var(--c-paper-2); box-shadow: inset 0 1px 2px var(--c-emboss-lo), 0 1px 0 var(--c-emboss-hi);
+  border: var(--c-line) solid var(--c-hair); transition: background-color var(--c-d-row) var(--c-ease-row);
+}
+html.ui-instrument:root .set-v > .btn[aria-pressed]::after {
+  top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 4px; background: var(--c-sheet);
+  box-shadow: 0 0 0 var(--c-line) var(--c-hair), 0 1px 0 var(--c-emboss-hi) inset;
+  transition: transform 300ms cubic-bezier(.6, 0, .2, 1.5);
+}
+html.ui-instrument:root .set-v > .btn[aria-pressed="true"] { background: var(--c-teal); border-color: var(--c-teal); }
+html.ui-instrument:root .set-v > .btn[aria-pressed="true"]::after { transform: translateX(18px); }
+html.ui-instrument:root .set-v > .btn[aria-pressed]:active::after { transform: scaleX(1.12); transform-origin: left center; }
+html.ui-instrument:root .set-v > .btn[aria-pressed="true"]:active::after { transform: translateX(16px) scaleX(1.12); }
+html.ui-instrument:root .set-v > .btn[aria-pressed]:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument:root .set-v > .btn[aria-pressed]:disabled { opacity: 0.55; }
+/* 44px target on every pointer, not only touch. */
+html.ui-instrument:root .set-v > .btn[aria-pressed]::before { content: ''; position: absolute; inset: -9px -2px; }
+
+/* Segmented control and the primary action, in C's language: the segment is
+   an engraved strip (radius 8px at most), the selected segment is inked. Pills
+   are kept for .c-btn-primary and .c-chip only. */
+html.ui-instrument:root .settings-grid .seg { border-radius: 6px; background: var(--c-sheet); box-shadow: none; border: var(--c-line) solid var(--c-hair); }
+html.ui-instrument:root .settings-grid .seg > button {
+  min-height: 44px; border-radius: 6px; font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 14px; color: var(--c-ink-2);
+}
+html.ui-instrument:root .settings-grid .seg > button[aria-pressed="true"],
+html.ui-instrument:root .settings-grid .seg > button.on { background: var(--c-ink); color: var(--c-paper); box-shadow: none; }
+html.ui-instrument:root .settings-grid .btn-primary {
+  min-height: 44px; border-radius: 6px; background: var(--c-teal); color: var(--c-paper); border: 0;
+  font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 15px;
+}
+html.ui-instrument:root .settings-grid .btn-ghost,
+html.ui-instrument:root .settings-grid .btn-quiet {
+  min-height: 44px; border-radius: 6px; background: transparent; box-shadow: none; border: var(--c-line) solid var(--c-hair); color: var(--c-ink);
+}
+html.ui-instrument:root .set-danger { background: var(--c-sheet); box-shadow: none !important; border: var(--c-line) solid var(--c-ink-2) !important; }
+html.ui-instrument:root .set-danger > .sc-label { font-family: var(--c-sc); text-transform: none; letter-spacing: 0.14em; font-size: 13px; color: var(--c-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument:root .set-v > .btn[aria-pressed]::after { transition: none; }
+  html.ui-instrument:root .set-v > .btn[aria-pressed]:active::after { transform: none; }
+  html.ui-instrument:root .set-v > .btn[aria-pressed="true"]:active::after { transform: translateX(18px); }
+}
+@media (forced-colors: active) {
+  html.ui-instrument:root .set-v > .btn[aria-pressed="true"] { background: Highlight; }
+}
+
+@media (hover: hover) { html.ui-instrument:root .settings-grid .btn-primary:hover:not(:disabled) { filter: none; background: var(--accent-hover, var(--c-teal)); } }
+html.ui-instrument:root .settings-grid .btn-primary:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument:root .settings-grid .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+html.ui-instrument:root .settings-grid .btn-primary:disabled { background: var(--c-paper-2); color: var(--c-ink-3); border: var(--c-line) solid var(--c-hair); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument:root .settings-grid .btn-primary:active { transform: none; } }
+@media (hover: hover) { html.ui-instrument:root .settings-grid .btn-ghost:hover, html.ui-instrument:root .settings-grid .btn-quiet:hover { background: var(--c-paper-2); } }
+html.ui-instrument:root .settings-grid .btn-ghost:focus-visible, html.ui-instrument:root .settings-grid .btn-quiet:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+/* Status words keep C's palette: positive state in teal, never the legacy green. */
+html.ui-instrument:root .set-row .set-v[style*="--good"] { color: var(--c-teal) !important; }
+
+/* ── Jury round 1 ─────────────────────────────────────────────────────────
+   The masthead in Instrument Serif; a centred column of at most 680px;
+   no copper on a storage state (copper is the examiner's); words, not the
+   mark glyph, for included tiers (markup); a fade on the phone tab strip;
+   label over value on narrow phones. */
+html.ui-instrument:root div:has(> .settings-grid) > h1 { font: 400 clamp(34px, 5vw, 48px)/1 var(--c-serif); letter-spacing: -0.01em; color: var(--c-ink); }
+html.ui-instrument:root div:has(> .settings-grid) { max-width: calc(240px + 32px + 680px); margin-inline: auto; }
+html.ui-instrument:root .settings-grid > .grid { max-width: 680px; }
+html.ui-instrument:root .set-row .set-v[style*="--warn"] {
+  color: var(--c-ink-2) !important; text-decoration: underline dashed var(--c-hair); text-decoration-thickness: var(--c-line); text-underline-offset: 4px;
+}
+@media (max-width: 860px) {
+  html.ui-instrument:root div:has(> .settings-grid) { max-width: 680px; }
+  html.ui-instrument:root .set-menu { -webkit-mask-image: linear-gradient(to right, #000 85%, transparent); mask-image: linear-gradient(to right, #000 85%, transparent); }
+}
+@media (max-width: 400px) {
+  html.ui-instrument:root .set-row { flex-direction: column; align-items: flex-start; gap: 2px; padding-block: 10px; }
+  html.ui-instrument:root .set-row .set-k { padding-block: 0; }
+  html.ui-instrument:root .set-row .set-v { margin-left: 0; text-align: left; }
+}
+
+/* ── Jury round 2: two groups, "You" then "Account" ───────────────────── */
+html.ui-instrument:root .settings-grid .set-group { margin: 6px 0 -6px; }
+html.ui-instrument:root .settings-grid .set-group:not(:first-child) { margin-top: 22px; padding-top: 18px; border-top: var(--c-line) solid var(--c-hair); }
+/* The question-bank figure is a quiet fact: no full-width meter beside it. */
+html.ui-instrument:root .settings-grid .meter { display: none; }
+@media (max-width: 860px) {
+  /* Clear of the floating dock. */
+  html.ui-instrument:root div:has(> .settings-grid) { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 480px) {
+  html.ui-instrument:root .set-row { flex-direction: column; align-items: flex-start; gap: 2px; padding-block: 10px; }
+  html.ui-instrument:root .set-row .set-k { padding-block: 0; }
+  html.ui-instrument:root .set-row .set-v { margin-left: 0; text-align: left; }
+  html.ui-instrument:root .settings-grid .card .spread { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── Jury round 3 ── initials ring, SC text Edit, C chips ────────────────── */
+html.ui-instrument:root .c-initials {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  border: var(--c-line) solid var(--c-hair); font: var(--c-t-label); letter-spacing: 0.06em; color: var(--c-ink);
+}
+html.ui-instrument:root .settings-grid .set-edit {
+  min-height: 44px; padding: 0 4px; border: 0 !important; background: transparent !important; box-shadow: none !important;
+  font: var(--c-t-button); letter-spacing: 0.12em; color: var(--c-teal); text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px;
+}
+html.ui-instrument:root .settings-grid .c-chip { width: auto !important; min-height: 44px; padding: 0 18px; font: var(--c-t-label); letter-spacing: 0.12em; background: var(--c-sheet); color: var(--c-ink-2); border: var(--c-line) solid var(--c-hair); box-shadow: none; }
+html.ui-instrument:root .settings-grid .c-chip:lang(hi) { font-family: var(--c-text); letter-spacing: 0; }
+html.ui-instrument:root .settings-grid .c-chip[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
+html.ui-instrument:root .settings-grid .c-chip svg { display: none; }
+html.ui-instrument:root .settings-grid .theme-seg { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; border: 0; background: transparent; }
+html.ui-instrument:root .settings-grid .row[role="group"]:has(> .c-chip) { gap: 8px; }

@@ -1,0 +1,58 @@
+/* First open, direction C. The bezel engraves (stroke-dashoffset 1 -> 0,
+   800ms, cubic-bezier(.6,0,.2,1)), the P' mark writes itself on the same
+   curve, the line fades in, then the pad. Opacity and stroke-dashoffset only.
+   Reduce Motion: the final frame at once. Loaded by App.jsx behind the flag. */
+
+html.ui-instrument .fo {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-content: center; justify-items: center; gap: 20px;
+  padding: 32px 16px; background: var(--c-paper); color: var(--c-ink); font-family: var(--c-text); text-align: center; overflow-y: auto;
+}
+/* The mark is PMark (PR1). Frame one is empty: the bezel ring engraves
+   (PMark's own engrave), the dial's fill fades in under it at 300ms and the
+   P′ at 600ms. No disc before the stroke. */
+html.ui-instrument .fo-pmark { width: 120px; height: 120px; overflow: visible; }
+html.ui-instrument .fo-pmark circle:first-child { opacity: 0; animation: fo-in 400ms 300ms ease-out forwards; }
+html.ui-instrument .fo-pmark text { opacity: 0; animation: fo-in 400ms 600ms var(--c-ease-row) forwards; }
+html.ui-instrument .fo-line {
+  margin: 0; max-width: 16em; font-family: var(--c-serif); font-weight: 400; font-size: clamp(28px, 4.6vw, 40px); line-height: 1.05; letter-spacing: -0.01em;
+  opacity: 0; animation: fo-in 400ms 900ms var(--c-ease-row) forwards; text-wrap: balance;
+}
+html.ui-instrument .fo-ask { display: grid; justify-items: center; gap: 10px; opacity: 0; animation: fo-in 400ms 1200ms var(--c-ease-row) forwards; }
+html.ui-instrument .fo-ask .c-label { margin: 8px 0 0; }
+html.ui-instrument .fo-sheet {
+  width: min(440px, calc(100vw - 32px)); height: 180px; background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); border-radius: 4px;
+  box-shadow: inset 0 1px 2px var(--c-emboss-lo);
+  background-image: none; position: relative;
+}
+html.ui-instrument .fo-sheet::after { content: ''; position: absolute; left: 24px; right: 24px; top: 132px; border-top: var(--c-line) solid var(--c-hair); pointer-events: none; }
+html.ui-instrument .fo-pad { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+html.ui-instrument .fo-ack { margin: 0; min-height: 1.5em; max-width: 22em; font-size: 15px; color: var(--c-ink-2); }
+html.ui-instrument .fo-acts { display: flex; gap: 10px; align-items: center; }
+html.ui-instrument .fo-go.c-btn-primary {
+  min-height: 44px; padding: 0 22px; border-radius: var(--radius-pill); border: var(--c-line) solid var(--c-teal); background: var(--c-teal); color: var(--c-paper);
+  font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 15px; cursor: pointer;
+}
+html.ui-instrument .fo-quiet {
+  min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--c-ink-2); cursor: pointer;
+  font: var(--c-t-button); letter-spacing: 0.12em; text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px; text-decoration-color: var(--c-hair);
+}
+html.ui-instrument .fo-skip {
+  min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--c-ink-2); cursor: pointer;
+  font: var(--c-t-button); letter-spacing: 0.12em; text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px; text-decoration-color: var(--c-hair);
+}
+@media (hover: hover) { html.ui-instrument .fo-skip:hover { color: var(--c-ink); text-decoration-color: var(--c-ink-2); } }
+html.ui-instrument .fo-skip:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument .fo-go:focus-visible, html.ui-instrument .fo-quiet:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+@media (hover: hover) { html.ui-instrument .fo-quiet:hover { color: var(--c-ink); text-decoration-color: var(--c-ink-2); } }
+html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transform: translateY(1px); }
+@media (forced-colors: active) {
+  html.ui-instrument .fo-sheet { border-color: CanvasText; background-image: none; }
+}
+@keyframes fo-in { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument .fo-pmark circle:first-child, html.ui-instrument .fo-pmark text { animation: none; opacity: 1; }
+  html.ui-instrument .fo-line, html.ui-instrument .fo-ask { animation: none; opacity: 1; }
+  html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transform: none; }
+}
+/* Optical centre: the stack sits a little above the geometric centre. */
+@media (min-width: 700px) { html.ui-instrument .fo { padding-bottom: 10vh; } }

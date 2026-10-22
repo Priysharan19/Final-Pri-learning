@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { chromium } from '@playwright/test';
 import { ensureBuild } from './e2e.mjs';
 import { startOnlinePlatform } from './support/online-session.mjs';
-import { createVerifiedProfile } from './support/verified-onboarding.mjs';
+import { createVerifiedProfile, passFirstOpen } from './support/verified-onboarding.mjs';
 
 const TOPIC = 'y7-equations';
 const TOPIC_NAME = 'Linear Equations';
@@ -170,6 +170,7 @@ async function relaunch(profileDir) {
     hasTouch: true,
     reducedMotion: 'reduce'
   });
+  await passFirstOpen(ctx);
   return { ctx, page: await pageOf(ctx) };
 }
 

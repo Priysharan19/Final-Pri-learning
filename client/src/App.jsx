@@ -165,6 +165,19 @@ export function Logo({ large = false, onClick }) {
   );
 }
 
+// The sign-in and first-open skins (direction C) are needed only before a
+// profile is let in, so they load then, on demand, and are never warmed for
+// offline (sign-in needs a connection anyway). Loaded here rather than from
+// their components because the sign-in screen is also bundled bare by the
+// onboarding checks, whose bundler takes no stylesheets.
+let signInSkin = null;
+function SignInSkin() {
+  useEffect(() => {
+    signInSkin ||= Promise.all([import('./instrument/margin/signin.css'), import('./instrument/margin/firstopen.css')]).catch(() => { signInSkin = null; });
+  }, []);
+  return null;
+}
+
 export default function App() {
   const [user, setUserState] = useState(undefined);
   // The profile most recently handed to setUser, read by `activate` below.
@@ -462,6 +475,7 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
+        {INSTRUMENT_ON && <SignInSkin />}
         <React.Suspense fallback={<RouteLoading />}>
           <Routes>
             {/* A store reviewer and a payment provider open these without an

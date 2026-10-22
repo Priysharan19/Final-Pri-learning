@@ -38,8 +38,11 @@ for (const key of ['settings.helpBody', 'settings.helpBodyIndia']) {
 }
 // Online-only checking (owner decision 2026-10-10): the welcome line promises
 // no offline or on-device marking, and says what checking needs.
-ok(!/offline|on your device/i.test(en['login.heroSub']) && /checked by Pri’s server/.test(en['login.heroSub']) && /Pri account and a connection/.test(en['login.heroSub']), 'the welcome line says answers are checked by the server with an account and a connection (EN)');
-ok(!/बिना इंटरनेट/.test(hi['login.heroSub']) && /Pri का सर्वर जाँचता है/.test(hi['login.heroSub']) && /Pri खाता और कनेक्शन चाहिए/.test(hi['login.heroSub']), 'and in Hindi');
+ok(!/offline|on your device/i.test(en['login.heroPrivacy']) && /Pri’s server/.test(en['login.welcomeSub']) && /Pri account and a connection/.test(en['login.heroPrivacy']), 'the sign-in says answers are marked by the server (welcome line) and that checking needs an account and a connection (fine print) (EN)');
+ok(!/बिना इंटरनेट/.test(hi['login.heroPrivacy']) && /Pri का सर्वर/.test(hi['login.welcomeSub']) && /Pri खाता और कनेक्शन चाहिए/.test(hi['login.heroPrivacy']), 'and in Hindi');
+// The sign-in fine print is one line (approved copy change, jury round 2).
+ok(en['login.heroPrivacy'] === "Private by default, no ads. Checking needs a Pri account and a connection." && !('login.heroSub' in en), 'the sign-in fine print is one line, and the second paragraph is gone (EN)');
+ok(hi['login.heroPrivacy'] === "डिफ़ॉल्ट रूप से निजी, कोई विज्ञापन नहीं। जाँच के लिए Pri खाता और कनेक्शन चाहिए।" && !('login.heroSub' in hi), 'and in Hindi');
 
 // ── 3 · The editor footer names who reads, accurately ────────────────────────
 const card = read('client/src/components/QuestionCard.jsx');

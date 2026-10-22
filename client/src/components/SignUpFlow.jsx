@@ -95,6 +95,9 @@ export default function SignUpFlow({
   const [destination, setDestination] = useState('');
   const [challenge, setChallenge] = useState(null);     // { id, channel, destination, expiresAt }
   const [code, setCode] = useState('');
+  // The code was accepted: the boxes lock in, left to right (drawn only by
+  // the instrument skin; nothing in the flow waits for it).
+  const [locked, setLocked] = useState(false);
   const [ticket, setTicket] = useState('');
   const [pendingSocial, setPendingSocial] = useState(null);
   const [account, setAccount] = useState(null);
@@ -269,8 +272,10 @@ export default function SignUpFlow({
         go('age');
         return;
       }
+      setLocked(true);
       await signedIn(result);
     } catch (err) {
+      setLocked(false);
       // A request that never reached the server spent nothing: keep the digits
       // so "Verify and continue" can send the same code again.
       if (!isNetworkFailure(err)) { setInvalid(err?.code === 'OTP_INVALID'); setCode(''); }
@@ -485,7 +490,7 @@ export default function SignUpFlow({
               aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
               onChange={e => { setDestination(e.target.value); setError(''); }} />
           </div>
-          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
+          <button type="submit" className="btn btn-primary btn-lg signup-next c-btn-primary" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
             {busy === 'send' ? t('signup.sending') : t(isSms ? 'signup.continuePhone' : 'signup.continueEmail')}
           </button>
         </form>
@@ -509,6 +514,8 @@ export default function SignUpFlow({
               {t(isSms ? 'signup.useEmail' : 'signup.usePhone')}
             </button>
           )}
+          {/* The parent door sits in the same row as the other side doors. */}
+          {!inline && <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>}
         </div>
         {/* Inside a page the terms are not otherwise on screen; the landing
             screen already carries them in its footer, once. */}
@@ -520,11 +527,7 @@ export default function SignUpFlow({
             })}
           </p>
         )}
-        {!inline && (
-          <div className="signup-alt signup-alt-quiet">
-            <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>
-          </div>
-        )}
+
       </>
     );
   } else if (step === 'password') {
@@ -541,7 +544,7 @@ export default function SignUpFlow({
           <input className="input" id="signup-password" type="password" autoComplete="current-password" maxLength={200} value={password}
             aria-describedby={error ? errorId : undefined}
             onChange={e => { setPassword(e.target.value); setError(''); }} />
-          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !!busy} data-testid="signup-password-submit">
+          <button type="submit" className="btn btn-primary btn-lg signup-next c-btn-primary" disabled={!available || !!busy} data-testid="signup-password-submit">
             {busy === 'password' ? t('signup.checking') : t('signup.passwordSubmit')}
           </button>
         </form>
@@ -565,20 +568,20 @@ export default function SignUpFlow({
         </p>
         <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void verify(); }}>
           <OtpInput value={code} onChange={c => { setCode(c); setInvalid(false); setError(''); }} onComplete={c => verify(c)}
-            disabled={busy === 'verify'} invalid={invalid} idPrefix="signup-code" labelledBy="signup-step-title signup-code-lead"
+            disabled={busy === 'verify'} invalid={invalid} locked={locked} idPrefix="signup-code" labelledBy="signup-step-title signup-code-lead"
             describedBy={error ? errorId : undefined} />
-          <button type="submit" className="btn btn-primary btn-lg signup-next" data-testid="signup-verify"
+          <button type="submit" className="btn btn-primary btn-lg signup-next c-btn-primary" data-testid="signup-verify"
             disabled={!!busy || codeExpired} aria-busy={busy === 'verify' || undefined}>
             {busy === 'verify' ? t('signup.checking') : t('signup.verify')}
           </button>
         </form>
         {codeExpired && !error && <p className="signup-hint" role="status" data-testid="signup-code-expired">{t('signup.codeExpired')}</p>}
         <div className="signup-alt">
-          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={() => sendCode({ resend: true })} data-testid="signup-resend">
+          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={() => { setLocked(false); void sendCode({ resend: true }); }} data-testid="signup-resend">
             {busy === 'send' ? t('signup.sending') : waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
           <button type="button" className="linklike" disabled={busy === 'verify'} data-testid="signup-change-destination"
-            onClick={() => { setCode(''); go('method', 'back'); }}>{t(challenge?.channel === 'sms' ? 'signup.changeNumber' : 'signup.changeEmail')}</button>
+            onClick={() => { setCode(''); setLocked(false); go('method', 'back'); }}>{t(challenge?.channel === 'sms' ? 'signup.changeNumber' : 'signup.changeEmail')}</button>
         </div>
         <p className="signup-hint">{t(challenge?.channel === 'sms' ? 'signup.codeHelpPhone' : 'signup.codeHelp')}</p>
       </>
@@ -613,7 +616,7 @@ export default function SignUpFlow({
               })}
             </span>
           </label>
-          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!!busy} data-testid="signup-age-next">
+          <button type="submit" className="btn btn-primary btn-lg signup-next c-btn-primary" disabled={!!busy} data-testid="signup-age-next">
             {busy === 'verify' ? t('signup.checking') : t('signup.continue')}
           </button>
         </form>
@@ -642,7 +645,7 @@ export default function SignUpFlow({
           })}
         </div>
         {jee && <p className="signup-hint">{t('signup.trackJeeHint')}</p>}
-        <button type="button" className="btn btn-primary btn-lg signup-next" disabled={!ready || !!busy}
+        <button type="button" className="btn btn-primary btn-lg signup-next c-btn-primary" disabled={!ready || !!busy}
           onClick={() => (account ? (needsParent ? go('parent') : finish()) : completeDetails())}
           data-testid="signup-class-next">
           {busy === 'verify' || busy === 'finish' ? t('signup.checking') : t('signup.continue')}
@@ -676,7 +679,7 @@ export default function SignUpFlow({
               aria-describedby={error ? errorId : undefined}
               onChange={e => { setParentDestination(e.target.value); setError(''); }} />
           </div>
-          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!parentDestination.trim() || !!busy} data-testid="signup-parent-send">
+          <button type="submit" className="btn btn-primary btn-lg signup-next c-btn-primary" disabled={!parentDestination.trim() || !!busy} data-testid="signup-parent-send">
             {busy === 'parent' ? t('signup.sending') : t('signup.parentSend')}
           </button>
         </form>

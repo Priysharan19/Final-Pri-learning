@@ -143,7 +143,7 @@ function LanguageSection() {
       <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
         {LANGUAGES.map(l => (
-          <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
+          <button key={l.id} type="button" className={`gen-opt c-chip ${chosen === l.id ? 'on' : ''}`}
             style={{ width: 160 }} lang={l.htmlLang} disabled={busy}
             aria-pressed={chosen === l.id} aria-label={t('lang.switchTo', { language: l.english })}
             onClick={() => pick(l.id)}>{l.label}</button>
@@ -279,13 +279,17 @@ function CrashReportsCard({ t }) {
   );
 }
 
+// Order: what a student comes to Settings for first ("You"), then the account.
+/** Up to two initials, for the instrument build's avatar ring. */
+const initialsOf = name => String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => [...w][0].toUpperCase()).join('') || '·';
+
 const SECTIONS = [
-  ['plan', '♛', 'settings.secPlan'],
   ['profile', '☺', 'settings.secProfile'],
-  ['security', '⚿', 'settings.secSecurity'],
-  ['handwriting', '✒', 'settings.secHandwriting'],
   ['language', '◍', 'settings.secLanguage'],
   ['appearance', '◐', 'settings.secAppearance'],
+  ['handwriting', '✒', 'settings.secHandwriting'],
+  ['plan', '♛', 'settings.secPlan'],
+  ['security', '⚿', 'settings.secSecurity'],
   ['courses', '', 'settings.secCourses'],
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
@@ -397,7 +401,7 @@ export default function Settings() {
   const { user, setUser, toast } = useApp();
   const t = useT();
   const [storageInfo, setStorageInfo] = useState(null);
-  const [active, setActive] = useState('plan');
+  const [active, setActive] = useState('profile');
   const importRef = useRef(null);
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
@@ -509,47 +513,21 @@ export default function Settings() {
         </div>
 
         <div className="grid" style={{ gap: 18 }}>
-          {/* ── Plan ── */}
-          <div className="card" ref={el => secRefs.current.plan = el}>
-            <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
-            <div className="spread" style={{ fontSize: 14 }}>
-              <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
-            </div>
-            <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
-            <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
-            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">✓</span></div>
-            {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
-            <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
-          </div>
-
-          {/* ── Account information ── */}
-          <div className="card">
-            <h2 style={{ marginBottom: 8 }}>{t('settings.accountInfo')}</h2>
-            <div className="set-row"><span className="set-k">{t('settings.dataLocation')}</span><span className="set-v">{t(storageInfo?.native ? 'settings.dataLocationNative' : 'settings.dataLocationBrowser')}</span></div>
-            <div className="set-row">
-              <span className="set-k">{t('settings.storageProtection')}</span>
-              <span className="set-v" style={{ color: storageInfo?.native || storageInfo?.persisted ? 'var(--good)' : 'var(--warn)' }}>
-                {t(storageInfo?.native ? 'settings.storageSandbox' : storageInfo?.persisted ? 'settings.storagePersisted' : 'settings.storagePending')}
-              </span>
-            </div>
-            {storageInfo && storageInfo.quota > 0 && (
-              <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
-            )}
-            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
-          </div>
-
+          {INSTRUMENT && <p className="set-group c-label">{t('settings.groupYou')}</p>}
           {/* ── Profile ── */}
           <div className="card" ref={el => secRefs.current.profile = el}>
             <div className="spread">
               <h2>{t('settings.profileInfo')}</h2>
-              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}><Icon name="pen" size={15} />{t('common.edit')}</button>}
+              {!editing && <button className="btn btn-ghost btn-sm set-edit" onClick={() => setEditing(true)}>{!INSTRUMENT && <Icon name="pen" size={15} />}{t('common.edit')}</button>}
             </div>
             {!editing ? (
               <div style={{ marginTop: 8 }}>
                 <div className="set-row"><span className="set-k">{t('settings.fullName')}</span><span className="set-v">{user.name}</span></div>
-                <div className="set-row"><span className="set-k">{t('settings.avatar')}</span><span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span></div>
+                <div className="set-row"><span className="set-k">{t('settings.avatar')}</span>{INSTRUMENT
+                  // Instrument build: initials in a hairline ring, never the
+                  // stored emoji (the stored avatar value is untouched).
+                  ? <span className="set-v"><span className="c-initials" role="img" aria-label={user.name}>{initialsOf(user.name)}</span></span>
+                  : <span className="set-v" style={{ fontSize: 20 }}>{user.avatar}</span>}</div>
                 {user.role !== 'teacher' && <div className="set-row"><span className="set-k">{t(user.course === 'in' ? 'settings.classLevel' : 'settings.yearLevel')}</span><span className="set-v">{t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: user.year })}</span></div>}
                 <div className="set-row"><span className="set-k">{t('settings.course')}</span><span className="set-v">{user.courseLabel}</span></div>
                 <div className="set-row"><span className="set-k">{t('settings.dailyGoal')}</span><span className="set-v">{t('settings.dailyGoalValue', { count: user.dailyGoal, n: user.dailyGoal })}</span></div>
@@ -560,7 +538,7 @@ export default function Settings() {
                   <label className="label" htmlFor="set-name">{t('settings.name')}</label>
                   <input className="input" id="set-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                 </div>
-                <div className="field">
+                {!INSTRUMENT && <div className="field">
                   <div className="label" id="set-avatar">{t('settings.avatar')}</div>
                   <div className="avatar-row" role="group" aria-labelledby="set-avatar">
                     {AVATARS.map(a => (
@@ -569,7 +547,7 @@ export default function Settings() {
                         onClick={() => setForm(f => ({ ...f, avatar: a }))}>{a}</button>
                     ))}
                   </div>
-                </div>
+                </div>}
                 {user.role !== 'teacher' && (
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
@@ -624,16 +602,6 @@ export default function Settings() {
             )}
           </div>
 
-          {/* ── Account & Security ── */}
-          <div ref={el => secRefs.current.security = el}>
-            <SecuritySection toast={toast} />
-          </div>
-
-          {/* ── Handwriting ── */}
-          <div ref={el => secRefs.current.handwriting = el}>
-            <HandwritingSection toast={toast} />
-          </div>
-
           {/* ── Language ── */}
           <div ref={el => secRefs.current.language = el}>
             <LanguageSection />
@@ -644,11 +612,53 @@ export default function Settings() {
             <h2 style={{ marginBottom: 12 }}>{t('settings.appearance')}</h2>
             <div className="seg theme-seg" role="group" aria-label={t('settings.appearance')}>
               {[['light', 'sun', 'settings.themeLight'], ['dark', 'moon', 'settings.themeDark'], ['system', 'device', 'settings.themeSystem']].map(([value, icon, label]) => (
-                <button key={value} type="button" className={user.theme === value ? 'on' : ''} aria-pressed={user.theme === value}
+                <button key={value} type="button" className={`c-chip${user.theme === value ? ' on' : ''}`} aria-pressed={user.theme === value}
                   onClick={() => setTheme(value)}><Icon name={icon} size={16} />{t(label)}</button>
               ))}
             </div>
             <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
+          </div>
+
+          {/* ── Handwriting ── */}
+          <div ref={el => secRefs.current.handwriting = el}>
+            <HandwritingSection toast={toast} />
+          </div>
+
+          {INSTRUMENT && <p className="set-group c-label">{t('settings.groupAccount')}</p>}
+          {/* ── Plan ── */}
+          <div className="card" ref={el => secRefs.current.plan = el}>
+            <h2>{t('settings.localPlan')}</h2>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
+            <div className="spread" style={{ fontSize: 14 }}>
+              <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
+            </div>
+            <div className="meter" style={{ margin: '6px 0 14px' }}><i style={{ width: '100%' }} /></div>
+            <div className="set-row"><span className="set-k">{t('settings.status')}</span><span className="set-v" style={{ color: 'var(--good)' }}>{t('settings.active')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">{t('settings.included')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.freeCourses')}</span><span className="set-v">{t('settings.included')}</span></div>
+            {/* #283: what Premium adds, worded from PLAN_CAPABILITIES — never "all features". */}
+            <p className="muted" data-premium-adds style={{ margin: '10px 0 0', fontSize: 13 }}>{t('settings.premiumAdds')}</p>
+          </div>
+
+          {/* ── Account information ── */}
+          <div className="card">
+            <h2 style={{ marginBottom: 8 }}>{t('settings.accountInfo')}</h2>
+            <div className="set-row"><span className="set-k">{t('settings.dataLocation')}</span><span className="set-v">{t(storageInfo?.native ? 'settings.dataLocationNative' : 'settings.dataLocationBrowser')}</span></div>
+            <div className="set-row">
+              <span className="set-k">{t('settings.storageProtection')}</span>
+              <span className="set-v" style={{ color: storageInfo?.native || storageInfo?.persisted ? 'var(--good)' : 'var(--warn)' }}>
+                {t(storageInfo?.native ? 'settings.storageSandbox' : storageInfo?.persisted ? 'settings.storagePersisted' : 'settings.storagePending')}
+              </span>
+            </div>
+            {storageInfo && storageInfo.quota > 0 && (
+              <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
+            )}
+            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
+          </div>
+
+          {/* ── Account & Security ── */}
+          <div ref={el => secRefs.current.security = el}>
+            <SecuritySection toast={toast} />
           </div>
 
           {/* ── Courses ── */}
