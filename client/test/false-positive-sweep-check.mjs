@@ -134,7 +134,7 @@ function numericProbes(q, a) {
   // 100% is 1, 44% is 0.44 — so only the doubled sign is probed there.)
   const asksPercent = a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '');
   if (v !== 0) {
-    const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`] : [`${fmt(v * 100)} percent %`];
+    const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`, `${fmt(v * 100)} percents`] : [`${fmt(v * 100)} percent %`];
     for (const input of spellings) out.push({ input, why: 'a hundred times the key, with the word percent' });
   }
   if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
@@ -155,6 +155,8 @@ function setProbes(a) {
   const has = x => vals.some(v => Math.abs(v - x) <= Math.max(tol, bandOf(v, a.tol)));
   const list = arr => arr.map(fmt).join(', ');
   if (vals.length > 1) out.push({ input: list(vals.slice(1)), why: 'a solution dropped' });
+  // The word "percent" is never a ÷100 inside a list (#670 final review).
+  if (vals.some(v => Math.abs(v) > 1)) out.push({ input: vals.map(v => `${fmt(v * 100)} percent`).join(', '), why: 'every element a hundred times, with the word percent' });
   const extra = Math.max(...vals) + 1;
   out.push({ input: list([...vals, extra]), why: 'an extra solution' });
   for (let i = 0; i < vals.length; i++) {
@@ -173,6 +175,7 @@ function pointProbes(a) {
   if (a.x !== 0) out.push({ input: pt(-a.x, a.y), why: 'x negated' });
   if (a.y !== 0) out.push({ input: pt(a.x, -a.y), why: 'y negated' });
   out.push({ input: pt(a.x + 1, a.y), why: 'x shifted' }, { input: pt(a.x, a.y + 1), why: 'y shifted' });
+  if (Math.abs(a.x) > 1 || Math.abs(a.y) > 1) out.push({ input: `(${fmt(a.x * 100)} percent, ${fmt(a.y * 100)} percent)`, why: 'both coordinates a hundred times, with the word percent' });
   return out;
 }
 
@@ -456,7 +459,22 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
       if (unknown) expect(`label: "${unknown} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${unknown} = ${fmt(q.answer.value)}`).correct);
     }
   }
-  for (const input of ['65%.', '{65%}']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  for (const input of ['65%.', '{65%}', '{65 percent}', '(65 percent)']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  expect('percent: "6500 percents" is not 65 %', !verdict(own, '6500 percents').correct);
+  // A letter inside an expression or a ratio is not GIVEN (#670 final review): the
+  // asked c in "3x + 4y + c = 0 … find c", B in "∠A : ∠B = 7 : 5 … find ∠B".
+  const lineC = { answerType: 'numeric', prompt: 'The line $3x + 4y + c = 0$ is at a distance $2$ from the origin. Find the smaller of the two possible values of $c$.', answer: { value: -10 } };
+  expect('label: "c = -10" answers for the c in the line\'s equation', verdict(lineC, 'c = -10').correct);
+  const ratioB = { answerType: 'numeric', prompt: 'In triangle ABC, $\\angle A : \\angle B = 7 : 5$ and $\\angle C = 60^\\circ$. Find $\\angle B$.', answer: { value: 50 } };
+  expect('label: "B = 50" answers for the B in a ratio', verdict(ratioB, 'B = 50').correct);
+  for (const [id, d] of [['c11-line-distance-reasoning', 3], ['c7-angle-sum-reasoning', 3]]) {
+    if (!GENERATORS[id]) continue;
+    for (let i = 1; i <= 40; i++) {
+      const q = generateQuestion(id, d, i * 7919);
+      const L = (q.prompt.match(/values? of \$([a-z])\$/) || q.prompt.match(/Find \$(?:\\angle\s*)?([A-Za-z])\$/) || [])[1];
+      if (L) expect(`label: "${L} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${L} = ${fmt(q.answer.value)}`).correct);
+    }
+  }
   const bold = { answerType: 'numeric', prompt: 'Find the **median** of the data.', answer: { value: 6 } };
   expect('label: bold markup does not hide the asked noun: "median = 6" accepted', verdict(bold, 'median = 6').correct);
   expect('label: "Answer = 6" accepted', verdict(bold, 'Answer = 6').correct);

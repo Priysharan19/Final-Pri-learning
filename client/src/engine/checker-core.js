@@ -189,7 +189,9 @@ const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s
 // Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
 const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
 const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
-const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|taken|obtained|formed|made|attained|reached)$/;
+const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|after|before|taken|obtained|formed|made|attained|reached|enclosed|bounded|the|a|an|it|its)$/;
+// Words a student puts before a label that are not part of it: "Hence area = 72", "The area is 72".
+const LABEL_LEAD = /^(?:(?:hence|so|thus|therefore|the|a|an|total|required|final)\s+)+/i;
 const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
 /** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
 function quantityKey(text) {
@@ -231,7 +233,7 @@ function askedFor(question) {
   for (const m of tail.matchAll(ASK_NOUN)) {
     const words = [], lead = [];
     for (const word of m[1].toLowerCase().split(/\s+/)) {
-      if (PHRASE_ENDS.test(word)) break;
+      if (words.length && PHRASE_ENDS.test(word)) break;
       if (!words.length && NOT_A_NAME.has(word)) {
         // "the total cost": "total" on its own names the asked total too.
         if (QUANTITY_MODIFIERS.has(word)) { nouns.push(word); lead.push(word); }
@@ -269,9 +271,19 @@ export function readAnswerLabel(question, raw) {
     // Only a letter standing alone and set equal to a plain number is given
     // ("a = 7,", "when x = 3"); "3x = -18" or "4^x = 281" is the equation to
     // solve, and on a "Solve …" question the letter is the unknown.
-    const promptText = String(question?.prompt ?? '').replace(/\$/g, ' ');
-    const given = !/\bsolve\b/i.test(promptText)
-      && new RegExp(`(^|[\\s,(;:])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?=[\\s,.;:)]|$)`).test(promptText);
+    // A letter inside an expression is not given either: "3x + 4y + c = 0 …
+    // find c" or "∠A : ∠B = 7 : 5" (a ratio), nor one the asking sentence names.
+    const prompt = String(question?.prompt ?? '');
+    const promptText = prompt.replace(/\$/g, ' ');
+    const named = new RegExp(`\\$\\s*(?:\\\\angle\\s*)?${label}\\s*\\$`).test(askingSentences(prompt));
+    let given = false;
+    for (const g of promptText.matchAll(new RegExp(`(^|[\\s,(;])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?!\\s*:)(?=[\\s,.;)]|$)`, 'g'))) {
+      const before = promptText.slice(0, g.index + g[1].length).replace(/\s+$/, '');
+      if (/[+\-*/^=<>:·×÷\d)]$/.test(before) || /\\[A-Za-z]+$/.test(before)) continue;
+      given = true;
+      break;
+    }
+    given = given && !/\bsolve\b/i.test(promptText) && !named;
     if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
     // A one-letter label is read off as it always was — unless the question
     // asks, and only asks, for a plainly different quantity on that letter: a
@@ -288,11 +300,14 @@ export function readAnswerLabel(question, raw) {
     }
     return { input: raw };
   }
-  // "Area of PQR = 72": the label's own head phrase, up to "of", names the quantity.
+  // "Area of PQR = 72": the label's own head phrase, up to "of", names the
+  // quantity; "Hence area", "The area", "Total area" are the area too.
+  const bare = label.replace(LABEL_LEAD, '').trim() || label;
   const headWords = [];
-  for (const w of label.split(/\s+/)) { if (PHRASE_ENDS.test(w.toLowerCase())) break; headWords.push(w); }
+  for (const w of bare.split(/\s+/)) { if (headWords.length && PHRASE_ENDS.test(w.toLowerCase())) break; headWords.push(w); }
   const head = quantityKey(headWords.join(' '));
-  if (math.includes(key) || nouns.includes(key) || (head && head !== key && nouns.includes(head))) return { input: m[2], asked };
+  const bareKey = quantityKey(bare);
+  if ([key, bareKey, head].some(k => k && (math.includes(k) || nouns.includes(k)))) return { input: m[2], asked };
   return { input: raw, asked };
 }
 
@@ -586,7 +601,7 @@ function checkAnswerWithinBudget(question, rawInput) {
           // Every "percent"/"per cent" is a sign wherever it stands, so the word
           // cannot slip a ÷100 past this guard ("6500 percent cm"); a sentence's
           // full stop and one outer pair of brackets or braces are not part of it.
-          let pct = rawInput.trim().replace(/\s*\bper\s?cent\b/gi, '%').replace(/[％٪]/g, '%')
+          let pct = rawInput.trim().replace(/\s*\bper\s?cents?\b/gi, '%').replace(/[％٪]/g, '%')
             .replace(/(?<!\.)\.\s*$/, '').trim();
           const signs = (pct.match(/%/g) || []).length;
           if (signs) {
