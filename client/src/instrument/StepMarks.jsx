@@ -31,7 +31,13 @@ export function MarkStamp({ kind }) {
 
 // Ceremonies striking marks now; the date window waits only while one is.
 let running = 0;
-const PER = 860;   // one row slot; write.css spells it out in its tokens
+// One row's slot comes from write.css's own tokens (row + gap + stamp + rest),
+// read once per ceremony, so the CSS and this timer cannot drift apart.
+const slot = el => {
+  const cs = getComputedStyle(el);
+  const ms = ['--c-d-row', '--wc-d-gap', '--wc-d-stamp', '--wc-d-rest'].reduce((t, k) => t + (parseFloat(cs.getPropertyValue(k)) || 0), 0);
+  return ms || 860;
+};
 
 /**
  * The Check ceremony over the InkAnswer root. Each visible [data-wc-row] gets
@@ -46,6 +52,7 @@ export function useCheckCeremony(stageRef, key) {
     const root = stageRef.current?.parentElement;
     if (!ON || !root || !key) return undefined;
     // Visible rows only: the chips on a tablet, the reading list on a phone.
+    const PER = slot(root);
     const rows = [...root.querySelectorAll('[data-wc-row]')].filter(r => r.querySelector('.wc-plane')?.getClientRects().length);
     rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
     root.style.setProperty('--wc-u', `${rows.length * PER}ms`);
@@ -56,7 +63,7 @@ export function useCheckCeremony(stageRef, key) {
     // Only a ceremony that ran to its end lets the score into the window.
     const end = () => { if (on) { stop(); window.dispatchEvent(new Event('pri:check-marked')); } };
     const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const t = setTimeout(end, still ? 0 : rows.length * PER + 320);
+    const t = setTimeout(end, still ? 0 : rows.length * PER + (parseFloat(getComputedStyle(root).getPropertyValue('--wc-d-under')) || 320));
     return () => { clearTimeout(t); stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);

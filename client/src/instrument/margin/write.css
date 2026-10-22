@@ -2,11 +2,11 @@
    Instrument build only (loaded by StepMarks.jsx; `write` is in the flag-off
    skip list). Every mark drawn here is the deterministic engine's verdict.
    Timings are tokens: margin.css's --c-d-row / --c-d-set / --c-ease-*, plus
-   C's stamp, flip and underline values below. A row's slot (--wc-d) is set by
-   useCheckCeremony: row + gap + stamp + rest = 260 + 40 + 340 + 220 = 860ms. */
+   C's stamp, flip and underline values below. useCheckCeremony reads
+   row + gap + stamp + rest from these tokens for each row's slot (--wc-d). */
 html.ui-instrument {
   --wc-col: 200px;
-  --wc-d-gap: 40ms; --wc-d-stamp: 340ms; --wc-d-rise: 600ms; --wc-d-under: 320ms;
+  --wc-d-gap: 40ms; --wc-d-stamp: 340ms; --wc-d-rest: 220ms; --wc-d-rise: 600ms; --wc-d-under: 320ms;
   --wc-d-flip: 170ms; --wc-d-flip-wait: 110ms;
   --wc-ease-stamp: cubic-bezier(.7, 0, .9, .6); --wc-ease-settle: cubic-bezier(.2, 0, .2, 1); --wc-ease-flip: cubic-bezier(0, 0, .3, 1);
 }
