@@ -682,7 +682,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
                   {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark. */}
-                  {INSTRUMENT_PLOT && !stale && engineMark(lineVerdicts[li]) && <span className="wc-list-stamp"><MarkStamp kind={engineMark(lineVerdicts[li])} /></span>}
+                  {INSTRUMENT_PLOT && !stale && <MarkStamp kind={engineMark(lineVerdicts[li])} />}
                   <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}

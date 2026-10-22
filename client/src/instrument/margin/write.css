@@ -1,39 +1,28 @@
 /* Pri Luxury · Write & Check (C "Examiner's Chronograph", depth from A).
    Instrument build only (loaded by StepMarks.jsx; `write` is in the flag-off
    skip list). Every mark drawn here is the deterministic engine's verdict.
-   Curves and durations are C's (motion.js): row reveal 260ms, emboss stamp
-   340ms with a 420ms press ring, calendar flip 170ms; the plane rise is A's. */
-.in-read[data-wc-row] { gap: 10px; padding-right: 6px; perspective: 1400px; }
-.in-read[data-wc-row] .in-read-m { font-family: var(--c-text); color: var(--c-ink); }
-html.ui-instrument .ink-verdict-layer .ink-verdict { display: none; }
-.wc-plane { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; transform: translateZ(36px); }
-.wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
+   C's curves and durations (motion.js): row reveal 260ms, emboss stamp 340ms
+   with a 420ms press ring, calendar flip 170ms; A's 36px plane rise. */
+[data-wc-row] .in-read-m { font-family: var(--c-text); }
+.ink-verdict-layer .ink-verdict, .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
+.wc-plane { position: relative; display: grid; transform: translateZ(36px); }
+.wc-stamp { filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
 .wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
-html.ui-instrument .ink-underline[data-wc-first-error] { border-bottom: 1.5px solid var(--c-copper); transform-origin: 0 50%; }
-
-.wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row 260ms cubic-bezier(.2,.8,.2,1) var(--wc-d) both; }
-.wc-go [data-wc-row] .wc-stamp { animation: wc-stamp 340ms cubic-bezier(.7,0,.9,.6) calc(var(--wc-d) + 300ms) both; }
-.wc-go [data-wc-row] .wc-ring { animation: wc-ring 420ms cubic-bezier(.3,0,.2,1) calc(var(--wc-d) + 300ms); }
-.wc-go [data-wc-row] .wc-plane { animation: wc-rise 600ms cubic-bezier(.2,.8,.2,1) calc(var(--wc-d) + 490ms) both; }
-.wc-go .ink-underline[data-wc-first-error] { animation: wc-under 320ms cubic-bezier(.2,.8,.2,1) var(--wc-u) both; }
+[data-wc-first-error] { border-bottom-color: var(--c-copper) !important; transform-origin: 0; }
+.wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row .26s cubic-bezier(.2,.8,.2,1) var(--wc-d) both; }
+.wc-go [data-wc-row] .wc-stamp { animation: wc-stamp .34s cubic-bezier(.7,0,.9,.6) calc(var(--wc-d) + .3s) both; }
+.wc-go [data-wc-row] .wc-ring { animation: wc-ring .42s cubic-bezier(.3,0,.2,1) calc(var(--wc-d) + .3s); }
+.wc-go [data-wc-row] .wc-plane { animation: wc-rise .6s cubic-bezier(.2,.8,.2,1) calc(var(--wc-d) + .49s) both; }
+.wc-go [data-wc-first-error] { animation: wc-under .32s cubic-bezier(.2,.8,.2,1) var(--wc-u) both; }
 @keyframes wc-row { from { opacity: 0; transform: translateY(6px); } }
-@keyframes wc-stamp { 0% { opacity: 0; transform: scale(1.7); } 55% { opacity: 1; transform: scale(.9); animation-timing-function: cubic-bezier(.2,0,.2,1); } }
+@keyframes wc-stamp { 0% { opacity: 0; transform: scale(1.7); } 55% { transform: scale(.9); animation-timing-function: cubic-bezier(.2,0,.2,1); } }
 @keyframes wc-ring { 0% { transform: scale(1.9); } 60% { opacity: .55; transform: scale(1.05); } }
 @keyframes wc-rise { from { transform: none; } }
 @keyframes wc-under { from { transform: scaleX(0); } }
-
-.wc-datewin {
-  display: inline-flex; justify-content: center; min-width: 52px; padding: 4px 8px; perspective: 200px; overflow: hidden;
-  background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: 2px; box-shadow: var(--c-deboss);
-  font: 400 14px/1 var(--c-text); font-variant-numeric: tabular-nums lining-nums; color: var(--c-ink);
-}
+.wc-datewin { display: inline-block; min-width: 52px; padding: 4px 8px; text-align: center; perspective: 200px; background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: 2px; box-shadow: var(--c-deboss); font: 400 14px/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); }
+.wc-datewin span { display: inline-block; animation: wc-flip .17s cubic-bezier(0,0,.3,1) .11s both; }
 .wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
-.wc-datewin:not([data-date-window="pending"]) span { animation: wc-flip 170ms cubic-bezier(0,0,.3,1) 110ms both; }
 @keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
-
-.wc-list-stamp { display: none; }
-@media (max-width: 560px) {
-  html.ui-instrument .ink-line-verdict:has(.wc-list-stamp) > svg { display: none; }
-  html.ui-instrument .wc-list-stamp { display: inline-flex; perspective: 1400px; }
-}
+/* Phone: the chips are hidden, so the reading list is the margin. */
+@media (min-width: 561px) { .ink-line-verdict .wc-plane { display: none; } .ink-line-verdict:has(.wc-plane) > svg:first-child { display: inline; } }
 @media (prefers-reduced-motion: reduce) { .wc-go *, .wc-datewin span { animation: none !important; } }
