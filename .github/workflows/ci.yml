@@ -416,7 +416,7 @@ jobs:
           # #292: the gate through the whole ceremony on the production /v1 chain
           # (its Postgres run is in the platform-postgres job).
           node server/test/guardian-consent-coverage-check.mjs 2>&1 | tee guardian-coverage.log
-          grep -Fq 'GUARDIAN CONSENT COVERAGE — PASS — 31/31 checks' guardian-coverage.log
+          grep -Fq 'GUARDIAN CONSENT COVERAGE — PASS — 38/38 checks' guardian-coverage.log
           node server/test/guardian-notice-version-check.mjs
           node client/test/task03-guardian-notice-check.mjs
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
@@ -882,7 +882,7 @@ jobs:
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
-          grep -Eq 'E2E SUITE.*45/45.*3 flows' browser.log
+          grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
           # Account first (issue #477): a child signs up on the one card and a
           # parent approves on their own page; the gate journey in both engines.
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log

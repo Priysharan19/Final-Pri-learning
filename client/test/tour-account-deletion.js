@@ -325,10 +325,14 @@ export const flows = [
         await confirm.waitFor({ timeout: 10000 });
         await check('the first press only asks, naming this device too',
           await confirm.getByText('including this one', { exact: false }).isVisible() && liveSessions() === 2 && !seen.includes('POST /v1/account/logout-all'));
+        const focused = () => page.evaluate(() => document.activeElement?.getAttribute('data-testid') || document.activeElement?.tagName || null);
+        await check('opening the confirmation moves focus to Cancel, the safe default', await focused() === 'cloud-sign-out-everywhere-cancel', `focus on ${await focused()}`);
         await shot('confirm');
-        await page.getByTestId('cloud-sign-out-everywhere-cancel').click();
+        await page.keyboard.press('Enter');
+        await confirm.waitFor({ state: 'detached', timeout: 10000 });
         await check('cancel ends nothing: both sessions still work and the shell is still open',
           await confirm.count() === 0 && liveSessions() === 2 && await phoneMe() === 200 && await page.locator('.shell').count() === 1);
+        await check('and focus returns to the button that opened it', await focused() === 'cloud-sign-out-everywhere', `focus on ${await focused()}`);
 
         await page.getByTestId('cloud-sign-out-everywhere').click();
         await page.getByTestId('cloud-sign-out-everywhere-yes').click();

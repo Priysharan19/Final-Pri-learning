@@ -408,6 +408,15 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // per-device route above revokes one; password change and reset revoke all
   // but are not something a student whose iPad was lost should have to invent.
   router.post('/logout-all', requireSession(db), rateLimit(db, 'logout-all', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    // The session cookie is device-wide and can change hands between the panel
+    // being drawn and the click (another local profile or tab signs in). The
+    // client names the account it means; a session for any other account is
+    // refused before anything is revoked, as DELETE /v1/account does (#521).
+    // The id never selects what is revoked — only the session does.
+    const named = req.body?.accountId;
+    if (named != null && String(named) !== String(req.platformSession.account_id)) {
+      return res.status(409).json({ error: { code: 'ACCOUNT_MISMATCH', message: 'The signed-in account is not the one this profile is linked to. Nothing was signed out.' } });
+    }
     const info = await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL',
       [Date.now(), req.platformSession.account_id]);
     clearSessionCookies(res);

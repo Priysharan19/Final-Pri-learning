@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { deleteCloudAccount, disconnectCloudAccount, signOutCloudAccountEverywhere } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
-import { cloudErrorCopy, cloudErrorText } from '../platform/cloudErrorCopy.js';
+import { cloudErrorCopy, cloudErrorText, signOutEverywhereFailureKey } from '../platform/cloudErrorCopy.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 
 function when(value, t) {
@@ -22,6 +22,19 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [busy, setBusy] = useState('');
   // "Sign out everywhere" asks once more before it ends every session.
   const [confirmEverywhere, setConfirmEverywhere] = useState(false);
+  // Focus follows the confirmation: onto its safe default (Cancel) when it
+  // opens, and back to the button that opened it when it closes.
+  const everywhereTrigger = useRef(null);
+  const everywhereCancel = useRef(null);
+  const everywhereReturn = useRef(false);
+  useEffect(() => {
+    if (confirmEverywhere) everywhereCancel.current?.focus();
+    else if (everywhereReturn.current) { everywhereReturn.current = false; everywhereTrigger.current?.focus(); }
+  }, [confirmEverywhere]);
+  function closeEverywhere() {
+    everywhereReturn.current = true;
+    setConfirmEverywhere(false);
+  }
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   // The export asks for fresh proof of the credential (401 REAUTH_REQUIRED
@@ -215,8 +228,8 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setMessage(tLater('cloudSecurity.signedOutEverywhere'));
       await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
     } catch (err) {
-      setConfirmEverywhere(false);
-      setError(cloudErrorText(err, tLater, tLater('cloudSecurity.signOutEverywhereFailed')));
+      closeEverywhere();
+      setError(tLater(signOutEverywhereFailureKey(err)));
     } finally { setBusy(''); }
   }
 
@@ -472,7 +485,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
         </div>
         <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
           {!confirmEverywhere
-            ? <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere" onClick={() => { setConfirmEverywhere(true); setMessage(''); setError(''); }} disabled={!!busy}>
+            ? <button ref={everywhereTrigger} className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere" onClick={() => { setConfirmEverywhere(true); setMessage(''); setError(''); }} disabled={!!busy}>
               {t('cloudSecurity.signOutEverywhere')}
             </button>
             : <div role="group" aria-labelledby="cloud-sign-out-everywhere-ask" data-testid="cloud-sign-out-everywhere-confirm">
@@ -481,7 +494,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
                 <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-sign-out-everywhere-yes" onClick={signOutEverywhere} disabled={!!busy}>
                   {busy === 'logout-all' ? t('cloudSecurity.signingOutEverywhere') : t('cloudSecurity.signOutEverywhereYes')}
                 </button>
-                <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere-cancel" onClick={() => setConfirmEverywhere(false)} disabled={!!busy}>
+                <button ref={everywhereCancel} className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere-cancel" onClick={closeEverywhere} disabled={!!busy}>
                   {t('common.cancel')}
                 </button>
               </div>
