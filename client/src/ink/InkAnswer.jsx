@@ -353,7 +353,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // the note goes and "Read my answer" is there to be pressed.
   useEffect(() => {
     const clearIf = kinds => setStatus(prev => (prev?.kind === 'waiting' && kinds.includes(prev.block?.kind) ? null : prev));
-    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'not-allowed']));
+    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'mfa', 'not-allowed']));
     const onOnline = () => { setOnline(true); clearIf(['offline']); };
     const onOffline = () => setOnline(false);
     if (typeof window !== 'undefined') {
@@ -373,7 +373,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
-    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
+    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'mfa', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
   }, [user]);
 
   // Submit found the server no longer holds this page's read (readExpired is

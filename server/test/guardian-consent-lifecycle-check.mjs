@@ -125,7 +125,7 @@ try {
   assert.equal((await request(origin, '/protected', { jar: first.jar })).status, 403, 'pending child sync must fail closed');
   const preConfirmWithdraw = await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: firstBearer } });
   assert.deepEqual(preConfirmWithdraw.data, { ok: true, withdrawn: true });
-  const confirmAfterWithdraw = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: firstBearer } });
+  const confirmAfterWithdraw = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: firstBearer, approve: true, noticeVersion: '2026-10-22' } });
   assert.equal(confirmAfterWithdraw.status, 200);
   assert.deepEqual(confirmAfterWithdraw.data, { ok: true, confirmed: false });
   assert.equal((await db.get('SELECT confirmed_at,withdrawn_at FROM guardian_consents WHERE account_id=?', [first.accountId])).confirmed_at, null);
@@ -134,7 +134,7 @@ try {
   // confirm -> withdraw ends withdrawn, and repeated withdrawal is idempotent.
   const second = await registerChild(origin, 'guardian-two@example.test', 'guardian2@example.test');
   const secondBearer = await guardianBearer(db, second.accountId);
-  const confirmed = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: secondBearer } });
+  const confirmed = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: secondBearer, approve: true, noticeVersion: '2026-10-22' } });
   assert.deepEqual(confirmed.data, { ok: true, confirmed: true });
   assert.equal((await request(origin, '/protected', { jar: second.jar })).status, 200, 'confirmed child sync should pass');
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: secondBearer } })).data,
@@ -149,7 +149,7 @@ try {
   const thirdBearer = await guardianBearer(db, third.accountId);
   await db.run(`UPDATE account_tokens SET created_at=?, expires_at=?, consumed_at=?
     WHERE account_id=? AND purpose='guardian-consent'`, [Date.now() - 2 * 60 * 60 * 1000, Date.now() - 60 * 60 * 1000, Date.now() - 90 * 60 * 1000, third.accountId]);
-  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: thirdBearer } })).status, 400,
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: thirdBearer, approve: true, noticeVersion: '2026-10-22' } })).status, 400,
     'expired/consumed guardian bearer must never elevate permission');
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: thirdBearer } })).data,
     { ok: true, withdrawn: true }, 'expired/consumed bearer may still reduce permission');
@@ -172,7 +172,7 @@ try {
   // long after the confirmation link has been purged — then exactly once.
   const fifth = await registerChild(origin, 'guardian-five@example.test', 'guardian5@example.test');
   const fifthConfirm = await guardianBearer(db, fifth.accountId);
-  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm } })).data.confirmed, true);
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed, true);
   const fifthWithdraw = await guardianBearer(db, fifth.accountId, 'guardian-withdraw');
   assert.notEqual(fifthWithdraw, fifthConfirm, 'the withdrawal credential is a separate bearer');
   const sixHoursOn = Date.now() + 6 * 60 * 60 * 1000 + 60_000;
@@ -180,14 +180,14 @@ try {
   assert.ok(swept.tokens >= 1, 'housekeeping purges the spent confirmation token');
   assert.equal(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-consent'", [fifth.accountId]), undefined, 'the confirmation token is gone');
   assert.ok(await db.get("SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-withdraw' AND consumed_at IS NULL", [fifth.accountId]), 'the withdrawal credential survives');
-  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm } })).status, 400, 'the confirmation link still dies after its hour');
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthConfirm, approve: true, noticeVersion: '2026-10-22' } })).status, 400, 'the confirmation link still dies after its hour');
   assert.equal((await request(origin, '/protected', { jar: fifth.jar })).status, 200, 'consent stands meanwhile');
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fifthWithdraw } })).data,
     { ok: true, withdrawn: true }, 'the kept link withdraws after housekeeping has run');
   assert.equal((await request(origin, '/protected', { jar: fifth.jar })).data.error.code, 'GUARDIAN_CONSENT_WITHDRAWN');
   assert.equal((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fifthWithdraw } })).status, 400,
     'the credential is revoked by the withdrawal it performed');
-  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthWithdraw } })).status, 400,
+  assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: fifthWithdraw, approve: true, noticeVersion: '2026-10-22' } })).status, 400,
     'and could never confirm');
 
   // Account deletion must revoke the guardian bearer by FK cascade.
