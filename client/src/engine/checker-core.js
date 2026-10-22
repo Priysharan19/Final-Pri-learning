@@ -184,7 +184,11 @@ function namedPrecisionBand(question) {
 // that names a different quantity built on that letter — "b = 5" when the
 // question asks for b² — is a different claim, refused with a reason.
 const ASK_MATH = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/gi;
-const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+(?:the\s+)?(?:(?:least|greatest|smallest|largest|minimum|maximum|possible|exact|total|required)\s+)*([a-z]{3,})\b/gi;
+const ASK_VERB = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\b/gi;
+const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+((?:[a-z]+\s+){0,4}[a-z]+)/gi;
+// Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
+const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
+const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per)$/;
 const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
 /** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
 function quantityKey(text) {
@@ -203,8 +207,27 @@ function quantityKey(text) {
 /** What the question asks for: written quantities and asked-for nouns. */
 function askedFor(question) {
   const prompt = String(question?.prompt ?? '');
-  const math = [...prompt.matchAll(ASK_MATH)].map(m => quantityKey(m[1])).filter(k => k && !/[=<>]/.test(k));
-  const nouns = [...prompt.matchAll(ASK_NOUN)].map(m => m[1].toLowerCase());
+  // Only the last ask counts: in "Find the area …, and hence find the height"
+  // the answer is the height, so "area = 8" names the wrong thing.
+  const verbs = [...prompt.matchAll(ASK_VERB)];
+  const from = verbs.length ? verbs[verbs.length - 1].index : 0;
+  const tail = prompt.slice(from);
+  const math = [...tail.matchAll(ASK_MATH)].map(m => quantityKey(m[1])).filter(k => k && !/[=<>]/.test(k));
+  // The asked noun phrase, without its leading article and modifiers: "the
+  // least possible mean deviation about the mean" asks for "mean deviation".
+  // A label must be the whole phrase or a trailing part of it ("deviation",
+  // "interest rate", "rate") — never a leading word, which names something
+  // else: "mean" is not the mean deviation, "cube" is not the cube root.
+  const nouns = [];
+  for (const m of tail.matchAll(ASK_NOUN)) {
+    const words = [];
+    for (const word of m[1].toLowerCase().split(/\s+/)) {
+      if (PHRASE_ENDS.test(word)) break;
+      if (!words.length && NOT_A_NAME.has(word)) continue;
+      words.push(word);
+    }
+    for (let i = 0; i < words.length; i++) if (!NOT_A_NAME.has(words[i])) nouns.push(words.slice(i).join(''));
+  }
   return { math, nouns };
 }
 const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;
@@ -246,7 +269,16 @@ function percentAnswerWanted(question, ans) {
   if (ans && typeof ans.percent === 'boolean') return ans.percent;
   // A "%" beside the answer box asks for a percentage whatever the prompt says.
   if (/%/.test(String(question?.answerSuffix ?? ''))) return true;
-  return ASKS_PERCENT.test(String(question?.prompt ?? ''));
+  // The word counts only where the question asks for its answer: "a test that
+  // is 95 percent accurate … find the probability" asks for a probability.
+  const asking = askingSentences(String(question?.prompt ?? ''));
+  return ASKS_PERCENT.test(asking) || /\bas\s+an?\s+\\?%/i.test(asking);
+}
+/** The sentences of a prompt that ask for the answer (the last one when none says so). */
+function askingSentences(prompt) {
+  const sentences = prompt.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const asking = sentences.filter(x => /\?\s*$/.test(x) || /\b(?:find|what|express|calculate|give|how|state|determine|work out|evaluate|compute|write)\b/i.test(x));
+  return (asking.length ? asking : sentences.slice(-1)).join(' ');
 }
 
 // One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
@@ -518,6 +550,31 @@ function checkAnswerWithinBudget(question, rawInput) {
         const labelled = readAnswerLabel(question, rawInput);
         if (labelled.refuse) return { correct: false, feedback: labelled.refuse };
         rawInput = labelled.input;
+        // A percentage is written once, at the end: "65%", "65 percent", "(65%)".
+        // Any other % — "(6500%)" read as 65, "6500%%", "6500% + 0" — is a
+        // percentage sign used as arithmetic, never the answer's unit (P0).
+        if (typeof rawInput === 'string') {
+          let pct = rawInput.trim().replace(/\s*\bper\s?cent\b\.?$/i, '%').replace(/[％٪]/g, '%');
+          const signs = (pct.match(/%/g) || []).length;
+          if (signs) {
+            const outer = pct.match(/^\((.*)\)$/s);
+            if (outer && !/[()]/.test(outer[1])) pct = outer[1].trim();
+            if (signs !== 1 || !/%\s*$/.test(pct)) {
+              return { correct: false, feedback: 'Write a percentage once, at the end — like 65%.' };
+            }
+            if (percentAnswerWanted(question, ans)) {
+              // The sign is the answer's unit: what stands before it is the
+              // percentage, evaluated whole — "20/3%" is 20/3 per cent.
+              rawInput = pct.replace(/\s*%\s*$/, '');
+            } else if (!(Math.abs(Number(ans.value)) <= 1)) {
+              // A % beside an answer outside 0–1 (an area, a count, money) on a
+              // question that does not ask for a percentage is a wrong unit.
+              return { correct: false, feedback: 'This question does not ask for a percentage.' };
+            } else {
+              rawInput = pct;               // 44% is 0.44 on a probability question
+            }
+          }
+        }
         // A unit the student wrote that contradicts the question's unit is a
         // wrong answer, never stripped and ignored: 12 cm is not 12 m.
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
@@ -539,14 +596,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         const { meta } = parsed;
         let value = parsed.value;
         if (angleUnit && angleRead && angleRead !== angleUnit) value = convertAngle(value, angleRead, angleUnit);
-        // On a question that asks for a percentage, a "%" the student typed is
-        // the answer's unit, not a division by 100: "65%" is 65 per cent and is
-        // read as 65; "6500%" is 6500 per cent and is NOT 65. Reading the sign as
-        // ÷100 first marked "6500%" right for 65 and "2500%" right for a 25%
-        // profit. Without the sign the number is already in per cent, so a bare
-        // 0.65 is 0.65%, never 65%.
-        const percentUnit = meta.isPercent && percentAnswerWanted(question, ans);
-        if (percentUnit) value *= 100;
+        // (A % on a question that asks for a percentage was removed above as the
+        // answer's unit, so "6500%" is 6500 there, never 65; a bare 0.65 is 0.65%.)
         // "975 paise" on a question priced in rupees is ₹9.75: the word names a
         // hundredth of the rupee, so the value is divided. On a question that
         // asks in paise the word is the question's own unit and nothing moves.

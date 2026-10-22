@@ -132,7 +132,9 @@ function numericProbes(q, a) {
   // On a percentage question a typed % is the answer's unit: 100 times the key
   // with the sign is 100 times too big, never the key read as ÷100.
   if ((a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) {
-    out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' });
+    out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' },
+      { input: `(${fmt(v * 100)}%)`, why: 'a hundred times the percentage, bracketed with the sign' }, { input: `${fmt(v * 100)}%%`, why: 'a hundred times the percentage, two signs' },
+      { input: `${fmt(v * 100)}% + 0`, why: 'a hundred times the percentage, the sign used as arithmetic' });
   }
   return out;
 }
@@ -402,6 +404,20 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const bySuffix = { answerType: 'numeric', prompt: 'Find the combined mean mark.', answerSuffix: '%', answer: { value: 66.3 } };
   expect('percent: a % beside the box asks for a percentage, so 66.3% is 66.3', verdict(bySuffix, '66.3%').correct);
   expect('percent: and 6630% is not', !verdict(bySuffix, '6630%').correct);
+  // The sign anywhere but once at the end is arithmetic, not the unit (#670 review).
+  for (const input of ['(6500%)', '6500%%', '6500% + 0', '6500%·1', 'percentage = (6500%)']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  expect('percent: "(65%)" is 65 %', verdict(own, '(65%)').correct);
+  const cv = { answerType: 'numeric', prompt: 'Find its coefficient of variation, as a percentage.', answerSuffix: '%', answer: { value: 20 / 3, simplestFraction: { n: 20, d: 3 }, requireFraction: false } };
+  for (const input of ['20/3%', '(20/3)%', '6 2/3%']) expect(`percent: "${input}" is 20/3 %`, verdict(cv, input).correct);
+  expect('percent: "2000/3%" is not 20/3 %', !verdict(cv, '2000/3%').correct);
+  const asSymbol = { answerType: 'numeric', prompt: 'Express 13/20 as a %.', answer: { value: 65 } };
+  expect('percent: "as a %" asks for a percentage: 65% accepted', verdict(asSymbol, '65%').correct);
+  expect('percent: and 6500% refused', !verdict(asSymbol, '6500%').correct);
+  const areaPct = { answerType: 'numeric', prompt: 'Find the area.', answer: { value: 72 } };
+  for (const input of ['7200%', '7200 percent']) expect(`percent: "${input}" is a wrong unit for an area of 72`, !verdict(areaPct, input).correct);
+  const accurate = { answerType: 'numeric', prompt: 'A test is 95 percent accurate. Find the probability that it gives a correct result twice.', answer: { value: 0.44 } };
+  expect('percent: a "percent" in the data does not make the question ask for one: 44% is 0.44', verdict(accurate, '44%').correct);
+  expect('percent: and 0.44% is not', !verdict(accurate, '0.44%').correct);
   const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
   expect('percent: on a question not asking for a percentage, 44% is still 0.44', verdict(prob, '44%').correct);
   // (f) A label is read off only when it names the asked quantity.
@@ -414,6 +430,16 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const area = { answerType: 'numeric', prompt: 'Find the area of triangle PQR.', answer: { value: 72 } };
   expect('label: "Area = 72" accepted', verdict(area, 'Area = 72').correct);
   expect('label: "Perimeter = 72" refused', !verdict(area, 'Perimeter = 72').correct);
+  // A noun label must be the whole asked phrase or its trailing part (#670 review).
+  const md = { answerType: 'numeric', prompt: 'Find the mean deviation about the mean of the data.', answer: { value: 2.4 } };
+  expect('label: "Mean = 2.4" is not the mean deviation', !verdict(md, 'Mean = 2.4').correct);
+  expect('label: "mean deviation = 2.4" accepted', verdict(md, 'mean deviation = 2.4').correct);
+  const root = { answerType: 'numeric', prompt: 'Find the cube root of 91125.', answer: { value: 45 } };
+  expect('label: "Cube = 45" is not the cube root', !verdict(root, 'Cube = 45').correct);
+  expect('label: "cube root = 45" accepted', verdict(root, 'cube root = 45').correct);
+  const hence = { answerType: 'numeric', prompt: 'Find the area of triangle ABC, and hence find the height from A.', answer: { value: 8 } };
+  expect('label: only the last ask counts: "area = 8" refused', !verdict(hence, 'area = 8').correct);
+  expect('label: "height = 8" accepted', verdict(hence, 'height = 8').correct);
   const sum = { answerType: 'numeric', prompt: 'Find $a + b$.', answer: { value: 7 } };
   expect('label: "a = 7" claims a = 7, refused for a + b', !verdict(sum, 'a = 7').correct);
   expect('label: "a + b = 7" accepted', verdict(sum, 'a + b = 7').correct);
