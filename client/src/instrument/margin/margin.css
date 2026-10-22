@@ -1,0 +1,208 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Pri Learning · the luxury layer of the instrument interface.
+   Direction: C "Examiner's Chronograph" (cotton paper, engraved hairlines,
+   giant serif maths, chronograph precision) with depth and light borrowed
+   from A "Spatial" (one key light, rim highlights, planes on springs).
+   Reference: https://claude.ai/artifact/W2cFXctgCMAgLREJ7oaW2R (tabs C and A).
+
+   Rules: marks come only from the deterministic engine; a wrong answer is
+   never celebrated; marks differ by shape as well as colour; no gradients on
+   surfaces; glass only on the floating tab bar and Check dock, never behind
+   maths; reduced motion shows the complete final frame.
+
+   Loaded after instrument.css and scoped to html.ui-instrument, so it exists
+   only in a PRI_FEATURE_INSTRUMENT build. It remaps every --in-* token, so each
+   instrument screen takes the new material before its own pass lands.
+   Colours are OKLCH with an sRGB hex fallback (WebKit before 15.4).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Self-hosted subsets (fonts/README.md). Latin only: Devanagari falls through
+   to the system Hindi faces named in each stack. Four faces, not six: italics
+   are set in STIX Two italic (Instrument Serif's italic cut cost 15 kB) and
+   there is no STIX 600 (the date window is STIX 400 tabular), which keeps the
+   instrument build inside its install ceiling. Ask for neither. */
+@font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/iserif-400.woff2) format('woff2'); }
+@font-face { font-family: 'STIX Two Text'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/stix-400.woff2) format('woff2'); }
+@font-face { font-family: 'STIX Two Text'; font-style: italic; font-weight: 400; font-display: swap; src: url(./fonts/stix-400i.woff2) format('woff2'); }
+@font-face { font-family: 'Cormorant SC'; font-style: normal; font-weight: 600; font-display: swap; src: url(./fonts/cormorant-sc-600.woff2) format('woff2'); }
+
+/* ── Cotton paper (day) ──────────────────────────────────────────────────── */
+/* One departure from the reference: copper is #b0440e, not #b4470f, so the
+   examiner's copper text meets AA on the paper-2 wells (4.63:1, was 4.43). */
+html.ui-instrument {
+  --c-paper: #f5f1e8; --c-paper-2: #ede7da; --c-sheet: #fbf9f4;
+  --c-ink: #1a1916; --c-ink-2: #4f4a41; --c-ink-3: #6b6457;
+  --c-hair: #b9ae99; --c-hair-2: #d8cfbf;
+  --c-teal: #0b6e69; --c-teal-soft: rgba(11, 110, 105, 0.1);
+  --c-copper: #b0440e; --c-copper-soft: rgba(180, 71, 15, 0.09);
+  --c-dial: #f9f6ef; --c-dial-line: #2a2823;
+  --c-bezel: #e3ddd0; --c-bezel-2: #cfc7b7; --c-bezel-3: #c2b9a7;
+  --c-lume: #0b6e69;
+  --c-hand: #1d1c19; --c-hand-2: #4a463f;
+  --c-emboss-hi: rgba(255, 255, 255, 0.85); --c-emboss-lo: rgba(60, 45, 20, 0.22);
+  --c-pen: #1f2a44;
+  --c-on-teal: #fbf9f4;
+  /* A's light: specular colour, the two desk pools, glass edge. */
+  --c-spec: rgba(255, 255, 255, 0.95);
+  --c-pool-teal: rgba(11, 110, 105, 0.13); --c-pool-copper: rgba(180, 71, 15, 0.08);
+  --c-glass-edge: rgba(255, 255, 255, 0.9);
+  /* Engraved depth: one hairline width, one lift, one float. */
+  --c-line: 1px;
+  --c-lift: inset 0 1px 0 var(--c-emboss-hi), 0 0 0 var(--c-line) var(--c-hair-2), 0 1px 2px rgba(60, 45, 20, 0.06);
+  --c-float: 0 0 0 var(--c-line) var(--c-hair), 0 18px 40px -16px rgba(60, 45, 20, 0.28), 0 2px 6px rgba(60, 45, 20, 0.06);
+  --c-deboss: inset 0 1px 2px var(--c-emboss-lo), 0 1px 0 var(--c-emboss-hi);
+
+  /* Type: body and maths in STIX Two, display in Instrument Serif, labels in
+     Cormorant SC. Interface chrome keeps Instrument Sans (instrument.css). */
+  --c-serif: 'Instrument Serif', 'Tiro Devanagari Hindi', 'Kohinoor Devanagari', Georgia, serif;
+  --c-italic: 'STIX Two Text', 'Tiro Devanagari Hindi', Georgia, serif;
+  --c-text: 'STIX Two Text', 'Tiro Devanagari Hindi', 'Kohinoor Devanagari', Georgia, serif;
+  --c-sc: 'Cormorant SC', 'Kohinoor Devanagari', Georgia, serif;
+  --c-t-body: 400 16px/1.5 var(--c-text);
+  --c-t-label: 600 13px/1.2 var(--c-sc);
+  --c-t-tab: 600 14px/1.2 var(--c-sc);
+  --c-t-button: 600 15px/1 var(--c-sc);
+  --c-t-mast: 400 clamp(40px, 7vw, 84px)/0.95 var(--c-serif);
+  --c-t-eq: 400 clamp(40px, 7.4cqi, 82px)/1.02 var(--c-text);
+  --c-t-wq: 400 clamp(28px, 5cqi, 52px)/1.05 var(--c-text);
+  --c-t-big: 400 clamp(72px, 12cqi, 140px)/0.9 var(--c-serif);
+
+  /* Radii: engraved precision, 8px at most everywhere. The pill is a named
+     token for primary actions and chips only (margin-design-check enforces). */
+  --c-radius: 4px; --c-radius-lg: 6px; --radius-pill: 999px;
+
+  /* Easings and durations from the C reference (motion.js holds keyframes). */
+  --c-ease-sweep: cubic-bezier(0.45, 0, 0.2, 1);
+  --c-ease-row: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --c-ease-set: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --c-ease-engrave: cubic-bezier(0.6, 0, 0.2, 1);
+  --c-ease-press: cubic-bezier(0.3, 0, 0.2, 1);
+  --c-d-press: 120ms; --c-d-row: 260ms; --c-d-set: 420ms; --c-d-engrave: 800ms;
+
+  /* Every instrument token, remapped. The surface ladder keeps its order:
+     l1 is the lightest sheet, l2–l5 step darker for hover, pressed and wells. */
+  --in-void: var(--c-paper-2); --in-base: var(--c-paper); --in-l1: var(--c-sheet);
+  --in-l2: #f8f5ee; --in-l3: var(--c-paper-2); --in-l4: var(--c-bezel); --in-l5: var(--c-bezel-2);
+  --in-edge: var(--c-hair-2); --in-edge-2: var(--c-hair); --in-edge-3: var(--c-bezel-3);
+  --in-tx: var(--c-ink); --in-tx-2: var(--c-ink-2); --in-tx-3: var(--c-ink-3);
+  --in-action: var(--c-teal); --in-on-action: var(--c-on-teal); --in-signal: var(--c-teal);
+  --in-good: var(--c-teal); --in-slip: var(--c-copper); --in-bad: var(--c-copper); --in-ink: var(--c-pen);
+  --in-hi: var(--c-emboss-hi); --in-shadow: rgba(60, 45, 20, 0.2);
+  --accent-hover: #095c58; --accent-pressed: #074a47;
+  --accent-soft: var(--c-teal-soft); --accent-line: rgba(11, 110, 105, 0.35);
+  --control-border: #8a8170;
+  --page: var(--c-paper);
+  --shadow: var(--c-float); --shadow-sm: var(--c-lift);
+}
+@supports (color: oklch(0% 0 0)) {
+  html.ui-instrument {
+    --c-paper: oklch(95.9% 0.013 86.8); --c-paper-2: oklch(92.9% 0.019 86.1); --c-sheet: oklch(98.2% 0.007 88.6);
+    --c-ink: oklch(21.3% 0.006 91.6); --c-ink-2: oklch(41.1% 0.016 82.4); --c-ink-3: oklch(50.6% 0.022 83);
+    --c-teal: oklch(48.7% 0.082 189.2); --c-copper: oklch(52.7% 0.153 41.8); --c-pen: oklch(28.8% 0.05 265.9);
+  }
+}
+
+/* ── Midnight enamel (night) ─────────────────────────────────────────────── */
+html.ui-instrument[data-theme="dark"] {
+  --c-paper: #0a1115; --c-paper-2: #0f191e; --c-sheet: #0d171c;
+  --c-ink: #ece6d8; --c-ink-2: #b4ae9f; --c-ink-3: #9a9586;
+  --c-hair: #3d4c51; --c-hair-2: #1f2d33;
+  --c-teal: #63d2c4; --c-teal-soft: rgba(99, 210, 196, 0.1);
+  --c-copper: #ee9b63; --c-copper-soft: rgba(238, 155, 99, 0.1);
+  --c-dial: #0c1820; --c-dial-line: #cbc4b2;
+  --c-bezel: #1a252b; --c-bezel-2: #2a383e; --c-bezel-3: #34444a;
+  --c-lume: #7fe6d7;
+  --c-hand: #e9e2d0; --c-hand-2: #a59f8f;
+  --c-emboss-hi: rgba(255, 255, 255, 0.07); --c-emboss-lo: rgba(0, 0, 0, 0.6);
+  --c-pen: #e7e1d2;
+  --c-on-teal: #0a1115;
+  --c-spec: rgba(255, 255, 255, 0.55);
+  --c-pool-teal: rgba(71, 189, 179, 0.2); --c-pool-copper: rgba(240, 145, 92, 0.1);
+  --c-glass-edge: rgba(255, 255, 255, 0.16);
+  --c-lift: inset 0 1px 0 var(--c-emboss-hi), 0 0 0 var(--c-line) var(--c-hair-2);
+  --c-float: 0 0 0 var(--c-line) var(--c-hair), 0 22px 48px -14px rgba(0, 0, 0, 0.7);
+  --in-l2: #0f191e; --in-l3: var(--c-bezel); --in-l4: var(--c-bezel-2); --in-l5: var(--c-bezel-3);
+  --in-edge-3: #4a5a60;
+  --in-shadow: rgba(0, 0, 0, 0.6);
+  --accent-hover: #80ddd1; --accent-pressed: #4fb8ab;
+  --accent-line: rgba(99, 210, 196, 0.35);
+  --control-border: #6d7b80;
+}
+@supports (color: oklch(0% 0 0)) {
+  html.ui-instrument[data-theme="dark"] {
+    --c-paper: oklch(17.2% 0.014 233.6); --c-paper-2: oklch(20.6% 0.018 230.3); --c-sheet: oklch(19.7% 0.018 230.4);
+    --c-ink: oklch(92.6% 0.02 87.5); --c-ink-2: oklch(75.2% 0.022 88.8); --c-ink-3: oklch(67% 0.022 91.7);
+    --c-teal: oklch(79.5% 0.104 184.4); --c-copper: oklch(76.1% 0.123 53.8); --c-pen: oklch(91% 0.021 88.7);
+  }
+}
+
+/* ── Materials ───────────────────────────────────────────────────────────────
+   Opaque paper everywhere; depth is engraved (one hairline, one inset
+   highlight). No full-screen grain or blend layer: it would re-blend the
+   whole page on every ink frame. .c-glass is for the floating tab bar and
+   Check dock only: one 12px blur pass, opaque before color-mix() support and
+   under Reduce Transparency. */
+.ui-instrument .c-desk { background: var(--c-paper); }
+.ui-instrument .c-sheet { background: var(--c-sheet); box-shadow: var(--c-lift); border-radius: var(--c-radius-lg); }
+.ui-instrument .c-float { background: var(--c-sheet); box-shadow: var(--c-float); border-radius: var(--c-radius-lg); }
+.ui-instrument .c-well { background: var(--c-paper-2); box-shadow: var(--c-deboss); border-radius: var(--c-radius); }
+.ui-instrument .c-glass { background: var(--c-sheet); box-shadow: inset 0 0 0 var(--c-line) var(--c-glass-edge), var(--c-float); }
+@supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .ui-instrument .c-glass { background: color-mix(in srgb, var(--c-sheet) 74%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ui-instrument .c-glass { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); }
+}
+
+/* A's rim light: a 1px ring on raised objects (bezel, question card, score
+   window), lit from --lx/--ly (light.js). This is light on an edge, masked
+   to the ring, never a surface fill. */
+.ui-instrument .c-rim { position: relative; isolation: isolate; }
+.ui-instrument .c-rim::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: var(--c-line); pointer-events: none;
+  background: radial-gradient(70% 90% at var(--lx, 30%) var(--ly, -10%), var(--c-spec), transparent 60%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+@media (forced-colors: active) { .ui-instrument .c-rim::before { display: none; } }
+
+/* ── Type ────────────────────────────────────────────────────────────────── */
+html.ui-instrument body { font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; font-kerning: normal; }
+html.ui-instrument :focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
+.ui-instrument .c-label { font: var(--c-t-label); letter-spacing: 0.14em; color: var(--c-ink-2); }
+.ui-instrument .c-mast { font: var(--c-t-mast); letter-spacing: -0.01em; text-wrap: balance; color: var(--c-ink); }
+.ui-instrument .c-eq { font: var(--c-t-eq); letter-spacing: -0.015em; white-space: nowrap; }
+.ui-instrument .c-big { font: var(--c-t-big); font-variant-numeric: tabular-nums; }
+.ui-instrument .c-num { font-variant-numeric: tabular-nums lining-nums; }
+.ui-instrument :lang(hi) .c-label, .ui-instrument .c-label:lang(hi) { letter-spacing: 0; line-height: 1.35; }
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+.ui-instrument .c-btn {
+  min-height: 44px; padding: 0 20px; border-radius: var(--c-radius); border: var(--c-line) solid var(--c-hair);
+  background: var(--c-sheet); color: var(--c-ink); font: var(--c-t-button); letter-spacing: 0.12em; cursor: pointer;
+  transition: transform var(--c-d-press) var(--c-ease-press), background-color var(--c-d-press) var(--c-ease-press);
+}
+.ui-instrument .c-btn:hover { background: var(--in-l2); }
+.ui-instrument .c-btn:active { transform: scale(0.97); }
+.ui-instrument .c-btn:disabled { opacity: 0.55; cursor: default; transform: none; }
+.ui-instrument .c-btn-primary { border-radius: var(--radius-pill); background: var(--c-teal); border-color: var(--c-teal); color: var(--c-on-teal); }
+.ui-instrument .c-btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.ui-instrument .c-chip { border-radius: var(--radius-pill); min-height: 44px; padding: 0 14px; border: var(--c-line) solid var(--c-hair); background: var(--c-sheet); font: var(--c-t-label); letter-spacing: 0.12em; color: var(--c-ink-2); cursor: pointer; }
+.ui-instrument .c-chip[aria-pressed="true"] { background: var(--c-ink); border-color: var(--c-ink); color: var(--c-sheet); }
+
+/* Marks differ by shape as well as colour (MarkGlyph in MarginIcon.jsx). */
+.ui-instrument .c-mark-ok { color: var(--c-teal); }
+.ui-instrument .c-mark-x, .ui-instrument .c-mark-ecf { color: var(--c-copper); }
+
+/* The icon set: teal only on the live part, copper only on marking icons. */
+.ui-instrument .m-icon .acc { stroke: var(--c-teal); }
+.ui-instrument .m-icon .cop { stroke: var(--c-copper); }
+@media (forced-colors: active) { .ui-instrument .m-icon .acc, .ui-instrument .m-icon .cop { stroke: currentColor; } }
+
+/* ── Reduced motion: clamp what moves; never add a fade that wasn't there ── */
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument *, html.ui-instrument *::before, html.ui-instrument *::after {
+    animation-duration: 1ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important;
+    transition-duration: 1ms !important; transition-delay: 0ms !important;
+  }
+}
