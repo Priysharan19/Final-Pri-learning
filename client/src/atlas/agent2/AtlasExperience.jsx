@@ -23,6 +23,25 @@ function IconShape({ shape, x, y, active }) {
 }
 const fmt = value => Math.round(value * 100) / 100;
 const CURRICULUM_NOTE = 'Chapter names/IDs are read from Pri curriculum. The map is a selected demonstration window, not a statement of complete CBSE syllabus coverage.';
+// Camera framing uses the same immovable graph coordinates. Switching concepts
+// changes the viewport, never rearranges nodes or confuses spatial memory.
+function frameConcept(data, id, layer, focus) {
+  const visible = new Set([id]);
+  if (focus) for (const e of data.layers[layer] || []) {
+    if (e.source === id || e.target === id) { visible.add(e.source); visible.add(e.target); }
+  } else data.nodes.forEach(n => visible.add(n.id));
+  const nodes = data.nodes.filter(n => visible.has(n.id));
+  if (!nodes.length) return { x: 0, y: 0, scale: 1 };
+  const left = Math.min(...nodes.map(n => n.x - 45));
+  const right = Math.max(...nodes.map(n => n.x + 270));
+  const top = Math.min(...nodes.map(n => n.y - 55));
+  const bottom = Math.max(...nodes.map(n => n.y + 75));
+  const scale = clamp(Math.min(1.06, (W - 120) / Math.max(1, right-left),
+    (H - 125) / Math.max(1, bottom-top)), 0.45, 1.06);
+  return { x: W / 2 - (left + right) / 2 * scale,
+    y: H / 2 - (top + bottom) / 2 * scale, scale };
+}
+
 
 export default function AtlasExperience({
   graph = null, initialConceptId = 'c10-pair-linear-equations', onSelectConcept = null,
@@ -35,10 +54,9 @@ export default function AtlasExperience({
   );
   const [focus, setFocus] = useState(true);
   const [isPanning, setIsPanning] = useState(false);
-  const [view, setView] = useState(() => {
-    const target = data.nodes.find(n => n.id === initialConceptId) || data.nodes[0];
-    return { x: W / 2 - (target?.x || 0) * 0.85, y: H / 2 - (target?.y || 0) * 0.85, scale: 0.85 };
-  });
+  const [view, setView] = useState(() => frameConcept(data,
+    data.nodes.some(n => n.id === initialConceptId) ? initialConceptId : data.selectionDefault,
+    'prerequisite', true));
   const svg = useRef(null);
   const drag = useRef(null);
   const touchPoints = useRef(new Map());
@@ -61,10 +79,9 @@ export default function AtlasExperience({
   };
   const select = useCallback(id => {
     setSelected(id);
-    const n = nodes.find(item => item.id === id);
-    if (n) setView(old => ({ ...old, x: W / 2 - n.x * old.scale, y: H / 2 - n.y * old.scale }));
+    if (nodes.some(item => item.id === id)) setView(frameConcept(data, id, layer, focus));
     onSelectConcept?.({ conceptId: id, chapterId: id, provenance: 'Pri curriculum identity' });
-  }, [nodes, onSelectConcept]);
+  }, [data, nodes, layer, focus, onSelectConcept]);
   const zoomAt = (factor, cursor = { x: W / 2, y: H / 2 }) => {
     setView(old => {
       const scale = clamp(old.scale * factor, 0.45, 2.4);
@@ -75,7 +92,7 @@ export default function AtlasExperience({
   };
   const centre = () => {
     if (!current) return;
-    setView({ scale: 0.85, x: W / 2 - current.x * 0.85, y: H / 2 - current.y * 0.85 });
+    setView(frameConcept(data, current.id, layer, focus));
   };
   const panStart = e => {
     if (e.button !== 0 || e.target.closest?.('[data-graph-node]')) return;
@@ -144,11 +161,11 @@ export default function AtlasExperience({
           <div className="pa2-toolbar" role="group" aria-label="Connection layer">
             {Object.entries(EDGE_LABELS).map(([key, value]) => (
               <button type="button" key={key} className={layer === key ? 'is-active' : ''} aria-pressed={layer === key}
-                onClick={() => setLayer(key)}>{value[0]}</button>
+                onClick={() => { setLayer(key); setView(frameConcept(data, selected, key, focus)); }}>{value[0]}</button>
             ))}
           </div>
           <div className="pa2-explain"><span>{EDGE_LABELS[layer][1]}</span>
-            <label><input type="checkbox" checked={focus} onChange={e => setFocus(e.target.checked)} /> Focus</label></div>
+            <label><input type="checkbox" checked={focus} onChange={e => { setFocus(e.target.checked); setView(frameConcept(data, selected, layer, e.target.checked)); }} /> Focus</label></div>
           {data.demo && <div className="pa2-demo" role="note">SYNTHETIC DEMONSTRATION — no real student record loaded.</div>}
           <div className="pa2-viewport">
             <svg ref={svg} viewBox={'0 0 ' + W + ' ' + H} className="pa2-graph"
@@ -162,6 +179,7 @@ export default function AtlasExperience({
                   const a = lookup.get(e.source), b = lookup.get(e.target);
                   if (!a || !b) return null;
                   const nearby = selected === e.source || selected === e.target;
+                  if (focus && !nearby) return null;
                   const dx = b.x - a.x, dy = b.y - a.y;
                   const curve = 'M ' + a.x + ' ' + a.y + ' Q ' + (a.x + b.x) / 2 + ' ' + ((a.y + b.y) / 2 - Math.min(50, Math.abs(dx) * 0.08) * (i % 2 ? -1 : 1)) + ' ' + b.x + ' ' + b.y;
                   return <path key={layer + '-' + e.source + '-' + e.target} d={curve}
@@ -208,7 +226,7 @@ export default function AtlasExperience({
             <div className="pa2-overline">CONCEPT INSPECTOR · CLASS {current.grade}</div>
             <h2>{current.name}</h2><p className="pa2-subtitle">{(ATLAS_SUBJECTS[current.strand] || ATLAS_SUBJECTS.algebra).label} · {current.id}</p>
             <div className="pa2-rule" />
-            <h3>Curriculum identity</h3><p>{current.chapterSource}</p><p>This is a Pri curriculum identity; prerequisites and links are Pri-authored, not CBSE-certified relationships.</p>
+            <h3>Curriculum identity</h3><p>Chapter metadata source: {current.chapterSource}</p><p>This is a Pri curriculum identity; prerequisites and links are Pri-authored, not CBSE-certified relationships.</p>
             <div className="pa2-rule" /><h3>Evidence state</h3>
             <strong className="pa2-state">{data.demo ? 'Synthetic demonstration only' : current.evidence.state}</strong>
             <p>{data.demo ? 'No real learner progress is shown.' : current.evidence.accuracy === null ?
@@ -217,7 +235,7 @@ export default function AtlasExperience({
             <div className="pa2-rule" />
             <h3>Prerequisites</h3>
             {current.prerequisites.length ? <ul className="pa2-prereqs">{current.prerequisites.map(p =>
-              <li key={p.id}><span>{lookup.get(p.id)?.name || p.id}</span><small>{p.skill}</small>
+              <li key={p.id}><span>{lookup.get(p.id)?.name || p.name}</span><small>{p.skill}</small>
                 {lookup.has(p.id) && <button type="button" onClick={() => select(p.id)}>Explore</button>}</li>)}</ul> :
               <p>No prerequisite specified in Pri’s authored map.</p>}
             <div className="pa2-rule" />
@@ -229,7 +247,7 @@ export default function AtlasExperience({
             <h3>Learning actions</h3>
             <p>Recommended practice: solve a curriculum question on {current.name}. Practice availability must be resolved by the host application.</p>
             <div className="pa2-actions">
-              {current.id === 'c10-pair-linear-equations' && <button type="button" className="pa2-primary" onClick={() => onOpenLaboratory?.({ conceptId: current.id, chapterId: current.id })}>Open lines laboratory ↗</button>}
+              {current.id === 'c10-pair-linear-equations' && <button type="button" className="pa2-primary" disabled={!onOpenLaboratory} onClick={() => onOpenLaboratory?.({ conceptId: current.id, chapterId: current.id })}>Open lines laboratory ↗</button>}
               <button type="button" disabled={!onOpenPaper} onClick={openPaper}>Continue to Paper ↗</button>
             </div>
             <p className="pa2-fineprint">{CURRICULUM_NOTE}</p>

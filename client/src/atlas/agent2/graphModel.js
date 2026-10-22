@@ -49,7 +49,7 @@ export function buildAtlasGraph({ ids = ATLAS_IDS, attempts = [], evidenceLinks 
     return {
       id: ch.id, name: ch.name, grade: ch.grade, strand: mapStrandOf(ch.id) || 'algebra',
       chapterSource: ch.examSource || 'Pri curriculum chapter identity', native: !!ch.native,
-      prerequisites: prerequisitesOf(ch.id).map(p => ({ id: p.id, skill: p.skill })),
+      prerequisites: prerequisitesOf(ch.id).map(p => ({ id: p.id, name: IN_CHAPTER_BY_ID[p.id]?.name || p.id, skill: p.skill })),
       evidence: { count: evidence.attempts, independentCorrect: evidence.independentCorrect,
         accuracy: accuracy.enough ? accuracy.value : null, needed: accuracy.needed,
         state: demo ? 'synthetic demonstration' : evidence.attempts === 0 ? 'no observed evidence' :
