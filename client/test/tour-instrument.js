@@ -181,7 +181,10 @@ export const flow = {
     const geo = await mapGeo();
     await check('the map draws every chapter as a positioned node', geo.n === chapters, `${geo.n} nodes`);
     await check('no two map nodes or labels overlap', geo.pairs.length === 0, geo.pairs.slice(0, 6).join(', '));
-    await check('the card floats over the map at desktop width and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
+    // Luxury register: all strand columns stay in one row at readable size, so
+    // the card floats beside them only where they fit; otherwise it sits under
+    // the map. Either way it covers no node.
+    await check('the card covers no node (floating beside the columns, or under the map)', geo.covered.length === 0 && (geo.floating || await page.evaluate(() => document.querySelector('[data-map-card]').getBoundingClientRect().top >= Math.max(...[...document.querySelectorAll('[data-map-node]')].map(g => g.getBoundingClientRect().bottom)))), JSON.stringify({ floating: geo.floating, covered: geo.covered }));
     await check('the map links are straight lines', (await page.locator('.in-map-edge').evaluateAll(es => es.every(e => / L /.test(e.getAttribute('d')) && !/Q/.test(e.getAttribute('d'))))));
     writeFileSync(join(outDir, 'map-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     await page.locator('[data-map-practise]').click();
