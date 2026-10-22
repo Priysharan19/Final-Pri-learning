@@ -1,3 +1,9 @@
+# Updated Mission 02 handoff (22 October 2026)
+
+This original handoff describes the PR #675 initial prototype. For the **current exact arithmetic domain, typed chapter identity, same-coefficient synthetic Paper, 84-node rendering and independent cross-agent findings**, see [PRI-ATLAS-AGENT2-MISSION02-REVIEW.md](PRI-ATLAS-AGENT2-MISSION02-REVIEW.md). The current callback shape carries a typed curriculum chapter selection with conceptId null; the previous description may be outdated. The large safe integer domain is now explicitly rejected outside [-6,6]. No production integration is certified.
+
+---
+
 # PRI ATLAS — Agent 2 engineering handoff
 
 22 October 2026. Branch: prototype/pri-atlas-agent2-20261022, based on protected main 3f4343a731297de930c7e328579dc7ee63970477.

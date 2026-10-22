@@ -63,9 +63,24 @@ try {
   assert.equal(await page.locator('[data-result-kind]').getAttribute('data-result-kind'),'unique');
   checks+=2;
   await page.screenshot({path:out+'/laboratory-desktop.png',fullPage:true});
+  // Change the actual experiment, then demand the same equations in Paper.
+  await page.getByRole('slider',{name:'Line 1 coefficient c'}).fill('6');
+  await page.getByRole('slider',{name:'Line 2 coefficient a'}).fill('2');
+  const eq1 = await page.locator('.pa2-line-card legend strong').first().innerText();
+  const eq2 = await page.locator('.pa2-line-card legend strong').nth(1).innerText();
   await page.getByRole('button',{name:'Open practice question'}).click();
-  await page.getByRole('heading',{name:'Paper transition contract'}).waitFor();
-  assert.ok((await page.locator('pre').innerText()).includes('c10-pair-linear-equations'));
+  await page.getByRole('heading',{name:'From your experiment'}).waitFor();
+  const text = await page.locator('.pa2-paper-sheet').innerText();
+  assert.ok(text.includes(eq1),'Paper must preserve line 1 coefficients');
+  assert.ok(text.includes(eq2),'Paper must preserve line 2 coefficients');
+  assert.ok(text.includes('Deterministic worked explanation'));
+  assert.equal(await page.locator('main[data-lab-paper-synthetic]').count(),1);
+  await page.screenshot({path:out+'/lab-to-paper-exact.png',fullPage:true});
+  checks+=4;
+  await page.getByRole('button',{name:'Return to Laboratory'}).click();
+  await page.getByRole('button',{name:'Back to Atlas'}).click();
+  const selectedChapter = page.locator('.pa2-concept-list button[aria-current="true"]');
+  assert.ok((await selectedChapter.innerText()).includes('Pair of Linear Equations'));
   checks++;
   const mobile=await browser.newPage({ viewport: {width:390,height:844},deviceScaleFactor:1 });
   mobile.on('pageerror',err => errors.push(String(err)));
@@ -82,5 +97,5 @@ try {
   checks+=2;
   await mobile.screenshot({path:out+'/laboratory-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS PRI ATLAS Agent 2 browser: '+checks+' interactions/accessibility/responsive checks; five screenshots; no page/console errors');
+  console.log('PASS PRI ATLAS Agent 2 browser: '+checks+' interactions/accessibility/responsive checks; six screenshots; no page/console errors');
 } finally { await browser.close(); }

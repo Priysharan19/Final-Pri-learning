@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { classifySystem, clipLine, equationText, DEFAULT_LINES, LINE_PRESETS } from './lineMath.js';
+import { createLaboratoryHandoff } from './mathHandoff.js';
 import './atlas.css';
 
 const WIDTH = 720;
@@ -42,13 +43,10 @@ export default function LaboratoryExperience({ onOpenPaper = null, onBackToAtlas
   const preset = key => { setLines(LINE_PRESETS[key].map(line => ({ ...line }))); setShowQuestion(false); };
   const reset = () => { setLines(fresh()); setShowQuestion(false); };
   const prompt = examplePrompt(...lines);
+  const handoff = useMemo(() => createLaboratoryHandoff(lines), [lines]);
   const openPaper = () => {
-    if (onOpenPaper) {
-      onOpenPaper({
-        chapterId: 'c10-pair-linear-equations', conceptId: 'c10-pair-linear-equations',
-        source: 'atlas-agent2-laboratory', question: { type: 'free-response', text: prompt, provenance: 'Pri Atlas prototype-authored; NOT an official CBSE past-paper question' }
-      });
-    } else setShowQuestion(true);
+    if (onOpenPaper) onOpenPaper(handoff);
+    else setShowQuestion(true);
   };
   return <section className="pa2-experience pa2-laboratory" data-laboratory-agent2>
     <div className="pa2-overline">PRI ATLAS / 02 — MATHEMATICAL LABORATORY</div>
@@ -99,8 +97,8 @@ export default function LaboratoryExperience({ onOpenPaper = null, onBackToAtlas
       <aside className="pa2-inspector">
         <div className="pa2-overline">LIVE MATHEMATICAL RESULT</div><h2 aria-live="polite" data-result-kind={verdict.kind}>{RESULT_TITLES[verdict.kind]}</h2>
         <p aria-live="polite">{verdict.description}</p>
-        {verdict.point && <div className="pa2-coordinate" aria-live="polite">x = {NUMBER.format(verdict.point.x)}
-          <span>y = {NUMBER.format(verdict.point.y)}</span></div>}
+        {verdict.point && <div className="pa2-coordinate" aria-live="polite">x = {verdict.exactPoint.x.text}
+          <span>y = {verdict.exactPoint.y.text}</span></div>}
         <div className="pa2-rule" />
         <button type="button" className="pa2-explanation-toggle" onClick={() => setShowExplanation(v => !v)}
           aria-expanded={showExplanation}>Why does this happen? {showExplanation ? '−' : '+'}</button>
@@ -119,8 +117,8 @@ export default function LaboratoryExperience({ onOpenPaper = null, onBackToAtlas
         <p>Use the current coefficients in a prototype-authored examination-style question. It is not an official past-paper item.</p>
         <button type="button" className="pa2-primary" onClick={openPaper}>Open practice question ↗</button>
         {showQuestion && <section className="pa2-question" aria-label="Prototype practice question">
-          <h3>Practice · 3 marks (illustrative only)</h3><p>{prompt}</p>
-          <small>Standalone preview. No response is stored or graded here.</small>
+          <h3>Practice · 3 marks (illustrative only)</h3><p>{handoff.question.text}</p>
+          <small>Synthetic-only preview. No response is stored or graded here.</small>
         </section>}
         {onBackToAtlas && <button type="button" className="pa2-secondary" onClick={onBackToAtlas}>← Back to Atlas</button>}
         <p className="pa2-fineprint">Demonstration runs locally, never reports a mark and never alters the learning engine.</p>

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ATLAS_SUBJECTS, syntheticAtlas } from './graphModel.js';
+import { chapterNavigationEvent } from './identity.js';
 import './atlas.css';
 
 const W = 1200;
@@ -25,9 +26,21 @@ const fmt = value => Math.round(value * 100) / 100;
 const CURRICULUM_NOTE = 'Chapter names/IDs are read from Pri curriculum. The map is a selected demonstration window, not a statement of complete CBSE syllabus coverage.';
 // Camera framing uses the same immovable graph coordinates. Switching concepts
 // changes the viewport, never rearranges nodes or confuses spatial memory.
-function frameConcept(data, id, layer, focus) {
+function focusEdgesFor(data, id, layer) {
+  const all = (data.layers[layer] || []).filter(e=>e.source===id||e.target===id);
+  if(data.nodes.length<=40 || all.length<=5) return all;
+  const byId = new Map(data.nodes.map(n=>[n.id,n]));
+  const centre = byId.get(id);
+  const score = e => {
+    const n=byId.get(e.source===id?e.target:e.source);
+    return (e.target===id?0:1e7) +
+      Math.hypot((centre?.x||0)-(n?.x||0),(centre?.y||0)-(n?.y||0));
+  };
+  return [...all].sort((a,b)=>score(a)-score(b)).slice(0,5);
+}
+function frameConcept(data, id, layer, focus, selectiveEdges = null) {
   const visible = new Set([id]);
-  if (focus) for (const e of data.layers[layer] || []) {
+  if (focus) for (const e of selectiveEdges || data.layers[layer] || []) {
     if (e.source === id || e.target === id) { visible.add(e.source); visible.add(e.target); }
   } else data.nodes.forEach(n => visible.add(n.id));
   const nodes = data.nodes.filter(n => visible.has(n.id));
@@ -56,22 +69,27 @@ export default function AtlasExperience({
   const [isPanning, setIsPanning] = useState(false);
   const [view, setView] = useState(() => frameConcept(data,
     data.nodes.some(n => n.id === initialConceptId) ? initialConceptId : data.selectionDefault,
-    'prerequisite', true));
+    'prerequisite', true, data.nodes.length > 40 ? focusEdgesFor(data,initialConceptId,'prerequisite') : null));
   const svg = useRef(null);
   const drag = useRef(null);
   const touchPoints = useRef(new Map());
   const pinch = useRef(null);
   const nodes = data.nodes;
   const current = nodes.find(n => n.id === selected) || nodes[0] || null;
-  const edges = data.layers[layer] || [];
+  const allIncident = useMemo(() => (data.layers[layer] || [])
+    .filter(e => e.source === selected || e.target === selected), [data, layer, selected]);
+  // At very high density prefer prerequisites, then nearby directly connected
+  // chapters. The complete link set stays in the inspector, not silently lost.
+  const focusedEdges = useMemo(() => focusEdgesFor(data, selected, layer), [data, selected, layer]);
   const neighbours = useMemo(() => {
     const ids = new Set([selected]);
-    for (const e of edges) if (e.source === selected || e.target === selected) {
+    for (const e of (focus ? focusedEdges : allIncident)) {
       ids.add(e.source); ids.add(e.target);
     }
     return ids;
-  }, [edges, selected]);
-  const edgesHere = edges.filter(e => e.source === selected || e.target === selected);
+  }, [allIncident,focusedEdges,focus,selected]);
+  const edgesHere = allIncident;
+  const edges = data.layers[layer] || [];
   const lookup = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes]);
   const toSvg = e => {
     const r = svg.current.getBoundingClientRect();
@@ -79,9 +97,9 @@ export default function AtlasExperience({
   };
   const select = useCallback(id => {
     setSelected(id);
-    if (nodes.some(item => item.id === id)) setView(frameConcept(data, id, layer, focus));
-    onSelectConcept?.({ conceptId: id, chapterId: id, provenance: 'Pri curriculum identity' });
-  }, [data, nodes, layer, focus, onSelectConcept]);
+    if (nodes.some(item => item.id === id)) setView(frameConcept(data, id, layer, focus, data.nodes.length > 40 ? focusEdgesFor(data, id, layer) : null));
+    onSelectConcept?.(chapterNavigationEvent(id, 'atlas-agent2'));
+  }, [data, nodes, layer, focus, focusedEdges, onSelectConcept]);
   const zoomAt = (factor, cursor = { x: W / 2, y: H / 2 }) => {
     setView(old => {
       const scale = clamp(old.scale * factor, 0.45, 2.4);
@@ -104,7 +122,7 @@ export default function AtlasExperience({
   }, []);
   const centre = () => {
     if (!current) return;
-    setView(frameConcept(data, current.id, layer, focus));
+    setView(frameConcept(data, current.id, layer, focus, data.nodes.length > 40 ? focusEdgesFor(data,selected,layer) : null));
   };
   const panStart = e => {
     if (e.button !== 0 || e.target.closest?.('[data-graph-node]')) return;
@@ -158,7 +176,7 @@ export default function AtlasExperience({
     }
   };
   const openPaper = () => onOpenPaper?.({
-    chapterId: selected, conceptId: selected, source: 'atlas-agent2',
+    ...chapterNavigationEvent(selected, 'atlas-agent2'),
     provenance: 'prototype navigation request; no question assigned'
   });
   return (
@@ -173,11 +191,11 @@ export default function AtlasExperience({
           <div className="pa2-toolbar" role="group" aria-label="Connection layer">
             {Object.entries(EDGE_LABELS).map(([key, value]) => (
               <button type="button" key={key} className={layer === key ? 'is-active' : ''} aria-pressed={layer === key}
-                onClick={() => { setLayer(key); setView(frameConcept(data, selected, key, focus)); }}>{value[0]}</button>
+                onClick={() => { setLayer(key); setView(frameConcept(data, selected, key, focus, data.nodes.length > 40 ? focusEdgesFor(data,selected,key) : null)); }}>{value[0]}</button>
             ))}
           </div>
           <div className="pa2-explain"><span>{EDGE_LABELS[layer][1]}</span>
-            <label><input type="checkbox" checked={focus} onChange={e => { setFocus(e.target.checked); setView(frameConcept(data, selected, layer, e.target.checked)); }} /> Focus</label></div>
+            <label><input type="checkbox" checked={focus} onChange={e => { setFocus(e.target.checked); setView(frameConcept(data, selected, layer, e.target.checked, data.nodes.length > 40 ? focusEdgesFor(data,selected,layer) : null)); }} /> Focus</label></div>
           {data.demo && <div className="pa2-demo" role="note">SYNTHETIC DEMONSTRATION — no real student record loaded.</div>}
           <div className="pa2-viewport">
             <svg ref={svg} viewBox={'0 0 ' + W + ' ' + H} className="pa2-graph"
@@ -191,7 +209,7 @@ export default function AtlasExperience({
                   const a = lookup.get(e.source), b = lookup.get(e.target);
                   if (!a || !b) return null;
                   const nearby = selected === e.source || selected === e.target;
-                  if (focus && !nearby) return null;
+                  if (focus && (!nearby || (nodes.length > 40 && !focusedEdges.includes(e)))) return null;
                   const dx = b.x - a.x, dy = b.y - a.y;
                   const curve = 'M ' + a.x + ' ' + a.y + ' Q ' + (a.x + b.x) / 2 + ' ' + ((a.y + b.y) / 2 - Math.min(50, Math.abs(dx) * 0.08) * (i % 2 ? -1 : 1)) + ' ' + b.x + ' ' + b.y;
                   return <path key={layer + '-' + e.source + '-' + e.target} d={curve}
@@ -202,16 +220,17 @@ export default function AtlasExperience({
                 {nodes.map((n, i) => {
                   const info = ATLAS_SUBJECTS[n.strand] || ATLAS_SUBJECTS.algebra;
                   const isOn = n.id === selected;
+                  const showLabel = !focus || neighbours.has(n.id);
                   return <g key={n.id} data-graph-node={n.id} role="button" tabIndex={0}
                     aria-label={n.name + ', Class ' + n.grade + ', ' + n.evidence.state + ', select concept'}
                     aria-pressed={isOn} onClick={() => select(n.id)} onKeyDown={e => keyboardNode(e, n, i)}
-                    className="pa2-node" style={{ color: info.colour, opacity: focus && !neighbours.has(n.id) ? 0.2 : 1 }}>
+                    className="pa2-node" style={{ color: info.colour, opacity: focus && !neighbours.has(n.id) ? nodes.length > 40 ? 0.07 : 0.2 : 1 }}>
                     <circle cx={n.x} cy={n.y} r="29" fill="transparent" />
                     {isOn && <circle cx={n.x} cy={n.y} r="23" fill="none" stroke="currentColor" strokeWidth="1.5" />}
                     <IconShape shape={info.shape} x={n.x} y={n.y} active={isOn} />
-                    <text x={n.x + 25} y={n.y - 2} className="pa2-node-name">{n.lines?.[0] || n.name}</text>
-                    {n.lines?.[1] && <text x={n.x + 25} y={n.y + 14} className="pa2-node-name">{n.lines[1]}</text>}
-                    <text x={n.x + 25} y={n.y + (n.lines?.[1] ? 31 : 15)} className="pa2-node-meta">CLASS {n.grade} · {n.evidence.count ? n.evidence.count + ' observed' : 'no observed answers'}</text>
+                    {showLabel && <text x={n.x + 25} y={n.y - 2} className="pa2-node-name">{n.lines?.[0] || n.name}</text>}
+                    {showLabel && n.lines?.[1] && <text x={n.x + 25} y={n.y + 14} className="pa2-node-name">{n.lines[1]}</text>}
+                    {showLabel && <text x={n.x + 25} y={n.y + (n.lines?.[1] ? 31 : 15)} className="pa2-node-meta">CLASS {n.grade} · {n.evidence.count ? n.evidence.count + ' observed' : 'no observed answers'}</text>}
                   </g>;
                 })}
               </g>
@@ -223,6 +242,9 @@ export default function AtlasExperience({
               <button type="button" onClick={centre}>Centre</button>
             </div>
           </div>
+          {focus && nodes.length > 40 && allIncident.length > focusedEdges.length && <p className="pa2-explain">
+            Showing {focusedEdges.length} directly connected links. {allIncident.length-focusedEdges.length} additional links appear in the inspector.
+          </p>}
           <div className="pa2-legend">
             {Object.values(ATLAS_SUBJECTS).map(s => <span key={s.label}><i style={{ backgroundColor: s.colour }} /> {s.label}</span>)}
           </div>
@@ -259,7 +281,7 @@ export default function AtlasExperience({
             <h3>Learning actions</h3>
             <p>Recommended practice: solve a curriculum question on {current.name}. Practice availability must be resolved by the host application.</p>
             <div className="pa2-actions">
-              {current.id === 'c10-pair-linear-equations' && <button type="button" className="pa2-primary" disabled={!onOpenLaboratory} onClick={() => onOpenLaboratory?.({ conceptId: current.id, chapterId: current.id })}>Open lines laboratory ↗</button>}
+              {current.id === 'c10-pair-linear-equations' && <button type="button" className="pa2-primary" disabled={!onOpenLaboratory} onClick={() => onOpenLaboratory?.(chapterNavigationEvent(current.id, 'atlas-agent2'))}>Open lines laboratory ↗</button>}
               <button type="button" disabled={!onOpenPaper} onClick={openPaper}>Continue to Paper ↗</button>
             </div>
             <p className="pa2-fineprint">{CURRICULUM_NOTE}</p>

@@ -115,3 +115,14 @@
 @media (prefers-reduced-motion: reduce) {
   .pa2-experience *, .pa2-experience *::before, .pa2-experience *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.pa2-lab-paper h1 {font-weight:580;font-size:clamp(30px,3vw,48px);letter-spacing:-.04em;}
+.pa2-paper-sheet { max-width:800px;background:#f9f7f1;color:#1c2430;
+  padding:clamp(24px,4vw,60px);border:1px solid #bebbb0;font:19px/1.7 Georgia,serif; }
+.pa2-paper-sheet .pa2-overline {color:#4e5b68;font:600 12px/1.5 system-ui,sans-serif;}
+.pa2-paper-sheet h2 {font:600 23px/1.3 system-ui,sans-serif;margin:20px 0;}
+.pa2-paper-sheet li {padding:7px 0 7px 8px;}
+.pa2-paper-sheet .pa2-rule {border-color:#c7c9c7;}
+.pa2-paper-sheet .pa2-fineprint {color:#52606e !important;}
+.pa2-return {margin-top:24px;padding:12px 20px;min-height:44px;border:1px solid #7e91a2;background:#202b38;color:#f2f5f8;}
+@media (max-width:620px){.pa2-paper-sheet {font-size:17px;}}
