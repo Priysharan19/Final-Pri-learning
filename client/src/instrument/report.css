@@ -71,7 +71,7 @@ html.ui-instrument .in-report-title { font: 400 clamp(40px, 7vw, 84px)/.95 var(-
 html.ui-instrument .in-report-lede { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
 
 html.ui-instrument .in-segc { border-radius: 8px; background: transparent; box-shadow: inset 0 0 0 1px var(--c-hair); padding: 3px; }
-html.ui-instrument .in-segc button.c-chip { border-radius: var(--radius-pill); border: 0; font: 600 14px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); min-height: 38px; padding: 6px 16px; }
+html.ui-instrument .in-segc button.c-chip { border-radius: var(--radius-pill); border: 0; background: transparent; font: 600 14px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); min-height: 38px; padding: 6px 16px; }
 html.ui-instrument .in-segc button[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); box-shadow: none; }
 html.ui-instrument .in-segc button:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
 
