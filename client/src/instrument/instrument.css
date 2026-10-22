@@ -1196,3 +1196,69 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .in-bar-slot .in-led-search { width: min(330px, 30vw); min-width: 0; height: 32px; padding: 0 10px; }
 .in-bar-slot .in-segc button { min-height: 28px; }
+
+/* ── Craft layer (interface polish 1) ──────────────────────────────────────
+   One motion vocabulary and one elevation scale; focus keeps the global
+   outline ring (it survives forced-colors and never hides a state shadow). Additive: it
+   restates timing and depth on existing hooks; the one geometry change is the
+   iPad writing bar below. Motion is transform/opacity only and is off under
+   prefers-reduced-motion (theme.css also zeroes every duration there). */
+html.ui-instrument {
+  --in-ease-out: cubic-bezier(.2, 0, 0, 1);
+  --in-ease-spring: cubic-bezier(.2, 1.1, .4, 1);
+  --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms;
+  --in-sh-1: 0 0 0 1px var(--in-edge), 0 1px 0 var(--in-edge);
+  --in-sh-2: 0 0 0 1px var(--in-edge-2), 0 1px 2px var(--in-edge), 0 8px 24px -14px var(--in-shadow);
+  --in-sh-3: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3), 0 24px 64px -24px var(--in-shadow);
+}
+
+/* Press: everything a finger or cursor commits to gives back a little. */
+.in-btn, .in-ch, .in-tab, .in-flt, .in-pal-item, .in-cmd {
+  transition: transform var(--in-dur-1) var(--in-ease-out), background-color var(--in-dur-2) var(--in-ease-out), color var(--in-dur-2) var(--in-ease-out), box-shadow var(--in-dur-2) var(--in-ease-out);
+}
+.in-btn:active, .in-flt:active { transform: scale(.985); }
+.in-ch:active, .in-pal-item:active { transform: scale(.995); }
+.in-tab:hover { background: color-mix(in srgb, var(--in-l3) 55%, transparent); }
+.in-tab:active { transform: scale(.98); }
+.in-flt:hover:not([aria-pressed="true"]) { background: var(--in-l1); color: var(--in-tx); }
+.in-pal-item:hover:not([aria-selected="true"]) { background: var(--in-l3); }
+
+/* Arrival: the command bar lands with a short spring; pages rise once. */
+.in-pal { animation: in-pal-in var(--in-dur-3) var(--in-ease-spring) both; box-shadow: var(--in-sh-3); }
+.in-scrim { animation-duration: var(--in-dur-2); animation-timing-function: var(--in-ease-out); }
+@keyframes in-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.in-plate-head, .in-plate .in-scope, .in-plate-acts, .in-report-head, .in-report-figs, .in-rp { animation: in-rise var(--in-dur-3) var(--in-ease-out) both; }
+.in-plate .in-scope, .in-report-figs { animation-delay: 40ms; }
+.in-plate-acts, .in-rp { animation-delay: 80ms; }
+
+/* Depth: one scale. Figures and panels sit at 1, floating tools at 2. */
+.in-plate-head { z-index: 1; }
+.in-ghost { z-index: 0; }
+.in-kpis { background: var(--in-l1); box-shadow: var(--in-sh-1); }
+.in-resume { box-shadow: inset 3px 0 0 var(--in-c1), var(--in-sh-1); }
+.in-eqn { box-shadow: var(--in-sh-2); }
+
+/* Type rhythm: figures are tabular everywhere; eyebrows share one voice. */
+html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pal-r) { font-variant-numeric: tabular-nums; }
+.in-greet small, .in-plate-head small, .in-next-label small, .in-pal-group { font-size: 11px; letter-spacing: 0.1em; }
+.in-plate-head h2 { text-wrap: balance; }
+.in-greet h1 { text-wrap: balance; }
+.in-plate-head p, .in-note { text-wrap: pretty; }
+
+/* Empty states: say so quietly, on the grid, not in a floating pill. */
+.in-chart-empty { box-shadow: var(--in-sh-1); background: var(--in-l1); color: var(--in-tx-2); }
+
+/* Device fit: on the iPad the writing bar keeps the live status and the
+   buttons; the decorative key hint (aria-hidden) gives way instead of
+   wrapping the bar into three ragged columns. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  html.ui-instrument .ws-actions .in-wbar-note { display: none; }
+  html.ui-instrument .ws-actions .status-line { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 1; min-width: 0; }
+  html.ui-instrument .ws-actions .status-line > * { margin-left: 0; overflow-wrap: anywhere; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .in-pal, .in-scrim, .in-plate-head, .in-plate .in-scope, .in-plate-acts, .in-report-head, .in-report-figs, .in-rp { animation: none; }
+  .in-btn, .in-ch, .in-tab, .in-flt, .in-pal-item, .in-cmd { transition: none; }
+  .in-btn:active, .in-flt:active, .in-ch:active, .in-pal-item:active, .in-tab:active { transform: none; }
+}
