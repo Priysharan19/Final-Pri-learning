@@ -24,7 +24,7 @@
 
 /* The register dial. */
 .m-dial { margin: 18px 0 6px; }
-.m-dial-box { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; }
+.m-dial-box { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; }
 .m-dial-box svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .m-dial-guil { opacity: .2; }
 .m-dial-num { font-family: var(--c-serif); fill: var(--c-ink); }
@@ -37,8 +37,9 @@
 .m-datewin { position: absolute; left: 66.5%; top: 47%; width: 13.5%; height: 6%; display: flex; align-items: center; justify-content: center; background: var(--c-sheet); border: 1px solid var(--c-dial-line); box-shadow: var(--c-deboss); font: 400 clamp(11px, 1.3vw, 16px)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); perspective: 200px; overflow: hidden; }
 .m-flip { display: inline-grid; }
 .m-flip > span { grid-area: 1 / 1; backface-visibility: hidden; }
-.m-dial-cap { margin: 10px 0 0; text-align: center; font: 400 13px/18px var(--c-text); color: var(--c-ink-2); }
-@media (max-width: 1180px) { .m-dial-box { max-width: 300px; } }
+.m-dial-cap { display: flex; justify-content: center; gap: 18px; margin: 12px 0 0; font: 400 15px/20px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.m-dial-cap span { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); margin-right: 6px; }
+@media (max-width: 760px) { .m-dial-box { max-width: 340px; } }
 
 /* The ledger: three figures that roll like an odometer. */
 /* Whole-pixel columns, so the engraved dividers never straddle a device pixel. */
@@ -48,35 +49,46 @@
 .k-ledger > div + div { border-left: 1px solid var(--c-hair-2); padding-left: 14px; }
 .k-ledger dt { font: var(--c-t-label); line-height: 16px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); }
 .k-ledger dd { margin: 2px 0 0; font: 400 34px/38px var(--c-serif); color: var(--c-ink); }
-.k-odo, .k-odo > span { display: inline-flex; height: 38px; overflow: hidden; vertical-align: top; }
-.k-odo > span > span { display: flex; flex-direction: column; transform: translateY(calc(var(--d) * -38px)); animation: k-roll 480ms var(--c-ease-sweep) 300ms backwards; }
+.k-odo, .k-odo > span { display: inline-flex; height: 38px; overflow: clip; contain: paint; vertical-align: top; }
+/* The drum starts on a blank cell (never a false zero), turns once, and waits
+   for the dial's hands to settle; it plays once per page load. */
+.k-odo > span > span { display: flex; flex-direction: column; transform: translateY(calc(var(--d) * -38px)); animation: k-roll 480ms var(--c-ease-sweep) 1300ms backwards; }
+.k-ledger.k-still .k-odo > span > span { animation: none; }
 .k-odo i { font-style: normal; height: 38px; line-height: 38px; text-align: center; }
 @keyframes k-roll { from { transform: translateY(0); } }
+/* A chapter with no answers: a clean ruled frame, nothing plotted. */
+.k-slot { min-height: 240px; background: repeating-linear-gradient(to bottom, transparent 0 31px, var(--c-hair-2) 31px 32px), var(--c-sheet); }
+/* The account: initials in Cormorant SC on paper-2, ringed by a hairline. */
+.in-bar .user-chip .user-avatar { font: 600 12px var(--c-sc); letter-spacing: .06em; background: var(--c-paper-2); color: var(--c-ink); box-shadow: inset 0 0 0 1px var(--c-hair); }
+/* ⌘K's field: borderless; its underline turns teal while it has focus. */
+.ui-instrument .in-pal-q:focus-within { border-bottom-color: var(--c-teal); }
+.ui-instrument .in-pal-q input:focus-visible { outline: none; }
+.ui-instrument :lang(hi) .in-greet h1 { line-height: 1.2; letter-spacing: 0; word-spacing: .1em; font-family: 'Kohinoor Devanagari', 'Noto Serif Devanagari', var(--c-serif); font-weight: 400; }
 
 /* Chapter mastery as ten engraved ticks. */
 .k-ticks { display: grid; grid-template-columns: repeat(10, 2px); gap: 3px; align-items: end; height: 14px; }
 .k-ticks i { height: 8px; background: var(--c-ink-3); opacity: .45; }
-.k-ticks i:nth-child(5n) { height: 14px; }
 .k-ticks i.on { background: var(--c-teal); opacity: 1; }
 
 /* The resume card's action is the screen's one primary (pill) control. */
-.in-resume .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
+.k-next .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
 
-/* Shared element: Index resume card → Write question head. */
-html[data-vt="question"] .in-qh { view-transition-name: pri-question; }
-::view-transition-group(pri-question) { animation-duration: 480ms; animation-timing-function: var(--c-ease-sweep); }
+/* Shared element: the Index's next question → Write's question prompt. */
+html[data-vt="question"] .q-prompt { view-transition-name: pri-question; }
+/* No double exposure: the old page holds still underneath, the new one fades in over 120ms. */
+html[data-vt="question"]::view-transition-old(root) { animation: none; }
+html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 120ms var(--c-ease-row) both; }
+@keyframes k-vt-in { from { opacity: 0; } }
+::view-transition-group(pri-question) { animation-duration: 380ms; animation-timing-function: var(--c-ease-sweep); }
 
 /* States. Focus: the teal ring, inset where the control is flush to a rule.
    Disabled: engraved but unlit (40% ink, no press). Loading: the outline
    holds its place, quiet text, never a shimmer. */
-.ui-instrument .in-tab:focus-visible { outline-offset: -6px; }
-.ui-instrument .k-dock > :focus-visible { outline-offset: -2px; }
-.ui-instrument .in-resume:focus-within { box-shadow: var(--c-float), 0 0 0 1px var(--c-teal); }
+.ui-instrument :is(.in-tab, .in-mark, .in-cmd, .k-dock > *):focus-visible { outline-offset: 3px; border-radius: 4px; }
+.ui-instrument .in-tab:focus-visible { outline-offset: -3px; }
 :is(.in-tab, .k-dock > *, .in-pal-item, .c-btn-primary):is(:disabled, [aria-disabled="true"]) { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none; }
-.in-resume.k-wait { min-height: 76px; display: grid; align-content: center; gap: 10px; box-shadow: inset 0 0 0 1px var(--c-hair-2); background: none; pointer-events: none; }
-.in-resume.k-wait::after { content: none; }
-.in-resume.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
-.in-resume.k-wait i + i { width: 38%; }
+.k-next.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
+.k-next.k-wait i + i { width: 38%; }
 .in-pal-empty.k-wait { font: italic 400 15px var(--c-italic); }
 
 @media (prefers-reduced-motion: reduce) {

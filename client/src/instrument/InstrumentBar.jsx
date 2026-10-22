@@ -142,7 +142,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className="in-spacer" />
         <div className="in-bar-slot" ref={setBarSlot} data-instrument-bar-slot />
         <button type="button" className="in-cmd" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-label={t('inst.cmdOpenLabel')}>
-          <Glyph name="search" /><span className="in-cmd-t">{t('inst.cmdPlaceholder')}</span><span className="in-kbd" aria-hidden="true">{CHORD}</span>
+          <Glyph name="search" /><span className="in-cmd-t">{t('inst.cmdShort')}</span><span className="in-kbd" aria-hidden="true">{CHORD}</span>
         </button>
         <span className={`in-status${online ? '' : ' is-off'}`} role="status" data-live-lamp={online ? 'online' : 'offline'}><i aria-hidden="true" /><span className="in-status-t">{online ? t('inst.online') : t('inst.offline')}</span></span>
         {accountMenu}

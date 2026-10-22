@@ -49,7 +49,7 @@ const TICKS = Array.from({ length: 60 }, (_, i) => {
   const [x1, y1] = pt(182, i * 6); const [x2, y2] = pt(major ? 166 : 174, i * 6);
   return { x1, y1, x2, y2, w: major ? (i % 15 === 0 ? 2.2 : 1.4) : 0.5 };
 });
-// A percentage scale: 12 o'clock is 0 (and 100). 30 is left out because the
+// A percentage scale: 12 o'clock reads 100 (and is 0), as on the reference. 30 is left out because the
 // date window sits on it, as on the reference dial.
 const NUMERALS = [10, 20, 40, 50, 60, 70, 80, 90, 100].map(p => {
   const [x, y] = pt(150, p * 3.6);
@@ -130,7 +130,7 @@ export default function IndexDial({ accuracy, covered, label, caption, ariaLabel
           <circle cx="200" cy="200" r="182" fill="none" stroke="var(--c-dial-line)" strokeWidth=".4" />
           <circle cx="200" cy="200" r="174" fill="none" stroke="var(--c-dial-line)" strokeWidth=".3" />
           {TICKS.map((t, i) => <line key={i} className="m-dial-tick" x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="var(--c-dial-line)" strokeWidth={t.w} />)}
-          {NUMERALS.map(n => <text key={n.p} x={n.x} y={n.y} textAnchor="middle" className="m-dial-num" fontSize={n.size}>{n.p === 100 ? '0' : n.p}</text>)}
+          {NUMERALS.map(n => <text key={n.p} x={n.x} y={n.y} textAnchor="middle" className="m-dial-num" fontSize={n.size}>{n.p}</text>)}
           <text x="200" y="262" textAnchor="middle" className="m-dial-num" fontSize="22">P′</text>
           <text x="200" y="280" textAnchor="middle" className="m-dial-sc">{label}</text>
           <Dauphine len={96} w={7} hand={hour} />

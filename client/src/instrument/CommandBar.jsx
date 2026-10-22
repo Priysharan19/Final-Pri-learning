@@ -89,7 +89,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     const track = practiceTrack(user);
     const groups = [
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
-        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, meta: t('inst.chapterN', { n: c.index + 1 }),
+        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, num: String(c.index + 1).padStart(2, '0'),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
@@ -126,7 +126,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
           <Glyph name="search" size={20} />
           {/* autoFocus: keys typed the moment the bar opens land in the field. */}
           <input ref={input} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
-            placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
+            placeholder={t('inst.cmdShort')} aria-label={t('inst.cmdPlaceholder')}
             role="combobox" aria-expanded="true" aria-controls="in-pal-list"
             aria-activedescendant={flat[sel] ? `in-pal-${flat[sel].id}` : undefined} />
           <span className="in-kbd">esc</span>
@@ -142,8 +142,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
                 return (
                   <button key={row.id} id={`in-pal-${row.id}`} type="button" role="option" aria-selected={sel === mine}
                     className="in-pal-item" tabIndex={-1} onMouseMove={() => setSel(mine)} onClick={() => choose(row)}
-                    style={row.colour ? { '--cc': `var(${row.colour})` } : undefined}>
-                    {row.colour ? <i className="in-pal-swatch" aria-hidden="true" /> : row.glyph && <Glyph name={row.glyph} />}
+                    >
+                    {row.num ? <span className="in-pal-num" aria-hidden="true">{row.num}</span> : row.glyph && <Glyph name={row.glyph} />}
                     <b lang={row.colour || row.content ? 'en' : undefined} className={row.math ? 'is-math' : undefined}>{row.math ? <MathText text={row.label} /> : row.label}</b>
                     {row.meta && <span className="in-pal-meta">· {row.meta}</span>}
                     <span className="in-pal-r">{row.hint && <small>{row.hint}</small>}<span className="in-kbd" aria-hidden="true">↵</span></span>

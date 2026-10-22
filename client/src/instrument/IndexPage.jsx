@@ -10,6 +10,7 @@ import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
 import TermGloss from '../components/TermGloss.jsx';
+import { MathText } from '../lib/latex.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 import IndexDial from './margin/IndexDial.jsx';
 import { registerOf } from './margin/register.js';
@@ -44,23 +45,24 @@ function Ticks({ value }) {
 
 // A figure whose digits roll into place like an odometer (CSS, Settle, 300ms
 // in). Screen readers get the plain figure.
+let ledgerRolled = false;
 function Odometer({ value }) {
   const text = String(value);
   return (
     <span className="k-odo">
       <span className="sr-only">{text}</span>
-      {/* Two turns of the drum, so every digit (0 included) rolls a full cycle. */}
+      {/* A blank cell, then two turns of the drum: it starts empty, never on a false 0. */}
       {[...text].map((ch, i) => /\d/.test(ch)
-        ? <span key={i} aria-hidden="true"><span style={{ '--d': 10 + Number(ch) }}>{Array.from({ length: 20 }, (_, n) => <i key={n}>{n % 10}</i>)}</span></span>
+        ? <span key={i} aria-hidden="true"><span style={{ '--d': 11 + Number(ch) }}><i />{Array.from({ length: 20 }, (_, n) => <i key={n}>{n % 10}</i>)}</span></span>
         : <span key={i} aria-hidden="true">{ch}</span>)}
     </span>
   );
 }
 
-// The shared element (design v3 05): the resume card becomes Write's question
-// head. With the View Transitions API the card is named for the old snapshot
-// and the new page's .in-qh carries the same name (shell.css); the update
-// waits briefly for that head to mount so the two can be matched, and falls
+// The shared element (design v3 05): the next question on the Index becomes
+// Write's question prompt. With the View Transitions API the card is named for the old snapshot
+// and the new page's .q-prompt carries the same name (shell.css); the update
+// waits briefly for that prompt to mount so the two can be matched, and falls
 // back to a cross-fade if it does not arrive. No API, or Reduce Motion: a cut.
 function morphTo(card, go) {
   if (typeof document.startViewTransition !== 'function' || reduced() || !card) { go(); return; }
@@ -69,13 +71,13 @@ function morphTo(card, go) {
   try {
     const vt = document.startViewTransition(() => {
       card.style.viewTransitionName = '';
-      // Only now, and only for this transition, does the head take the name.
+      // Only now, and only for this transition, does the prompt take the name.
       root.dataset.vt = 'question';
       flushSync(go);
     return new Promise(resolve => {
       const t0 = performance.now();
       // Rendering (and so rAF) is paused while the update runs: poll on a timer.
-      const look = () => (document.querySelector('.in-qh') || performance.now() - t0 > 300 ? resolve() : setTimeout(look, 16));
+      const look = () => (document.querySelector('.q-prompt') || performance.now() - t0 > 300 ? resolve() : setTimeout(look, 16));
       look();
     });
     });
@@ -136,12 +138,15 @@ export default function IndexPage() {
   // fades at 0ms, the resume card rises at 40ms, the rows follow 40ms apart
   // (at most five staggered), the ledger digits roll at 300ms (CSS). Once.
   const entered = useRef({ greet: false, resume: false, rows: false });
+  // The ledger rolls on the first Index of a page load only; decided at mount.
+  const rolls = useRef(!ledgerRolled);
+  useEffect(() => { if (chapters.length) ledgerRolled = true; }, [chapters.length]);
   useLayoutEffect(() => {
     const el = root.current; const done = entered.current;
     if (!el || reduced()) return;
     const greet = el.querySelector('.in-greet');
     if (greet && !done.greet) { done.greet = true; greet.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 340, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }); }
-    const card = el.querySelector('.in-resume');
+    const card = el.querySelector('.k-next');
     if (card && !done.resume) { done.resume = true; rowReveal([card], { delay: 40, stagger: 0 }); }
     const rows = el.querySelectorAll('.in-chs > li');
     if (rows.length && !done.rows) {
@@ -183,68 +188,60 @@ export default function IndexPage() {
 
   return (
     <div className="in-index" data-instrument-index ref={root}>
-      <div className="in-spine">
-        <div className="in-greet">
-          <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
-          <h1>{t(greetingKey(hour), { name })}</h1>
-        </div>
-
-        {curriculum && chapters.length > 0 && (
-          <>
-            <IndexDial accuracy={register.accuracy} covered={register.covered} label={t('inst.dialLabel')} caption={t('inst.dialCaption')}
-              ariaLabel={register.accuracy == null
-                ? t('inst.dialAriaHeld', { started: register.started, total: register.total })
-                : t('inst.dialAria', { accuracy: register.accuracy, started: register.started, total: register.total })} />
-            <dl className="k-ledger" data-instrument-ledger>
+      <header className="k-hero">
+        {curriculum && chapters.length > 0 ? (
+          <IndexDial accuracy={register.accuracy} covered={register.covered} label={t('inst.dialLabel')}
+            caption={<><span>{t('inst.dialLong')}</span>{register.accuracy == null ? '—' : `${register.accuracy}%`}<span>{t('inst.dialShort')}</span>{`${register.covered}%`}</>}
+            ariaLabel={register.accuracy == null
+              ? t('inst.dialAriaHeld', { started: register.started, total: register.total })
+              : t('inst.dialAria', { accuracy: register.accuracy, started: register.started, total: register.total })} />
+        ) : <div className="m-dial" aria-hidden="true" />}
+        <div>
+          <div className="in-greet">
+            <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
+            <h1>{t(greetingKey(hour), { name })}</h1>
+          </div>
+          {/* Loading: the block's engraved rules hold its place (no shimmer). */}
+          {recent === undefined && <div className="k-next k-wait" aria-hidden="true"><i /><i /></div>}
+          {recent && (
+            <div className="k-next" data-instrument-resume ref={resumeCard}>
+              <small>{t('inst.resumePrefix')} · <span lang="en">{recent.subtopicName || ''}</span></small>
+              {recent.prompt ? <p className="k-q" lang="en"><MathText text={recent.prompt} /></p> : <p className="k-q" lang="en"><TermGloss text={recent.subtopicName || ''} /></p>}
+              {resumeMarks && <small>{t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible })}</small>}
+              {resumeMarks && resumeMarks.possible <= 10 && (
+                <div className="in-seg10" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
+                </div>
+              )}
+              <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: recent.subtopic, track })}
+                onClick={e => {
+                  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  e.preventDefault();
+                  const to = practiceHref({ subtopic: recent.subtopic, track });
+                  morphTo(resumeCard.current?.querySelector('.k-q'), () => nav(to, { replace: isCurrentUrl(to) }));
+                }}>{t('inst.resume')}</PageLink>
+            </div>
+          )}
+          {/* A new student: chapter 1's first question, one tap away. */}
+          {recent === null && chapters[0] && (
+            <div className="k-next" data-instrument-begin>
+              <small>{t('inst.chapterN', { n: 1 })} · <span lang="en">{chapters[0].row.name}</span></small>
+              <p className="k-q">{t('inst.beginFirst')}</p>
+              <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: chapters[0].row.id, track })}>{t('inst.begin')}</PageLink>
+            </div>
+          )}
+          {curriculum && chapters.length > 0 && (
+            <dl className={`k-ledger${rolls.current ? '' : ' k-still'}`} data-instrument-ledger>
               <div><dt>{t('inst.ledgerAnswers')}</dt><dd><Odometer value={register.answers} /></dd></div>
               <div><dt>{t('inst.ledgerCorrect')}</dt><dd><Odometer value={register.correct == null ? '—' : register.correct} /></dd></div>
               <div><dt>{t('inst.ledgerChapters')}</dt><dd><Odometer value={`${register.started}/${register.total}`} /></dd></div>
             </dl>
-          </>
-        )}
+          )}
+        </div>
+      </header>
 
-        {/* Loading: the card's engraved outline holds its place (no shimmer). */}
-        {recent === undefined && <div className="in-resume k-wait" aria-hidden="true"><i /><i /></div>}
-        {recent && (
-          <div className="in-resume c-rim" data-instrument-resume ref={resumeCard}>
-            <div>
-              <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
-              <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
-            </div>
-            <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: recent.subtopic, track })}
-              onClick={e => {
-                if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-                e.preventDefault();
-                const to = practiceHref({ subtopic: recent.subtopic, track });
-                morphTo(resumeCard.current, () => nav(to, { replace: isCurrentUrl(to) }));
-              }}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
-            {resumeMarks && resumeMarks.possible <= 10 && (
-              <div className="in-seg10" aria-hidden="true">
-                {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
-              </div>
-            )}
-          </div>
-        )}
-
-        {phone && current && (
-          <>
-            <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}>
-              <ChapterScope figure={current.figure} colourVar="--c-lume" label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
-              <div className="in-next-label">
-                <small>{t('inst.chapterN', { n: current.index + 1 })}{markOf(current.row.id) ? ` · ${markOf(current.row.id).earned}/${markOf(current.row.id).possible}` : ''}</small>
-                <b lang="en"><TermGloss text={current.row.name} /></b>
-              </div>
-            </div>
-            <div className="in-strip" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} style={{ '--cc': `var(${c.colour})` }}
-                  className={c.evidence.attempts ? undefined : 'is-new'}
-                  aria-current={current.row.id === c.row.id ? 'true' : undefined} onClick={() => setPick(c.row.id)} />
-              ))}
-            </div>
-          </>
-        )}
-
+      <div className="k-body">
+      <div className="in-spine">
         {!curriculum && <div className="skeleton" style={{ height: 380, marginTop: 18 }} aria-hidden="true" />}
 
         {curriculum && (
@@ -285,7 +282,12 @@ export default function IndexPage() {
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
-          {!phone && <ChapterScope figure={current.figure} colourVar="--c-lume" label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
+          {/* Evidence only: a chapter with no answers has nothing to plot, so it
+              gets a clean ruled frame (the slot PR5's empty plot fills), never an
+              invented curve. */}
+          {current.evidence.attempts > 0
+            ? !phone && <ChapterScope figure={current.figure} colourVar="--c-lume" label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
+            : <div className="in-scope k-slot" data-empty-plot aria-hidden="true" />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
               {current.row.dotpoints.slice(0, 4).map((dp, i) => {
@@ -307,12 +309,13 @@ export default function IndexPage() {
           )}
           <div>
             <div className="in-plate-acts">
-              <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
+              <PageLink className="c-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
             </div>
             {current.evidence.attempts > 0 && current.evidence.accuracy == null && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.accuracyHeld')}</p>}
           </div>
         </section>
       )}
+      </div>
       {curriculum && !chapters.length && <p className="in-empty">{t('inst.noChapters')}</p>}
     </div>
   );
