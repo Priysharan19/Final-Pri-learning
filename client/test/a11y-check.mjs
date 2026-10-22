@@ -887,11 +887,12 @@ async function run() {
       // runner does by chance, so the surface is still disabled when the
       // canvas shows. `times: 1` — only the replay; nothing later is slowed.
       const REPLAY = '**/v1/practice/*/submit';
-      let held = 0;
+      let held = 0, replayDone = false;
       const holdReplay = async route => {
         held += 1;
         await new Promise(r => setTimeout(r, 2500));
         await route.continue().catch(() => { });
+        replayDone = true;
       };
       await page.route(REPLAY, holdReplay, { times: 1 });
       try {
@@ -927,7 +928,15 @@ async function run() {
       });
       platform.reader.lines = null; platform.reader.text = '7'; platform.reader.confidence = 0.97;
       let release; platform.reader.gate = new Promise(resolve => { release = resolve; });
+      // While the earlier answer is still being checked the page says so, and
+      // the pen is drawn on now, inside that check: it must not be dropped.
+      refusals.replay = {
+        held,
+        checking: await page.locator('.ink-answer .ink-status[role="status"]').first().textContent({ timeout: 2000 }).then(t => (t || '').trim()).catch(() => null),
+        disabled: await page.locator('.ink-answer.ink-disabled').count()
+      };
       try {
+        refusals.replay.strokeDuringReplay = !replayDone;
         await stroke(60);
         const read = page.locator('[data-ink-read]').first();
         await read.waitFor({ timeout: 15000 }).catch(async (err) => {
@@ -1493,6 +1502,10 @@ async function run() {
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
     section('read on request');
+    ok('an earlier answer being checked again after a relaunch is said on the writing surface in words, the page stays writable, and a stroke written meanwhile is kept and offered for reading',
+      refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
+        refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
+      JSON.stringify(refusals.replay));
     ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
       refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
         /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
