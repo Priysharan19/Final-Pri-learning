@@ -8,6 +8,7 @@ import CommandBar, { prewarmCommandBar } from './CommandBar.jsx';
 import Glyph from './Glyph.jsx';
 import { setBarSlot } from './BarSlot.jsx';
 import MarginIcon from './margin/MarginIcon.jsx';
+import PMark from './margin/PMark.jsx';
 import { startLight } from './margin/light.js';
 import { optionalWarmAllowed, studentBusy } from '../local/offlineWarm.js';
 import './margin/shell.css';
@@ -131,7 +132,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
     <>
       <header className="in-bar no-print" data-instrument-bar>
         <button type="button" className="in-mark" onClick={() => nav('/', { replace: isCurrentUrl('/') })} aria-label={t('inst.home')}>
-          <span className="in-mark-glyph" aria-hidden="true">P<em>′</em></span>Pri
+          <PMark size={28} />Pri
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')} ref={tabsRef}>
           {TABS.map(tab => (
