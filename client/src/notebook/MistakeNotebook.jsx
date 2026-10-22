@@ -77,7 +77,9 @@ function NotebookEntry({ item, user, t, onTwin, busy }) {
   );
 }
 
-export default function MistakeNotebook() {
+// `heading` is the title's level: h1 when the notebook is the page (NotebookPage).
+export default function MistakeNotebook({ heading = 'h2' }) {
+  const Heading = heading === 'h1' ? 'h1' : 'h2';
   const { user, toast } = useApp();
   const t = useT();
   const nav = useNavigate();
@@ -111,7 +113,7 @@ export default function MistakeNotebook() {
 
   return (
     <section className="card notebook" data-error-notebook data-mistake-notebook aria-labelledby="notebook-title">
-      <h2 id="notebook-title" className="notebook-title">{t('notebook.title')}</h2>
+      <Heading id="notebook-title" className="notebook-title">{t('notebook.title')}</Heading>
       <p className="muted notebook-how">{t('notebook.how')}</p>
       {book.available === false && <p className="muted notebook-empty">{t(book.reason === 'sign-in' ? 'notebook.signIn' : 'notebook.offline')}</p>}
       {book.available !== false && book.dueCount > 0 && (

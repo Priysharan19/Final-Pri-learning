@@ -6,7 +6,7 @@ import MistakeNotebook from './MistakeNotebook.jsx';
 export default function NotebookPage() {
   return (
     <div className="qpage" data-notebook-page style={{ maxWidth: 760 }}>
-      <MistakeNotebook />
+      <MistakeNotebook heading="h1" />
     </div>
   );
 }
