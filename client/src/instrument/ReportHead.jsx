@@ -6,6 +6,7 @@ import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
 import BarSlot from './BarSlot.jsx';
+import './report.css';
 
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the

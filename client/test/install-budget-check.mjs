@@ -36,7 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { optionalWarmAllowed, warmOfflineBuild } from '../src/local/offlineWarm.js';
+import { optionalWarmAllowed, warmOfflineBuild, prefetchInstrumentTabs, studentBusy } from '../src/local/offlineWarm.js';
 import { ON_DEMAND, PRECACHE_SKIP } from '../vite.config.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -203,8 +203,19 @@ eq(absent.length, 0, `every file the first paint blocks on is in the install (${
 
 ok(PRECACHE.includes('/') && PRECACHE.includes('/index.html'),
   'the shell is installed under both the names a navigation can arrive at');
-ok(PRECACHE.some(url => /inter-latin-wght-normal/.test(url)),
-  'the Latin Inter subset is installed — it paints every word of the interface');
+// The interface face's Latin subset paints every word of the interface, so it
+// is installed. Which face that is depends on the build: Inter in the
+// interface production ships, Instrument Sans where the v1.1 instrument
+// interface is built in (features.json records the flag; instrument.css remaps
+// every interface font token to Instrument Sans). Same promise, per build.
+{
+  const instrumentBuild = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')).instrument === true;
+  const [face, name] = instrumentBuild
+    ? [/instrument-sans-latin-wght-normal/, 'Instrument Sans']
+    : [/inter-latin-wght-normal/, 'Inter'];
+  ok(PRECACHE.some(url => face.test(url)),
+    `the Latin ${name} subset is installed — it paints every word of the interface in this build`);
+}
 ok(PRECACHE.some(url => /KaTeX_Main-Regular/.test(url)) && PRECACHE.some(url => /KaTeX_Math-Italic/.test(url)),
   'and the KaTeX faces a rendered question is set in');
 ok(PRECACHE.includes('/manifest.webmanifest'), 'the web manifest is installed, so the app can be added to a home screen offline');
@@ -285,6 +296,60 @@ eq(metered.sent[0]?.optional, false, 'on a metered 2G link the recogniser is lef
 const silent = fakeWorker();
 const timedOut = await warmOfflineBuild({ scope: silent.scope, timeoutMs: 30 });
 eq(timedOut, null, 'a worker that never answers resolves rather than leaving the page waiting on it forever');
+
+// ── 8 · Prefetching the instrument's on-demand tabs (issue #658) ───────────
+// Runtime only, outside the manifests above, so it moves no budget number. The
+// decision is the recogniser's: cheap link, online, and never mid-task.
+
+const tabWindow = ({ connection = { effectiveType: '4g', saveData: false }, onLine = true, busySelectors = [] } = {}) => ({
+  navigator: { onLine, connection, serviceWorker: {} },
+  document: { querySelector: (sel) => (busySelectors.some(b => sel.includes(b)) ? {} : null) }
+});
+const countingLoaders = () => { const calls = []; return { calls, loaders: ['map', 'report', 'progress', 'scripts'].map(n => () => { calls.push(n); return Promise.resolve(); }) }; };
+const now = (run) => run();
+
+{
+  const l = countingLoaders();
+  eq(await prefetchInstrumentTabs({ scope: tabWindow(), loaders: l.loaders, idle: now }), 'fetched', 'on an unmetered 4G link, online and idle, the instrument tabs are prefetched');
+  eq(l.calls.join(','), 'map,report,progress,scripts', 'and every on-demand tab chunk is asked for');
+}
+for (const [connection, label] of [
+  [{ effectiveType: '4g', saveData: true }, 'Data Saver'],
+  [{ effectiveType: '3g', saveData: false }, 'a 3G link'],
+  [{ effectiveType: '2g', saveData: false }, 'a 2G link'],
+  [undefined, 'a browser that reports no connection']
+]) {
+  const l = countingLoaders();
+  const scope = tabWindow({ connection });
+  if (!connection) delete scope.navigator.connection;
+  eq(await prefetchInstrumentTabs({ scope, loaders: l.loaders, idle: now }), 'skipped', `${label} means the tabs are not prefetched`);
+  eq(l.calls.length, 0, `and with ${label} nothing is fetched`);
+}
+{
+  const l = countingLoaders();
+  eq(await prefetchInstrumentTabs({ scope: tabWindow({ onLine: false }), loaders: l.loaders, idle: now }), 'skipped', 'offline, nothing is prefetched');
+  const noSw = tabWindow(); delete noSw.navigator.serviceWorker;
+  eq(await prefetchInstrumentTabs({ scope: noSw, loaders: l.loaders, idle: now }), 'skipped', 'with no service worker to keep them, nothing is prefetched');
+  eq(l.calls.length, 0, 'and neither case fetched anything');
+}
+ok(studentBusy(tabWindow({ busySelectors: ['.ink-stage'] })), 'an ink surface on screen counts as the student writing');
+ok(studentBusy(tabWindow({ busySelectors: ['aria-busy'] })), 'an aria-busy control counts as a Check in flight');
+{
+  const l = countingLoaders();
+  let idles = 0;
+  const result = await prefetchInstrumentTabs({ scope: tabWindow({ busySelectors: ['.ink-stage'] }), loaders: l.loaders, idle: (run) => { idles++; run(); }, attempts: 3 });
+  eq(result, 'busy', 'while the student keeps writing, the prefetch gives up rather than competing with the ink');
+  eq(idles, 3, 'after retrying at idle the stated number of times');
+  eq(l.calls.length, 0, 'and never fetches during inking');
+}
+{
+  const l = countingLoaders();
+  const scope = tabWindow({ busySelectors: ['aria-busy'] });
+  let idles2 = 0;
+  const result = await prefetchInstrumentTabs({ scope, loaders: l.loaders, idle: (run) => { if (++idles2 === 2) scope.document.querySelector = () => null; run(); }, attempts: 3 });
+  eq(result, 'fetched', 'a Check that finishes lets the next idle attempt prefetch');
+  eq(l.calls.length, 4, 'and that attempt asks for every tab');
+}
 
 // ── Report ───────────────────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
 import { constellation, MAP_W } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
+import './map.css';
 
 // The syllabus map (v1.1 instrument, design s6): the student's chapters as a
 // free constellation (instrument/mapLayout.js — column by prerequisite depth,
