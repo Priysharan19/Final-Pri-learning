@@ -173,6 +173,8 @@ jobs:
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
           grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          # #483: the CBSE X/XII answer-blind pilot stays review-only and unwired.
+          grep -Fq 'PASS 12 original CBSE X/XII questions, 12 distinct archetype identities, 6 each by grade' suites.log
           grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
           grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
           grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
