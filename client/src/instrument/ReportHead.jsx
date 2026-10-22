@@ -232,7 +232,7 @@ export default function ReportHead() {
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
           {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
-        <div data-report-method className="lux-report-hero"><b>{cur?.methodPct != null ? <Roll text={fmtPct(cur.methodPct)} /> : '—'}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+        <div data-report-method className={cur?.methodPct != null ? 'lux-report-hero' : undefined}><b>{cur?.methodPct != null ? <Roll text={fmtPct(cur.methodPct)} /> : '—'}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">

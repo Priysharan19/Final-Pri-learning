@@ -81,3 +81,6 @@ html.ui-instrument .in-led-open { padding: 4px 16px 16px; border-top: 1px solid 
   html.ui-instrument .in-flt:active { transform: none; }
 }
 @keyframes lux-scr-fade { from { opacity: 0; } to { opacity: 1; } }
+/* The corner score is the visible mark; the certified strip stays for
+   assistive technology (and its tests) without saying it twice on paper. */
+html.ui-instrument .in-led-row .in-led-res [data-mark-strip] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

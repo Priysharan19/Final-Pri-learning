@@ -190,7 +190,8 @@ export default function MapPage() {
     return () => clearTimeout(id);
   }, [!!origin.current, arrived, motion.reduced]);  // eslint-disable-line react-hooks/exhaustive-deps
   const hops = useMemo(() => (origin.current ? hopsFrom(origin.current, layout.nodes, layout.edges) : new Map()), [layout, !!origin.current]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const hopOf = id => Math.min(5, hops.has(id) ? hops.get(id) : 5);
+  // Chapters with no drawn link arrive with the third ring, not last.
+  const hopOf = id => Math.min(4, hops.has(id) ? hops.get(id) : 3);
   // An edge is drawn from its end nearer the origin, so the lines grow outward.
   const outward = e => (hopOf(e.to.row.id) < hopOf(e.from.row.id) ? `M${e.to.x} ${e.to.y} L ${e.from.x} ${e.from.y}` : e.d);
 

@@ -146,3 +146,6 @@ html.ui-instrument .in-reading-plot figcaption { font: 600 13px var(--c-sc); let
   html.ui-instrument .lux-report-hero b { animation: in-chart-fade 200ms linear both; }
   html.ui-instrument .in-chart-area, html.ui-instrument .in-chart-line, html.ui-instrument .in-chart-dot.is-end, html.ui-instrument .in-chart-val { animation: in-chart-fade 200ms linear both; }
 }
+/* The roll's own spans keep the headline's size (the figures' "b span" rule
+   is for the "/62" suffix only). */
+html.ui-instrument .in-report-figs b .lux-roll, html.ui-instrument .in-report-figs b .lux-roll span { font-size: inherit; color: inherit; letter-spacing: 0; }
