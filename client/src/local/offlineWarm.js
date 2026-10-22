@@ -91,3 +91,47 @@ export function scheduleOfflineWarm(scope = window) {
   scope.navigator.serviceWorker.ready.then(() => whenIdle(ask), () => { });
   scope.navigator.serviceWorker.addEventListener('controllerchange', () => whenIdle(ask), { once: true });
 }
+
+// ── The instrument's on-demand tabs ──────────────────────────────────────────
+// In an instrument build the Map, the Report and Scripts are ON_DEMAND (see
+// vite.config.js): not installed and not warmed, so the budget stays honest.
+// Without more, a student who never opened one online could not open it
+// offline (issue #658). Once the app has launched online, this asks for those
+// chunks at runtime, at idle, so the service worker's /assets/ runtime rule
+// keeps them. It goes through the module graph (the loaders are the same
+// import() calls the routes use), so it fetches exactly the chunks and CSS a
+// visit would and nothing else.
+//
+// The same rule as the recogniser decides whether the bytes are cheap
+// (optionalWarmAllowed: no Data Saver, no metered/2G/3G, no unknown link). It
+// also needs to be online, and it never runs while the student is writing or a
+// Check is running: an ink surface on screen or an aria-busy control means
+// "later", tried again at the next idle, up to a few times.
+
+/** Is the student mid-task right now (inking, or a Check in flight)? */
+export function studentBusy(scope = typeof window === 'undefined' ? {} : window) {
+  const doc = scope.document;
+  if (!doc?.querySelector) return false;
+  return Boolean(doc.querySelector('.ink-stage, [aria-busy="true"]'));
+}
+
+/**
+ * Prefetch the instrument's on-demand tab chunks once the page is idle.
+ * Resolves with what happened, so the decision can be tested without a browser:
+ *   'skipped' (link not cheap, offline, or no service worker), 'busy' (the
+ *   student stayed mid-task for every attempt) or 'fetched'.
+ */
+export function prefetchInstrumentTabs({ scope = window, loaders = [], idle = whenIdle, attempts = 5 } = {}) {
+  if (!loaders.length || !scope.navigator?.serviceWorker) return Promise.resolve('skipped');
+  if (scope.navigator.onLine === false || !optionalWarmAllowed(scope)) return Promise.resolve('skipped');
+  return new Promise((resolve) => {
+    const tryOnce = (left) => idle(() => {
+      if (studentBusy(scope)) {
+        if (left > 1) tryOnce(left - 1); else resolve('busy');
+        return;
+      }
+      Promise.allSettled(loaders.map(load => load())).then(() => resolve('fetched'));
+    });
+    tryOnce(attempts);
+  });
+}

@@ -6,6 +6,7 @@ import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
 import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { prefetchInstrumentTabs } from './local/offlineWarm.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
@@ -69,6 +70,14 @@ const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><P
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   import('./instrument/instrument.css');
+  // The Map, Report and Scripts tabs are on demand in this build; after an
+  // online launch, at idle and only on a cheap link, fetch them so the service
+  // worker keeps them for offline (local/offlineWarm.js, issue #658).
+  void prefetchInstrumentTabs({
+    scope: window,
+    loaders: [() => import('./instrument/MapPage.jsx'), () => import('./instrument/ReportHead.jsx'),
+      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx')]
+  });
 }
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.

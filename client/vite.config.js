@@ -207,11 +207,15 @@ export const ON_DEMAND = [
   // A build made with the flag on is the opposite case, and it pays for its
   // own interface by not warming what that interface leaves unpainted or
   // reaches only by an explicit visit:
-  //   · Inter. Every interface token (--font, --font-display) is remapped to
-  //     Instrument Sans in instrument.css, so no rule of this build paints in
-  //     'Inter Variable'. Instrument Sans takes Inter's place in the install
-  //     (BOOT_FONTS below); Inter is still declared, so a browser that ever
-  //     asks for it fetches it and keeps it.
+  //   · Inter. Once instrument.css has loaded, every interface token (--font,
+  //     --font-display) is remapped to Instrument Sans. Before that, the boot
+  //     theme.css still names 'Inter Variable', so the moment between first
+  //     paint and instrument.css arriving paints in Inter where it is cached,
+  //     and in the system fallback face on an offline first open where it is
+  //     not. That is a brief flash of the fallback face, not missing text.
+  //     Instrument Sans takes Inter's place in the install (BOOT_FONTS below);
+  //     Inter is still declared, so a browser that asks for it fetches it and
+  //     keeps it.
   //   · Instrument Sans's Latin Extended subset, by the Inter script-subset
   //     argument above: fetched only when a glyph in its range appears.
   //   · The Map, the Report (ReportHead with the Progress page under it) and
@@ -223,9 +227,9 @@ export const ON_DEMAND = [
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
     [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
   ] : [
-    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
+    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
 
   // The previous-year archive is reached only by a student who asks for past
