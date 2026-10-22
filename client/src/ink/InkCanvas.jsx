@@ -97,11 +97,9 @@ const InkCanvas = forwardRef(function InkCanvas({
       && cs.getPropertyValue('--c-pen').trim())
       || cs.getPropertyValue('--ink').trim() || '#efece1';
     if (OUTLINE_BUILD) {
-      // Wet ink reads wet on either paper: dark ink deepens under a black
-      // glaze, light ink on midnight enamel lifts under a light one.
-      const el = document.documentElement, theme = el.getAttribute('data-theme');
-      const night = theme === 'dark' || (theme !== 'light' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
-      glazeRef.current = night ? ['#fff', 0.3] : ['#000', 0.12];
+      // The wet glaze is a theme token (write.css): it deepens dark ink on
+      // paper and lifts light ink on midnight enamel.
+      glazeRef.current = [cs.getPropertyValue('--wc-glaze').trim() || '#000', parseFloat(cs.getPropertyValue('--wc-glaze-a')) || 0.12];
     }
   }, []);
 
@@ -381,7 +379,10 @@ const InkCanvas = forwardRef(function InkCanvas({
   useEffect(() => {
     const mo = new MutationObserver(redrawBase);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => mo.disconnect();
+    // A system light/dark switch changes the tokens without touching data-theme.
+    const mq = OUTLINE_BUILD && typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+    mq?.addEventListener?.('change', redrawBase);
+    return () => { mo.disconnect(); mq?.removeEventListener?.('change', redrawBase); };
   }, [redrawBase]);
 
   // ── input (native listeners — no per-event React overhead) ──

@@ -56,7 +56,7 @@ export function useCheckCeremony(stageRef, key) {
     rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
     root.style.setProperty('--wc-u', `${rows.length * PER}ms`);
     lastSpan = rows.length * PER + 1000;
-    root.classList.remove('wc-go'); void root.offsetWidth; root.classList.add('wc-go');
+    root.classList.remove('wc-go', 'wc-done'); void root.offsetWidth; root.classList.add('wc-go');
     // Nothing to strike (stale, unsure or unmarked lines): no ceremony, and
     // the date window, seeing none running, shows the score at once.
     if (!rows.length) return undefined;
@@ -64,7 +64,7 @@ export function useCheckCeremony(stageRef, key) {
     let on = true;
     const stop = () => { if (on) { on = false; running--; } };
     // Only a ceremony that ran to its end lets the score into the window.
-    const end = () => { if (on) { stop(); window.dispatchEvent(new Event('pri:check-marked')); } };
+    const end = () => { if (on) { stop(); root.classList.add('wc-done'); window.dispatchEvent(new Event('pri:check-marked')); } };
     const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const t = setTimeout(end, still ? 0 : rows.length * PER + (ms(cs, '--wc-d-under') || 320));
     return () => { clearTimeout(t); stop(); };

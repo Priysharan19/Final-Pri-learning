@@ -1,15 +1,23 @@
 /* Pri Luxury · Write & Check (C "Examiner's Chronograph", depth from A).
-   Instrument build only (loaded by StepMarks.jsx; `write` is in the flag-off
-   skip list). Every mark drawn here is the deterministic engine's verdict.
-   Timings are tokens: margin.css's --c-d-row / --c-d-set / --c-ease-*, plus
-   C's stamp, flip and underline values below. useCheckCeremony reads
-   row + gap + stamp + rest from these tokens for each row's slot (--wc-d). */
+   Instrument build only (loaded by InkAnswer/StepMarks; `write` is in the
+   flag-off skip list). Every mark drawn here is the deterministic engine's
+   verdict. Every timing and dimension is a token: margin.css's --c-d-row,
+   --c-d-set, --c-ease-*, --c-line, plus C's values below. useCheckCeremony
+   reads row + gap + stamp + rest (and the underline) from these tokens. */
 html.ui-instrument {
-  --wc-col: 200px;
+  --wc-col: 200px; --wc-row-pad: 10px; --wc-row-min: 44px; --wc-row-size: 14px;
+  --wc-mark: 34px; --wc-ring-out: 3px; --wc-rise-z: 36px; --wc-set-y: 6px;
+  --wc-depth: 1400px; --wc-flip-depth: 200px;
+  --wc-stamp-from: 1.7; --wc-stamp-dip: .9; --wc-ring-from: 1.9; --wc-ring-at: 1.05; --wc-ring-a: .55;
   --wc-d-gap: 40ms; --wc-d-stamp: 340ms; --wc-d-rest: 220ms; --wc-d-rise: 600ms; --wc-d-under: 320ms;
   --wc-d-flip: 170ms; --wc-d-flip-wait: 110ms;
   --wc-ease-stamp: cubic-bezier(.7, 0, .9, .6); --wc-ease-settle: cubic-bezier(.2, 0, .2, 1); --wc-ease-flip: cubic-bezier(0, 0, .3, 1);
+  --wc-win-w: 52px; --wc-win-pad: 4px 8px; --wc-win-r: 2px;
+  /* Wet ink glaze (read by InkCanvas): deepens ink on cotton paper. */
+  --wc-glaze: #000; --wc-glaze-a: .12;
 }
+/* …and lifts light ink on midnight enamel. */
+html.ui-instrument[data-theme="dark"] { --wc-glaze: #fff; --wc-glaze-a: .3; }
 
 /* iPad: C's margin column beside the writing, ruled off in copper. The
    canvas gives up the column (so no one writes under the marks); the
@@ -17,46 +25,47 @@ html.ui-instrument {
 @media (min-width: 561px) {
   html.ui-instrument .ink-stage { padding-inline-end: var(--wc-col); }
   html.ui-instrument .ink-stage::before {
-    content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: var(--wc-col);
-    z-index: 1; background: var(--c-sheet); border-inline-start: var(--c-line) solid var(--c-copper); pointer-events: none;
+    content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: var(--wc-col); z-index: 1;
+    background: var(--c-sheet); border-inline-start: var(--c-line) solid var(--c-copper); pointer-events: none;
   }
   html.ui-instrument .in-read {
     right: auto; inset-inline-end: 0; width: var(--wc-col); justify-content: space-between;
-    padding: 0 10px; min-height: 44px; border-radius: 0; background: none; box-shadow: none;
+    padding: 0 var(--wc-row-pad); min-height: var(--wc-row-min); border-radius: 0; background: none; box-shadow: none;
     border-block-end: var(--c-line) solid var(--c-hair-2); animation: none;
-    font-size: 14px; color: var(--c-ink);   /* the maths stays in KaTeX's Computer Modern */
+    font-size: var(--wc-row-size); color: var(--c-ink);   /* the maths stays in KaTeX's Computer Modern */
   }
   html.ui-instrument .in-read.is-slip { background: var(--c-copper-soft); box-shadow: none; }
   html.ui-instrument .in-read .katex { font-size: 1em; }
-  html.ui-instrument .in-read-cf { width: 28px; background: var(--c-hair-2); }
-  html.ui-instrument .in-read-cf i { background: var(--c-ink-3); }
+  /* The reader's confidence is shown only where it matters: an unsure line. */
+  html.ui-instrument .in-read:not(.is-unc) .in-read-cf { display: none; }
   [data-wc-row] .in-read-tg { display: none; }   /* the stamp says it */
-  .ink-line > .wc-plane { display: none; }   /* the list keeps its badge */
+  .ink-line > .wc-plane { display: none; }        /* the list keeps its badge */
   .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: inline; }
 }
 
 .ink-verdict[data-wc-stamped], .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: none; }
 .ink-line > .wc-plane { margin-inline-start: auto; order: 9; }
-[data-wc-row] { perspective: 1400px; }   /* the plane the mark rises on */
-.wc-plane { position: relative; display: grid; transform: translateZ(36px); }
-.wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
-.wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
+[data-wc-row] { perspective: var(--wc-depth); }   /* the plane the mark rises on */
+.wc-plane { position: relative; display: grid; width: var(--wc-mark); height: var(--wc-mark); transform: translateZ(var(--wc-rise-z)); }
+.wc-stamp { width: 100%; height: 100%; overflow: visible; opacity: 0; filter: drop-shadow(0 var(--c-line) 0 var(--c-emboss-hi)) drop-shadow(0 calc(-1 * var(--c-line)) 0 var(--c-emboss-lo)); }
+.wc-go .wc-stamp, .wc-done .wc-stamp { opacity: 1; }   /* never shown before it is struck */
+.wc-ring { position: absolute; inset: calc(-1 * var(--wc-ring-out)); border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
 .ink-verdict-layer .ink-underline[data-wc-first-error] { border-block-end-color: var(--c-copper); transform-origin: left; }
 .ink-verdict-layer .ink-underline[data-wc-first-error]:dir(rtl) { transform-origin: right; }
 
-.wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row var(--c-d-row) var(--c-ease-row) var(--wc-d) both; }
-.wc-go [data-wc-row] .wc-stamp { animation: wc-stamp var(--wc-d-stamp) var(--wc-ease-stamp) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)) both; }
-.wc-go [data-wc-row] .wc-ring { animation: wc-ring var(--c-d-set) var(--c-ease-press) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)); }
-.wc-go [data-wc-row] .wc-plane { animation: wc-rise var(--wc-d-rise) var(--c-ease-row) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap) + var(--wc-d-stamp) * .55) both; }
-.wc-go .ink-underline[data-wc-first-error] { animation: wc-under var(--wc-d-under) var(--c-ease-row) var(--wc-u) both; }
-@keyframes wc-row { from { opacity: 0; transform: translateY(6px); } }
-@keyframes wc-stamp { 0% { opacity: 0; transform: scale(1.7); } 55% { transform: scale(.9); animation-timing-function: var(--wc-ease-settle); } }
-@keyframes wc-ring { 0% { transform: scale(1.9); } 60% { opacity: .55; transform: scale(1.05); } }
+.wc-go:not(.wc-done) [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row var(--c-d-row) var(--c-ease-row) var(--wc-d) both; }
+.wc-go:not(.wc-done) [data-wc-row] .wc-stamp { animation: wc-stamp var(--wc-d-stamp) var(--wc-ease-stamp) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)) both; }
+.wc-go:not(.wc-done) [data-wc-row] .wc-ring { animation: wc-ring var(--c-d-set) var(--c-ease-press) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)); }
+.wc-go:not(.wc-done) [data-wc-row] .wc-plane { animation: wc-rise var(--wc-d-rise) var(--c-ease-row) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap) + var(--wc-d-stamp) * .55) both; }
+.wc-go:not(.wc-done) .ink-underline[data-wc-first-error] { animation: wc-under var(--wc-d-under) var(--c-ease-row) var(--wc-u) both; }
+@keyframes wc-row { from { opacity: 0; transform: translateY(var(--wc-set-y)); } }
+@keyframes wc-stamp { 0% { opacity: 0; transform: scale(var(--wc-stamp-from)); } 55% { transform: scale(var(--wc-stamp-dip)); animation-timing-function: var(--wc-ease-settle); } }
+@keyframes wc-ring { 0% { transform: scale(var(--wc-ring-from)); } 60% { opacity: var(--wc-ring-a); transform: scale(var(--wc-ring-at)); } }
 @keyframes wc-rise { from { transform: none; } }
 @keyframes wc-under { from { transform: scaleX(0); } }
 
 /* Date window: STIX 400 tabular, a calendar complication. */
-.wc-datewin { display: inline-block; min-width: 52px; padding: 4px 8px; text-align: center; perspective: 200px; background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: 2px; box-shadow: var(--c-deboss); font: 400 14px/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); }
+.wc-datewin { display: inline-block; min-width: var(--wc-win-w); padding: var(--wc-win-pad); text-align: center; perspective: var(--wc-flip-depth); background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: var(--wc-win-r); box-shadow: var(--c-deboss); font: 400 var(--wc-row-size)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); }
 .wc-datewin span { display: inline-block; animation: wc-flip var(--wc-d-flip) var(--wc-ease-flip) var(--wc-d-flip-wait) both; }
 .wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
 @keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
