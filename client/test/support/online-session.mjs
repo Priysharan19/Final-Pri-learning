@@ -545,6 +545,7 @@ function onlineSession(platform, ctx, page) {
     await platform.grantPremium(session.account.id);
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const deadline = Date.now() + 30000;
+    let opened = Date.now();
     for (;;) {
       const plan = await page.evaluate(accountId => new Promise(done => {
         const open = indexedDB.open('pri-learning');
@@ -557,8 +558,11 @@ function onlineSession(platform, ctx, page) {
         };
       }), String(session.account.id));
       if (plan === 'premium') return;
-      if (Date.now() > deadline) throw new Error(`online-session: the device never learned the Premium grant (plan ${plan})`);
+      if (Date.now() > deadline) throw new Error(`online-session: the device never learned the Premium grant (plan ${plan}; ${JSON.stringify(calls.filter(c => /entitlements|account\/me/.test(c.path)).slice(-4).map(c => `${c.status} ${c.path}`))})`);
       await page.waitForTimeout(250);
+      // Settings verifies the session as it opens; a load that raced the
+      // profile's own start is opened again, never short-cut on the device.
+      if (Date.now() - opened > 5000) { await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' }); opened = Date.now(); }
     }
   }
 
