@@ -49,9 +49,26 @@ import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
-import { MarkStamp, engineMark, useCheckCeremony } from '../instrument/StepMarks.jsx';
+import { CLOUD_WORKING_ENGINE } from './cloudWorking.js';
 // v1.1 instrument: the student's own equations, drawn under the reading.
 const INSTRUMENT_PLOT = featureEnabled('instrument');
+// Pri Luxury Write & Check: the margin marks and the Check ceremony, a chunk of
+// the instrument build only. Fetched as this module loads, so it has arrived
+// long before the first Check.
+const writeMarks = INSTRUMENT_PLOT ? import('../instrument/StepMarks.jsx') : null;
+const MarkStamp = writeMarks ? React.lazy(() => writeMarks.then(m => ({ default: m.MarkStamp }))) : () => null;
+const CheckCeremony = writeMarks ? React.lazy(() => writeMarks.then(m => ({ default: m.CheckCeremony }))) : () => null;
+/** The stamp a line earns, from the deterministic engine's verdict only. A
+ *  line the second (model) read judged is never stamped: an opinion is not a
+ *  mark. ✓ circle, ✗ diamond; the dashed ecf capsule only if the engine ever
+ *  reports a carried line (it does not today). */
+export function engineMark(v) {
+  if (!v || v.source === CLOUD_WORKING_ENGINE) return null;
+  if (v.status === 'ok') return 'ok';
+  if (v.status === 'break' || v.status === 'wrong') return 'x';
+  if (v.status === 'ecf') return 'ecf';
+  return null;
+}
 
 // Engine names are for developers and evaluators, not students: shown in dev
 // builds, LAN research mode, or with ?inkdiag=1.
@@ -113,7 +130,6 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const stageRef = useRef(null);
   const ceremonyKey = INSTRUMENT_PLOT && Array.isArray(lineVerdicts) && lineVerdicts.some(engineMark)
     ? lineVerdicts.map(v => engineMark(v) || '-').join('') : null;
-  useCheckCeremony(stageRef, ceremonyKey);
   const { user } = useApp();
   const inRouter = useInRouterContext();
   const userRef = useRef(user);
@@ -585,6 +601,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             (which stays the accessible source and keeps Edit / I wrote): only
             on lines the geometry plausibly matched, the bar only from the
             reader's own confidence, the tag only from the engine's verdict. */}
+        {ceremonyKey && <React.Suspense fallback={null}><CheckCeremony sheetRef={stageRef} ceremonyKey={ceremonyKey} /></React.Suspense>}
         {INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
           <div className="in-read-layer" aria-hidden="true" data-reading-chips={rec.lines.filter(l => l.box).length}>
             {rec.lines.map((line, li) => {
@@ -610,7 +627,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       </span>
                     )}
                     {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
-                    <MarkStamp kind={mark} />
+                    {mark && <React.Suspense fallback={null}><MarkStamp kind={mark} /></React.Suspense>}
                   </span>
                 </React.Fragment>
               );

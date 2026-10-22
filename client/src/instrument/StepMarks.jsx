@@ -1,31 +1,14 @@
-import React, { useLayoutEffect } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
-import { featureEnabled } from '../platform/features.js';
-import { CLOUD_WORKING_ENGINE } from '../ink/cloudWorking.js';
 import { MarkGlyph } from './margin/MarginIcon.jsx';
-import { reduced, rowReveal, embossStamp, planeSpring } from './margin/motion.js';
+import { reduced, rowReveal, embossStamp, planeSpring, flip } from './margin/motion.js';
 
-// Write & Check (Pri Luxury, direction C): the margin's engine marks and the
-// Check ceremony. Its stylesheet is a lazily loaded chunk of the instrument
-// build only (`write` in the flag-off skip list), so the classic build gains
-// nothing but these few functions.
-const INSTRUMENT = featureEnabled('instrument');
-if (INSTRUMENT && typeof document !== 'undefined') import('./margin/write.css');
-
-/**
- * The stamp a line earns, from the deterministic engine's verdict only. A
- * line the second (model) read judged is never stamped: a model's opinion is
- * not a mark. Shapes differ as well as colours: ✓ circle, ✗ diamond, dashed
- * ecf capsule (drawn only if the engine ever reports a carried line).
- */
-export function engineMark(v) {
-  if (!v || v.source === CLOUD_WORKING_ENGINE) return null;
-  if (v.status === 'ok') return 'ok';
-  if (v.status === 'break' || v.status === 'wrong') return 'x';
-  if (v.status === 'ecf') return 'ecf';
-  return null;
-}
+// Write & Check (Pri Luxury, direction C): the margin's engine marks, the
+// Check ceremony and the date window. This module is only ever loaded lazily,
+// by the instrument build (StepMarks and write are in the flag-off skip list
+// in vite.config.js), so the classic build carries none of it.
+import './margin/write.css';
 
 export function MarkStamp({ kind }) {
   if (!kind) return null;
@@ -94,6 +77,53 @@ export function useCheckCeremony(sheetRef, key) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+}
+
+/**
+ * The date window (Pri Luxury, direction C): "– /3" until the engine has
+ * decided, then the score flips in like a calendar complication, after the
+ * margin's marks are struck (`pri:check-marked`), or at once when there is no
+ * ceremony to wait for (typed answers, Reduce Motion). Display only and
+ * aria-hidden: the verdict is announced once, by the card's own live region.
+ */
+export function DateWindow({ score, outOf }) {
+  const [shown, setShown] = useState(score);
+  const flipRef = useRef(null);
+  useEffect(() => {
+    if (score == null) { setShown(null); return undefined; }
+    let fired = false;
+    const go = () => { if (!fired) { fired = true; setShown(score); } };
+    const onMarked = () => go();
+    window.addEventListener('pri:check-marked', onMarked);
+    // No margin ceremony is coming (nothing was written, or it already ran):
+    // the figure lands after the longest ceremony could take, never before.
+    const hasRows = typeof document !== 'undefined' && document.querySelector('[data-wc-row]');
+    const fallback = setTimeout(go, hasRows && !reduced() ? 6000 : 0);
+    return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); };
+  }, [score]);
+  // The window's faces are owned by flip() (motion.js): React renders the
+  // empty frame and never reconciles inside it.
+  const face = shown == null ? `– /${outOf}` : `${shown} /${outOf}`;
+  useEffect(() => {
+    const win = flipRef.current;
+    if (!win) return undefined;
+    if (!win.firstChild) { const f = document.createElement('span'); f.textContent = face; win.appendChild(f); return undefined; }
+    if (win.lastElementChild?.textContent === face) return undefined;
+    const h = flip(win, face);
+    return () => h.finish();
+  }, [face]);
+  if (!Number.isInteger(outOf) || outOf < 1) return null;
+  return (
+    <span className="wc-datewin" aria-hidden="true" data-date-window={shown == null ? 'pending' : `${shown}/${outOf}`}>
+      <span className="wc-flip" ref={flipRef} />
+    </span>
+  );
+}
+
+/** The ceremony as a component, so InkAnswer can load it lazily. Renders nothing. */
+export function CheckCeremony({ sheetRef, ceremonyKey }) {
+  useCheckCeremony(sheetRef, ceremonyKey);
+  return null;
 }
 
 export default function StepMarks({ markRows }) {

@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
-import { flip, reduced } from './margin/motion.js';
 
 // v1.1 instrument: the question header's right side (design s4 `.qh`). The
 // number is a real count — the questions shown in this visit to Practice, or
@@ -18,46 +17,9 @@ const clock = ms => {
 };
 
 
-/**
- * The date window (Pri Luxury, direction C): "– /3" until the engine has
- * decided, then the score flips in like a calendar complication, after the
- * margin's marks are struck (`pri:check-marked`), or at once when there is no
- * ceremony to wait for (typed answers, Reduce Motion). Display only and
- * aria-hidden: the verdict is announced once, by the card's own live region.
- */
-function DateWindow({ score, outOf }) {
-  const [shown, setShown] = useState(score);
-  const flipRef = useRef(null);
-  useEffect(() => {
-    if (score == null) { setShown(null); return undefined; }
-    let fired = false;
-    const go = () => { if (!fired) { fired = true; setShown(score); } };
-    const onMarked = () => go();
-    window.addEventListener('pri:check-marked', onMarked);
-    // No margin ceremony is coming (nothing was written, or it already ran):
-    // the figure lands after the longest ceremony could take, never before.
-    const hasRows = typeof document !== 'undefined' && document.querySelector('[data-wc-row]');
-    const fallback = setTimeout(go, hasRows && !reduced() ? 6000 : 0);
-    return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); };
-  }, [score]);
-  // The window's faces are owned by flip() (motion.js): React renders the
-  // empty frame and never reconciles inside it.
-  const face = shown == null ? `– /${outOf}` : `${shown} /${outOf}`;
-  useEffect(() => {
-    const win = flipRef.current;
-    if (!win) return undefined;
-    if (!win.firstChild) { const f = document.createElement('span'); f.textContent = face; win.appendChild(f); return undefined; }
-    if (win.lastElementChild?.textContent === face) return undefined;
-    const h = flip(win, face);
-    return () => h.finish();
-  }, [face]);
-  if (!Number.isInteger(outOf) || outOf < 1) return null;
-  return (
-    <span className="wc-datewin" aria-hidden="true" data-date-window={shown == null ? 'pending' : `${shown}/${outOf}`}>
-      <span className="wc-flip" ref={flipRef} />
-    </span>
-  );
-}
+// The date window and the margin marks live in StepMarks.jsx, a chunk of the
+// instrument build only, so the classic build carries none of their motion.
+const DateWindow = React.lazy(() => import('./StepMarks.jsx').then(m => ({ default: m.DateWindow })));
 
 export default function QuestionHead({ index, length = null, answered = 0, startedAt, stopped = false, score = null, outOf = null }) {
   const t = useT();
@@ -86,7 +48,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
       {!bounded && answered > 0 && <span className="in-qh-a">{t('inst.answeredSession', { n: answered })}</span>}
       <span className="in-qh-sep" aria-hidden="true">·</span>
       <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer>{clock(now - startedAt)}</span>
-      <DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} />
+      <React.Suspense fallback={null}><DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} /></React.Suspense>
     </span>
   );
 }
