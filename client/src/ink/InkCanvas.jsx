@@ -35,6 +35,9 @@ const RAW_UPDATE = typeof window !== 'undefined' && 'onpointerrawupdate' in wind
 // Pri Luxury (instrument build only): strokes are painted as tapered filled
 // outlines with a wet-ink settle. Presentation only: the points recorded,
 // stored, read and marked are the same in both renderers.
+/* global __PRI_FEATURE_INSTRUMENT__ */
+// A compile-time constant, so the classic build drops the outline renderer.
+const OUTLINE_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
 const outlineInkOn = () => typeof document !== 'undefined' && document.documentElement.classList.contains('ui-instrument');
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Wet ink: 12% darker (a black glaze at .12) and 8% wider, settling over 400ms.
@@ -87,7 +90,7 @@ const InkCanvas = forwardRef(function InkCanvas({
    *  in the frame loop — only when the theme actually changes. */
   const refreshInk = useCallback(() => {
     const cs = getComputedStyle(document.documentElement);
-    inkRef.current = (outlineRef.current
+    inkRef.current = ((OUTLINE_BUILD && outlineRef.current)
       && (cs.getPropertyValue('--c-pen').trim() || cs.getPropertyValue('--wc-pen').trim()))
       || cs.getPropertyValue('--ink').trim() || '#efece1';
   }, []);
@@ -147,7 +150,7 @@ const InkCanvas = forwardRef(function InkCanvas({
     ctx.globalAlpha = 1;
   };
 
-  const paintStroke = (ctx, pts, color, alpha = 1) => (outlineRef.current
+  const paintStroke = (ctx, pts, color, alpha = 1) => ((OUTLINE_BUILD && outlineRef.current)
     ? paintOutline(ctx, pts, color, alpha)
     : paintRange(ctx, pts, 1, pts.length, color, alpha));
   // k: wetness 1 → 0. The glaze is a second fill of the same outline.
@@ -220,7 +223,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   const renderLive = useCallback(() => {
     rafRef.current = 0;
     if (!dirtyRef.current) return;
-    if (outlineRef.current) { dirtyRef.current = false; renderOutline(); return; }
+    if ((OUTLINE_BUILD && outlineRef.current)) { dirtyRef.current = false; renderOutline(); return; }
     dirtyRef.current = false;
     const ctx = ctxRef.current.live;
     const cur = currentRef.current;
@@ -348,7 +351,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       predRectRef.current = null;
       predictedRef.current = [];
       redrawBase();
-      if (outlineRef.current && wetRef.current.length) { dirtyRef.current = true; scheduleFrame(); }
+      if ((OUTLINE_BUILD && outlineRef.current) && wetRef.current.length) { dirtyRef.current = true; scheduleFrame(); }
       // The live layer is empty now (or its points moved): the stroke in
       // progress is painted again from its first point on the next frame.
       if (currentRef.current) {
@@ -544,13 +547,13 @@ const InkCanvas = forwardRef(function InkCanvas({
           strokesRef.current = [...strokesRef.current, stroke];
           // Outline ink settles wet on the live layer first; under Reduce
           // Motion it lands settled.
-          if (outlineRef.current && !reducedMotion()) wetRef.current = [...wetRef.current, { stroke, at: performance.now() }];
+          if ((OUTLINE_BUILD && outlineRef.current) && !reducedMotion()) wetRef.current = [...wetRef.current, { stroke, at: performance.now() }];
           else paintStroke(ctxRef.current.base, points, inkRef.current);
           notify();
         }
         // Measured only after the stroke is safely committed.
         strokeEnded(e, { cancelled: e.type !== 'pointerup', kept: points.length });
-        if (outlineRef.current) { dirtyRef.current = true; scheduleFrame(); } else clearLive();
+        if ((OUTLINE_BUILD && outlineRef.current)) { dirtyRef.current = true; scheduleFrame(); } else clearLive();
         force(x => x + 1);
       }
     };

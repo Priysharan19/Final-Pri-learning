@@ -11,17 +11,21 @@ import { MarkGlyph } from './margin/MarginIcon.jsx';
 // flip, same curves and durations as motion.js) so the ceremony costs the
 // install a few hundred bytes; write.css is a CSS chunk of the instrument
 // build only (`write` in the flag-off skip list).
-if (featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
+/* global __PRI_FEATURE_INSTRUMENT__ */
+// Compile-time: the classic build folds every export below to a no-op and
+// carries none of this (nor MarkGlyph).
+const ON = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
+if (ON && featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
 
 /** The stamp a line earns. A line the second (model) read judged
  *  (source 'cloud-working') is never stamped: an opinion is not a mark. */
 export function engineMark(v) {
-  if (!v || v.source === 'cloud-working') return null;
+  if (!ON || !v || v.source === 'cloud-working') return null;
   return v.status === 'ok' ? 'ok' : v.status === 'break' || v.status === 'wrong' ? 'x' : v.status === 'ecf' ? 'ecf' : null;
 }
 
 export function MarkStamp({ kind }) {
-  return kind ? <span className="wc-plane" aria-hidden="true"><i className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
+  return ON && kind ? <span className="wc-plane" aria-hidden="true"><i className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
 }
 
 // Ceremonies striking marks now; the date window waits only while one is.
@@ -39,7 +43,7 @@ const PER = 860;   // C section 5: set a row 260ms, strike 340ms, rest 220ms
 export function useCheckCeremony(stageRef, key) {
   useLayoutEffect(() => {
     const root = stageRef.current?.parentElement;
-    if (!root || !key) return undefined;
+    if (!ON || !root || !key) return undefined;
     // Visible rows only: the chips on a tablet, the reading list on a phone.
     const rows = [...root.querySelectorAll('[data-wc-row]')].filter(r => r.querySelector('.wc-plane')?.getClientRects().length);
     rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
@@ -68,7 +72,7 @@ export function DateWindow({ score, outOf }) {
     const cap = setTimeout(go, 6000);
     return () => { removeEventListener('pri:check-marked', go); cancelAnimationFrame(f); clearTimeout(cap); };
   }, [score]);
-  return outOf >= 1 ? <span className="wc-datewin" aria-hidden="true" data-date-window={shown ?? 'pending'}><span key={shown ?? '-'}>{shown ?? '–'} /{outOf}</span></span> : null;
+  return ON && outOf >= 1 ? <span className="wc-datewin" aria-hidden="true" data-date-window={shown ?? 'pending'}><span key={shown ?? '-'}>{shown ?? '–'} /{outOf}</span></span> : null;
 }
 
 export default function StepMarks({ markRows }) {
