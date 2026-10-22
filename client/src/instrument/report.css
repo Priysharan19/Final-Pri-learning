@@ -85,7 +85,7 @@ html.ui-instrument .in-report-figs em { font: 400 14px var(--c-text); color: var
 html.ui-instrument .in-report-figs em.is-down { color: var(--c-ink-2); }
 html.ui-instrument .lux-report-hero { grid-column: 1 / -1; order: -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
 html.ui-instrument .in-report-figs > .lux-report-hero { padding-top: 18px; }
-html.ui-instrument .lux-report-hero b:has(.lux-roll) { font-size: clamp(72px, 12vw, 140px); line-height: .9; }
+html.ui-instrument .lux-report-hero b { font-size: clamp(72px, 12vw, 140px); line-height: .9; }
 html.ui-instrument .lux-report-hero small { order: -1; flex-basis: 100%; margin: 0 0 4px; }
 html.ui-instrument .lux-report-hero em { font-size: 16px; }
 
@@ -153,3 +153,38 @@ html.ui-instrument .in-report-figs b .lux-roll, html.ui-instrument .in-report-fi
 /* C's chart is ruled, not graph paper: the 33 vertical grid lines (drawn
    first) go, and every other horizontal rule is kept as an engraved hair. */
 html.ui-instrument .in-chart-grid line:nth-child(-n+33), html.ui-instrument .in-chart-grid line:nth-child(even) { display: none; }
+
+/* ── The Progress page under the Report, in C ─────────────────────────────
+   It is the shared page (IndiaProgress / ProgressAustralia), so it is
+   restyled here, scoped to .pg inside the instrument build, by remapping the
+   legacy theme tokens to C and then flattening its cards to paper with
+   engraved rules. Loads with the Report chunk, never in the install. */
+html.ui-instrument .pg {
+  --surface: var(--c-sheet); --surface-2: var(--c-paper-2); --surface-3: var(--c-hair-2);
+  --surface-default: var(--c-sheet); --surface-raised: var(--c-sheet); --surface-sunken: var(--c-paper-2);
+  --hairline: var(--c-hair); --hairline-faint: var(--c-hair-2); --hairline-strong: var(--c-hair);
+  --border-default: var(--c-hair); --border-subtle: var(--c-hair-2); --border-strong: var(--c-hair);
+  --ink: var(--c-ink); --ink-2: var(--c-ink-2); --ink-3: var(--c-ink-3);
+  --text-primary: var(--c-ink); --text-secondary: var(--c-ink-2); --text-tertiary: var(--c-ink-3);
+  --accent: var(--c-teal); --accent-soft: var(--c-teal-soft); --accent-subtle: var(--c-teal-soft); --info: var(--c-teal); --good: var(--c-teal); --bad: var(--c-copper);
+  --font: var(--c-text); --font-display: var(--c-serif);
+  color: var(--c-ink); font-family: var(--c-text);
+}
+html.ui-instrument .pg .card { background: none; border: 0; border-top: 1px solid var(--c-hair); border-radius: 0; box-shadow: none; padding: 16px 0 18px; }
+html.ui-instrument .pg .card-title, html.ui-instrument .pg .sc-label { font: 600 13px var(--c-sc); letter-spacing: .14em; text-transform: none; color: var(--c-ink-2); }
+html.ui-instrument .pg-head .pg-title, html.ui-instrument .pg h2, html.ui-instrument .pg h3 { font: 400 28px/1.1 var(--c-serif); letter-spacing: -.01em; color: var(--c-ink); }
+html.ui-instrument .pg .muted, html.ui-instrument .pg .sub { color: var(--c-ink-2); font-family: var(--c-text); }
+html.ui-instrument .pg .big { font: 400 40px/1 var(--c-serif); font-variant-numeric: tabular-nums; color: var(--c-ink); letter-spacing: 0; }
+html.ui-instrument .pg-facts { gap: 0; }
+html.ui-instrument .pg-facts > .card { padding: 14px 16px 14px 0; }
+html.ui-instrument .pg-facts > .card + .card { border-left: 1px solid var(--c-hair-2); padding-left: 16px; }
+html.ui-instrument .pg-coverage-track { height: 1px; border-radius: 0; background: var(--c-hair); overflow: visible; }
+html.ui-instrument .pg-coverage-track > div { height: 3px; margin-top: -1px; background: var(--c-teal); }
+html.ui-instrument .pg .syl-table { font: 400 15px var(--c-text); font-variant-numeric: tabular-nums; }
+html.ui-instrument .pg .syl-table th { background: none; border-bottom: 1px solid var(--c-hair); font: 600 13px var(--c-sc); letter-spacing: .12em; text-transform: none; color: var(--c-ink-2); }
+html.ui-instrument .pg .syl-table td { border-bottom: 1px solid var(--c-hair-2); }
+html.ui-instrument .pg .syl-table tr, html.ui-instrument .pg .syl-table thead { background: none; }
+html.ui-instrument .pg .btn { border-radius: 4px; font: 600 14px var(--c-sc); letter-spacing: .12em; }
+html.ui-instrument .pg .btn-ghost, html.ui-instrument .pg .btn-quiet { background: none; box-shadow: inset 0 0 0 1px var(--c-hair); color: var(--c-ink); }
+html.ui-instrument .pg .set-row { border-color: var(--c-hair-2); }
+html.ui-instrument .pg [role="tablist"] button, html.ui-instrument .pg .tabs button { font: 600 14px var(--c-sc); letter-spacing: .12em; }

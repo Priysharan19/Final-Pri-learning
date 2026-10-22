@@ -109,7 +109,7 @@ html.ui-instrument .in-led-open { padding: 4px 16px 16px; border-top: 1px solid 
 @media (max-width: 640px) {
   html.ui-instrument .in-led-day { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   html.ui-instrument .in-led-main { grid-template-areas: "th th" "q q" "ch ch" "res tm"; }
-  .in-scr-th { height: 96px; }
+  html.ui-instrument .in-scr-th { height: 96px; }
   html.ui-instrument .in-led-q { font-size: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -120,8 +120,48 @@ html.ui-instrument .in-led-open { padding: 4px 16px 16px; border-top: 1px solid 
 @keyframes lux-scr-fade { from { opacity: 0; } to { opacity: 1; } }
 /* The corner score is the visible mark; the certified strip stays for
    assistive technology (and its tests) without saying it twice on paper. */
-html.ui-instrument .in-led-row:has(.in-scr-score) .in-led-res [data-mark-strip] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html.ui-instrument .in-led-row.has-score .in-led-res [data-mark-strip] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* The page head in C's masthead voice. */
-html.ui-instrument .grid:has(> #in-hist-ledger) > .spread h2 { margin: 0; font: 400 clamp(34px, 5vw, 56px)/.95 var(--c-serif); letter-spacing: -.01em; color: var(--c-ink); }
-html.ui-instrument .grid:has(> #in-hist-ledger) > .spread .sub { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
-html.ui-instrument .grid:has(> #in-hist-ledger) > .spread .chip { border-radius: 4px; background: none; box-shadow: inset 0 0 0 1px var(--c-hair); font: 400 14px var(--c-text); color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
+html.ui-instrument .in-hist > .spread h2 { margin: 0; font: 400 clamp(34px, 5vw, 56px)/.95 var(--c-serif); letter-spacing: -.01em; color: var(--c-ink); }
+html.ui-instrument .in-hist > .spread .sub { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
+html.ui-instrument .in-hist > .spread .chip { border-radius: 4px; background: none; box-shadow: inset 0 0 0 1px var(--c-hair); font: 400 14px var(--c-text); color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
+
+/* Even cards: every card in a row is as tall as the tallest, and the title,
+   chapter and result rows line up across it. */
+html.ui-instrument .hist-row.in-led-row { display: flex; flex-direction: column; }
+html.ui-instrument .hist-row.in-led-row > .in-led-main { flex: 1; grid-template-rows: auto auto auto 1fr; align-content: start; }
+html.ui-instrument .in-led-q { line-height: 1.4; height: calc(1.4em + 10px); }
+html.ui-instrument .in-led-q * { line-height: inherit; }
+html.ui-instrument .in-led-res { align-self: end; }
+
+/* Thumbnail states: loading is three engraved rules drawing in (distinct
+   from empty paper); no saved strokes or a failed fetch shows a quiet pen. */
+html.ui-instrument .in-scr-wait { position: absolute; left: 12px; right: 64px; top: 26px; display: grid; gap: 20px; }
+html.ui-instrument .in-scr-wait i { display: block; height: 1px; background: var(--c-ink-3); transform-origin: left; animation: lux-scr-engrave 1.2s cubic-bezier(.6, 0, .2, 1) infinite alternate; }
+html.ui-instrument .in-scr-wait i:nth-child(2) { animation-delay: 150ms; width: 80%; }
+html.ui-instrument .in-scr-wait i:nth-child(3) { animation-delay: 300ms; width: 60%; }
+@keyframes lux-scr-engrave { from { transform: scaleX(.15); opacity: .35; } to { transform: scaleX(1); opacity: .8; } }
+html.ui-instrument .in-scr-none { position: absolute; left: 12px; top: 14px; color: var(--c-ink-3); }
+
+/* Selects, search and count in C. */
+html.ui-instrument .in-flt.is-menu { min-height: 44px; box-shadow: inset 0 0 0 1px var(--c-hair); background: var(--c-sheet); color: var(--c-ink); font: 400 15px var(--c-text); letter-spacing: 0; }
+html.ui-instrument .in-flt.is-menu select { font: inherit; color: inherit; }
+html.ui-instrument .in-flt.is-menu option { background: var(--c-sheet); color: var(--c-ink); }
+html.ui-instrument .in-flt.is-menu::after { color: var(--c-ink-2); }
+
+/* Error notebook: a paper section with an engraved rule, no filled card. */
+html.ui-instrument .in-hist .card.notebook { background: none; border: 0; border-top: 1px solid var(--c-hair); border-radius: 0; box-shadow: none; padding: 16px 0 0; }
+html.ui-instrument .in-hist .notebook-title { font: 400 28px/1.1 var(--c-serif); color: var(--c-ink); }
+html.ui-instrument .in-hist .notebook .muted { font-family: var(--c-text); color: var(--c-ink-2); }
+html.ui-instrument .in-hist .notebook-item { border-color: var(--c-hair-2); }
+html.ui-instrument .in-hist .notebook-slip { font: 600 13px var(--c-sc); letter-spacing: .12em; color: var(--c-copper); }
+
+/* Empty and load-failed states for the whole page, in C. */
+html.ui-instrument .in-hist .error-box { background: none; border: 0; border-top: 1px solid var(--c-copper); border-radius: 0; color: var(--c-ink); font-family: var(--c-text); padding: 14px 0; }
+html.ui-instrument .in-hist .in-state-orb { box-shadow: 0 0 0 1px var(--c-hair); color: var(--c-teal); }
+html.ui-instrument .in-hist .in-state-title { font: 400 28px/1.1 var(--c-serif); color: var(--c-ink); }
+html.ui-instrument .in-hist .in-state-copy { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument .in-scr-wait i { animation: none; transform: none; opacity: .5; }
+}
