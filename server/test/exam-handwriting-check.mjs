@@ -59,7 +59,7 @@ const fake = createServer((req, res) => {
     const [, behaviour, label] = Buffer.from(image.split(',')[1], 'base64').toString('utf8').split('|');
     provider.total += 1;
     provider.calls.set(label, callsFor(label) + 1);
-    const lines = label.split('\n').map(text => ({ text, latex: '', confidence: 0.96 }));
+    const lines = label.split('\n').map(text => ({ text, latex: '', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }));
     const read = { lines, confidence: 0.96, needs_confirmation: false };
     if (behaviour === 'blank') return reply(res, sent.model, { lines: [], confidence: 0, needs_confirmation: true });
     if (behaviour === 'unsure') return reply(res, sent.model, { lines: lines.map(l => ({ ...l, confidence: 0.4 })), confidence: 0.4, needs_confirmation: true });

@@ -131,6 +131,63 @@ const later = predictExamMark(PAPER, mixed, { nowMs: NOW + 1 });
 ok(JSON.stringify(later.units.map(u => u.sd)) !== JSON.stringify(advice.units.map(u => u.sd)),
   'one millisecond later the spread moves — the instant is an input, so callers comparing predictions must hold it fixed');
 
+// ── 9 · Display only: a prediction can never become a mark (#196) ───────────
+// Reconciliation of the #192 authority on current main. A predicted mark is a
+// sentence on the progress page. It must never be reachable from anything that
+// marks, records or syncs an attempt, and the server (which decides marks,
+// ADR-0001) must never import it. Computing one must not touch the evidence.
+{
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const { join, relative } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+  const walk = (dir, out = []) => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name.startsWith('.')) continue;
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p, out);
+      else if (/\.(m?js|jsx)$/.test(name)) out.push(p);
+    }
+    return out;
+  };
+  const NAMES_PREDICTOR = /(?:from\s*|import\s*\(\s*|import\s+)['"][^'"]*markPredictor(?:\.js)?['"]/;
+  const rel = p => relative(ROOT, p).split('\\').join('/');
+  const clientImporters = walk(join(ROOT, 'client/src')).filter(p => !p.endsWith('markPredictor.js') && NAMES_PREDICTOR.test(readFileSync(p, 'utf8'))).map(rel).sort();
+  eq(clientImporters, ['client/src/local/backend.js', 'client/src/pages/IndiaProgress.jsx'],
+    'only the progress summary and the progress page import the predictor — no checker, marker, sync or exam module');
+  const serverImporters = walk(join(ROOT, 'server')).filter(p => NAMES_PREDICTOR.test(readFileSync(p, 'utf8'))).map(rel);
+  eq(serverImporters, [], 'the server, which decides every mark, never imports the predictor');
+  ok(!NAMES_PREDICTOR.test('import { checkAnswer } from "./checker.js";') && NAMES_PREDICTOR.test("import { predictExamMark } from '../engine/markPredictor.js';"),
+    'self-test: the import scan recognises a predictor import and ignores others');
+
+  const own = readFileSync(join(ROOT, 'client/src/engine/markPredictor.js'), 'utf8');
+  eq([...own.matchAll(/^\s*import\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/gm)].map(m => m[1]), ['./adaptive.js'],
+    'the predictor imports only the rating maths — no store, database, sync or transport');
+  ok(!/\bimport\s*\(/.test(own), 'and no dynamic import a static check could miss');
+
+  const backend = readFileSync(join(ROOT, 'client/src/local/backend.js'), 'utf8');
+  const calls = backend.split('\n').filter(line => /predictExamMark\(/.test(line) && !/^\s*import\b/.test(line));
+  eq(calls.length, 1, 'the local backend calls the predictor in exactly one place');
+  ok(/examPrediction:\s*\(\(\) => \{[\s\S]{0,400}?predictExamMark\(blueprint, ratings/.test(backend),
+    'and that place is the read-only examPrediction field of the progress summary');
+  const page = readFileSync(join(ROOT, 'client/src/pages/IndiaProgress.jsx'), 'utf8');
+  ok(/import\s*\{\s*predictionSentence\s*\}\s*from\s*'\.\.\/engine\/markPredictor\.js'/.test(page),
+    'the progress page takes only the sentence that describes a prediction');
+
+  const freezeDeep = value => {
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const v of Object.values(value)) freezeDeep(v); }
+    return value;
+  };
+  const evidence = JSON.parse(JSON.stringify(mixed));
+  const before = JSON.stringify(evidence);
+  let threw = null;
+  let frozenPrediction = null;
+  try { frozenPrediction = predictExamMark(PAPER, freezeDeep(evidence), { nowMs: NOW }); } catch (e) { threw = e; }
+  ok(threw === null, `a prediction over frozen evidence never writes to it${threw ? ` (${threw.message})` : ''}`);
+  eq(JSON.stringify(evidence), before, 'the ratings are exactly as they were');
+  eq(frozenPrediction, predictExamMark(PAPER, mixed, { nowMs: NOW }), 'and the prediction is the same one, so it is a pure read of the evidence');
+}
+
 console.log(failures.length
   ? `MARK PREDICTOR: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `MARK PREDICTOR: PASS — ${pass}/${pass} checks — weighted by the real paper, shrunk toward the middle on thin evidence, silent about topics never attempted.`);
