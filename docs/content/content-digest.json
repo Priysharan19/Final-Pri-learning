@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.10.5",
+ "contentVersion": "2026.10.6",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -51,7 +51,7 @@
   "c11-complex-modulus-reasoning": "ea381baaa17cf7ad",
   "c11-complex-numbers": "8c827ff5aa1a2940",
   "c11-complex-polar-reasoning": "02ee3ff426f6446d",
-  "c11-complex-quadratic-jee-reasoning": "49b56eeda89babe6",
+  "c11-complex-quadratic-jee-reasoning": "4a78785a02cec3c7",
   "c11-complex-quadratic-reasoning": "cd552e77d859e9a2",
   "c11-compound-event-reasoning": "c81823bf1c1bc59a",
   "c11-conic-sections": "80aa5d3a1d57dc99",

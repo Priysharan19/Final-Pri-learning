@@ -156,17 +156,6 @@ function parseComplexTex(tex) {
   const im = (m[3] === '-' ? -1 : 1) * (m[4] ? Math.sqrt(3) : 1);
   return [re, im];
 }
-/** "3 - 2i", "-i", "4i", "5" → [re, im] (integers). */
-function parseCx(tex) {
-  const s = tex.replace(/\s+/g, '');
-  let m = s.match(/^(-?\d+)$/);
-  if (m) return [Number(m[1]), 0];
-  m = s.match(/^(-?)(\d*)i$/);
-  if (m) return [0, (m[1] ? -1 : 1) * (m[2] === '' ? 1 : Number(m[2]))];
-  m = s.match(/^(-?\d+)([+-])(\d*)i$/);
-  if (m) return [Number(m[1]), (m[2] === '-' ? -1 : 1) * (m[3] === '' ? 1 : Number(m[3]))];
-  return null;
-}
 /** "(u)^{p}(v)^{q}" or "\dfrac{(u)^{p}}{(v)^{q}}" → numeric complex. */
 function parsePolarExpr(tex) {
   const factor = t => {
@@ -852,25 +841,11 @@ export const SOLVE_JEE_C11 = {
   },
 
   // The #408 replacement for the routine D4 quadratic. Each branch re-solves
-  // without the conjugate-root / Vieta / De Moivre shortcuts the generator uses.
+  // from the actual roots (quadratic formula, complex powers, numeric moduli)
+  // rather than the recurrence or |α|² = αβ the generator uses.
   'c11-complex-quadratic-jee-reasoning'(q) {
     const p = q.prompt;
-    let m = p.match(/^The quadratic equation \$x\^2 \+ px \+ q = 0\$, in which \$p\$ and \$q\$ are real numbers, has \$\\dfrac\{([^{}]+)\}\{([^{}]+)\}\$ as one of its roots\. Find \$([pq])\$\.$/);
-    if (m) {
-      const num = parseCx(m[1]), den = parseCx(m[2]);
-      if (!num || !den) return ['could not read the root'];
-      const w = cdiv(num, den);
-      if (Math.abs(w[1]) < 1e-9) return ['the given root is real, so p and q are not determined'];
-      // Substitute w into x² + px + q = 0 and separate parts: two real linear
-      // equations in p and q — Im: Im(w²) + p·Im(w) = 0; Re: Re(w²) + p·Re(w) + q = 0.
-      const w2 = cmul(w, w);
-      const P = -w2[1] / w[1], Qv = -w2[0] - P * w[0];
-      const residual = Math.hypot(w2[0] + P * w[0] + Qv, w2[1] + P * w[1]);
-      if (residual > 1e-9) return [`root does not satisfy the recovered equation (${residual})`];
-      const v = m[3] === 'p' ? P : Qv;
-      if (Math.abs(v - Math.round(v)) > 1e-9) return [`${m[3]} = ${v} is not whole`];
-      return keyInt(q, Math.round(v), 'substitution and separation of parts');
-    }
+    let m;
     m = p.match(/^Let \$\\alpha\$ and \$\\beta\$ be the roots of \$([^$]+) = 0\$\. Find \$\\alpha\^\{(\d+)\} \+ \\beta\^\{(\d+)\}\$\.$/);
     if (m) {
       const P = parsePoly(m[1]);
@@ -886,6 +861,24 @@ export const SOLVE_JEE_C11 = {
       if (Math.abs(sum[1]) > 1e-6 * Math.max(1, Math.abs(sum[0]))) return ['the sum is not real'];
       if (Math.abs(sum[0] - Math.round(sum[0])) > 1e-6 * Math.max(1, Math.abs(sum[0]))) return [`sum ${sum[0]} is not whole`];
       return keyInt(q, Math.round(sum[0]), 'complex powers of the roots');
+    }
+    m = p.match(/^For how many integers \$k\$ are the roots of \$x\^2 \+ \(([^()]+)\)x \+ \(([^()]+)\) = 0\$ non-real and both strictly inside the circle \$\|z\| = (\d+)\$\?$/);
+    if (m) {
+      const Bk = parsePoly(m[1], 'k'), Ck = parsePoly(m[2], 'k'), r = Number(m[3]);
+      if (!Bk || !Ck) return ['could not read the coefficients'];
+      const at = (poly, k) => Object.entries(poly).reduce((acc, [e, co]) => acc + co * k ** Number(e), 0);
+      // Every integer k in a wide window: compute the roots and their moduli.
+      // C(k) grows like k², so nothing outside the window can be inside |z| = r.
+      let count = 0;
+      for (let k = -300; k <= 300; k++) {
+        const B = at(Bk, k), C = at(Ck, k), disc = B * B - 4 * C;
+        if (!Number.isInteger(disc)) return ['the coefficients are not whole numbers'];
+        if (disc >= 0) continue;                // real roots (a repeated one included)
+        const mod1 = Math.hypot(-B / 2, Math.sqrt(-disc) / 2), mod2 = Math.hypot(-B / 2, -Math.sqrt(-disc) / 2);
+        // On the circle is not strictly inside; float noise is far below 1e-9 here.
+        if (mod1 < r - 1e-9 && mod2 < r - 1e-9) count++;
+      }
+      return keyInt(q, count, 'integer scan of the actual roots');
     }
     m = p.match(/^Find the real number \$k\$ for which the roots of \$x\^2 \+ \(([^()]+)\)x \+ \(([^()]+)\) = 0\$ are non-real and both lie on the circle \$\|z\| = (\d+)\$\.$/);
     if (!m) return ['could not read the prompt'];

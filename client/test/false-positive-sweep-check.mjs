@@ -129,6 +129,12 @@ function numericProbes(q, a) {
     if (u) out.push({ input: `${fmt(v)} ${u}`, why: `wrong unit ${u} (asked ${String(q.answerSuffix).trim()})`, unit: true });
   }
   if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  // Two numbers written as a list — a trap (or 0) beside the key, in either
+  // order — are not one answer. "0, -2" once read as 0 − 2 (issue #408 review).
+  const beside = [0, ...(q.traps || []).map(t => t?.value)].filter(x => typeof x === 'number' && Number.isFinite(x) && differs(x, v));
+  for (const t of new Set(beside)) {
+    for (const input of [`${fmt(t)}, ${fmt(v)}`, `${fmt(v)}, ${fmt(t)}`, `${fmt(t)},${fmt(v)}`, `${fmt(t)}\n${fmt(v)}`]) out.push({ input, why: 'two numbers written as a list' });
+  }
   return out;
 }
 
@@ -389,6 +395,22 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const ix = w => methodMarks({ meta: { kind: 'expression', canonical: 'x^1' }, working: w, marks: 2, prompt: 'Simplify $x^{6} \\div x^{5}$.' })?.awarded || 0;
   expect('method: x = x earns nothing on x^6 ÷ x^5', ix('0 = 0\n1 = 1\nx = x') === 0);
   expect('method: a genuine step still earns on x^6 ÷ x^5', ix('x^6/x^5 = x^(6-5)\nx^(6-5) = x') >= 1);
+  // (d) A list of two signed numbers is not their difference (issue #408 review):
+  // "0, -2" was read as 0 − 2 and marked right for −2.
+  const neg = { answerType: 'numeric', prompt: 'Find the real number $k$.', answer: { value: -2 } };
+  for (const input of ['0, -2', '0,-2', 'k=0,-2', '0\n-2', '0; -2', '3, -5', '-5, 3'])
+    expect(`list: "${input.replace(/\n/g, '⏎')}" is not -2`, !verdict(neg, input).correct);
+  expect('list: -2 itself is accepted', verdict(neg, '-2').correct);
+  expect('list: k = -2 is accepted', verdict(neg, 'k = -2').correct);
+  expect('list: 3 - 5 written as arithmetic is unchanged', verdict(neg, '3 - 5').correct === verdict({ ...neg, answer: { value: -2 } }, '3-5').correct);
+  const big = { answerType: 'numeric', prompt: 'Find the number.', answer: { value: -1234 } };
+  expect('list: grouped -1,234 is still one number', verdict(big, '-1,234').correct);
+  // A digit group led by 0 is no written number: "0,240" is the list 0 and 240.
+  const club = { answerType: 'numeric', prompt: 'How many students are in the club altogether?', answer: { value: 240 } };
+  expect('list: "0,240" is not 240', !verdict(club, '0,240').correct);
+  expect('list: "0 240" is not 240', !verdict(club, '0 240').correct);
+  const lakh = { answerType: 'numeric', prompt: 'Find the amount in rupees.', answer: { value: 1234567 } };
+  for (const input of ['1,234,567', '12,34,567', '1 234 567']) expect(`grouping: ${input} is still 1234567`, verdict(lakh, input).correct);
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────

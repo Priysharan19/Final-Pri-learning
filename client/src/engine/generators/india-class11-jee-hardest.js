@@ -2050,30 +2050,20 @@ function sampleSpaceReasoning(rng) {
 // point ("solve x² + bx + c = 0, give the imaginary part"), which issue #408
 // found was the quadratic formula and nothing more. The coverage table retires
 // that rung (curriculum-in-hardest-covers.js, INDIA_RETIRED_RUNGS). Each form
-// here needs an idea the formula does not supply: the conjugate root of a real
-// quadratic, De Moivre on the roots, or |α|² = αβ with a candidate rejected
-// because it makes the roots real.
+// joins two ideas the formula does not supply:
+//   · αⁿ + βⁿ from the coefficients alone — the recurrence sₖ = (α + β)sₖ₋₁ −
+//     αβ·sₖ₋₂ (or the polar form of the roots), with a period to find when the
+//     roots lie on the unit circle;
+//   · the k for which the roots are non-real and on |z| = r: |α|² = αβ for a
+//     conjugate pair gives two candidates, and the discriminant rejects one;
+//   · how many integers k put both roots strictly inside |z| = r: the product
+//     bounds k to an interval, and the discriminant thins it.
+// An independent maths review (2026-10-22) judged a conjugate-root variant and
+// the pure-imaginary roots (x² + k² = 0) too routine for this rung; both were
+// left out. Human maths review of what remains is still pending.
 // ═════════════════════════════════════════════════════════════════════════════
 
-/** a + bi as it is written: 3 - 2i, -i, 4i, 5. */
-function cTex(re, im) {
-  if (im === 0) return String(re);
-  const imPart = Math.abs(im) === 1 ? 'i' : `${Math.abs(im)}i`;
-  if (re === 0) return `${im < 0 ? '-' : ''}${imPart}`;
-  return `${re} ${im < 0 ? '-' : '+'} ${imPart}`;
-}
-
-/**
- * x² + bx + c with non-real roots r·e^{±iθ} at a standard angle (θ = π/3, 2π/3,
- * π/2, π/4, 3π/4), scaled by k. The roots are never written in the prompt.
- */
-const ROOT_PAIRS = Object.freeze([1, 2, 3].flatMap(k => [
-  { b: -k, c: k * k, t: [1, 3] }, { b: k, c: k * k, t: [2, 3] }, { b: 0, c: k * k, t: [1, 2] },
-  { b: -2 * k, c: 2 * k * k, t: [1, 4] }, { b: 2 * k, c: 2 * k * k, t: [3, 4] },
-  { b: -2 * k, c: 4 * k * k, t: [1, 3] }, { b: 2 * k, c: 4 * k * k, t: [2, 3] }
-].map(Object.freeze)));
-
-/** √c with its square factor taken out: 3, 2\\sqrt{2}, \\sqrt{2}. */
+/** √c with its square factor taken out: 3, 2\sqrt{2}, \sqrt{2}. */
 function sqrtTex(c) {
   let out = 1, rest = c;
   for (let f = 2; f * f <= rest; f++) while (rest % (f * f) === 0) { rest /= f * f; out *= f; }
@@ -2081,7 +2071,24 @@ function sqrtTex(c) {
   return `${out === 1 ? '' : out}\\sqrt{${rest}}`;
 }
 
-/** αⁿ + βⁿ for the roots of x² + bx + c, by Newton's recurrence in exact integers. */
+/**
+ * x² + bx + c with non-real roots r·e^{±iθ} at a standard angle (θ = π/3, 2π/3,
+ * π/4, 3π/4), scaled by k; t = [p, q] means θ = pπ/q. The roots are never
+ * written in the prompt. Duplicates across scalings are removed.
+ */
+const ROOT_PAIRS = Object.freeze((() => {
+  const out = new Map();
+  for (let k = 1; k <= 3; k++) {
+    for (const row of [
+      { b: -k, c: k * k, t: [1, 3] }, { b: k, c: k * k, t: [2, 3] },
+      { b: -2 * k, c: 2 * k * k, t: [1, 4] }, { b: 2 * k, c: 2 * k * k, t: [3, 4] },
+      { b: -2 * k, c: 4 * k * k, t: [1, 3] }, { b: 2 * k, c: 4 * k * k, t: [2, 3] }
+    ]) if (!out.has(`${row.b},${row.c}`)) out.set(`${row.b},${row.c}`, Object.freeze(row));
+  }
+  return [...out.values()];
+})());
+
+/** αⁿ + βⁿ for the roots of x² + bx + c, by the recurrence in exact integers. */
 function powerSum(b, c, n) {
   let prev = 2, cur = -b;                       // s₀ = 2, s₁ = α + β = −b
   if (n === 0) return prev;
@@ -2089,110 +2096,108 @@ function powerSum(b, c, n) {
   return cur;
 }
 
+/** The recurrence sₖ = (α + β)sₖ₋₁ − αβ·sₖ₋₂ for x² + bx + c, as written. */
+const recurrenceTex = (b, c) => `s_k = ${cx(-b, 's_{k-1}')} - ${c === 1 ? '' : c}s_{k-2}`;
+
 function complexQuadraticReasoning(rng) {
-  const kind = rc(rng, ['conjugate-root', 'root-powers', 'roots-on-circle']);
+  const kind = rc(rng, ['root-powers', 'roots-on-circle', 'roots-inside']);
   for (let guard = 0; guard < 400; guard++) {
-    if (kind === 'conjugate-root') {
-      // The root is shown as a quotient (a + bi)/(c + di) that simplifies to u + vi.
-      const u = ri(rng, -6, 6), v = nz(rng, -6, 6);
-      const c = ri(rng, 1, 4), d = nz(rng, -4, 4);
-      const a = u * c - v * d, b = u * d + v * c;
-      if (b === 0) continue;
-      const askP = rng() < 0.5;
-      if (askP && u === 0) continue;
-      const p = -2 * u, qv = u * u + v * v;
-      const value = askP ? p : qv;
-      return {
-        prompt: `The quadratic equation $x^2 + px + q = 0$, in which $p$ and $q$ are real numbers, has $\\dfrac{${cTex(a, b)}}{${cTex(c, d)}}$ as one of its roots. Find $${askP ? 'p' : 'q'}$.`,
-        answerType: 'numeric', answer: { value },
-        traps: traps(value, askP
-          ? [
-            { value: -p, why: 'The sum of the roots is $-p$, not $p$.' },
-            { value: -u, why: 'Only one root was used. Because $p$ and $q$ are real, the conjugate of the given root is the other root, and the sum is twice the real part.' },
-            { value: -2 * a, why: 'The given root has to be simplified first: divide by $c + di$ by multiplying top and bottom by its conjugate.' }
-          ]
-          : [
-            { value: u * u - v * v, why: 'That is the real part of the square of the root. The product of a root and its conjugate is $|z|^2 = x^2 + y^2$.' },
-            { value: a * a + b * b, why: 'That is the squared modulus of the numerator only; it must be divided by the squared modulus of the denominator.' },
-            { value: -qv, why: 'The product of the roots of $x^2 + px + q = 0$ is $+q$.' }
-          ]),
-        hints: [
-          'Simplify the given root to the form $x + yi$ by multiplying top and bottom by the conjugate of the denominator.',
-          'A quadratic with real coefficients has its non-real roots in conjugate pairs, so you know the other root too.',
-          `Use ${askP ? 'the sum of the roots, which is $-p$' : 'the product of the roots, which is $q$'}.`
-        ],
-        steps: [
-          { h: 'Simplify the root', d: `$\\dfrac{${cTex(a, b)}}{${cTex(c, d)}} = \\dfrac{(${cTex(a, b)})(${cTex(c, -d)})}{${c * c + d * d}} = ${cTex(u, v)}$` },
-          { h: 'The other root', d: `$p$ and $q$ are real, so the conjugate $${cTex(u, -v)}$ is the other root` },
-          askP
-            ? { h: 'Sum of the roots', d: `$-p = (${cTex(u, v)}) + (${cTex(u, -v)}) = ${2 * u}$` }
-            : { h: 'Product of the roots', d: `$q = (${cTex(u, v)})(${cTex(u, -v)}) = ${u * u} + ${v * v}$` },
-          { h: 'Answer', d: `$${askP ? 'p' : 'q'} = ${value}$` }
-        ],
-        reasoning: 'conjugate-root'
-      };
-    }
     if (kind === 'root-powers') {
-      const { b, c, t } = rc(rng, ROOT_PAIRS);           // θ = (t[0]/t[1])π
-      const n = ri(rng, 5, 15);
+      // On the unit circle (x² ∓ x + 1) the powers repeat with period 6, so n
+      // can be large; elsewhere the size grows like rⁿ, so n stays small.
+      const unit = rng() < 1 / 3;
+      const { b, c, t } = unit ? rc(rng, ROOT_PAIRS.filter(p => p.c === 1)) : rc(rng, ROOT_PAIRS.filter(p => p.c > 1));
+      const n = unit ? ri(rng, 20, 2030) : ri(rng, 5, 15);
       const value = powerSum(b, c, n);
       if (value === 0 || Math.abs(value) > 50000) continue;
-      const sumPower = (-b) ** n;
-      const turns = mod(n * t[0], 2 * t[1]);                // nθ reduced into [0, 2π), in units of π/t[1]
+      const root = Math.round(Math.sqrt(c));
+      const modulusOnly = root * root === c ? 2 * root ** n : n % 2 === 0 ? 2 * c ** (n / 2) : null;
+      const turns = mod(n * t[0], 2 * t[1]);   // nθ reduced into [0, 2π), in units of π/t[1]
+      const reduced = n * t[0] === turns ? '' : `, which is $${piTex(turns, t[1])}$ after whole turns`;
+      const firstSix = [0, 1, 2, 3, 4, 5].map(i => powerSum(b, c, i));
       return {
         prompt: `Let $\\alpha$ and $\\beta$ be the roots of $${polyTex([1, b, c])} = 0$. Find $\\alpha^{${n}} + \\beta^{${n}}$.`,
         answerType: 'numeric', answer: { value },
         traps: traps(value, [
-          { value: sumPower, why: '$\\alpha^n + \\beta^n$ is not $(\\alpha + \\beta)^n$: the cross terms of the binomial expansion do not vanish.' },
-          { value: -value, why: 'The size is right; recheck the angle $n\\theta$ and the sign of its cosine.' },
-          { value: 2 * c ** Math.floor(n / 2), why: 'The modulus alone is not enough: $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$ needs the cosine of $n\\theta$.' }
+          { value: (-b) ** n, why: '$\\alpha^n + \\beta^n$ is not $(\\alpha + \\beta)^n$: the cross terms of the binomial expansion do not vanish.' },
+          { value: -value, why: 'The size is right; recheck the sign — the angle $n\\theta$ or the step of the recurrence.' },
+          ...(modulusOnly == null ? [] : [{ value: modulusOnly, why: 'That is $2r^n$, the modulus part alone: $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$ also needs the cosine of $n\\theta$.' }])
         ]),
         hints: [
-          'The roots are non-real conjugates, so write them as $r(\\cos\\theta \\pm i\\sin\\theta)$: $r^2$ is their product and $2r\\cos\\theta$ their sum.',
-          'By De Moivre, $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$.',
-          'Reduce $n\\theta$ by whole turns before taking the cosine.'
+          'Let $s_k = \\alpha^k + \\beta^k$. The coefficients give $s_1 = \\alpha + \\beta$ and the product $\\alpha\\beta$.',
+          'Each root satisfies the equation, so $\\alpha^2 = (\\alpha + \\beta)\\alpha - \\alpha\\beta$; multiplying by $\\alpha^{k-2}$ and adding the same for $\\beta$ gives $s_k = (\\alpha + \\beta)s_{k-1} - \\alpha\\beta\\,s_{k-2}$.',
+          'The roots are non-real conjugates, so the sequence is $2r^k\\cos k\\theta$; when the roots lie on the unit circle it repeats, and only $n$ modulo the period matters.'
         ],
         steps: [
-          { h: 'Roots in polar form', d: `$\\alpha\\beta = ${c}$ and $\\alpha + \\beta = ${-b}$, so $r = ${sqrtTex(c)}$ and $\\cos\\theta = ${b === 0 ? '0' : `\\dfrac{${-b}}{2 \\times ${sqrtTex(c)}}`}$, which gives $\\theta = ${piTex(t[0], t[1])}$` },
-          { h: 'De Moivre', d: `$\\alpha^{${n}} + \\beta^{${n}} = 2\\left(${sqrtTex(c)}\\right)^{${n}}\\cos ${piTex(n * t[0], t[1])}$, and $${piTex(n * t[0], t[1])}$ is $${piTex(turns, t[1])}$ after whole turns` },
-          { h: 'Check by recurrence', d: `With $s_k = \\alpha^k + \\beta^k$: $s_k = ${b === 0 ? '' : `${cx(-b, 's_{k-1}')} `}- ${c}s_{k-2}$, $s_0 = 2$, $s_1 = ${-b}$` },
+          { h: 'Sum and product', d: `$\\alpha + \\beta = ${-b}$ and $\\alpha\\beta = ${c}$` },
+          { h: 'Recurrence', d: `With $s_k = \\alpha^k + \\beta^k$: $${recurrenceTex(b, c)}$, $s_0 = 2$, $s_1 = ${-b}$${c === 1 ? `; $s_0, \\ldots, s_5 = ${firstSix.join(', ')}$ and the values repeat every $6$ terms, so $s_{${n}} = s_{${n % 6}}$` : ''}` },
+          { h: 'Polar form, as a check', d: `$r = ${sqrtTex(c)}$ and $\\theta = ${piTex(t[0], t[1])}$, so $s_{${n}} = 2${c === 1 ? '' : `\\left(${sqrtTex(c)}\\right)^{${n}}`}\\cos ${piTex(n * t[0], t[1])}$${reduced}` },
           { h: 'Answer', d: `$\\alpha^{${n}} + \\beta^{${n}} = ${value}$` }
         ],
-        reasoning: 'root-powers'
+        reasoning: unit ? 'root-powers-periodic' : 'root-powers'
       };
     }
-    // Both roots non-real and on |z| = r. For a real quadratic the non-real roots
-    // are conjugates, so |α|² = αβ = C(k) = r²; that has two solutions k₁, k₂, and
-    // the discriminant B(k)² − 4r² < 0 keeps exactly one of them.
-    const r = ri(rng, 1, 5);
-    const k1 = ri(rng, -6, 6), k2 = ri(rng, -6, 6);
-    if (k1 === k2) continue;
-    const m = nz(rng, -3, 3), n0 = ri(rng, -8, 8);
+    // For a real quadratic the non-real roots are conjugates, so |α|² = αβ =
+    // C(k). C(k) = (k − k₁)(k − k₂) + r², with B(k) = mk + n₀ the coefficient of x.
+    const r = ri(rng, 1, 6);
+    const k1 = ri(rng, -6, 4), k2 = k1 + ri(rng, 1, 8);
+    const m = nz(rng, -3, 3), n0 = nz(rng, -8, 8);
     const B = k => m * k + n0;
-    const good = rng() < 0.5 ? k1 : k2, bad = good === k1 ? k2 : k1;
-    if (!(B(good) ** 2 < 4 * r * r) || !(B(bad) ** 2 > 4 * r * r)) continue;
+    const C = k => (k - k1) * (k - k2) + r * r;
     const c1 = -(k1 + k2), c0 = k1 * k2 + r * r;
+    const quad = `x^2 + (${lin(m, n0, 'k')})x + (${polyTex([1, c1, c0], 'k')}) = 0`;
+    const hints = [
+      'Non-real roots of a quadratic with real coefficients are a conjugate pair $\\alpha$, $\\bar{\\alpha}$, so they have the same modulus.',
+      'For a conjugate pair, $|\\alpha|^2 = \\alpha\\bar{\\alpha}$, which is the product of the roots.',
+      'A value of $k$ that gets the modulus right must still give non-real roots: check the discriminant.'
+    ];
+    if (kind === 'roots-on-circle') {
+      const good = rng() < 0.5 ? k1 : k2, bad = good === k1 ? k2 : k1;
+      if (r < 1 || !(B(good) ** 2 < 4 * r * r) || !(B(bad) ** 2 > 4 * r * r)) continue;
+      return {
+        prompt: `Find the real number $k$ for which the roots of $${quad}$ are non-real and both lie on the circle $|z| = ${r}$.`,
+        answerType: 'numeric', answer: { value: good },
+        traps: traps(good, [
+          { value: bad, why: `That value also makes the product of the roots $${r * r}$, but then the discriminant is positive and the roots are real, not non-real.` },
+          { value: k1 + k2, why: 'That is the sum of the two candidate values, not a value of $k$.' }
+        ]),
+        hints,
+        steps: [
+          { h: 'Modulus from the product', d: `Both roots on $|z| = ${r}$ and conjugate: $\\alpha\\bar{\\alpha} = ${r * r}$, so $${polyTex([1, c1, c0], 'k')} = ${r * r}$` },
+          { h: 'Candidates', d: `$${polyTex([1, c1, k1 * k2], 'k')} = 0$, so $k = ${k1}$ or $k = ${k2}$` },
+          { h: 'Reject', d: `At $k = ${bad}$ the coefficient of $x$ is $${B(bad)}$ and $${par(B(bad))}^2 - 4(${r * r}) = ${B(bad) ** 2 - 4 * r * r} > 0$: the roots are real` },
+          { h: 'Keep', d: `At $k = ${good}$: $${par(B(good))}^2 - 4(${r * r}) = ${B(good) ** 2 - 4 * r * r} < 0$, so the roots are non-real with modulus $${r}$` },
+          { h: 'Answer', d: `$k = ${good}$` }
+        ],
+        reasoning: 'roots-on-circle'
+      };
+    }
+    // Strictly inside: C(k) < r², i.e. k₁ < k < k₂; then B(k)² < 4C(k) for non-real.
+    if (r < 2 || k2 - k1 < 3) continue;
+    const between = [];
+    for (let k = k1 + 1; k < k2; k++) between.push(k);
+    // No candidate may sit on the discriminant boundary (a repeated real root).
+    if (between.some(k => B(k) ** 2 === 4 * C(k))) continue;
+    const kept = between.filter(k => B(k) ** 2 < 4 * C(k));
+    if (!kept.length || kept.length === between.length) continue;
+    const value = kept.length;
+    const ends = [k1, k2].filter(k => B(k) ** 2 < 4 * C(k)).length;   // on the circle, not inside
     return {
-      prompt: `Find the real number $k$ for which the roots of $x^2 + (${lin(m, n0, 'k')})x + (${polyTex([1, c1, c0], 'k')}) = 0$ are non-real and both lie on the circle $|z| = ${r}$.`,
-      answerType: 'numeric', answer: { value: good },
-      traps: traps(good, [
-        { value: bad, why: `That value also makes the product of the roots $${r * r}$, but then the discriminant is positive and the roots are real, not non-real.` },
-        { value: k1 + k2, why: 'That is the sum of the two candidate values, not a value of $k$.' },
-        ...(Number.isInteger(-n0 / m) ? [{ value: -n0 / m, why: 'That makes the coefficient of $x$ zero; it does not put the roots on the circle.' }] : [])
+      prompt: `For how many integers $k$ are the roots of $${quad}$ non-real and both strictly inside the circle $|z| = ${r}$?`,
+      answerType: 'numeric', answer: { value },
+      traps: traps(value, [
+        { value: between.length, why: 'That counts every $k$ that makes the product of the roots less than the square of the radius, but some of those give real roots.' },
+        ...(ends ? [{ value: value + ends, why: `The end values $k = ${k1}$ and $k = ${k2}$ put the roots ON the circle, not strictly inside it.` }] : []),
+        { value: between.length - value, why: 'That counts the values of $k$ that give real roots.' }
       ]),
-      hints: [
-        'Non-real roots of a quadratic with real coefficients are a conjugate pair $\\alpha$, $\\bar{\\alpha}$.',
-        'For a conjugate pair, $|\\alpha|^2 = \\alpha\\bar{\\alpha}$, which is the product of the roots.',
-        'Each value of $k$ that makes the product right must still give non-real roots: check the discriminant.'
-      ],
+      hints: [hints[0], hints[1], `Inside means $|\\alpha| < ${r}$, which bounds $k$ to an interval; then keep only the integers that give a negative discriminant.`],
       steps: [
-        { h: 'Modulus from the product', d: `Both roots on $|z| = ${r}$ and conjugate: $\\alpha\\bar{\\alpha} = ${r * r}$, so $${polyTex([1, c1, c0], 'k')} = ${r * r}$` },
-        { h: 'Candidates', d: `$${polyTex([1, c1, k1 * k2], 'k')} = 0$, so $k = ${Math.min(k1, k2)}$ or $k = ${Math.max(k1, k2)}$` },
-        { h: 'Reject', d: `At $k = ${bad}$ the coefficient of $x$ is $${B(bad)}$ and $${par(B(bad))}^2 - 4(${r * r}) = ${B(bad) ** 2 - 4 * r * r} > 0$: the roots are real` },
-        { h: 'Keep', d: `At $k = ${good}$: $${par(B(good))}^2 - 4(${r * r}) = ${B(good) ** 2 - 4 * r * r} < 0$, so the roots are non-real with modulus $${r}$` },
-        { h: 'Answer', d: `$k = ${good}$` }
+        { h: 'Modulus from the product', d: `Non-real roots are conjugate, so $|\\alpha|^2 = \\alpha\\bar{\\alpha} = ${polyTex([1, c1, c0], 'k')}$` },
+        { h: 'Inside the circle', d: `$${polyTex([1, c1, c0], 'k')} < ${r * r} \\iff ${polyTex([1, c1, k1 * k2], 'k')} < 0 \\iff ${k1} < k < ${k2}$: the integers ${between.map(k => `$${k}$`).join(', ')}` },
+        { h: 'Non-real roots', d: `The discriminant $(${lin(m, n0, 'k')})^2 - 4(${polyTex([1, c1, c0], 'k')})$ is negative only at ${kept.map(k => `$k = ${k}$`).join(', ')}` },
+        { h: 'Answer', d: `$${value}$ integer${value === 1 ? '' : 's'}` }
       ],
-      reasoning: 'roots-on-circle'
+      reasoning: 'roots-inside'
     };
   }
   return complexQuadraticReasoning(makeRng(FALLBACK_SEED));

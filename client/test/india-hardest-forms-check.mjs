@@ -794,15 +794,16 @@ for (const r of retirements) {
   ok(`${where}: the rung was above the CBSE window`, r.diff > cbse.ceiling, `${r.diff} vs ${cbse.ceiling}`);
   ok(`${where}: CBSE still reaches its hardest level at the dot point`, indiaRequestableDifficulties(chapter, { dotpoint: r.dp, track: 'cbse', grade }).includes(cbse.ceiling));
   // No JEE request — at the dot point or chapter-level — is ever answered by the retired rung.
-  for (const track of ['jee-main', 'jee-advanced']) {
+  for (const track of ['jee-main', 'jee-advanced']) for (const profile of [11, 12]) {
     for (const dotpoint of [r.dp, null]) {
       const served = new Set();
       for (let i = 0; i < 200; i++) {
-        const t = resolveIndiaTarget(chapter, { track, grade: 12, dotpoint, difficulty: r.diff, random: () => i / 200 });
+        const t = resolveIndiaTarget(chapter, { track, grade: profile, dotpoint, difficulty: r.diff, random: () => i / 200 });
         if (t) served.add(`${t.generator}@${t.difficulty}`);
       }
-      ok(`${where}: ${track} ${dotpoint == null ? 'chapter-level' : `dot point ${dotpoint}`} D${r.diff} never serves the retired form`, !served.has(`${r.gen}@${r.diff}`), [...served].join(', '));
-      if (dotpoint != null) ok(`${where}: ${track} D${r.diff} at the dot point is the replacement`, served.size === 1 && served.has(`${r.replacedBy}@${r.diff}`), [...served].join(', '));
+      const label = `${track} Class ${profile} ${dotpoint == null ? 'chapter-level' : `dot point ${dotpoint}`} D${r.diff}`;
+      ok(`${where}: ${label} never serves the retired form`, !served.has(`${r.gen}@${r.diff}`), [...served].join(', '));
+      if (dotpoint != null) ok(`${where}: ${label} is the replacement`, served.size === 1 && served.has(`${r.replacedBy}@${r.diff}`), [...served].join(', '));
     }
   }
 }
@@ -887,9 +888,10 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
       const n = Number(token);
       const significant = !Number.isFinite(n) || !Number.isInteger(n) || Math.abs(n) >= 10;
       // A set answer is "stated" as x = r; any other answer as "= value".
+      // A full stop ending the sentence still states it: "= 37." (a decimal point does not).
       const lhs = q.answerType === 'set' ? 'x\\s*' : '';
-      const stated = new RegExp(`${lhs}=\\s*${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9.a-zA-Z^{(\\\\])`).test(hintText);
-      const present = significant && new RegExp(`(^|[^0-9.])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9.])`).test(hintText);
+      const stated = new RegExp(`${lhs}=\\s*${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9a-zA-Z^{(\\\\]|\\.[0-9])`).test(hintText);
+      const present = significant && new RegExp(`(^|[^0-9.])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9]|\\.[0-9])`).test(hintText);
       ok(`${id} seed ${seed}: no hint states the answer`, !stated && !present, `${token} in: ${hintText.slice(0, 160)}`);
     }
     // A keyed fraction whose decimal terminates is accepted as that exact

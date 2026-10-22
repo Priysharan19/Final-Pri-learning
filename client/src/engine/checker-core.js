@@ -182,7 +182,8 @@ function percentAnswerWanted(question, ans) {
 
 // One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
 // 12 34 567 (lakh, spaced). Nothing else that breaks digits apart is a number.
-const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$|^\d{1,2}(?: \d{2})* \d{3}$/;
+// The leading group never starts with 0: "0,240" is the list 0 and 240, not 240.
+const GROUPED = /^[1-9]\d{0,2}(?:,\d{3})+$|^[1-9]\d?(?:,\d{2})*,\d{3}$|^[1-9]\d{0,2}(?: \d{3})+$|^[1-9]\d?(?: \d{2})* \d{3}$/;
 // A space a person types or pastes between digit groups: the plain space, the
 // no-break space, and the thin, narrow no-break, en, figure and punctuation
 // spaces typesetting uses for digit groups. A tab or a line break is never one
@@ -276,7 +277,11 @@ export function parseNumericInput(raw) {
   // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
   // lists, not 123.
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
-  const meta = { isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
+  // A comma, semicolon or line break before a signed number separates two
+  // numbers: "0, -2" and "3,-5" are lists, never 0 − 2 or 3 − 5. (The digit
+  // runs above stop at the sign, so they cannot see this.)
+  if (/\d\s*[,;\n\r]\s*[-+−–]\s*\.?\d/.test(s)) throw new Error('Not a single number');
+  const meta ={ isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"
   const mixed = s.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/) ||
