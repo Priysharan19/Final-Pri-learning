@@ -507,6 +507,42 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   );`);
   addColumnIfMissing(db, 'account_sessions', 'mfa_verified_at', 'mfa_verified_at INTEGER');
 
+
+  // Schema v14 — the parent weekly report (parentReport.js): who has confirmed
+  // they want it, and one row per account and week so a report is sent once.
+  db.exec(`CREATE TABLE IF NOT EXISTS parent_report_links (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    recipient_email TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','active','stopped')),
+    confirm_token_hash TEXT,
+    confirm_expires_at INTEGER,
+    unsubscribe_token_hash TEXT,
+    unsubscribe_token_envelope TEXT,
+    requested_at INTEGER NOT NULL,
+    confirmed_at INTEGER,
+    stopped_at INTEGER,
+    stopped_by TEXT CHECK(stopped_by IS NULL OR stopped_by IN ('recipient','account','consent'))
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_confirm ON parent_report_links(confirm_token_hash);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_unsubscribe ON parent_report_links(unsubscribe_token_hash);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_status ON parent_report_links(status);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS parent_report_sends (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    week_start INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','sent','skipped','failed')),
+    skip_reason TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER,
+    claimed_until INTEGER,
+    provider_message_id TEXT,
+    last_error_code TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    PRIMARY KEY(account_id, week_start)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_sends_due ON parent_report_sends(status, next_attempt_at);`);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

@@ -91,7 +91,8 @@ export async function createServerApp(db, {
   dist = DEFAULT_DIST,
   legacy = !production,
   requestLog = true,
-  log
+  log,
+  parentReport = {}
 } = {}) {
   const app = express();
   // How much of X-Forwarded-For to believe is deployment configuration with no
@@ -136,7 +137,8 @@ export async function createServerApp(db, {
     billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers, ...googleBilling.verifiers },
     billingCheckout: webBilling.checkout,
     billingNative: { ...appleBilling.native, ...googleBilling.native },
-    billingLifecycle: webBilling.lifecycle
+    billingLifecycle: webBilling.lifecycle,
+    parentReport
   }));
 
   if (legacy && !production) {

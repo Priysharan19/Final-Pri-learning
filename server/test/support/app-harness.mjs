@@ -42,7 +42,9 @@ export async function startApp({
   production = process.env.NODE_ENV === 'production',
   dist = null,
   legacy = false,
-  log = null
+  log = null,
+  // { transport, publicOrigin } for the parent report router (parentReport.js).
+  parentReport
 } = {}) {
   let testStore = null;
   if (!db && engine) {
@@ -50,7 +52,7 @@ export async function startApp({
     db = testStore.store;
   }
   if (!db) db = createPlatformDb(':memory:');
-  const app = await createServerApp(db, { production, dist, legacy, requestLog: typeof log === 'function', log: log || undefined });
+  const app = await createServerApp(db, { production, dist, legacy, requestLog: typeof log === 'function', log: log || undefined, parentReport });
   const server = await new Promise((resolve, reject) => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
     listener.once('error', reject);

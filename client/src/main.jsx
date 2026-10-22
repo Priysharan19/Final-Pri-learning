@@ -8,6 +8,7 @@ import './ink/interactionGuard.js';
 import App from './App.jsx';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
+import { parseParentEmailFragment } from './parent/parentReportApi.js';
 import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -44,6 +45,15 @@ const GUARDIAN_MODE = window.location.pathname === '/guardian/consent';
 // account"): no profile, no session, reachable by someone without the app.
 const DELETE_REQUEST_MODE = window.location.pathname === '/account/delete-request';
 if (DELETE_REQUEST_MODE && !window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+// The parent's own page for the weekly report email (confirm / stop): no
+// profile, no session; the token is in the fragment and stripped the same way.
+const PARENT_EMAIL_MODE = window.location.pathname === '/parent/report-email';
+let parentEmailData = null;
+if (PARENT_EMAIL_MODE) {
+  parentEmailData = parseParentEmailFragment(window.location.hash);
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
 let guardianToken = null;
 if (GUARDIAN_MODE) {
   const data = parseAccountActionFragment(window.location.hash);
@@ -91,8 +101,17 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
-if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE) bootPhase('render');
-if (GUARDIAN_MODE) {
+if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
+if (PARENT_EMAIL_MODE) {
+  const ParentReportEmailAction = React.lazy(() => import('./parent/ParentReportEmailAction.jsx'));
+  root.render(
+    <ErrorBoundary scope="parent report email">
+      <React.Suspense fallback={null}>
+        <ParentReportEmailAction data={parentEmailData} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (GUARDIAN_MODE) {
   // Outside StrictMode for the same reason as account actions: one-time codes.
   const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
   root.render(

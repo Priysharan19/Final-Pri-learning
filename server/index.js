@@ -16,6 +16,7 @@ import { startAuthDeliveryWorker } from './platform/authDelivery.js';
 import { startGoogleNotificationWorker } from './platform/googleBilling.js';
 import { applyVerifiedEntitlement } from './platform/entitlements.js';
 import { startHousekeeping } from './platform/housekeeping.js';
+import { startParentReportWorker } from './platform/parentReport.js';
 import { startAlertNotifier } from './platform/alertNotifier.js';
 import { createServerApp } from './app.js';
 
@@ -51,6 +52,8 @@ const deliveryWorker = startAuthDeliveryWorker(platformDb);
 // Expired sessions, tokens, idempotency keys, rate buckets and nonces are
 // purged at startup and every six hours; /v1/health reports the last run.
 startHousekeeping(platformDb);
+// Weekly parent reports: off unless PRI_PARENT_REPORT_EMAILS=on (parentReport.js).
+startParentReportWorker(platformDb);
 
 // Google Play real-time notifications are queued by the webhook and re-fetched
 // from the Play Developer API here, outside any database transaction.

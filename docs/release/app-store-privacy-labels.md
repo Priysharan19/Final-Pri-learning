@@ -46,7 +46,7 @@ profile shared or used for marketing). Declaring it is the conservative answer.
 
 | Apple data type | Tick? | Manifest type | Third party receives it | Why (code) |
 |---|---|---|---|---|
-| **Contact Info → Email Address** | Yes | `EmailAddress` | Resend (email delivery), for links and codes | `accounts.js`; `authDelivery.js`; `otpEmail.js`. Includes a guardian's email for a child's account (`guardianConsent.js`). |
+| **Contact Info → Email Address** | Yes | `EmailAddress` | Resend (email delivery), for links and codes | `accounts.js`; `authDelivery.js`; `otpEmail.js`. Includes a guardian's email for a child's account (`guardianConsent.js`), and a parent's email for the Premium weekly report (`parentReport.js`, `parent_report_links`; double opt-in; Resend delivers the confirmation and the weekly report). |
 | **Contact Info → Phone Number** | Yes | `PhoneNumber` (**added**) | SMS provider (MSG91 or Twilio Verify — **OWNER** names the live one) | `otp.js` (`account_phones`), guardian phone code (`GUARDIAN_PHONE_METHOD`), `smsProvider.js`. Collected only when `PRI_SMS_PROVIDER` is configured; declared because the shipped client offers the path. |
 | **Contact Info → Name** | Yes | `Name` | No | `accounts.name`; guardian name (`guardian_consents.guardian_name`). |
 | **Contact Info → Physical Address, Other Contact Info** | No | — | — | Never asked for. |
@@ -64,7 +64,7 @@ profile shared or used for marketing). Declaring it is the conservative answer.
 | **Diagnostics → Performance Data** | Yes | `PerformanceData` (**added**) | No | `telemetry.js` `performance-sample`. Purposes: Analytics, App Functionality. |
 | **Diagnostics → Other Diagnostic Data** | Yes | `OtherDiagnosticData` | No | `telemetry.js` `client-error`, `sync-failure`, `api-failure`, `recognition-failure`, `bad-question-opened`. |
 | **Diagnostics → Crash Data** | No | — | — | No crash-reporting SDK. **OWNER:** if MetricKit/Crashlytics is added, declare it. |
-| **Other Data** | Yes | `OtherDataTypes` (**added**) | Guardian email/phone → the delivery provider | The "18 or older" declaration (`accounts.age_basis`), class and track, and the guardian-consent record (method, notice version, times). |
+| **Other Data** | Yes | `OtherDataTypes` (**added**) | Guardian email/phone → the delivery provider; the weekly report's aggregate summary → the email provider (Resend), to the confirmed parent only | The "18 or older" declaration (`accounts.age_basis`), class and track, the guardian-consent record (method, notice version, times), and the parent weekly report's link state and per-week send ledger (`parent_report_links`, `parent_report_sends`: status, times, skip reason, provider message id). The report itself is computed from existing graded-attempt rows and not stored. **No new Apple data type**: the report adds a recipient Email Address (already ticked) and derives everything else from Other Usage Data (already ticked). |
 | **Location, Health & Fitness, Sensitive Info, Contacts, Browsing History, Search History** | No | — | — | No such API; the client network boundary is its own origin. |
 
 ### Not collected (and why the label can say so)
