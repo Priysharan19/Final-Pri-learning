@@ -17,8 +17,6 @@ const clock = ms => {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
-
-
 export default function QuestionHead({ index, length = null, answered = 0, startedAt, stopped = false, score = null, outOf = null }) {
   const t = useT();
   const [now, setNow] = useState(() => Date.now());
@@ -46,7 +44,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
       {!bounded && answered > 0 && <span className="in-qh-a">{t('inst.answeredSession', { n: answered })}</span>}
       <span className="in-qh-sep" aria-hidden="true">·</span>
       <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer>{clock(now - startedAt)}</span>
-      <DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} />
+      <DateWindow score={score} outOf={outOf} />
     </span>
   );
 }

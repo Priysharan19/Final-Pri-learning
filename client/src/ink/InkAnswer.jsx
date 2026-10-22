@@ -682,12 +682,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
-                  {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark. */}
-                  {INSTRUMENT_PLOT && !stale && !isLowConfidence(line, lineConfidenceFloor) && <MarkStamp kind={engineMark(lineVerdicts[li])} />}
                   <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+              {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark, at its trailing edge as in C. */}
+              {INSTRUMENT_PLOT && !stale && !isLowConfidence(line, lineConfidenceFloor) && <MarkStamp kind={engineMark(lineVerdicts?.[li])} />}
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}

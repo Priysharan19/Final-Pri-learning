@@ -31,11 +31,12 @@ html.ui-instrument {
   html.ui-instrument .in-read-cf { width: 28px; background: var(--c-hair-2); }
   html.ui-instrument .in-read-cf i { background: var(--c-ink-3); }
   [data-wc-row] .in-read-tg { display: none; }   /* the stamp says it */
-  .ink-line-verdict .wc-plane { display: none; } /* the list keeps its badge */
-  .ink-line-verdict:has(.wc-plane) > svg:first-child { display: inline; }
+  .ink-line > .wc-plane { display: none; }   /* the list keeps its badge */
+  .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: inline; }
 }
 
-.ink-verdict[data-wc-stamped], .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
+.ink-verdict[data-wc-stamped], .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: none; }
+.ink-line > .wc-plane { margin-inline-start: auto; order: 9; }
 [data-wc-row] { perspective: 1400px; }   /* the plane the mark rises on */
 .wc-plane { position: relative; display: grid; transform: translateZ(36px); }
 .wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }

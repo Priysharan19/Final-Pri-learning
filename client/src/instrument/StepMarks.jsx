@@ -31,13 +31,11 @@ export function MarkStamp({ kind }) {
 
 // Ceremonies striking marks now; the date window waits only while one is.
 let running = 0;
+let lastSpan = 6000;   // the longest the date window may wait: the running ceremony's length
 // One row's slot comes from write.css's own tokens (row + gap + stamp + rest),
 // read once per ceremony, so the CSS and this timer cannot drift apart.
-const slot = el => {
-  const cs = getComputedStyle(el);
-  const ms = ['--c-d-row', '--wc-d-gap', '--wc-d-stamp', '--wc-d-rest'].reduce((t, k) => t + (parseFloat(cs.getPropertyValue(k)) || 0), 0);
-  return ms || 860;
-};
+const ms = (cs, k) => { const v = cs.getPropertyValue(k).trim(), n = parseFloat(v) || 0; return /ms$/.test(v) ? n : n * 1000; };
+const slot = cs => ['--c-d-row', '--wc-d-gap', '--wc-d-stamp', '--wc-d-rest'].reduce((t, k) => t + ms(cs, k), 0) || 860;
 
 /**
  * The Check ceremony over the InkAnswer root. Each visible [data-wc-row] gets
@@ -52,18 +50,23 @@ export function useCheckCeremony(stageRef, key) {
     const root = stageRef.current?.parentElement;
     if (!ON || !root || !key) return undefined;
     // Visible rows only: the chips on a tablet, the reading list on a phone.
-    const PER = slot(root);
+    const cs = getComputedStyle(root);
+    const PER = slot(cs);
     const rows = [...root.querySelectorAll('[data-wc-row]')].filter(r => r.querySelector('.wc-plane')?.getClientRects().length);
     rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
     root.style.setProperty('--wc-u', `${rows.length * PER}ms`);
+    lastSpan = rows.length * PER + 1000;
     root.classList.remove('wc-go'); void root.offsetWidth; root.classList.add('wc-go');
+    // Nothing to strike (stale, unsure or unmarked lines): no ceremony, and
+    // the date window, seeing none running, shows the score at once.
+    if (!rows.length) return undefined;
     running++;
     let on = true;
     const stop = () => { if (on) { on = false; running--; } };
     // Only a ceremony that ran to its end lets the score into the window.
     const end = () => { if (on) { stop(); window.dispatchEvent(new Event('pri:check-marked')); } };
     const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const t = setTimeout(end, still ? 0 : rows.length * PER + (parseFloat(getComputedStyle(root).getPropertyValue('--wc-d-under')) || 320));
+    const t = setTimeout(end, still ? 0 : rows.length * PER + (ms(cs, '--wc-d-under') || 320));
     return () => { clearTimeout(t); stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
@@ -80,7 +83,7 @@ export function DateWindow({ score, outOf }) {
     const go = () => setShown(score);
     addEventListener('pri:check-marked', go);
     const f = requestAnimationFrame(() => running || go());
-    const cap = setTimeout(go, 6000);
+    const cap = setTimeout(go, lastSpan);
     return () => { removeEventListener('pri:check-marked', go); cancelAnimationFrame(f); clearTimeout(cap); };
   }, [score]);
   return ON && outOf >= 1 ? <span className="wc-datewin" aria-hidden="true" data-date-window={shown ?? 'pending'}><span key={shown ?? '-'}>{shown ?? '–'} /{outOf}</span></span> : null;
