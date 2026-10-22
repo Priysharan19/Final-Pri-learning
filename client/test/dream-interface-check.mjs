@@ -235,7 +235,9 @@ check('practice is a thinking-mode route: no navigation furniture while working'
 
 check('the action bar holds exactly one primary action', () => {
   const bar = card.slice(card.indexOf('<div className="ws-actions'), card.indexOf('</section>', card.indexOf('<div className="ws-actions')));
-  assert.equal((bar.match(/btn-primary/g) || []).length, 1);
+  // One primary *button*: the instrument's C class on that same button
+  // (`c-btn-primary`) is not a second action.
+  assert.equal((bar.match(/(?<![\w-])btn-primary/g) || []).length, 1);
 });
 
 check('Home offers one primary next action (#487)', () => {
