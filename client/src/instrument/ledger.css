@@ -133,9 +133,10 @@ html.ui-instrument .in-hist > .spread .chip { border-radius: 4px; background: no
    chapter and result rows line up across it. */
 html.ui-instrument .hist-row.in-led-row { display: flex; flex-direction: column; }
 html.ui-instrument .hist-row.in-led-row > .in-led-main { flex: 1; grid-template-rows: auto auto auto 1fr; align-content: start; }
-/* Titles stay on one line box: tall maths (a stacked fraction) is clipped to
-   it, and the end fades out instead of an ellipsis that would split KaTeX. */
-html.ui-instrument .in-led-q { display: flex; align-items: center; line-height: 1.4; height: calc(1.6em + 10px); overflow: hidden; text-overflow: clip;
+/* Titles are one line: History flattens their fractions to a/b, so the box
+   grows to the glyphs (never clips a top) and only the width is trimmed,
+   by a fade rather than an ellipsis that would split KaTeX. */
+html.ui-instrument .in-led-q { display: flex; align-items: center; line-height: 1.4; min-height: calc(1.6em + 10px); overflow: hidden; text-overflow: clip;
   -webkit-mask-image: linear-gradient(to right, #000 82%, transparent); mask-image: linear-gradient(to right, #000 82%, transparent); }
 html.ui-instrument .in-led-q > * { flex: none; }
 html.ui-instrument .in-led-q * { line-height: inherit; }

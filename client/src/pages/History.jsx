@@ -88,6 +88,43 @@ function InkReplay({ strokes, height = 160, label }) {
 // saved-attempt detail the row opens, fetched only when the card is on screen
 // and only for attempts written in ink; anything else shows the ruled paper
 // with the answer the student gave. Display only, nothing is recomputed.
+// Card titles (instrument Scripts only) set maths on one text line: every
+// stacked fraction inside $…$ becomes a/b, bracketed when a side is more than
+// one term, so nothing rises above the line box. Roots and powers are already
+// inline at text size. Display only: the question itself is untouched and
+// other screens render it as before.
+function readGroup(s, i) {
+  // A braced group, or a single token (\frac12 has unbraced arguments).
+  if (s[i] !== '{') {
+    const tok = /^(\\[a-zA-Z]+|[^\s{}\\])/.exec(s.slice(i));
+    return tok ? { body: tok[1], end: i + tok[1].length } : null;
+  }
+  let depth = 0;
+  for (let j = i; j < s.length; j++) {
+    if (s[j] === '{') depth++;
+    else if (s[j] === '}' && --depth === 0) return { body: s.slice(i + 1, j), end: j + 1 };
+  }
+  return null;
+}
+const side = x => (/^[\w.]+$|^\\[a-zA-Z]+$/.test(x.trim()) ? x : `(${x})`);
+function flattenFractions(tex) {
+  let out = '', i = 0;
+  const re = /\\[dt]?frac(?![a-zA-Z])/g;
+  for (let m; (m = re.exec(tex));) {
+    let k = m.index + m[0].length;
+    while (tex[k] === ' ') k++;
+    const num = readGroup(tex, k);
+    let k2 = num ? num.end : -1;
+    while (k2 >= 0 && tex[k2] === ' ') k2++;
+    const den = num && readGroup(tex, k2);
+    if (!den) continue;
+    out += tex.slice(i, m.index) + `${side(flattenFractions(num.body))}/${side(flattenFractions(den.body))}`;
+    i = den.end; re.lastIndex = den.end;
+  }
+  return out + tex.slice(i);
+}
+const flatTitle = text => String(text ?? '').replace(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g, (_, tex) => `$${flattenFractions(tex)}$`);
+
 const THUMB_MAX = 24;
 const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
 // The thumbnail exists only in an instrument build: the build constant (not
@@ -356,7 +393,7 @@ function HistoryForProfile() {
                   {ScriptThumb && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} />}
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
-                  <span className="in-led-q"><MathText text={item.prompt} /></span>
+                  <span className="in-led-q"><MathText text={flatTitle(item.prompt)} /></span>
                   <span className="in-led-ch" lang="en"><TermGloss text={item.subtopicName} /></span>
                   <span className="in-led-res">
                     {!item.repeat && Number.isInteger(item.marksPossible) ? <MarkStrip earned={item.marksEarned} possible={item.marksPossible} /> : (
