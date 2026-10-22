@@ -3,6 +3,8 @@
  * This module is deliberately NOT imported in the app. Any authenticated graded use requires server-only solution escrow.
  * pri-original-c10-poly-factor-01 is held from the Class X core bank: the 2026-27 syllabus (SecP1X p3)
  * covers zeros and coefficients of quadratics, not cubic factorisation by the factor theorem.
+ * pri-original-c10-tri-area-06 (areas of similar triangles) and pri-original-c12-area-between-09 (area between
+ * two curves) are held too: both were removed in the 2023-24 rationalisation. The examiner confirms against 2026-27.
  * Separate private reviewer ZIP and independently checked mathematical receipts remain outside this public repository.
  */
 export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
@@ -15,7 +17,7 @@ export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
   "questions": [
     {
       "contentId": "pri-original-c10-poly-factor-01",
-      "contentVersion": "2026.10.14.1",
+      "contentVersion": "2026.10.22.1",
       "grade": 10,
       "track": "CBSE-enrichment-hold-from-core",
       "topic": "Polynomials",
@@ -30,7 +32,7 @@ export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
     },
     {
       "contentId": "pri-original-c10-poly-rootshift-02",
-      "contentVersion": "2026.10.14.1",
+      "contentVersion": "2026.10.22.1",
       "grade": 10,
       "track": "CBSE-standard",
       "topic": "Polynomials",
@@ -39,7 +41,7 @@ export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
       "rights": "original-authorship-review-pending",
       "status": "ungraded-answer-blind-public-authoring-draft",
       "sourceURL": "https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1X_2026-27.pdf",
-      "question": "The two zeros α and β of 3x²−7x+2=0 are each increased by 1. Construct a quadratic with integer coefficients having zeros α+1, β+1.",
+      "question": "The two zeros α and β of the polynomial 3x²−7x+2 are each increased by 1. Construct a quadratic with integer coefficients having zeros α+1, β+1.",
       "hint": "Change both the sum and the product when translating roots.",
       "diagramSpec": null
     },
@@ -103,9 +105,9 @@ export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
     },
     {
       "contentId": "pri-original-c10-tri-area-06",
-      "contentVersion": "2026.10.14.1",
+      "contentVersion": "2026.10.22.1",
       "grade": 10,
-      "track": "CBSE-standard",
+      "track": "CBSE-enrichment-hold-from-core",
       "topic": "Triangles",
       "archetypeId": "pri-similar-area-square-ratio",
       "provenance": "original-Pri-Learning-exam-style-not-PYQ",
@@ -148,9 +150,9 @@ export const CBSE_202627_ORIGINAL_EXAM_BLIND = {
     },
     {
       "contentId": "pri-original-c12-area-between-09",
-      "contentVersion": "2026.10.14.1",
+      "contentVersion": "2026.10.22.1",
       "grade": 12,
-      "track": "CBSE-standard",
+      "track": "CBSE-enrichment-hold-from-core",
       "topic": "Applications of Integrals",
       "archetypeId": "pri-bounded-curve-intersection-area",
       "provenance": "original-Pri-Learning-exam-style-not-PYQ",
