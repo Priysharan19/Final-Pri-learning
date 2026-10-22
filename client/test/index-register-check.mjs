@@ -54,5 +54,11 @@ const r2 = fromCurriculum(cur2, user10);
 check('a second evidence load updates answers, correct and accuracy together', r2.answers === 160 && r2.correct === 104 && r2.accuracy === 65, JSON.stringify(r2));
 check('the dial reading always equals the ledger\'s own ratio', Math.round(accuracyClaim(r2.correct, r2.answers, 10).value) === r2.accuracy);
 
+// A brand-new student: nothing answered, so the ledger reads 0, —, 0/14. (The
+// jury's "ANSWERS 1 · 1/25" was the odometer drawing every digit one cell high,
+// not data; the drum's blank cell no longer shrinks.)
+const fresh = fromCurriculum({ years: [{ year: 10, chapters: own(14).map(c => ({ ...c, attempts: 0, correct: 0 })) }] }, user10);
+check('a new student\'s register is 0 answers, correct withheld, 0 of 14 started', fresh.answers === 0 && fresh.correct === null && fresh.started === 0 && fresh.total === 14 && fresh.accuracy === null, JSON.stringify(fresh));
+
 console.log(`${passed}/${passed + failed} index register checks passed`);
 process.exit(failed ? 1 : 0);
