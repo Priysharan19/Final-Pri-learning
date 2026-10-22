@@ -200,3 +200,6 @@ html.ui-instrument .in-flt.c-chip { letter-spacing: .08em; }
 }
 /* No ink and no answer: quiet ruled paper with the attempt's mode. */
 html.ui-instrument .in-scr-mode { position: absolute; left: 12px; top: 26px; display: inline-flex; align-items: center; font: 600 13px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-3); }
+/* No paper (no ink, no answer): a compact text card, clear of the bookmark. */
+html.ui-instrument .hist-row.in-led-row.is-text { align-self: start; }
+html.ui-instrument .hist-row.in-led-row.is-text .in-led-q { padding-right: 48px; min-height: 0; }

@@ -2991,6 +2991,7 @@ export default {
   "inst.tabScripts": "Scripts",
   "inst.reportWeekLine": "Practised {n} of the last 7 days",
   "inst.reportLost": "Where marks were lost",
+  "inst.reportLostUnplaced": "{n} of the {p} marks lost this period aren’t placed in a chapter on this syllabus yet.",
   "inst.reportLostNone": "No certified marks lost yet.",
   "inst.mapTitleScope": "{scope} mathematics",
   "inst.mapStarted": "{started} of {total} chapters started",

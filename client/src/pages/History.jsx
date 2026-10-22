@@ -97,6 +97,10 @@ const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
 // the runtime flag) is false elsewhere, so the component tree-shakes out.
 /* global __PRI_FEATURE_INSTRUMENT__ */
 const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
+// The student's own typed answer, when the list row has one (not a status word).
+const typedOf = item => (item.answerGiven && !STATUS_WORD.test(String(item.answerGiven).trim()) ? String(item.answerGiven) : null);
+// Paper only when it will hold the student's own work: saved ink or an answer.
+const paperOf = item => !!(item.hasInk || typedOf(item));
 const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
 // Marks in the instrument build are C's shapes (✓ circle, ✗ diamond).
 const MarkGlyph = INSTRUMENT_BUILD ? InstrumentMark : null;
@@ -132,7 +136,7 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
     for (const st of ink.strokes) for (const pt of st.points || []) { x1 = Math.min(x1, pt.x); y1 = Math.min(y1, pt.y); x2 = Math.max(x2, pt.x); y2 = Math.max(y2, pt.y); }
     if (isFinite(x1)) box = `${x1 - 8} ${y1 - 8} ${x2 - x1 + 16} ${y2 - y1 + 16}`;
   }
-  const typed = item.answerGiven && !STATUS_WORD.test(String(item.answerGiven).trim()) ? String(item.answerGiven) : null;
+  const typed = typedOf(item);
   return (
     <span className={`in-scr-th is-${box ? 'ok' : ink.state}`} ref={ref} aria-hidden="true" data-thumb={box ? 'ok' : ink.state}>
       {box ? (
@@ -357,11 +361,11 @@ function HistoryForProfile() {
           <section key={g.key} className="in-led-day" aria-labelledby={g.key ? `in-led-day-${g.key}` : undefined}>
             {g.key && <h3 className="in-led-dayh" id={`in-led-day-${g.key}`}>{dayLabel(g.key)}</h3>}
             {g.items.map(item => (
-              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}${ScriptThumb && scoredOf(item) ? ' has-score' : ''}`} data-question-id={item.id}
+              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}${ScriptThumb && paperOf(item) && scoredOf(item) ? ' has-score' : ''}${ScriptThumb && !paperOf(item) ? ' is-text' : ''}`} data-question-id={item.id}
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
-                  {ScriptThumb && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} modeLabel={MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : t('history.modePractice')} />}
+                  {ScriptThumb && paperOf(item) && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} modeLabel={MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : t('history.modePractice')} />}
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={INSTRUMENT_BUILD ? flatTitle(item.prompt) : item.prompt} /></span>

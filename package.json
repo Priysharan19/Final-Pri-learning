@@ -133,7 +133,7 @@
     "test:marker:progress": "node client/test/marker-method-progress-check.mjs",
     "test:marker:working": "node client/test/marker-working-branch-check.mjs",
     "test:marker:ap": "node client/test/marker-ap-first-error-check.mjs",
-    "test:instrument:plot": "node client/test/student-plot-check.mjs && node client/test/flat-title-check.mjs",
+    "test:instrument:plot": "node client/test/student-plot-check.mjs && node client/test/flat-title-check.mjs && node client/test/report-lost-check.mjs",
     "test:marker:rubrics": "node client/test/marker-working-rubrics-check.mjs",
     "test:marker:lost": "node client/test/marker-lost-marks-check.mjs",
     "test:marker:verified": "node server/test/verified-step-marks-check.mjs && node client/test/verified-step-marks-check.mjs",

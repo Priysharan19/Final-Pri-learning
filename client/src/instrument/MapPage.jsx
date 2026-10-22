@@ -8,7 +8,7 @@ import { prerequisitesOf, mapStrandOf } from '../engine/prerequisites.js';
 import { IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
-import { strandColumns, MAP_W, NODE_R } from './mapLayout.js';
+import { strandRegister, elbowPath, MAP_W, NODE_R } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
 import './map.css';
 
@@ -34,7 +34,7 @@ const STRAND_KEY = {
 // is measured. In map units this scales with the rendered map width, and the
 // card floats only while that reserve is a modest share of the map.
 const CARD_PX = { w: 310 + 24 + 18, pad: 24 + 18 };
-const FLOAT_MAX_SHARE = 0.4;
+const FLOAT_MIN_W = 1300;
 // "Most lost marks are in …" is said of a dot point only once it has at least
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
@@ -134,10 +134,11 @@ export default function MapPage() {
     return () => { live = false; };
   }, []);
 
-  const unit = wrapW > 0 ? MAP_W / wrapW : 1;
-  const floating = wrapW > 0 && CARD_PX.w * unit <= MAP_W * FLOAT_MAX_SHARE;
-  // Rounded to 10 map units so a pixel of resize does not re-lay the map.
-  const reserve = floating ? { w: Math.ceil((CARD_PX.w * unit) / 10) * 10, h: Math.ceil(((cardH + CARD_PX.pad) * unit) / 10) * 10 } : null;
+  // The map is laid out in real pixels (so 14px type is 14px). The card floats
+  // at the right only where all the strand columns still fit beside it.
+  const W = wrapW > 0 ? Math.floor(wrapW / 10) * 10 : MAP_W;
+  const floating = wrapW >= FLOAT_MIN_W;
+  const reserve = floating ? { w: CARD_PX.w, h: cardH + CARD_PX.pad } : null;
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
@@ -146,27 +147,29 @@ export default function MapPage() {
       evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy),
       marks: marks[row.id] || null
     }));
-    const placed = strandColumns(
+    const placed = strandRegister(
       nodes.map(n => ({ id: n.row.id, name: n.row.name, strand: n.strand })),
-      reserve ? { card: reserve } : {}
+      { width: W, reserveRight: reserve ? reserve.w : 0, top: floating ? 150 : 64 }
     );
     const at = new Map(placed.nodes.map(p => [p.id, p]));
-    nodes.forEach(n => Object.assign(n, { x: at.get(n.row.id).x, y: at.get(n.row.id).y, r: at.get(n.row.id).r, lines: at.get(n.row.id).lines }));
+    nodes.forEach(n => { const p = at.get(n.row.id); Object.assign(n, { x: p.x, y: p.y, r: p.r, lines: p.lines, col: p.col, band: p.band }); });
     const byId = new Map(nodes.map(node => [node.row.id, node]));
     const edges = [];
     for (const node of nodes) for (const pre of prerequisitesOf(node.row.id)) {
       const from = byId.get(pre.id);
       if (!from) continue;
-      edges.push({ from, to: node, skill: pre.skill, d: `M${from.x} ${from.y} L ${node.x} ${node.y}`, opacity: 0.16 + 0.55 * Math.min(secureOf(from), secureOf(node)) });
+      edges.push({ from, to: node, skill: pre.skill, d: elbowPath(from, node, placed.rows, edges.length), lane: edges.length, opacity: 0.16 + 0.55 * Math.min(secureOf(from), secureOf(node)) });
     }
     // The syllabus sequence, drawn as one hairline route through every chapter
     // in the scope's own order (the rows as the curriculum lists them).
-    const route = nodes.slice(1).map((node, i) => ({ from: nodes[i], to: node, d: `M${nodes[i].x} ${nodes[i].y} L ${node.x} ${node.y}` }));
+    // Within a column that order runs straight down its spine.
+    const route = nodes.slice(1).filter((node, i) => nodes[i].col === node.col)
+      .map(node => { const from = nodes[nodes.indexOf(node) - 1]; return { from, to: node, d: `M${from.x} ${from.y + from.r} L ${node.x} ${node.y - node.r}` }; });
     const started = nodes.filter(node => node.evidence.attempts > 0).length;
     // Only the chapters drawn on this map count toward the month's total.
     const monthly = month ? nodes.map(n => month[n.row.id]).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m.earned) || 0), possible: a.possible + (Number(m.possible) || 0) }), { earned: 0, possible: 0 }) : null;
-    return { nodes, edges, route, columns: placed.columns, height: placed.height, byId, started, monthly };
-  }, [curriculum, marks, month, user, reserve?.w, reserve?.h]);  // eslint-disable-line react-hooks/exhaustive-deps
+    return { nodes, edges, route, rows: placed.rows, columns: placed.columns, height: placed.height, byId, started, monthly };
+  }, [curriculum, marks, month, user, W, reserve?.w, reserve?.h]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
@@ -192,7 +195,7 @@ export default function MapPage() {
   const hops = useMemo(() => (origin ? hopsFrom(origin, layout.nodes, layout.edges) : new Map()), [layout, origin]);
   const hopOf = id => Math.min(4, hops.has(id) ? hops.get(id) : 3);
   // An edge is drawn from its end nearer the origin, so the lines grow outward.
-  const outward = e => (hopOf(e.to.row.id) < hopOf(e.from.row.id) ? `M${e.to.x} ${e.to.y} L ${e.from.x} ${e.from.y}` : e.d);
+  const outward = e => (hopOf(e.to.row.id) < hopOf(e.from.row.id) ? elbowPath(e.to, e.from, layout.rows, e.lane) : e.d);
 
   // The card's prose: fixed sentences over the chapter's own figures.
   const lostDotpoint = node => {
@@ -223,7 +226,7 @@ export default function MapPage() {
           </p>
         </header>
         <div className={`in-map-graph${motion.running ? '' : ' is-still'}${arrived ? ' is-arrived' : ' is-arriving'}`} ref={graphRef} data-map-arrived={arrived ? 'true' : 'false'}>
-          <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: W }} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
             {layout.columns.map(c => STRAND_KEY[c.strand] && <text key={c.strand} className="in-map-strand" x={c.x - NODE_R} y={c.headY}>{t(STRAND_KEY[c.strand])}</text>)}
             {layout.route.map((e, i) => (
               <path key={`r${i}`} className={`in-map-route${isRecommended(e.to) && !layout.edges.some(x => isRecommended(x.to)) ? ' is-toward' : ''}`} pathLength="1"
@@ -259,7 +262,7 @@ export default function MapPage() {
           </svg>
           <ol className="in-map-list" aria-label={t('inst.mapTitle')}>
             {layout.nodes.map(node => (
-              <li key={node.row.id} style={{ left: `${(node.x / MAP_W) * 100}%`, top: `${(node.y / H) * 100}%` }}>
+              <li key={node.row.id} style={{ left: `${(node.x / W) * 100}%`, top: `${(node.y / H) * 100}%` }}>
                 <button type="button" className={`in-map-hit${isRecommended(node) ? ' is-next' : ''}`} data-map-chapter={node.row.id}
                   aria-current={current?.row.id === node.row.id ? 'true' : undefined}
                   aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}

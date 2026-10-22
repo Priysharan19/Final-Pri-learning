@@ -117,7 +117,7 @@ html.ui-instrument .in-map-foot { font: 400 13px/1.5 var(--c-text); color: var(-
 @media (max-width: 640px) {
   html.ui-instrument .in-map-list { gap: 0; border-top: 1px solid var(--c-hair); }
   html.ui-instrument .in-map-hit { border-radius: 0; border-bottom: 1px solid var(--c-hair-2); color: var(--c-ink); padding: 10px 2px; }
-  html.ui-instrument .in-map-hit[aria-current="true"] { background: var(--c-teal-soft); box-shadow: none; }
+  html.ui-instrument .in-map-hit[aria-current="true"] { background: none; box-shadow: none; }
   html.ui-instrument .in-map-hit-name { font: 400 15px var(--c-text); }
   html.ui-instrument .in-map-hit-name b, html.ui-instrument .in-map-hit-name small { font: 600 12px var(--c-sc); letter-spacing: .1em; color: var(--c-ink-2); text-transform: none; }
   html.ui-instrument .in-map-hit-name em { font: 400 13px var(--c-text); color: var(--c-ink-2); }

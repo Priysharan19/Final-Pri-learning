@@ -202,3 +202,11 @@ html.ui-instrument .in-week-seg { fill: none; stroke: var(--c-hair); stroke-widt
 html.ui-instrument .in-week-seg.is-on { stroke: var(--c-lume); stroke-width: 3; }
 html.ui-instrument .in-week-today { fill: none; stroke: var(--c-ink-2); stroke-width: 1; }
 html.ui-instrument .in-week-line { margin: 0; font: 400 16px/1.4 var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
+
+/* ── Jury round 2 ── */
+html.ui-instrument .in-report-title.is-eyebrow { font: 600 15px/1.2 var(--c-sc); letter-spacing: .14em; color: var(--c-ink-2); }
+html.ui-instrument .in-week-today { fill: none; stroke: var(--c-lume); stroke-width: 1.5; stroke-linecap: round; }
+html.ui-instrument .in-chart-bar { stroke: var(--c-ink-2); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html.ui-instrument .in-chart-bar.is-today { stroke: var(--c-lume); stroke-width: 1.5; }
+html.ui-instrument .in-chart[data-report-chart="empty"] .in-chart-empty { top: auto; bottom: -34px; left: 0; transform: none; max-width: none; text-align: left; }
+html.ui-instrument .in-chart[data-report-chart="empty"] { margin-bottom: 40px; }

@@ -110,26 +110,30 @@ export function overlaps(boxes) {
   return out;
 }
 
-// ── Strand columns (luxury direction C) ─────────────────────────────────────
-// The register layout: one column per strand (Number · Algebra · Geometry ·
-// Coordinates · Trigonometry · Calculus · Data, only those present), chapters
-// in syllabus order down each column, every node the same size (mastery is
-// drawn as an arc, not a radius). A column under the floating card starts
-// below it. Pure and deterministic; uses only the chapters' own strand and
-// order, never invented links.
+// ── Strand register (luxury direction C) ────────────────────────────────────
+// One column per strand (Number · Algebra · Geometry · Coordinates ·
+// Trigonometry · Calculus · Data, only those present), chapters in syllabus
+// order down each column, every node the same size (mastery is an arc, not a
+// radius). Laid out in real pixels so the type is drawn at its true size. All
+// columns sit in one row when they fit at MIN_COL px; otherwise they wrap into
+// rows of `perRow` with a routing gutter between rows. Prerequisite links are
+// drawn as orthogonal elbows that leave a node to the left, run in the clear
+// gutter beside its column, cross between columns only in a channel above a
+// row of nodes, and enter the other node from the left, so a line never
+// crosses a label. Pure and deterministic; only the chapters' own strand and
+// order, and the given links, are used.
 export const STRAND_ORDER = ['number', 'algebra', 'geometry', 'coord', 'trig', 'calculus', 'data'];
 export const NODE_R = 12;
-const COL_TOP = 150;       // under the title and the strand headings
-const COL_HEAD = 112;      // strand heading baseline
-const COL_GAP = 26;
-const ROW_MIN = 64;
+const PAD_L = 34;          // room for the first column's gutter
+const MIN_COL = 168;       // narrowest column that keeps 14px names readable
+const ROW_TOP = 150;       // first row's nodes, under the title and headings
+const HEAD_ABOVE = 40;     // strand heading baseline above a row's first node
+const CHANNEL_ABOVE = 22;  // routing channel above a row's first node
+const ROW_GAP = 96;        // between rows (headings, channel, gutter)
+const NAME_CH = 7.6;       // px per character of the 14px STIX name
+const GUTTER = 20;         // vertical lanes run this far left of a node
 
-/**
- * @param chapters [{ id, name, strand }] in syllabus order
- * @param reserve  { card: {w, h} | null } in map units
- * @returns { nodes: [{ id, x, y, r, lines }], columns: [{ strand, x }], height }
- */
-/** A name in up to `most` lines (the column labels have room for three). */
+/** A name in up to `most` lines of `max` characters. */
 function wrapLines(name, max, most) {
   const lines = [''];
   for (const w of String(name).split(/\s+/).filter(Boolean)) {
@@ -140,29 +144,74 @@ function wrapLines(name, max, most) {
   return lines;
 }
 
-export function strandColumns(chapters, reserve = {}) {
-  const strands = STRAND_ORDER.filter(s => chapters.some(c => c.strand === s));
-  const extra = [...new Set(chapters.map(c => c.strand))].filter(s => !STRAND_ORDER.includes(s));
-  const all = [...strands, ...extra];
-  const k = Math.max(1, all.length);
-  const colW = (MAP_W - LEFT + COL_GAP) / k;
-  const maxCh = Math.max(10, Math.floor((colW - COL_GAP - NODE_R * 2 - 20) / LABEL_CH));
-  const card = reserve.card ? { x1: MAP_W - reserve.card.w, y2: reserve.card.h } : null;
+/**
+ * @param chapters [{ id, name, strand }] in syllabus order
+ * @param opts { width: px, reserveRight: px kept clear at the right }
+ * @returns { nodes: [{ id, x, y, r, lines, col, band }], columns: [{ strand, x, headY, band }], rows: [{ top }], height, width }
+ */
+export function strandRegister(chapters, { width = MAP_W, reserveRight = 0, top: firstTop = ROW_TOP } = {}) {
+  const present = new Set(chapters.map(c => c.strand));
+  const strands = [...STRAND_ORDER.filter(s => present.has(s)), ...[...present].filter(s => !STRAND_ORDER.includes(s))];
+  const usable = Math.max(MIN_COL, width - reserveRight - PAD_L);
+  const perRow = Math.max(1, Math.min(strands.length, Math.floor(usable / MIN_COL)));
+  const rowsOf = Math.ceil(strands.length / perRow);
+  const balanced = Math.ceil(strands.length / rowsOf);   // 6 → 3 + 3, not 4 + 2
+  const colW = usable / balanced;
+  const maxCh = Math.max(9, Math.floor((colW - NODE_R * 2 - 26) / NAME_CH));
   const nodes = [];
   const columns = [];
-  let height = 0;
-  all.forEach((strand, ci) => {
-    const x = LEFT - NODE_R + ci * colW + NODE_R;
-    const right = x + colW - COL_GAP;
-    const underCard = card && right > card.x1;
-    let y = underCard ? Math.max(COL_TOP, card.y2 + 70) : COL_TOP;
-    columns.push({ strand, x, headY: underCard ? y - 38 : COL_HEAD });
-    for (const c of chapters.filter(ch => ch.strand === strand)) {
-      const lines = wrapLines(c.name, maxCh, 3);
-      nodes.push({ id: c.id, x, y, r: NODE_R, lines });
-      y += Math.max(ROW_MIN, 26 + lines.length * 17 + 20);
-    }
-    height = Math.max(height, y);
-  });
-  return { nodes, columns, height: height + 70 };
+  const rows = [];
+  let top = firstTop;
+  for (let r = 0; r < rowsOf; r++) {
+    rows.push({ top });
+    let bottom = top;
+    strands.slice(r * balanced, (r + 1) * balanced).forEach((strand, ci) => {
+      const x = PAD_L + NODE_R + ci * colW;
+      columns.push({ strand, x, headY: top - HEAD_ABOVE, band: r });
+      let y = top;
+      for (const c of chapters.filter(ch => ch.strand === strand)) {
+        const lines = wrapLines(c.name, maxCh, 3);
+        nodes.push({ id: c.id, x, y, r: NODE_R, lines, col: columns.length - 1, band: r });
+        y += Math.max(64, 30 + lines.length * 18 + 20);
+      }
+      bottom = Math.max(bottom, y);
+    });
+    top = bottom + ROW_GAP;
+  }
+  return { nodes, columns, rows, height: top - ROW_GAP + 70, width };
+}
+
+/**
+ * An orthogonal elbow from node a to node b (1px lines, radius-4 joins):
+ * left out of a into its gutter, along the routing channel above the row
+ * (or the gutter between rows), down the gutter beside b, and right into b.
+ * `lane` (0, 1, 2 …) separates links that share a channel.
+ */
+export function elbowPath(a, b, rows, lane = 0) {
+  const R = 4;
+  const ga = a.x - GUTTER - (lane % 4) * 3;
+  const gb = b.x - GUTTER - (lane % 4) * 3;
+  if (a.col === b.col) {
+    // Same column: down (or up) the gutter beside it.
+    const dir = b.y > a.y ? 1 : -1;
+    return `M${a.x - a.r} ${a.y} L ${ga + R} ${a.y} A${R} ${R} 0 0 ${dir > 0 ? 0 : 1} ${ga} ${a.y + dir * R} L ${ga} ${b.y - dir * R} A${R} ${R} 0 0 ${dir > 0 ? 0 : 1} ${ga + R} ${b.y} L ${b.x - b.r} ${b.y}`;
+  }
+  const upper = Math.min(a.band, b.band);
+  const lower = Math.max(a.band, b.band);
+  const cy = (a.band === b.band ? rows[upper].top - CHANNEL_ABOVE : rows[lower].top - ROW_GAP / 2 - 8) - (lane % 4) * 3;
+  const sx = gb > ga ? 1 : -1;
+  // a → its gutter → up/down to the channel → across → down/up to b → into b.
+  const v1 = cy < a.y ? -1 : 1;
+  const v2 = b.y > cy ? 1 : -1;
+  return [
+    `M${a.x - a.r} ${a.y} L ${ga + R} ${a.y}`,
+    `A${R} ${R} 0 0 ${v1 < 0 ? 1 : 0} ${ga} ${a.y + v1 * R}`,
+    `L ${ga} ${cy - v1 * R}`,
+    `A${R} ${R} 0 0 ${(v1 < 0) === (sx > 0) ? 1 : 0} ${ga + sx * R} ${cy}`,
+    `L ${gb - sx * R} ${cy}`,
+    `A${R} ${R} 0 0 ${(v2 > 0) === (sx > 0) ? 1 : 0} ${gb} ${cy + v2 * R}`,
+    `L ${gb} ${b.y - v2 * R}`,
+    `A${R} ${R} 0 0 ${v2 > 0 ? 0 : 1} ${gb + R} ${b.y}`,
+    `L ${b.x - b.r} ${b.y}`
+  ].join(' ');
 }

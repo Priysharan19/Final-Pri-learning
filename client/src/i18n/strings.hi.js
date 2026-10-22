@@ -3054,6 +3054,7 @@ export default {
   "inst.tabScripts": "उत्तर-पुस्तिकाएँ",
   "inst.reportWeekLine": "पिछले 7 में से {n} दिन अभ्यास किया",
   "inst.reportLost": "जहाँ अंक कटे",
+  "inst.reportLostUnplaced": "इस अवधि में खोए {p} में से {n} अंक अभी इस पाठ्यक्रम के किसी अध्याय में नहीं जुड़े हैं।",
   "inst.reportLostNone": "अभी तक कोई प्रमाणित अंक नहीं कटे।",
   "inst.mapTitleScope": "{scope} गणित",
   "inst.mapStarted": "{total} में से {started} अध्याय शुरू किए",

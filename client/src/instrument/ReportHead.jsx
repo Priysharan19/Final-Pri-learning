@@ -6,6 +6,7 @@ import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
 import BarSlot from './BarSlot.jsx';
+import { lostPanel } from './reportLost.js';
 import './report.css';
 
 /** The headline figure, rolled digit by digit (presentation only): each digit
@@ -89,6 +90,7 @@ function Chart({ series, labels, t, spoken, failed }) {
   const path = (run, key) => run.map((i, k) => `${k ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(series[i][key]).toFixed(1)}`).join(' ');
   const area = run => `${path(run, 'methodPct')} L${X(run[run.length - 1]).toFixed(1)} ${CH - PADB} L${X(run[0]).toFixed(1)} ${CH - PADB} Z`;
   const any = series.some(p => p.methodPct != null || p.accuracyPct != null);
+  const qMax = Math.max(0, ...series.map(p => Number(p.questions) || 0));
   const last = key => { for (let i = n - 1; i >= 0; i--) if (series[i][key] != null) return i; return -1; };
   const lm = last('methodPct'); const la = last('accuracyPct');
   // The two end values never collide: the higher line's value goes above its
@@ -107,6 +109,11 @@ function Chart({ series, labels, t, spoken, failed }) {
           {gridX.map(x => <line key={`x${x}`} x1={x} y1={0} x2={x} y2={CH} />)}
           {gridY.map(y => <line key={`y${y}`} x1={0} y1={y} x2={CW} y2={y} />)}
         </g>
+        {/* Below the floor, what is allowed: questions answered per point, as
+            hairline bars, the latest in lume. Never a withheld percentage. */}
+        {!any && qMax > 0 && series.map((p, i) => p.questions > 0 && (
+          <line key={`q${i}`} className={`in-chart-bar${i === n - 1 ? ' is-today' : ''}`} x1={X(i)} x2={X(i)} y1={CH - PADB} y2={CH - PADB - (p.questions / qMax) * (CH - PADB - PADT)} data-chart-bar={p.questions} />
+        ))}
         {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} fill={`url(#${hatch})`} />)}
         {runs('methodPct').map((r, k) => r.length > 1
           ? <path key={`m${k}`} className="in-chart-line is-method" d={path(r, 'methodPct')} pathLength="1" data-chart-line="method" />
@@ -173,10 +180,7 @@ export default function ReportHead() {
     const rows = scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || [];
     const nameOf = id => rows.find(r => r.id === id)?.name || null;
     const colourOf = id => { const i = rows.findIndex(r => r.id === id); return i >= 0 ? colourFor(i) : '--in-tx-3'; };
-    const lost = Object.entries(marks)
-      .map(([id, m]) => ({ id, name: nameOf(id), lost: m.possible - m.earned, ...m }))
-      .filter(c => c.name && c.lost > 0)
-      .sort((a, b) => b.lost - a.lost || a.name.localeCompare(b.name)).slice(0, 3);
+    const lost = (cur) => lostPanel(marks, nameOf, cur);
     return { week, lost, colourOf };
   }, [stats, marks, curriculum, user]);
 
@@ -210,15 +214,16 @@ export default function ReportHead() {
     } else if (cur.questions > 0) lede.push(t('inst.ledeFew', { count: cur.questions, n: cur.questions }));
     else lede.push(t('inst.ledeNone'));
   }
-  const worst = view.lost[0];
+  const lostNow = view.lost(cur);
+  const worst = lostNow.rows[0];
 
   return (
     <section className="in-report" aria-labelledby="in-report-title" data-instrument-report data-report-period={period} data-report-loaded={shown ? shown.period : 'none'}>
       <div className="in-report-head">
         <div>
           {user?.course === 'in'
-            ? <h1 id="in-report-title" className="in-report-title">{title}</h1>
-            : <h2 id="in-report-title" className="in-report-title">{title}</h2>}
+            ? <h1 id="in-report-title" className="in-report-title is-eyebrow">{title}</h1>
+            : <h2 id="in-report-title" className="in-report-title is-eyebrow">{title}</h2>}
           {lede.length > 0 && (
             <p className={`in-report-lede${cur && cur.methodPct == null ? ' is-withheld' : ''}`} data-report-lede>
               {lede.join(' ')}
@@ -250,7 +255,7 @@ export default function ReportHead() {
         <div className="in-report-heat">
           {/* Consistency, calmly: the last seven calendar days from the same
               practice-day activity, as one line and a chronograph week ring
-              (a hairline segment per day, lume where practised, today ringed). */}
+              (a hairline segment per day, lume where practised, today marked by a tick inside the ring). */}
           <div className="in-week" role="img" aria-label={t('inst.reportWeekLine', { n: view.week.filter(c => c.n > 0).length })} data-report-week>
             <svg className="in-week-ring" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
               {view.week.map((c, i) => {
@@ -261,7 +266,7 @@ export default function ReportHead() {
                 return (
                   <g key={c.key}>
                     <path className={`in-week-seg${c.n ? ' is-on' : ''}`} d={`M${pt(a0, 26)} A26 26 0 0 1 ${pt(a1, 26)}`} />
-                    {today && <path className="in-week-today" d={`M${pt(a0, 30.5)} A30.5 30.5 0 0 1 ${pt(a1, 30.5)}`} />}
+                    {today && <path className="in-week-today" d={`M${pt((a0 + a1) / 2, 21)} L ${pt((a0 + a1) / 2, 15)}`} />}
                   </g>
                 );
               })}
@@ -270,13 +275,15 @@ export default function ReportHead() {
           </div>
           <div className="in-report-lost">
             <h3>{t('inst.reportLost')}</h3>
-            {view.lost.length ? (
-              <ul>{view.lost.map(c => (
+            {lostNow.state === 'rows' ? (
+              <ul>{lostNow.rows.map(c => (
                 <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
                   <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned}/${c.possible}`}</small>
                 </li>
               ))}</ul>
-            ) : <p className="in-note">{t('inst.reportLostNone')}</p>}
+            ) : lostNow.state === 'unplaced'
+              ? <p className="in-note" data-report-lost-unplaced>{t('inst.reportLostUnplaced', { n: lostNow.unplaced, p: lostNow.possible })}</p>
+              : <p className="in-note">{t('inst.reportLostNone')}</p>}
           </div>
         </div>
       </div>
