@@ -120,6 +120,7 @@ check('marks are images named by their caller', /role="img" aria-label=\{label\}
 // One brand mark.
 const pmark = readFileSync(join(dir, 'margin/PMark.jsx'), 'utf8');
 check('the brand mark is one Instrument Serif P′ in an engraved bezel', /Instrument Serif/.test(pmark) && /P<tspan[^>]*>′/.test(pmark) && /reduced\(\)/.test(pmark));
+check('the lock-up wordmark is "Pri Learning" in the C serif, as real text', />Pri Learning</.test(pmark) && /var\(--c-serif\)/.test(pmark));
 
 // Motion.
 const s = simulateSpring({ from: -1400, to: 0 }, 1.2);
