@@ -60,6 +60,11 @@ import QuestionHead from '../instrument/QuestionHead.jsx';
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
 const INSTRUMENT = featureEnabled('instrument');
+// Pri Luxury: the score is one figure in the date window; how it was set is
+// one hairline section the student opens. Classic build: unchanged.
+function HowMarksSet({ on, label, children }) {
+  return on ? <details className="wc-how" data-how-marks-set><summary>{label}</summary>{children}</details> : children;
+}
 // Both chords work (the handler takes Meta or Control), so the chip names both
 // rather than guessing the keyboard from the device.
 const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
@@ -445,6 +450,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
   const [peek, setPeek] = useState(false);
   const [peekOpen, setPeekOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);   // instrument phone footer: the ⋯ overflow
   const inkSaveTimer = useRef(null);
   // The most recent pen-lift owns the save indicator. A previous asynchronous
   // IDB acknowledgement must never overwrite the status of newer strokes.
@@ -2339,7 +2345,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {/* ── The student's work: the surface everything else attaches to ── */}
       <section className="ws-work" aria-label={t('verdict.workRegion')}>
         <div className={`ws-qpeek no-print${peek ? ' is-on' : ''}`} aria-hidden={!peek}>
-          <span className="ws-qpeek-text">{plainPrompt}</span>
+          <span className="ws-qpeek-text">{INSTRUMENT ? <MathText text={question.prompt} /> : plainPrompt}</span>
           <button type="button" className="btn btn-quiet btn-sm" tabIndex={peek ? 0 : -1} onClick={() => setPeekOpen(true)}>{t('verdict.showQuestion')}</button>
         </div>
 
@@ -2991,6 +2997,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
+                <HowMarksSet on={INSTRUMENT} label={t('inst.howMarksSet')}>
                 {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
                 {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
@@ -3023,6 +3030,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('verdict.boardStyleNote')}</p>
                   </div>
                 )}
+                </HowMarksSet>
               </div>
               {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
               {/* A repeat is marked like any answer but earns nothing; said
@@ -3074,7 +3082,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
-        <div className="ws-actions editor-foot no-print">
+        <div className="ws-actions editor-foot no-print" data-more={INSTRUMENT && moreOpen ? 'open' : undefined}>
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
@@ -3118,6 +3126,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </button>
                 );
               })()
+            )}
+            {INSTRUMENT && !resolved && (
+              <button type="button" className="btn btn-quiet wc-more" aria-expanded={moreOpen} aria-label={t('inst.moreActions')}
+                onClick={() => setMoreOpen(o => !o)}>⋯</button>
             )}
             {INSTRUMENT && writeMode && !resolved && inkHasStrokes && (
               <button type="button" className="btn btn-quiet in-wbar-reset" data-wbar-reset disabled={busy}

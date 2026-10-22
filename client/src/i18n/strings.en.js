@@ -3017,6 +3017,8 @@ export default {
   "inst.readSlip": "slip",
   "inst.readUnsure": "not sure",
   "inst.readOk": "checks",
+  "inst.howMarksSet": "How the marks were set",
+  "inst.moreActions": "More actions",
   "inst.qNumber": "Q{n}",
   "inst.qNumberOf": "Q{n}/{total}",
   "inst.qNumberSr": "Question {n} this session",

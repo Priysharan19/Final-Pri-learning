@@ -3080,6 +3080,8 @@ export default {
   "inst.readSlip": "चूक",
   "inst.readUnsure": "पक्का नहीं",
   "inst.readOk": "सही",
+  "inst.howMarksSet": "अंक कैसे तय हुए",
+  "inst.moreActions": "और विकल्प",
   "inst.qNumber": "प्र{n}",
   "inst.qNumberOf": "प्र{n}/{total}",
   "inst.qNumberSr": "इस सत्र का प्रश्न {n}",

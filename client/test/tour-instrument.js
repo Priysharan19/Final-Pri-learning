@@ -374,15 +374,33 @@ export const writeFlow = {
     await page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
     await check('Ctrl+↵ checks the working, as the primary does', await page.locator('.verdict, .eval-card').count() > 0);
     await check('Check marks the shell for the scan', await shell.getAttribute('data-marked') === 'yes');
-    const scan = await page.evaluate(() => {
-      const el = document.querySelector('.editor-shell[data-marked="yes"] .ink-stage');
-      if (!el) return null;
-      const s = getComputedStyle(el, '::after');
-      return { name: s.animationName, border: s.borderBottomColor, pointer: s.pointerEvents };
+    // Pri Luxury (C): the marking ceremony replaces the v1.1 scan band. While
+    // marks are struck the card's verdict waits; the stamps are only on lines
+    // the deterministic engine marked; the ceremony never takes the pen; and
+    // the verdict is shown once the ceremony has ended.
+    const during = await page.evaluate(() => {
+      const v = document.querySelector('.ws .verdict');
+      const stage = document.querySelector('.ink-stage');
+      return {
+        marking: document.documentElement.classList.contains('wc-marking'),
+        verdictHidden: !!v && getComputedStyle(v).opacity === '0',
+        scan: stage ? getComputedStyle(stage, '::after').animationName : null,
+        layerPointer: getComputedStyle(document.querySelector('.in-read-layer') || document.body).pointerEvents
+      };
     });
-    const signal = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-signal').trim());
-    await check('the scan runs once, in the signal colour', scan?.name === 'in-scan', JSON.stringify({ scan, signal }));
-    await check('the scan never takes the pen: it ignores pointer input', scan?.pointer === 'none');
+    await check('the marking ceremony runs in place of the scan band, and the verdict waits for it', during.marking && during.verdictHidden && during.scan === 'none', JSON.stringify(during));
+    await check('the ceremony never takes the pen: the margin ignores pointer input', during.layerPointer === 'none', during.layerPointer);
+    await page.waitForFunction(() => !document.documentElement.classList.contains('wc-marking'), null, { timeout: 8000 }).catch(() => {});
+    const after = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('[data-reading-chips] [data-read-chip]')];
+      return {
+        done: !!document.querySelector('.wc-done'),
+        stampsOnlyOnEngineRows: rows.every(r => !!r.querySelector('.wc-plane') === r.hasAttribute('data-wc-row')),
+        stamped: rows.filter(r => r.querySelector('.wc-plane')).length,
+        verdictShown: getComputedStyle(document.querySelector('.ws .verdict')).opacity !== '0'
+      };
+    });
+    await check('stamps appear only on engine-marked lines, and the verdict only after the ceremony ends', after.done && after.stampsOnlyOnEngineRows && after.stamped >= 1 && after.verdictShown, JSON.stringify(after));
     const verdict = page.locator('.verdict').first();
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);

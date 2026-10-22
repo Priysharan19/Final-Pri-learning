@@ -130,3 +130,24 @@ html.ui-instrument .ws-actions { position: sticky; bottom: 0; z-index: 6; backgr
 @media (prefers-reduced-transparency: reduce) { html.ui-instrument .ws-actions { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); } }
 /* The score window, C size, beside the question. */
 html.ui-instrument .wc-datewin { min-width: calc(var(--wc-win-w) * 1.6); padding: var(--wc-win-pad); font-size: calc(var(--wc-row-size) * 1.7); line-height: 1.6; }
+
+/* The C ceremony replaces the v1.1 scan band (approved design change). */
+html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { display: none; animation: none; }
+
+/* The verdict's breakdown: one hairline section, opened on request. */
+html.ui-instrument .wc-how { margin-top: var(--wc-row-pad); border-block-start: var(--c-line) solid var(--c-hair); }
+html.ui-instrument .wc-how > summary { min-height: var(--wc-row-min); display: flex; align-items: center; cursor: pointer; font: var(--c-t-label); letter-spacing: .14em; color: var(--c-ink-2); }
+/* Callouts on midnight enamel use enamel fills, not paper beige. */
+html.ui-instrument :is(.ink-comments > *, .ink-line-math, .in-read) { background-color: var(--c-sheet); }
+/* The copper margin rule, one hairline, on every width. */
+html.ui-instrument .ink-stage::before { border-inline-start-color: var(--c-copper); }
+/* Phone: question first, one Check pill. */
+.wc-more { display: none; }
+@media (max-width: 560px) {
+  html.ui-instrument .wc-more { display: inline-flex; min-width: 44px; justify-content: center; }
+  html.ui-instrument .ws-actions:not([data-more="open"]) .ws-actions-btns > .btn-quiet:not(.hint-bulb):not(.wc-more) { display: none; }
+  html.ui-instrument .ws-actions .status-line, html.ui-instrument .ws-actions .in-wbar-note { display: none; }
+  /* The ladder stays shut until the Hint pill opens a rung. */
+  html.ui-instrument .in-ladder .in-rung:not([data-hint-shown]):not(.hintbox) { display: none; }
+  html.ui-instrument .ws .q-prompt { font: var(--c-t-wq); font-size: clamp(20px, 5.4vw, 26px); }
+}
