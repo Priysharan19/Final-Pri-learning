@@ -227,7 +227,10 @@ export const ON_DEMAND = [
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
     [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened'],
+    // The Notes loader: the Index's key result and ⌘K's formula lookup reach it
+    // only after the hero settles or on the first keystroke, like Notes itself.
+    [/(^|\/)notesIndex-[^/]*\.js$/, 'instrument: Notes loader, fetched when the key result or a formula search needs it']
   ] : [
     [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|shell|IndexDial|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
