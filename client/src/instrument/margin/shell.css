@@ -59,6 +59,8 @@
 /* The lock-up never wraps; on a portrait iPad the bar's command field and
    lamp step down to their icons so the six tabs keep one line. */
 .in-bar .c-wordmark { white-space: nowrap; }
+.in-bar .in-mark { flex: none; }
+.k-hero .m-dial { width: min(100%, 460px); }
 @media (min-width: 761px) and (max-width: 900px) {
   .in-bar { gap: 12px; }
   .in-tab { padding: 0 9px; }
