@@ -1,0 +1,1 @@
+var e=`pri.firstOpen.v1`;function t(){try{return window.localStorage.getItem(e)===`1`}catch{return!0}}function n(){try{window.localStorage.setItem(e,`1`)}catch{}}export{n,t};
