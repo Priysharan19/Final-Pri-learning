@@ -292,6 +292,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 .in-kpis div { display: flex; flex-direction: column-reverse; gap: 2px; }
 .in-kpis b { display: block; font: 400 34px/38px var(--c-serif); font-variant-numeric: tabular-nums; color: var(--c-ink); }
 .in-scope { position: relative; min-height: 240px; border-radius: 8px; background: var(--c-sheet); box-shadow: inset 0 0 0 1px var(--c-hair); overflow: hidden; }
+.in-plate-acts .c-btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .in-plate-acts { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .in-note { color: var(--c-ink-3); font-size: 13px; margin: 0; }
 .in-empty { padding: 40px 0; color: var(--c-ink-3); }
