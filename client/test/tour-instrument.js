@@ -481,7 +481,7 @@ export const writeFlow = {
       await page.waitForSelector('[data-instrument-report]', { timeout: 15000 }).catch(() => {});
       const fig = (await page.locator('[data-report-marks] b').textContent().catch(() => '')).replace(/\s+/g, '');
       await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
-      await check('today’s practice is lit on the heat-map', await page.locator('.in-heat i.is-on').count() >= 1);
+      await check('today’s practice is lit on the week ring', await page.locator('[data-report-week] .in-week-seg.is-on').count() >= 1);
       // One question is under every evidence floor: the chart draws no line,
       // never a zero, and says why.
       await check('below the floor the chart draws no point and says so', await page.locator('[data-report-chart="empty"] [data-chart-empty]').count() === 1 && await page.locator('[data-chart-line]').count() === 0);

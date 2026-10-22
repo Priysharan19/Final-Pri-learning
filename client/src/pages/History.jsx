@@ -20,6 +20,7 @@ import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
 import { flatTitle } from '../instrument/flatTitle.js';
+import { MarkGlyph as InstrumentMark } from '../instrument/margin/MarginIcon.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
@@ -97,6 +98,8 @@ const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
 /* global __PRI_FEATURE_INSTRUMENT__ */
 const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
 const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
+// Marks in the instrument build are C's shapes (✓ circle, ✗ diamond).
+const MarkGlyph = INSTRUMENT_BUILD ? InstrumentMark : null;
 const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index }) {
   const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
   const wantsInk = !!item.hasInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
@@ -137,8 +140,10 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
           {ink.strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
         </svg>
       ) : ink.state === 'loading' ? <span className="in-scr-wait"><i /><i /><i /></span>
-        : ink.state === 'error' || ink.state === 'empty' || (ink.state === 'idle' && item.hasInk && !typed) ? <span className={`in-scr-none${ink.state === 'error' ? ' is-error' : ''}`}><Icon name="pen" size={14} /></span>
-          : typed ? <span className="in-scr-typed"><MathText text={typed} /></span> : null}
+        : typed ? <span className="in-scr-typed"><MathText text={typed} /></span>
+          // Never a blank sheet: without ink or a typed answer, the question's
+          // first line sits on the ruling (a failed fetch adds a dashed pen).
+          : <span className="in-scr-qline">{ink.state === 'error' && <span className="in-scr-none is-error"><Icon name="pen" size={13} /></span>}<MathText text={flatTitle(item.prompt)} /></span>}
       {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
     </span>
   );
@@ -363,7 +368,9 @@ function HistoryForProfile() {
                   <span className="in-led-res">
                     {!item.repeat && Number.isInteger(item.marksPossible) ? <MarkStrip earned={item.marksEarned} possible={item.marksPossible} /> : (
                       <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
-                        {item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·'}
+                        {item.correct == null ? '·' : MarkGlyph
+                          ? <span aria-hidden="true"><MarkGlyph kind={item.correct ? 'ok' : 'x'} label="" size={20} /></span>
+                          : item.correct ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
                       </span>
                     )}
                     <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
@@ -400,10 +407,11 @@ function HistoryForProfile() {
       <h1 className="sr-only">{t('history.title')}</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2>{t('history.heading')}</h2>
-          <p className="sub" style={{ marginTop: 3 }}>{t('history.sub')}</p>
+          {INSTRUMENT_STRIP && <p className="in-hist-eyebrow" data-history-eyebrow>{counts ? t('inst.scriptsEyebrow', { n: formatNumber(counts.all ?? 0, user), look: formatNumber(counts.needsLook ?? 0, user) }) : '…'}</p>}
+          <h2>{INSTRUMENT_STRIP ? t('inst.scriptsTitle') : t('history.heading')}</h2>
+          {!INSTRUMENT_STRIP && <p className="sub" style={{ marginTop: 3 }}>{t('history.sub')}</p>}
         </div>
-        <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>
+        {!INSTRUMENT_STRIP && <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>}
       </div>
 
       {!INSTRUMENT_STRIP && <ErrorNotebook />}

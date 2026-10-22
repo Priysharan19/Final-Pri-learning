@@ -109,3 +109,60 @@ export function overlaps(boxes) {
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (hit(boxes[i], boxes[j])) out.push([i, j]);
   return out;
 }
+
+// ── Strand columns (luxury direction C) ─────────────────────────────────────
+// The register layout: one column per strand (Number · Algebra · Geometry ·
+// Coordinates · Trigonometry · Calculus · Data, only those present), chapters
+// in syllabus order down each column, every node the same size (mastery is
+// drawn as an arc, not a radius). A column under the floating card starts
+// below it. Pure and deterministic; uses only the chapters' own strand and
+// order, never invented links.
+export const STRAND_ORDER = ['number', 'algebra', 'geometry', 'coord', 'trig', 'calculus', 'data'];
+export const NODE_R = 12;
+const COL_TOP = 150;       // under the title and the strand headings
+const COL_HEAD = 112;      // strand heading baseline
+const COL_GAP = 26;
+const ROW_MIN = 64;
+
+/**
+ * @param chapters [{ id, name, strand }] in syllabus order
+ * @param reserve  { card: {w, h} | null } in map units
+ * @returns { nodes: [{ id, x, y, r, lines }], columns: [{ strand, x }], height }
+ */
+/** A name in up to `most` lines (the column labels have room for three). */
+function wrapLines(name, max, most) {
+  const lines = [''];
+  for (const w of String(name).split(/\s+/).filter(Boolean)) {
+    const cur = lines[lines.length - 1];
+    if (cur && (cur + ' ' + w).length > max && lines.length < most) lines.push(w);
+    else lines[lines.length - 1] = cur ? `${cur} ${w}` : w;
+  }
+  return lines;
+}
+
+export function strandColumns(chapters, reserve = {}) {
+  const strands = STRAND_ORDER.filter(s => chapters.some(c => c.strand === s));
+  const extra = [...new Set(chapters.map(c => c.strand))].filter(s => !STRAND_ORDER.includes(s));
+  const all = [...strands, ...extra];
+  const k = Math.max(1, all.length);
+  const colW = (MAP_W - LEFT + COL_GAP) / k;
+  const maxCh = Math.max(10, Math.floor((colW - COL_GAP - NODE_R * 2 - 20) / LABEL_CH));
+  const card = reserve.card ? { x1: MAP_W - reserve.card.w, y2: reserve.card.h } : null;
+  const nodes = [];
+  const columns = [];
+  let height = 0;
+  all.forEach((strand, ci) => {
+    const x = LEFT - NODE_R + ci * colW + NODE_R;
+    const right = x + colW - COL_GAP;
+    const underCard = card && right > card.x1;
+    let y = underCard ? Math.max(COL_TOP, card.y2 + 70) : COL_TOP;
+    columns.push({ strand, x, headY: underCard ? y - 38 : COL_HEAD });
+    for (const c of chapters.filter(ch => ch.strand === strand)) {
+      const lines = wrapLines(c.name, maxCh, 3);
+      nodes.push({ id: c.id, x, y, r: NODE_R, lines });
+      y += Math.max(ROW_MIN, 26 + lines.length * 17 + 20);
+    }
+    height = Math.max(height, y);
+  });
+  return { nodes, columns, height: height + 70 };
+}

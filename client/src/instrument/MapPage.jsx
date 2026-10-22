@@ -8,7 +8,7 @@ import { prerequisitesOf, mapStrandOf } from '../engine/prerequisites.js';
 import { IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
-import { constellation, MAP_W } from './mapLayout.js';
+import { strandColumns, MAP_W, NODE_R } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
 import './map.css';
 
@@ -39,7 +39,6 @@ const FLOAT_MAX_SHARE = 0.4;
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
 
-const fillOf = node => 0.14 + (node.evidence.mastery / 100) * 0.86;
 const secureOf = node => node.evidence.accuracy == null ? 0 : node.evidence.mastery / 100;
 
 
@@ -147,9 +146,8 @@ export default function MapPage() {
       evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy),
       marks: marks[row.id] || null
     }));
-    const placed = constellation(
-      nodes.map(n => ({ id: n.row.id, name: n.row.name, mastery: n.evidence.mastery })),
-      id => prerequisitesOf(id).map(p => p.id),
+    const placed = strandColumns(
+      nodes.map(n => ({ id: n.row.id, name: n.row.name, strand: n.strand })),
       reserve ? { card: reserve } : {}
     );
     const at = new Map(placed.nodes.map(p => [p.id, p]));
@@ -161,10 +159,13 @@ export default function MapPage() {
       if (!from) continue;
       edges.push({ from, to: node, skill: pre.skill, d: `M${from.x} ${from.y} L ${node.x} ${node.y}`, opacity: 0.16 + 0.55 * Math.min(secureOf(from), secureOf(node)) });
     }
+    // The syllabus sequence, drawn as one hairline route through every chapter
+    // in the scope's own order (the rows as the curriculum lists them).
+    const route = nodes.slice(1).map((node, i) => ({ from: nodes[i], to: node, d: `M${nodes[i].x} ${nodes[i].y} L ${node.x} ${node.y}` }));
     const started = nodes.filter(node => node.evidence.attempts > 0).length;
     // Only the chapters drawn on this map count toward the month's total.
     const monthly = month ? nodes.map(n => month[n.row.id]).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m.earned) || 0), possible: a.possible + (Number(m.possible) || 0) }), { earned: 0, possible: 0 }) : null;
-    return { nodes, edges, height: placed.height, byId, started, monthly };
+    return { nodes, edges, route, columns: placed.columns, height: placed.height, byId, started, monthly };
   }, [curriculum, marks, month, user, reserve?.w, reserve?.h]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const track = practiceTrack(user);
@@ -210,7 +211,6 @@ export default function MapPage() {
 
   const lost = current ? lostDotpoint(current) : null;
   const feeds = current ? preNames(current) : [];
-  const firstPre = current ? layout.byId.get(prerequisitesOf(current.row.id)[0]?.id) : null;
 
   return (
     <div className="in-map" data-instrument-map>
@@ -224,6 +224,11 @@ export default function MapPage() {
         </header>
         <div className={`in-map-graph${motion.running ? '' : ' is-still'}${arrived ? ' is-arrived' : ' is-arriving'}`} ref={graphRef} data-map-arrived={arrived ? 'true' : 'false'}>
           <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+            {layout.columns.map(c => STRAND_KEY[c.strand] && <text key={c.strand} className="in-map-strand" x={c.x - NODE_R} y={c.headY}>{t(STRAND_KEY[c.strand])}</text>)}
+            {layout.route.map((e, i) => (
+              <path key={`r${i}`} className={`in-map-route${isRecommended(e.to) && !layout.edges.some(x => isRecommended(x.to)) ? ' is-toward' : ''}`} pathLength="1"
+                d={e.d} style={{ '--hop': Math.min(hopOf(e.from.row.id), hopOf(e.to.row.id)) }} />
+            ))}
             {layout.edges.map((e, i) => (
               <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}`} pathLength="1"
                 d={outward(e)} style={{ strokeOpacity: isRecommended(e.to) ? undefined : 0.45 + 0.55 * e.opacity, '--hop': Math.min(hopOf(e.from.row.id), hopOf(e.to.row.id)) }} />
@@ -235,8 +240,14 @@ export default function MapPage() {
             )))}
             {layout.nodes.map(node => (
               <g key={node.row.id} className={`in-map-node${current?.row.id === node.row.id ? ' is-on' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})`, '--hop': hopOf(node.row.id) }} data-map-node={node.row.id}>
-                <circle className="in-map-dot" cx={node.x} cy={node.y} r={node.r} style={{ fillOpacity: fillOf(node) }} />
-                <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 7} />
+                {/* C's sub-dial: a hairline ring whose teal arc is the floored
+                    mastery (dashed when not started), an ink dot at the centre. */}
+                <circle className={`in-map-ring${node.evidence.attempts === 0 ? ' is-new' : ''}`} cx={node.x} cy={node.y} r={node.r} />
+                {node.evidence.accuracy != null && node.evidence.mastery > 0 && (
+                  <circle className="in-map-arc" cx={node.x} cy={node.y} r={node.r} pathLength="100"
+                    strokeDasharray={`${node.evidence.mastery} 100`} transform={`rotate(-90 ${node.x} ${node.y})`} />
+                )}
+                <circle className="in-map-dot" cx={node.x} cy={node.y} r={2.5} />
                 <text x={node.x + node.r + 14} y={node.y + 3} className="in-map-name" lang="en">
                   {node.lines.map((ln, k) => <tspan key={k} x={node.x + node.r + 14} dy={k ? 17 : 0}>{ln}</tspan>)}
                 </text>
@@ -249,7 +260,7 @@ export default function MapPage() {
           <ol className="in-map-list" aria-label={t('inst.mapTitle')}>
             {layout.nodes.map(node => (
               <li key={node.row.id} style={{ left: `${(node.x / MAP_W) * 100}%`, top: `${(node.y / H) * 100}%` }}>
-                <button type="button" className="in-map-hit" data-map-chapter={node.row.id}
+                <button type="button" className={`in-map-hit${isRecommended(node) ? ' is-next' : ''}`} data-map-chapter={node.row.id}
                   aria-current={current?.row.id === node.row.id ? 'true' : undefined}
                   aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
                   aria-label={`${STRAND_KEY[node.strand] ? t(STRAND_KEY[node.strand]) + ' · ' : ''}${node.row.name}${isRecommended(node) ? ` · ${t('inst.mapNext')}` : ''}`}
@@ -257,7 +268,11 @@ export default function MapPage() {
                   onMouseEnter={e => { if (window.matchMedia?.('(hover: hover)').matches && e.currentTarget.getBoundingClientRect().width < 60) setPick(node.row.id); }}>
                   {/* The phone list shows the bare name for space; the card carries the gloss. */}
                   <span className="in-map-hit-name" aria-hidden="true">
-                    <i className="in-map-hit-dot" style={{ '--cc': `var(${node.colour})`, '--f': fillOf(node) }} />
+                    <svg className="in-map-hit-dial" viewBox="0 0 20 20" width="20" height="20">
+                      <circle className={`in-map-ring${node.evidence.attempts === 0 ? ' is-new' : ''}`} cx="10" cy="10" r="8" />
+                      {node.evidence.accuracy != null && node.evidence.mastery > 0 && <circle className="in-map-arc" cx="10" cy="10" r="8" pathLength="100" strokeDasharray={`${node.evidence.mastery} 100`} transform="rotate(-90 10 10)" />}
+                      <circle className="in-map-dot" cx="10" cy="10" r="1.8" />
+                    </svg>
                     <b>{String(node.index + 1).padStart(2, '0')}</b><span lang="en">{node.row.name}</span>
                     <em>{percentOf(node)}</em>
                     {STRAND_KEY[node.strand] && <small>{t(STRAND_KEY[node.strand])}</small>}
@@ -270,7 +285,7 @@ export default function MapPage() {
             <li><i className="is-secure" />{t('inst.mapLegendSecure')}</li>
             <li><i className="is-building" />{t('inst.mapLegendBuilding')}</li>
             <li><i className="is-new" />{t('inst.mapLegendNew')}</li>
-            <li>{t('inst.mapLegendSize')}</li>
+            <li>{t('inst.mapLegendArc')}</li>
           </ul>
         </div>
 
@@ -286,11 +301,17 @@ export default function MapPage() {
               {current.evidence.attempts === 0 ? t('inst.mapCardNew')
                 : current.evidence.accuracy == null ? t('inst.mapCardBuilding') : t('inst.mapCardSecure', { n: current.evidence.mastery })}
               {lost && <> {named('inst.mapCardLost', {}, 'dotpoint', lost.text)}</>}
-              {feeds.length > 0 && <> {feeds.length === 1 && firstPre && firstPre.evidence.accuracy != null
-                ? named('inst.mapCardFeedsSecure', { n: firstPre.evidence.mastery }, 'chapter', feeds.join(', '))
-                : named('inst.mapCardFeeds', {}, 'chapter', feeds.join(', '))}</>}
             </p>
-            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</PageLink>
+            {feeds.length > 0 && (
+              <div className="in-map-pre" data-map-builds-on>
+                <span>{t('inst.mapBuildsOn')}</span>
+                <ul>{prerequisitesOf(current.row.id).map((p, k) => {
+                  const pre = layout.byId.get(p.id);
+                  return <li key={p.id} lang="en"><TermGloss text={feeds[k]} />{pre && pre.evidence.accuracy != null && <em>{`${pre.evidence.mastery}%`}</em>}</li>;
+                })}</ul>
+              </div>
+            )}
+            <PageLink className="c-btn c-btn-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</PageLink>
             {isRecommended(current) && <p className="in-note">{t('inst.mapNextWhy')}</p>}
             </div>
           </aside>

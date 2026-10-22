@@ -47,7 +47,7 @@ function Roll({ text }) {
 // percentage the evidence floor withholds is "—" and a chart point it
 // withholds is a gap, never a zero. The existing Progress page follows.
 
-const WEEKS = 15;
+const DAYS = 7;
 const PERIODS = ['week', 'month', 'term'];
 
 function previousDate(date) {
@@ -167,10 +167,9 @@ export default function ReportHead() {
     const activity = Array.isArray(stats.activity) ? stats.activity : [];
     const byDay = new Map(activity.map(d => [d.date, Number(d.questions) || 0]));
     const keys = [dayKey(Date.now(), timezoneOf(user))];
-    while (keys.length < WEEKS * 7) keys.push(previousDate(keys[keys.length - 1]));
+    while (keys.length < DAYS) keys.push(previousDate(keys[keys.length - 1]));
     const cells = keys.reverse().map(key => ({ key, n: byDay.get(key) || 0 }));
-    const heatDays = cells.filter(c => c.n > 0).length;
-    const max = Math.max(1, ...cells.map(c => c.n));
+    const week = cells;
     const rows = scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || [];
     const nameOf = id => rows.find(r => r.id === id)?.name || null;
     const colourOf = id => { const i = rows.findIndex(r => r.id === id); return i >= 0 ? colourFor(i) : '--in-tx-3'; };
@@ -178,7 +177,7 @@ export default function ReportHead() {
       .map(([id, m]) => ({ id, name: nameOf(id), lost: m.possible - m.earned, ...m }))
       .filter(c => c.name && c.lost > 0)
       .sort((a, b) => b.lost - a.lost || a.name.localeCompare(b.name)).slice(0, 3);
-    return { cells, heatDays, max, lost, colourOf };
+    return { week, lost, colourOf };
   }, [stats, marks, curriculum, user]);
 
   if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true" />;
@@ -187,6 +186,8 @@ export default function ReportHead() {
   const shown = report?.period === period ? report : null;
   const cur = shown?.current || null;
   const series = Array.isArray(shown?.series) ? shown.series : [];
+  // A change is stated only against a window that had something in it.
+  const hadBefore = k => { const v = shown?.previous?.[k]; return v != null && Number(v) > 0; };
   const title = period === 'week' ? t('inst.reportThisWeek')
     : period === 'term' ? t('inst.reportThisTerm')
       : cur ? dateName(cur.to, user, { month: 'long' }) : t('inst.periodMonth');
@@ -219,7 +220,7 @@ export default function ReportHead() {
             ? <h1 id="in-report-title" className="in-report-title">{title}</h1>
             : <h2 id="in-report-title" className="in-report-title">{title}</h2>}
           {lede.length > 0 && (
-            <p className="in-report-lede" data-report-lede>
+            <p className={`in-report-lede${cur && cur.methodPct == null ? ' is-withheld' : ''}`} data-report-lede>
               {lede.join(' ')}
               {worst && (() => { const [pre, post = ''] = t('inst.ledeChapter', { chapter: '\u0000' }).split('\u0000'); return <> {pre}<span lang="en">{worst.name}</span>{post}</>; })()}
             </p>
@@ -235,19 +236,37 @@ export default function ReportHead() {
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
-        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} />}</div>
+        {/* The hero is the method figure when the floor allows it, else the
+            count of questions answered: never a withheld figure. */}
+        <div data-report-questions className={cur && cur.methodPct == null ? 'lux-report-hero' : undefined}><b>{cur ? (cur.methodPct == null ? <Roll text={String(cur.questions)} /> : cur.questions) : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && hadBefore('questions') && <Delta n={shown.delta?.questions} />}</div>
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
-          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
-        <div data-report-method className={cur?.methodPct != null ? 'lux-report-hero' : undefined}><b>{cur?.methodPct != null ? <Roll text={fmtPct(cur.methodPct)} /> : '—'}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
-        <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
+          {cur?.marksPossible > 0 && hadBefore('marksPossible') && <Delta n={shown.delta?.marksEarned} />}</div>
+        <div data-report-method className={cur?.methodPct != null ? 'lux-report-hero' : undefined}><b>{cur?.methodPct != null ? <Roll text={fmtPct(cur.methodPct)} /> : '—'}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && hadBefore('methodPct') && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+        <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small></div>
       </div>
       <div className="in-rp">
         <Chart series={series} labels={labels} t={t} spoken={spoken} failed={failed} />
         <div className="in-report-heat">
-          <h2>{t('inst.reportHeat', { n: WEEKS })}</h2>
-          <div className="in-heat" role="img" aria-label={t('inst.reportHeatSpoken', { days: view.heatDays, n: WEEKS })}>
-            {view.cells.map(c => <i key={c.key} style={{ '--v': c.n ? 0.25 + (c.n / view.max) * 0.75 : 0 }} className={c.n ? 'is-on' : ''} title={t('inst.reportHeatCell', { date: c.key, n: c.n })} />)}
+          {/* Consistency, calmly: the last seven calendar days from the same
+              practice-day activity, as one line and a chronograph week ring
+              (a hairline segment per day, lume where practised, today ringed). */}
+          <div className="in-week" role="img" aria-label={t('inst.reportWeekLine', { n: view.week.filter(c => c.n > 0).length })} data-report-week>
+            <svg className="in-week-ring" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              {view.week.map((c, i) => {
+                const a0 = (i / 7) * 2 * Math.PI - Math.PI / 2 + 0.07;
+                const a1 = ((i + 1) / 7) * 2 * Math.PI - Math.PI / 2 - 0.07;
+                const pt = (a, r) => `${(32 + r * Math.cos(a)).toFixed(2)} ${(32 + r * Math.sin(a)).toFixed(2)}`;
+                const today = i === view.week.length - 1;
+                return (
+                  <g key={c.key}>
+                    <path className={`in-week-seg${c.n ? ' is-on' : ''}`} d={`M${pt(a0, 26)} A26 26 0 0 1 ${pt(a1, 26)}`} />
+                    {today && <path className="in-week-today" d={`M${pt(a0, 30.5)} A30.5 30.5 0 0 1 ${pt(a1, 30.5)}`} />}
+                  </g>
+                );
+              })}
+            </svg>
+            <p className="in-week-line">{t('inst.reportWeekLine', { n: view.week.filter(c => c.n > 0).length })}</p>
           </div>
           <div className="in-report-lost">
             <h3>{t('inst.reportLost')}</h3>

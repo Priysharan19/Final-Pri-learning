@@ -46,9 +46,6 @@
 .in-report-heat h2, .in-report-lost h3 { margin: 0 0 12px; font: 500 12px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3); }
 .in-report-lost { margin-top: 16px; }
 .in-report-lost h3 { font-size: 11px; }
-.in-heat { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: 4px; }
-.in-heat i { aspect-ratio: 1; border-radius: 2px; background: var(--in-l3); }
-.in-heat i.is-on { background: color-mix(in srgb, var(--in-tx) calc(var(--v) * 100%), var(--in-l3)); }
 .in-report-lost ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .in-report-lost li { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 4px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px; color: var(--in-tx); }
 .in-report-lost li i { width: 8px; height: 8px; border-radius: 50%; background: var(--cc); }
@@ -132,8 +129,6 @@ html.ui-instrument .in-chart-empty { background: var(--c-sheet); box-shadow: 0 0
 /* Heat-map and lost marks, in the same paper language. */
 html.ui-instrument .in-report-heat { background: none; box-shadow: none; border-top: 1px solid var(--c-hair); border-radius: 0; padding: 14px 0 0; }
 html.ui-instrument .in-report-heat h2, html.ui-instrument .in-report-lost h3 { font: 600 13px var(--c-sc); letter-spacing: .14em; text-transform: none; color: var(--c-ink-2); }
-html.ui-instrument .in-heat i { border-radius: 1px; background: var(--c-hair-2); }
-html.ui-instrument .in-heat i.is-on { background: color-mix(in srgb, var(--c-teal) calc(var(--v) * 100%), var(--c-hair-2)); }
 html.ui-instrument .in-report-lost li { background: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--c-hair-2); padding: 8px 0; font: 400 15px var(--c-text); color: var(--c-ink); }
 html.ui-instrument .in-report-lost li i { border-radius: 0; transform: rotate(45deg) scale(.8); background: var(--c-copper); }
 html.ui-instrument .in-report-lost li small { font: 400 20px var(--c-serif); color: var(--c-copper); font-variant-numeric: tabular-nums; }
@@ -192,3 +187,18 @@ html.ui-instrument .pg .pg-sheet, html.ui-instrument .pg .table-scroll { backgro
 html.ui-instrument .pg .pg-sheet .sc-label { margin: 0; }
 html.ui-instrument .pg .pg-priorities > *, html.ui-instrument .pg .pg-priorities li { background: none; border-color: var(--c-hair-2); }
 html.ui-instrument .pg .syl-table td:first-child, html.ui-instrument .pg .syl-table th:first-child { padding-left: 0; }
+
+/* ── Jury round 1 ── */
+/* The withheld-accuracy sentence reads as a note under the figure. */
+html.ui-instrument .in-report-lede.is-withheld { font: italic 400 17px/1.5 var(--c-italic); color: var(--c-ink-2); }
+html.ui-instrument .in-report-title { font-size: clamp(34px, 4.6vw, 56px); }
+/* The chart is ruled on the page: no frame, no card, no boxed note. */
+html.ui-instrument .in-chart { background: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--c-hair); }
+html.ui-instrument .in-chart-empty { background: none; box-shadow: none; border-radius: 0; padding: 0; font: italic 400 16px/1.5 var(--c-italic); color: var(--c-ink-2); }
+/* Consistency as a week ring: seven hairline segments, lume where
+   practised, today ringed outside; one calm line beside it. */
+html.ui-instrument .in-week { display: flex; align-items: center; gap: 16px; margin: 0 0 8px; }
+html.ui-instrument .in-week-seg { fill: none; stroke: var(--c-hair); stroke-width: 1.5; }
+html.ui-instrument .in-week-seg.is-on { stroke: var(--c-lume); stroke-width: 3; }
+html.ui-instrument .in-week-today { fill: none; stroke: var(--c-ink-2); stroke-width: 1; }
+html.ui-instrument .in-week-line { margin: 0; font: 400 16px/1.4 var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }

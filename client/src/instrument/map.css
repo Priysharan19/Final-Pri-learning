@@ -91,11 +91,7 @@ html.ui-instrument .in-map-pulse { fill: var(--c-teal); filter: none; }
 
 /* Nodes: ink dots filled by mastery (fill-opacity stays inline), an engraved
    ring, and lume teal only for the chapter in the inspector. */
-html.ui-instrument .in-map-dot { fill: var(--c-ink); stroke: var(--c-ink); stroke-width: 1; stroke-opacity: .9; }
 html.ui-instrument .in-map-ring { stroke: var(--c-hair); stroke-opacity: 1; stroke-width: 1; }
-html.ui-instrument .in-map-node.is-next .in-map-ring { stroke: var(--c-teal); stroke-dasharray: 2 3; }
-html.ui-instrument .in-map-node.is-on .in-map-ring { stroke: var(--c-lume); stroke-width: 1.5; stroke-dasharray: none; animation: none; }
-html.ui-instrument .in-map-node.is-on .in-map-dot { fill: var(--c-lume); stroke: var(--c-lume); }
 html.ui-instrument .in-map-name { font: 400 14px var(--c-text); fill: var(--c-ink); }
 html.ui-instrument .in-map-label { font: 600 12px var(--c-sc); letter-spacing: .12em; fill: var(--c-ink-2); font-variant-numeric: tabular-nums; }
 html.ui-instrument .in-map-legend { font: 600 12px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); }
@@ -123,8 +119,6 @@ html.ui-instrument .in-map-foot { font: 400 13px/1.5 var(--c-text); color: var(-
   html.ui-instrument .in-map-hit { border-radius: 0; border-bottom: 1px solid var(--c-hair-2); color: var(--c-ink); padding: 10px 2px; }
   html.ui-instrument .in-map-hit[aria-current="true"] { background: var(--c-teal-soft); box-shadow: none; }
   html.ui-instrument .in-map-hit-name { font: 400 15px var(--c-text); }
-  html.ui-instrument .in-map-hit-dot { box-shadow: 0 0 0 1px var(--c-ink); background: color-mix(in srgb, var(--c-ink) calc(var(--f) * 100%), transparent); }
-  html.ui-instrument .in-map-hit[aria-current="true"] .in-map-hit-dot { box-shadow: 0 0 0 1px var(--c-lume); background: var(--c-lume); }
   html.ui-instrument .in-map-hit-name b, html.ui-instrument .in-map-hit-name small { font: 600 12px var(--c-sc); letter-spacing: .1em; color: var(--c-ink-2); text-transform: none; }
   html.ui-instrument .in-map-hit-name em { font: 400 13px var(--c-text); color: var(--c-ink-2); }
 }
@@ -150,4 +144,38 @@ html.ui-instrument .in-map-card-in { animation: lux-map-settle 600ms var(--c-eas
   html.ui-instrument .in-map-graph.is-arriving .in-map-node { animation: none; stroke-dashoffset: 0; opacity: 1; }
   html.ui-instrument .in-map-graph.is-arriving { animation: lux-map-appear 200ms linear both; }
   html.ui-instrument .in-map-card-in { animation: lux-map-appear 200ms linear both; }
+}
+
+/* ── Jury round 1: strand columns, sub-dial nodes, knockouts ── */
+html.ui-instrument .in-map-strand { font: 600 13px var(--c-sc); letter-spacing: .12em; text-transform: none; fill: var(--c-ink-2); paint-order: stroke; stroke: var(--c-paper); stroke-width: 6px; stroke-linejoin: round; }
+html.ui-instrument .in-map-route { fill: none; stroke: var(--c-hair); stroke-width: 1; vector-effect: non-scaling-stroke; }
+html.ui-instrument .in-map-route.is-toward { stroke: var(--c-teal); stroke-width: 1.5; stroke-dasharray: 3 3; }
+html.ui-instrument .in-map-graph.is-arriving .in-map-route { stroke-dasharray: 1; stroke-dashoffset: 1; animation: lux-map-engrave 480ms cubic-bezier(.6, 0, .2, 1) calc(var(--hop, 0) * 60ms) forwards; }
+/* Labels never crossed: each sits on a paper knockout. */
+html.ui-instrument .in-map-name, html.ui-instrument .in-map-label { paint-order: stroke; stroke: var(--c-paper); stroke-width: 6px; stroke-linejoin: round; }
+/* Nodes as sub-dials: hairline ring, teal mastery arc, ink centre dot. */
+html.ui-instrument .in-map-ring { fill: var(--c-paper); stroke: var(--c-ink-3); stroke-width: 1; }
+html.ui-instrument .in-map-ring.is-new { stroke-dasharray: 2 2.5; }
+html.ui-instrument .in-map-arc { fill: none; stroke: var(--c-teal); stroke-width: 1.5; stroke-linecap: butt; }
+html.ui-instrument .in-map-dot { fill: var(--c-ink); stroke: none; }
+html.ui-instrument .in-map-node.is-on .in-map-ring { stroke: var(--c-lume); stroke-width: 1.5; }
+html.ui-instrument .in-map-node.is-on .in-map-dot { fill: var(--c-lume); }
+html.ui-instrument .in-map-node.is-next:not(.is-on) .in-map-ring { stroke: var(--c-teal); }
+/* Legend as rings: full arc, part arc, dashed. */
+html.ui-instrument .in-map-legend i { width: 10px; height: 10px; border-radius: 50%; background: none; box-shadow: none; border: 1px solid var(--c-ink-3); }
+html.ui-instrument .in-map-legend i.is-secure { border: 1.5px solid var(--c-teal); background: none; }
+html.ui-instrument .in-map-legend i.is-building { border: 1.5px solid var(--c-ink-3); border-top-color: var(--c-teal); border-right-color: var(--c-teal); background: none; }
+html.ui-instrument .in-map-legend i.is-new { border: 1px dashed var(--c-ink-3); background: none; }
+/* Inspector: prerequisites as a hairline list of full names; intrinsic CTA. */
+html.ui-instrument .in-map-pre span { font: 600 13px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); }
+html.ui-instrument .in-map-pre ul { margin: 6px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--c-hair-2); }
+html.ui-instrument .in-map-pre li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--c-hair-2); font: 400 15px/1.35 var(--c-text); color: var(--c-ink); }
+html.ui-instrument .in-map-pre em { font-style: normal; color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
+html.ui-instrument .in-map-card .c-btn-primary { justify-self: start; width: auto; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 22px; line-height: 1; text-decoration: none; }
+html.ui-instrument .in-map-graph-wrap:not(.is-floating) .in-map-card .c-btn-primary { justify-self: start; }
+/* Phone list: the same mini dial per row; the recommended row ringed in lume. */
+html.ui-instrument .in-map-hit-dial { display: none; }
+@media (max-width: 640px) {
+  html.ui-instrument .in-map-graph svg.in-map-hit-dial { display: block; flex: none; align-self: center; width: 20px; height: 20px; overflow: visible; }
+  html.ui-instrument .in-map-hit[aria-current="true"] .in-map-ring, html.ui-instrument .in-map-hit.is-next .in-map-ring { stroke: var(--c-lume); stroke-width: 1.5; }
 }
