@@ -13,16 +13,20 @@ compromised by untrusted workflow code. So the Mac lane is built on these rules:
 | --- | --- |
 | No runner is online except while the owner runs one job by hand | `scripts/pri-mac-runner-once.sh` registers one just-in-time (JIT) runner; GitHub removes it after one job |
 | Each run gets a new label that nobody can guess, on top of `self-hosted, macOS, ARM64` | `pri-mac-runner-once.sh label` (`openssl rand -hex 8`) → `runs-on: [self-hosted, macOS, ARM64, '${{ inputs.runner_label }}']` |
-| Started only by a manual dispatch from the owner, from `main`, on the canonical repository | `workflow_dispatch` is the only trigger. The GitHub-hosted `guard` job checks event, repository, actor and triggering actor against the owner, and the ref |
+| The label stays private until the Mac job starts | The `guard` job never receives `runner_label` and nothing in the workflow prints it. The Mac job's `if:` only checks its shape (`startsWith(inputs.runner_label, 'pri-mac-')`). The exact check is in the job: the `pri-mac-<16 hex>` regex and `RUNNER_NAME` equal to the label |
+| A listening runner is exposed for a bounded time | `run` stops the runner and cleans up (exit 3) if no job is assigned within `PRI_RUNNER_JOB_WAIT_SECONDS` (default 900 = 15 minutes) |
+| Started only by a manual dispatch from the owner, from `main`, on the canonical repository | `workflow_dispatch` is the only trigger. The GitHub-hosted `guard` job and the Mac job both check event, repository, actor and triggering actor against the owner, and the ref |
 | An exact commit that is on `main` | Required `sha` input (40 lowercase hex). The guard checks `compare/<sha>...main` is `identical` or `ahead` with `behind_by` 0. The Mac job checks out that SHA and asserts `git rev-parse HEAD` before any repository code runs |
 | Least privilege | Top-level `permissions: contents: read`, `persist-credentials: false`, no `secrets.` reads, no `${{ }}` inside `run:` scripts |
-| Not an admin, not inside the launcher clone | The script refuses a macOS admin account and any runner root inside a git work tree (so never inside `PriLearningLauncher`), `$HOME` or a `$HOME` dot-directory. The workflow fails again if the job's account is an admin or the workspace path contains `PriLearningLauncher` |
+| Not an admin, not inside the launcher clone | The script refuses a macOS admin account and any runner root inside a git work tree (so never inside `PriLearningLauncher`), `$HOME` or a `$HOME` dot-directory. The work-tree check walks parent directories for `.git` itself, so it holds even when git is absent or refuses another user's repository ("dubious ownership"). The workflow fails again if the job's account is an admin or the workspace path contains `PriLearningLauncher` |
 | A fresh work directory each run, destroyed afterwards | `mktemp -d` under `$PRI_RUNNER_ROOT/runs`. The exit trap (which also runs on Ctrl-C or failure) deletes `.credentials`, `.credentials_rsaparams`, `.runner` and the whole run directory |
 | Diagnostics are kept without credentials | `_diag/*.log` is copied, redacted, to `$PRI_RUNNER_ROOT/diag/<label>-<UTC time>/` before deletion |
 | The credential is never printed and never on a command line | `mint` refuses to write to a terminal. `run` reads the JIT config from stdin and gives it to the runner as `ACTIONS_RUNNER_INPUT_JITCONFIG`, not as `--jitconfig` in argv (which `ps` shows to every local user). The workflow fails if that variable reaches the job environment |
 
 `tools/ci-self-hosted-runner-check.mjs` (run in CI's "Suites policy and contracts" job and in
-`npm run test:ci:policy`) enforces this contract. It applies to **every** workflow whose
+`npm run test:ci:policy`) enforces this contract. It requires the exact guard and isolation
+assertion lines, and forbids `continue-on-error`, `|| true`, `|| :`, `set +e` and step-level
+`if:` on the guard, checkout, HEAD and isolation steps. It applies to **every** workflow whose
 `runs-on` is not a GitHub-hosted image. It also exercises the script against a fake runner
 tarball, and checks with negative fixtures that each rule really rejects what it should.
 
@@ -57,7 +61,11 @@ tarball, and checks with negative fixtures that each rule really rejects what it
 
    Copy the tarball's SHA-256 from the release notes. The script refuses a tarball whose hash
    does not match. Re-copy the script whenever `main` changes it.
-4. **Retire the old persistent runner.** If `pri-final-macbook-trusted` (label
+4. **Require approval for fork pull requests.** In Settings → Actions → General → "Approval for
+   running fork pull request workflows from contributors", choose **Require approval for all
+   external contributors**. While a one-job runner is listening, its private label is all that
+   keeps another workflow off the Mac, so do not approve a fork PR run while one is up.
+5. **Retire the old persistent runner.** If `pri-final-macbook-trusted` (label
    `pri-learning-mac-trusted-manual`) is still registered, stop its service, run
    `./config.sh remove` in its directory, and check that Settings → Actions → Runners no longer
    lists it. The new workflow does not route to that label.
@@ -69,7 +77,7 @@ clone of `main`. This is not the launcher clone, and the clone does not have to 
 that runs the job:
 
 ```bash
-LABEL="$(scripts/pri-mac-runner-once.sh label)"   # e.g. pri-mac-3f9c0a1b2d4e5f60 (not a secret)
+LABEL="$(scripts/pri-mac-runner-once.sh label)"   # private: share it with nothing but the dispatch below
 SHA="$(git rev-parse origin/main)"                # or any commit already on main
 
 # Terminal A — mint the one-job credential and pipe it to pri-ci; it stays in the foreground.
@@ -91,9 +99,15 @@ The runner takes the one job and exits. The script then prints
 scripts/pri-mac-runner-once.sh cleanup "$LABEL"   # expect: DEREGISTERED: no runner named ... is registered
 ```
 
-If you abort before a job arrives (Ctrl-C in terminal A), the trap still deletes the run
-directory. `cleanup` then removes the offline registration that is left behind. Pass a new
-label next time and never reuse one.
+**Keep the label private until the Mac job has started.** Do not paste it into an issue, a PR,
+chat or a shared terminal. Once the Mac job is queued, the label is visible in the public run,
+but by then the runner has already taken that job, and a JIT runner accepts only one.
+
+**If the `guard` job fails, or the Mac job does not start within a minute or two, press Ctrl-C
+in terminal A at once and run `cleanup`.** The trap still deletes the run directory, and
+`cleanup` removes the offline registration that is left behind. If you do nothing, the runner
+stops by itself after `PRI_RUNNER_JOB_WAIT_SECONDS` (default 15 minutes) without a job, and
+cleans up the same way. Use a new label next time and never reuse one.
 
 The runner reads `ACTIONS_RUNNER_INPUT_JITCONFIG` as its `--jitconfig` argument, which is how
 the credential stays out of argv. The workflow's isolation step fails if that variable shows up
@@ -115,6 +129,16 @@ Record these in the issue. Never fabricate them:
 - negative proof: the contract test's fixtures show that `pull_request`, `pull_request_target`,
   `push`, `issue_comment`, `schedule`, `workflow_run` and `merge_group` triggers are rejected,
   and the workflow declares none of them.
+
+## What persists between runs
+
+Each run's work directory is destroyed, but the `pri-ci` account's home folder is not. A job
+could leave files there, for example a `~/Library/LaunchAgents` item, shell start-up files,
+npm or Xcode caches. That is acceptable only because every job runs a trusted commit that is
+already on `main`, dispatched by the owner. It would not be acceptable for untrusted code. Check
+`/Users/pri-ci/Library/LaunchAgents` (and `crontab -l` as `pri-ci`) from time to time, and
+whenever a run looked unusual. Delete and recreate the `pri-ci` account if anything there is
+unexpected.
 
 The workflow produces simulator evidence only. That is not physical iPhone/iPad, Apple Pencil,
 signing, TestFlight or store evidence.

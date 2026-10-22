@@ -4,7 +4,8 @@ name: Pri Mac V1 Acceptance (trusted manual)
 # The Pri Mac never listens for work on its own: the owner starts ONE just-in-time
 # runner with scripts/pri-mac-runner-once.sh under the non-admin pri-ci account,
 # which prints a fresh unpredictable label, and dispatches this workflow with that
-# label and an exact commit SHA on main. Procedure:
+# label and an exact commit SHA on main. The label stays private until the Mac
+# job starts: the guard job never receives it and nothing here prints it. Procedure:
 # docs/operations/mac-trusted-runner.md. The contract is enforced on every PR by
 # tools/ci-self-hosted-runner-check.mjs; never add pull_request,
 # pull_request_target, push, issue_comment, schedule or workflow_run here.
@@ -31,6 +32,7 @@ jobs:
   guard:
     name: Trusted dispatch guard (owner, repository, SHA on main, runner label)
     # Never allocate the Pri Mac for PRs, forks, branches, bots or schedules.
+    # This job deliberately never receives the runner label.
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'Priysharan19/Final-Pri-learning' &&
@@ -45,7 +47,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_SHA: ${{ inputs.sha }}
-          INPUT_LABEL: ${{ inputs.runner_label }}
           EVENT_NAME: ${{ github.event_name }}
           REPO: ${{ github.repository }}
           REPO_OWNER: ${{ github.repository_owner }}
@@ -60,24 +61,25 @@ jobs:
           [[ "$ACTOR" == "$REPO_OWNER" && "$TRIGGERING_ACTOR" == "$REPO_OWNER" ]] || fail "only the repository owner may dispatch the Pri Mac lane"
           [[ "$DISPATCH_REF" == 'refs/heads/main' ]] || fail "dispatch from main only (got $DISPATCH_REF)"
           [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "sha must be a full 40-hex lowercase commit SHA"
-          [[ "$INPUT_LABEL" =~ ^pri-mac-[0-9a-f]{16}$ ]] || fail "runner_label must be the pri-mac-<16 hex> label printed by scripts/pri-mac-runner-once.sh"
           # compare/{sha}...main: "identical" or "ahead" with behind_by 0 means
           # the SHA is main itself or an ancestor of main. A fork or unmerged
           # branch commit is "diverged"/"behind" and is refused.
           status="$(gh api "repos/$REPO/compare/$INPUT_SHA...main" --jq '.status + " " + (.behind_by | tostring)')"
           [[ "$status" == 'identical 0' || "$status" == 'ahead 0' ]] || fail "sha $INPUT_SHA is not reachable from main ($status)"
-          echo "Trusted dispatch: $INPUT_SHA on main -> one-job runner $INPUT_LABEL"
+          echo "Trusted dispatch: $INPUT_SHA is on main"
 
   apple-v1:
     name: iPhone + iPad native acceptance on Pri Mac
     needs: guard
-    # Defence in depth: the same owner/repository/ref gate as the guard job.
+    # Defence in depth: the same owner/repository/ref gate as the guard job,
+    # plus a shape check of the label (the exact check is RUNNER_NAME below).
     if: >-
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'Priysharan19/Final-Pri-learning' &&
       github.actor == github.repository_owner &&
       github.triggering_actor == github.repository_owner &&
-      github.ref == 'refs/heads/main'
+      github.ref == 'refs/heads/main' &&
+      startsWith(inputs.runner_label, 'pri-mac-')
     # The per-run label exists only while the owner's one-job runner is up.
     runs-on: [self-hosted, macOS, ARM64, '${{ inputs.runner_label }}']
     timeout-minutes: 90
@@ -110,6 +112,7 @@ jobs:
           EXPECTED_LABEL: ${{ inputs.runner_label }}
         run: |
           set -euo pipefail
+          [[ "$EXPECTED_LABEL" =~ ^pri-mac-[0-9a-f]{16}$ ]] || { echo "::error::runner_label is not a pri-mac-<16 hex> label"; exit 1; }
           test "$RUNNER_NAME" = "$EXPECTED_LABEL"
           test "$RUNNER_OS" = 'macOS'
           test "$RUNNER_ARCH" = 'ARM64'

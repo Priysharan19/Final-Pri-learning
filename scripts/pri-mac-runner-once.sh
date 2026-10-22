@@ -5,14 +5,19 @@
 # Mac, lets it accept exactly one job from
 # .github/workflows/pri-mac-v1-acceptance.yml, then destroys every trace of it.
 # There is no persistent runner: nothing listens for jobs except while the owner
-# is running this script, and every run gets a fresh, unpredictable label so a
-# public static label can never route work to this machine.
+# is running this script (at most PRI_RUNNER_JOB_WAIT_SECONDS before a job must
+# arrive), and every run gets a fresh, unpredictable label so a public static
+# label can never route work to this machine.
+#
+# KEEP THE LABEL PRIVATE until the Mac job has started. While the runner is
+# listening, the label is the only thing that keeps any other workflow (a fork
+# PR approved to run, a collaborator's branch workflow) off this machine. Pass
+# it only to the dispatch below; never paste it into an issue, PR or chat.
 #
 # Owner procedure (full text: docs/operations/mac-trusted-runner.md):
 #
 #   # 1. In the OWNER's macOS account (gh logged in as the repository owner):
-#   LABEL="$(scripts/pri-mac-runner-once.sh label)"
-#   echo "$LABEL"                     # the label is not a secret; the JIT config is
+#   LABEL="$(scripts/pri-mac-runner-once.sh label)"   # private until the job starts
 #
 #   # 2. Mint the one-job credential in the owner account and hand it, over a
 #   #    pipe only, to the non-admin pri-ci account that runs the job:
@@ -26,6 +31,10 @@
 #   # 4. After the job, confirm GitHub de-registered the runner:
 #   scripts/pri-mac-runner-once.sh cleanup "$LABEL"
 #
+#   If the guard job fails or the Mac job does not start, Ctrl-C the runner at
+#   once and run `cleanup` (the runner also gives up on its own after
+#   PRI_RUNNER_JOB_WAIT_SECONDS without a job).
+#
 # Subcommands:
 #   label            print a fresh label: pri-mac-<16 lowercase hex>
 #   mint LABEL       (owner account, needs gh) write the encoded JIT runner
@@ -36,6 +45,8 @@
 #                    directory, run exactly one job, preserve redacted _diag
 #                    logs outside the work directory, then delete .credentials,
 #                    .credentials_rsaparams, .runner and the whole work directory.
+#                    Exits 3 (after the same cleanup) if no job is assigned within
+#                    PRI_RUNNER_JOB_WAIT_SECONDS.
 #   cleanup LABEL    (owner account, needs gh) confirm the runner named LABEL
 #                    is no longer registered; if a run was aborted before a job
 #                    arrived and it is still listed (offline), remove it.
@@ -47,6 +58,9 @@
 #                              Must not be inside any git work tree (so never inside the
 #                              PriLearningLauncher clone), a dot-directory of $HOME, or
 #                              $HOME itself.
+#   PRI_RUNNER_JOB_WAIT_SECONDS default 900 (15 minutes): how long the runner may listen
+#                              without being assigned a job before it is stopped and
+#                              cleaned up.
 #   PRI_RUNNER_ALLOW_ADMIN     set to exactly "I-ACCEPT-ADMIN-RUNNER-RISK" to let the
 #                              script itself run under a macOS admin account (local
 #                              debugging of this script only). The workflow independently
@@ -93,6 +107,29 @@ physical_dir() {
   (cd "$1" && pwd -P)
 }
 
+# True if DIR or any parent contains .git (a directory, or a file for worktrees
+# and submodules). Independent of git itself, which may be absent or refuse a
+# repository owned by another user ("dubious ownership").
+inside_git_tree() {
+  local dir="$1"
+  while :; do
+    [[ -e "$dir/.git" ]] && return 0
+    [[ "$dir" == "/" || -z "$dir" ]] && return 1
+    dir="$(dirname "$dir")"
+  done
+}
+
+# Send TERM to a process and all its descendants (children first). Used from
+# the EXIT trap.
+# shellcheck disable=SC2317
+kill_tree() {
+  local pid="$1" child
+  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
+    kill_tree "$child"
+  done
+  kill -TERM "$pid" 2>/dev/null || true
+}
+
 refuse_admin_account() {
   [[ "$(id -u)" -ne 0 ]] || die "refusing to run a runner as root"
   if id -Gn | tr ' ' '\n' | grep -qx 'admin'; then
@@ -118,7 +155,7 @@ refuse_unsafe_root() {
   case "$root/" in
     "$home"/.*) die "refusing runner root inside a dot-directory of \$HOME: $root" ;;
   esac
-  if git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if inside_git_tree "$root" || git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     die "refusing runner root inside a git work tree: $root"
   fi
   [[ -O "$root" ]] || die "runner root is not owned by $(id -un): $root"
@@ -171,6 +208,7 @@ RUN_DIR=''
 RUNS_ROOT=''
 DIAG_DEST=''
 RUNNER_DIR=''
+RUNNER_PID=''
 
 # Called only from the EXIT trap of `run`.
 # shellcheck disable=SC2317
@@ -189,6 +227,7 @@ preserve_diag() {
       s/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}/[REDACTED-GITHUB-TOKEN]/g;
       s/(bearer|token|basic)\s+[A-Za-z0-9._~+\/=-]{16,}/$1 [REDACTED]/gi;
       s/("?(?:access_?token|accessToken|token|password|secret|privateKey|jitconfig|encoded_jit_config)"?\s*[:=]\s*)"[^"]*"/$1"[REDACTED]"/gi;
+      s/\b((?:access_?token|accessToken|token|password|secret|privateKey|jitconfig|encoded_jit_config)\s*[:=]\s*)(?!["\[])[^\s,;"\x27}\]]+/${1}[REDACTED]/gi;
       s/[A-Za-z0-9+\/]{80,}={0,2}/[REDACTED-BLOB]/g;
     ' "$log" > "$DIAG_DEST/$(basename "$log")"
   done
@@ -199,6 +238,10 @@ preserve_diag() {
 cleanup_run() {
   local rc=$?
   set +e
+  if [[ -n "$RUNNER_PID" ]] && kill -0 "$RUNNER_PID" 2>/dev/null; then
+    kill_tree "$RUNNER_PID"
+    wait "$RUNNER_PID" 2>/dev/null
+  fi
   preserve_diag
   if [[ -n "$RUNNER_DIR" ]]; then
     rm -f "$RUNNER_DIR/.credentials" "$RUNNER_DIR/.credentials_rsaparams" "$RUNNER_DIR/.runner"
@@ -232,6 +275,9 @@ cmd_run() {
   root="$(physical_dir "$root")"
   refuse_unsafe_root "$root"
 
+  local wait_seconds="${PRI_RUNNER_JOB_WAIT_SECONDS:-900}"
+  [[ "$wait_seconds" =~ ^[1-9][0-9]*$ ]] || die "PRI_RUNNER_JOB_WAIT_SECONDS must be a positive whole number of seconds"
+
   local tarball="${PRI_RUNNER_TARBALL:-}" expected="${PRI_RUNNER_TARBALL_SHA256:-}" actual
   [[ -n "$tarball" && -f "$tarball" ]] || die "PRI_RUNNER_TARBALL must name the downloaded actions-runner-osx-arm64-*.tar.gz"
   [[ "$expected" =~ ^[0-9a-f]{64}$ ]] || die "PRI_RUNNER_TARBALL_SHA256 must be the 64-hex SHA-256 from the actions/runner release notes"
@@ -256,12 +302,34 @@ cmd_run() {
   tar -xzf "$tarball" -C "$RUNNER_DIR"
   [[ -x "$RUNNER_DIR/run.sh" ]] || die "runner tarball did not contain run.sh"
 
-  note "one-job runner $label listening from $RUN_DIR (Ctrl-C aborts; cleanup still runs)"
+  note "one-job runner $label listening from $RUN_DIR for up to ${wait_seconds}s (Ctrl-C aborts; cleanup still runs)"
+  note "keep the label private; if the guard job fails or the Mac job does not start, Ctrl-C now and run: $0 cleanup $label"
   printf 'PRI_RUNNER_LABEL=%s\n' "$label"
   # The runner reads ACTIONS_RUNNER_INPUT_<ARG> as --<arg>; passing it through
   # the environment keeps the credential out of argv. A JIT runner is ephemeral:
   # it accepts exactly one job and GitHub de-registers it afterwards.
-  (cd "$RUNNER_DIR" && ACTIONS_RUNNER_INPUT_JITCONFIG="$jit_config" ./run.sh)
+  (cd "$RUNNER_DIR" && ACTIONS_RUNNER_INPUT_JITCONFIG="$jit_config" ./run.sh) &
+  RUNNER_PID=$!
+
+  # The runner starts a Worker (and its _diag/Worker_*.log) only when a job is
+  # assigned. Bound how long an idle, listening runner may stay exposed.
+  local waited=0
+  while kill -0 "$RUNNER_PID" 2>/dev/null; do
+    if compgen -G "$RUNNER_DIR/_diag/Worker_*.log" >/dev/null; then
+      note "job assigned to $label; waiting for it to finish"
+      break
+    fi
+    if [[ "$waited" -ge "$wait_seconds" ]]; then
+      note "no job was assigned within ${wait_seconds}s; stopping the runner. Then run: $0 cleanup $label"
+      exit 3
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  local rc=0
+  wait "$RUNNER_PID" || rc=$?
+  RUNNER_PID=''
+  return "$rc"
 }
 
 main() {
