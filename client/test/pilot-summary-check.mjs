@@ -116,7 +116,7 @@ const sydney = buildPilotSummary({ request: REQUEST, attempts, activity, dayOf: 
 ok('3 · days are the profile\'s own calendar days, not UTC', sydney.questionsAttempted !== summary.questionsAttempted || sydney.hintsUsed !== summary.hintsUsed);
 
 // ── 6 · zero attempts ───────────────────────────────────────────────────────
-const empty = buildPilotSummary({ request: { participant: 'S7', from: '2026-09-01', to: '2026-09-07' }, attempts: [], activity: [], dayOf: istDay, now: NOW });
+const empty = buildPilotSummary({ request: { participant: 'S007', from: '2026-09-01', to: '2026-09-07' }, attempts: [], activity: [], dayOf: istDay, now: NOW });
 eq('6 · no attempts: zeros, a null accuracy, no scores', pick(empty),
   { activeDays: 0, questionsAttempted: 0, repeatAttempts: 0, correctAttempts: 0, accuracy: null, practiceMs: 0, hintsUsed: 0, topicsTouched: 0, baseline: null, post: null, completed: null });
 
@@ -130,16 +130,28 @@ eq('2 · no completion rule is invented: completed is null until the programme d
 ok('the integrity boundary travels with the file', summary.limitations.some(l => /does not show that Pri Learning caused/.test(l)));
 
 // ── what a request may ask for ──────────────────────────────────────────────
-const refuse = (name, input, message) => rejects(name, async () => pilotRequest({ ...REQUEST, ...input }), { status: 400, message });
-await refuse('a name is not a participant code', { participant: 'Asha' }, /participant code/);
-await refuse('an email address is not a participant code', { participant: 'asha@example.com' }, /participant code/);
-await refuse('a code that is too long is refused', { participant: 'S1234567' }, /participant code/);
-await refuse('an impossible date is refused', { from: '2026-02-30' }, /start date and an end date/);
-await refuse('an end before the start is refused', { from: '2026-09-08' }, /on or before/);
-await refuse('a period over a year is refused', { from: '2025-01-01', to: '2026-09-07' }, /a year or less/);
-await refuse('a baseline over 100% is refused', { baseline: 101 }, /percentage/);
-await refuse('a post-test that is not a number is refused', { post: 'high' }, /percentage/);
-await refuse('an unknown programme is refused', { pilot: 'constructor' }, /programme/);
+const refuse = (name, input, code) => rejects(name, async () => pilotRequest({ ...REQUEST, ...input }), { status: 400, code });
+for (const participant of ['Asha', 'ASHA2010', 'RAVI1', 'AMIT-07', 'asha@example.com', 'S12', 'S12345', 'S-042', '']) {
+  await refuse(`2 · "${participant}" is not a participant code (a name, name + year or address cannot pass)`, { participant }, 'PILOT_PARTICIPANT');
+}
+eq('the issued shapes pass', ['S042', 's0420', ' S999 '].map(participant => pilotRequest({ ...REQUEST, participant }).participant), ['S042', 'S0420', 'S999']);
+await refuse('an impossible date is refused', { from: '2026-02-30' }, 'PILOT_DATES');
+await refuse('an end before the start is refused', { from: '2026-09-08' }, 'PILOT_ORDER');
+await refuse('a period over a year is refused', { from: '2025-01-01', to: '2026-09-07' }, 'PILOT_SPAN');
+await refuse('a baseline over 100% is refused', { baseline: 101 }, 'PILOT_SCORE');
+await refuse('a post-test that is not a number is refused', { post: 'high' }, 'PILOT_SCORE');
+await refuse('an unknown programme is refused', { pilot: 'constructor' }, 'PILOT_UNKNOWN');
+await refuse('a prototype key is not a programme', { pilot: '__proto__' }, 'PILOT_UNKNOWN');
+const strings = { en: readFileSync(new URL('i18n/strings.en.js', SRC), 'utf8'), hi: readFileSync(new URL('i18n/strings.hi.js', SRC), 'utf8') };
+const ui = readFileSync(new URL('components/PilotSummaryExport.jsx', SRC), 'utf8');
+for (const code of ['PILOT_PARTICIPANT', 'PILOT_DATES', 'PILOT_ORDER', 'PILOT_SPAN', 'PILOT_SCORE', 'PILOT_UNKNOWN']) {
+  const key = ui.match(new RegExp(`${code}: '([^']+)'`))?.[1];
+  ok(`every refusal (${code}) is shown in the person's language`, !!key && strings.en.includes(`'${key}':`) && strings.hi.includes(`'${key}':`));
+}
+
+// A teacher's own question has no syllabus topic.
+const custom = buildPilotSummary({ request: REQUEST, attempts: [...attempts, { subtopic: 'custom', correct: 1, createdAt: at(9, 2, 9, 0) }], activity, dayOf: istDay, now: NOW });
+eq('a teacher\'s own question is an attempt but not a topic', [custom.questionsAttempted, custom.topicsTouched], [EXPECTED.questionsAttempted + 1, EXPECTED.topicsTouched]);
 eq('an empty score is no score', [pilotRequest({ ...REQUEST, baseline: '', post: null }).baseline, pilotRequest({ ...REQUEST, baseline: '', post: null }).post], [null, null]);
 
 // ── Through the app: the local backend and its gateway ──────────────────────
@@ -189,7 +201,20 @@ const lockedDisk = JSON.stringify(rawRows());
 await rejects('1 · once locked, the protected profile cannot export', () => call('POST', '/data/pilot-summary', REQUEST), { status: 401, needsPassword: true });
 ok('1 · and the refusal changed nothing on disk', JSON.stringify(rawRows()) === lockedDisk);
 
-// ── The route is a read ─────────────────────────────────────────────────────
+// ── The route is a read, and is off in a production build ──────────────────
+const { classifyMutation } = await import(`${SRC}local/outbox.js`);
+eq('7 · the request is not a mutation: nothing is queued to sync', classifyMutation('POST', '/data/pilot-summary', viaApp, REQUEST), null);
+const { featureStates, featureDefines } = await import(new URL('../vite.config.js', import.meta.url).href);
+eq('a production build has the summary off unless PRI_FEATURE_PILOT_SUMMARY=1', [featureStates('build', {}).pilotSummary, featureDefines('build', {}).__PRI_FEATURE_PILOT_SUMMARY__], [false, 'false']);
+eq('and on only when the build asks for it', featureStates('build', { PRI_FEATURE_PILOT_SUMMARY: '1' }).pilotSummary, true);
+const settingsSource = readFileSync(new URL('pages/SettingsLegacy.jsx', SRC), 'utf8');
+ok('Settings shows the control only behind the flag, and not to a teacher',
+  /\{user\.role !== 'teacher' && featureEnabled\('pilotSummary'\) && <PilotSummaryExport \/>\}/.test(settingsSource));
+globalThis.__PRI_FEATURE_OVERRIDES__ = { pilotSummary: false };
+await dispatch('POST', '/profiles/select', { id: asha.id });
+await rejects('a build without the flag has no such route', () => call('POST', '/data/pilot-summary', REQUEST), { status: 404, code: 'FEATURE_DISABLED' });
+delete globalThis.__PRI_FEATURE_OVERRIDES__;
+
 const backendSource = readFileSync(new URL('local/backend.js', SRC), 'utf8');
 const routeBody = backendSource.slice(backendSource.indexOf("'POST /data/pilot-summary'"), backendSource.indexOf("'POST /classes/:id/import-progress'"));
 ok('7 · the route opens the profile through requireProfile()', /const p = await requireProfile\(\);/.test(routeBody));

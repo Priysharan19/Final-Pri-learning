@@ -5031,6 +5031,9 @@ const routes = {
   // it reads this profile's attempt and activity rows and writes nothing. A
   // protected profile must be open (requireProfile), as for every other read.
   'POST /data/pilot-summary': async (body) => {
+    if (!featureEnabled('pilotSummary')) {
+      throw Object.assign(new Error('The study programme summary is not available in this build.'), { status: 404, code: 'FEATURE_DISABLED' });
+    }
     const p = await requireProfile();
     const tz = timezoneOf(p);
     return buildPilotSummary({

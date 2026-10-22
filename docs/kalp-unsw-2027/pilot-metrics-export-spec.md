@@ -69,7 +69,7 @@ For a given unchanged local dataset and date range, aggregate results must be re
 - `activeDays`: count unique activity rows inside the pilot date range with `questions > 0`.
 - `questionsAttempted`: sum answered attempts inside the date range. Avoid double-counting retries; define and test the rule before the pilot begins.
 - `correctAttempts`: count attempts that meet the chosen attempt-level definition of correctness.
-- `accuracy`: `correctAttempts / questionsAttempted`, null when zero attempts.
+- `accuracy`: `correctAttempts / (questionsAttempted − repeatAttempts)`, null when that is zero (see *Counting rules* below).
 - `practiceMs`: sum existing recorded practice milliseconds; do not present as total screen time.
 - `hintsUsed`: sum hints recorded on the attempt/question evidence path chosen for the pilot.
 - `topicsTouched`: unique syllabus subtopics attempted in the period.
@@ -102,12 +102,12 @@ Built behind `PRI_FEATURE_PILOT_SUMMARY=1` (off in a production build until a pr
 - Code: `client/src/local/pilotSummary.js` (pure builder), route `POST /data/pilot-summary` in `client/src/local/backend.js` (read-only; opens the profile through `requireProfile()`, so a locked protected profile is refused with `needsPassword`).
 - Test: `client/test/pilot-summary-check.mjs` (`npm run test:pilot:summary`) covers the eight required tests above against a hand-counted fixture.
 - Schema `pri-pilot-summary-v2`. (`tools/pilot-summary-from-progress.mjs` emits the earlier bridge shape `pri-pilot-summary-v1` from a teacher progress file; the two are different files.)
-- The participant code must look like `S042` (1–4 letters, an optional hyphen, 1–6 digits), so a name or an email address cannot be typed into it.
+- Each programme in `PILOTS` declares the participant codes it issues; for `india-student-impact-2026` that is `S` and three or four digits (`S042`), so a name, a name plus a birth year or an email address cannot be typed into it.
 - The file carries `app.commit` (the release SHA) when the build has a release identity, and fixed `limitations` text including the integrity boundary below.
 
 ### Counting rules `pri-pilot-rules-v1`
 
-These are the rules the Progress page and the teacher progress file already use (`client/src/engine/progressTruth.js`).
+These follow the teacher progress file (`client/src/engine/progressTruth.js` `quotedTotals`): every attempt counts, including Rapid Fire and Match answers and a teacher's own questions. The Progress page's accuracy claim is narrower (learning evidence only, games excluded), so the two accuracies can differ.
 
 - Days are the profile's own calendar days (its timezone), and `from`/`to` are inclusive. A period is at most 366 days.
 - `questionsAttempted`: one per attempt row in the period. A question resolves once, so second tries at the same question never add an attempt.
@@ -117,5 +117,5 @@ These are the rules the Progress page and the teacher progress file already use 
 - `activeDays`: activity rows in the period with at least one question.
 - `practiceMs`: the activity rows' answering time in the period. It is not screen time.
 - `hintsUsed`: hints recorded on the attempt rows in the period.
-- `topicsTouched`: distinct subtopics among the attempts in the period.
+- `topicsTouched`: distinct syllabus subtopics among the attempts in the period (a teacher's own questions have none and are not counted).
 - `completed`: `null` until the programme declares its completion rule in `PILOTS` (`pilotSummary.js`), in code and reviewed, before recruitment. The app does not invent one.

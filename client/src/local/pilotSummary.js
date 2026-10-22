@@ -10,8 +10,9 @@
 // What leaves the device is a fixed list of counts. The builder never copies a
 // field from a source row into its output; it only counts, sums and measures,
 // so a name, an address, a profile id, an answer, handwriting or a photo has
-// no path into the file. The participant code is checked against a shape a
-// name cannot take (letters then digits, e.g. S042).
+// no path into the file. The participant code is checked against the shape the
+// programme issues (S then three or four digits, e.g. S042), which a name, a
+// name plus a birth year or an address cannot take.
 //
 // Counting rules (pri-pilot-rules-v1), the same ones the progress file and the
 // Progress page use (engine/progressTruth.js):
@@ -23,23 +24,26 @@
 //   · a day is an active day when its activity row records a question.
 //   · practice time is the activity rows' answering time, not screen time.
 //   · days are the profile's own calendar days (its timezone), inclusive.
+//   · every attempt counts, Rapid Fire and Match answers and a teacher's own
+//     questions included, as in the progress file; a teacher's own question
+//     has no syllabus topic, so it is not a topic touched.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { isCreditedCorrect, isRepeat } from '../engine/progressTruth.js';
 
 export const PILOT_SUMMARY_SCHEMA = 'pri-pilot-summary-v2';
 export const PILOT_RULES = 'pri-pilot-rules-v1';
-export const PARTICIPANT_PATTERN = /^[A-Z]{1,4}-?[0-9]{1,6}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DAYS = 366;
 
 /**
- * The programmes a summary can be made for. A completion rule is part of the
- * programme's design, fixed before anyone is recruited; until it is declared
- * here a summary says `completed: null` rather than inventing one.
+ * The programmes a summary can be made for, each with the participant codes it
+ * issues. A completion rule is part of the programme's design, fixed before
+ * anyone is recruited; until it is declared here a summary says
+ * `completed: null` rather than inventing one.
  */
 export const PILOTS = Object.freeze({
-  'india-student-impact-2026': Object.freeze({ completion: null })
+  'india-student-impact-2026': Object.freeze({ participant: /^S[0-9]{3,4}$/, completion: null })
 });
 export const DEFAULT_PILOT = 'india-student-impact-2026';
 
@@ -66,21 +70,21 @@ const dayNumber = text => Date.UTC(...text.split('-').map((n, i) => Number(n) - 
 function score(value, label) {
   if (value === undefined || value === null || value === '') return null;
   const n = Number(value);
-  if (!Number.isFinite(n) || n < 0 || n > 100) throw bad(`${label} must be a percentage from 0 to 100.`);
+  if (!Number.isFinite(n) || n < 0 || n > 100) throw bad(`${label} must be a percentage from 0 to 100.`, 'PILOT_SCORE');
   return Math.round(n * 100) / 100;
 }
 
 /** Check what the person asked for. Throws a 400 the screen can show. */
 export function pilotRequest(input = {}) {
-  const participant = String(input.participant ?? '').trim().toUpperCase();
-  if (!PARTICIPANT_PATTERN.test(participant)) throw bad('Use the participant code the programme gave you, like S042.');
   const pilot = String(input.pilot ?? DEFAULT_PILOT);
-  if (!Object.hasOwn(PILOTS, pilot)) throw bad('That programme is not one this app knows.');
+  if (!Object.hasOwn(PILOTS, pilot)) throw bad('That programme is not one this app knows.', 'PILOT_UNKNOWN');
+  const participant = String(input.participant ?? '').trim().toUpperCase();
+  if (!PILOTS[pilot].participant.test(participant)) throw bad('Use the participant code the programme gave you, like S042.', 'PILOT_PARTICIPANT');
   const from = String(input.from ?? '');
   const to = String(input.to ?? '');
-  if (!validDate(from) || !validDate(to)) throw bad('Choose a start date and an end date.');
-  if (from > to) throw bad('The start date must be on or before the end date.');
-  if (dayNumber(to) - dayNumber(from) + 1 > MAX_DAYS) throw bad('Choose a period of a year or less.');
+  if (!validDate(from) || !validDate(to)) throw bad('Choose a start date and an end date.', 'PILOT_DATES');
+  if (from > to) throw bad('The start date must be on or before the end date.', 'PILOT_ORDER');
+  if (dayNumber(to) - dayNumber(from) + 1 > MAX_DAYS) throw bad('Choose a period of a year or less.', 'PILOT_SPAN');
   return { participant, pilot, from, to, baseline: score(input.baseline, 'Baseline'), post: score(input.post, 'Post-test') };
 }
 
@@ -106,7 +110,7 @@ export function buildPilotSummary({ request, attempts = [], activity = [], dayOf
     if (isRepeat(a)) repeatAttempts += 1;
     if (isCreditedCorrect(a)) correctAttempts += 1;
     hintsUsed += count(a.hintsUsed);
-    if (typeof a.subtopic === 'string' && a.subtopic) topics.add(a.subtopic);
+    if (typeof a.subtopic === 'string' && a.subtopic && a.subtopic !== 'custom') topics.add(a.subtopic);
   }
 
   let activeDays = 0;
