@@ -13,6 +13,7 @@
 import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 function whenItResets(resetsAt, timeZone) {
   if (!Number.isFinite(resetsAt)) return null;
@@ -68,7 +69,7 @@ export default function FreeCapNotice({ gate, onRetry }) {
         </p>
 
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <PageLink className="btn btn-primary" to="/settings#cloud-account-title">
+          <PageLink className={PRIMARY} to="/settings#cloud-account-title">
             {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
           </PageLink>
           {onRetry && (

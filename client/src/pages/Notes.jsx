@@ -26,6 +26,7 @@ import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
 import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 // Official exam-track names remain visible as students move between notes,
 // examples and practice; internal URL slugs are never presented as titles.
@@ -452,7 +453,7 @@ function ChapterNotes({ chapterId }) {
         </div>
         {notes && <MathText block className="nt-lede" text={notes.summary} />}
         <div className="nt-actions">
-          <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)} data-testid="notes-practise">
+          <button type="button" className={PRIMARY} onClick={() => nav(practiceLink)} data-testid="notes-practise">
             {t('notes.practise')}
           </button>
           {notes && (
@@ -568,7 +569,7 @@ function ChapterNotes({ chapterId }) {
           )}
 
           <div className="nt-end nt-reveal">
-            <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
+            <button type="button" className={PRIMARY} onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
           </div>
         </div>
@@ -779,7 +780,7 @@ function Flashcards({ chapter, points, onClose }) {
             <div className="nt-cards-nav">
               <button type="button" className="btn btn-secondary" onClick={() => go(-1)} disabled={i === 0}>{t('notes.prev')}</button>
               <span className="nt-cards-count">{t('notes.cardProgress', { n: i + 1, total: points.length })}</span>
-              <button type="button" className="btn btn-primary" onClick={() => go(1)} data-testid="notes-card-next">{t('notes.next')}</button>
+              <button type="button" className={PRIMARY} onClick={() => go(1)} data-testid="notes-card-next">{t('notes.next')}</button>
             </div>
           </>
         ) : (

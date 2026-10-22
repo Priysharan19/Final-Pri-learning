@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 function dueText(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -89,7 +90,7 @@ export default function AssignmentInboxPanel() {
               </div>
               {row.specification?.instructions && <p style={{ margin: '10px 0 0' }}>{String(row.specification.instructions)}</p>}
               {row.submission?.feedback && <div className="notice" style={{ marginTop: 10 }}>{t('inbox.feedbackReturned')}</div>}
-              <button type="button" className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={() => openAssignment(row)}>
+              <button type="button" className={`${PRIMARY} btn-sm`} style={{ marginTop: 12 }} onClick={() => openAssignment(row)}>
                 {state === 'submitted' ? t('inbox.review') : state === 'started' ? t('inbox.resume') : state === 'returned' ? t('inbox.revise') : t('inbox.start')}
               </button>
             </div>

@@ -227,9 +227,13 @@ export const ON_DEMAND = [
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
     [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened'],
+    // The practice-surface skin (luxury PR6): on demand like the tabs above,
+    // fetched when a practice surface opens and warmed at idle with them; an
+    // offline first open keeps the instrument skin, never an unstyled page.
+    [/(^|\/)practice-[^/]*\.(js|css)$/, 'instrument practice-surface skin, fetched when a practice surface opens']
   ] : [
-    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
+    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|practice|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
 
   // The previous-year archive is reached only by a student who asks for past

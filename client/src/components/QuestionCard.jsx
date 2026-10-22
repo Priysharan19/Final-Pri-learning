@@ -59,6 +59,10 @@ import QuestionHead from '../instrument/QuestionHead.jsx';
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
 const INSTRUMENT = featureEnabled('instrument');
+// Luxury PR6: an engine-marked option carries the mark's shape (✓ circle,
+// ✗ diamond) beside its word. The glyph module is already in the instrument
+// install; with the flag off nothing is imported.
+const MarkGlyph = INSTRUMENT ? React.lazy(() => import('../instrument/margin/MarginIcon.jsx').then(m => ({ default: m.MarkGlyph }))) : null;
 // Both chords work (the handler takes Meta or Control), so the chip names both
 // rather than guessing the keyboard from the device.
 const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
@@ -2402,7 +2406,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => chooseOption(i)}>
                   <span className="mcq-key">{'ABCD'[i]}</span>
                   <span lang="en"><MathText text={opt} /></span>
-                  {mark && <span className="mcq-mark">{mark}</span>}
+                  {mark && <span className="mcq-mark">
+                    {MarkGlyph && !res.revealed && typeof res.correct === 'boolean' && (
+                      <span className="mcq-glyph" aria-hidden="true"><React.Suspense fallback={null}><MarkGlyph kind={cls.endsWith(' right') ? 'ok' : 'x'} size={24} label="" /></React.Suspense></span>
+                    )}
+                    {mark}
+                  </span>}
                 </button>
               );
             })}

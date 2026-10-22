@@ -42,6 +42,7 @@ import Icon from '../components/Icon.jsx';
 import { CheckSignIn } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import '../workspace.css';
+import { PRIMARY } from '../instrument/primary.js';
 
 const SAVE_DEBOUNCE_MS = 600;
 // A submitted paper waiting for the server is asked about again this often.
@@ -684,7 +685,7 @@ export default function ExamRoom() {
             </div>
           )}
           <div className="row" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={recheck} disabled={rechecking}>
+            <button className={PRIMARY} onClick={recheck} disabled={rechecking}>
               {rechecking ? t('examRoom.pendingChecking') : t('examRoom.pendingRetry')}
             </button>
             <button className="btn btn-ghost" onClick={() => nav('/exams')}>{t('examRoom.pendingLeave')}</button>
@@ -727,7 +728,7 @@ export default function ExamRoom() {
             <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-marked-by={result.markedBy}>{t(MARKED_BY_KEY[result.markedBy])}</p>
           )}
           <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => nav('/exams')}>{t('examRoom.newPaper')}</button>
+            <button className={PRIMARY} onClick={() => nav('/exams')}>{t('examRoom.newPaper')}</button>
             <button className="btn btn-ghost" onClick={() => nav('/stats')}>{t('examRoom.seeInsights')}</button>
           </div>
         </div>
@@ -1069,7 +1070,7 @@ export default function ExamRoom() {
           <div>
             <div className="verdict-body">{submitError}</div>
             {phase === 'sitting' && left <= 0 && (
-              <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={() => finalise('deadline')}>{t('common.tryAgain')}</button>
+              <button className={`${PRIMARY} btn-sm`} style={{ marginTop: 8 }} onClick={() => finalise('deadline')}>{t('common.tryAgain')}</button>
             )}
           </div>
         </div>
@@ -1158,8 +1159,8 @@ export default function ExamRoom() {
           </span>
           <button className="btn btn-ghost" disabled={cur === 0} onClick={() => setCur(c => c - 1)}>{t('examRoom.previous')}</button>
           {cur < exam.questions.length - 1
-            ? <button className="btn btn-primary" onClick={() => setCur(c => c + 1)}>{t('examRoom.next')}</button>
-            : <button className="btn btn-primary" onClick={() => setConfirming(true)} disabled={locked}>{t('exam.reviewSubmit')}</button>}
+            ? <button className={PRIMARY} onClick={() => setCur(c => c + 1)}>{t('examRoom.next')}</button>
+            : <button className={PRIMARY} onClick={() => setConfirming(true)} disabled={locked}>{t('exam.reviewSubmit')}</button>}
         </div>
       </section>
       <p className="exam-rules">{t('examRoom.conditionsNote')}</p>
@@ -1177,7 +1178,7 @@ export default function ExamRoom() {
             <p className="muted" style={{ marginTop: 10 }}>{t('exam.confirmFinal')}</p>
             <div className="sheet-actions">
               <button className="btn btn-ghost" onClick={() => setConfirming(false)}>{t('exam.keepWorking')}</button>
-              <button className="btn btn-primary" onClick={() => { setConfirming(false); finalise('student'); }} disabled={locked}>{t('exam.submitPaper')}</button>
+              <button className={PRIMARY} onClick={() => { setConfirming(false); finalise('student'); }} disabled={locked}>{t('exam.submitPaper')}</button>
             </div>
           </div>
         </>

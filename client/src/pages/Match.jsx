@@ -8,6 +8,7 @@ import { useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
+import { PRIMARY } from '../instrument/primary.js';
 
 // The rivals' names are what the backend stores in match history (the English
 // name is the record), so the display name is looked up from the stored name.
@@ -187,7 +188,7 @@ export default function Match() {
                     </button>
                   ))}
                 </div>
-                <button className="btn btn-primary btn-glow" style={{ width: '100%', marginTop: 16 }} onClick={start}>{t('match.play')}</button>
+                <button className={`${PRIMARY} btn-glow`} style={{ width: '100%', marginTop: 16 }} onClick={start}>{t('match.play')}</button>
                 <div className="row" style={{ marginTop: 10 }}>
                   <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => nav('/rush')}>{t('match.rapidFireSolo')}</button>
                 </div>
@@ -240,7 +241,7 @@ export default function Match() {
         <p className="sub">{result.won ? t('match.finalScoreWon', { me, rival }) : t('match.finalScoreLost', { me, rival })}</p>
         <p className="muted" style={{ marginTop: 8 }}>{t('match.career', { wins: t('match.winsCounted', { count: result.wins, n: result.wins }), matches: t('match.matchesCounted', { count: result.played, n: result.played }) })}</p>
         <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
-          <button className="btn btn-primary" onClick={() => setPhase('lobby')}>{t('match.rematch')}</button>
+          <button className={PRIMARY} onClick={() => setPhase('lobby')}>{t('match.rematch')}</button>
           <button className="btn btn-ghost" onClick={() => setPhase('lobby')}>{t('match.lobby')}</button>
         </div>
       </div>
@@ -288,7 +289,7 @@ export default function Match() {
                 onChange={e => setAnswer(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && answer.trim()) answerCurrent(answer); }}
                 autoCapitalize="none" autoCorrect="off" spellCheck={false} />
-              <button className="btn btn-primary" disabled={!answer.trim()} onClick={() => answerCurrent(answer)}>{t('rush.go')}</button>
+              <button className={PRIMARY} disabled={!answer.trim()} onClick={() => answerCurrent(answer)}>{t('rush.go')}</button>
             </div>
           )}
           <div className="spread" style={{ marginTop: 12 }}>

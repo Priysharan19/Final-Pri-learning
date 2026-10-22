@@ -67,6 +67,13 @@ const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportH
 // Index and the Report (the Report's summary above the same Progress page).
 const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
 const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
+// Practice surfaces (luxury PR6): every v1.0 page still reachable from the
+// instrument's tabs, dock, ⌘K and Settings (the practice workspace, papers,
+// notes, games, tasks, plan, placement) takes direction C from one on-demand
+// stylesheet, scoped to the <main> that carries data-c-surface. The Index,
+// Map, Report, Scripts and Settings are styled by their own screens.
+const C_SURFACE = /^\/(practice|practise-photo|exams|notes|rush|match|tasks|classes|plan|placement)(\/|$)/;
+const loadPracticeSkin = INSTRUMENT_ON ? () => import('./instrument/margin/practice.css') : null;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   // The luxury layer remaps the instrument's tokens, so it must land after
@@ -78,7 +85,7 @@ if (INSTRUMENT_ON && typeof document !== 'undefined') {
   void prefetchInstrumentTabs({
     scope: window,
     loaders: [() => import('./instrument/MapPage.jsx'), () => import('./instrument/ReportHead.jsx'),
-      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx')]
+      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx'), loadPracticeSkin]
   });
 }
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
@@ -428,6 +435,8 @@ export default function App() {
   }, [moreOpen, closeMore]);
 
   useEffect(() => { setMoreOpen(false); }, [loc.pathname, loc.hash]);
+  const cSurface = INSTRUMENT_ON && C_SURFACE.test(loc.pathname);
+  useEffect(() => { if (cSurface) loadPracticeSkin().catch(() => { /* offline first open: the page keeps the instrument skin */ }); }, [cSurface]);
 
   const toast = useCallback((content, ms = 3800, kind = '') => {
     const id = Math.random().toString(36).slice(2);
@@ -597,7 +606,7 @@ export default function App() {
               </p>
             )}
             <main className="content fade-in" id="main" tabIndex={-1} ref={mainRef}
-              aria-label={pageTitle || 'Pri Learning'} key={loc.pathname}>
+              aria-label={pageTitle || 'Pri Learning'} key={loc.pathname} data-c-surface={cSurface ? '' : undefined}>
               <ErrorBoundary scope="route" resetKey={loc.pathname} onHome={() => nav('/')}>
                 {/* Inside the boundary, so a route chunk that will not load is
                     reported as a broken route rather than blanking the shell. */}

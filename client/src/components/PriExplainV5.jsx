@@ -14,6 +14,7 @@ import './PriExplainV8.css';
 // Loaded last: re-expresses the player in the product's one visual system.
 import './PriExplainInstrument.css';
 import Icon from './Icon.jsx';
+import { PRIMARY } from '../instrument/primary.js';
 
 const SOLUTION_EVENT = 'pri:worked-solution';
 const ATTEMPT_EVENT = 'pri:attempt-feedback';
@@ -532,7 +533,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                     {teaching.shouldOfferFollowUp && onTrySimilar && (
                       <div className="pri-explain-followup">
                         <span>{t('explain.lockIn')}</span>
-                        <button className="btn btn-primary btn-sm" type="button" onClick={trySimilar}>{t('explain.tryOne')}</button>
+                        <button className={`${PRIMARY} btn-sm`} type="button" onClick={trySimilar}>{t('explain.tryOne')}</button>
                       </div>
                     )}
                   </div>
@@ -560,7 +561,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
               <div>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={restart}>{t('explain.restart')}</button>
                 <button className="btn btn-ghost btn-sm" type="button" onClick={() => { pausePlayback(); stepBack(); }} disabled={index === 0 && beat === 0 && !checkpointPassed}>{t('explain.back')}</button>
-                <button className="btn btn-primary btn-sm" type="button" onClick={() => {
+                <button className={`${PRIMARY} btn-sm`} type="button" onClick={() => {
                   if (atFinished) restart();
                   else if (playing) pausePlayback();
                   else setPlaying(true);

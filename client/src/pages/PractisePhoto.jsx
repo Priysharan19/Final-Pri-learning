@@ -17,6 +17,7 @@ import { cloudAvailable } from '../platform/cloudTransport.js';
 const PhotoAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 import { chapterChoices, identifyQuestionPhoto, practiseHrefFor } from '../lib/questionPhoto.js';
 import { createPhotoRequestGate } from './photoPractiseRequest.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 const STATE_KEY = {
   offline: 'snap.offline',
@@ -124,7 +125,7 @@ export default function PractisePhoto() {
       <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
         onChange={onFile} data-photo-practise-input aria-hidden="true" tabIndex={-1} />
       <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" disabled={busy} onClick={() => inputRef.current?.click()} data-photo-practise-pick>
+        <button className={PRIMARY} disabled={busy} onClick={() => inputRef.current?.click()} data-photo-practise-pick>
           {result ? t('snap.another') : t('snap.pick')}
         </button>
       </div>
@@ -139,7 +140,7 @@ export default function PractisePhoto() {
 
       {result?.state === 'signed-out' && cloudAvailable() && (
         <div data-photo-practise-account-recovery style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn-primary btn-sm"
+          <button type="button" className={`${PRIMARY} btn-sm`}
             aria-expanded={accountRecoveryOpen}
             data-testid="photo-practise-sign-in"
             onClick={() => setAccountRecoveryOpen(open => !open)}>
@@ -173,7 +174,7 @@ export default function PractisePhoto() {
           <p className="muted" style={{ fontSize: 12.5 }}>{t('snap.confirmNote')}</p>
 
           <div className="row" style={{ gap: 10, marginTop: 12 }}>
-            <button className="btn btn-primary" disabled={!href} onClick={() => href && nav(href)} data-photo-practise-start>
+            <button className={PRIMARY} disabled={!href} onClick={() => href && nav(href)} data-photo-practise-start>
               {t('snap.start')}
             </button>
           </div>

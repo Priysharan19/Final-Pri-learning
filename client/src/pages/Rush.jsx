@@ -6,6 +6,7 @@ import { useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
+import { PRIMARY } from '../instrument/primary.js';
 
 export default function Rush() {
   const { user, celebrate, refreshUser } = useApp();
@@ -88,7 +89,7 @@ export default function Rush() {
         <p className="sub" style={{ maxWidth: 460, margin: '0 auto 20px' }}>
           {t('rush.lobbyIntro')}
         </p>
-        <button className="btn btn-primary btn-lg" onClick={start}>{t('rush.start')}</button>
+        <button className={`${PRIMARY} btn-lg`} onClick={start}>{t('rush.start')}</button>
         {refusal && (
           <div className="verdict verdict-technical" role="alert" data-game-refused={refusal} style={{ marginTop: 14, textAlign: 'left' }}>
             <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('verdict.notCheckedLabel')}</span></span>
@@ -113,7 +114,7 @@ export default function Rush() {
           </p>
         )}
         <div className="row" style={{ justifyContent: 'center', marginTop: 18 }}>
-          <button className="btn btn-primary" onClick={start}>{t('rush.goAgain')}</button>
+          <button className={PRIMARY} onClick={start}>{t('rush.goAgain')}</button>
         </div>
       </div>
     );
@@ -156,7 +157,7 @@ export default function Rush() {
             <input ref={inputRef} className="input answer-input" value={answer} aria-label={t('verdict.yourAnswer')} placeholder={q.inputHint || t('rush.answerPlaceholder')}
               onChange={e => setAnswer(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && answer.trim()) answerCurrent(answer); }} />
-            <button className="btn btn-primary" disabled={!answer.trim()} onClick={() => answerCurrent(answer)}>{t('rush.go')}</button>
+            <button className={PRIMARY} disabled={!answer.trim()} onClick={() => answerCurrent(answer)}>{t('rush.go')}</button>
           </div>
         )}
         <div className="spread" style={{ marginTop: 14 }}>

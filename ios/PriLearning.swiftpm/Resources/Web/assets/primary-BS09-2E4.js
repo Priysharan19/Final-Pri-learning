@@ -1,0 +1,1 @@
+import{mt as e}from"./backend-CeO9p-Dg.js";var t=e(`instrument`)?`btn btn-primary c-btn c-btn-primary`:`btn btn-primary`;export{t};
