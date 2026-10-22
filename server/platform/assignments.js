@@ -1,7 +1,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
-import { requireSession } from './security.js';
+import { requireMfa, requireSession } from './security.js';
 
 function parseObject(raw) {
   try {
@@ -133,6 +133,11 @@ export function createAssignmentExecutionRouter(db) {
   db = asStore(db);
   const router = asyncRouter();
   router.use(requireSession(db));
+  // An admin reaches any class by virtue of the role, so the role brings the
+  // same verified second factor every other admin route requires (admin.js).
+  // Teachers and students are unaffected.
+  const adminMfa = requireMfa();
+  router.use((req, res, next) => (req.platformSession?.role === 'admin' ? adminMfa(req, res, next) : next()));
 
   router.get('/', async (req, res) => {
     const assignments = await listAssignmentsForAccount(db, req.platformSession.account_id, req.platformSession.role);

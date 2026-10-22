@@ -52,8 +52,13 @@ export function stepMetaFor(q) {
 // An issued question and every committed grade must use the SAME server-owned
 // rubric. Difficulty alone is not marks; the authored non-auxiliary criteria
 // define the total, bounded by the question's four-mark practice contract.
+/** A step that carries a mark (not an auxiliary Check / Note / Bonus line). */
+export function isSchemeStep(step) {
+  return !/^(check|note|bonus)/i.test(step?.h);
+}
+
 export function marksPossibleFor(q) {
-  const keySteps = (q.steps || []).filter(step => !/^(check|note|bonus)/i.test(step.h));
+  const keySteps = (q.steps || []).filter(isSchemeStep);
   const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }
@@ -77,7 +82,7 @@ export function stepEvidence(q, answer, steps, result) {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
       });
-      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
+      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
     } catch { partial = null; }
   }
   return { stepReport: report, partial };
@@ -132,7 +137,7 @@ export function examWorkingStage(q, working, grid, stage) {
     const method = methodMarks({ meta: stage.meta, working: String(working), marks, prompt: q.prompt });
     if (method && method.awarded > 0) {
       response.awarded = Math.max(0, Math.min(marks - 1, method.awarded));
-      response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note };
+      response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note, lost: method.lost };
     }
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }

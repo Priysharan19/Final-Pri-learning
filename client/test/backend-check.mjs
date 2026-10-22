@@ -541,6 +541,7 @@ function routeTable() {
 
 /** The route key a call lands on, or null when nothing in the table matches. */
 function resolveRoute(keys, method, path) {
+  path = String(path).split('?')[0];   // a GET's query string is its body, not its route
   const exact = `${method} ${path}`;
   if (keys.includes(exact)) return exact;
   for (const key of keys) {
@@ -657,6 +658,12 @@ async function run() {
 
   const GET = (path, body) => call('GET', path, body);
   const POST = (path, body) => call('POST', path, body);
+  // The way the app sends a request: through the gateway's validateRequest
+  // (local/gateway.js), then to the backend with what it passed on.
+  const { validateRequest } = await import(`${SRC}local/gateway.js`);
+  const gated = async (method, path, body) => { const c = validateRequest(method, path, body); return call(c.method, c.path, c.body); };
+  const GATED_GET = path => gated('GET', path);
+  const GATED_POST = (path, body) => gated('POST', path, body);
   const PATCH = (path, body) => call('PATCH', path, body);
 
   // Bindings a later group needs from an earlier one. Declared here so that a
@@ -901,11 +908,13 @@ async function run() {
       answer: worked.right, ms: 5000, viaInk: true,
       ink: { strokes: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }], recognized: canaryInk }
     });
-    // One-request Submit (#441 port): the picture travels with the submission,
-    // so a handwritten Submit is ONE request to the server — no separate
-    // /recognize (and no /confirm) before it.
-    eq('a handwritten Submit is one request: one /submit, no separate /recognize',
-      [online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 0]);
+    // Read on request (#440): the page was read when the student asked (the
+    // harness plays that press: one /handwriting/transcribe). Submit buys no
+    // read: it is ONE /submit (#506) whose picture the server only replays
+    // against the kept reading (paid: false — server/test/recognition-dedupe-check.mjs),
+    // and no separate /recognize.
+    eq('a handwritten Submit buys no read: the student\'s one read, then one /submit and no /recognize',
+      [(online.traffic.read || 0) - (inkTraffic.read || 0), online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 1, 0]);
 
     const disk = JSON.stringify(rawRows());
     ok('the question is on disk at all', disk.includes(sealed.id), 'no row on disk names this profile — nothing was written');
@@ -1219,8 +1228,13 @@ async function run() {
         POST(`/practice/${offlineQ.question.id}/reveal`, { ms: 1000 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
       await rejects('offline, an exam does not start', POST('/exams', { length: 10, minutes: 30 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
       ok('offline, a question can still be read', !!(await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true })).question.prompt);
-      ok('offline, a hint the question already carries can still be read',
-        typeof (await POST(`/practice/${offlineQ.question.id}/hint`, {})).level === 'number');
+      // The hint ladder is the server's (PR #584): each rung is served and
+      // charged there, so offline a hint is refused like a check, and the
+      // device records no rung of its own.
+      const hintBefore = (await idb.get('questions', offlineQ.question.id)).hintLevel ?? null;
+      await rejects('offline, a hint is not served from the device',
+        POST(`/practice/${offlineQ.question.id}/hint`, {}), { status: 503, code: 'RECONNECT_TO_CHECK' });
+      eq('offline, no hint rung is recorded', (await idb.get('questions', offlineQ.question.id)).hintLevel ?? null, hintBefore);
     });
     eq('offline, the server graded nothing', online.traffic.grade, gradedBefore);
     {
@@ -1845,6 +1859,8 @@ async function run() {
 
     blankExam = (await POST('/exams', { length: 10 })).exam;
     const blank = await POST(`/exams/${blankExam.id}/submit`, { answers: {}, ms: 60000 });
+    await rejects('Retry checking on a marked paper that holds no saved page says so by name and marks nothing',
+      POST(`/exams/${blankExam.id}/handwriting`, { key: 'no-such-page' }), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
     eq('an unanswered paper scores nothing', blank.score, 0);
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);
@@ -2050,6 +2066,60 @@ async function run() {
         const events = await online.db.all("SELECT payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [stored.serverQuestionId]);
         ok('— as does the server’s own graded-attempt record', !stored.answered || (events.length === 1 && JSON.parse(events[0].payload_json).repeat === true), show(events.map(e => JSON.parse(e.payload_json).repeat)));
         eq('the first sitting’s receipt is not a repeat', row.serverReceipt?.repeat === true, false);
+
+        // Marks per chapter (v1.1 Report and Map): server-certified receipts
+        // only, a repeat left out entirely (it would read as marks lost), and
+        // nothing from a row without a certified receipt.
+        const byChapter = (await GET('/marks/by-chapter')).chapters;
+        const meNow = (await GET('/me')).user;
+        const expected = {};
+        for (const q of rawRows().questions.filter(r => r.pid === meNow.id && r.answered)) {
+          const rec = q.serverReceipt;
+          if (!rec || rec.authoritative !== true || !Number.isInteger(rec.marksEarned) || !Number.isInteger(rec.marksPossible)) continue;
+          const id = q.india?.chapterId || q.subtopic;
+          const c = expected[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+          if (rec.repeat === true || q.repeatOf) { c.repeats += 1; continue; }
+          c.earned += rec.marksEarned; c.possible += rec.marksPossible; c.questions += 1;
+        }
+        const core = o => Object.fromEntries(Object.entries(o).map(([k, c]) => [k, { earned: c.earned, possible: c.possible, questions: c.questions, repeats: c.repeats }]));
+        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(core(byChapter)).sort()), JSON.stringify(Object.entries(expected).sort()));
+        const owner = row.india?.chapterId || row.subtopic;
+        ok('the repeat is counted as a repeat, not as marks lost', byChapter[owner]?.repeats >= (stored.answered ? 1 : 0), show(byChapter[owner]));
+        ok('no chapter claims more marks than it could have earned', Object.values(byChapter).every(c => c.earned <= c.possible && c.earned >= 0), show(byChapter));
+        const listed = (await POST('/history/list', { pageSize: 100 })).items.find(i => i.id === again.value.question.id);
+        ok('a repeat’s history row says it was a repeat', !stored.answered || listed?.repeat === true, show(listed && { repeat: listed.repeat, marks: listed.marksEarned }));
+
+        // Report series, map-this-month and History counts/sort/chapter (v1.1 instrument).
+        const series = await GATED_GET('/report/series?period=week');
+        eq('report series names its rolling window', [series.period, series.window, series.series.length], ['week', 'rolling-7-days', 7]);
+        ok('report series reads only certified receipts', series.source === 'server-certified-receipts' && series.current.marksEarned <= series.current.marksPossible, show(series.current));
+        ok('report repeats are counted apart, never as questions', series.current.repeats >= (stored.answered ? 1 : 0), show(series.current));
+        ok('a percentage under the evidence floor is null', series.current.certifiedQuestions >= series.floors.window || series.current.marksPct === null, show(series.current));
+        eq('the question delta is current minus previous', series.delta.questions, series.current.questions - series.previous.questions);
+        await rejects('an unknown report period is refused', GATED_GET('/report/series?period=decade'), { status: 400 });
+        eq('a month reaches the backend through the gateway', (await GATED_GET('/report/series?period=month')).series.length, 4);
+        eq('a term reaches the backend through the gateway', (await GATED_GET('/report/series?period=term')).window, 'rolling-13-weeks');
+        const monthMap = await GATED_GET(`/marks/by-chapter?since=${(await GET('/marks/by-chapter')).monthStart}`);
+        const allMap = (await GET('/marks/by-chapter')).chapters;
+        ok('this month’s map never exceeds all-time marks', Object.entries(monthMap.chapters).every(([k, c]) => c.possible <= allMap[k].possible), show(monthMap));
+        eq('a future since keeps nothing', Object.keys((await GATED_GET('/marks/by-chapter?since=2999-01-01')).chapters).length, 0);
+        await rejects('a malformed since is refused', GATED_GET('/marks/by-chapter?since=last-week'), { status: 400 });
+        ok('dot-point marks sum with the unattributed rest to the chapter', Object.values(allMap).every(c =>
+          ['earned', 'possible', 'questions'].every(k => Object.values(c.dotpoints).reduce((s, d) => s + d[k], 0) + c.unattributed[k] === c[k])), show(allMap));
+        const everything = await GATED_POST('/history/list', { pageSize: 1000 });
+        const items = everything.items;
+        eq('filter counts: all', everything.counts.all, items.length);
+        eq('filter counts: incorrect', everything.counts.wrong, items.filter(i => i.correct === false).length);
+        eq('filter counts: correct', everything.counts.correct, items.filter(i => i.correct === true).length);
+        eq('filter counts: handwritten', everything.counts.ink, items.filter(i => i.hasInk || i.hasScribble || i.hasPhoto).length);
+        eq('filter counts: needs another look', everything.counts.needsLook, items.filter(i => i.needsLook).length);
+        eq('the needs-another-look filter lists exactly those', (await GATED_POST('/history/list', { filter: 'needsLook', pageSize: 1000 })).total, everything.counts.needsLook);
+        const oldest = (await GATED_POST('/history/list', { sort: 'oldest', pageSize: 1000 })).items.map(i => i.answeredAt);
+        ok('sort=oldest is ascending', oldest.every((t, i) => !i || oldest[i - 1] <= t), show(oldest));
+        const chapter = items[0]?.subtopic;
+        const inChapter = await GATED_POST('/history/list', { subtopic: chapter, pageSize: 1000 });
+        ok('subtopic keeps one chapter, and its counts are that chapter’s', inChapter.items.every(i => i.subtopic === chapter) && inChapter.counts.all === inChapter.total, show(inChapter.counts));
+        await rejects('an unknown sort is refused', GATED_POST('/history/list', { sort: 'random' }), { status: 400 });
       }
     }
 
@@ -2341,6 +2411,29 @@ async function run() {
     eq('the ink archive keeps the strokes that were drawn', archived.strokes.length, 1);
     eq('and the reading taken off them', archived.recognized, inkQ.right);
     eq('an unknown ink id comes back empty rather than throwing', (await GET('/ink/not-a-real-id')).ink, null);
+    // Review 18, N10: the harness plays the student's Read before a handwritten
+    // Submit. A device that submits ink which was NEVER read must not get it
+    // marked: no provider call is made for it and nothing is graded.
+    {
+      const unread = await answerableQuestion({});
+      const before = { ...online.traffic };
+      online.traffic.studentHasRead = false;
+      // (Every picture in this harness is the same stand-in image, so the read
+      // an earlier question paid for is forgotten first: this page was never read.)
+      await online.db.run("DELETE FROM idempotency_keys WHERE scope='recognition-read'");
+      try {
+        await rejects('ink submitted without ever being read is not marked: the server answers "read again", never a silent read',
+          POST(`/practice/${unread.question.id}/submit`, { answer: unread.right, ms: 4000, viaInk: true, ink: { strokes: [{ points: [{ x: 5, y: 5 }, { x: 40, y: 60 }, { x: 80, y: 20 }] }], recognized: unread.right } }),
+          { status: 409, code: 'RECOGNITION_READ_EXPIRED' });
+      } finally { online.traffic.studentHasRead = true; }
+      // The one-request Submit (#506) reaches /submit once and is refused there
+      // before marking; the server holds no completion and the device no attempt.
+      const completed = await online.db.get("SELECT key FROM idempotency_keys WHERE scope='practice-completion' AND key=?", [(await idb.get('questions', unread.question.id)).serverQuestionId]);
+      const unreadRow = await idb.get('questions', unread.question.id);
+      const unreadAttempts = (await idb.byIndex('attempts', 'pid', unreadRow.pid)).filter(a => a.questionId === unread.question.id).length;
+      eq('and for that submission the device asked for no read and nothing was marked: at most one refused /submit, no server completion, no attempt, no try spent',
+        [(online.traffic.read || 0) - (before.read || 0), online.traffic.grade - before.grade <= 1, !!completed, unreadAttempts, unreadRow.answered || 0], [0, true, false, 0, 0]);
+    }
     const inkDetail = await GET(`/history/${inkQ.question.id}/detail`).then(value => ({ value }), error => ({ error }));
     eq('the same ink reaches history', inkDetail.value?.ink?.recognized ?? `threw ${inkDetail.error?.name}: ${inkDetail.error?.message}`, inkQ.right);
 
@@ -2550,6 +2643,25 @@ async function run() {
 
     await rejects('a stranger cannot read a teacher’s class analytics',
       GET(`/classes/${theirs.class.id}/analytics`), { status: 404 });
+  } catch (err) { crashed(err); }
+
+  // ── The error notebook ─────────────────────────────────────────────────────
+  // Filing and twin selection are the server's (server/test/practice-hints-
+  // notebook-check.mjs); here both device routes are driven so the coverage
+  // figure stays whole, and their boundaries are re-asserted.
+  section('error notebook');
+  try {
+    await POST('/profiles/select', { id: ada.id });
+    const book = await GET('/notebook');
+    eq('a signed-in profile reads its notebook from the server', [book.available, Array.isArray(book.entries)], [true, true]);
+    const twinsBefore = (await idb.byIndex('questions', 'pid', ada.id)).length;
+    await rejects('a twin of an entry this account does not own is refused',
+      POST('/notebook/00000000-0000-4000-8000-000000000000/twin', {}), { status: 404, code: 'NOTEBOOK_ENTRY_NOT_FOUND' });
+    eq('the refused twin wrote no question row', (await idb.byIndex('questions', 'pid', ada.id)).length, twinsBefore);
+    // dispatch, not POST: this profile is never linked to an account.
+    await dispatch('POST', '/profiles', { name: 'Notebook Guest', year: 10 });
+    eq('a profile with no account reads no notebook and is told to sign in', [(await GET('/notebook')).available, (await GET('/notebook')).reason], [false, 'sign-in']);
+    await POST('/profiles/select', { id: ada.id });
   } catch (err) { crashed(err); }
 
   // ── Coverage of the dispatcher's own route table ───────────────────────────

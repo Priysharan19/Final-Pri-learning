@@ -15,9 +15,11 @@ ARG SOURCE_DATE_EPOCH
 ARG PRI_FEATURE_PLACEMENT
 ARG PRI_FEATURE_TUTOR
 ARG PRI_FEATURE_EXTENDED_TRACKS
+ARG PRI_FEATURE_INSTRUMENT
 ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
     PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
-    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS}
+    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS} \
+    PRI_FEATURE_INSTRUMENT=${PRI_FEATURE_INSTRUMENT}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
@@ -58,6 +60,10 @@ COPY server/tools ./server/tools
 # router imports these ESM files at runtime; the built web assets alone cannot
 # satisfy those imports. Never copy the whole client/src tree into runtime.
 COPY client/src/engine ./client/src/engine
+# The marker's lost-mark and board-row explanations read the English catalogue
+# and plural rules (engine/lost-marks.js, engine/cbseMarking.js). Only these two
+# self-contained files; no other client source enters the image.
+COPY client/src/i18n/strings.en.js client/src/i18n/languages.js ./client/src/i18n/
 COPY client/package.json ./client/package.json
 COPY release ./release
 COPY --from=server-deps /app/server/node_modules ./server/node_modules

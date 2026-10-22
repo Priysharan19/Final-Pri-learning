@@ -10,7 +10,7 @@ import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
 import {
-  ageDecision, confirmConsent, consentBlockerCode, consentState, recordConsentRequest, withdrawConsent
+  acceptsCurrentNotice, ageDecision, confirmConsent, consentBlockerCode, consentState, recordConsentRequest, withdrawConsent
 } from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -19,7 +19,8 @@ import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
 import { createMfaRouter } from './mfa.js';
 import { isCommonPassword } from './commonPasswords.js';
-import { verifyReauthCode } from './otp.js';
+import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
+import { maskPhone } from './otpCore.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -267,6 +268,44 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
   });
 }
 
+// ── What of idempotency_keys an account export carries (P2, train 9) ─────────
+// The table is the account's server-side record of its exam papers, answers
+// and results and its practice questions, gradings and handwriting-reading
+// receipts, so it belongs in the export. Every row is listed (scope, key and
+// timestamps), but a row's body is exported only for the scopes below; the
+// request digest (a hash) never is.
+//   · EXPORT_BODY_SCOPES — what the student wrote or was already shown: their
+//     answer snapshots, results, gradings, reading transcripts, completions,
+//     reveals, hint rungs, tries, issue replies and the daily counter.
+//   · SEALED_SCOPES — the escrowed question/paper holds the answers, worked
+//     steps and marking criteria. Its body is exported only once the question
+//     is resolved (its completion/result row exists for the same key); an
+//     unresolved one is listed as withheld, so an export can never be used to
+//     read the answer to a question that is still open.
+//   · anything else (exam-layout's seed, sync-push / exam-create replay
+//     caches, a scope added later) is internal machinery: listed, body
+//     withheld. A new scope is withheld until someone decides otherwise here.
+const EXPORT_BODY_SCOPES = new Set([
+  'exam-answers', 'exam-result', 'practice-grade', 'practice-recognition', 'recognition-read', 'practice-completion',
+  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content'
+]);
+const SEALED_SCOPES = { 'exam-paper': 'exam-result', 'practice-question': 'practice-completion' };
+
+function exportReceipts(rows) {
+  const present = new Set(rows.map(row => row.scope + '\u0000' + row.key));
+  return rows.map(row => {
+    const base = { scope: row.scope, key: row.key, createdAt: Number(row.created_at), expiresAt: Number(row.expires_at) };
+    let withheld = null;
+    if (SEALED_SCOPES[row.scope]) {
+      if (!present.has(SEALED_SCOPES[row.scope] + '\u0000' + row.key)) withheld = 'unresolved-question';
+    } else if (!EXPORT_BODY_SCOPES.has(row.scope)) withheld = 'internal';
+    if (withheld) return { ...base, body: null, withheld };
+    let body;
+    try { body = JSON.parse(row.response_json); } catch { body = null; }
+    return { ...base, body };
+  });
+}
+
 export function createAccountRouter(db, { beforeDelete = null } = {}) {
   db = asStore(db);
   ensureDeliveryTable(db);
@@ -434,6 +473,12 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // permission, is revoked by the withdrawal it performs, goes with the account,
   // and housekeeping never purges it while it is live (housekeeping.js).
   router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    // Checked before the token is spent, so a page showing an older notice
+    // (a tab left open over a deploy) costs the guardian nothing: they reload
+    // and the same link still works.
+    if (!acceptsCurrentNotice(req.body)) {
+      return res.status(400).json({ error: { code: 'GUARDIAN_NOTICE_REQUIRED', message: 'Read and accept the current notice first.' } });
+    }
     const raw = String(req.body?.token || '');
     const now = Date.now();
     const token = raw ? await db.get(`SELECT * FROM account_tokens
@@ -445,7 +490,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       await db.transaction(async () => {
         await spendToken(db, token.id, now);
         await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
-        confirmed = await confirmConsent(db, token.account_id, now);
+        confirmed = await confirmConsent(db, token.account_id, req.body.noticeVersion, now);
         if (confirmed) {
           const consent = await db.get('SELECT guardian_email FROM guardian_consents WHERE account_id = ?', [token.account_id]);
           // One live withdrawal bearer per account: a re-confirmation (a new
@@ -511,6 +556,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       emailVerified: !!account?.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
+      renewalRequired: !!state.renewal,
       method: state.row?.method || null
     });
   });
@@ -582,6 +628,52 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ?', [passwordHash, now, account.id]);
         await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, account.id]);
       });
+      await createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
+      res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
+    } catch (err) { next(err); }
+  });
+
+  // A first password for a signed-in account that has none (made with a
+  // one-time code, Apple or Google). PATCH above changes a password; this only
+  // ever sets one where password_hash IS NULL, so it can never overwrite a
+  // credential. A session cookie is not enough: the credential must have been
+  // proven inside REAUTH_FRESH_MS (the sign-in itself, or POST /reauth with a
+  // fresh code or provider token). The password signs in with the account's
+  // email, so a phone account (synthetic, undeliverable address) or one whose
+  // address was never verified is refused. Every other session is revoked and
+  // this one rotated, as a password change does.
+  router.post('/password', requireSession(db), requireRecentAuth(db), rateLimit(db, 'password-set', { limit: 5, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const newPassword = String(req.body?.newPassword || '');
+      const weak = passwordProblem(newPassword);
+      if (weak) return res.status(400).json({ error: weak });
+      const account = await db.get('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
+      if (!account) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
+      if (account.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_ALREADY_SET', message: 'This account already has a password. Change it instead.' } });
+      const em = String(account.email || '');
+      if (!em || em.endsWith(`@${PHONE_ACCOUNT_EMAIL_DOMAIN}`) || !account.email_verified_at) {
+        return res.status(409).json({ error: { code: 'PASSWORD_NEEDS_EMAIL', message: 'A password signs in with a verified email address, and this account has none.' } });
+      }
+
+      const now = Date.now();
+      const deviceId = req.platformSession.device_id;
+      const passwordHash = await bcrypt.hash(newPassword, BCRYPT_COST);
+      try {
+        await db.transaction(async () => {
+          // Only the request that finds password_hash still NULL sets it.
+          const info = await db.run('UPDATE accounts SET password_hash = ?, updated_at = ? WHERE id = ? AND password_hash IS NULL AND deleted_at IS NULL', [passwordHash, now, account.id]);
+          if (info.changes !== 1) throw Object.assign(new Error('Password already set.'), { code: 'PASSWORD_ALREADY_SET' });
+          await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
+            VALUES ('password', ?, ?, ?, ?)`, [em, account.id, em, now]);
+          await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, account.id]);
+          await audit(db, account.id, 'account.password-set', 'account', account.id, {}, now);
+        });
+      } catch (err) {
+        if (err?.code === 'PASSWORD_ALREADY_SET' || isUniqueViolation(err)) {
+          return res.status(409).json({ error: { code: 'PASSWORD_ALREADY_SET', message: 'This account already has a password. Change it instead.' } });
+        }
+        throw err;
+      }
       await createSession(db, res, account.id, deviceId, req.get('user-agent') || '', now);
       res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
     } catch (err) { next(err); }
@@ -689,6 +781,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const telemetryTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='operational_events'").get();
     const telemetry = telemetryTable ? await db.all(`SELECT event_type,surface,metadata_json,created_at
       FROM operational_events WHERE account_id=? ORDER BY created_at`, [accountId]) : [];
+    const receiptRows = await db.all(`SELECT scope,key,response_json,created_at,expires_at
+      FROM idempotency_keys WHERE account_id=? ORDER BY created_at, scope, key`, [accountId]);
+    const receipts = exportReceipts(receiptRows);
+    // The account's own verified number, in full: it is the account's sign-in
+    // identifier, exactly as its email is exported in full above. On SQLite
+    // the OTP module creates the table lazily; Postgres is migrated.
+    const phonesTable = !raw || !!raw.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='account_phones'").get();
+    const phones = phonesTable ? await db.all('SELECT phone_e164,verified_at FROM account_phones WHERE account_id=?', [accountId]) : [];
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
@@ -699,7 +799,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       format: 'pri-account-export-v1',
       counts: {
         identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
-        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length
+        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length,
+        receipts: receipts.length, phones: phones.length
       }
     }, Date.now());
     res.set('Cache-Control', 'no-store');
@@ -715,6 +816,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       assignmentFeedback: feedback,
       telemetry,
       issueReports: reports,
+      // Added within pri-account-export-v1: new top-level keys only, nothing
+      // existing renamed or removed, so a reader of the earlier shape still works.
+      receipts,
+      phones: phones.map(row => ({ phone: row.phone_e164, verifiedAt: Number(row.verified_at) })),
       entitlement: {
         plan: entitlement.plan,
         status: entitlement.status,
@@ -722,7 +827,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         currentPeriodEnd: entitlement.currentPeriodEnd ?? null
       },
       guardianConsent: consent.required
-        ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null, noticeVersion: consent.row?.notice_version || null }
+        // The guardian's phone is masked exactly as the guardian's email is (and
+        // as /guardian/state shows them). The account typed it in, so the
+        // masked form is enough to recognise which parent was asked; the full
+        // number is another person's identifier, and an export file is easily
+        // passed on from a shared device. Same reasoning as the email.
+        ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null,
+          guardianPhone: consent.row?.guardian_phone ? maskPhone(consent.row.guardian_phone) : null,
+          method: consent.row?.method || null, noticeVersion: consent.row?.notice_version || null }
         : null
     });
   });

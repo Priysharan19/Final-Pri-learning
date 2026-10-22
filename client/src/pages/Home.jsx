@@ -34,6 +34,17 @@ function LazyPlanCard(props) {
   return Card ? <Card {...props} /> : null;
 }
 
+// The per-dot-point review card, lazily like the plan card.
+function LazyReviewQueueCard(props) {
+  const [Card, setCard] = useState(null);
+  useEffect(() => {
+    let live = true;
+    import('../home/ReviewQueueCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
+    return () => { live = false; };
+  }, []);
+  return Card ? <Card {...props} /> : null;
+}
+
 export default function Home() {
   const { user, dueCount } = useApp();
   const nav = useNavigate();
@@ -278,6 +289,7 @@ export default function Home() {
         <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
         <PlacementCard placement={placement} onGo={path => nav(path)}
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
+        <LazyReviewQueueCard user={user} />
         <LazyPlanCard user={user} stats={stats} />
         {alternatives.length > 0 && (
           <ul className="home-alts">
@@ -320,7 +332,7 @@ export default function Home() {
             {chips.length > 0 && (
               <button className="icon-btn" title={t('home.clearFilters')} aria-label={t('home.clearFilters')} onClick={resetAll}><Icon name="review" size={16} /></button>
             )}
-            <button className="btn btn-primary" onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
+            <button className="btn btn-ghost" onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
           </div>
           {open && (
             <div className="gen-panel" id="gen-panel">
@@ -462,7 +474,7 @@ export default function Home() {
                   <button className="btn btn-secondary" type="button" data-study-examples onClick={() => learn('examples')}>{t('study.examples')}</button>
                 </>
               )}
-              <button className="btn btn-primary" type="button" data-study-practice onClick={generate}>{t('study.practice')}</button>
+              <button className="btn btn-ghost" type="button" data-study-practice onClick={generate}>{t('study.practice')}</button>
             </div>
             {!studyAvailable && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('study.reviewPending')}</p>}
           </div>
@@ -630,14 +642,14 @@ function PlacementCard({ placement, onGo, onSkip }) {
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
         {placement.status === 'none' && (
           <>
-            <button className="btn btn-primary" onClick={() => onGo('/placement?go=1')}>{t('placement.start')}</button>
+            <button className="btn btn-ghost" onClick={() => onGo('/placement?go=1')}>{t('placement.start')}</button>
             <button className="btn btn-quiet" onClick={onSkip}>{t('placement.notNow')}</button>
           </>
         )}
-        {placement.status === 'active' && <button className="btn btn-primary" onClick={() => onGo('/placement')}>{t('placement.resume')}</button>}
+        {placement.status === 'active' && <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.resume')}</button>}
         {placement.status === 'finished' && (
           <>
-            {rootChapter && <button className="btn btn-primary" onClick={() => onGo(practiceHref({ subtopic: rootChapter.id, track: 'cbse' }))}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
+            {rootChapter && <button className="btn btn-ghost" onClick={() => onGo(practiceHref({ subtopic: rootChapter.id, track: 'cbse' }))}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
             <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.seeResult')}</button>
           </>
         )}

@@ -39,7 +39,7 @@
 // Run on its own:  node client/test/tour-write-sign-in.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
@@ -234,6 +234,8 @@ export const saveTruthFlow = {
     // ── draw ─────────────────────────────────────────────────────────────────
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
     const settledFirst = await waitWorkState(page, SETTLED);
     const first = await saveTruth(page, qid);
@@ -312,6 +314,8 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'throw'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const failed = await waitWorkState(page, 'save-failed');
     const refused = await saveTruth(page, qid);
     const refusedLog = await statusLog(page);
@@ -341,6 +345,8 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'drop'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '3', { x: 240 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const caught = await waitWorkState(page, 'save-failed');
     const droppedLog = await statusLog(page);
     const dropped = await saveTruth(page, qid);
@@ -384,6 +390,8 @@ export const sessionEndedWriteFlow = {
     // ── a REAL reader outage, signed in ──────────────────────────────────────
     reader.down = true;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const retry = page.locator('[data-ink-retry-reading]');
     await retry.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const outage = await cardText(page);
@@ -402,6 +410,8 @@ export const sessionEndedWriteFlow = {
     const ended = endServerSession(online);
     const readsBefore = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     const recovery = page.locator('[data-ink-account-recovery]');
     const signIn = recovery.locator('[data-ink-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
@@ -427,13 +437,22 @@ export const sessionEndedWriteFlow = {
     // ── sign in again, on the card ───────────────────────────────────────────
     await signIn.click();
     await online.signInHere(recovery, { account });
-    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('[data-ink-account-recovery]'), null, { timeout: 30000 }).catch(() => {});
+    await settle();
+    await online.settled();
     await check('signed in again without leaving: same page, same question, same strokes, and the sign-in notice is gone',
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && new URL(page.url()).pathname === '/practice' &&
         await shownId(page) === qid && await mathText('.q-prompt') === prompt && await inkOnCanvas(page) === inkBefore &&
         await page.locator('[data-ink-account-recovery]').count() === 0, page.url());
-    await check(`the kept page is then read by itself and the transcript is shown, editable [${EVIDENCE}]`,
-      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length > readsBefore,
+    // Read on request (#440): signing in again reads nothing by itself; the
+    // kept page is read when the student presses Read my answer, once.
+    await check(`signing in again sends nothing to be read: the reader is not asked until the student presses Read my answer [${EVIDENCE}]`,
+      reader.requests.length === readsBefore && await page.locator('[data-ink-read]').first().isVisible().catch(() => false),
+      `${reader.requests.length - readsBefore} provider requests before the press`);
+    await pressRead(page);
+    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
+    await check(`on the press the kept page is read once and the transcript is shown, editable [${EVIDENCE}]`,
+      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length === readsBefore + 1,
       `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBefore} provider requests`);
     const right = await online.answerOf();
     if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
@@ -477,6 +496,8 @@ export const sessionEndedWriteFlow = {
     reader.text = '7';
     const readsBeforeSecond = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     await check(`the cleared page is rewritten and read again for the second try [${EVIDENCE}]`,
       await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '7' && reader.requests.length > readsBeforeSecond,
@@ -533,6 +554,10 @@ export const sessionEndedPhotoFlow = {
     const readsBefore = reader.requests.length;
     await page.getByRole('button', { name: /answer with a photo/i }).click();
     await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'working.png', mimeType: 'image/png', buffer: PNG });
+    // Attaching sends nothing (owner decision): the student asks for the read,
+    // and it is that request the server answers "signed out".
+    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.locator('[data-photo-read]').click().catch(() => {});
     const signIn = page.locator('[data-photo-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
@@ -554,11 +579,21 @@ export const sessionEndedPhotoFlow = {
     await signIn.click();
     await online.signInHere(page.locator('[data-photo-account-recovery]'), { account });
     const transcript = page.locator('[data-photo-correct-transcript]');
+    // Read on request (#440): signing in again reads nothing by itself; the
+    // same photo is read when the student asks, once.
+    const readPhoto = page.locator('[data-photo-read], [data-photo-retry-reading]').first();
+    await readPhoto.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await settle();
+    await online.settled();
+    await check(`signed in again in place: nothing is read by itself — the reader is not asked and no transcript appears until the student asks [${EVIDENCE}]`,
+      reader.requests.length === readsBefore && await transcript.count() === 0 && await readPhoto.isVisible().catch(() => false),
+      `${reader.requests.length - readsBefore} provider requests; transcript ${await transcript.count()}`);
+    await readPhoto.click().catch(() => {});
     await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check(`signed in again in place: same question, the SAME photo, now read by itself with an editable transcript [${EVIDENCE}]`,
+    await check(`then on the student's request: same question, the SAME photo, read once with an editable transcript [${EVIDENCE}]`,
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
         await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
-        await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && reader.requests.length > readsBefore,
+        await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && reader.requests.length === readsBefore + 1,
       `transcript ${JSON.stringify(await transcript.inputValue().catch(() => null))}`);
     const right = await online.answerOf();
     if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
@@ -593,6 +628,8 @@ export const sessionEndedSubmitFlow = {
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    // Read on request (#440): the student asks for the reading.
+    await pressRead(page);
     await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     const right = await online.answerOf();
     if (!await check(`signed in, the page is read and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,
@@ -617,12 +654,18 @@ export const sessionEndedSubmitFlow = {
         !/not quite|incorrect|not this time/i.test(seen) && !OUTAGE_WORDS.test(seen),
       seen.slice(0, 500));
     const signIn = page.locator('.verdict [data-check-sign-in]');
+    // The refused Submit keeps the page on the device first (sealed draft,
+    // confirmed by readback); the sign-in waits on that, so the line passes
+    // through "Saving…" before it settles — as in the photo flow.
+    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
     const held = await saveTruth(page, qid);
     await check('the work is held: same question, strokes on the page and in the store, the corrected reading still shown, sign-in button beside it',
       await shownId(page) === qid && await inkOnCanvas(page) === inkBefore && held.kept &&
         await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === right.text &&
         (await signIn.innerText().catch(() => '')).trim() === 'Sign in again to check this answer' && await signIn.isEnabled().catch(() => false),
-      JSON.stringify({ kept: held.kept, state: held.state, line: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) }));
+      JSON.stringify({ kept: held.kept, state: held.state, line: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null),
+        sameQuestion: await shownId(page) === qid, sameInk: await inkOnCanvas(page) === inkBefore,
+        signIn: (await signIn.innerText().catch(() => '')).trim(), signInEnabled: await signIn.isEnabled().catch(() => false) }));
 
     // ── sign in again on the card, press Submit ──────────────────────────────
     await signIn.click();
@@ -660,7 +703,7 @@ export const typedReloadFlow = {
     const answerBox = page.locator('.editor-body input.answer-input');
     const workingBox = page.locator('.editor-body textarea');
     let right = null;
-    for (let skips = 0; skips <= MAX_SKIPS && !right; skips++) {
+    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) { await typeTab.click(); await settle(); }
       if (await answerBox.count() === 1 && await page.locator('.editor-body .btn-disclose').count() === 1) {

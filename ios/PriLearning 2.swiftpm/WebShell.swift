@@ -124,6 +124,7 @@ struct WebShell: UIViewRepresentable {
         coordinator.detachBilling()
         coordinator.detachCloud()
         coordinator.detachHost()
+        coordinator.detachPageTone()
     }
 
     // MARK: - Coordinator
@@ -212,17 +213,26 @@ struct WebShell: UIViewRepresentable {
 
         private var themeColorObservation: NSKeyValueObservation?
         private var becameActiveObserver: NSObjectProtocol?
+        private var resignedActiveObserver: NSObjectProtocol?
 
         /// Reports the tone of the page's paper to ContentView, which sets the
         /// status bar's ink from it. The page states its paper as theme-color
         /// (client/src/lib/theme.js); WebKit exposes it as `themeColor`.
         func attachPageTone(to webView: WKWebView) {
             pinDeviceAppearance(webView)
+            watchDeviceAppearance(webView)
             becameActiveObserver = NotificationCenter.default.addObserver(
                 forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
             ) { [weak self, weak webView] _ in
-                guard let webView else { return }
-                self?.pinDeviceAppearance(webView)
+                guard let self, let webView else { return }
+                self.pinDeviceAppearance(webView)
+                self.watchDeviceAppearance(webView)
+            }
+            resignedActiveObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.willResignActiveNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                self?.deviceAppearanceWatch?.invalidate()
+                self?.deviceAppearanceWatch = nil
             }
             themeColorObservation = webView.observe(\.themeColor, options: [.initial, .new]) { webView, _ in
                 var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
@@ -240,10 +250,45 @@ struct WebShell: UIViewRepresentable {
         /// profile following the device would then follow the status bar, which
         /// follows the page — a loop that sticks on the first paper. The web
         /// view keeps the device's own appearance (the screen's, which no window
-        /// override reaches), refreshed whenever the app becomes active.
+        /// override reaches), refreshed whenever the app becomes active and,
+        /// while it is active, by watchDeviceAppearance.
         private func pinDeviceAppearance(_ webView: WKWebView) {
             let device = (webView.window?.windowScene?.screen ?? UIScreen.main).traitCollection.userInterfaceStyle
             if webView.overrideUserInterfaceStyle != device { webView.overrideUserInterfaceStyle = device }
+        }
+
+        private var deviceAppearanceWatch: Timer?
+
+        /// Undoes attachPageTone when SwiftUI takes the shell down.
+        func detachPageTone() {
+            deviceAppearanceWatch?.invalidate()
+            deviceAppearanceWatch = nil
+            themeColorObservation = nil
+            for observer in [becameActiveObserver, resignedActiveObserver].compactMap({ $0 }) {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            becameActiveObserver = nil
+            resignedActiveObserver = nil
+        }
+
+        /// The device can switch light/dark on its schedule while Pri stays in
+        /// the foreground (#533). Nothing in the shell is told: on iPhone,
+        /// preferredColorScheme (the status bar's ink) overrides the window
+        /// scene's appearance, so neither the scene nor any view in it sees the
+        /// device change, and the screen — the one place that does follow the
+        /// device — offers no change registration. So while Pri is active the
+        /// screen's appearance is looked at once a second and the web view is
+        /// re-pinned when it differs. Seen in the iOS 27 simulator: the scene
+        /// registration this replaces never fired. Stopped while inactive.
+        private func watchDeviceAppearance(_ webView: WKWebView) {
+            deviceAppearanceWatch?.invalidate()
+            let watch = Timer(timeInterval: 1, repeats: true) { [weak self, weak webView] timer in
+                guard let self, let webView else { timer.invalidate(); return }
+                self.pinDeviceAppearance(webView)
+            }
+            watch.tolerance = 0.5
+            RunLoop.main.add(watch, forMode: .common)
+            deviceAppearanceWatch = watch
         }
 
         /// Only `https://<signed cloud host>/account-action#…` is accepted, and it

@@ -40,6 +40,50 @@ def load_official(path: Path = DEFAULT_OFFICIAL):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+# Rights evidence (#395). Source metadata is not a licence: the book manifest
+# and the official-sources "owner-confirmed" flag say where a row came from,
+# not that Pri may redistribute it. Every publish row therefore carries its own
+# rights record, and anything missing or not cleared fails closed.
+RIGHTS_EVIDENCE_KINDS = {
+    "book": {"written-licence", "publisher-grant"},
+    "official": {"written-licence", "publisher-grant", "official-terms"},
+}
+RIGHTS_NON_PERSON_RE = re.compile(r"^(automated:|ai\b|claude|gpt|model)", re.I)
+
+
+def audit_rights(row, errors, kind):
+    rights = row.get("rights")
+    if not isinstance(rights, dict):
+        fail(errors, row, "publish record has no rights evidence (RIGHTS_REVIEW_REQUIRED)")
+        return
+    if rights.get("status") != "cleared":
+        fail(errors, row, f"rights status {rights.get('status')!r} is not 'cleared' (RIGHTS_REVIEW_REQUIRED)")
+    evidence = rights.get("evidence") or {}
+    if evidence.get("kind") not in RIGHTS_EVIDENCE_KINDS[kind]:
+        fail(errors, row, f"rights evidence kind {evidence.get('kind')!r} is not accepted for a {kind} source")
+    if not str(evidence.get("ref") or "").strip():
+        fail(errors, row, "rights evidence has no reference to the licence or terms document")
+    if not str(rights.get("grantor") or "").strip():
+        fail(errors, row, "rights record names no grantor")
+    scope = rights.get("scope")
+    if not isinstance(scope, list) or "redistribute-question" not in scope:
+        fail(errors, row, "rights scope does not cover redistributing the question")
+    elif row.get("steps") and "redistribute-solution" not in scope:
+        fail(errors, row, "rights scope does not cover the worked solution that would be shown")
+    if rights.get("translation") and "translate" not in (scope or []):
+        fail(errors, row, "translated/adapted row is outside the rights grant")
+    who, when = rights.get("recordedBy"), rights.get("recordedAt")
+    if not who or not when:
+        fail(errors, row, "rights record lacks who recorded it and when")
+    elif RIGHTS_NON_PERSON_RE.match(str(who)):
+        fail(errors, row, "rights evidence must be recorded by a person, not an automated reviewer")
+    else:
+        try:
+            datetime.fromisoformat(str(when).replace("Z", "+00:00"))
+        except ValueError:
+            fail(errors, row, "rights recordedAt is not ISO-8601")
+
+
 def audit(rows, manifest, publish=False, official=None):
     errors, warnings = [], []
     if official is None:
@@ -102,6 +146,7 @@ def audit(rows, manifest, publish=False, official=None):
         if publish and status != "approved":
             fail(errors, row, f"publish set contains status {status!r}")
         if publish:
+            audit_rights(row, errors, "book")
             if not target:
                 fail(errors, row, "approved publish record has no targetChapter")
             if exam.get("track") not in VALID_TRACKS:
@@ -270,6 +315,7 @@ def audit_official(row, manifest, official, publish, errors):
         fail(errors, row, f"publish set contains status {status!r}")
         return
     # Everything below is the publish gate for an approved official row.
+    audit_rights(row, errors, "official")
     if not doc.get("sha256") or src.get("sha256") != doc.get("sha256"):
         fail(errors, row, "official source is not pinned to the manifest sha256")
     licensing = official.get("licensing") or {}

@@ -21,6 +21,9 @@ import { assessFormulaLine, bareNumbers, chainDiagnosis, cleanLine, evaluateChai
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
+import { lostMarks, ruleKeyFor } from './lost-marks.js';
+
+export { lostMarks, ruleKeyFor };
 
 export { cleanInput, parseNumericInput };
 
@@ -2590,6 +2593,15 @@ const letterFree = claim => {
  * Returns null when nothing in the working could be verified; otherwise
  * { okLines, progressLines, awarded, note, report }.
  */
+/** `x = x`, `0 = 0`, `2(x+1) = 2(x+1)`: both sides written identically. */
+function tautology(text) {
+  const parts = String(text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '').split('=');
+  return parts.length >= 2 && parts.every(p => p && p === parts[0]);
+}
+function canonicalHasLetter(meta) {
+  try { return variablesOf(parse(String(meta.canonical ?? ''))).size > 0; } catch { return false; }
+}
+
 export function methodMarks(input = {}) {
   return withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input));
 }
@@ -2797,6 +2809,16 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       row.reason = 'restated'; return row;
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // A line whose two sides are written the same (`x = x`, `0 = 0`) is true
+    // of everything and moves nothing on, on any kind of question.
+    if (claim?.kind === 'equation' && tautology(l.text)) { row.reason = 'unrelated'; return row; }
+    // Simplifying an expression in a letter is work on that expression. A line
+    // with no letter in it (`10 - 10 = 0`, `2 + 2 = 4`) is arithmetic beside
+    // the method — it used to earn a mark whenever the simplified answer was
+    // 0, because `0 = 0` "reached" it.
+    if ((meta.kind === 'expression' || meta.kind === 'derivative') && claim && letterFree(claim) && canonicalHasLetter(meta)) {
+      row.reason = 'unrelated'; return row;
+    }
     // A verified line in another unknown of the question's system. Finding the
     // other unknown is part of solving the pair, and it earns at most two
     // marks, each once:
@@ -2979,5 +3001,7 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
     : restated
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
-  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, report: rep };
+  // Where each mark not awarded went (ledger 3.6): explanation only, never credit.
+  const lost = lostMarks(vector, allLines, meta);
+  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, lost, report: rep };
 }

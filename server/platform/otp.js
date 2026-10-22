@@ -24,7 +24,7 @@ import {
 } from './otpCore.js';
 import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv } from './otpEmail.js';
-import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
+import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
 import { deleteAccountRows, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
@@ -320,6 +320,9 @@ export function createOtpRouter(db, {
     } catch (error) { return sendError(res, error); }
   });
 
+  // Mailbox-only proof, unlike the in-app delete's password step-up: accepted
+  // risk R-22 (docs/security/accepted-risks.md). The mailbox can already reset
+  // the password, so this grants nothing the mailbox does not already have.
   router.post('/delete-confirm', rateLimit(db, 'otp-delete-confirm', { limit: 30, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
     try {
       const destination = normalizeEmail(req.body?.email);
@@ -481,7 +484,7 @@ export function createOtpRouter(db, {
   // What this establishes is a parent-controlled channel, nothing more (see
   // docs/release/otp-sign-in.md).
   router.post('/guardian/approve', rateLimit(db, 'otp-guardian-approve', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
-    if (req.body?.approve !== true || String(req.body?.noticeVersion || '') !== CONSENT_NOTICE_VERSION) {
+    if (!acceptsCurrentNotice(req.body)) {
       return bad(res, 'GUARDIAN_NOTICE_REQUIRED', 'Read and accept the current notice first.');
     }
     const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
@@ -501,7 +504,7 @@ export function createOtpRouter(db, {
     const row = await db.get('SELECT guardian_email, guardian_phone, withdrawn_at FROM guardian_consents WHERE account_id = ?', [live.account_id]);
     const named = row && (channel === 'sms' ? row.guardian_phone === destination : normalizeEmail(row.guardian_email) === destination);
     if (!named || row.withdrawn_at) return invalidCode(res);
-    const confirmed = await confirmConsent(db, live.account_id, now);
+    const confirmed = await confirmConsent(db, live.account_id, req.body.noticeVersion, now);
     const child = await db.get('SELECT name FROM accounts WHERE id = ?', [live.account_id]);
     res.json({ ok: true, confirmed, childName: child?.name || null });
   });

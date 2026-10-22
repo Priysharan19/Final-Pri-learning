@@ -9,7 +9,8 @@
 // one still passes the same gate before anything opens.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
@@ -17,6 +18,10 @@ import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
+
+// The instrument build's sign-in carries a decorative plot panel (design s10);
+// the flag-off build never loads it.
+const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -556,6 +561,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     return (
       <div className="auth-wrap">
         <MathField />
+        {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         <div className="auth-col fade-in">
           <Logo large />
           {atStart && (
@@ -587,8 +593,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
               <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-                <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
-                <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
+                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
+                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink>
               </p>
             </>
           )}

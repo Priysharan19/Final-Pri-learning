@@ -16,8 +16,11 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
-import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
+import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
+import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
+import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
+import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
+import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
@@ -27,6 +30,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
 import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import { markRowsFor } from './markRows.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
@@ -39,6 +43,7 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // entitlement record and its own count, inside the issue transaction.
 import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
+import { verifyReadReceipt } from './readReceipt.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -99,7 +104,7 @@ const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transc
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
 const RECOGNIZE_LIMIT = Object.freeze({ limit: 120, windowMs: 60 * 60 * 1000 });
-const RECOGNITION_FIELDS = new Set(['image', 'mode']);
+const RECOGNITION_FIELDS = new Set(['image', 'mode', 'receipt', 'text']);
 const CORRECTION_FIELDS = new Set(['text']);
 const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
 
@@ -450,6 +455,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
+      q._generator = sealed.g;
       preparedNonce = sealed.n;
       preparedExpiry = sealed.x;
     } else {
@@ -467,6 +473,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       try { ({ q, repeat, trapDelivered } = chooseQuestion(request, seed)); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
+      q._generator = request.generator;
     }
     // Optional issue idempotency: normal practice may request a fresh question;
     // network retries can opt into the same server question with a stable key.
@@ -586,7 +593,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const qid = String(req.params.id || '');
     const body = req.body;
     if (!UUID.test(qid) || !plain(body) || unknown(body, RECOGNITION_FIELDS).length ||
-        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string') {
+        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string' ||
+        (body.receipt !== undefined && typeof body.receipt !== 'string') || (body.text !== undefined && !limitedText(body.text, 12000))) {
       return reject(res, 400, 'RECOGNITION_INVALID', 'Send only an ink/photo image and its input mode.');
     }
     const accountId = req.platformSession.account_id;
@@ -606,9 +614,25 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     let result;
     let reused = false;
     try {
-      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
-      if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
-      ({ result, reused } = read);
+      // Submit is not a request to read. This route never starts a provider
+      // call: it binds the transcript the student was already shown (the kept
+      // read, or one still in flight). When that read is gone the answer is a
+      // named, retryable refusal and the student presses Read again.
+      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+      if (read.missing) {
+        // The 15-minute kept read is gone. The student was given a read
+        // receipt when they had the page read (readReceipt.js): if it
+        // verifies — this account, this question, this picture, this reader,
+        // this text, recent enough — the read is proven and marking proceeds
+        // on the text they were shown. Otherwise: read again. Never a call.
+        const proven = verifyReadReceipt(body.receipt, { accountId, questionId: qid, image: body.image, text: body.text, env });
+        if (!proven.ok) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
+        result = { text: body.text, lines: [], confidence: null, needsConfirmation: proven.needsConfirmation };
+        reused = true;
+      } else {
+        if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+        ({ result, reused } = read);
+      }
     } catch (error) {
       if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
       return reject(res, 502, 'RECOGNITION_FAILED', 'The answer could not be read this time.');
@@ -687,48 +711,117 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return res.status(201).json({ receipt: outcome.receipt, questionId: qid, mode: outcome.mode, corrected: true });
   });
 
+  // ── Reveal, and the hint ladder's last rung ─────────────────────────────
+  // Both end the question as REVEALED: resolved, not correct, no marks. Called
+  // inside the account's transaction. A second call replays the first reply.
+  async function commitReveal(accountId, qid, now, viaHint = false) {
+    const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-reveal' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (prior) return { response: JSON.parse(prior.response_json) };
+    const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (!escrow) return { status: 404, code: 'QUESTION_NOT_FOUND' };
+    const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
+    if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
+    const q = JSON.parse(escrow.response_json);
+    // Decided now, not only at issue: copies issued before the first of them
+    // was resolved are repeats the moment its solution has been shown.
+    if (await contentSeen(db, accountId, q, now)) q._repeat = true;
+    await markContentSeen(db, accountId, q, now);
+    const ladder = ladderEvidence(viaHint ? HINT_RUNGS.length : await hintLevelOf(accountId, qid));
+    const attemptId = randomUUID();
+    const response = { authoritative: true, revealed: true, resolved: true, correct: false,
+      marksEarned: 0, marksPossible: marksPossibleFor(q), creditedMarks: 0,
+      hintLevel: ladder.hintLevel, markWeight: 0,
+      questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
+      ...(q._repeat === true ? { repeat: true } : {}) };
+    const hash = digest({ qid, operation: 'reveal' });
+    for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
+      await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
+        [accountId, scope, qid, JSON.stringify(value), hash, now, now + MAX_AGE]);
+    }
+    if (!recordsProgress(q)) return { response };
+    const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
+    const cursor = await nextSyncCursor(db, accountId);
+    await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
+      [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
+        revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
+        ...(q._repeat === true ? { repeat: true } : {}),
+        contentId: opaqueContentId(q.contentId),
+        subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
+        dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
+        mode: q._practiceMode || 'practice', hintsUsed: Math.max(1, ladder.hintHelpUnits), support: 'supported',
+        ...ladder, markWeight: 0, creditedMarks: 0,
+        createdAt: now, serverAcknowledgedAt: now }), now]);
+    return { response };
+  }
+
+  // The rungs this account has opened on this question (0–4), as committed.
+  async function hintLevelOf(accountId, qid) {
+    const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-hints' AND key=?", [accountId, qid]);
+    if (!row) return 0;
+    try { return rungLevelOf(JSON.parse(row.response_json).level); } catch { return 0; }
+  }
+
   router.post('/:id/reveal', rateLimit(db, 'practice-reveal', { limit: 120, windowMs: 3600000 }), async (req, res) => {
     const qid = String(req.params.id || '');
     if (!UUID.test(qid) || !plain(req.body ?? {}) || Object.keys(req.body ?? {}).length)
       return reject(res, 400, 'PRACTICE_REVEAL_INVALID', 'Invalid question reveal request.');
     const accountId = req.platformSession.account_id;
     const now = Date.now();
+    const result = await db.transaction(() => commitReveal(accountId, qid, now), { accountScope: accountId, lock: syncLockKey(accountId) });
+    if (result.status) return reject(res, result.status, result.code, 'The question is unavailable or already resolved.');
+    return res.status(200).json(result.response);
+  });
+
+  // ── The hint ladder (engine/hintLadder.js) ───────────────────────────────
+  // nudge → method → worked step → full solution, strictly in order, served
+  // from the server's escrowed question and charged HERE, in the account's
+  // transaction, the moment a rung is served. The charge is the committed
+  // level: a device cannot skip a rung (409 HINT_RUNG_ORDER), cannot lower
+  // it (asking for an opened rung again re-serves it and charges nothing
+  // more), and the submission commit reads the level under the same lock, so
+  // a correct answer is credited with the weight left after the rungs
+  // actually served. The solution rung is a reveal: the question resolves as
+  // revealed, never correct. Another account's question is 404.
+  router.post('/:id/hint', rateLimit(db, 'practice-hint', { limit: 400, windowMs: 3600000 }), async (req, res) => {
+    const qid = String(req.params.id || '');
+    const body = req.body ?? {};
+    if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    if (!plain(body) || unknown(body, new Set(['rung'])).length || !HINT_RUNGS.includes(body.rung)) {
+      return reject(res, 400, 'HINT_RUNG_INVALID', 'Choose a hint rung: nudge, method, worked or solution.');
+    }
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const want = HINT_RUNGS.indexOf(body.rung) + 1;
     const result = await db.transaction(async () => {
-      const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-reveal' AND key=? AND expires_at>?", [accountId, qid, now]);
-      if (prior) return { response: JSON.parse(prior.response_json) };
       const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
       if (!escrow) return { status: 404, code: 'QUESTION_NOT_FOUND' };
       const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
       if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       const q = JSON.parse(escrow.response_json);
-      // Decided now, not only at issue: copies issued before the first of them
-      // was resolved are repeats the moment its solution has been shown.
-      if (await contentSeen(db, accountId, q, now)) q._repeat = true;
-      await markContentSeen(db, accountId, q, now);
-      const attemptId = randomUUID();
-      const response = { authoritative: true, revealed: true, resolved: true, correct: false,
-        marksEarned: 0, marksPossible: marksPossibleFor(q),
-        questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
-        ...(q._repeat === true ? { repeat: true } : {}) };
-      const hash = digest({ qid, operation: 'reveal' });
-      for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
-        await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
-          [accountId, scope, qid, JSON.stringify(value), hash, now, now + MAX_AGE]);
+      if (ONE_TRY_MODES.includes(q._practiceMode) || !ladderAvailable(q)) return { status: 409, code: 'HINT_NOT_AVAILABLE' };
+      const level = await hintLevelOf(accountId, qid);
+      if (want > level + 1) return { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(level) };
+      const reached = Math.max(level, want);
+      if (reached > level) {
+        await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-hints',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
+          [accountId, qid, JSON.stringify({ level: reached, rungs: HINT_RUNGS.slice(0, reached), at: now }), digest({ qid, level: reached }), now, now + MAX_AGE]);
       }
-      if (!recordsProgress(q)) return { response };
-      const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
-      const cursor = await nextSyncCursor(db, accountId);
-      await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
-        [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
-          revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
-          ...(q._repeat === true ? { repeat: true } : {}),
-          contentId: opaqueContentId(q.contentId),
-          subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
-          mode: q._practiceMode || 'practice', hintsUsed: 1, support: 'supported',
-          createdAt: now, serverAcknowledgedAt: now }), now]);
-      return { response };
+      if (body.rung === 'solution') {
+        const revealed = await commitReveal(accountId, qid, now, true);
+        if (revealed.status) return revealed;
+        return { response: { ...revealed.response, rung: 'solution', level: HINT_RUNGS.length, remaining: 0, endsQuestion: true } };
+      }
+      const rung = buildHintLadder(q)[want - 1];
+      return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
+        hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
+        markWeight: markWeightAfter(reached), next: nextRungAfter(reached) } };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
-    if (result.status) return reject(res, result.status, result.code, 'The question is unavailable or already resolved.');
+    if (result.status) {
+      const message = result.code === 'HINT_RUNG_ORDER' ? 'Open the hint rungs in order.'
+        : result.code === 'HINT_NOT_AVAILABLE' ? 'This question offers no hints.'
+          : result.status === 404 ? 'This question does not belong to this account.' : 'This question has been completed.';
+      return res.status(result.status).json({ error: { code: result.code, message }, ...(result.next ? { next: result.next } : {}) });
+    }
     return res.status(200).json(result.response);
   });
 
@@ -760,10 +853,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // instead of a receipt, and this one request does what the three did, in
     // the same order and under the same checks:
     //
-    //   · the picture is read through recognitionOps — the transcript the
-    //     student was just shown is reused, so Submit never pays for a second
-    //     read of an unchanged picture; a picture not read before (a photo) is
-    //     read once, under the same allowance and ceiling;
+    //   · the picture's reading comes from recognitionOps — only the
+    //     transcript the student asked for and was shown is reused; a picture
+    //     never read is refused (RECOGNITION_READ_EXPIRED) and nothing is
+    //     paid for or marked (#440: Submit never buys a read);
     //   · the reader is sent the picture and nothing else. The answer in this
     //     body, the question, its solution and its key never reach it: reading
     //     stays answer-blind (handwritingProvider.js);
@@ -870,7 +963,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // already resolved is a repeat, which earns nothing and keeps its own
       // two tries.
       const spent = tries >= 1 || (q._repeat !== true && known.has(triedKey));
-      return { sealedJson: sealed.response_json, q, priorTry, tries, spent };
+      // The hint rungs served so far, as the server charged them.
+      const hintLevel = await hintLevelOf(accountId, qid);
+      return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel };
     };
     const refuse = outcome => reject(res, outcome.status, outcome.code,
       outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.'
@@ -911,7 +1006,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         let read;
         try {
-          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+          // Read on request (#440): Submit never buys a read. Only a reading the
+          // student asked for (Read my answer / Read my photo) is replayed; a
+          // picture never read is refused before anything is marked.
+          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+          if (read.missing) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
           if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
         } catch (error) {
           if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
@@ -997,7 +1096,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const state = await gate();
         if (state.status || state.response) return state;
         if (state.sealedJson !== forecast.sealedJson) return { again: true };
-        const { q, priorTry, tries, spent } = state;
+        const { q, priorTry, tries, spent, hintLevel } = state;
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
       // correctness from a withheld canonical answer.
@@ -1062,9 +1161,30 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
       const said = !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback;
       const attemptId = randomUUID();
+      // The hint ladder's charge, from the level committed under this lock.
+      // `marksEarned` stays the deterministic engine's mark; `creditedMarks`
+      // is that mark times the weight the served rungs left.
+      const ladder = ladderEvidence(hintLevel);
+      const creditedMarks = Math.round(marksEarned * ladder.markWeight * 100) / 100;
+      // What the error notebook may file a wrong resolution under: only what
+      // the deterministic engine diagnosed — the authored trap its feedback
+      // matched, or a high-confidence Step Check diagnosis. Nothing is
+      // inferred, and a slip that names neither is not filed.
+      let misconception = null;
+      if (resolved && !result.correct && !invalid) {
+        if (trapWhy) misconception = { id: misconceptionIdForTrap(q.subtopic, trapWhy), source: 'trap', label: misconceptionLabel(trapWhy) };
+        else {
+          const diagnosis = evidence?.stepReport?.diagnosis;
+          const id = diagnosis && diagnosis.confidence === 'high' && diagnosis.code !== 'counterexample' ? misconceptionIdForDiagnosis(diagnosis) : null;
+          if (id) misconception = { id, source: 'step', label: misconceptionLabel(diagnosis.title || '') || null };
+        }
+      }
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
+        // An open try's reply keeps its fixed, silent shape; the ladder's
+        // charge is stated by the reply that resolves the question.
+        ...(resolved ? { hintLevel: ladder.hintLevel, markWeight: ladder.markWeight, creditedMarks } : {}),
         triesLeft: resolved ? 0 : 1,
         feedback: said + (notRead ? (said ? ' ' : '') + WORKING_NOT_READ_NOTE : ''), trapWhy,
         ...(notRead ? { workingNotRead: true } : {}),
@@ -1075,6 +1195,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
           solution: solutionFor(q),
+          // Supplemental aggregate marking: no per-step allocations are invented.
+          ...(!invalid ? { markRows: markRowsFor(q, {
+            marksEarned, marksPossible, creditedMarks, attemptId, submissionId,
+            correct: result.correct === true,
+            partial, workingNotRead: notRead, resolved
+          }) } : {}),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these
           // server-attested authored distractor explanations, not from an answer key.
@@ -1129,11 +1255,17 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             ...(q._repeat === true ? { repeat: true } : {}),
             contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
+            dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
             mode: q._practiceMode || 'practice', inputMode: mode,
-            // Assistance is currently client-observed, not server-certified. Until
-            // hints/tutor levels are server-committed, restored progress must not
-            // claim independent mastery for a result whose help is unknown.
-            hintsUsed: 1, support: 'supported', createdAt: now,
+            // Hint rungs are now server-committed (`hintLevel`, `hintRungs`,
+            // `markWeight`, `creditedMarks`); tutor levels are still
+            // client-observed, so restored progress must not claim independent
+            // mastery for a result whose help is unknown.
+            hintsUsed: Math.max(1, ladder.hintHelpUnits), support: 'supported',
+            ...ladder, creditedMarks,
+            ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
+              ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),
+            createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
       } else if (!invalid) {
@@ -1150,6 +1282,124 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // The question kept changing under three attempts to commit one mark.
     // Nothing was written; the same submission key retries safely.
     return sendMarkerBusy(res);
+  });
+
+  // ── The error notebook ──────────────────────────────────────────────────
+  // Wrong resolutions of THIS account's server-marked practice, filed under
+  // the misconception the deterministic engine diagnosed when it committed
+  // the mark (`misconception` on the graded-attempt event). A wrong answer the
+  // engine named no misconception for is not filed: nothing is inferred here.
+  // Each filed entry is a hypothesis about a slip, not a verdict on the
+  // student (docs/research/MISCONCEPTION_ERROR_ONTOLOGY_DIAGNOSTIC_EVIDENCE_V7.md §4).
+  const NOTEBOOK_SCAN = 1000;
+  const NOTEBOOK_GROUPS = 40;
+  const NOTEBOOK_ITEMS = 12;
+  const NOTEBOOK_MODES = new Set(['practice', 'review', 'task']);
+  const serverAttempts = async (accountId, limit) => (await db.all(
+    "SELECT id,occurred_at,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' ORDER BY server_cursor DESC LIMIT ?",
+    [accountId, limit])).map(row => { try { return { id: row.id, at: Number(row.occurred_at), ...JSON.parse(row.payload_json) }; } catch { return null; } }).filter(Boolean);
+  const filed = a => a.correct !== true && a.revealed !== true && typeof a.misconception === 'string' && a.misconception &&
+    NOTEBOOK_MODES.has(a.mode || 'practice') && typeof a.subtopic === 'string' && a.subtopic;
+
+  router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const groups = new Map();
+    for (const a of await serverAttempts(accountId, NOTEBOOK_SCAN)) {
+      if (!filed(a)) continue;
+      const g = groups.get(a.misconception) || (groups.size < NOTEBOOK_GROUPS ? groups.set(a.misconception, {
+        key: a.misconception, misconception: { id: a.misconception, nameKey: misconceptionById(a.misconception)?.name || null,
+          label: a.misconceptionLabel || null, source: a.misconceptionSource || null },
+        subtopics: [], count: 0, lastAt: 0, items: [] }).get(a.misconception) : null);
+      if (!g) continue;
+      g.count++;
+      g.lastAt = Math.max(g.lastAt, a.at);
+      if (!g.subtopics.includes(a.subtopic)) g.subtopics.push(a.subtopic);
+      if (g.items.length < NOTEBOOK_ITEMS) g.items.push({ id: a.id, questionId: a.questionId, subtopic: a.subtopic,
+        dotpoint: a.dotpoint || null, difficulty: Number(a.difficulty) || 2, answeredAt: a.at });
+    }
+    // The prompt of a resolved question is the student's own history; it is
+    // read from this account's escrow and is gone once that has expired.
+    for (const g of groups.values()) {
+      for (const item of g.items) {
+        const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
+          [accountId, item.questionId, now]);
+        let q = null;
+        try { q = sealed ? JSON.parse(sealed.response_json) : null; } catch { q = null; }
+        item.prompt = q ? String(q.prompt || '') : null;
+        item.canTwin = !!q && !q.multipart && !q.custom;
+      }
+    }
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt) });
+  });
+
+  // A twin: a NEW server-chosen question from the same generator, at the same
+  // difficulty, on the same dot point, avoiding the original content, and
+  // drawn where it can be to spring the same misconception. It is issued and
+  // escrowed like any question and marked like any question. The entry must be
+  // one of this account's filed attempts: anything else is 404.
+  router.post('/notebook/:attemptId/twin', rateLimit(db, 'practice-twin', { limit: 120, windowMs: 3600000 }), async (req, res) => {
+    const attemptId = String(req.params.attemptId || '');
+    if (!UUID.test(attemptId)) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    if (req.body !== undefined && (!plain(req.body) || Object.keys(req.body).length)) {
+      return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A twin takes no parameters.');
+    }
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const row = await db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='graded-attempt'", [accountId, attemptId]);
+    let attempt = null;
+    try { attempt = row ? JSON.parse(row.payload_json) : null; } catch { attempt = null; }
+    if (!attempt || !filed(attempt)) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, attempt.questionId, now]);
+    if (!sealed) return reject(res, 410, 'NOTEBOOK_TWIN_EXPIRED', 'The original question is no longer held, so no twin can be drawn.');
+    const original = JSON.parse(sealed.response_json);
+    if (original.multipart || original.custom) return reject(res, 409, 'NOTEBOOK_TWIN_UNAVAILABLE', 'This question has no generated twin.');
+    await ensureBanks();
+    const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
+    let chosen;
+    try {
+      chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
+        dotpoint: typeof original.dotpoint === 'string' ? original.dotpoint : undefined,
+        avoid: new Set([opaqueContentHash(original.contentHash)]),
+        trap: { owner: original.subtopic, key: attempt.misconception } });
+    } catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+    const q = chosen.q;
+    q._practiceMode = 'review';
+    q._generator = generator;
+    let repeat = chosen.repeat;
+    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    const trySpent = !repeat && await contentTried(db, accountId, q, now);
+    const payload = JSON.stringify(q);
+    const id = randomUUID();
+    await db.transaction(async () => {
+      await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
+        [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+    }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
+      twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
+        sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
+      ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
+  });
+
+  // ── The spaced review queue, per dot point ──────────────────────────────
+  // Derived from this account's server-graded attempts by the shared pure
+  // engine (engine/reviewQueue.js): the chapter's FSRS state replayed from the
+  // same grades the device uses, and each dot point's own attempts. Nothing
+  // is stored: a review done is the next graded attempt.
+  router.get('/review-queue', rateLimit(db, 'practice-review-queue', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const attempts = (await serverAttempts(accountId, 4000))
+      .filter(a => a.mode !== 'placement' && typeof a.subtopic === 'string' && a.subtopic)
+      .map(a => ({ subtopic: a.subtopic, dotpoint: a.dotpoint || null, correct: a.correct === true, revealed: a.revealed === true,
+        hintsUsed: rungLevelOf(a.hintLevel), difficulty: Number(a.difficulty) || 2, at: a.at }));
+    const { ratings, reviews } = reviewStateFromAttempts(attempts);
+    const queue = dueDotpoints({ ratings, reviews, now });
+    const pick = r => ({ subtopic: r.subtopic, dotpoint: r.dotpoint, attempts: r.attempts, correct: r.correct,
+      lastAt: r.lastAt, recall: r.recall, target: r.target, dueAt: r.dueAt, overdueDays: r.overdueDays });
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ due: queue.due.map(pick), upcoming: queue.upcoming.map(pick), dueCount: queue.dueCount, counted: queue.counted, at: now });
   });
 
   return router;

@@ -293,7 +293,7 @@ async function enrol(http, dbPath, label, tinyImage) {
   const verify = await http('/v1/account/email/verify', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'verify-email') } });
   if (verify.status !== 200) throw new Error(`verify email ${label}: ${verify.status} ${verify.code}`);
   if (tinyImage) gates.verifiedNoConsent = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tinyImage } });
-  const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'guardian-consent') } });
+  const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'guardian-consent'), approve: true, noticeVersion: '2026-10-22' } });
   if (consent.status !== 200 || consent.data?.confirmed !== true) throw new Error(`guardian confirm ${label}: ${consent.status} ${consent.code}`);
   const state = await http('/v1/account/guardian/state', { jar });
   return { jar, accountId, gates, consentState: state.data?.state ?? null, ageBasis: state.data?.ageBasis ?? null };
@@ -408,8 +408,11 @@ try {
   // ── Answer-blindness at the route (no provider call is made by a refusal) ──
   const leak = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, expectedAnswer: '24' } });
   expect('blind', 'a transcribe body that names an answer is refused (400 HANDWRITING_NOT_ANSWER_BLIND)', leak.status === 400 && leak.code === 'HANDWRITING_NOT_ANSWER_BLIND', `${leak.status} ${leak.code}`);
-  const leak2 = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, questionId: 'anything' } });
-  expect('blind', 'a transcribe body that names a question is refused (400)', leak2.status === 400, `${leak2.status} ${leak2.code}`);
+  // Question CONTENT is what must never reach the reader; `questionId` is an
+  // allowed binding for the read receipt (server/platform/handwriting.js), so
+  // probing with it would pass for the wrong reason.
+  const leak2 = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, question: 'What is 2 + 2?' } });
+  expect('blind', 'a transcribe body that carries the question text is refused (400 HANDWRITING_NOT_ANSWER_BLIND)', leak2.status === 400 && leak2.code === 'HANDWRITING_NOT_ANSWER_BLIND', `${leak2.status} ${leak2.code}`);
 
   // ── Questions: issued by the server, which chooses the seed ────────────────
   const PROMPT = /first term \$(-?\d+)\$ and common difference \$(-?\d+)\$, which term is equal to \$(-?\d+)\$\? Give the term number\./;

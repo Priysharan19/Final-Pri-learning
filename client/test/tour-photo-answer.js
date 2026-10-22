@@ -40,12 +40,21 @@
 //
 // Run on its own:  node client/test/tour-photo-answer.js [--browser=webkit]
 // ─────────────────────────────────────────────────────────────────────────────
+import { deflateSync } from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+// A second, different picture (a 2×1 grey image, built here), for replacing the first.
+const PNG2 = (() => {
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = buf => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const body = Buffer.concat([Buffer.from(type), data]); const sum = Buffer.alloc(4); sum.writeUInt32BE(crc(body)); return Buffer.concat([len, body, sum]); };
+  const header = Buffer.alloc(13); header.writeUInt32BE(2, 0); header.writeUInt32BE(1, 4); header[8] = 8; header[9] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header), chunk('IDAT', deflateSync(Buffer.from([0, 90, 200]))), chunk('IEND', Buffer.alloc(0))]);
+})();
 const OWNER = { generator: 'c11-relations-functions', difficulty: 3, seed: 301 };
 const OWNER_PROMPT = /least value taken by the real function/i;
 // What the app showed the owner: every line of the page, the inequalities strict.
@@ -91,7 +100,13 @@ const lineState = page => page.evaluate(() => [...document.querySelectorAll('[da
 })));
 
 /** The page's own issue request, answered by the real server binding the desk's sealed token. */
-async function serveOwnersQuestion(ctx, online, accountId) {
+// Installed before the profile exists. Creating and signing in the profile
+// lands on /practice, which issues a question at once for the default topic;
+// when that topic was the owner's subtopic, the later /practice?subtopic= visit
+// reused it and sent no new issue, so a route installed after sign-in never
+// steered it (about 1 run in 5, on main too). The account is read from the
+// request itself (the client names the linked account), else the session.
+async function serveOwnersQuestion(ctx, online) {
   const { encryptDeliveryToken } = await import('../../server/platform/deliveryCrypto.js');
   await ctx.route('**/v1/practice/issue', async route => {
     let body = null;
@@ -103,6 +118,8 @@ async function serveOwnersQuestion(ctx, online, accountId) {
     const prepared = encryptDeliveryToken(JSON.stringify({
       g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID()
     }), 'practice-prepared-v1');
+    const accountId = body?.account ?? online.account?.id;
+    if (!accountId) return route.continue();
     const response = await route.fetch({ postData: JSON.stringify({ prepared, account: String(accountId) }) });
     return route.fulfill({ response });
   });
@@ -118,13 +135,13 @@ export const ownerPageFlow = {
     const { reader } = online;
     try {
       reader.lines = OWNER_TRANSCRIPT; reader.confidence = 0.88; reader.down = false;
+      await serveOwnersQuestion(ctx, online);
       await goto('/');
       await createProfile({ name: 'Photo Page', course: 'in', year: 11 });
       const account = await online.signIn({ name: 'Photo Page' });
       // Let the account panel's own requests finish before leaving Settings:
       // WebKit reports a fetch cut off by a navigation as a page error.
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await serveOwnersQuestion(ctx, online, account.id);
       await page.goto(`${base}/practice?subtopic=${OWNER.generator}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
       const prompt = await mathText('.q-prompt');
@@ -145,7 +162,32 @@ export const ownerPageFlow = {
       // ── the photo is attached and read ─────────────────────────────────────
       await page.getByRole('button', { name: /answer with a photo/i }).click();
       await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: PNG });
+      // Attaching is not asking for a read (owner decision): the photo is
+      // previewed and kept; nothing is sent until "Read my photo" is pressed.
+      const readMine = page.locator('[data-photo-read]');
+      await readMine.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      const pageReads = () => online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/);
+      const pageReadsBefore = (await pageReads()).length;
+      const hint = (await page.locator('[data-photo-unread]').innerText().catch(() => '')).replace(/\s+/g, ' ');
+      await check(`attach only: 0 provider calls — the photo is previewed with "Read my photo", and the page says truthfully when it is sent to the AI reading service [${EVIDENCE}]`,
+        reader.requests.length === readsBefore && await readMine.isVisible() && /^data:image\//.test(await page.locator('.photo-thumb img').getAttribute('src').catch(() => '') || '') &&
+          await page.locator('[data-photo-lines]').count() === 0 && /has not been sent anywhere/.test(hint) && /sent once to Pri’s AI reading service/.test(hint) &&
+          await page.locator('.ws-actions .btn-primary').isDisabled(),
+        `provider +${reader.requests.length - readsBefore}; hint ${JSON.stringify(hint)}`);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await readMine.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(1500);
+      await check(`attach, then reload: 0 provider calls — the same photo is back, still unread, with "Read my photo" [${EVIDENCE}]`,
+        reader.requests.length === readsBefore && await readMine.isVisible() && await shownId(page) === qid && await page.locator('[data-photo-lines]').count() === 0,
+        `provider +${reader.requests.length - readsBefore}`);
+      // An impatient double press: one read.
+      await page.evaluate(() => { const b = document.querySelector('[data-photo-read]'); b.click(); b.click(); });
       await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      await check(`Read my photo, pressed twice in one moment: exactly 1 provider call and 1 page request [${EVIDENCE}]`,
+        reader.requests.length === readsBefore + 1 && (await pageReads()).length === pageReadsBefore + 1, `provider +${reader.requests.length - readsBefore}; page requests +${(await pageReads()).length - pageReadsBefore}`);
       const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
       const sent = reader.requests.slice(readsBefore);
       await check(`the photo is read once, answer-blind: one request, one picture, nothing of the question [${EVIDENCE}]`,
@@ -273,10 +315,25 @@ async function webkitGeneric({ page, check, mathText, online, reader, account, p
   const readsBefore = reader.requests.length;
   await page.getByRole('button', { name: /answer with a photo/i }).click();
   await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: PNG });
+  await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  await page.locator('[data-photo-read]').click();
   await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  // Replacing the photo drops its reading; the new photo is not read until asked.
+  {
+    const afterFirstRead = reader.requests.length;
+    await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page-2.png', mimeType: 'image/png', buffer: PNG2 });
+    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    await check(`replace the photo: the previous reading is gone and 0 provider calls are made until "Read my photo" is pressed [${EVIDENCE}]`,
+      reader.requests.length === afterFirstRead && await page.locator('[data-photo-lines]').count() === 0 && await page.locator('[data-photo-read]').isVisible() &&
+        await page.locator('.ws-actions .btn-primary').isDisabled(), `provider +${reader.requests.length - afterFirstRead}`);
+    await page.locator('[data-photo-read]').click();
+    await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await check(`and the replacement is read once when asked: 1 provider call [${EVIDENCE}]`, reader.requests.length === afterFirstRead + 1, `provider +${reader.requests.length - afterFirstRead}`);
+  }
   let lines = await lineState(page);
-  await check(`the photo is read once and every line is on screen, strict signs as returned [${EVIDENCE}]`,
-    reader.requests.length === readsBefore + 1 && lines.length === 9 && lines[6].text === '(x+3)² > 0' && lines[8].text === 'least value ⇒ 6.', JSON.stringify(lines.map(l => l.text)));
+  await check(`each photo was read once when asked (two photos, two calls) and every line is on screen, strict signs as returned [${EVIDENCE}]`,
+    reader.requests.length === readsBefore + 2 && lines.length === 9 && lines[6].text === '(x+3)² > 0' && lines[8].text === 'least value ⇒ 6.', JSON.stringify(lines.map(l => l.text)));
   await check('the doubted line says "Check this line" as a doubt about the reading', lines[6].check && /reader was not sure \(≥ or >\)/.test(lines[6].note), JSON.stringify(lines[6]));
   const answerField = page.locator('[data-final-answer]');
   await check('the answer field holds "6", not the sentence', await answerField.inputValue() === '6', JSON.stringify(await answerField.inputValue()));
@@ -354,12 +411,14 @@ export const usageLimitFlow = {
 
       // ── first read: inside the ceiling ─────────────────────────────────────
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
-      await check(`the first read works: one request, and the reading is shown [${EVIDENCE}]`,
+      await pressRead(page);
+      await check(`the first read works: one press, one request, and the reading is shown [${EVIDENCE}]`,
         await until(page, async () => await page.locator('.ink-preview .ink-line').count() === 1, 20000) && transcribes.length === 1 && refusals.length === 0,
         `${transcribes.length} request(s), ${refusals.length} refusal(s)`);
 
       // ── second read: the server's ceiling ──────────────────────────────────
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '1', { x: 160 });
+      await pressRead(page);     // "Read again" for the changed page
       const inkStatus = page.locator('.ink-status-line');
       await check('the second read is refused by the server\'s own ceiling: 503 PAID_CAPACITY_REACHED, with when it resets',
         await until(page, async () => refusals.length === 1, 20000) && refusals[0].body?.error?.code === 'PAID_CAPACITY_REACHED' &&
@@ -381,8 +440,8 @@ export const usageLimitFlow = {
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '1', { x: 280 });   // more writing must not re-send either
       await page.evaluate(() => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
       await page.waitForTimeout(5500);
-      await check('over ten seconds — with more writing and a return to the tab — not one more read is sent',
-        transcribes.length === sentAtRefusal && sentAtRefusal === 2, `${transcribes.length - sentAtRefusal} extra request(s); ${transcribes.length} in all`);
+      await check('over ten seconds — with more writing and a return to the tab — not one more read is sent, and no "Read again" is offered against a limit that has not lifted',
+        transcribes.length === sentAtRefusal && sentAtRefusal === 2 && await page.locator('[data-ink-read]').count() === 0, `${transcribes.length - sentAtRefusal} extra request(s); ${transcribes.length} in all`);
       await check('and the page still says usage limit, not "reading" and not a wrong answer',
         /usage limit/.test(await inkStatus.innerText()) && await page.locator('.verdict-bad').count() === 0);
 

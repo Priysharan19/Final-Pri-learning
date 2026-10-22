@@ -50,7 +50,7 @@ run() {
   local target="$1" method="${1##*#}" log; shift
   [[ "$target" == *.* ]] || target="$CLASS#$target"
   log="$OUT/$method.txt"
-  adb shell am instrument -w -r -e class "$target" -e priExpect "$EXPECT" "$@" "$RUNNER" | tee "$log"
+  adb shell am instrument -w -r -e class "$target" -e priExpect "$EXPECT" ${PRI_STORE_SHOTS:+-e priShots 1} "$@" "$RUNNER" | tee "$log"
   # am instrument exits 0 even when a test fails: decide from its own report.
   # A skipped test (assumption failure, status -4) only counts on the floor image.
   if grep -q "FAILURES!!!\|INSTRUMENTATION_FAILED\|Process crashed" "$log" || ! grep -q "^OK (" "$log" ||
@@ -113,7 +113,7 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
     sleep 2
     run "$CLOUD#offlineWorkIsKeptUnmarkedAndSyncIsNotOffered" "${cloud_args[@]}" -e priCloudOffline true "$@"
     # Reconnect: the same server and database come back.
-    node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
+    node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart $( [ "${PRI_CLOUD_READER:-}" = synthetic ] && echo --synthetic-reader ) --out "$OUT/restart.env"
     RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
     summary="$summary, opened offline: the gate says retry and the server's record is unchanged"
   fi

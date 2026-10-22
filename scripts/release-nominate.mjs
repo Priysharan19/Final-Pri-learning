@@ -118,9 +118,9 @@ export function promotionCommands(sha, { productionOrigin = PRODUCTION_ORIGIN } 
     'git fetch origin',
     `git merge-base --is-ancestor ${sha} origin/main          # must succeed`,
     `git merge-base --is-ancestor origin/deploy/production ${sha}   # fast-forward only`,
-    `git push origin ${sha}:refs/heads/deploy/production`,
+    `git push origin ${sha}:refs/heads/deploy/production   # OPERATOR ONLY: requires signed release authorization; never run from CI`,
     `curl -s ${productionOrigin}/v1/health   # releaseIdentity.releaseSha == ${sha}`,
-    `npm run verify:deployment -- --origin ${productionOrigin} --sha ${sha} --engine postgres`
+    `npm run verify:deployment -- --origin ${productionOrigin} --sha ${sha} --engine sqlite --persistent-storage-proven --auth-email-proven`
   ];
 }
 
@@ -316,7 +316,7 @@ async function main() {
     if (report.ok) {
       console.log(`NOMINATION: PASS — ${report.sha} — ${passed}/${counted} checks`);
       console.log('');
-      console.log('This tool pushed nothing. Before promoting: the 24 h clean staging soak (docs/operations/postgres-cutover.md §4.5),');
+      console.log('This tool pushed nothing. Production still uses SQLite on /data; never infer a Postgres cutover. Before promoting: the 24 h clean staging soak (docs/operations/postgres-cutover.md §4.5),');
       console.log('acceptance A–D on staging (tools/acceptance/staging-acceptance.mjs), the device matrix (docs/release/device-matrix.md),');
       console.log('and the approval the release record names (ios/PriLearning.swiftpm/RELEASE.md §11). Then, by hand:');
       console.log('');

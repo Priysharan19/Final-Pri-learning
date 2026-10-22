@@ -130,10 +130,26 @@ class InkInputTest {
 
     /** One stroke of real MotionEvents across the canvas at height fraction fy. */
     private fun stroke(s: ActivityScenario<MainActivity>, tool: Int, fy: Float, fx0: Float = 0.2f, fx1: Float = 0.6f, steps: Int = 24) {
+        // After a toolbar mode change the canvas can reflow outside the actual
+        // app window. On API 33 a targeted instrumentation MotionEvent outside
+        // that window throws, rather than reaching the shared canvas at all.
+        // Recenter before the real input and fail with coordinates if the full
+        // stroke would still leave the WebView: never fabricate page events.
+        assertEquals("the ink canvas can be brought into view", "true", eval(s,
+            "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();if(!c)return false;c.scrollIntoView({block:'center',inline:'nearest'});return true;})()"))
+        Thread.sleep(180)
         val rect = waitFor(s, "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();var r=c.getBoundingClientRect();return [r.left,r.top,r.width,r.height,window.devicePixelRatio].join(',');})()")
         val (l, t, w, h, dpr) = rect.trim('"').split(',').map { it.toFloat() }
         val loc = IntArray(2)
-        s.onActivity { it.webView!!.getLocationOnScreen(loc) }
+        val viewSize = IntArray(2)
+        s.onActivity { val web = it.webView!!; web.getLocationOnScreen(loc); viewSize[0] = web.width; viewSize[1] = web.height }
+        val x0 = loc[0] + (l + w * fx0) * dpr
+        val x1 = loc[0] + (l + w * fx1) * dpr
+        val y0 = loc[1] + (t + h * fy - 4f) * dpr
+        val y1 = loc[1] + (t + h * fy + 4f) * dpr
+        assertTrue("canvas input bounds exceed app WebView: x=$x0..$x1, y=$y0..$y1, window=${loc[0]},${loc[1]}+${viewSize[0]}x${viewSize[1]}",
+            minOf(x0, x1) >= loc[0] && maxOf(x0, x1) < loc[0] + viewSize[0] &&
+            y0 >= loc[1] && y1 < loc[1] + viewSize[1])
         val stylus = tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER
         val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = tool })
         val source = if (stylus) InputDevice.SOURCE_STYLUS or InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_TOUCHSCREEN
@@ -196,6 +212,7 @@ class InkInputTest {
             assertEquals("before any stylus event the shell has not seen a stylus", "\"false\"",
                 waitFor(s, "window.__f0 && window.__f0.ok && String(window.__f0.result.stylusSeen)"))
             stroke(s, MotionEvent.TOOL_TYPE_STYLUS, 0.55f)
+            StoreShots.shot("03-write")
             m = metrics(s)
             val pen = m.getJSONArray("strokes").getJSONObject(m.getJSONArray("strokes").length() - 1)
             assertEquals("a stylus arrives as pointerType pen", "pen", pen.getString("pointerType"))
@@ -253,18 +270,50 @@ class InkInputTest {
             assertTrue("the stylus eraser end removes that stroke ($bandErased px left, was $bandInked)", bandErased <= bandEmpty + 5)
 
             // ── reading is the server's job (owner decision: server-only) ────
-            // The emulator has no Pri server, so the strokes must NOT be read or
-            // marked on the device; the student is told why and the ink is kept.
-            val status = waitFor(s, "(function(){var e=document.querySelector('.ink-status');return e&&e.innerText.trim()?e.innerText.trim().slice(0,160):false;})()", 30_000)
-            assertTrue("the student is told why the handwriting is not read yet: $status", status.length > 10)
-            assertEquals("no on-device reading is shown or offered for marking", "0",
-                eval(s, "String(document.querySelectorAll('.ink-preview .ink-line').length)").trim('"'))
-            assertTrue("the ink is kept on the page while it waits", inkPixels(s) > 0)
+            // Signed in against the fixture server (#477), started with its
+            // SYNTHETIC reader (scripts/synthetic-reader-server.mjs: the model
+            // hop is a scripted stand-in answering "7"), the strokes are read by
+            // the server and never on the device: the reading the card shows is
+            // the server's, labelled as such, and carries the stand-in's text.
+            // Read on request (#440): nothing is read until the student presses
+            // Read my answer — writing, erasing and rotating send nothing.
+            waitFor(s, "!!document.querySelector('[data-ink-read]')", 30_000)
+            Thread.sleep(2000)
+            assertEquals("nothing is read before the student presses Read my answer", "false",
+                eval(s, "!!document.querySelector('.ink-preview .ink-line[data-text]')"))
+            assertEquals("the press reaches the Read my answer button", "true",
+                eval(s, "(function(){var b=document.querySelector('[data-ink-read]');if(!b)return false;b.click();return true;})()"))
+            val read = waitFor(s, "(function(){var p=document.querySelector('.ink-preview');if(!p)return false;var n=p.querySelector('.ink-status');var l=p.querySelector('.ink-line[data-text]');return n&&l?(n.innerText.trim()+'|'+l.getAttribute('data-text')):false;})()", 30_000).trim('"')
+            assertTrue("the card shows a reading made on Pri's server: $read", read.startsWith("Read on the server"))
+            assertEquals("the reading is the server reader's (synthetic stand-in), not the device's: $read", "7", read.substringAfter('|'))
+            assertTrue("the ink is kept on the page", inkPixels(s) > 0)
 
             m = metrics(s)
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
             val strokes: JSONArray = m.getJSONArray("strokes")
             for (i in 0 until strokes.length()) assertEquals("no stroke was cancelled", false, strokes.getJSONObject(i).getBoolean("cancelled"))
+        }
+    }
+
+    /** Store listing only (-e priShots 1): a question answered by a photo. Skipped otherwise. */
+    @Test
+    fun storeShotPhoto() {
+        assumeTrue("store screenshots only", InstrumentationRegistry.getArguments().getString("priShots", "") == "1")
+        AccountFirst.useFixtureServer()
+        ActivityScenario.launch(MainActivity::class.java).use { s ->
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
+            eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt')")
+            val label = "Photo: answer with a photo of your working"
+            for (i in 0 until 14) {
+                if (eval(s, "!!($byLabel)('$label')") == "true") break
+                eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
+                Thread.sleep(1100)
+            }
+            assertEquals("a question offering Photo was found", "true", eval(s, "!!($byLabel)('$label')"))
+            eval(s, "($byLabel)('$label').click()")
+            Thread.sleep(1000)
+            StoreShots.shot("04-photo")
         }
     }
 }

@@ -59,10 +59,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { chromium } from '@playwright/test';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
-import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
-import { join, extname, resolve, sep, relative } from 'node:path';
+import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
@@ -136,35 +135,10 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
-}
-
-const MIME = {
-  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
-  '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
-  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
-  '.webmanifest': 'application/manifest+json', '.ico': 'image/x-icon'
-};
-
-async function serve(dir) {
-  // The build's own files, listed once: a request names one of them or it is a
-  // route (one page, many routes) — no request path is ever joined onto disk.
-  const root = resolve(dir);
-  const files = new Map(readdirSync(root, { recursive: true, withFileTypes: true })
-    .filter(e => e.isFile())
-    .map(e => { const abs = join(e.parentPath ?? e.path, e.name); return ['/' + relative(root, abs).split(sep).join('/'), abs]; }));
-  const shell = join(root, 'index.html');
-  const server = createServer((req, res) => {
-    const path = decodeURIComponent((req.url || '/').split('?')[0]);
-    const target = files.get(path) ?? shell;
-    res.writeHead(200, { 'Content-Type': MIME[extname(target)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
-    res.end(readFileSync(target));
-  });
-  await new Promise(r => server.listen(0, '127.0.0.1', r));
-  return { server, base: `http://127.0.0.1:${server.address().port}` };
 }
 
 // ── The audit, run inside the page ───────────────────────────────────────────
@@ -756,6 +730,11 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
+      // Read on request (#440): the strokes alone send nothing. The control
+      // that asks for the read must be there, then the student presses it.
+      const readButton = page.locator('[data-ink-read]').first();
+      await readButton.waitFor({ state: 'visible', timeout: 20000 });
+      await readButton.click();
       // Server-only reading (owner decision): with no reader in this harness
       // the page shows the reading/waiting status rather than a local reading.
       // Signed out (as this walk is here) the page shows the in-card sign-in
@@ -896,6 +875,112 @@ async function run() {
         };
       } finally {
         await online.reconnect();
+      }
+    });
+
+    // read on request (review 17, F4): the Read / reading / read / stale states
+    // of a handwritten answer, driven from the keyboard on the real server with
+    // the scripted stand-in reader. Where focus goes when "Read my answer"
+    // leaves the page, and what the stale and submit-reason states say.
+    await step('practice · read on request', '/practice', async () => {
+      // Regression for #627: that one replay is held for a while, as a slow
+      // runner does by chance, so the surface is still disabled when the
+      // canvas shows. `times: 1` — only the replay; nothing later is slowed.
+      const REPLAY = '**/v1/practice/*/submit';
+      let held = 0, replayDone = false;
+      const holdReplay = async route => {
+        held += 1;
+        await new Promise(r => setTimeout(r, 2500));
+        await route.continue().catch(() => { });
+        replayDone = true;
+      };
+      await page.route(REPLAY, holdReplay, { times: 1 });
+      try {
+        await typedQuestion();
+        const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+        if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+        await writeTab.click();
+        // The question reopened here is the one "reconnect asked" left a held
+        // submission on, and relaunch recovery replays it as the card mounts.
+        // While that replay is in flight the writing surface is disabled
+        // (.ink-disabled: pointer-events none), so a stroke drawn then is never
+        // written and "Read my answer" never comes (#627; on a slow runner the
+        // replay outlasted the canvas appearing). Drawing waits until the surface
+        // accepts the pen, not merely until the canvas exists.
+        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      } catch (err) { await page.unroute(REPLAY, holdReplay).catch(() => { }); throw err; }
+      const box = await page.locator('.ink-canvas-live').boundingBox();
+      const stroke = async (x) => {
+        await page.mouse.move(box.x + x, box.y + 40);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + x + i * 3, box.y + 40 + i * 9);
+        await page.mouse.up();
+        await wait(page, 700);
+      };
+      const focusNow = () => page.evaluate(() => {
+        const el = document.activeElement;
+        return { tag: (el?.tagName || '').toLowerCase(), body: el === document.body || !el, inInk: !!el?.closest?.('.ink-answer'), role: el?.getAttribute?.('role') || null, id: el?.id || null, text: (el?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) };
+      });
+      const reason = () => page.evaluate(() => {
+        const r = document.querySelector('[data-submit-reason]');
+        const b = document.querySelector('.ws-actions .btn-primary');
+        return r ? { key: r.getAttribute('data-submit-reason'), role: r.getAttribute('role'), text: (r.textContent || '').trim(), describes: !!b && b.getAttribute('aria-describedby') === r.id, disabled: !!b && b.disabled } : null;
+      });
+      platform.reader.lines = null; platform.reader.text = '7'; platform.reader.confidence = 0.97;
+      let release; platform.reader.gate = new Promise(resolve => { release = resolve; });
+      // While the earlier answer is still being checked the page says so, and
+      // the pen is drawn on now, inside that check: it must not be dropped.
+      refusals.replay = {
+        held,
+        checking: await page.locator('.ink-answer .ink-status[role="status"]').first().textContent({ timeout: 2000 }).then(t => (t || '').trim()).catch(() => null),
+        disabled: await page.locator('.ink-answer.ink-disabled').count()
+      };
+      try {
+        refusals.replay.strokeDuringReplay = !replayDone;
+        await stroke(60);
+        const read = page.locator('[data-ink-read]').first();
+        await read.waitFor({ timeout: 15000 }).catch(async (err) => {
+          // What the writing surface was showing when "Read my answer" never
+          // came: enough to tell no ink, a known block and a missing button apart.
+          const state = await page.evaluate((at) => {
+            const ink = document.querySelector('.ink-answer');
+            const live = document.querySelector('.ink-canvas-live');
+            const hit = document.elementFromPoint(at.x, at.y);
+            return {
+              question: (document.querySelector('.q-prompt')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+              canvases: document.querySelectorAll('.ink-canvas-live').length,
+              hitAtStroke: hit ? `${hit.tagName.toLowerCase()}.${String(hit.className || '').split(' ').join('.')}` : null,
+              online: navigator.onLine,
+              inkClass: ink?.className || null,
+              status: (ink?.querySelector('[role="status"]')?.textContent || '').trim().slice(0, 120),
+              buttons: [...(ink?.querySelectorAll('button') || [])].map(b => (b.textContent || '').trim()).slice(0, 12),
+              canvas: live ? { w: live.width, h: live.height, rect: live.getBoundingClientRect().toJSON() } : null
+            };
+          }, { x: box.x + 60, y: box.y + 40 }).catch(e => ({ error: String(e) }));
+          throw new Error(`${String(err.message || err).split('\n')[0]} — ${JSON.stringify({ box, state })}`);
+        });
+        refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
+        await read.focus();
+        await page.keyboard.press('Enter');
+        await wait(page, 600);
+        refusals.read.during = { focus: await focusNow(), spoken: await spokenNow(), button: await page.locator('[data-ink-read]').count() };
+        release(); platform.reader.gate = null;
+        await page.waitForSelector('.ink-line', { timeout: 20000 });
+        await wait(page, 500);
+        refusals.read.after = { focus: await focusNow(), lines: await page.locator('.ink-line').count() };
+        await stroke(160);
+        await page.waitForSelector('[data-ink-stale]', { timeout: 15000 });
+        refusals.read.stale = {
+          label: await page.locator('[data-ink-stale]').evaluate(el => ({ role: el.getAttribute('role'), text: (el.textContent || '').trim() })),
+          again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
+          reason: await reason()
+        };
+      } finally {
+        release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6;
+        // Never left armed for a later step's submit.
+        await page.unroute(REPLAY, holdReplay).catch(() => { });
+        // Without a replay the regression above proved nothing: said, not hidden.
+        if (held !== 1) console.log(`note: read on request — the relaunch replay was held ${held} times (expected 1); the #627 regression did not run`);
       }
     });
 
@@ -1415,6 +1500,27 @@ async function run() {
     ok('the session ended, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
       announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
+
+    section('read on request');
+    ok('an earlier answer being checked again after a relaunch is said on the writing surface in words, the page stays writable, and a stroke written meanwhile is kept and offered for reading',
+      refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
+        refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
+      JSON.stringify(refusals.replay));
+    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
+      refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
+        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
+      JSON.stringify({ button: refusals.read?.button, unread: refusals.read?.unread }));
+    ok('activating "Read my answer" from the keyboard does not drop focus to <body>: while the page is read, focus rests on the announced reading status inside the writing surface',
+      refusals.read?.during?.button === 0 && refusals.read.during.focus.body === false && refusals.read.during.focus.inInk === true &&
+        refusals.read.during.focus.role === 'status' && /\p{L}/u.test(refusals.read.during.focus.text),
+      JSON.stringify(refusals.read?.during));
+    ok('when the reading lands, focus moves to the reading itself — still inside the writing surface, never <body>',
+      refusals.read?.after?.lines >= 1 && refusals.read.after.focus.body === false && refusals.read.after.focus.inInk === true && refusals.read.after.focus.id === 'ink-reading',
+      JSON.stringify(refusals.read?.after));
+    ok('after the ink changes the transcript is announced as from earlier writing, a named "Read again" button is offered, and Submit says why in words',
+      refusals.read?.stale?.label?.role === 'status' && /\p{L}/u.test(refusals.read.stale.label.text) && refusals.read.stale.again?.tag === 'button' &&
+        /\p{L}/u.test(refusals.read.stale.again.name) && refusals.read.stale.reason?.key === 'ink.submitReadAgain' && refusals.read.stale.reason.describes === true,
+      JSON.stringify(refusals.read?.stale));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

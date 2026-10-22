@@ -298,6 +298,30 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/account/password",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "recentAuth": {
+        "freshMs": 600000
+      },
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires the credential proven inside 10 minutes (the sign-in, or POST /v1/account/reauth's session-bound step-up cookie); sets a first password only where password_hash IS NULL (never overwrites one) and only for a verified, non-synthetic sign-in email; revokes every session and issues a new one; writes an account.password-set audit row with no metadata",
+      "rateLimits": [
+        {
+          "key": "password-set",
+          "limit": 5,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/account/devices",
       "auth": "session",
@@ -2147,6 +2171,98 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/practice/review-queue",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the spaced review queue derived from this account's own server-graded attempts by the shared pure engine; no-store; nothing stored or written",
+      "rateLimits": [
+        {
+          "key": "practice-review-queue",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/notebook/:attemptId/twin",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "the attempt must be one of this account's own filed server-graded attempts (else 404) whose original question is still held in this account's escrow (else 410); issues a new server-chosen question escrowed to this account, marked like any other; takes no parameters",
+      "rateLimits": [
+        {
+          "key": "practice-twin",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/practice/notebook",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account) and this account's escrowed prompts; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "practice-notebook",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/hint",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question (escrow row keyed by this account; another account's id is 404); rungs served strictly in order from the server's escrowed question and charged in the account's transaction under its sync lock; a completed question is 409; the solution rung commits a zero-credit reveal",
+      "rateLimits": [
+        {
+          "key": "practice-hint",
+          "limit": 400,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/practice/:id/repeat",
       "auth": "session",
@@ -2248,7 +2364,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
@@ -2271,7 +2387,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
@@ -2298,6 +2414,29 @@
       "rateLimits": [
         {
           "key": "exam-finish",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/:id/handwriting",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); reads ONE page of handwriting that was captured and never read when the paper was finalised: accepted only after finalisation (409 EXAM_NOT_FINALISED before), only for an answer key the stored result holds as pending (409 EXAM_HANDWRITING_NOT_PENDING otherwise), and only when the SHA-256 of the presented picture equals the digest frozen in the result (409 EXAM_HANDWRITING_CHANGED otherwise: nothing written, erased or photographed after the paper closed can be read); the picture is never stored; the read goes through recognitionOps (daily AI allowance, deployment spend ceiling, kept-read dedupe: an unchanged picture already read for this account is not paid for again); each read is reserved in the result row under the account sync lock BEFORE the provider is asked, at most 3 are ever started per page, never sooner than the backoff (1 min, then 15 min, or the ceiling/allowance reset) and none after 7 days, whatever is sent here; a confident reading is turned into the answer by a fixed rule and marked by the deterministic engine in the marker pool; only that answer's line, the totals derived from the lines, one graded-attempt event and the score in the paper's own exam-result event change; an uncertain, empty or exhausted page stays pending and unmarked for an authorised person; session and guardian consent are rechecked inside both transactions; no model output sets a mark and no client field carries a transcript, an answer or a mark",
+      "rateLimits": [
+        {
+          "key": "exam-handwriting",
           "limit": 120,
           "windowMs": 3600000,
           "identity": "account"

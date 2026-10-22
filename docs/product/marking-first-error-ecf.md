@@ -153,3 +153,40 @@ together (`T_n = a + (n-1)d  n = 9`, `… = 33 d = 3`); a word beside the workin
 - `server/test/owner-ap-first-mistake-contract-check.mjs` — the owner's page over
   HTTP against the shipped app (SQLite or `--engine=postgres`).
 - `client/test/working-evidence-check.mjs` — the presentation rules.
+
+## Formula rubrics beyond AP (`workingRubrics.js`)
+
+`client/src/engine/generators/workingRubrics.js` builds the same plan for any
+"formula, substitute, evaluate" question from a list of parts:
+`formulaPlan({ givens, aliases, parts: [{ letter, labels, forms, source, expected, why, traps }], combine })`.
+A part that uses an earlier part's letter binds it, so a value slipped above and
+used correctly below is carried forward. Plan letters are single characters; a
+letter written as a symbol (θ) is an alias (`ANGLE_ALIASES`). A one-letter label
+must not fold onto a different given (`A` is read as `a`): the corpus checks it.
+
+Families carrying one (tranche 1): sector area, sector perimeter (arc + 2r),
+quarter-circle segment (sector − triangle), square less four quarter-circles,
+cylinder + hemisphere, and the minute-hand sector (θ = 6m, then the sector).
+
+### The adversarial corpus (`npm run test:marker:rubrics`)
+
+`client/test/marker-working-rubrics-check.mjs` writes, for every plan-carrying
+question of the listed families (12 seeds × 4 levels), the model page and a set
+of attacks, all marked through `markerOps.stepEvidence`:
+each value line falsified three ways is the first break and never verified;
+each given substituted wrongly is never a plain verified line; every authored
+wrong formula is a break and earns nothing; a wrong final answer is never
+correct and earns at most marks − 1; a bare answer, the copied question, prose,
+givens alone (beyond a word problem's identify mark), repetition and a sweep of
+candidates earn nothing; a part's value slipped and carried is the one first
+break, everything built on it is `ecf`, and the method around it still earns.
+A new rubric family is added to `RUBRIC_FAMILIES` there.
+
+### Coverage, honestly
+
+`node scripts/working-rubric-census.mjs` lists every subtopic issuing multi-mark
+numeric questions and how many carry a plan. Most still have none (they are
+marked on the final answer, with the equation step check where one applies).
+Forms that need multi-character letters (`x_1`, `Σfx`) — distance, section,
+grouped mean/median/mode — need a letter-alias extension before they can carry
+a plan; they are not covered here.

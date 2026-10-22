@@ -41,6 +41,10 @@ export const ENGINE_SUITES = [
   // Examination papers: sealed paper, answer snapshots, exactly-once
   // finalisation and the deadline rule, account-scoped under Row-Level Security.
   'exam-authority-check.mjs',
+  // Handwriting not read when a paper closed: frozen by digest, pending, and
+  // read a bounded number of times — the attempt reservation and the result
+  // amendment under the account lock, on the Postgres store.
+  'exam-handwriting-check.mjs',
   // Method marks need progress and issuing by seed is deterministic and
   // per-account — through the same real HTTP routes, on the Postgres store.
   'method-progress-http-check.mjs',
@@ -55,6 +59,12 @@ export const ENGINE_SUITES = [
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // Security P2s (train 10): admin MFA on class and assignment routes, the
+  // account export is complete, and every account-owned table is under RLS
+  // for the pri_server role — proved live on Postgres.
+  'admin-mfa-class-routes-check.mjs',
+  'account-export-completeness-check.mjs',
+  'rls-account-coverage-check.mjs',
   // The marker runs off the request thread under a hard deadline, and a
   // submission is read → marked → committed with the state re-read under the
   // account's lock. The re-check and the exactly-once guarantees under
@@ -67,8 +77,10 @@ export const ENGINE_SUITES = [
   // The data export behind fresh proof of the credential, and the new-device
   // sign-in notice: session rows, audit rows and the step-up on Postgres too.
   'export-reauth-check.mjs',
+  'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',
@@ -95,6 +107,8 @@ export const ENGINE_SUITES = [
   'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
+  // CodeQL #461: the same account-keyed quota must serialize on real Postgres.
+  'pr618-recognition-rate-concurrency-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening
   // set (session lifetime, sync quota, per-account RLS scope, password policy,
   // join-code encryption, guardian withdrawal credential, health exposure).

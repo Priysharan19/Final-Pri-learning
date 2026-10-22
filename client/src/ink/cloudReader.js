@@ -138,9 +138,21 @@ export function forgetCloudReads(transport = cloud) { readsByTransport.delete(tr
  * waiting, so a single caller's cancel behaves exactly as it always did. The
  * request carries the picture and a cancel signal, and nothing else.
  */
+// The issued question the student is answering, by the SERVER's id, set by the
+// card. It travels with a read only so the server can bind the read receipt
+// to that question; it is never part of what the reader is sent.
+let readingQuestion = null;
+export function setReadingQuestion(serverQuestionId) {
+  readingQuestion = typeof serverQuestionId === 'string' && /^[0-9a-f-]{36}$/i.test(serverQuestionId) ? serverQuestionId : null;
+}
+/** The read receipt of a served read and the text it covers, for Submit; or null. */
+const attestedOf = response => (typeof response?.receipt === 'string' && typeof response?.transcription?.text === 'string'
+  ? Object.freeze({ receipt: response.receipt, text: response.transcription.text }) : null);
+
 function transcribeOnce(transport, image, { signal = null, now = Date.now() } = {}) {
   const memory = readMemory(transport);
-  const key = pictureKey(image);
+  const questionId = readingQuestion;
+  const key = `${questionId || ''}|${pictureKey(image)}`;
   const gone = () => Object.assign(new Error('The read was cancelled.'), { name: 'AbortError' });
   if (signal?.aborted) return Promise.reject(gone());
   const kept = memory.done.get(key);
@@ -149,7 +161,7 @@ function transcribeOnce(transport, image, { signal = null, now = Date.now() } = 
   if (!flight) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     flight = { waiters: 0, controller, promise: null };
-    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null }))
+    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null, ...(questionId ? { questionId } : {}) }))
       .then(response => {
         // Remembered only when the reader stood behind it. A reading it
         // doubted may be asked for again: a second look can be a better one.
@@ -483,6 +495,7 @@ export async function readWithCloud(strokes, {
     }
     return {
       transcription,
+      attested: attestedOf(response),
       raster: { width: raster.width, height: raster.height, bytes: raster.bytes },
       readiness: ready,
       diagnostics: handwritingDiagnostics()
@@ -583,6 +596,7 @@ export async function readPhotoWithCloud(dataUrl, {
     if (!transcription?.lines?.length) return { reason: 'empty', readiness: ready, diagnostics: handwritingDiagnostics() };
     return {
       transcription,
+      attested: attestedOf(response),
       photo: { width: prepared.width, height: prepared.height, bytes: prepared.bytes, quality: prepared.quality },
       readiness: ready,
       diagnostics: handwritingDiagnostics()
@@ -647,7 +661,7 @@ function readerFailureOf(outcome) {
     ? { code: outcome.readiness.lastFailureCode, status: outcome.readiness.lastFailureStatus } : null;
   if (!own) return probe;
   // An account-side reason from either source outranks "did not answer".
-  const account = [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN];
+  const account = [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN, READER_FAILURE.MFA];
   if (probe && !account.includes(classifyReaderFailure(own).kind) && account.includes(classifyReaderFailure(probe).kind)) return probe;
   return own;
 }
@@ -670,13 +684,13 @@ export function accountBlockedKey(outcome = null) {
   const failure = readerFailureOf(outcome);
   if (!failure) return null;
   const named = classifyReaderFailure(failure);
-  return [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN].includes(named.kind) ? named.photoKey : null;
+  return [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN, READER_FAILURE.MFA].includes(named.kind) ? named.photoKey : null;
 }
 
 /** Blockers the student can clear in Account settings (sign in, verify, consent). */
 export const ACCOUNT_BLOCKED_KEYS = Object.freeze(new Set([
-  'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian',
-  'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian'
+  'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian', 'ink.waitingMfa',
+  'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian', 'verdict.photoReadingMfa'
 ]));
 
 /** Semantic reader states: blockers are not handwriting failures. */

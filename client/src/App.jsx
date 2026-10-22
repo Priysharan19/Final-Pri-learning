@@ -1,15 +1,18 @@
 import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import PageLink from './components/PageLink.jsx';
+import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
-import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
+import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { prefetchInstrumentTabs } from './local/offlineWarm.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
-import Home from './pages/Home.jsx';
+import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
@@ -25,7 +28,7 @@ import { BrandWordmark } from './components/BrandMark.jsx';
 // on a link that delivers about 90 kB a second. They are behind a boundary now.
 // The service worker still holds every one of them for offline use; the change
 // is only about what has to arrive before a student can do anything.
-const Progress = React.lazy(() => import('./pages/Progress.jsx'));
+const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
@@ -48,6 +51,34 @@ const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
+// The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
+// the owner flips it. Its code and stylesheet load only when the flag is on.
+// The build constant is read directly here (not through featureEnabled) so the
+// bundler can see which branch survives: an instrument build then drops the
+// v1.0 Home page, the v1.0 sidebar and everything only they import.
+/* global __PRI_FEATURE_INSTRUMENT__ */
+const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__ && import.meta.env?.PROD === true;
+const INSTRUMENT_ON = INSTRUMENT_BUILD || featureEnabled('instrument');
+const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/InstrumentBar.jsx')) : null;
+const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
+const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.jsx')) : null;
+const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportHead.jsx')) : null;
+// The routes name `Home` and `Progress`; in the instrument build those are the
+// Index and the Report (the Report's summary above the same Progress page).
+const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
+const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
+if (INSTRUMENT_ON && typeof document !== 'undefined') {
+  document.documentElement.classList.add('ui-instrument');
+  import('./instrument/instrument.css');
+  // The Map, Report and Scripts tabs are on demand in this build; after an
+  // online launch, at idle and only on a cheap link, fetch them so the service
+  // worker keeps them for offline (local/offlineWarm.js, issue #658).
+  void prefetchInstrumentTabs({
+    scope: window,
+    loaders: [() => import('./instrument/MapPage.jsx'), () => import('./instrument/ReportHead.jsx'),
+      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx')]
+  });
+}
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.
 const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
@@ -321,7 +352,7 @@ export default function App() {
   // that (sign-in, onboarding) the screen keeps whatever theme-boot.js painted
   // from the last preference used on this device.
   useEffect(() => {
-    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || 'light');
+    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || DEFAULT_THEME_PREF);
     applyTheme(pref);
     return followSystemTheme(pref, () => applyTheme(pref));
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -496,12 +527,12 @@ export default function App() {
   const destinationLink = (item, className, onClick) => {
     const active = isDestinationActive(loc, item.to);
     return (
-      <Link key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
+      <PageLink key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
         aria-current={active ? 'page' : undefined} onClick={onClick}>
         <span className="nav-ico" aria-hidden="true">{item.ico}</span>
         <span className="nav-label">{t(item.key)}</span>
         {item.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
-      </Link>
+      </PageLink>
     );
   };
 
@@ -528,16 +559,23 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
-        <header className="topbar">
-          <Logo onClick={() => nav('/')} />
-          <div className="top-stats">
-            <ThemeToggle />
-            <AccountMenu user={user} onSwitch={switchProfile} />
-          </div>
-        </header>
+        {INSTRUMENT_ON ? (
+          <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
+            <InstrumentBar user={user} setUser={setUser} navItems={navItems}
+              accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
+          </React.Suspense>
+        ) : (
+          <header className="topbar">
+            <Logo onClick={() => nav('/', { replace: isCurrentUrl('/') })} />
+            <div className="top-stats">
+              <ThemeToggle />
+              <AccountMenu user={user} onSwitch={switchProfile} />
+            </div>
+          </header>
+        )}
 
         <div className="body-row">
-          <aside className="sidebar no-print">
+          {!INSTRUMENT_ON && <aside className="sidebar no-print">
             <div className="sidebar-inner">
               {navSections.map(section => (
                 <div className="nav-section" key={section.label}>
@@ -548,7 +586,7 @@ export default function App() {
               <div className="nav-spacer" />
               {user.role !== 'teacher' && <SidebarHistory recent={recent} />}
             </div>
-          </aside>
+          </aside>}
 
           <div className="main">
             {activated?.offline && (
@@ -569,7 +607,7 @@ export default function App() {
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
-                    <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
+                    <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
@@ -606,10 +644,10 @@ export default function App() {
         {mobilePrimary.map(item => {
           const active = isDestinationActive(loc, item.to);
           return (
-            <Link key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
+            <PageLink key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
-              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
-            </Link>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{INSTRUMENT_ON && item.to === '/' ? t('inst.tabIndex') : t(item.key)}</span>
+            </PageLink>
           );
         })}
         <button
@@ -632,10 +670,10 @@ export default function App() {
             {mobileMore.map(item => {
               const active = isDestinationActive(loc, item.to);
               return (
-                <Link key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
+                <PageLink key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
                   aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
                   <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
-                </Link>
+                </PageLink>
               );
             })}
           </div>

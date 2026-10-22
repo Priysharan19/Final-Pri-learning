@@ -31,8 +31,20 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [exportChallenge, setExportChallenge] = useState(null);
   const [exportCode, setExportCode] = useState('');
   const [exportCodeInvalid, setExportCodeInvalid] = useState(false);
+  // A first password for an account made with a one-time code, Apple or
+  // Google (POST /v1/account/password). The server asks for fresh proof when
+  // the sign-in is older than 10 minutes; the panel then asks for a code to
+  // the account's own address and sends it once to POST /v1/account/reauth.
+  const [firstPassword, setFirstPassword] = useState({ next: '', confirm: '' });
+  const [firstProof, setFirstProof] = useState(false);
+  const [firstChallenge, setFirstChallenge] = useState(null);
+  const [firstCode, setFirstCode] = useState('');
+  const [firstCodeInvalid, setFirstCodeInvalid] = useState(false);
 
   const hasPassword = providers.some(row => row.provider === 'password');
+  // The password signs in with the account's email, so only a real, verified
+  // address can carry one (a phone account's address is synthetic).
+  const canSetPassword = providers.length > 0 && !hasPassword && !!account?.email && !!account?.emailVerified && !String(account.email).endsWith('@phone.invalid');
   const socialProviders = providers.filter(row => row.provider === 'google' || row.provider === 'apple');
   const canDeleteWithPassword = hasPassword && deletePhrase.trim() === 'DELETE' && deletePassword.length > 0;
   // An account made with Google or Apple has no password; deleting it takes a
@@ -106,6 +118,67 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       await reload();
       await onChanged?.();
     } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloudSecurity.passwordChangeFailed'))); }
+    finally { setBusy(''); }
+  }
+
+  function resetFirstPassword() {
+    setFirstPassword({ next: '', confirm: '' });
+    setFirstProof(false);
+    setFirstChallenge(null);
+    setFirstCode('');
+    setFirstCodeInvalid(false);
+  }
+
+  async function setFirstPasswordNow(proof) {
+    if (firstPassword.next !== firstPassword.confirm) {
+      setError(tLater('cloudSecurity.passwordMismatch'));
+      return;
+    }
+    start('set-password');
+    try {
+      if (proof) await cloud.reauth(proof);
+      await cloud.setPassword({ newPassword: firstPassword.next });
+      resetFirstPassword();
+      setMessage(tLater('cloudSecurity.passwordSet'));
+      await reload();
+      await onChanged?.();
+    } catch (err) {
+      const wrongCode = err?.code === 'OTP_REAUTH_FAILED';
+      setFirstCodeInvalid(wrongCode);
+      if (wrongCode) setFirstCode('');
+      if (err?.code === 'REAUTH_REQUIRED') {
+        setFirstProof(true);
+        setMessage(tLater('cloudSecurity.setPasswordConfirmFirst'));
+      } else {
+        const copy = cloudErrorCopy(err);
+        setError(wrongCode ? tLater('cloudSecurity.codeInvalid')
+          : copy ? tLater(copy.key, copy.vars) : cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.setPasswordFailed')));
+      }
+    } finally { setBusy(''); }
+  }
+
+  async function submitFirstPassword(e) {
+    e.preventDefault();
+    if (busy) return;
+    if (!firstProof) {
+      await setFirstPasswordNow(null);
+      return;
+    }
+    if (firstChallenge && firstCode.length === OTP_LENGTH) {
+      await setFirstPasswordNow({ otpChallengeId: firstChallenge, otpCode: firstCode });
+    }
+  }
+
+  async function requestFirstPasswordCode() {
+    if (busy) return;
+    start('code');
+    try {
+      const sent = await cloud.otpReauthRequest();
+      setFirstChallenge(sent?.challengeId || null);
+      setFirstCode('');
+      setFirstCodeInvalid(false);
+      setMessage(tLater('cloudSecurity.codeSent'));
+    } catch (err) { setError(cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.setPasswordFailed'))); }
     finally { setBusy(''); }
   }
 
@@ -281,7 +354,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const providerLabel = useMemo(() => ({ password: t('cloudSecurity.providerPassword'), google: 'Google', apple: 'Apple' }), [t]);
 
   return (
-    <div style={{ marginTop: 14 }}>
+    <div className="cs-stack" style={{ marginTop: 14 }}>
       {!account?.emailVerified && <div className="card" style={{ boxShadow: 'none', marginBottom: 14 }}>
         <div className="sc-label">{t('cloudSecurity.emailVerification')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.verificationRequired')}</div>
@@ -399,7 +472,46 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
         </button>
       </form>}
 
-      <form className="card" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
+      {canSetPassword && <form className="card" style={{ boxShadow: 'none', marginTop: 14 }} onSubmit={submitFirstPassword} data-testid="cloud-set-password">
+        <div className="sc-label">{t('login.password')}</div>
+        <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.setPasswordTitle')}</div>
+        <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>{t('cloudSecurity.setPasswordHelp')}</p>
+        <div className="grid cols-2" style={{ gap: 10 }}>
+          <div className="field">
+            <label className="label" htmlFor="cloud-first-password">{t('settings.newPassword')}</label>
+            <input className="input" id="cloud-first-password" type="password" autoComplete="new-password" minLength={10} maxLength={200} value={firstPassword.next} onChange={e => setFirstPassword(v => ({ ...v, next: e.target.value }))} required />
+          </div>
+          <div className="field">
+            <label className="label" htmlFor="cloud-first-password-confirm">{t('cloudSecurity.confirmNewPassword')}</label>
+            <input className="input" id="cloud-first-password-confirm" type="password" autoComplete="new-password" minLength={10} maxLength={200} value={firstPassword.confirm} onChange={e => setFirstPassword(v => ({ ...v, confirm: e.target.value }))} required />
+          </div>
+        </div>
+        {!firstProof ? <button className="btn btn-ghost btn-sm" type="submit" data-testid="cloud-set-password-submit" disabled={!!busy} style={{ marginTop: 10 }}>
+          {busy === 'set-password' ? t('cloudSecurity.changing') : t('cloudSecurity.setPasswordAction')}
+        </button> : <>
+          <p className="muted" style={{ fontSize: 13, margin: '10px 0 8px' }}>{t('cloudSecurity.setPasswordReauthHelp')}</p>
+          {firstChallenge ? <>
+            <p className="label" id="cloud-first-password-code-label" style={{ margin: '0 0 6px' }}>{t('cloudSecurity.codeLabel')}</p>
+            <OtpInput value={firstCode} onChange={value => { setFirstCode(value); setFirstCodeInvalid(false); setError(''); }} autoFocus={false}
+              disabled={!!busy} invalid={firstCodeInvalid} idPrefix="cloud-first-password-code" labelledBy="cloud-first-password-code-label" />
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button className="btn btn-ghost btn-sm" type="submit" data-testid="cloud-set-password-with-code" disabled={firstCode.length !== OTP_LENGTH || !!busy}>
+                {busy === 'set-password' ? t('cloudSecurity.changing') : t('cloudSecurity.setPasswordWithCode')}
+              </button>
+              <button className="btn btn-ghost btn-sm" type="button" disabled={!!busy} onClick={requestFirstPasswordCode}>
+                {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+              </button>
+            </div>
+          </> : <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-set-password-send-code" disabled={!!busy} onClick={requestFirstPasswordCode}>
+            {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+          </button>}
+          <div style={{ marginTop: 8 }}>
+            <button className="btn btn-quiet btn-sm" type="button" disabled={!!busy} onClick={resetFirstPassword}>{t('cloudSecurity.exportCancel')}</button>
+          </div>
+        </>}
+      </form>}
+
+      <form className="card set-danger" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
         <div className="sc-label">{t('cloudSecurity.dangerZone')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.deleteTitle')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>

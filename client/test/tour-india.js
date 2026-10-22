@@ -94,10 +94,16 @@ export const flow = {
     await check('the navigation carries no NSW jargon', !HSC.test(nav) && !/\bYear\b/.test(nav), `nav reads ${JSON.stringify(nav)}`);
 
     await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('main h1', { timeout: 30000 });
-    const progressTitle = await page.locator('main h1').innerText();
+    // IndiaProgress mounts its heading only once the server curriculum and
+    // stats have arrived; asserting \`main h1\` at once raced the loading state
+    // on slow runners. Wait for the page's own heading or its error — an
+    // error is surfaced as a failure with the page state, never a pass.
+    const progressHead = page.locator('main .pg-head h1, main .pg-head .pg-title');
+    await page.locator('main .pg-head h1, main .pg-head .pg-title, main [role="alert"]').first()
+      .waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const progressTitle = await progressHead.count() === 1 ? await progressHead.innerText() : '';
     await check('Progress is the India presentation for Class 10', /Class 10/.test(progressTitle) && !HSC.test(progressTitle),
-      `heading reads ${JSON.stringify(progressTitle)}`);
+      `URL ${page.url()}, heading ${JSON.stringify(progressTitle)}, screen ${JSON.stringify((await page.locator('main').innerText().catch(() => '')).slice(0, 400))}`);
     await check('a fresh student is not shown someone else’s past: no demo history', !/\bPri demo\b/i.test(await page.locator('main').innerText()));
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('main', { timeout: 30000 });

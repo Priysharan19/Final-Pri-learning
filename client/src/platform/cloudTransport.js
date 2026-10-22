@@ -489,11 +489,26 @@ export const cloud = Object.freeze({
     method: 'POST', body, idempotencyKey, timeoutMs
   }),
   getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
+  // One page of handwriting frozen, unread, when the paper closed. The server
+  // reads it only if its picture is the frozen one, and bounds how often.
+  resolveExamHandwriting: (examId, body, timeoutMs = 60000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/handwriting', { method: 'POST', body, timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
-  recognizePractice: (questionId, mode, image) =>
+  // The hint ladder is served and charged by the server, one named rung at a
+  // time; the error notebook and the per-dot-point review queue are derived
+  // there from this account's server-marked attempts.
+  hintPractice: (questionId, rung) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/hint', { method: 'POST', body: { rung } }),
+  practiceNotebook: () => cloudRequest('/v1/practice/notebook'),
+  notebookTwin: attemptId => cloudRequest('/v1/practice/notebook/' + pathId(attemptId, 'attempt id') + '/twin', { method: 'POST', body: {} }),
+  reviewQueue: () => cloudRequest('/v1/practice/review-queue'),
+  // Submit never reads: it binds a read the student asked for. `attested`
+  // is the read receipt and the text that was read (readReceipt.js on the
+  // server), sent so the read is proven even after the server's short kept
+  // record of it has gone.
+  recognizePractice: (questionId, mode, image, attested = null) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
-      method: 'POST', body: { mode, image }, timeoutMs: 55000
+      method: 'POST', timeoutMs: 55000,
+      body: { mode, image, ...(attested && typeof attested.receipt === 'string' && typeof attested.text === 'string' ? { receipt: attested.receipt, text: attested.text } : {}) }
     }),
   confirmPracticeRecognition: (questionId, receipt, text) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') +
@@ -505,7 +520,7 @@ export const cloud = Object.freeze({
   // A guardian answering the email has no account and no session — the token in
   // their link is the whole authority, which is why it is single-use, hashed at
   // rest and expires in an hour.
-  guardianConfirm: token => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token } }),
+  guardianConfirm: (token, noticeVersion) => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion } }),
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   // Staff second factor (server/platform/mfa.js). The secret and the recovery
@@ -537,6 +552,9 @@ export const cloud = Object.freeze({
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),
   changePassword: body => cloudRequest('/v1/account/password', { method: 'PATCH', body }),
+  // A first password for an account made without one (server/platform/
+  // accounts.js POST /password): needs fresh proof, like the export.
+  setPassword: body => cloudRequest('/v1/account/password', { method: 'POST', body }),
   verifyEmail: body => cloudRequest('/v1/account/email/verify', { method: 'POST', body }),
   devices: () => cloudRequest('/v1/account/devices'),
   revokeDevice: sessionId => cloudRequest(`/v1/account/devices/${pathId(sessionId, 'session id')}`, { method: 'DELETE' }),
@@ -552,8 +570,11 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
   // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
   // 45 s by default) so the server answers before the client gives up.
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
-    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
+  // `questionId` (the server's id of the issued question) only lets the
+  // server bind its read receipt to that question; the reader is sent the
+  // picture alone.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null } = {}) =>
+    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.

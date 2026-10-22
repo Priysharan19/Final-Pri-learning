@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import { featureEnabled } from '../platform/features.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import {
@@ -63,6 +65,9 @@ function ProfilePractice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  // v1.1 instrument: the question's number within this visit to Practice
+  // (each distinct question shown counts once). Display only.
+  const shownCount = useRef({ id: null, n: 0 });
   const currentQuestionRef = useRef(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
@@ -419,7 +424,7 @@ function ProfilePractice() {
 
   const exitBar = (
     <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
-      <Icon name="back" /><span>{t('nav.home')}</span>
+      <Icon name="back" /><span>{t(featureEnabled('instrument') ? 'inst.tabIndex' : 'nav.home')}</span>
     </button>
   );
 
@@ -537,7 +542,7 @@ function ProfilePractice() {
             <strong>{t('practice.emptyTitle')}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <Link className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
               {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
               )}
@@ -570,7 +575,7 @@ function ProfilePractice() {
                   {t('practice.levelLetPriChoose')}
                 </button>
               )}
-              <Link className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
             </div>
           </div>
         )}
@@ -588,10 +593,10 @@ function ProfilePractice() {
                   <p className="muted" style={{ margin: '0 0 8px' }}>{t('practice.pyqNearestTitle')}</p>
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     {pyqAlternatives.map(alt => (
-                      <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                      <PageLink key={alt.subtopic} className="btn btn-ghost btn-sm"
                         to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
                         {t('practice.pyqNearestCta', { name: alt.name })}
-                      </Link>
+                      </PageLink>
                     ))}
                   </div>
                 </div>
@@ -664,8 +669,15 @@ function ProfilePractice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {(() => {
+            if (shownCount.current.id !== serve.question.id) shownCount.current = { id: serve.question.id, n: shownCount.current.n + 1 };
+            return null;
+          })()}
           <QuestionCard
             key={`${user.id}:${serve.question.id}`}
+            sessionIndex={shownCount.current.n}
+            sessionLength={assignmentMode && Number.isInteger(assignmentTarget) && assignmentTarget > 0 ? assignmentTarget : null}
+            sessionAnswered={session.answered}
             question={serve.question}
             reason={serve.reason}
             reasonTag={serve.reasonTag || null}

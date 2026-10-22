@@ -171,6 +171,10 @@ export function asJeePyqPayload(rec) {
     // `tol`; dropping it would mark an answer the exam accepted as wrong.
     const tol = Number(rec.answer?.tol);
     const answer = Number.isFinite(tol) && tol > 0 ? { value, tol } : { value };
+    // A record may declare the published rounding rule for its numerical-value
+    // section (engine/tolerance.js, docs/content/marking-tolerance.md). It is
+    // applied only when the key itself says so; nothing is inferred.
+    if (rec.answer?.rounding === 'nta-2dp' || rec.answer?.rounding === 'nta-integer') answer.rounding = rec.answer.rounding;
     return { ...base, answerType: 'numeric', answer, inputHint: 'Enter the numerical value' };
   }
 

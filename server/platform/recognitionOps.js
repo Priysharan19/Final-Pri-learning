@@ -75,10 +75,11 @@ import { SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, providerConfig } from './han
  * How long a completed read is reusable. One attempt at a question is: write,
  * read, check the transcript, submit, see the verdict, perhaps a second try.
  * That is minutes. 15 minutes covers a student who pauses mid-question or
- * reloads, without keeping a transcript of a child's writing in memory for
- * longer than one sitting at one question. A read is a pure function of the
- * picture and the configuration, so the TTL is not about staleness — it bounds
- * how long the text is kept for this purpose.
+ * reloads, without keeping a transcript of a child's writing for longer than
+ * one sitting at one question. It is a cost guard only: Submit does NOT depend
+ * on it. A student who submits after it has gone presents the read receipt
+ * they were given (readReceipt.js) — and without one Submit asks them to read
+ * again; it never buys a read (`paid: false` below).
  */
 export const RECOGNITION_TTL_MS = 15 * 60 * 1000;
 /** The scope of a kept read in idempotency_keys. */
@@ -191,7 +192,7 @@ export function createRecognitionOps({
 } = {}) {
   const settings = { ttlMs, maxTranscriptBytes, now };
   const inFlight = new Map();  // operation id → Promise<outcome>   (this process only)
-  const counters = { providerReads: 0, storedHits: 0, inFlightHits: 0, stored: 0, notStored: 0 };
+  const counters = { providerReads: 0, storedHits: 0, inFlightHits: 0, stored: 0, notStored: 0, unpaidMisses: 0 };
 
   function operationId(accountId, image, env) {
     const match = DATA_URL.exec(String(image || ''));
@@ -284,12 +285,18 @@ export function createRecognitionOps({
    *   { result, reused: false }                 a provider read (paid);
    *   { result, reused: true, source }          a kept read, or a read already
    *                                             in flight (free);
-   *   { refusal: { kind, verdict } }            allowance or ceiling said no.
+   *   { refusal: { kind, verdict } }            allowance or ceiling said no;
+   *   { missing: true }                         `paid: false` and nothing kept.
    * Rejects with the provider's error; nothing is kept from a failure.
    */
-  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null }) {
+  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null, paid = true, fresh = false }) {
     db = asStore(db);
     const id = operationId(accountId, image, env);
+    // `paid: false` — the caller is not the student asking for a read (it is
+    // Submit, binding a transcript they were already shown). It may join a
+    // read in flight or reuse a kept one; it never starts a provider call.
+    // Resolves to { missing: true } when there is nothing to reuse.
+    if (paid === false && (!id || spendCeilingMissing(env).length)) return { missing: true };
     // An image this module cannot identify is never deduplicated: the adapter
     // validates it and refuses it by name.
     // Fail closed: a deployment that holds a key and no ceiling may not offer
@@ -302,7 +309,11 @@ export function createRecognitionOps({
     const running = inFlight.get(id);
     if (running) return joined(await running);
 
-    const kept = await recall(db, id, accountId);
+    // `fresh: true` — the student explicitly asked for this picture to be read
+    // AGAIN (an exam page whose earlier reading was uncertain). A kept read is
+    // not replayed to them; a read already in flight is still joined, and the
+    // new read replaces the kept one. It is a paid read, asked for by name.
+    const kept = fresh ? null : await recall(db, id, accountId);
     if (kept) {
       counters.storedHits += 1;
       recordRecognitionRead('cache');
@@ -312,6 +323,7 @@ export function createRecognitionOps({
     // started its read meanwhile. Join it rather than start a second one.
     const startedMeanwhile = inFlight.get(id);
     if (startedMeanwhile) return joined(await startedMeanwhile);
+    if (paid === false) { counters.unpaidMisses += 1; return { missing: true }; }
 
     const flight = paidRead({ db, accountId, image, env, transcribe, requestId })
       .then(async outcome => {

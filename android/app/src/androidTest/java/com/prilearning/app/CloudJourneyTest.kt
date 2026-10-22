@@ -125,6 +125,7 @@ class CloudJourneyTest {
         val state = waitFor(s, "(function(){if(document.querySelector('.home-greet')&&!$GATE)return 'home';" +
             "var f=document.querySelector('#signup-destination');if(f&&!f.disabled)return 'card';return false;})()", 90_000)
         if (state == "\"home\"") return
+        StoreShots.shot("01-sign-in")
         assertEquals("no device-only entry is offered", "false", eval(s, "!!document.querySelector('[data-testid=hero-offline]')"))
         setValue(s, "#signup-destination", email); Thread.sleep(200)
         click(s, "signup-send-code")
@@ -368,6 +369,7 @@ class CloudJourneyTest {
             // account may not submit (the card says it does not belong to this
             // account). The journey starts on a question issued to this account.
             openTypedQuestion(s, advanceFirst = true)
+            StoreShots.shot("02-practice-question")
             var escrow: JSONObject? = null
             val passed = mutableListOf<String>()
             for (i in 0 until 12) {
@@ -415,11 +417,14 @@ class CloudJourneyTest {
             assertEquals("the marks shown are the server's, not 'unavailable'", "false", eval(s, "!!document.querySelector('[data-grade-unavailable]')"))
             val marks = eval(s, QuestionCardJs.FULL_MARKS).trim('"')
             assertTrue("full marks are shown ($marks)", marks.isNotEmpty())
+            eval(s, "(function(){var e=document.querySelector('.eval-card');if(e)e.scrollIntoView({block:'center'});return true;})()")
+            StoreShots.shot("05-feedback")
             // What the SERVER holds, whatever the screen said.
             val serverId = assertServerMarkedOnce("after the right answer")
             assertEquals("the completed question is the one whose sealed answer was typed", escrow.getString("serverQuestionId"), serverId)
             openHistory(s)
             assertEquals("History shows the server-marked attempt", "Correct", historyVerdict(s, gradedId))
+            StoreShots.shot("06-history")
             gradedFile.writeText(JSONObject().put("id", gradedId).put("server", serverId).toString())
             Log.i("PRITEST", "server marked 0 with a try left, then $marks; History shows Correct")
             // The server recorded the marked attempt as a learning event of its

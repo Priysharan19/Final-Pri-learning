@@ -52,8 +52,23 @@ const ACCOUNT_SCOPED = new Set([
   'entitlement_snapshots', 'entitlement_support_grants',
   'billing_subscriptions', 'billing_trial_claims', 'billing_apple_accounts',
   'billing_google_accounts', 'billing_google_purchases',
-  'idempotency_keys', 'learning_events', 'sync_entities', 'operational_events'
+  'idempotency_keys', 'learning_events', 'sync_entities', 'operational_events',
+  // 20261019000000_rls_account_coverage.sql: every other table that names an
+  // account, scoped through the column(s) in ACCOUNT_OWNER below.
+  'accounts', 'classes', 'class_members', 'assignments', 'assignment_submissions', 'assignment_feedback',
+  'issue_reports', 'billing_payments', 'billing_events', 'billing_apple_signed_events', 'otp_challenges',
+  'audit_log', 'content_revisions', 'teacher_invites', 'feature_flags'
 ]);
+// The ownership predicate of each pri_account_scope policy (default account_id).
+const ACCOUNT_OWNER = new Map([
+  ['accounts', ['id']], ['classes', ['teacher_account_id']], ['class_members', ['student_account_id']],
+  ['assignments', ['teacher_account_id']], ['assignment_submissions', ['student_account_id']],
+  ['assignment_feedback', ['student_account_id', 'teacher_account_id']], ['audit_log', ['actor_account_id']],
+  ['content_revisions', ['author_account_id', 'reviewer_account_id']], ['teacher_invites', ['created_by', 'used_by']],
+  ['feature_flags', ['updated_by']]
+]);
+const scopeExpressionFor = table => SCOPE_EXPRESSION.replace("account_id = current_setting('pri.account_id', true)",
+  (ACCOUNT_OWNER.get(table) || ['account_id']).map(column => `${column} = current_setting('pri.account_id', true)`).join(' or '));
 const REQUIRED_EXPRESSION = "current_setting('pri.scope', true) = ANY (ARRAY['system', 'account'])";
 const REQUIRED_EXPRESSION_ALT = "current_setting('pri.scope', true) in ('system', 'account')";
 const SCOPE_EXPRESSION = "current_setting('pri.scope', true) = 'system' or (current_setting('pri.scope', true) = 'account' and coalesce(current_setting('pri.account_id', true), '') <> '' and account_id = current_setting('pri.account_id', true))";
@@ -314,7 +329,8 @@ export function compareSchemas(sqlite, postgres) {
       } else {
         // System scope, or account scope for exactly this row's account; an
         // unset or empty pri.account_id must never match, for reads and writes.
-        check(canonicalScope(policy.qual) === canonicalScope(SCOPE_EXPRESSION) && canonicalScope(policy.withcheck) === canonicalScope(SCOPE_EXPRESSION),
+        const expected = canonicalScope(scopeExpressionFor(table));
+        check(canonicalScope(policy.qual) === expected && canonicalScope(policy.withcheck) === expected,
           `${table}: policy ${policy.polname} does not scope rows to pri.account_id (USING ${policy.qual}; WITH CHECK ${policy.withcheck})`);
       }
     }

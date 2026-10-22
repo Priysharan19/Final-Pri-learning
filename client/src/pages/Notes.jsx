@@ -12,7 +12,8 @@
 // switched off by prefers-reduced-motion (Notes.css) and the content is fully
 // present without it: the reveal classes only ever hide what is already there.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
 import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
@@ -194,7 +195,7 @@ function NotesIndex() {
                   const num = (group.chapters.indexOf(c) + 1);
                   return (
                     <li key={c.id} className="nt-reveal" style={{ '--i': Math.min(num, 14) }}>
-                      <Link to={chapterNotesLink(c, params)} className="nt-chapter" data-testid="notes-chapter">
+                      <PageLink to={chapterNotesLink(c, params)} className="nt-chapter" data-testid="notes-chapter">
                         <span className="nt-chapter-n">{String(num).padStart(2, '0')}</span>
                         <span className="nt-chapter-body">
                           <span className="nt-chapter-name">{c.name}</span>
@@ -204,7 +205,7 @@ function NotesIndex() {
                         </span>
                         {marks.has(c.id) && <span className="nt-chapter-mark" aria-label={t('notes.bookmarked')}><BookmarkGlyph on /></span>}
                         <span className="nt-chapter-go" aria-hidden="true">→</span>
-                      </Link>
+                      </PageLink>
                       <button type="button" className="nt-mark-btn" aria-pressed={marks.has(c.id)}
                         aria-label={t('notes.bookmarkChapter', { chapter: c.name })} onClick={() => toggleMark(c.id)}>
                         <BookmarkGlyph on={marks.has(c.id)} />
@@ -276,7 +277,7 @@ function ChapterMap({ group, notes }) {
         <ul className="nt-map-strands" aria-hidden="true">
           {strands.map((s, i) => <li key={s} style={{ top: `${((top + i * rowH) / H) * 100}%` }}>{s}</li>)}
         </ul>
-        <div className="nt-map-canvas" style={{ aspectRatio: `${W} / ${H}` }}>
+        <div className="nt-map-canvas" style={{ aspectRatio: `${W} / ${H}`, '--n': group.chapters.length }}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
             {strands.map((s, i) => <line key={s} className="nt-map-row" x1="0" x2={W} y1={top + i * rowH} y2={top + i * rowH} />)}
             <polyline className="nt-map-thread" points={thread} pathLength="1" />
@@ -354,14 +355,14 @@ function SearchResults({ query }) {
       <ol className="nt-chapters">
         {results.slice(0, 40).map(({ c, grade, snippet }) => (
           <li key={c.id}>
-            <Link to={chapterNotesLink(c, params)} className="nt-chapter">
+            <PageLink to={chapterNotesLink(c, params)} className="nt-chapter">
               <span className="nt-chapter-n">{grade}</span>
               <span className="nt-chapter-body">
                 <span className="nt-chapter-name">{c.name}</span>
                 {snippet && <MathText className="nt-chapter-meta" text={snippet} />}
               </span>
               <span className="nt-chapter-go" aria-hidden="true">→</span>
-            </Link>
+            </PageLink>
           </li>
         ))}
       </ol>
@@ -420,16 +421,16 @@ function ChapterNotes({ chapterId }) {
   const backTo = notesIndexReturnLink(chapter, params);
 
   if (!chapter) {
-    return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><Link className="nt-back" to="/notes">← {t('notes.back')}</Link></div>;
+    return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.back')}</PageLink></div>;
   }
   return (
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title">
-      <Link className="nt-back" to={backTo}>← {t('notes.back')}</Link>
+      <PageLink className="nt-back" to={backTo}>← {t('notes.back')}</PageLink>
       <header className="nt-ch-head">
         <p className="nt-eyebrow">{t('common.classNumber', { n: grade })} · {t('notes.chapterNumber', { n: number })} · {chapter.strand}</p>
         <h1 className="nt-title" id="nt-ch-title">{chapter.name}</h1>
         <nav className="nt-path" aria-label={t('study.path')} data-study-path>
-          <Link to="/">{t('study.curriculum')}</Link>
+          <PageLink to="/">{t('study.curriculum')}</PageLink>
           <span>{t('common.classNumber', { n: grade })}</span>
           <span data-study-track>{STUDY_TRACK_LABELS[selected.track]}</span>
           <span>{t('study.subject')}</span>
@@ -468,7 +469,7 @@ function ChapterNotes({ chapterId }) {
           <p className="nt-builds">
             <span>{t('notes.buildsOn')}</span>
             {notes.prereqs.filter(p => IN_CHAPTER_BY_ID[p]).map(p => (
-              <Link key={p} to={chapterNotesLink(IN_CHAPTER_BY_ID[p], params)}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
+              <PageLink key={p} to={chapterNotesLink(IN_CHAPTER_BY_ID[p], params)}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></PageLink>
             ))}
           </p>
         )}

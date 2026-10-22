@@ -33,6 +33,9 @@ permissions:
 # flag-off (client/test/ios-bundle-features-check.mjs).
 env:
   PRI_FEATURE_AUSTRALIA: '1'
+  # Handwriting input in timed exams (off by default in a shipped build): the
+  # browser suites drive the gate-ON flow explicitly.
+  PRI_FEATURE_EXAM_HANDWRITING: '1'
   PRI_FEATURE_EXTENDED_TRACKS: '1'
 
 jobs:
@@ -78,6 +81,11 @@ jobs:
       - name: Build exact client
         run: npm run build --prefix client
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}-chromium
       - name: Install Chromium
         working-directory: client
         run: npx playwright install --with-deps chromium
