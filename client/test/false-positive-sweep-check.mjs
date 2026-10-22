@@ -129,6 +129,11 @@ function numericProbes(q, a) {
     if (u) out.push({ input: `${fmt(v)} ${u}`, why: `wrong unit ${u} (asked ${String(q.answerSuffix).trim()})`, unit: true });
   }
   if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  // On a percentage question a typed % is the answer's unit: 100 times the key
+  // with the sign is 100 times too big, never the key read as ÷100.
+  if ((a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) {
+    out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' });
+  }
   return out;
 }
 
@@ -389,6 +394,32 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const ix = w => methodMarks({ meta: { kind: 'expression', canonical: 'x^1' }, working: w, marks: 2, prompt: 'Simplify $x^{6} \\div x^{5}$.' })?.awarded || 0;
   expect('method: x = x earns nothing on x^6 ÷ x^5', ix('0 = 0\n1 = 1\nx = x') === 0);
   expect('method: a genuine step still earns on x^6 ÷ x^5', ix('x^6/x^5 = x^(6-5)\nx^(6-5) = x') >= 1);
+  // (e) On a percentage question a typed % is the unit (P0, owner review of #667's batch 2):
+  // "6500%" was read as 6500 ÷ 100 and marked right for 65.
+  const own = { answerType: 'numeric', prompt: 'What is the least possible percentage of households that own all three?', answerSuffix: '%', answer: { value: 65 } };
+  for (const input of ['6500%', '6500 %', '13/20%', '0.65%', '0.65', '6500 percent']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  for (const input of ['65', '65%', '65 %', '65 percent', '65 per cent']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  const bySuffix = { answerType: 'numeric', prompt: 'Find the combined mean mark.', answerSuffix: '%', answer: { value: 66.3 } };
+  expect('percent: a % beside the box asks for a percentage, so 66.3% is 66.3', verdict(bySuffix, '66.3%').correct);
+  expect('percent: and 6630% is not', !verdict(bySuffix, '6630%').correct);
+  const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
+  expect('percent: on a question not asking for a percentage, 44% is still 0.44', verdict(prob, '44%').correct);
+  // (f) A label is read off only when it names the asked quantity.
+  const b2 = { answerType: 'numeric', prompt: 'Find $b^2$.', answer: { value: 50 } };
+  for (const input of ['b^2 = 50', 'b² = 50', 'B^2=50']) expect(`label: "${input}" names b², accepted`, verdict(b2, input).correct);
+  for (const input of ['b = 50', 'a^2 = 50', 'c = 50']) expect(`label: "${input}" is not b² = 50`, input === 'c = 50' ? verdict(b2, input).correct : !verdict(b2, input).correct);
+  const pq = { answerType: 'numeric', prompt: 'Find $PQ^2$.', answer: { value: 87.2, simplestFraction: { n: 436, d: 5 }, requireFraction: false } };
+  expect('label: "PQ² = 436/5" accepted', verdict(pq, 'PQ² = 436/5').correct);
+  expect('label: "AB^2 = 436/5" (another length) refused', !verdict(pq, 'AB^2 = 436/5').correct);
+  const area = { answerType: 'numeric', prompt: 'Find the area of triangle PQR.', answer: { value: 72 } };
+  expect('label: "Area = 72" accepted', verdict(area, 'Area = 72').correct);
+  expect('label: "Perimeter = 72" refused', !verdict(area, 'Perimeter = 72').correct);
+  const sum = { answerType: 'numeric', prompt: 'Find $a + b$.', answer: { value: 7 } };
+  expect('label: "a = 7" claims a = 7, refused for a + b', !verdict(sum, 'a = 7').correct);
+  expect('label: "a + b = 7" accepted', verdict(sum, 'a + b = 7').correct);
+  const red = { answerType: 'numeric', prompt: 'Find $P(\\text{red})$ as a fraction in simplest form.', answer: { value: 0.4, simplestFraction: { n: 2, d: 5 } } };
+  expect('label: "P(red) = 2/5" accepted', verdict(red, 'P(red) = 2/5').correct);
+  expect('label: "P = 2/5" still accepted', verdict(red, 'P = 2/5').correct);
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────
