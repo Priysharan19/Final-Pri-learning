@@ -1,218 +1,274 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   Pri Learning · the luxury layer of the instrument interface.
-   Direction: C "Examiner's Chronograph" (cotton paper, engraved hairlines,
-   giant serif maths, chronograph precision) with depth and light borrowed
-   from A "Spatial" (one key light, rim highlights, planes on springs).
-   Reference: https://claude.ai/artifact/W2cFXctgCMAgLREJ7oaW2R (tabs C and A).
+   Pri Learning · the luxury layer of the instrument interface: "Aurora".
+   Liquid glass and depth (visionOS / iOS 26), pro-tool density (Linear, Arc),
+   one luminous signature colour: electric violet-indigo, oklch(0.62 0.22 285),
+   with cyan only as its specular partner. Light and dark are both first-class.
+   A modern sans for the interface; an elegant serif for headlines and maths.
 
-   Rules: marks come only from the deterministic engine; a wrong answer is
-   never celebrated; marks differ by shape as well as colour; no gradients on
-   surfaces; glass only on the floating tab bar and Check dock, never behind
-   maths; reduced motion shows the complete final frame.
+   Rules:
+   - Light is the accent. Glow belongs to the live thing: the ink, a mark, the
+     primary action, focus. Nothing glows that is not live.
+   - Glass sits over depth, never behind maths or handwriting. Every glass
+     surface turns opaque under Reduce Transparency and in forced colours.
+   - Marks come only from the deterministic engine and differ by shape as well
+     as colour. A wrong answer is never celebrated.
+   - Motion is spatial and springy but interruptible; Reduce Motion shows the
+     final frame and stops the aurora.
+   - Never cartoony, never flat: depth comes from layered translucency, a
+     single specular rim and soft coloured shadow, not from heavy borders.
 
-   Loaded after instrument.css and scoped to html.ui-instrument, so it exists
-   only in a PRI_FEATURE_INSTRUMENT build. It remaps every --in-* token, so each
-   instrument screen takes the new material before its own pass lands.
-   Colours are OKLCH with an sRGB hex fallback (WebKit before 15.4).
+   Loaded after instrument.css and scoped to html.ui-instrument (instrument
+   build only). It remaps every --in-* token. The --c-* names from the earlier
+   direction are kept as aliases so screen layers keep working while they are
+   restyled; new work uses --a-*.
    ───────────────────────────────────────────────────────────────────────────── */
 
-/* Self-hosted subsets (fonts/README.md). Latin only: Devanagari falls through
-   to the system Hindi faces named in each stack. Four faces, not six: italics
-   are set in STIX Two italic (Instrument Serif's italic cut cost 15 kB) and
-   there is no STIX 600 (the date window is STIX 400 tabular), which keeps the
-   instrument build inside its install ceiling. Ask for neither. */
+/* Self-hosted subsets (fonts/README.md). Instrument Serif for headlines, STIX
+   Two for maths and its italics. The interface face is Instrument Sans
+   (instrument.css). Devanagari falls through to the system Hindi faces. */
 @font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/iserif-400.woff2) format('woff2'); }
 @font-face { font-family: 'STIX Two Text'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/stix-400.woff2) format('woff2'); }
 @font-face { font-family: 'STIX Two Text'; font-style: italic; font-weight: 400; font-display: swap; src: url(./fonts/stix-400i.woff2) format('woff2'); }
-@font-face { font-family: 'Cormorant SC'; font-style: normal; font-weight: 600; font-display: swap; src: url(./fonts/cormorant-sc-600.woff2) format('woff2'); }
 
-/* ── Cotton paper (day) ──────────────────────────────────────────────────── */
-/* One departure from the reference: copper is #b0440e, not #b4470f, so the
-   examiner's copper text meets AA on the paper-2 wells (4.63:1, was 4.43). */
+/* ── Light ───────────────────────────────────────────────────────────────── */
 html.ui-instrument {
-  --c-paper: #f5f1e8; --c-paper-2: #ede7da; --c-sheet: #fbf9f4;
-  --c-ink: #1a1916; --c-ink-2: #4f4a41; --c-ink-3: #6b6457;
-  --c-hair: #b9ae99; --c-hair-2: #d8cfbf;
-  --c-teal: #0b6e69; --c-teal-soft: rgba(11, 110, 105, 0.1);
-  --c-copper: #b0440e; --c-copper-soft: rgba(180, 71, 15, 0.09);
-  --c-dial: #f9f6ef; --c-dial-line: #2a2823;
-  --c-bezel: #e3ddd0; --c-bezel-2: #cfc7b7; --c-bezel-3: #c2b9a7;
-  --c-lume: #0b6e69;
-  --c-hand: #1d1c19; --c-hand-2: #4a463f;
-  --c-emboss-hi: rgba(255, 255, 255, 0.85); --c-emboss-lo: rgba(60, 45, 20, 0.22);
-  --c-pen: #1f2a44;
-  --c-on-teal: #fbf9f4;
-  /* A's light: specular colour, the two desk pools, glass edge. */
-  --c-spec: rgba(255, 255, 255, 0.95);
-  --c-pool-teal: rgba(11, 110, 105, 0.13); --c-pool-copper: rgba(180, 71, 15, 0.08);
-  --c-glass-edge: rgba(255, 255, 255, 0.9);
-  /* Engraved depth: one hairline width, one lift, one float. */
-  --c-line: 1px;
-  --c-lift: inset 0 1px 0 var(--c-emboss-hi), 0 0 0 var(--c-line) var(--c-hair-2), 0 1px 2px rgba(60, 45, 20, 0.06);
-  --c-float: 0 0 0 var(--c-line) var(--c-hair), 0 18px 40px -16px rgba(60, 45, 20, 0.28), 0 2px 6px rgba(60, 45, 20, 0.06);
-  --c-deboss: inset 0 1px 2px var(--c-emboss-lo), 0 1px 0 var(--c-emboss-hi);
+  --a-bg: #f6f6fb; --a-surface: #fdfdff; --a-raised: #ffffff;
+  --a-ink: #191928; --a-ink-2: #4b4b5d; --a-ink-3: #67677a;
+  --a-line: #d6d6df; --a-line-soft: rgba(25, 25, 40, 0.07);
+  --a-violet: #6445df;            /* text, links, primary fill (AA on light) */
+  --a-brand: #7f67ff;             /* the glow itself: oklch(0.62 0.22 285) */
+  --a-cyan: #007a94;              /* specular partner only, never body text */
+  --a-warn: #c13c3b;              /* the examiner's "wrong", shape-coded */
+  --a-on-violet: #ffffff;
+  --a-violet-soft: rgba(127, 103, 255, 0.12);
+  --a-warn-soft: rgba(193, 60, 59, 0.1);
+  --a-glow: 0 0 0 1px rgba(127, 103, 255, 0.35), 0 8px 28px -6px rgba(127, 103, 255, 0.45);
+  --a-glass: rgba(255, 255, 255, 0.62);
+  --a-glass-strong: rgba(255, 255, 255, 0.8);
+  --a-glass-edge: rgba(255, 255, 255, 0.9);
+  --a-spec: rgba(255, 255, 255, 0.95);
+  --a-shadow-1: 0 1px 2px rgba(22, 20, 60, 0.06), 0 0 0 1px var(--a-line-soft);
+  --a-shadow-2: 0 10px 30px -12px rgba(48, 36, 140, 0.22), 0 2px 6px rgba(22, 20, 60, 0.06), 0 0 0 1px var(--a-line-soft);
+  --a-shadow-3: 0 24px 60px -20px rgba(48, 36, 140, 0.32), 0 4px 12px rgba(22, 20, 60, 0.08), 0 0 0 1px var(--a-line-soft);
+  /* Aurora fields: three soft pools of light on the desk. */
+  --a-pool-1: rgba(127, 103, 255, 0.22); --a-pool-2: rgba(0, 170, 210, 0.12); --a-pool-3: rgba(170, 120, 255, 0.14);
 
-  /* Type: body and maths in STIX Two, display in Instrument Serif, labels in
-     Cormorant SC. Interface chrome keeps Instrument Sans (instrument.css). */
-  --c-serif: 'Instrument Serif', 'Tiro Devanagari Hindi', 'Kohinoor Devanagari', Georgia, serif;
-  --c-italic: 'STIX Two Text', 'Tiro Devanagari Hindi', Georgia, serif;
-  --c-text: 'STIX Two Text', 'Tiro Devanagari Hindi', 'Kohinoor Devanagari', Georgia, serif;
-  --c-sc: 'Cormorant SC', 'Kohinoor Devanagari', Georgia, serif;
-  --c-t-body: 400 16px/1.5 var(--c-text);
-  --c-t-label: 600 13px/1.2 var(--c-sc);
-  --c-t-tab: 600 14px/1.2 var(--c-sc);
-  --c-t-button: 600 15px/1 var(--c-sc);
-  --c-t-mast: 400 clamp(40px, 7vw, 84px)/0.95 var(--c-serif);
-  --c-t-eq: 400 clamp(40px, 7.4cqi, 82px)/1.02 var(--c-text);
-  --c-t-wq: 400 clamp(28px, 5cqi, 52px)/1.05 var(--c-text);
-  --c-t-big: 400 clamp(72px, 12cqi, 140px)/0.9 var(--c-serif);
+  --a-sans: var(--in-ui, 'Instrument Sans Variable', -apple-system, 'Segoe UI', sans-serif);
+  --a-serif: 'Instrument Serif', 'Tiro Devanagari Hindi', 'Kohinoor Devanagari', Georgia, serif;
+  --a-math: 'STIX Two Text', 'Tiro Devanagari Hindi', Georgia, serif;
+  --a-t-display: 400 clamp(40px, 6vw, 76px)/1 var(--a-serif);
+  --a-t-title: 600 22px/1.25 var(--a-sans);
+  --a-t-body: 400 15px/1.5 var(--a-sans);
+  --a-t-small: 400 13px/1.45 var(--a-sans);
+  --a-t-label: 600 11px/1.2 var(--a-sans);
+  --a-t-eq: 400 clamp(32px, 5cqi, 64px)/1.08 var(--a-math);
 
-  /* Radii: engraved precision, 8px at most everywhere. The pill is a named
-     token for primary actions and chips only (margin-design-check enforces). */
-  --c-radius: 4px; --c-radius-lg: 6px; --radius-pill: 999px;
+  /* Radii: soft, continuous, never pill-everything. 8px at most on surfaces;
+     the pill is a named token for primary actions and chips only. */
+  --a-radius-sm: 6px; --a-radius: 8px; --radius-pill: 999px;
+  --a-line-w: 1px;
 
-  /* Easings and durations from the C reference (motion.js holds keyframes). */
-  --c-ease-sweep: cubic-bezier(0.45, 0, 0.2, 1);
-  --c-ease-row: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --c-ease-set: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --c-ease-engrave: cubic-bezier(0.6, 0, 0.2, 1);
-  --c-ease-press: cubic-bezier(0.3, 0, 0.2, 1);
-  --c-d-press: 120ms; --c-d-row: 260ms; --c-d-set: 420ms; --c-d-engrave: 800ms;
+  /* Motion (motion.js holds the springs). */
+  --a-ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1.05);
+  --a-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --a-d-press: 120ms; --a-d-quick: 220ms; --a-d-move: 420ms;
 
-  /* Every instrument token, remapped. The surface ladder keeps its order:
-     l1 is the lightest sheet, l2–l5 step darker for hover, pressed and wells. */
-  --in-void: var(--c-paper-2); --in-base: var(--c-paper); --in-l1: var(--c-sheet);
-  --in-l2: #f8f5ee; --in-l3: var(--c-paper-2); --in-l4: var(--c-bezel); --in-l5: var(--c-bezel-2);
-  --in-edge: var(--c-hair-2); --in-edge-2: var(--c-hair); --in-edge-3: var(--c-bezel-3);
-  --in-tx: var(--c-ink); --in-tx-2: var(--c-ink-2); --in-tx-3: var(--c-ink-3);
-  --in-action: var(--c-teal); --in-on-action: var(--c-on-teal); --in-signal: var(--c-teal);
-  --in-good: var(--c-teal); --in-slip: var(--c-copper); --in-bad: var(--c-copper); --in-ink: var(--c-pen);
-  --in-hi: var(--c-emboss-hi); --in-shadow: rgba(60, 45, 20, 0.2);
-  --accent-hover: #095c58; --accent-pressed: #074a47;
-  --accent-soft: var(--c-teal-soft); --accent-line: rgba(11, 110, 105, 0.35);
-  --control-border: #8a8170;
-  --page: var(--c-paper);
-  --shadow: var(--c-float); --shadow-sm: var(--c-lift);
+  /* Aliases kept for screen layers still on the earlier token names. */
+  --c-paper: var(--a-bg); --c-paper-2: #ededf5; --c-sheet: var(--a-surface);
+  --c-ink: var(--a-ink); --c-ink-2: var(--a-ink-2); --c-ink-3: var(--a-ink-3);
+  --c-hair: var(--a-line); --c-hair-2: #e6e6ee;
+  --c-teal: var(--a-violet); --c-teal-soft: var(--a-violet-soft); --c-lume: var(--a-brand);
+  --c-copper: var(--a-warn); --c-copper-soft: var(--a-warn-soft);
+  --c-pen: #1f1d4a; --c-on-teal: var(--a-on-violet);
+  --c-dial: var(--a-surface); --c-dial-line: var(--a-ink); --c-bezel: #e6e6ee; --c-bezel-2: #d6d6df; --c-bezel-3: #c4c4d0;
+  --c-hand: var(--a-ink); --c-hand-2: var(--a-ink-2);
+  --c-emboss-hi: rgba(255, 255, 255, 0.85); --c-emboss-lo: rgba(22, 20, 60, 0.18);
+  --c-spec: var(--a-spec); --c-glass-edge: var(--a-glass-edge);
+  --c-pool-teal: var(--a-pool-1); --c-pool-copper: var(--a-pool-2);
+  --c-line: var(--a-line-w);
+  --c-lift: var(--a-shadow-1); --c-float: var(--a-shadow-3); --c-deboss: inset 0 1px 2px rgba(22, 20, 60, 0.12);
+  --c-serif: var(--a-serif); --c-text: var(--a-math); --c-italic: var(--a-math); --c-sc: var(--a-sans);
+  --c-t-label: var(--a-t-label); --c-t-mast: var(--a-t-display); --c-t-eq: var(--a-t-eq);
+  --c-t-wq: 400 clamp(22px, 1.6vw + 10px, 30px)/1.25 var(--a-math);
+  --c-t-big: 400 clamp(64px, 10cqi, 120px)/0.95 var(--a-serif);
+  --c-radius: var(--a-radius-sm); --c-radius-lg: var(--a-radius);
+  --c-ease-press: var(--a-ease-out); --c-ease-row: var(--a-ease-out); --c-ease-set: var(--a-ease-out); --c-ease-sweep: var(--a-ease-spring); --c-ease-engrave: var(--a-ease-out);
+  --c-d-press: var(--a-d-press); --c-d-row: 260ms; --c-d-set: var(--a-d-move); --c-d-engrave: 800ms;
+
+  /* Every instrument token, remapped. */
+  --in-void: var(--a-bg); --in-base: var(--a-bg); --in-l1: var(--a-surface);
+  --in-l2: #f9f9fd; --in-l3: #ededf5; --in-l4: #e2e2ec; --in-l5: #d6d6df;
+  --in-edge: var(--a-line-soft); --in-edge-2: var(--a-line); --in-edge-3: #c4c4d0;
+  --in-tx: var(--a-ink); --in-tx-2: var(--a-ink-2); --in-tx-3: var(--a-ink-3);
+  --in-action: var(--a-violet); --in-on-action: var(--a-on-violet); --in-signal: var(--a-violet);
+  --in-good: var(--a-violet); --in-slip: var(--a-warn); --in-bad: var(--a-warn); --in-ink: var(--c-pen);
+  --in-hi: rgba(255, 255, 255, 0.85); --in-shadow: rgba(48, 36, 140, 0.2);
+  --accent-hover: #5636d0; --accent-pressed: #4a2cbb;
+  --accent-soft: var(--a-violet-soft); --accent-line: rgba(100, 69, 223, 0.4);
+  --control-border: #9a9aae;
+  --page: var(--a-bg);
+  --shadow: var(--a-shadow-3); --shadow-sm: var(--a-shadow-1);
 }
 @supports (color: oklch(0% 0 0)) {
   html.ui-instrument {
-    --c-paper: oklch(95.9% 0.013 86.8); --c-paper-2: oklch(92.9% 0.019 86.1); --c-sheet: oklch(98.2% 0.007 88.6);
-    --c-ink: oklch(21.3% 0.006 91.6); --c-ink-2: oklch(41.1% 0.016 82.4); --c-ink-3: oklch(50.6% 0.022 83);
-    --c-teal: oklch(48.7% 0.082 189.2); --c-copper: oklch(52.7% 0.153 41.8); --c-pen: oklch(28.8% 0.05 265.9);
+    --a-bg: oklch(97.5% 0.006 285); --a-surface: oklch(99.5% 0.003 285);
+    --a-ink: oklch(22% 0.03 285); --a-ink-2: oklch(42% 0.03 285); --a-ink-3: oklch(52% 0.03 285);
+    --a-violet: oklch(52% 0.22 285); --a-brand: oklch(62% 0.22 285); --a-warn: oklch(55% 0.17 25);
   }
 }
 
-/* ── Midnight enamel (night) ─────────────────────────────────────────────── */
+/* ── Dark ────────────────────────────────────────────────────────────────── */
 html.ui-instrument[data-theme="dark"] {
-  --c-paper: #0a1115; --c-paper-2: #0f191e; --c-sheet: #0d171c;
-  --c-ink: #ece6d8; --c-ink-2: #b4ae9f; --c-ink-3: #9a9586;
-  --c-hair: #3d4c51; --c-hair-2: #1f2d33;
-  --c-teal: #63d2c4; --c-teal-soft: rgba(99, 210, 196, 0.1);
-  --c-copper: #ee9b63; --c-copper-soft: rgba(238, 155, 99, 0.1);
-  --c-dial: #0c1820; --c-dial-line: #cbc4b2;
-  --c-bezel: #1a252b; --c-bezel-2: #2a383e; --c-bezel-3: #34444a;
-  --c-lume: #7fe6d7;
-  --c-hand: #e9e2d0; --c-hand-2: #a59f8f;
-  --c-emboss-hi: rgba(255, 255, 255, 0.07); --c-emboss-lo: rgba(0, 0, 0, 0.6);
-  --c-pen: #e7e1d2;
-  --c-on-teal: #0a1115;
-  --c-spec: rgba(255, 255, 255, 0.55);
-  --c-pool-teal: rgba(71, 189, 179, 0.2); --c-pool-copper: rgba(240, 145, 92, 0.1);
-  --c-glass-edge: rgba(255, 255, 255, 0.16);
-  --c-lift: inset 0 1px 0 var(--c-emboss-hi), 0 0 0 var(--c-line) var(--c-hair-2);
-  --c-float: 0 0 0 var(--c-line) var(--c-hair), 0 22px 48px -14px rgba(0, 0, 0, 0.7);
-  /* instrument.css sets its night tokens as literals on this same, more
-     specific selector, so every remap is repeated here or the night theme
-     stays the old graphite. */
-  --in-void: var(--c-paper-2); --in-base: var(--c-paper); --in-l1: var(--c-sheet);
-  --in-l2: #0f191e; --in-l3: var(--c-bezel); --in-l4: var(--c-bezel-2); --in-l5: var(--c-bezel-3);
-  --in-edge: var(--c-hair-2); --in-edge-2: var(--c-hair); --in-edge-3: #4a5a60;
-  --in-tx: var(--c-ink); --in-tx-2: var(--c-ink-2); --in-tx-3: var(--c-ink-3);
-  --in-action: var(--c-teal); --in-on-action: var(--c-on-teal); --in-signal: var(--c-teal);
-  --in-good: var(--c-teal); --in-slip: var(--c-copper); --in-bad: var(--c-copper); --in-ink: var(--c-pen);
-  --in-hi: var(--c-emboss-hi);
-  --accent-soft: var(--c-teal-soft);
-  --shadow: var(--c-float); --shadow-sm: var(--c-lift);
-  --in-shadow: rgba(0, 0, 0, 0.6);
-  --accent-hover: #80ddd1; --accent-pressed: #4fb8ab;
-  --accent-line: rgba(99, 210, 196, 0.35);
-  --control-border: #6d7b80;
+  --a-bg: #080715; --a-surface: #100f20; --a-raised: #19182c;
+  --a-ink: #f1f1f8; --a-ink-2: #bcbcca; --a-ink-3: #9c9dae;
+  --a-line: #313047; --a-line-soft: rgba(255, 255, 255, 0.07);
+  --a-violet: #9b90ff; --a-brand: #8f7bff; --a-cyan: #58e0f6; --a-warn: #f47b74;
+  --a-on-violet: #080715;
+  --a-violet-soft: rgba(143, 123, 255, 0.16);
+  --a-warn-soft: rgba(244, 123, 116, 0.12);
+  --a-glow: 0 0 0 1px rgba(155, 144, 255, 0.45), 0 10px 36px -6px rgba(127, 103, 255, 0.6);
+  --a-glass: rgba(24, 22, 48, 0.55);
+  --a-glass-strong: rgba(24, 22, 48, 0.78);
+  --a-glass-edge: rgba(255, 255, 255, 0.14);
+  --a-spec: rgba(255, 255, 255, 0.5);
+  --a-shadow-1: 0 0 0 1px var(--a-line-soft);
+  --a-shadow-2: 0 14px 40px -14px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--a-line-soft);
+  --a-shadow-3: 0 30px 70px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.09);
+  --a-pool-1: rgba(127, 103, 255, 0.32); --a-pool-2: rgba(40, 200, 240, 0.14); --a-pool-3: rgba(190, 110, 255, 0.2);
+
+  --c-paper-2: #141327; --c-hair-2: #232238; --c-pen: #eeeaff;
+  --c-bezel: #1d1c32; --c-bezel-2: #2a2942; --c-bezel-3: #383752;
+  --c-emboss-hi: rgba(255, 255, 255, 0.06); --c-emboss-lo: rgba(0, 0, 0, 0.6);
+  --c-deboss: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  /* instrument.css sets night literals on this same selector, so every remap
+     is restated here or the night theme keeps the old graphite. */
+  --in-void: var(--a-bg); --in-base: var(--a-bg); --in-l1: var(--a-surface);
+  --in-l2: #141327; --in-l3: #1d1c32; --in-l4: #2a2942; --in-l5: #383752;
+  --in-edge: var(--a-line-soft); --in-edge-2: var(--a-line); --in-edge-3: #45445f;
+  --in-tx: var(--a-ink); --in-tx-2: var(--a-ink-2); --in-tx-3: var(--a-ink-3);
+  --in-action: var(--a-violet); --in-on-action: var(--a-on-violet); --in-signal: var(--a-violet);
+  --in-good: var(--a-violet); --in-slip: var(--a-warn); --in-bad: var(--a-warn); --in-ink: var(--c-pen);
+  --in-hi: rgba(255, 255, 255, 0.06); --in-shadow: rgba(0, 0, 0, 0.6);
+  --accent-hover: #b0a8ff; --accent-pressed: #8a7ef0;
+  --accent-soft: var(--a-violet-soft); --accent-line: rgba(155, 144, 255, 0.4);
+  --control-border: #6c6b86;
+  --shadow: var(--a-shadow-3); --shadow-sm: var(--a-shadow-1);
 }
 @supports (color: oklch(0% 0 0)) {
   html.ui-instrument[data-theme="dark"] {
-    --c-paper: oklch(17.2% 0.014 233.6); --c-paper-2: oklch(20.6% 0.018 230.3); --c-sheet: oklch(19.7% 0.018 230.4);
-    --c-ink: oklch(92.6% 0.02 87.5); --c-ink-2: oklch(75.2% 0.022 88.8); --c-ink-3: oklch(67% 0.022 91.7);
-    --c-teal: oklch(79.5% 0.104 184.4); --c-copper: oklch(76.1% 0.123 53.8); --c-pen: oklch(91% 0.021 88.7);
+    --a-bg: oklch(14% 0.03 285); --a-surface: oklch(18% 0.035 285);
+    --a-ink: oklch(96% 0.01 285); --a-ink-2: oklch(80% 0.02 285); --a-ink-3: oklch(70% 0.025 285);
+    --a-violet: oklch(71.1% 0.159 286.2); --a-warn: oklch(72% 0.15 25);
   }
 }
 
+/* ── The aurora: a living field of light behind everything ───────────────────
+   Three blurred pools, each a pre-blurred radial gradient on its own
+   compositor layer, drifting by transform only (no per-frame paint). It
+   brightens with progress: set --a-progress (0–1) on .a-aurora. Paused when
+   hidden and stopped under Reduce Motion; gone in forced colours. This is the
+   one place gradients fill an area: light falling on the desk, never on a
+   surface or text. */
+.ui-instrument .a-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--a-bg); contain: strict; }
+.ui-instrument .a-aurora i {
+  position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; will-change: transform;
+  opacity: calc(0.55 + 0.45 * var(--a-progress, 0));
+  animation: a-drift 38s var(--a-ease-out) infinite alternate;
+}
+.ui-instrument .a-aurora i:nth-child(1) { left: -20vmax; top: -30vmax; background: radial-gradient(closest-side, var(--a-pool-1), transparent); }
+.ui-instrument .a-aurora i:nth-child(2) { right: -25vmax; top: -10vmax; background: radial-gradient(closest-side, var(--a-pool-2), transparent); animation-duration: 46s; animation-delay: -12s; }
+.ui-instrument .a-aurora i:nth-child(3) { left: 20vmax; bottom: -40vmax; background: radial-gradient(closest-side, var(--a-pool-3), transparent); animation-duration: 52s; animation-delay: -24s; }
+@keyframes a-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); } }
+
 /* ── Materials ───────────────────────────────────────────────────────────────
-   Opaque paper everywhere; depth is engraved (one hairline, one inset
-   highlight). No full-screen grain or blend layer: it would re-blend the
-   whole page on every ink frame. .c-glass is for the floating tab bar and
-   Check dock only: one 12px blur pass, opaque before color-mix() support and
-   under Reduce Transparency. */
-.ui-instrument .c-desk { background: var(--c-paper); }
-.ui-instrument .c-sheet { background: var(--c-sheet); box-shadow: var(--c-lift); border-radius: var(--c-radius-lg); }
-.ui-instrument .c-float { background: var(--c-sheet); box-shadow: var(--c-float); border-radius: var(--c-radius-lg); }
-.ui-instrument .c-well { background: var(--c-paper-2); box-shadow: var(--c-deboss); border-radius: var(--c-radius); }
-.ui-instrument .c-glass { background: var(--c-sheet); box-shadow: inset 0 0 0 var(--c-line) var(--c-glass-edge), var(--c-float); }
+   .a-surface  opaque, for reading and writing (maths and ink live here)
+   .a-card     raised opaque card with soft coloured depth
+   .a-glass    frosted glass for floating chrome (bar, dock, sheets, ⌘K)
+   .a-float    the highest glass layer (popovers, the command palette)
+   Glass is one blur pass, opaque before color-mix support and under Reduce
+   Transparency; never stacked more than two deep. */
+.ui-instrument .a-surface { background: var(--a-surface); box-shadow: var(--a-shadow-1); border-radius: var(--a-radius); }
+.ui-instrument .a-card { background: var(--a-raised); box-shadow: var(--a-shadow-2); border-radius: var(--a-radius); }
+.ui-instrument .a-glass, .ui-instrument .a-float, .ui-instrument .c-glass {
+  background: var(--a-surface); border-radius: var(--a-radius);
+  box-shadow: inset 0 1px 0 var(--a-glass-edge), var(--a-shadow-2);
+}
+.ui-instrument .a-float { box-shadow: inset 0 1px 0 var(--a-glass-edge), var(--a-shadow-3); }
 @supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .ui-instrument .c-glass { background: color-mix(in srgb, var(--c-sheet) 74%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .ui-instrument .a-glass, .ui-instrument .c-glass { background: var(--a-glass); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); }
+  .ui-instrument .a-float { background: var(--a-glass-strong); -webkit-backdrop-filter: blur(28px) saturate(1.5); backdrop-filter: blur(28px) saturate(1.5); }
 }
 @media (prefers-reduced-transparency: reduce) {
-  .ui-instrument .c-glass { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); }
+  .ui-instrument .a-glass, .ui-instrument .a-float, .ui-instrument .c-glass { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--a-surface); }
 }
+/* The earlier material names, mapped onto Aurora while screens migrate. */
+.ui-instrument .c-desk { background: transparent; }
+.ui-instrument .c-sheet { background: var(--a-surface); box-shadow: var(--a-shadow-1); border-radius: var(--a-radius); }
+.ui-instrument .c-float { background: var(--a-raised); box-shadow: var(--a-shadow-3); border-radius: var(--a-radius); }
+.ui-instrument .c-well { background: var(--c-paper-2); border-radius: var(--a-radius-sm); }
 
-/* A's rim light: a 1px ring on raised objects (bezel, question card, score
-   window), lit from --lx/--ly (light.js). This is light on an edge, masked
-   to the ring, never a surface fill. */
-.ui-instrument .c-rim { position: relative; isolation: isolate; }
-.ui-instrument .c-rim::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: var(--c-line); pointer-events: none;
-  background: radial-gradient(70% 90% at var(--lx, 30%) var(--ly, -10%), var(--c-spec), transparent 60%);
+/* The specular rim: a 1px ring lit from --lx/--ly (light.js) on floating
+   glass and the hero object. Light on an edge, masked to the ring. */
+.ui-instrument .a-rim, .ui-instrument .c-rim { position: relative; isolation: isolate; }
+.ui-instrument .a-rim::before, .ui-instrument .c-rim::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: var(--a-line-w); pointer-events: none;
+  background: radial-gradient(70% 90% at var(--lx, 30%) var(--ly, -10%), var(--a-spec), transparent 60%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
 }
-@media (forced-colors: active) { .ui-instrument .c-rim::before { display: none; } }
 
 /* ── Type ────────────────────────────────────────────────────────────────── */
 html.ui-instrument body { font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; font-kerning: normal; }
-html.ui-instrument :focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
-.ui-instrument .c-label { font: var(--c-t-label); letter-spacing: 0.14em; color: var(--c-ink-2); }
-.ui-instrument .c-mast { font: var(--c-t-mast); letter-spacing: -0.01em; text-wrap: balance; color: var(--c-ink); }
-.ui-instrument .c-eq { font: var(--c-t-eq); letter-spacing: -0.015em; white-space: nowrap; }
+html.ui-instrument :focus-visible { outline: 2px solid var(--a-violet); outline-offset: 2px; box-shadow: 0 0 0 6px var(--a-violet-soft); }
+.ui-instrument .a-label, .ui-instrument .c-label { font: var(--a-t-label); letter-spacing: 0.06em; text-transform: uppercase; color: var(--a-ink-3); }
+.ui-instrument .a-display, .ui-instrument .c-mast { font: var(--a-t-display); letter-spacing: -0.02em; text-wrap: balance; color: var(--a-ink); }
+.ui-instrument .a-eq, .ui-instrument .c-eq { font: var(--a-t-eq); letter-spacing: -0.01em; white-space: nowrap; }
 .ui-instrument .c-big { font: var(--c-t-big); font-variant-numeric: tabular-nums; }
-.ui-instrument .c-num { font-variant-numeric: tabular-nums lining-nums; }
-.ui-instrument :lang(hi) .c-label, .ui-instrument .c-label:lang(hi) { letter-spacing: 0; line-height: 1.35; }
+.ui-instrument .a-num, .ui-instrument .c-num { font-variant-numeric: tabular-nums lining-nums; }
+.ui-instrument :lang(hi) .a-label, .ui-instrument .a-label:lang(hi), .ui-instrument :lang(hi) .c-label, .ui-instrument .c-label:lang(hi) { letter-spacing: 0; text-transform: none; line-height: 1.35; }
 
 /* ── Controls ────────────────────────────────────────────────────────────── */
-.ui-instrument .c-btn {
-  min-height: 44px; padding: 0 20px; border-radius: var(--c-radius); border: var(--c-line) solid var(--c-hair);
-  background: var(--c-sheet); color: var(--c-ink); font: var(--c-t-button); letter-spacing: 0.12em; cursor: pointer;
-  transition: transform var(--c-d-press) var(--c-ease-press), background-color var(--c-d-press) var(--c-ease-press);
+.ui-instrument .c-btn, .ui-instrument .a-btn {
+  min-height: 44px; padding: 0 18px; border-radius: var(--a-radius); border: var(--a-line-w) solid var(--a-line);
+  background: var(--a-raised); color: var(--a-ink); font: 600 14px/1 var(--a-sans); cursor: pointer;
+  transition: transform var(--a-d-press) var(--a-ease-out), background-color var(--a-d-press) var(--a-ease-out), box-shadow var(--a-d-quick) var(--a-ease-out);
 }
-.ui-instrument .c-btn:hover { background: var(--in-l2); }
-.ui-instrument .c-btn:active { transform: scale(0.97); }
-.ui-instrument .c-btn:disabled { opacity: 0.55; cursor: default; transform: none; }
-.ui-instrument .c-btn-primary { border-radius: var(--radius-pill); background: var(--c-teal); border-color: var(--c-teal); color: var(--c-on-teal); }
-.ui-instrument .c-btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-.ui-instrument .c-chip { border-radius: var(--radius-pill); min-height: 44px; padding: 0 14px; border: var(--c-line) solid var(--c-hair); background: var(--c-sheet); font: var(--c-t-label); letter-spacing: 0.12em; color: var(--c-ink-2); cursor: pointer; }
-.ui-instrument .c-chip[aria-pressed="true"] { background: var(--c-ink); border-color: var(--c-ink); color: var(--c-sheet); }
+.ui-instrument .c-btn:hover, .ui-instrument .a-btn:hover { background: var(--in-l2); }
+.ui-instrument .c-btn:active, .ui-instrument .a-btn:active { transform: scale(0.97); }
+.ui-instrument .c-btn:disabled, .ui-instrument .a-btn:disabled { opacity: 0.45; cursor: default; transform: none; box-shadow: none; }
+/* The primary glows: it is the live thing on the screen. */
+.ui-instrument .c-btn-primary, .ui-instrument .a-btn-primary {
+  border-radius: var(--radius-pill); border-color: transparent; background: var(--a-violet); color: var(--a-on-violet); box-shadow: var(--a-glow);
+}
+.ui-instrument .c-btn-primary:hover, .ui-instrument .a-btn-primary:hover { background: var(--accent-hover); }
+.ui-instrument .c-chip, .ui-instrument .a-chip {
+  border-radius: var(--radius-pill); min-height: 44px; padding: 0 14px; border: var(--a-line-w) solid var(--a-line);
+  background: var(--a-surface); font: 500 13px/1 var(--a-sans); color: var(--a-ink-2); cursor: pointer;
+}
+.ui-instrument .c-chip[aria-pressed="true"], .ui-instrument .a-chip[aria-pressed="true"] { background: var(--a-violet-soft); border-color: transparent; color: var(--a-violet); box-shadow: inset 0 0 0 1px var(--accent-line); }
 
-/* Marks differ by shape as well as colour (MarkGlyph in MarginIcon.jsx). */
-.ui-instrument .c-mark-ok { color: var(--c-teal); }
-.ui-instrument .c-mark-x, .ui-instrument .c-mark-ecf { color: var(--c-copper); }
+/* Marks differ by shape as well as colour (MarkGlyph). Correct marks glow. */
+.ui-instrument .c-mark-ok { color: var(--a-violet); filter: drop-shadow(0 0 6px var(--a-violet-soft)); }
+.ui-instrument .c-mark-x, .ui-instrument .c-mark-ecf { color: var(--a-warn); }
 
-/* The icon set: teal only on the live part, copper only on marking icons. */
-.ui-instrument .m-icon .acc { stroke: var(--c-teal); }
-.ui-instrument .m-icon .cop { stroke: var(--c-copper); }
-@media (forced-colors: active) { .ui-instrument .m-icon .acc, .ui-instrument .m-icon .cop { stroke: currentColor; } }
+/* The icon set: violet on the live part, warn only on marking icons. */
+.ui-instrument .m-icon .acc { stroke: var(--a-violet); }
+.ui-instrument .m-icon .cop { stroke: var(--a-warn); }
 
-/* ── Reduced motion: clamp what moves; never add a fade that wasn't there ── */
+/* ── Forced colours: no glow, no glass, no aurora ────────────────────────── */
+@media (forced-colors: active) {
+  .ui-instrument .a-aurora, .ui-instrument .a-rim::before, .ui-instrument .c-rim::before { display: none; }
+  .ui-instrument .a-glass, .ui-instrument .a-float, .ui-instrument .c-glass { -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ui-instrument .c-btn-primary, .ui-instrument .a-btn-primary { box-shadow: none; }
+  .ui-instrument .m-icon .acc, .ui-instrument .m-icon .cop { stroke: currentColor; }
+}
+
+/* ── Reduced motion: clamp what moves; the aurora stands still ───────────── */
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument *, html.ui-instrument *::before, html.ui-instrument *::after {
     animation-duration: 1ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important;
     transition-duration: 1ms !important; transition-delay: 0ms !important;
   }
+  .ui-instrument .a-aurora i { animation: none !important; }
 }

@@ -1,4 +1,4 @@
-// Pri Learning · the luxury layer (C "Examiner's Chronograph" + A's light)
+// Pri Learning · the luxury layer (Aurora)
 // keeps its own promises.
 //
 // It pins: scoping to the instrument build; no surface gradients (the one
@@ -27,25 +27,29 @@ const checks = [];
 const check = (name, ok, detail = '') => checks.push({ name, ok: !!ok, detail });
 
 // Scope, materials, fallbacks.
-const rules = bare(css).split('}').map(r => r.split('{')[0].trim()).filter(sel => sel && !sel.startsWith('@') && !/^--|:\s/.test(sel));
+const rules = bare(css).split('}').map(r => r.split('{')[0].trim()).filter(sel => sel && !sel.startsWith('@') && !/^--|:\s/.test(sel) && !/^(from|to|\d+%)$/.test(sel));
 check('every rule is scoped to the instrument build', rules.every(sel => /ui-instrument/.test(sel)), rules.filter(s => !/ui-instrument/.test(s)).join(' | '));
-check('the instrument loads the layer after instrument.css, behind the flag', /INSTRUMENT_ON[\s\S]{0,500}instrument\.css'\)\.then\(\(\) => import\('\.\/instrument\/margin\/margin\.css'\)\)/.test(app));
-const grads = [...bare(css).matchAll(/(?<!repeating-)(linear|radial|conic)-gradient\(/g)].length;
-const maskGrads = [...bare(css).matchAll(/mask[^;]*linear-gradient\(#000 0 0\)/g)].join('').match(/linear-gradient/g)?.length || 0;
-check('no surface gradients: only the masked rim light', /\.c-rim::before\s*\{[^}]*radial-gradient[^}]*mask:/s.test(bare(css)) && grads === 1 + maskGrads, `gradients ${grads}, mask helpers ${maskGrads}`);
-check('backdrop blur lives only in .c-glass', [...bare(css).replace(/@supports[^{]*\{/g, '').matchAll(/([^{}]+)\{[^}]*backdrop-filter:\s*blur/g)].every(m => /\.c-glass/.test(m[1])));
-check('glass is opaque before color-mix support and under Reduce Transparency', /\.c-glass \{ background: var\(--c-sheet\)/.test(css) && /prefers-reduced-transparency:\s*reduce\)[\s\S]{0,200}c-glass[\s\S]{0,120}backdrop-filter:\s*none/.test(css));
+check('the instrument loads the layer after instrument.css, behind the flag', /INSTRUMENT_ON[\s\S]{0,700}instrument\.css'\)\.then\(\(\) => import\('\.\/instrument\/margin\/margin\.css'\)\)/.test(app));
+const gradRules = [...bare(css).replace(/@supports[^{]*\{/g, '').matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(m => /(?<!repeating-)(radial|conic|linear)-gradient\(/.test(m[2].replace(/mask[^;]*;/g, '')));
+check('area gradients only light the desk (aurora pools) or an edge (masked rim)', gradRules.every(m => /\.a-aurora i|::before/.test(m[1]) && (/\.a-aurora i/.test(m[1]) || /mask:/.test(m[2]))), gradRules.map(m => m[1].trim()).join(' | '));
+check('no gradient text', !/background-clip:\s*text/.test(bare(css)));
+check('backdrop blur lives only in glass materials', [...bare(css).replace(/@supports[^{]*\{/g, '').matchAll(/([^{}]+)\{[^}]*backdrop-filter:\s*blur/g)].every(m => /\.(a-glass|a-float|c-glass)/.test(m[1])));
+check('glass is opaque before color-mix support and under Reduce Transparency', /\.a-glass, \.ui-instrument \.a-float, \.ui-instrument \.c-glass \{\s*background: var\(--a-surface\)/.test(css) && /prefers-reduced-transparency:\s*reduce\)[\s\S]{0,260}backdrop-filter:\s*none/.test(css));
 check('no full-screen blend layer (it would re-blend every ink frame)', !/mix-blend-mode/.test(bare(css)) && !/body::after/.test(bare(css)));
-const rm = (bare(css).match(/prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?\}\s*)\}/) || [])[1] || '';
-check('Reduce Motion clamps durations without forcing new fades', /animation-duration:\s*1ms/.test(rm) && /transition-duration:\s*1ms/.test(rm) && !/transition-property/.test(rm));
-check('the rim light disappears in forced colours', /forced-colors:\s*active\)\s*\{[^}]*c-rim::before[^}]*display:\s*none/.test(css));
+const rm = (bare(css).match(/prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/) || [])[1] || '';
+check('Reduce Motion clamps motion, stops the aurora and adds no fades', /animation-duration:\s*1ms/.test(rm) && /transition-duration:\s*1ms/.test(rm) && /a-aurora i \{ animation: none/.test(rm) && !/transition-property/.test(rm));
+check('the aurora drifts by transform only, on its own layer', /@keyframes a-drift \{ from \{ transform:[^}]*\} to \{ transform:[^}]*\} \}/.test(css) && /\.a-aurora i \{[^}]*will-change: transform/.test(css) && /\.a-aurora \{[^}]*contain: strict/.test(css));
+check('forced colours remove the aurora, rim, glow and blur', /forced-colors:\s*active\)\s*\{[\s\S]*?a-aurora[\s\S]*?backdrop-filter:\s*none[\s\S]*?box-shadow:\s*none/.test(css));
+check('cyan is specular only, never text', !/[^-]color:\s*var\(--a-cyan\)/.test(bare(css)));
+const aur = readFileSync(join(dir, 'margin/Aurora.jsx'), 'utf8');
+check('the aurora pauses while hidden and clamps progress to 0–1', /visibilitychange/.test(aur) && /Math\.max\(0, Math\.min\(1/.test(aur) && /aria-hidden="true"/.test(aur));
 
 // Colours.
 const block = sel => (css.match(new RegExp(`${sel.replace(/[[\]]/g, '\\$&')}\\s*\\{([\\s\\S]*?)\\n\\}`)) || [])[1] || '';
 const day = block('html.ui-instrument'), night = block('html.ui-instrument[data-theme="dark"]');
-const colourTokens = [...day.matchAll(/(--c-[a-z0-9-]+):\s*(#|rgba)/g)].map(m => m[1]);
+const colourTokens = [...day.matchAll(/(--a-[a-z0-9-]+):\s*(#|rgba)/g)].map(m => m[1]);
 const missing = colourTokens.filter(t => !night.includes(`${t}:`));
-check('every colour token has a midnight-enamel twin', missing.length === 0, missing.join(','));
+check('every Aurora colour token has a dark twin', missing.length === 0, missing.join(','));
 
 const hex = (b, t) => (b.match(new RegExp(`${t}:\\s*(#[0-9a-f]{6})`, 'i')) || [])[1];
 const lin = c => (c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
@@ -55,36 +59,36 @@ const oklab = h => {
   return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
 };
 const supports = [...css.matchAll(/@supports \(color: oklch\(0% 0 0\)\) \{([\s\S]*?)\n\}/g)].map(m => m[1]);
-let oklchBad = [];
+const oklchBad = [];
 supports.forEach((s, i) => {
-  for (const [, tok, L, C, H] of s.matchAll(/(--c-[a-z0-9-]+): oklch\(([\d.]+)% ([\d.]+) ([\d.]+)\)/g)) {
+  for (const [, tok, L, C, H] of s.matchAll(/(--a-[a-z0-9-]+): oklch\(([\d.]+)% ([\d.]+) ([\d.]+)\)/g)) {
     const [l, a, b] = oklab(hex(i ? night : day, tok));
     const want = [l * 100, Math.hypot(a, b), (Math.atan2(b, a) * 180 / Math.PI + 360) % 360];
-    if (Math.abs(want[0] - L) > 0.15 || Math.abs(want[1] - C) > 0.002 || (want[1] > 0.01 && Math.abs(want[2] - H) > 1)) oklchBad.push(`${i ? 'night' : 'day'} ${tok}`);
+    if (Math.abs(want[0] - L) > 0.6 || Math.abs(want[1] - C) > 0.012 || (want[1] > 0.02 && Math.abs(want[2] - H) > 3)) oklchBad.push(`${i ? 'dark' : 'light'} ${tok}`);
   }
 });
-check('every OKLCH value matches its sRGB fallback', supports.length === 2 && oklchBad.length === 0, oklchBad.join(','));
+check('every OKLCH value matches its sRGB fallback (within gamut rounding)', supports.length === 2 && oklchBad.length === 0, oklchBad.join(','));
+check('the signature colour is oklch(0.62 0.22 285)', /--a-brand: oklch\(62% 0\.22 285\)/.test(css));
 
 const lum = h => { const c = [1, 3, 5].map(i => lin(parseInt(h.slice(i, i + 2), 16))); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-for (const [label, b] of [['cotton paper', day], ['midnight enamel', night]]) {
-  for (const bg of ['--c-paper', '--c-sheet', '--c-paper-2']) {
-    for (const t of ['--c-ink', '--c-ink-2', '--c-ink-3', '--c-teal', '--c-copper', '--c-pen']) {
+for (const [label, b] of [['light', day], ['dark', night]]) {
+  for (const bg of ['--a-bg', '--a-surface']) {
+    for (const t of ['--a-ink', '--a-ink-2', '--a-ink-3', '--a-violet', '--a-warn']) {
       const r = ratio(hex(b, t), hex(b, bg));
       check(`${t} meets AA on ${bg} (${label})`, r >= 4.5, r.toFixed(2));
     }
   }
-  check(`the lume meets 3:1 on the dial (${label})`, ratio(hex(b, '--c-lume'), hex(b, '--c-dial')) >= 3, ratio(hex(b, '--c-lume'), hex(b, '--c-dial')).toFixed(2));
-  check(`primary text on teal meets AA (${label})`, ratio(hex(b, '--c-on-teal'), hex(b, '--c-teal')) >= 4.5, ratio(hex(b, '--c-on-teal'), hex(b, '--c-teal')).toFixed(2));
+  check(`text on the primary meets AA (${label})`, ratio(hex(b, '--a-on-violet'), hex(b, '--a-violet')) >= 4.5, ratio(hex(b, '--a-on-violet'), hex(b, '--a-violet')).toFixed(2));
 }
 
-// Night must re-state every --in-* remap: instrument.css's night literals sit
+// Night must restate every --in-* remap: instrument.css's night literals sit
 // on html.ui-instrument[data-theme="dark"], which outranks the day block.
 const instCss = readFileSync(join(dir, 'instrument.css'), 'utf8');
 const instNight = (instCss.match(/html\.ui-instrument\[data-theme="dark"\]\s*\{([^}]*)\}/) || [])[1] || '';
 const overridden = [...instNight.matchAll(/(--in-[a-z0-9-]+):/g)].map(m => m[1]).filter(t => !/^--in-c\d|--in-unc|--in-tx-4|--in-shadow|--in-dot/.test(t));
 const unmapped = overridden.filter(t => !night.includes(`${t}:`));
-check('every night token instrument.css sets is remapped in the night block', unmapped.length === 0, unmapped.join(','));
+check('every night token instrument.css sets is remapped in the dark block', unmapped.length === 0, unmapped.join(','));
 
 // Radius: 8px at most everywhere in the instrument interface, plus one named
 // pill token that only primary actions and chips may use.
@@ -96,7 +100,7 @@ for (const p of sheets) {
   for (const m of bare(readFileSync(p, 'utf8')).matchAll(/([^{}]+)\{([^}]*)\}/g)) {
     for (const r of m[2].matchAll(/border(?:-[a-z]+)*-radius:\s*([^;]+)/g)) {
       if ([...r[1].matchAll(/(\d+(?:\.\d+)?)px/g)].some(n => Number(n[1]) > 8)) radiusBad.push(`${p.slice(dir.length)}: ${m[1].trim()}`);
-      if (/--radius-pill/.test(r[1]) && !m[1].split(',').every(s => /\.c-btn-primary|\.c-chip|\.c-pill-ok/.test(s))) pillBad.push(`${p.slice(dir.length)}: ${m[1].trim()}`);
+      if (/--radius-pill/.test(r[1]) && !m[1].split(',').every(s => /\.(c|a)-btn-primary|\.(c|a)-chip|\.c-pill-ok/.test(s))) pillBad.push(`${p.slice(dir.length)}: ${m[1].trim()}`);
     }
   }
 }
@@ -106,8 +110,8 @@ check('the pill is one named token', /--radius-pill:\s*999px/.test(day) && (css.
 
 // Fonts: four subset faces, no faux bold or italic of Instrument Serif.
 const faces = [...css.matchAll(/@font-face\s*\{[^}]*\}/g)].map(m => m[0]);
-check('exactly four self-hosted faces (budget)', faces.length === 4 && faces.every(f => /url\(\.\/fonts\//.test(f)), String(faces.length));
-check('no Instrument Serif italic is requested (it is not shipped)', !/var\(--c-serif\)[^;]*italic|italic[^;]*var\(--c-serif\)/.test(bare(css)));
+check('exactly three self-hosted faces (budget)', faces.length === 3 && faces.every(f => /url\(\.\/fonts\//.test(f)), String(faces.length));
+check('no Instrument Serif italic is requested (it is not shipped)', !/var\(--(a|c)-serif\)[^;]*italic|italic[^;]*var\(--(a|c)-serif\)/.test(bare(css)));
 
 // Icons and marks.
 const iconNames = [...icons.matchAll(/^\s{2}([a-z]+): /gm)].map(m => m[1]);
@@ -119,7 +123,7 @@ check('marks are images named by their caller', /role="img" aria-label=\{label\}
 
 // One brand mark.
 const pmark = readFileSync(join(dir, 'margin/PMark.jsx'), 'utf8');
-check('the brand mark is one Instrument Serif P′ in an engraved bezel', /Instrument Serif/.test(pmark) && /P<tspan[^>]*>′/.test(pmark) && /reduced\(\)/.test(pmark));
+check('the brand mark is one Instrument Serif P′ on a lit glass tile, with unique gradient ids', /Instrument Serif/.test(pmark) && /P<tspan[^>]*>′/.test(pmark) && /reduced\(\)/.test(pmark) && /useId\(\)/.test(pmark));
 check('the lock-up wordmark is "Pri Learning" in the C serif, as real text', />Pri Learning</.test(pmark) && /var\(--c-serif\)/.test(pmark));
 
 // Motion.
