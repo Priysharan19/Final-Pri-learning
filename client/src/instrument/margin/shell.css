@@ -1,0 +1,87 @@
+/* Pri luxury · the shell and Index pieces that are new in direction C
+   (luxury-direction-spec.md, wow-reference/c-editorial.html). Restyles of
+   existing rules live in instrument.css itself; this file holds only what
+   instrument.css never had: the tab rule, the phone dock, the register dial,
+   the ledger, the tick meters and the shared-element names. Imported by the
+   lazy InstrumentBar and IndexPage chunks, so the flag-off build has none. */
+
+/* The active tab's rule: one 2px ink line moved by transform alone. */
+.k-tab-ind { position: absolute; left: 0; bottom: -1px; width: 100px; height: 2px; background: var(--c-ink); transform-origin: 0 0; pointer-events: none; opacity: 0; transition: transform 280ms var(--c-ease-row), opacity 120ms linear; }
+.k-tab-ind.is-on { opacity: 1; }
+
+/* Phone: the floating dock, the shell's only glass (.c-glass). */
+.k-dock { display: none; }
+@media (max-width: 760px) {
+  .ui-instrument .mobilenav { display: none !important; }
+  .k-dock { position: fixed; z-index: 70; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: 8px; }
+  .k-dock > * { position: relative; display: grid; place-items: center; width: 50px; height: 48px; border: 0; padding: 0; border-radius: 6px; background: none; color: var(--c-ink-3); cursor: pointer; transition: transform var(--c-d-press) var(--c-ease-press); }
+  .k-dock > :active { transform: scale(.94); }
+  .k-dock [aria-current="page"] { color: var(--c-ink); }
+  .k-dock [aria-current="page"]::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--c-teal); }
+  .shell.is-focus .k-dock { display: none; }
+  .in-cmd { background: none; box-shadow: none; }
+}
+
+/* The register dial. */
+.m-dial { margin: 18px 0 6px; }
+.m-dial-box { position: relative; width: 100%; max-width: 340px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; }
+.m-dial-box svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.m-dial-guil { opacity: .2; }
+.m-dial-num { font-family: var(--c-serif); fill: var(--c-ink); }
+.m-dial-sc { font: 600 12px var(--c-sc); letter-spacing: 2.4px; text-transform: uppercase; fill: var(--c-ink-2); }
+.m-dial-hand { transform-box: view-box; transform-origin: 200px 200px; }
+/* The seconds hand beats at 6 Hz for ten seconds after the hero, then rests:
+   a running hand kept the main thread restyling every frame (measured). */
+.m-dial-box > .m-dial-sec { position: absolute; inset: 0; pointer-events: none; animation: k-beat 10s steps(60) 2.4s forwards; }
+@keyframes k-beat { to { transform: rotate(60deg); } }
+.m-datewin { position: absolute; left: 66.5%; top: 47%; width: 13.5%; height: 6%; display: flex; align-items: center; justify-content: center; background: var(--c-sheet); border: 1px solid var(--c-dial-line); box-shadow: var(--c-deboss); font: 400 clamp(11px, 1.3vw, 16px)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); perspective: 200px; overflow: hidden; }
+.m-flip { display: inline-grid; }
+.m-flip > span { grid-area: 1 / 1; backface-visibility: hidden; }
+.m-dial-cap { margin: 10px 0 0; text-align: center; font: 400 13px/18px var(--c-text); color: var(--c-ink-2); }
+@media (max-width: 1180px) { .m-dial-box { max-width: 300px; } }
+
+/* The ledger: three figures that roll like an odometer. */
+/* Whole-pixel columns, so the engraved dividers never straddle a device pixel. */
+/* (Plain thirds first, for engines without round().) */
+.k-ledger { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-columns: round(down, 33.333%, 1px) round(down, 33.333%, 1px) 1fr; margin: 18px 0 4px; border-block: 1px solid var(--c-hair); }
+.k-ledger > div { padding: 10px 0 9px; }
+.k-ledger > div + div { border-left: 1px solid var(--c-hair-2); padding-left: 14px; }
+.k-ledger dt { font: var(--c-t-label); line-height: 16px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); }
+.k-ledger dd { margin: 2px 0 0; font: 400 34px/38px var(--c-serif); color: var(--c-ink); }
+.k-odo, .k-odo > span { display: inline-flex; height: 38px; overflow: hidden; vertical-align: top; }
+.k-odo > span > span { display: flex; flex-direction: column; transform: translateY(calc(var(--d) * -38px)); animation: k-roll 480ms var(--c-ease-sweep) 300ms backwards; }
+.k-odo i { font-style: normal; height: 38px; line-height: 38px; text-align: center; }
+@keyframes k-roll { from { transform: translateY(0); } }
+
+/* Chapter mastery as ten engraved ticks. */
+.k-ticks { display: grid; grid-template-columns: repeat(10, 2px); gap: 3px; align-items: end; height: 14px; }
+.k-ticks i { height: 8px; background: var(--c-ink-3); opacity: .45; }
+.k-ticks i:nth-child(5n) { height: 14px; }
+.k-ticks i.on { background: var(--c-teal); opacity: 1; }
+
+/* The resume card's action is the screen's one primary (pill) control. */
+.in-resume .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
+
+/* Shared element: Index resume card → Write question head. */
+html[data-vt="question"] .in-qh { view-transition-name: pri-question; }
+::view-transition-group(pri-question) { animation-duration: 480ms; animation-timing-function: var(--c-ease-sweep); }
+
+/* States. Focus: the teal ring, inset where the control is flush to a rule.
+   Disabled: engraved but unlit (40% ink, no press). Loading: the outline
+   holds its place, quiet text, never a shimmer. */
+.ui-instrument .in-tab:focus-visible { outline-offset: -6px; }
+.ui-instrument .k-dock > :focus-visible { outline-offset: -2px; }
+.ui-instrument .in-resume:focus-within { box-shadow: var(--c-float), 0 0 0 1px var(--c-teal); }
+:is(.in-tab, .k-dock > *, .in-pal-item, .c-btn-primary):is(:disabled, [aria-disabled="true"]) { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none; }
+.in-resume.k-wait { min-height: 76px; display: grid; align-content: center; gap: 10px; box-shadow: inset 0 0 0 1px var(--c-hair-2); background: none; pointer-events: none; }
+.in-resume.k-wait::after { content: none; }
+.in-resume.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
+.in-resume.k-wait i + i { width: 38%; }
+.in-pal-empty.k-wait { font: italic 400 15px var(--c-italic); }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-tab-ind, .k-dock > * { transition: none; }
+  .k-odo > span > span, .m-dial-box > .m-dial-sec { animation: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+@media (forced-colors: active) { .k-ticks i.on, .k-tab-ind { background: Highlight; } }

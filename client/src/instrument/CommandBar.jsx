@@ -14,13 +14,50 @@ const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress
 // focus returns to whatever opened it. A modal dialog, so the page behind is
 // inert to assistive tech while it is open.
 
+// The last lists, kept for the next opening, so the sheet draws complete on
+// its first frame. They are filled from the Index's own /curriculum read
+// (noteCurriculum) or an idle prewarm, and refreshed only once they are older
+// than STALE_MS: opening the sheet does not refetch warm lists.
+const STALE_MS = 5 * 60 * 1000;
+const memo = { key: '', chapters: [], at: 0, scriptsKey: '', scripts: [], scriptsAt: 0 };
+const sameIds = (a, b) => a.length === b.length && a.every((x, i) => (x.row?.id ?? x.id) === (b[i].row?.id ?? b[i].id));
+const fresh = at => Date.now() - at < STALE_MS;
+
+const scopeKeyOf = user => `${user?.id}|${user?.year}|${user?.indiaTrack}|${user?.country}|${user?.course}`;
+const chapterRows = (c, user) => { const scope = scopeFor(c, user); return (scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })); };
+
+/** The Index hands over the /curriculum it already read. */
+export function noteCurriculum(curriculum, user) {
+  if (!curriculum || !user) return;
+  memo.key = scopeKeyOf(user); memo.chapters = chapterRows(curriculum, user); memo.at = Date.now();
+}
+
+// One request in flight per list: the prewarm, an opening and the Index share it.
+const pending = {};
+const once = (key, run) => (pending[key] ||= run().finally(() => { delete pending[key]; }));
+const loadChapters = user => once(`c:${scopeKeyOf(user)}`, () => api.get('/curriculum').then(c => { noteCurriculum(c, user); return memo.chapters; }));
+const loadScripts = user => once(`s:${user?.id}`, () => api.post('/history/list', { page: 0, pageSize: 5 }).then(r => {
+  memo.scriptsKey = String(user?.id); memo.scripts = r?.items || []; memo.scriptsAt = Date.now(); return memo.scripts;
+}));
+
+/** Fill whatever is missing or stale, in idle time (the shell decides when). */
+export function prewarmCommandBar(user) {
+  if (!user) return;
+  if (!(memo.key === scopeKeyOf(user) && fresh(memo.at))) loadChapters(user).catch(() => { });
+  if (!(memo.scriptsKey === String(user.id) && fresh(memo.scriptsAt))) loadScripts(user).catch(() => { });
+}
+
 export default function CommandBar({ open, onClose, user, pages, actions, returnFocus }) {
   const t = useT();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
-  const [chapters, setChapters] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  const scopeKey = scopeKeyOf(user);
+  const warm = memo.key === scopeKey;
+  const warmScripts = memo.scriptsKey === String(user?.id);
+  const [chapters, setChapters] = useState(() => (warm ? memo.chapters : []));
+  const [scripts, setScripts] = useState(() => (warmScripts ? memo.scripts : []));
+  const [loaded, setLoaded] = useState(warm);
   const input = useRef(null);
 
   useEffect(() => {
@@ -28,15 +65,19 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     setQ(''); setSel(0);
     const id = requestAnimationFrame(() => input.current?.focus());
     let live = true;
-    api.get('/curriculum').then(c => {
-      if (!live) return;
-      const scope = scopeFor(c, user);
-      setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })));
-    }).catch(() => { });
-    api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
+    if (!(memo.key === scopeKey && fresh(memo.at))) {
+      loadChapters(user).then(next => { if (live) { setChapters(prev => (prev.length && sameIds(prev, next) ? prev : next)); setLoaded(true); } })
+        .catch(() => { if (live) setLoaded(true); });
+    }
+    // A cold or stale list is fetched after the 140ms arrival, so its render
+    // never lands mid-animation.
+    let later = 0;
+    if (!(memo.scriptsKey === String(user?.id) && fresh(memo.scriptsAt))) {
+      later = setTimeout(() => loadScripts(user).then(next => { if (live) setScripts(prev => (prev.length && sameIds(prev, next) ? prev : next)); }).catch(() => { }), 160);
+    }
     // Focus goes back to whatever opened the bar (recorded by the opener,
     // since the field has already taken focus by the time this runs).
-    return () => { live = false; cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
+    return () => { live = false; clearTimeout(later); cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user?.year, user?.indiaTrack, user?.country, user?.course]);
 
@@ -91,6 +132,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
           <span className="in-kbd">esc</span>
         </div>
         <div className="in-pal-list" id="in-pal-list" role="listbox" aria-label={t('inst.cmdLabel')}>
+          {!loaded && !q && <div className="in-pal-empty k-wait" role="status">{t('inst.cmdLoading')}</div>}
           {!flat.length && <div className="in-pal-empty">{t('inst.cmdNone', { q })}</div>}
           {items.map(g => (
             <div key={g.key} role="group" aria-label={g.label}>
