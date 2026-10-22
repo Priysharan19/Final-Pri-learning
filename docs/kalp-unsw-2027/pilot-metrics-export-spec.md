@@ -94,3 +94,28 @@ Where practical, use the existing Teacher Studio / task progress-file workflow s
 ## Reporting boundary
 
 The export proves usage and recorded outcomes. It does not prove that Pri Learning caused academic improvement. Baseline/post scores must be reported as observed change unless a stronger experimental design is used.
+
+## Implementation (in-app, #141)
+
+Built behind `PRI_FEATURE_PILOT_SUMMARY=1` (off in a production build until a programme that uses it starts): Settings → Data backup → **Study programme summary**. The person enters the participant code and the dates (and, only if the programme supplies them, the controlled baseline and post-test percentages), sees every number on screen, and then saves the file themselves. Nothing is sent anywhere.
+
+- Code: `client/src/local/pilotSummary.js` (pure builder), route `POST /data/pilot-summary` in `client/src/local/backend.js` (read-only; opens the profile through `requireProfile()`, so a locked protected profile is refused with `needsPassword`).
+- Test: `client/test/pilot-summary-check.mjs` (`npm run test:pilot:summary`) covers the eight required tests above against a hand-counted fixture.
+- Schema `pri-pilot-summary-v2`. (`tools/pilot-summary-from-progress.mjs` emits the earlier bridge shape `pri-pilot-summary-v1` from a teacher progress file; the two are different files.)
+- The participant code must look like `S042` (1–4 letters, an optional hyphen, 1–6 digits), so a name or an email address cannot be typed into it.
+- The file carries `app.commit` (the release SHA) when the build has a release identity, and fixed `limitations` text including the integrity boundary below.
+
+### Counting rules `pri-pilot-rules-v1`
+
+These are the rules the Progress page and the teacher progress file already use (`client/src/engine/progressTruth.js`).
+
+- Days are the profile's own calendar days (its timezone), and `from`/`to` are inclusive. A period is at most 366 days.
+- `questionsAttempted`: one per attempt row in the period. A question resolves once, so second tries at the same question never add an attempt.
+- `repeatAttempts`: attempts on content whose solution this account had already seen. A repeat is an attempt, never a correct one.
+- `correctAttempts`: correct attempts that are not repeats.
+- `accuracy`: `correctAttempts / (questionsAttempted − repeatAttempts)`, to 4 decimal places; `null` when that is zero.
+- `activeDays`: activity rows in the period with at least one question.
+- `practiceMs`: the activity rows' answering time in the period. It is not screen time.
+- `hintsUsed`: hints recorded on the attempt rows in the period.
+- `topicsTouched`: distinct subtopics among the attempts in the period.
+- `completed`: `null` until the programme declares its completion rule in `PILOTS` (`pilotSummary.js`), in code and reviewed, before recruitment. The app does not invent one.

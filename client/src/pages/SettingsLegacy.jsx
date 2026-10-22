@@ -17,6 +17,7 @@ import { priNative } from '../platform/native/index.js';
 import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
 import { featureEnabled } from '../platform/features.js';
 import Glyph from '../instrument/Glyph.jsx';
+import PilotSummaryExport from '../components/PilotSummaryExport.jsx';
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
@@ -666,6 +667,7 @@ export default function Settings() {
               <button className="btn btn-ghost btn-sm" onClick={exportBackup}>{t('settings.exportBackup')}</button>
               <button className="btn btn-ghost btn-sm" onClick={() => importRef.current?.click()}>{t('settings.restoreBackup')}</button>
               {user.role !== 'teacher' && <button className="btn btn-ghost btn-sm" onClick={exportProgressFile}>{t('settings.progressFile')}</button>}
+              {user.role !== 'teacher' && featureEnabled('pilotSummary') && <PilotSummaryExport />}
               <input ref={importRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importBackup} />
             </div>
             <hr className="divider" />
