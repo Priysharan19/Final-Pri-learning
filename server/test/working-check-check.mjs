@@ -136,6 +136,11 @@ ok(!sure.needsConfirmation, 'above it, it stands');
     'a judgement whose index is not an integer lands on no line: no cross is placed by a guess');
   const objectWhy = settle(reply({ lines: [{ index: 1, status: 'break', carried: false, why: { toString: () => 'injected' } }], hint: { toString: () => 'injected hint' } })).result;
   eq([objectWhy.lines[1].why, objectWhy.hint], ['', ''], 'feedback that is not a string is dropped, never stringified');
+  const astral = n => '\u{1D465}'.repeat(n);
+  const longWhy = settle(reply({ lines: [{ index: 1, status: 'break', carried: false, why: astral(300) }], hint: astral(400) })).result;
+  eq([[...longWhy.lines[1].why].length, [...longWhy.hint].length, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(longWhy.lines[1].why + longWhy.hint)],
+    [WORKING_SCHEMA.properties.lines.items.properties.why.maxLength, WORKING_SCHEMA.properties.hint.maxLength, false],
+    'feedback is bounded by code points, as the schema counts them, and never left with half a surrogate pair');
 }
 
 // ── 5 · Bounds on what may be sent ───────────────────────────────────────────
