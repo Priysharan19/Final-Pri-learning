@@ -1,13 +1,101 @@
-import React from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
+import { featureEnabled } from '../platform/features.js';
+import { MarkGlyph } from './margin/MarginIcon.jsx';
 
-// The server's mark, set out as CBSE-style step rows (server/platform/
-// markRows.js). Display only: the rows sum to the mark the deterministic
-// engine gave, and the server omits them rather than send rows that would
-// not. Whole marks. Authored step headings appear only on a correct answer;
-// a wrong answer's method marks are numbered, never named. Pri practice
-// feedback in a board-style layout, not a CBSE marking scheme.
+// Write & Check (Pri Luxury, direction C): the margin's engine marks, the
+// Check ceremony and the date window. Display only: every mark is the
+// deterministic engine's line verdict. The motion is CSS keyframes in
+// margin/write.css (C's row reveal, emboss stamp, press ring and calendar
+// flip, same curves and durations as motion.js) so the ceremony costs the
+// install a few hundred bytes; write.css is a CSS chunk of the instrument
+// build only (`write` in the flag-off skip list).
+/* global __PRI_FEATURE_INSTRUMENT__ */
+// Compile-time: the classic build folds every export below to a no-op and
+// carries none of this (nor MarkGlyph).
+const ON = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
+if (ON && featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
+
+export { engineMark } from './margin/engineMark.js';
+
+export function MarkStamp({ kind }) {
+  return ON && kind ? <span className="wc-plane" aria-hidden="true"><i className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
+}
+
+// Ceremonies striking marks now; the date window waits only while one is.
+let running = 0;
+let lastSpan = 6000;   // the longest the date window may wait: the running ceremony's length
+// One row's slot comes from write.css's own tokens (row + gap + stamp + rest),
+// read once per ceremony, so the CSS and this timer cannot drift apart.
+const ms = (cs, k) => { const v = cs.getPropertyValue(k).trim(), n = parseFloat(v) || 0; return /ms$/.test(v) ? n : n * 1000; };
+const slot = cs => ['--c-d-row', '--wc-d-gap', '--wc-d-stamp', '--wc-d-rest'].reduce((t, k) => t + ms(cs, k), 0) || 860;
+
+/**
+ * The Check ceremony over the InkAnswer root. Each visible [data-wc-row] gets
+ * its slot (--wc-d); `wc-go` on the root runs write.css's keyframes: the
+ * transcription is set, the engine mark struck and raised on its own plane,
+ * then the first error's copper underline draws; then `pri:check-marked`.
+ * Interruptible: a new verdict restarts it, unmount ends it. Reduce Motion:
+ * write.css drops the animations, so the marks are simply there.
+ */
+export function useCheckCeremony(stageRef, key) {
+  useLayoutEffect(() => {
+    const root = stageRef.current?.parentElement;
+    // Back to no verdict: nothing may stay mid-ceremony.
+    if (root && !key) root.classList.remove('wc-go', 'wc-done');
+    if (!ON || !root || !key) return undefined;
+    // Visible rows only: the chips on a tablet, the reading list on a phone.
+    const cs = getComputedStyle(root);
+    const PER = slot(cs);
+    const rows = [...root.querySelectorAll('[data-wc-row]')].filter(r => r.querySelector('.wc-plane')?.getClientRects().length);
+    rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
+    root.style.setProperty('--wc-u', `${rows.length * PER}ms`);
+    lastSpan = rows.length * PER + 1000;
+    root.classList.remove('wc-go', 'wc-done'); void root.offsetWidth; root.classList.add('wc-go');
+    // Nothing to strike (stale, unsure or unmarked lines): no ceremony, and
+    // the date window, seeing none running, shows the score at once.
+    if (!rows.length) return undefined;
+    // Phone: the margin is the reading list under the sheet. Bring the first
+    // error (or the first mark) into view only if it is below the fold, so
+    // the strike is seen; a row already on screen never moves the page.
+    if (rows[0].classList.contains('ink-line')) {
+      const focus = rows.find(r => r.querySelector('.c-mark-x')) || rows[0];
+      const box = focus.getBoundingClientRect();
+      if (box.top < 0 || box.bottom > innerHeight) focus.scrollIntoView?.({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+    running++;
+    // While marks are struck, the card's verdict waits (write.css): it is
+    // said once, after the score is in the window.
+    const html = document.documentElement;
+    html.classList.add('wc-marking');
+    let on = true;
+    const stop = () => { if (on) { on = false; running--; if (!running) html.classList.remove('wc-marking'); } };
+    // Only a ceremony that ran to its end lets the score into the window.
+    const end = () => { if (on) { stop(); root.classList.add('wc-done'); window.dispatchEvent(new Event('pri:check-marked')); } };
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const t = setTimeout(end, still ? 0 : rows.length * PER + (ms(cs, '--wc-d-under') || 320));
+    return () => { clearTimeout(t); stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+}
+
+/** The date window: "– /3" until the engine has decided, then the score
+ *  flips in once the marks are struck (or at once with no ceremony running).
+ *  aria-hidden: the verdict is announced once, by the card's live region. */
+export function DateWindow({ score, outOf }) {
+  const [shown, setShown] = useState(null);
+  useEffect(() => {
+    setShown(null);
+    if (score == null) return undefined;
+    const go = () => setShown(score);
+    addEventListener('pri:check-marked', go);
+    const f = requestAnimationFrame(() => running || go());
+    const cap = setTimeout(go, lastSpan);
+    return () => { removeEventListener('pri:check-marked', go); cancelAnimationFrame(f); clearTimeout(cap); };
+  }, [score]);
+  return ON && outOf >= 1 ? <span className="wc-datewin" aria-hidden="true" data-date-window={shown ?? 'pending'}><span key={shown ?? '-'}>{shown ?? '–'} /{outOf}</span></span> : null;
+}
 
 export default function StepMarks({ markRows }) {
   const t = useT();

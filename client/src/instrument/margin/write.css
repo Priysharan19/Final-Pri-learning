@@ -1,0 +1,153 @@
+/* Pri Luxury · Write & Check (C "Examiner's Chronograph", depth from A).
+   Instrument build only (loaded by InkAnswer/StepMarks; `write` is in the
+   flag-off skip list). Every mark drawn here is the deterministic engine's
+   verdict. Every timing and dimension is a token: margin.css's --c-d-row,
+   --c-d-set, --c-ease-*, --c-line, plus C's values below. useCheckCeremony
+   reads row + gap + stamp + rest (and the underline) from these tokens. */
+html.ui-instrument {
+  --wc-col: 200px; --wc-row-pad: 10px; --wc-row-min: 44px; --wc-row-size: 14px;
+  --wc-mark: 34px; --wc-ring-out: 3px; --wc-rise-z: 36px; --wc-set-y: 6px;
+  --wc-depth: 1400px; --wc-flip-depth: 200px;
+  --wc-stamp-from: 1.7; --wc-stamp-dip: .9; --wc-ring-from: 1.9; --wc-ring-at: 1.05; --wc-ring-a: .55;
+  --wc-d-gap: 40ms; --wc-d-stamp: 340ms; --wc-d-rest: 220ms; --wc-d-rise: 600ms; --wc-d-under: 320ms;
+  --wc-d-flip: 170ms; --wc-d-flip-wait: 110ms;
+  --wc-ease-stamp: cubic-bezier(.7, 0, .9, .6); --wc-ease-settle: cubic-bezier(.2, 0, .2, 1); --wc-ease-flip: cubic-bezier(0, 0, .3, 1);
+  --wc-win-w: 52px; --wc-win-pad: 4px 8px; --wc-win-r: 2px;
+  /* Wet ink glaze (read by InkCanvas): deepens ink on cotton paper. */
+  --wc-glaze: #000; --wc-glaze-a: .12;
+}
+/* …and lifts light ink on midnight enamel. */
+html.ui-instrument[data-theme="dark"] { --wc-glaze: #fff; --wc-glaze-a: .3; }
+
+/* iPad: C's margin column beside the writing, ruled off in copper. The
+   canvas gives up the column (so no one writes under the marks); the
+   transcription rows and their stamps live in it, each level with its line. */
+@media (min-width: 561px) {
+  html.ui-instrument .ink-stage { padding-inline-end: var(--wc-col); }
+  html.ui-instrument .ink-stage::before {
+    content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: var(--wc-col); z-index: 1;
+    background: var(--c-sheet); border-inline-start: var(--c-line) solid var(--c-copper); pointer-events: none;
+  }
+  html.ui-instrument .in-read {
+    right: auto; inset-inline-end: 0; width: var(--wc-col); justify-content: space-between;
+    padding: 0 var(--wc-row-pad); min-height: var(--wc-row-min); border-radius: 0; background: none; box-shadow: none;
+    border-block-end: var(--c-line) solid var(--c-hair-2); animation: none;
+    font-size: var(--wc-row-size); color: var(--c-ink);   /* the maths stays in KaTeX's Computer Modern */
+  }
+  html.ui-instrument .in-read.is-slip { background: var(--c-copper-soft); box-shadow: none; }
+  html.ui-instrument .in-read .katex { font-size: 1em; }
+  /* The reader's confidence is shown only where it matters: an unsure line. */
+  html.ui-instrument .in-read:not(.is-unc) .in-read-cf { display: none; }
+  [data-wc-row] .in-read-tg { display: none; }   /* the stamp says it */
+  .ink-line > .wc-plane { display: none; }        /* the list keeps its badge */
+  /* The "Look here" note never sits over handwriting: it moves into the
+     margin column, under its line's row. */
+  html.ui-instrument .ink-verdict-layer .ink-note { left: auto !important; inset-inline-end: 0; width: var(--wc-col); max-width: none; z-index: 2; }
+  .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: inline; }
+}
+
+.ink-verdict[data-wc-stamped], .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: none; }
+.ink-line > .wc-plane { margin-inline: 4px; }   /* right after the expression it marks */
+[data-wc-row] { perspective: var(--wc-depth); }   /* the plane the mark rises on */
+.wc-plane { position: relative; display: grid; width: var(--wc-mark); height: var(--wc-mark); transform: translateZ(var(--wc-rise-z)); }
+.wc-stamp { width: 100%; height: 100%; overflow: visible; opacity: 0; filter: drop-shadow(0 var(--c-line) 0 var(--c-emboss-hi)) drop-shadow(0 calc(-1 * var(--c-line)) 0 var(--c-emboss-lo)); }
+.wc-go .wc-stamp, .wc-done .wc-stamp { opacity: 1; }   /* never shown before it is struck */
+.wc-ring { position: absolute; inset: calc(-1 * var(--wc-ring-out)); border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
+.ink-verdict-layer .ink-underline[data-wc-first-error] { border-block-end-color: var(--c-copper); transform-origin: left; }
+.ink-verdict-layer .ink-underline[data-wc-first-error]:dir(rtl) { transform-origin: right; }
+
+.wc-go:not(.wc-done) [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row var(--c-d-row) var(--c-ease-row) var(--wc-d) both; }
+.wc-go:not(.wc-done) [data-wc-row] .wc-stamp { animation: wc-stamp var(--wc-d-stamp) var(--wc-ease-stamp) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)) both; }
+.wc-go:not(.wc-done) [data-wc-row] .wc-ring { animation: wc-ring var(--c-d-set) var(--c-ease-press) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)); }
+.wc-go:not(.wc-done) [data-wc-row] .wc-plane { animation: wc-rise var(--wc-d-rise) var(--c-ease-row) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap) + var(--wc-d-stamp) * .55) both; }
+.wc-go:not(.wc-done) .ink-underline[data-wc-first-error] { animation: wc-under var(--wc-d-under) var(--c-ease-row) var(--wc-u) both; }
+@keyframes wc-row { from { opacity: 0; transform: translateY(var(--wc-set-y)); } }
+@keyframes wc-stamp { 0% { opacity: 0; transform: scale(var(--wc-stamp-from)); } 55% { transform: scale(var(--wc-stamp-dip)); animation-timing-function: var(--wc-ease-settle); } }
+@keyframes wc-ring { 0% { transform: scale(var(--wc-ring-from)); } 60% { opacity: var(--wc-ring-a); transform: scale(var(--wc-ring-at)); } }
+@keyframes wc-rise { from { transform: none; } }
+@keyframes wc-under { from { transform: scaleX(0); } }
+
+/* Date window: STIX 400 tabular, a calendar complication. */
+.wc-datewin { display: inline-block; min-width: var(--wc-win-w); padding: var(--wc-win-pad); text-align: center; perspective: var(--wc-flip-depth); background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: var(--wc-win-r); box-shadow: var(--c-deboss); font: 400 var(--wc-row-size)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); }
+.wc-datewin span { display: inline-block; animation: wc-flip var(--wc-d-flip) var(--wc-ease-flip) var(--wc-d-flip-wait) both; }
+.wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
+@keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
+
+/* Phone: no column, so the note is not drawn on the sheet at all; the reading
+   list under the sheet carries the same words beside the line it is about. */
+@media (max-width: 560px) { html.ui-instrument .ink-verdict-layer .ink-note { display: none; } }
+@media (forced-colors: active) { .wc-stamp { filter: none; } .wc-stamp * { stroke: CanvasText; } .wc-datewin { box-shadow: none; } html.ui-instrument .ink-stage::before { border-color: CanvasText; } html.ui-instrument .ink-toolbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: Canvas; } }
+@media (prefers-reduced-motion: reduce) { .wc-go *, .wc-datewin span { animation: none !important; } }
+
+/* ── The Write chrome in C ───────────────────────────────────────────────── */
+/* The question in STIX, C's Write weight and leading (sized for a sentence,
+   where C's --c-t-wq sets a one-line equation). */
+html.ui-instrument .ws .q-prompt { font: var(--c-t-wq); font-size: var(--wc-q-size); letter-spacing: -.01em; color: var(--c-ink); }
+html.ui-instrument { --wc-q-size: clamp(22px, 1.6vw + 10px, 30px); --wc-glass-mix: 74%; --wc-glass-blur: 12px; }   /* margin.css's .c-glass values */
+/* The pen toolbar is the Check dock: the one floating control that may be
+   glass (C/A), opaque before color-mix and under Reduce Transparency. */
+html.ui-instrument .ink-toolbar { background: var(--c-sheet); border-radius: var(--c-radius-lg); box-shadow: inset 0 0 0 var(--c-line) var(--c-glass-edge), var(--c-float); }
+@supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  html.ui-instrument .ink-toolbar { background: color-mix(in srgb, var(--c-sheet) var(--wc-glass-mix), transparent); -webkit-backdrop-filter: blur(var(--wc-glass-blur)); backdrop-filter: blur(var(--wc-glass-blur)); }
+}
+@media (prefers-reduced-transparency: reduce) { html.ui-instrument .ink-toolbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); } }
+/* The hint ladder: small caps, engraved hairlines, STIX numerals. */
+html.ui-instrument .hints-block-title { font: var(--c-t-label); letter-spacing: .14em; text-transform: none; color: var(--c-ink-2); }
+html.ui-instrument .hints-block > :not(.hints-block-title), html.ui-instrument .in-ladder .in-rung { border-radius: var(--c-radius-lg); box-shadow: inset 0 0 0 var(--c-line) var(--c-hair); }
+html.ui-instrument .hints-block > :not(.hints-block-title)::before { font-family: var(--c-text); font-variant-numeric: tabular-nums; border-radius: var(--c-radius); }
+html.ui-instrument .wc-datewin { margin-inline-start: var(--wc-row-pad); }
+
+/* ── Write & Check in C: the rest of the chrome (jury r1) ────────────────── */
+/* Eyebrow: the topic and level as Cormorant SC, not mono boxes. */
+html.ui-instrument .ws .q-topmeta .tag { font: var(--c-t-label); letter-spacing: .14em; color: var(--c-ink-2); background: none; border: 0; box-shadow: none; padding: 0; }
+html.ui-instrument .ws .q-topmeta .tag + .tag::before { content: "·"; margin-inline-end: .5em; color: var(--c-ink-3); }
+/* Mode switch as C tabs: small caps over an ink rule (radius kept, unseen). */
+html.ui-instrument .mode-tabs.seg { background: none; box-shadow: inset 0 calc(-1 * var(--c-line)) 0 var(--c-hair); }
+html.ui-instrument .mode-tabs.seg button { font: var(--c-t-tab); letter-spacing: .14em; background: none; box-shadow: none; color: var(--c-ink-3); }
+html.ui-instrument .mode-tabs.seg button[aria-pressed="true"], html.ui-instrument .mode-tabs.seg button.on { color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-ink); }
+/* The hint ladder as a hairline list: no boxed cards, charges in small caps. */
+html.ui-instrument .hints-block > :not(.hints-block-title), html.ui-instrument .in-ladder .in-rung { background: none; box-shadow: none; border-block-end: var(--c-line) solid var(--c-hair-2); }
+html.ui-instrument .in-ladder .in-rung :is(small, .in-rung-cost) { font: var(--c-t-label); letter-spacing: .1em; color: var(--c-ink-3); }
+/* The sheet: cotton, ruled at the writing pitch, the margin on the same sheet. */
+html.ui-instrument .ink-stage .ink-wrap { background: var(--c-sheet) repeating-linear-gradient(to bottom, transparent 0 calc(var(--wc-pitch) - var(--c-line)), var(--c-hair-2) calc(var(--wc-pitch) - var(--c-line)) var(--wc-pitch)); }
+html.ui-instrument { --wc-pitch: 74px; }
+/* Never a box behind the student's line: the copper underline says it. */
+html.ui-instrument .ink-verdict-layer .ink-linebox { display: none; }
+/* The first-error note: STIX italic copper in the margin row, no card. */
+html.ui-instrument .ink-verdict-layer .ink-note { background: none; border: 0; box-shadow: none; padding: var(--wc-row-pad); font: italic var(--wc-row-size)/1.3 var(--c-italic, var(--c-text)); color: var(--c-copper); }
+html.ui-instrument .ink-verdict-layer .ink-note b { font-weight: 400; }
+/* The verdict: one STIX sentence, no rail, no icon, said once after the
+   score is in the window (the card waits while marks are struck). */
+html.ui-instrument .ws .verdict { border: 0; box-shadow: none; background: none; font: var(--c-t-body); color: var(--c-ink); }
+html.ui-instrument .ws .verdict .verdict-ico { display: none; }
+html.ui-instrument .ws :is(.verdict, .eval-card, .ink-comments) { transition: opacity var(--c-d-row) var(--c-ease-row) var(--wc-d-flip); }
+html.wc-marking .ws :is(.verdict, .eval-card, .ink-comments) { opacity: 0; transition: none; }
+/* Check dock: pinned to the foot of the sheet column, always reachable, glass. */
+html.ui-instrument .ws-actions { position: sticky; bottom: 0; z-index: 6; background: var(--c-sheet); border-top: var(--c-line) solid var(--c-hair); }
+@supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  html.ui-instrument .ws-actions { background: color-mix(in srgb, var(--c-sheet) var(--wc-glass-mix), transparent); -webkit-backdrop-filter: blur(var(--wc-glass-blur)); backdrop-filter: blur(var(--wc-glass-blur)); }
+}
+@media (prefers-reduced-transparency: reduce) { html.ui-instrument .ws-actions { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); } }
+/* The score window, C size, beside the question. */
+html.ui-instrument .wc-datewin { min-width: calc(var(--wc-win-w) * 1.6); padding: var(--wc-win-pad); font-size: calc(var(--wc-row-size) * 1.7); line-height: 1.6; }
+
+/* The C ceremony replaces the v1.1 scan band (approved design change). */
+html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { display: none; animation: none; }
+
+/* The verdict's breakdown: one hairline section, opened on request. */
+html.ui-instrument .wc-how { margin-top: var(--wc-row-pad); border-block-start: var(--c-line) solid var(--c-hair); }
+html.ui-instrument .wc-how > summary { min-height: var(--wc-row-min); display: flex; align-items: center; cursor: pointer; font: var(--c-t-label); letter-spacing: .14em; color: var(--c-ink-2); }
+/* Callouts on midnight enamel use enamel fills, not paper beige. */
+html.ui-instrument :is(.ink-comments > *, .ink-line-math, .in-read) { background-color: var(--c-sheet); }
+/* The copper margin rule, one hairline, on every width. */
+html.ui-instrument .ink-stage::before { border-inline-start-color: var(--c-copper); }
+/* Phone: question first, one Check pill. */
+.wc-more { display: none; }
+@media (max-width: 560px) {
+  html.ui-instrument .wc-more { display: inline-flex; min-width: 44px; justify-content: center; }
+  html.ui-instrument .ws-actions:not([data-more="open"]) .ws-actions-btns > .btn-quiet:not(.hint-bulb):not(.wc-more) { display: none; }
+  html.ui-instrument .ws-actions .status-line, html.ui-instrument .ws-actions .in-wbar-note { display: none; }
+  /* The ladder stays shut until the Hint pill opens a rung. */
+  html.ui-instrument .in-ladder .in-rung:not([data-hint-shown]):not(.hintbox) { display: none; }
+  html.ui-instrument .ws .q-prompt { font: var(--c-t-wq); font-size: clamp(20px, 5.4vw, 26px); }
+}

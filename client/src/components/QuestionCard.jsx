@@ -36,7 +36,8 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { strokeSignature } from '../ink/strokeSignature.js';
-import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
+import { engineLineVerdicts, withoutModelTicks } from '../instrument/margin/engineMark.js';
+import { annotationsLive, inkLineVerdicts, reportForLines, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
 
@@ -59,6 +60,11 @@ import QuestionHead from '../instrument/QuestionHead.jsx';
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
 const INSTRUMENT = featureEnabled('instrument');
+// Pri Luxury: the score is one figure in the date window; how it was set is
+// one hairline section the student opens. Classic build: unchanged.
+function HowMarksSet({ on, label, children }) {
+  return on ? <details className="wc-how" data-how-marks-set><summary>{label}</summary>{children}</details> : children;
+}
 // Both chords work (the handler takes Meta or Control), so the chip names both
 // rather than guessing the keyboard from the device.
 const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
@@ -444,6 +450,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
   const [peek, setPeek] = useState(false);
   const [peekOpen, setPeekOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);   // instrument phone footer: the ⋯ overflow
   const inkSaveTimer = useRef(null);
   // The most recent pen-lift owns the save indicator. A previous asynchronous
   // IDB acknowledgement must never overwrite the status of newer strokes.
@@ -1806,13 +1813,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       outcome: verdictOutcome, res: state.res, submitted: judged, shownLines: inkResult?.lines || [],
       live: judgedLive && inkResult?.stale !== true, answeredByWorking: isWorking
     });
-    if (!base) return null;
-    return base.map(v => (v.noteKind ? {
-      status: v.status,
-      note: v.noteKind === 'conclude' && res?.solution?.answerText
-        ? `this line should conclude ${String(res.solution.answerText)}`
-        : 'this line doesn’t reach the right answer — rework it'
-    } : v));
+    // Display boundary: these are the deterministic engine's verdicts, so they
+    // carry that provenance (and its ecf credit) for the margin's stamps.
+    // Presentation only; no status changes.
+    return engineLineVerdicts(base, reportForLines(state.res?.stepReport, judged?.lines || []), res?.solution?.answerText);
   }, [verdictOutcome, state.res, judged, inkResult, judgedLive, isWorking, res]);
 
   // ── A second read of the working ───────────────────────────────────────────
@@ -1881,8 +1885,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // A tick is the engine's. The second read is a model's opinion: where it
     // says the working breaks is shown, hedged, as before; where it finds
     // nothing wrong it earns no tick on the page.
-    const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
-    return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
+    return withoutModelTicks(merged, CLOUD_WORKING_ENGINE);
   }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
   // What the server established about the working that was submitted, for a
   // reading-based submission (handwriting or a photo), where the lines came
@@ -2249,7 +2252,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               v1.1 instrument design shows one, owner-approved; display only.) */}
           {INSTRUMENT && !diagnostic && (
             <QuestionHead index={sessionIndex} length={sessionLength} answered={sessionAnswered}
-              startedAt={startRef.current} stopped={resolved} />
+              startedAt={startRef.current} stopped={resolved}
+              outOf={Number(shownGrade?.possible) || Number(totalMarks) || null}
+              score={instrumentScore ? Number(shownGrade.awarded) : null} />
           )}
         </div>
         {/* A practice question's marks are the server's alone to state, so the
@@ -2340,7 +2345,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {/* ── The student's work: the surface everything else attaches to ── */}
       <section className="ws-work" aria-label={t('verdict.workRegion')}>
         <div className={`ws-qpeek no-print${peek ? ' is-on' : ''}`} aria-hidden={!peek}>
-          <span className="ws-qpeek-text">{plainPrompt}</span>
+          <span className="ws-qpeek-text">{INSTRUMENT ? <MathText text={question.prompt} /> : plainPrompt}</span>
           <button type="button" className="btn btn-quiet btn-sm" tabIndex={peek ? 0 : -1} onClick={() => setPeekOpen(true)}>{t('verdict.showQuestion')}</button>
         </div>
 
@@ -2992,6 +2997,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
+                <HowMarksSet on={INSTRUMENT} label={t('inst.howMarksSet')}>
                 {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
                 {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
@@ -3024,6 +3030,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('verdict.boardStyleNote')}</p>
                   </div>
                 )}
+                </HowMarksSet>
               </div>
               {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
               {/* A repeat is marked like any answer but earns nothing; said
@@ -3075,7 +3082,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
-        <div className="ws-actions editor-foot no-print">
+        <div className="ws-actions editor-foot no-print" data-more={INSTRUMENT && moreOpen ? 'open' : undefined}>
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
@@ -3120,6 +3127,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 );
               })()
             )}
+            {INSTRUMENT && !resolved && (
+              <button type="button" className="btn btn-quiet wc-more" aria-expanded={moreOpen} aria-label={t('inst.moreActions')}
+                onClick={() => setMoreOpen(o => !o)}>⋯</button>
+            )}
             {INSTRUMENT && writeMode && !resolved && inkHasStrokes && (
               <button type="button" className="btn btn-quiet in-wbar-reset" data-wbar-reset disabled={busy}
                 aria-label={t('ink.clearLabel')} onClick={() => inkControlRef.current?.clear?.()}>{t('inst.reset')}</button>
@@ -3138,7 +3149,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
             )}
             {!(diagnostic && resolved) && primary && (
-              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
+              <button className={`btn btn-primary${INSTRUMENT ? ' c-btn-primary' : ''}`} data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
                 aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
                 aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
                 {instrumentCheckKey && <Icon name="scan" size={16} />}

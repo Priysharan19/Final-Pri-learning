@@ -49,6 +49,9 @@ import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
+import { MarkStamp, engineMark, useCheckCeremony } from '../instrument/StepMarks.jsx';
+/* global __PRI_FEATURE_INSTRUMENT__ */
+if (typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__ && typeof document !== 'undefined') import('../instrument/margin/write.css');
 // v1.1 instrument: the student's own equations, drawn under the reading.
 const INSTRUMENT_PLOT = featureEnabled('instrument');
 
@@ -107,6 +110,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const formFactor = useFormFactor();
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
+  const stageRef = useRef(null);   // Pri Luxury Write & Check: the ceremony's root
   const { user } = useApp();
   const inRouter = useInRouterContext();
   const userRef = useRef(user);
@@ -487,6 +491,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // it now stands and nothing is known to stop a read. One press, one read.
   const canAskToRead = hasInk && !disabled && !shownStatus && !checkingEarlier && (!rec.lines.length || stale);
 
+  // Pri Luxury Write & Check: the one stamp per line, used to render the
+  // margin and the reading list and to key the ceremony (struck once per
+  // verdict). Never on a stale reading or a line the reader was unsure of.
+  const stampOf = li => (INSTRUMENT_PLOT && !stale && rec.lines[li] && !isLowConfidence(rec.lines[li], lineConfidenceFloor)
+    ? engineMark(lineVerdicts?.[li]) : null);
+  const stamps = rec.lines.map((_, li) => stampOf(li));
+  const ceremonyKey = stamps.some(Boolean) ? stamps.map(m => m || '-').join('') : null;
+  useCheckCeremony(stageRef, ceremonyKey);
+
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
       <div className="ink-toolbar" role="toolbar" aria-label={t('ink.toolbar')}>
@@ -518,7 +531,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           : <span className="ink-hint">{t('ink.hint')}</span>}
       </div>
 
-      <div className="ink-stage">
+      <div className="ink-stage" ref={stageRef}>
         <Surface
           ref={canvasRef}
           height={pageHeight * pages}
@@ -544,6 +557,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 const bad = v.status === 'break' || v.status === 'wrong';
                 if (!good && !bad) return null;
                 const showNote = bad && !noted;
+                const stamp = stamps[li];
+                const firstError = showNote && stamp === 'x';
                 if (showNote) noted = true;
                 const geometry = feedbackGeometry(line);
                 const b = geometry.anchor || line.box;
@@ -554,11 +569,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
                         style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }} />
                     ))}
-                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
+                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`} data-wc-stamped={stamp ? '' : undefined}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
                       title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
-                      <span key={`underline-${gi}`} className="ink-underline"
+                      <span key={`underline-${gi}`} className="ink-underline" data-wc-first-error={firstError ? '' : undefined}
                         style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
                     ))}
                     {showNote && (
@@ -590,10 +605,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               // so 0 is drawn as no bar rather than as an empty one.
               const conf = line.conf == null || Number(line.conf) <= 0 ? NaN : Number(line.conf);
               const tag = low ? t('inst.readUnsure') : slip ? t('inst.readSlip') : ok ? t('inst.readOk') : null;
+              const mark = stamps[li];
               return (
                 <React.Fragment key={li}>
                   {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
-                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} style={{ top: b.y + b.h / 2 }}>
+                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} data-wc-row={mark ? li : undefined} style={{ top: b.y + b.h / 2 }}>
                     <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
                     {Number.isFinite(conf) && (
                       <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
@@ -601,6 +617,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       </span>
                     )}
                     {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
+                    <MarkStamp kind={mark} />
                   </span>
                 </React.Fragment>
               );
@@ -661,6 +678,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           </div>
           {rec.lines.map((line, li) => (
             <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
+              data-wc-row={stamps[li] ? li : undefined}
               data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
               data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -674,6 +692,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 </span>
               )}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+              {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark, at its trailing edge as in C. */}
+              <MarkStamp kind={stamps[li]} />
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
