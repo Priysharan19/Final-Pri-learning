@@ -78,6 +78,14 @@ for (const [label, b] of [['cotton paper', day], ['midnight enamel', night]]) {
   check(`primary text on teal meets AA (${label})`, ratio(hex(b, '--c-on-teal'), hex(b, '--c-teal')) >= 4.5, ratio(hex(b, '--c-on-teal'), hex(b, '--c-teal')).toFixed(2));
 }
 
+// Night must re-state every --in-* remap: instrument.css's night literals sit
+// on html.ui-instrument[data-theme="dark"], which outranks the day block.
+const instCss = readFileSync(join(dir, 'instrument.css'), 'utf8');
+const instNight = (instCss.match(/html\.ui-instrument\[data-theme="dark"\]\s*\{([^}]*)\}/) || [])[1] || '';
+const overridden = [...instNight.matchAll(/(--in-[a-z0-9-]+):/g)].map(m => m[1]).filter(t => !/^--in-c\d|--in-unc|--in-tx-4|--in-shadow|--in-dot/.test(t));
+const unmapped = overridden.filter(t => !night.includes(`${t}:`));
+check('every night token instrument.css sets is remapped in the night block', unmapped.length === 0, unmapped.join(','));
+
 // Radius: 8px at most everywhere in the instrument interface, plus one named
 // pill token that only primary actions and chips may use.
 const sheets = [];

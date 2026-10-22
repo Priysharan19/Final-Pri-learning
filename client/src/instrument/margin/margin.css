@@ -121,8 +121,18 @@ html.ui-instrument[data-theme="dark"] {
   --c-glass-edge: rgba(255, 255, 255, 0.16);
   --c-lift: inset 0 1px 0 var(--c-emboss-hi), 0 0 0 var(--c-line) var(--c-hair-2);
   --c-float: 0 0 0 var(--c-line) var(--c-hair), 0 22px 48px -14px rgba(0, 0, 0, 0.7);
+  /* instrument.css sets its night tokens as literals on this same, more
+     specific selector, so every remap is repeated here or the night theme
+     stays the old graphite. */
+  --in-void: var(--c-paper-2); --in-base: var(--c-paper); --in-l1: var(--c-sheet);
   --in-l2: #0f191e; --in-l3: var(--c-bezel); --in-l4: var(--c-bezel-2); --in-l5: var(--c-bezel-3);
-  --in-edge-3: #4a5a60;
+  --in-edge: var(--c-hair-2); --in-edge-2: var(--c-hair); --in-edge-3: #4a5a60;
+  --in-tx: var(--c-ink); --in-tx-2: var(--c-ink-2); --in-tx-3: var(--c-ink-3);
+  --in-action: var(--c-teal); --in-on-action: var(--c-on-teal); --in-signal: var(--c-teal);
+  --in-good: var(--c-teal); --in-slip: var(--c-copper); --in-bad: var(--c-copper); --in-ink: var(--c-pen);
+  --in-hi: var(--c-emboss-hi);
+  --accent-soft: var(--c-teal-soft);
+  --shadow: var(--c-float); --shadow-sm: var(--c-lift);
   --in-shadow: rgba(0, 0, 0, 0.6);
   --accent-hover: #80ddd1; --accent-pressed: #4fb8ab;
   --accent-line: rgba(99, 210, 196, 0.35);
