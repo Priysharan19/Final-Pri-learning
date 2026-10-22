@@ -241,6 +241,8 @@ const INDIA_BANK_OF = {
   'c12-rate-approximation-reasoning': 'india-class12',
   'c12-monotonic-tangent-reasoning': 'india-class12',
   'c12-vector-direction-reasoning': 'india-class12',
+  // JEE D4 replacement for a retired routine rung (#408).
+  'c11-complex-quadratic-jee-reasoning': 'india-class11',
   // Hardest-level (D3) forms, tranche 3 (Classes VII, VIII, XI).
   'c7-place-value-systems-reasoning': 'india-class7-hardest',
   'c7-rounding-bounds-reasoning': 'india-class7-hardest',
