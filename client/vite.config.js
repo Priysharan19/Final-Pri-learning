@@ -227,7 +227,8 @@ export const ON_DEMAND = [
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
     [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened'],
+    [/(^|\/)(signin|firstopen|FirstOpen|SignInPlot|SignInMark)-[^/]*\.(js|css)$/, 'instrument sign-in and first-open skins, needed only before sign-in (which needs a connection)']
   ] : [
     [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|SignInMark|FirstOpen|EmptyPlot|settings|signin|firstopen|states|CommandBar|ledger|instrument|instrument-sans-[a-z-]+|margin|MarginIcon|PMark|shell|IndexDial|iserif-[0-9a-z]+|stix-[0-9a-z]+|cormorant-sc-[0-9a-z]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),

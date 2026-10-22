@@ -71,11 +71,7 @@ if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   // The luxury layer remaps the instrument's tokens, so it must land after
   // instrument.css in the cascade.
-  import('./instrument/instrument.css').then(() => import('./instrument/margin/margin.css'))
-    // Sign-in and first-open skins (direction C). Loaded here, not from their
-    // components, because the sign-in screen is also bundled bare by the
-    // onboarding checks, whose bundler takes no stylesheets.
-    .then(() => Promise.all([import('./instrument/margin/signin.css'), import('./instrument/margin/firstopen.css')]));
+  import('./instrument/instrument.css').then(() => import('./instrument/margin/margin.css'));
   // The Map, Report and Scripts tabs are on demand in this build; after an
   // online launch, at idle and only on a cheap link, fetch them so the service
   // worker keeps them for offline (local/offlineWarm.js, issue #658).
@@ -167,6 +163,19 @@ export function Logo({ large = false, onClick }) {
       <BrandWordmark height={large ? 44 : 22} />
     </Tag>
   );
+}
+
+// The sign-in and first-open skins (direction C) are needed only before a
+// profile is let in, so they load then, on demand, and are never warmed for
+// offline (sign-in needs a connection anyway). Loaded here rather than from
+// their components because the sign-in screen is also bundled bare by the
+// onboarding checks, whose bundler takes no stylesheets.
+let signInSkin = null;
+function SignInSkin() {
+  useEffect(() => {
+    signInSkin ||= Promise.all([import('./instrument/margin/signin.css'), import('./instrument/margin/firstopen.css')]).catch(() => { signInSkin = null; });
+  }, []);
+  return null;
 }
 
 export default function App() {
@@ -466,6 +475,7 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
+        {INSTRUMENT_ON && <SignInSkin />}
         <React.Suspense fallback={<RouteLoading />}>
           <Routes>
             {/* A store reviewer and a payment provider open these without an
