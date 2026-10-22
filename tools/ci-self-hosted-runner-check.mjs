@@ -353,6 +353,100 @@ function triggers(top) {
   return map.length ? map : listValue(on);
 }
 
+// ----------------------------------------------------------- grammar lint ---
+// The parsers above only understand plain `key:` lines; anything else would be
+// skipped, so a key YAML (and GitHub) still reads -- `  evil :`, `"env":`,
+// `"ev\x69l":`, `? env` -- could hide a job, a trigger, an env or a permission
+// from every check. This lint runs on EVERY workflow before classification and
+// fails closed: each non-blank, non-comment line outside a block scalar must be
+// a plain `key:` (optionally after `- `, nothing between the key and the colon),
+// a `- ` sequence item holding a plain scalar or single-line flow sequence, or
+// block-scalar content. The one other construct the repository uses -- a
+// single-line flow mapping of plain keys to scalars, e.g. a matrix include or
+// `with: {node-version: '24'}` -- is allowed narrowly (no quoted keys, no
+// nesting, no duplicates) and is still banned outright in a self-hosted workflow.
+const PLAIN_KEY_LINE = /^( *)((?:- )?)([A-Za-z0-9_.-]+):(?: (.*))?$/;
+const ITEM_LINE = /^( *)- (.*)$/;
+const BLOCK_SCALAR = /^[|>][-+0-9]*(?: +#.*)?$/;
+const QUOTED = /^('(?:[^']|'')*'|"(?:[^"\\]|\\.)*")/;
+
+function plainScalarOk(raw) {
+  const v = raw.trim();
+  if (v === '') return true;
+  if (/^[?{!&*%@`|>,\]}#-]/.test(v) && !/^-[0-9A-Za-z]/.test(v)) return false;
+  const q = v.match(QUOTED);
+  if (q) return /^(\s+#.*)?$/.test(v.slice(q[0].length));
+  return !/:(\s|$)/.test(v.replace(/\s+#.*$/, ''));
+}
+
+function flowSequenceOk(v) {
+  const inner = v.replace(/'(?:[^']|'')*'|"(?:[^"\\]|\\.)*"/g, "''");
+  return /^\[[^[\]{}]*\](\s+#.*)?$/.test(inner) && !/:(\s|$)/.test(inner);
+}
+
+function flowMappingOk(v) {
+  const m = v.match(/^\{(.*)\}(\s+#.*)?$/);
+  if (!m) return false;
+  const parts = [];
+  let cur = '';
+  let quote = null;
+  for (const ch of m[1]) {
+    if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
+    if (ch === "'" || ch === '"') { quote = ch; cur += ch; continue; }
+    if ('{}[]'.includes(ch)) return false;
+    if (ch === ',') { parts.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  if (quote) return false;
+  parts.push(cur);
+  const seen = new Set();
+  for (const part of parts) {
+    const kv = part.trim().match(/^([A-Za-z0-9_.-]+): (.*)$/);
+    if (!kv || seen.has(kv[1]) || !plainScalarOk(kv[2]) || /#/.test(kv[2].replace(QUOTED, ''))) return false;
+    seen.add(kv[1]);
+  }
+  return true;
+}
+
+const valueOk = raw => {
+  const v = raw.trim();
+  if (v.startsWith('[')) return flowSequenceOk(v);
+  if (v.startsWith('{')) return flowMappingOk(v);
+  return plainScalarOk(v);
+};
+
+export function lintWorkflowGrammar(name, source) {
+  const failures = [];
+  const lines = source.replace(/^﻿/, '').split('\n').map(l => l.replace(/\r$/, ''));
+  const bad = (i, why) => failures.push(`${name}:${i + 1}: grammar: ${why}: ${JSON.stringify(lines[i].slice(0, 100))}`);
+  let blockAt = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (blockAt >= 0) {
+      if (/^\s*$/.test(line) || indentOf(line) > blockAt) continue;
+      blockAt = -1;
+    }
+    if (/^\s*$/.test(line) || /^ *#/.test(line)) continue;
+    if (/^ *\t/.test(line) || /\t/.test(line.match(/^[ \t]*/)[0])) { bad(i, 'tab in indentation'); continue; }
+    const key = line.match(PLAIN_KEY_LINE);
+    if (key) {
+      const value = key[4] ?? '';
+      if (BLOCK_SCALAR.test(value)) { blockAt = key[1].length + key[2].length; continue; }
+      if (!valueOk(value)) bad(i, 'value must be a plain or quoted scalar, a single-line flow sequence, or a narrow flow mapping');
+      continue;
+    }
+    const item = line.match(ITEM_LINE);
+    if (item) {
+      if (BLOCK_SCALAR.test(item[2])) { blockAt = item[1].length; continue; }
+      if (!valueOk(item[2])) bad(i, 'sequence item must hold a plain key, scalar, flow sequence or narrow flow mapping');
+      continue;
+    }
+    if (/^ *-$/.test(line)) continue;
+    bad(i, 'not a plain `key:` line, `- ` item or block-scalar content (quoted, escaped or complex key, space before the colon, or a multi-line scalar)');
+  }
+  return failures;
+}
+
 // --------------------------------------------------------------- contract ---
 export function analyzeWorkflow(name, source) {
   const failures = [];
@@ -831,8 +925,13 @@ const check = (ok, message) => { if (ok) passed += 1; else failures.push(message
 // 1. Every real workflow: classify; every self-hosted one must meet the contract.
 const files = readdirSync(WORKFLOWS).filter(n => /\.ya?ml$/.test(n)).sort();
 const selfHostedFiles = [];
+const lintedFiles = [];
 for (const name of files) {
-  const result = analyzeWorkflow(name, readFileSync(path.join(WORKFLOWS, name), 'utf8'));
+  const source = readFileSync(path.join(WORKFLOWS, name), 'utf8');
+  const grammar = lintWorkflowGrammar(name, source);
+  for (const f of grammar) check(false, f);
+  if (!grammar.length) { passed += 1; lintedFiles.push(name); }
+  const result = analyzeWorkflow(name, source);
   if (result.selfHosted) selfHostedFiles.push(name);
   for (const f of result.failures) check(false, f);
   if (!result.failures.length) passed += 1;
@@ -972,6 +1071,53 @@ for (const runsOn of ['${{ matrix.os }}', '[self-hosted, macOS]', 'pri-learning-
   check(r.selfHosted && r.failures.some(f => /only be triggered by workflow_dispatch/.test(f)), `a pull_request workflow on runs-on ${runsOn.trim()} must be rejected`);
 }
 
+// 3b. Grammar fixtures: keys the line parsers would skip must be rejected
+//     before classification, in a brand-new workflow and in the Mac workflow.
+const fullCheck = (name, src) => [...lintWorkflowGrammar(name, src), ...analyzeWorkflow(name, src).failures];
+const evilPr = key => `name: evil\non:\n  pull_request:\npermissions:\n  contents: read\njobs:\n${key}\n    runs-on: [self-hosted, macOS, ARM64, pri-mac-0123456789abcdef]\n    steps:\n      - run: echo hi\n`;
+for (const [label, src] of [
+  ['new PR workflow with job key `  evil :`', evilPr('  evil :')],
+  ['new PR workflow with `jobs :`', evilPr('  evil:').replace('\njobs:\n', '\njobs :\n')],
+  ['new PR workflow with an escaped key "ev\\x69l":', evilPr('  "ev\\x69l":')],
+  ["new PR workflow with a single-quoted key 'evil':", evilPr("  'evil':")],
+  ['new PR workflow with `? evil` complex key', evilPr('  ? evil\n  :')],
+  ['new PR workflow with `on :`', evilPr('  evil:').replace('\non:\n', '\non :\n')],
+  ['tab indentation', evilPr('  evil:').replace('    steps:', '\tsteps:')]
+]) {
+  const f = fullCheck('fixture', src);
+  check(f.some(x => /grammar:/.test(x)), `grammar fixture "${label}" must be rejected; got: ${f.join(' | ') || 'no failure'}`);
+}
+if (existsSync(macPath)) {
+  const mac = readFileSync(macPath, 'utf8');
+  const top = 'permissions:\n  contents: read\n';
+  for (const [label, from, to] of [
+    ['top-level `env :` with PATH', top, `${top}\nenv :\n  PATH: /tmp/evil:/usr/bin:/bin\n`],
+    ['top-level `"env" :` with BASH_ENV', top, `${top}\n"env" :\n  BASH_ENV: ./evil.sh\n`],
+    ['top-level `"env":` with BASH_ENV', top, `${top}\n"env":\n  BASH_ENV: ./evil.sh\n`],
+    ['top-level `? env` complex key', top, `${top}\n? env\n: {PATH: /tmp/evil}\n`],
+    ['top-level `actions : write`', top, 'permissions:\n  contents: read\n  actions : write\n'],
+    ['job-level `permissions :` / `contents : write`', '    timeout-minutes: 90\n', '    timeout-minutes: 90\n    permissions :\n      contents : write\n'],
+    ['`container :` after the Mac steps', null, '    container :\n      image: evil/image\n'],
+    ['flow mapping with a quoted key', top, `${top}\nenv: {"PATH": /tmp/evil}\n`],
+    ['flow mapping with a duplicate key', top, `${top}\nenv: {A: 1, A: 2}\n`],
+    ['nested flow mapping', top, `${top}\nenv: {A: {B: 1}}\n`],
+    ['anchor on a value', '    timeout-minutes: 90\n', '    timeout-minutes: &t 90\n']
+  ]) {
+    const mutated = from === null ? `${mac}${to}` : mac.replace(from, to);
+    check(mutated !== mac, `grammar fixture "${label}" must actually change the workflow`);
+    const f = fullCheck('fixture', mutated);
+    check(f.some(x => /grammar:/.test(x)), `grammar fixture "${label}" must be rejected by the grammar lint; got: ${f.join(' | ') || 'no failure'}`);
+  }
+}
+// The narrow flow-mapping allowance still accepts the repository's own forms.
+for (const ok of [
+  "          - { api: 36, profile: pixel_tablet, expect: product, target: google_apis, webviewFlags: \"--disable-gpu-compositing\" }",
+  "        with: {python-version: '3.12', cache: pip, cache-dependency-path: tools/ink-foundation/requirements.txt}",
+  "    branches: [main, 'release/**']"
+]) {
+  check(lintWorkflowGrammar('ok', `jobs:\n  a:\n    steps:\n${ok}\n`).length === 0, `grammar lint accepts ${ok.trim()}`);
+}
+
 // 4. The owner runner script.
 const script = readFileSync(RUNNER_SCRIPT, 'utf8');
 for (const f of analyzeRunnerScript(script)) check(false, f);
@@ -1015,4 +1161,4 @@ if (failures.length) {
   console.error(`SELF-HOSTED RUNNER CONTRACT: FAIL — ${passed}/${total} checks`);
   process.exit(1);
 }
-console.log(`SELF-HOSTED RUNNER CONTRACT: PASS — ${passed}/${total} checks; ${files.length} workflows scanned, self-hosted: ${selfHostedFiles.join(', ') || 'none'}; every self-hosted lane is owner-dispatch-only for an exact SHA on main via a guard job, read-only, credential-free and routed by a fresh one-job label; runner script refuses admin/launcher/git roots, never prints or argv-passes its credential, and deletes its work directory; ${shellcheckNote}`);
+console.log(`SELF-HOSTED RUNNER CONTRACT: PASS — ${passed}/${total} checks; ${files.length} workflows scanned (${lintedFiles.length} grammar-clean), self-hosted: ${selfHostedFiles.join(', ') || 'none'}; every self-hosted lane is owner-dispatch-only for an exact SHA on main via a guard job, read-only, credential-free and routed by a fresh one-job label; runner script refuses admin/launcher/git roots, never prints or argv-passes its credential, and deletes its work directory; ${shellcheckNote}`);

@@ -25,7 +25,13 @@ compromised by untrusted workflow code. So the Mac lane is built on these rules:
 | The credential is never printed and never on a command line | `mint` refuses to write to a terminal. `run` reads the JIT config from stdin and gives it to the runner as `ACTIONS_RUNNER_INPUT_JITCONFIG`, not as `--jitconfig` in argv (which `ps` shows to every local user). The workflow fails if that variable reaches the job environment |
 
 `tools/ci-self-hosted-runner-check.mjs` (run in CI's "Suites policy and contracts" job and in
-`npm run test:ci:policy`) enforces this contract. **The whole `guard` job, and the Mac job
+`npm run test:ci:policy`) enforces this contract. It first runs a fail-closed grammar lint on
+**every** workflow file. Each line outside a block scalar must be a plain `key:` (nothing between
+the key and the colon), a `- ` item, or block-scalar content. Quoted, escaped and `? ` complex
+keys, and anything else the line parsers would skip, are rejected before any workflow is
+classified. The only exception is a narrow single-line flow mapping of plain keys, which the
+Android matrix and two `with:` lines use; it is still banned in the self-hosted workflow.
+**The whole `guard` job, and the Mac job
 from its key line through its third step (checkout, HEAD assertion, isolation), must match a
 reviewed canonical text kept in the checker, exactly apart from trailing whitespace.** A
 deny-list cannot list every way a script can exit 0 early (`exit`, `exec true`, `if false;`, a
