@@ -51,9 +51,9 @@ function Odometer({ value }) {
   return (
     <span className="k-odo">
       <span className="sr-only">{text}</span>
-      {/* A blank cell, then two turns of the drum: it starts empty, never on a false 0. */}
+      {/* A blank cell, then the drum: it starts empty, never on a false 0. */}
       {[...text].map((ch, i) => /\d/.test(ch)
-        ? <span key={i} aria-hidden="true"><span style={{ '--d': 11 + Number(ch) }}><i />{Array.from({ length: 20 }, (_, n) => <i key={n}>{n % 10}</i>)}</span></span>
+        ? <span key={i} aria-hidden="true"><span style={{ '--d': 1 + Number(ch) }}>{['', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <i key={n}>{n}</i>)}</span></span>
         : <span key={i} aria-hidden="true">{ch}</span>)}
     </span>
   );
