@@ -4,7 +4,8 @@
    C's curves and durations (motion.js): row reveal 260ms, emboss stamp 340ms
    with a 420ms press ring, calendar flip 170ms; A's 36px plane rise. */
 [data-wc-row] .in-read-m { font-family: var(--c-text); }
-.ink-verdict-layer .ink-verdict, .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
+.ink-verdict[data-wc-stamped], .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
+[data-wc-row] { perspective: 1400px; }   /* the plane the mark rises on */
 .wc-plane { position: relative; display: grid; transform: translateZ(36px); }
 .wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
 .wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
@@ -25,4 +26,5 @@
 @keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
 /* Phone: the chips are hidden, so the reading list is the margin. */
 @media (min-width: 561px) { .ink-line-verdict .wc-plane { display: none; } .ink-line-verdict:has(.wc-plane) > svg:first-child { display: inline; } }
+@media (forced-colors: active) { .wc-stamp { filter: none; } .wc-stamp * { stroke: CanvasText; } .wc-datewin { box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .wc-go *, .wc-datewin span { animation: none !important; } }

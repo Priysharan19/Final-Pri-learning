@@ -17,10 +17,11 @@ import { MarkGlyph } from './margin/MarginIcon.jsx';
 const ON = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
 if (ON && featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
 
-/** The stamp a line earns. A line the second (model) read judged
- *  (source 'cloud-working') is never stamped: an opinion is not a mark. */
+/** The stamp a line earns. Allowlist: only the on-device deterministic
+ *  engine's verdicts, which carry no `source`. Anything with a source (the
+ *  second, model read is 'cloud-working') is never stamped. */
 export function engineMark(v) {
-  if (!ON || !v || v.source === 'cloud-working') return null;
+  if (!ON || !v || v.source != null) return null;
   return v.status === 'ok' ? 'ok' : v.status === 'break' || v.status === 'wrong' ? 'x' : v.status === 'ecf' ? 'ecf' : null;
 }
 
@@ -51,9 +52,12 @@ export function useCheckCeremony(stageRef, key) {
     root.classList.remove('wc-go'); void root.offsetWidth; root.classList.add('wc-go');
     running++;
     let on = true;
-    const end = () => { if (on) { on = false; running--; window.dispatchEvent(new Event('pri:check-marked')); } };
-    const t = setTimeout(end, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : rows.length * PER + 320);
-    return () => { clearTimeout(t); end(); };
+    const stop = () => { if (on) { on = false; running--; } };
+    // Only a ceremony that ran to its end lets the score into the window.
+    const end = () => { if (on) { stop(); window.dispatchEvent(new Event('pri:check-marked')); } };
+    const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const t = setTimeout(end, still ? 0 : rows.length * PER + 320);
+    return () => { clearTimeout(t); stop(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 }

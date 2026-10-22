@@ -39,7 +39,8 @@ const RAW_UPDATE = typeof window !== 'undefined' && 'onpointerrawupdate' in wind
 // A compile-time constant, so the classic build drops the outline renderer.
 const OUTLINE_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
 const outlineInkOn = () => typeof document !== 'undefined' && document.documentElement.classList.contains('ui-instrument');
-const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduceMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+const reducedMotion = () => !!reduceMQ?.matches;   // one live query, not one per frame
 // Wet ink: 12% darker (a black glaze at .12) and 8% wider, settling over 400ms.
 const WET_MS = 400, WET_SWELL = 0.08;
 

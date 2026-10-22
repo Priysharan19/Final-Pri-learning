@@ -551,7 +551,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 const bad = v.status === 'break' || v.status === 'wrong';
                 if (!good && !bad) return null;
                 const showNote = bad && !noted;
-                const firstError = showNote && engineMark(v) === 'x';
+                const stamp = isLowConfidence(line, lineConfidenceFloor) ? null : engineMark(v);
+                const firstError = showNote && stamp === 'x';
                 if (showNote) noted = true;
                 const geometry = feedbackGeometry(line);
                 const b = geometry.anchor || line.box;
@@ -562,7 +563,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
                         style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }} />
                     ))}
-                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
+                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`} data-wc-stamped={stamp ? '' : undefined}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
                       title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
@@ -671,7 +672,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           </div>
           {rec.lines.map((line, li) => (
             <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
-              data-wc-row={INSTRUMENT_PLOT && !stale && engineMark(lineVerdicts?.[li]) ? li : undefined}
+              data-wc-row={INSTRUMENT_PLOT && !stale && !isLowConfidence(line, lineConfidenceFloor) && engineMark(lineVerdicts?.[li]) ? li : undefined}
               data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
               data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
@@ -682,7 +683,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
                   {/* Phone: the margin chips have no room, so the reading list is the margin and carries the struck mark. */}
-                  {INSTRUMENT_PLOT && !stale && <MarkStamp kind={engineMark(lineVerdicts[li])} />}
+                  {INSTRUMENT_PLOT && !stale && !isLowConfidence(line, lineConfidenceFloor) && <MarkStamp kind={engineMark(lineVerdicts[li])} />}
                   <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}
