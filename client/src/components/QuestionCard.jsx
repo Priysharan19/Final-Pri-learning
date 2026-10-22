@@ -390,6 +390,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // `busy` is React state and lands a render late, so two taps inside one frame
   // both saw it false and both posted. The ref is set synchronously.
   const inFlightRef = useRef(false);
+  // A relaunch replay of an earlier typed or photo submission is in flight
+  // (Relaunch recovery below). The page stays writable meanwhile: ink is the
+  // student's new work, not the submission being checked (#627). (An ink
+  // replay is the page itself, and stays frozen while it is checked.)
+  const [replaying, setReplaying] = useState(false);
+  const replayingRef = useRef(false);
+  // Strokes reported while a submission was in flight, reported again when it
+  // settles — for the question they were written on, never another.
+  const deferredInkRef = useRef(null);   // { questionId, strokes }
+  const onInkStrokesRef = useRef(null);
+  const questionIdRef = useRef(String(question.id));
+  questionIdRef.current = String(question.id);
   // A submission that has not had a definitive answer: an identical retry
   // reuses its idempotency key, so a timeout followed by a second tap is still
   // one attempt.
@@ -458,6 +470,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setJudged(null); setJudgedStale(false); setInkSignature(null);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
+    deferredInkRef.current = null;
     ++inkSaveRevision.current;
     setPeekOpen(false);
     startRef.current = Date.now();
@@ -1029,7 +1042,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // The page's content, whatever else is going on: an annotation of an
     // earlier revision must not outlive a single new stroke.
     setInkSignature(Array.isArray(strokes) && strokes.length ? strokeSignature(strokes) : null);
-    if (inFlightRef.current || attemptRef.current) return;
+    if (inFlightRef.current) {
+      deferredInkRef.current = { questionId: String(question.id), strokes };
+      // Written during a relaunch replay: kept on disk now, whatever the
+      // replay's answer (edit detection waits for the replay to settle).
+      if (replayingRef.current) { setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0); saveInk(strokes); }
+      return;
+    }
+    if (attemptRef.current) return;
     // New pen strokes after a submission was pressed are an edit of it. The
     // first report after a mount is the kept page being restored, not an edit.
     // (Ink drawn over a typed or photo submission is an edit from the first stroke.)
@@ -1041,6 +1061,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     saveInk(strokes);
   }, [question.id, question.subtopicName]); // eslint-disable-line react-hooks/exhaustive-deps
+  onInkStrokesRef.current = onInkStrokes;
   /**
    * Keep the page: the strokes, and with them the transcript and typed answer
    * of the moment (inkExtrasRef). "Saved" is said only after exactly that has
@@ -1514,6 +1535,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
+      const deferred = deferredInkRef.current;
+      deferredInkRef.current = null;
+      if (deferred && mountedRef.current && deferred.questionId === questionIdRef.current) onInkStrokesRef.current?.(deferred.strokes);
     }
   }
 
@@ -1545,13 +1569,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (plan.reattach) setPhotoReattachRequired(true);
       return;
     }
+    if (!pending.viaInk) { replayingRef.current = true; setReplaying(true); }
     (pending.viaInk ? Promise.resolve().then(() => readInkDraft(question.id)).catch(() => null) : Promise.resolve(null)).then(kept => {
-      deliver({
+      return deliver({
         answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
         ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
         submissionId: pending.submissionId
       }, { lines: pending.lines, recovering: true, sourceMode: pending.sourceMode });
-    });
+    }).catch(() => { }).finally(() => { replayingRef.current = false; if (mountedRef.current) setReplaying(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
@@ -1562,7 +1587,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (r?.stale !== true) setInkReadExpired(false);
     // Recovery: the page restored after a relaunch is read once, for display
     // beside the verdict, and then frozen like any submitted reading.
-    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+    if ((inFlightRef.current && !replayingRef.current) || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
   // Ink that waited for the reader (offline, signed out, reader down) is READ
@@ -2605,7 +2630,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
-                  disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
+                  disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
+                  focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
                   readExpired={inkExpiredCount}
