@@ -31,7 +31,7 @@ export function MarkStamp({ kind }) {
 
 // Ceremonies striking marks now; the date window waits only while one is.
 let running = 0;
-const PER = 860;   // C section 5: set a row 260ms, strike 340ms, rest 220ms
+const PER = 860;   // one row slot; write.css spells it out in its tokens
 
 /**
  * The Check ceremony over the InkAnswer root. Each visible [data-wc-row] gets

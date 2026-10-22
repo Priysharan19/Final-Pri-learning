@@ -1,30 +1,62 @@
 /* Pri Luxury · Write & Check (C "Examiner's Chronograph", depth from A).
    Instrument build only (loaded by StepMarks.jsx; `write` is in the flag-off
    skip list). Every mark drawn here is the deterministic engine's verdict.
-   C's curves and durations (motion.js): row reveal 260ms, emboss stamp 340ms
-   with a 420ms press ring, calendar flip 170ms; A's 36px plane rise. */
-[data-wc-row] .in-read-m { font-family: var(--c-text); }
+   Timings are tokens: margin.css's --c-d-row / --c-d-set / --c-ease-*, plus
+   C's stamp, flip and underline values below. A row's slot (--wc-d) is set by
+   useCheckCeremony: row + gap + stamp + rest = 260 + 40 + 340 + 220 = 860ms. */
+html.ui-instrument {
+  --wc-col: 200px;
+  --wc-d-gap: 40ms; --wc-d-stamp: 340ms; --wc-d-rise: 600ms; --wc-d-under: 320ms;
+  --wc-d-flip: 170ms; --wc-d-flip-wait: 110ms;
+  --wc-ease-stamp: cubic-bezier(.7, 0, .9, .6); --wc-ease-settle: cubic-bezier(.2, 0, .2, 1); --wc-ease-flip: cubic-bezier(0, 0, .3, 1);
+}
+
+/* iPad: C's margin column beside the writing, ruled off in copper. The
+   canvas gives up the column (so no one writes under the marks); the
+   transcription rows and their stamps live in it, each level with its line. */
+@media (min-width: 561px) {
+  html.ui-instrument .ink-stage { padding-inline-end: var(--wc-col); }
+  html.ui-instrument .ink-stage::before {
+    content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: var(--wc-col);
+    background: var(--c-sheet); border-inline-start: var(--c-line) solid var(--c-copper); pointer-events: none;
+  }
+  html.ui-instrument .in-read {
+    right: 0; width: var(--wc-col); justify-content: space-between;
+    padding: 0 10px; min-height: 44px; border-radius: 0; background: none; box-shadow: none;
+    border-block-end: var(--c-line) solid var(--c-hair-2); animation: none;
+    font: 400 14px/1.2 var(--c-text); color: var(--c-ink);
+  }
+  html.ui-instrument .in-read.is-slip { background: var(--c-copper-soft); box-shadow: none; }
+  html.ui-instrument .in-read .katex { font-size: 1em; }
+  [data-wc-row] .in-read-tg { display: none; }   /* the stamp says it */
+  .ink-line-verdict .wc-plane { display: none; } /* the list keeps its badge */
+  .ink-line-verdict:has(.wc-plane) > svg:first-child { display: inline; }
+}
+
 .ink-verdict[data-wc-stamped], .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
 [data-wc-row] { perspective: 1400px; }   /* the plane the mark rises on */
 .wc-plane { position: relative; display: grid; transform: translateZ(36px); }
 .wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
 .wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
-[data-wc-first-error] { border-bottom-color: var(--c-copper) !important; transform-origin: 0; }
-.wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row .26s cubic-bezier(.2,.8,.2,1) var(--wc-d) both; }
-.wc-go [data-wc-row] .wc-stamp { animation: wc-stamp .34s cubic-bezier(.7,0,.9,.6) calc(var(--wc-d) + .3s) both; }
-.wc-go [data-wc-row] .wc-ring { animation: wc-ring .42s cubic-bezier(.3,0,.2,1) calc(var(--wc-d) + .3s); }
-.wc-go [data-wc-row] .wc-plane { animation: wc-rise .6s cubic-bezier(.2,.8,.2,1) calc(var(--wc-d) + .49s) both; }
-.wc-go [data-wc-first-error] { animation: wc-under .32s cubic-bezier(.2,.8,.2,1) var(--wc-u) both; }
+.ink-verdict-layer .ink-underline[data-wc-first-error] { border-block-end-color: var(--c-copper); transform-origin: left; }
+.ink-verdict-layer .ink-underline[data-wc-first-error]:dir(rtl) { transform-origin: right; }
+
+.wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row var(--c-d-row) var(--c-ease-row) var(--wc-d) both; }
+.wc-go [data-wc-row] .wc-stamp { animation: wc-stamp var(--wc-d-stamp) var(--wc-ease-stamp) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)) both; }
+.wc-go [data-wc-row] .wc-ring { animation: wc-ring var(--c-d-set) var(--c-ease-press) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap)); }
+.wc-go [data-wc-row] .wc-plane { animation: wc-rise var(--wc-d-rise) var(--c-ease-row) calc(var(--wc-d) + var(--c-d-row) + var(--wc-d-gap) + var(--wc-d-stamp) * .55) both; }
+.wc-go .ink-underline[data-wc-first-error] { animation: wc-under var(--wc-d-under) var(--c-ease-row) var(--wc-u) both; }
 @keyframes wc-row { from { opacity: 0; transform: translateY(6px); } }
-@keyframes wc-stamp { 0% { opacity: 0; transform: scale(1.7); } 55% { transform: scale(.9); animation-timing-function: cubic-bezier(.2,0,.2,1); } }
+@keyframes wc-stamp { 0% { opacity: 0; transform: scale(1.7); } 55% { transform: scale(.9); animation-timing-function: var(--wc-ease-settle); } }
 @keyframes wc-ring { 0% { transform: scale(1.9); } 60% { opacity: .55; transform: scale(1.05); } }
 @keyframes wc-rise { from { transform: none; } }
 @keyframes wc-under { from { transform: scaleX(0); } }
+
+/* Date window: STIX 400 tabular, a calendar complication. */
 .wc-datewin { display: inline-block; min-width: 52px; padding: 4px 8px; text-align: center; perspective: 200px; background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: 2px; box-shadow: var(--c-deboss); font: 400 14px/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); }
-.wc-datewin span { display: inline-block; animation: wc-flip .17s cubic-bezier(0,0,.3,1) .11s both; }
+.wc-datewin span { display: inline-block; animation: wc-flip var(--wc-d-flip) var(--wc-ease-flip) var(--wc-d-flip-wait) both; }
 .wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
 @keyframes wc-flip { 0% { transform: rotateX(-90deg); } 75% { transform: rotateX(8deg); } }
-/* Phone: the chips are hidden, so the reading list is the margin. */
-@media (min-width: 561px) { .ink-line-verdict .wc-plane { display: none; } .ink-line-verdict:has(.wc-plane) > svg:first-child { display: inline; } }
-@media (forced-colors: active) { .wc-stamp { filter: none; } .wc-stamp * { stroke: CanvasText; } .wc-datewin { box-shadow: none; } }
+
+@media (forced-colors: active) { .wc-stamp { filter: none; } .wc-stamp * { stroke: CanvasText; } .wc-datewin { box-shadow: none; } html.ui-instrument .ink-stage::before { border-color: CanvasText; } }
 @media (prefers-reduced-motion: reduce) { .wc-go *, .wc-datewin span { animation: none !important; } }

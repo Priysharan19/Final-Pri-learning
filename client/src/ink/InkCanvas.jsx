@@ -41,7 +41,8 @@ const OUTLINE_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_F
 const outlineInkOn = () => typeof document !== 'undefined' && document.documentElement.classList.contains('ui-instrument');
 const reduceMQ = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 const reducedMotion = () => !!reduceMQ?.matches;   // one live query, not one per frame
-// Wet ink: 12% darker (a black glaze at .12) and 8% wider, settling over 400ms.
+// Wet ink: a glaze (12% darker on paper, lifted on midnight enamel) and 8%
+// wider, settling over 400ms.
 const WET_MS = 400, WET_SWELL = 0.08;
 
 const InkCanvas = forwardRef(function InkCanvas({
@@ -71,6 +72,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   const ctxRef = useRef({ base: null, live: null });
   const outlineRef = useRef(outlineInkOn());   // fixed per mount
   const wetRef = useRef([]);           // [{ stroke, at }] lifted strokes still settling (outline ink)
+  const glazeRef = useRef(['#000', 0.12]);   // [colour, alpha] of the wet glaze
   const [, force] = useState(0);
   toolRef.current = tool;
   disabledRef.current = disabled;
@@ -92,8 +94,15 @@ const InkCanvas = forwardRef(function InkCanvas({
   const refreshInk = useCallback(() => {
     const cs = getComputedStyle(document.documentElement);
     inkRef.current = ((OUTLINE_BUILD && outlineRef.current)
-      && (cs.getPropertyValue('--c-pen').trim() || cs.getPropertyValue('--wc-pen').trim()))
+      && cs.getPropertyValue('--c-pen').trim())
       || cs.getPropertyValue('--ink').trim() || '#efece1';
+    if (OUTLINE_BUILD) {
+      // Wet ink reads wet on either paper: dark ink deepens under a black
+      // glaze, light ink on midnight enamel lifts under a light one.
+      const el = document.documentElement, theme = el.getAttribute('data-theme');
+      const night = theme === 'dark' || (theme !== 'light' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches);
+      glazeRef.current = night ? ['#fff', 0.3] : ['#000', 0.12];
+    }
   }, []);
 
   /** Contexts are cached. A canvas resize resets the transform, so sizing
@@ -157,7 +166,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   // k: wetness 1 → 0. The glaze is a second fill of the same outline.
   const paintWet = (ctx, pts, ink, k, taper) => {
     paintOutline(ctx, pts, ink, 1, 1 + WET_SWELL * k, taper);
-    if (k > 0) paintOutline(ctx, pts, '#000', 0.12 * k, 1 + WET_SWELL * k, taper);
+    if (k > 0) paintOutline(ctx, pts, glazeRef.current[0], glazeRef.current[1] * k, 1 + WET_SWELL * k, taper);
   };
 
   const redrawBase = useCallback(() => {
