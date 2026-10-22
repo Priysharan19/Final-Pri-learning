@@ -18,7 +18,7 @@
 //
 // Pure: no network, no storage, no DOM.
 // ─────────────────────────────────────────────────────────────────────────────
-import { cleanInput, parseNumericInput } from '../engine/checker-core.js';
+import { cleanInput, parseNumericInput, readAnswerLabel } from '../engine/checker-core.js';
 import { normalize, parse } from '../engine/expr.js';
 import { parseIntervalInput, parseMatrixInput, parseVectorInput } from '../engine/answer-forms.js';
 import { withoutUnit } from '../engine/units.js';
@@ -422,6 +422,21 @@ export function answerFromLine(line, question = {}) {
   return whole ? { status: 'proposed', answer: whole } : { status: 'none' };
 }
 
+/** Does the label in front of a final line (if any) name what the question asks for? */
+function labelNamesTheAsk(text, answer, question) {
+  // An "=" that is a relation, not part of an arrow ("least value => 6").
+  const m = stripSentence(text).match(/^\s*([^=≈<>⇒→]{1,40}?)\s*(?:=(?![>=])|≈)/);
+  if (!m || !/\p{L}/u.test(m[1]) || STRONG_WORDS.test(m[1])) return true;
+  const label = m[1].trim();
+  const read = readAnswerLabel(question, `${label} = ${answer}`);
+  if (read.refuse) return false;
+  // Nothing to judge the label against (no asked quantity found): propose as before.
+  if (!read.asked) return true;
+  // A one-letter label is read as the typed field always has; a longer one
+  // must have been read off, or it names something else.
+  return /^[\p{L}θ]$/u.test(label) || !/[=≈]/.test(String(read.input));
+}
+
 /**
  * Propose the final answer from the lines of working the student has kept.
  *
@@ -453,6 +468,12 @@ export function proposeFinalAnswer(lines, question = {}) {
     .filter(l => l.found.status !== 'none');
 
   if (fromLast.status === 'ambiguous') return { status: 'ambiguous', candidates: fromLast.candidates };
+  // The label on the final line is judged as the typed field judges it: a line
+  // "b = 50" under "Find b²", or "Perimeter = 72" under "Find the area", names
+  // something other than what was asked, so nothing is proposed — the student
+  // is asked to enter the answer (#670 review: the photo path took whatever
+  // followed the last "=" and so accepted what the typed field refused).
+  if (type === 'numeric' && fromLast.status === 'proposed' && !labelNamesTheAsk(last.text, fromLast.answer, question)) return { status: 'none' };
   const all = distinct([
     ...(fromLast.status === 'proposed' ? [fromLast.answer] : []),
     ...announced.flatMap(l => (l.found.status === 'proposed' ? [l.found.answer] : l.found.candidates))

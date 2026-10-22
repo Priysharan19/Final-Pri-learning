@@ -423,7 +423,18 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   // (f) A label is read off only when it names the asked quantity.
   const b2 = { answerType: 'numeric', prompt: 'Find $b^2$.', answer: { value: 50 } };
   for (const input of ['b^2 = 50', 'b² = 50', 'B^2=50']) expect(`label: "${input}" names b², accepted`, verdict(b2, input).correct);
-  for (const input of ['b = 50', 'a^2 = 50', 'c = 50']) expect(`label: "${input}" is not b² = 50`, input === 'c = 50' ? verdict(b2, input).correct : !verdict(b2, input).correct);
+  for (const input of ['b = 50', 'a^2 = 50']) expect(`label: "${input}" is not b² = 50`, !verdict(b2, input).correct);
+  // Legacy, undecided: a one-letter label on an unrelated letter the question
+  // neither asks for nor gives is still read off as it always was.
+  expect('label (legacy): "c = 50" on a question that never mentions c is still read off', verdict(b2, 'c = 50').correct);
+  const tri = { answerType: 'numeric', prompt: 'In triangle ABC, $a = 7$ and $c = 9$. Find $b^2$.', answer: { value: 67 } };
+  expect('label: "c = 67" names the given c, refused', !verdict(tri, 'c = 67').correct);
+  expect('label: "b^2 = 67" accepted', verdict(tri, 'b^2 = 67').correct);
+  const henceB = { answerType: 'numeric', prompt: 'Find $b^2$ and hence $b$.', answer: { value: 5 } };
+  expect('label: "Find $b^2$ and hence $b$" asks for b too: "b = 5" accepted', verdict(henceB, 'b = 5').correct);
+  const bold = { answerType: 'numeric', prompt: 'Find the **median** of the data.', answer: { value: 6 } };
+  expect('label: bold markup does not hide the asked noun: "median = 6" accepted', verdict(bold, 'median = 6').correct);
+  expect('label: "Answer = 6" accepted', verdict(bold, 'Answer = 6').correct);
   const pq = { answerType: 'numeric', prompt: 'Find $PQ^2$.', answer: { value: 87.2, simplestFraction: { n: 436, d: 5 }, requireFraction: false } };
   expect('label: "PQ² = 436/5" accepted', verdict(pq, 'PQ² = 436/5').correct);
   expect('label: "AB^2 = 436/5" (another length) refused', !verdict(pq, 'AB^2 = 436/5').correct);

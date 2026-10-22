@@ -188,6 +188,7 @@ const ASK_VERB = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\b
 const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+((?:[a-z]+\s+){0,4}[a-z]+)/gi;
 // Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
 const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
+const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
 const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per)$/;
 const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
 /** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
@@ -211,8 +212,16 @@ function askedFor(question) {
   // the answer is the height, so "area = 8" names the wrong thing.
   const verbs = [...prompt.matchAll(ASK_VERB)];
   const from = verbs.length ? verbs[verbs.length - 1].index : 0;
-  const tail = prompt.slice(from);
-  const math = [...tail.matchAll(ASK_MATH)].map(m => quantityKey(m[1])).filter(k => k && !/[=<>]/.test(k));
+  const tail = prompt.slice(from).replace(/\*\*|__/g, '');
+  const math = [];
+  for (const m of tail.matchAll(ASK_MATH)) {
+    math.push(m[1]);
+    // "Find $b^2$ and hence $b$", "find $x$, $y$ and $x + y$": each $…$ joined on is asked too.
+    let rest = tail.slice(m.index + m[0].length);
+    for (let next; (next = rest.match(/^\s*(?:,|and(?:\s+hence)?|hence|then)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/i)); rest = rest.slice(next[0].length)) math.push(next[1]);
+  }
+  for (let i = 0; i < math.length; i++) math[i] = quantityKey(math[i]);
+  math.splice(0, math.length, ...math.filter(k => k && !/[=<>]/.test(k)));
   // The asked noun phrase, without its leading article and modifiers: "the
   // least possible mean deviation about the mean" asks for "mean deviation".
   // A label must be the whole phrase or a trailing part of it ("deviation",
@@ -223,7 +232,11 @@ function askedFor(question) {
     const words = [];
     for (const word of m[1].toLowerCase().split(/\s+/)) {
       if (PHRASE_ENDS.test(word)) break;
-      if (!words.length && NOT_A_NAME.has(word)) continue;
+      if (!words.length && NOT_A_NAME.has(word)) {
+        // "the total cost": "total" on its own names the asked total too.
+        if (QUANTITY_MODIFIERS.has(word)) nouns.push(word);
+        continue;
+      }
       words.push(word);
     }
     for (let i = 0; i < words.length; i++) if (!NOT_A_NAME.has(words[i])) nouns.push(words.slice(i).join(''));
@@ -244,8 +257,15 @@ export function readAnswerLabel(question, raw) {
   // Only a name is a label: "2 + 3 = 5" is working, not a label.
   if (!/[A-Za-zα-ωΔθ]/.test(label)) return { input: raw };
   const { math, nouns } = askedFor(question);
+  const asked = math.length + nouns.length;
   const key = quantityKey(label);
+  // "Answer = 5", "Ans = 5": the label is the answer itself.
+  if (/^(?:final\s+)?(?:answer|ans|result)$/i.test(label)) return { input: m[2] };
   if (/^[a-zθ]$/i.test(label)) {
+    // A letter the question GIVES a value ("In triangle ABC, a = 7, c = 9 …
+    // Find b²") names that given, not the answer, unless the letter itself is asked.
+    const given = new RegExp(`(^|[^A-Za-z\\\\])${label.replace(/[^A-Za-zθ]/g, '')}\\s*=\\s*-?\\d`).test(String(question?.prompt ?? '').replace(/\$/g, ''));
+    if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
     // A one-letter label is read off as it always was — unless the question
     // asks, and only asks, for a plainly different quantity on that letter: a
     // power or multiple of it (b², 2b) or a sum or difference of single letters
@@ -261,8 +281,8 @@ export function readAnswerLabel(question, raw) {
     }
     return { input: raw };
   }
-  if (math.includes(key) || nouns.includes(key)) return { input: m[2] };
-  return { input: raw };
+  if (math.includes(key) || nouns.includes(key)) return { input: m[2], asked };
+  return { input: raw, asked };
 }
 
 function percentAnswerWanted(question, ans) {
