@@ -38,3 +38,6 @@ html.ui-instrument .c-offline-kept { margin: 0; font-size: 14px; color: var(--c-
 html.ui-instrument:has([data-offline-banner]) .offline-entry {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+/* The empty state's one line, under the KPI row: STIX italic, quiet ink. */
+html.ui-instrument .in-plate-head:has(> .c-empty-note) { flex-wrap: wrap; }
+html.ui-instrument .c-empty-note { flex: 0 0 100%; margin: 0; font: italic 400 19px/1.3 var(--c-italic); color: var(--c-ink-2); }

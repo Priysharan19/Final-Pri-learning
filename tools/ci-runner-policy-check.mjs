@@ -133,7 +133,12 @@ for (const cmd of [
   'node client/test/tour-iphone-layout.js --no-build --browser=webkit',
   'node client/test/tour-activation-gate.js --no-build --browser=webkit',
   'node client/test/tour-photo-answer.js --no-build',
-  'node client/test/ink-canvas-loss-browser-check.mjs'
+  'node client/test/ink-canvas-loss-browser-check.mjs',
+  // The instrument build's first-open moment and the flag-on activation gate,
+  // run on tour-instrument.js's build (outside test:e2e, whose CI order is
+  // pinned to tour-ai-tutor.js's build above).
+  'node client/test/tour-first-open.js --no-build',
+  'npm run test:activation-gate:instrument'
 ]) {
   const expected = e2eChain.filter(c => c === cmd).length + 1;
   assert.equal(browserCommands.filter(c => c === cmd).length,

@@ -198,6 +198,9 @@ export default function IndexPage() {
               <div data-plate-questions><b>{current.evidence.attempts}</b><small>{t('inst.kpiQuestions')}</small></div>
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
+            {/* A new student sees the empty state above the fold: one line
+                under the figures; the ruled plot sits after the topics. */}
+            {chapters.every(c => !c.evidence.attempts) && <p className="c-empty-note" data-empty-note>{t('inst.emptyPlot')}</p>}
           </div>
           {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
@@ -222,7 +225,7 @@ export default function IndexPage() {
           {/* The empty first plot sits after the topics, not stacked on the
               chapter's scope: the scope is the chapter's mathematics, this is
               where the student's own first checked answer will go. */}
-          {chapters.every(c => !c.evidence.attempts) && <EmptyPlot />}
+          {chapters.every(c => !c.evidence.attempts) && <EmptyPlot bare />}
           <div>
             <div className="in-plate-acts">
               <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>

@@ -234,6 +234,7 @@
     "test:practice:state": "node client/test/practice-state-invariants-check.mjs",
     "test:golden-journey": "node client/test/golden-student-journey.mjs",
     "test:first-open": "node client/test/tour-first-open.js",
+    "test:activation-gate:instrument": "PRI_FEATURE_INSTRUMENT=1 node client/test/tour-activation-gate.js --no-build",
     "verify:deployment": "node tools/verify-deployment.mjs",
     "test:deploy": "node tools/deployment-contract.test.mjs",
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",
