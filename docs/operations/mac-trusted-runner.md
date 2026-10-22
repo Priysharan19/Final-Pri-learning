@@ -19,15 +19,22 @@ compromised by untrusted workflow code. So the Mac lane is built on these rules:
 | An exact commit that is on `main` | Required `sha` input (40 lowercase hex). The guard checks `compare/<sha>...main` is `identical` or `ahead` with `behind_by` 0. The Mac job checks out that SHA and asserts `git rev-parse HEAD` before any repository code runs |
 | Least privilege | Top-level `permissions: contents: read`, `persist-credentials: false`, no `secrets.` reads, no `${{ }}` inside `run:` scripts |
 | Not an admin, not inside the launcher clone | The script refuses a macOS admin account and any runner root inside a git work tree (so never inside `PriLearningLauncher`), `$HOME` or a `$HOME` dot-directory. The work-tree check walks parent directories for `.git` itself, so it holds even when git is absent or refuses another user's repository ("dubious ownership"). The workflow fails again if the job's account is an admin or the workspace path contains `PriLearningLauncher` |
-| A fresh work directory each run, destroyed afterwards | `mktemp -d` under `$PRI_RUNNER_ROOT/runs`. The exit trap (which also runs on Ctrl-C or failure, and ignores a second Ctrl-C) stops the runner, then deletes `.credentials`, `.credentials_rsaparams`, `.runner` and the whole run directory. The runner runs in its own process group. Cleanup sends TERM to the group, to the leader's descendants and to any process whose command line names the run directory (which catches double-forked processes). Whatever is still alive after 10 s gets KILL. Cleanup prints `no runner process is left running`, or lists the survivors and exits non-zero |
-| Diagnostics are kept without credentials | `_diag/*.log` is copied, redacted, to `$PRI_RUNNER_ROOT/diag/<label>-<UTC time>/` before deletion |
+| A fresh work directory each run, destroyed afterwards | `mktemp -d` under `$PRI_RUNNER_ROOT/runs`. The exit trap (which also runs on Ctrl-C or failure, and ignores a second Ctrl-C) stops the runner, then deletes `.credentials`, `.credentials_rsaparams`, `.runner` and the whole run directory. The runner runs in its own process group. Cleanup sends TERM to the group, to the leader's descendants, and to any process that names the run directory in its command line or has its working directory in it. That catches double-forked processes. Paths are compared as fixed strings, and working directories come from `lsof`, or `/proc` on Linux. Whatever is still alive after 10 s gets KILL. Cleanup prints `no runner process is left running`, or lists the survivors and exits non-zero |
+| Diagnostics are kept without credentials | `_diag/*.log` and the runner's console output are copied, redacted, to `$PRI_RUNNER_ROOT/diag/<label>-<UTC time>/` before deletion |
+| The background runner never owns the terminal | The runner's stdin is `/dev/null`. Its stdout and stderr go to a private file under `runs/`, outside the work directory, which is kept redacted as `runner-console.log`. So a terminal write or `tcsetattr` cannot stop it with SIGTTOU. The script itself reports when the runner is listening and when a job is assigned |
 | The credential is never printed and never on a command line | `mint` refuses to write to a terminal. `run` reads the JIT config from stdin and gives it to the runner as `ACTIONS_RUNNER_INPUT_JITCONFIG`, not as `--jitconfig` in argv (which `ps` shows to every local user). The workflow fails if that variable reaches the job environment |
 
 `tools/ci-self-hosted-runner-check.mjs` (run in CI's "Suites policy and contracts" job and in
-`npm run test:ci:policy`) enforces this contract. Both jobs' `if:` must equal a fixed canonical
-expression exactly (after whitespace normalisation). That rejects `always()`, `!cancelled()`,
-`failure()`, `success() ||` and any added `||`. The check also requires the exact guard and
-isolation assertion lines. It forbids `continue-on-error`, YAML merge keys, anchors and aliases,
+`npm run test:ci:policy`) enforces this contract. **The whole `guard` job, and the Mac job
+from its key line through its third step (checkout, HEAD assertion, isolation), must match a
+reviewed canonical text kept in the checker, exactly apart from trailing whitespace.** A
+deny-list cannot list every way a script can exit 0 early (`exit`, `exec true`, `if false;`, a
+heredoc, `shell: true {0}`). So any edit to those blocks needs a matching, reviewed edit to the
+checker. The check also forbids `defaults:`, top-level keys other than
+name/on/permissions/concurrency/jobs, extra Mac-job keys, duplicate mapping keys anywhere, flow
+mappings, and a `shell:` other than `bash`. Both jobs' `if:` must equal the canonical
+expression, which rejects `always()`, `!cancelled()`, `failure()`, `success() ||` and any added
+`||`. As defence in depth it still checks the individual guard and isolation lines. It forbids `continue-on-error`, YAML merge keys, anchors and aliases,
 `|| true`, `|| :`, `|| exit`, `|| return`, `exit 0`, `set +e`, `trap`, a second `fail()`
 definition, and step-level `if:` on the guard, checkout, HEAD and isolation steps. It applies to **every** workflow whose
 `runs-on` is not a GitHub-hosted image. It also exercises the script against a fake runner
@@ -90,7 +97,7 @@ scripts/pri-mac-runner-once.sh mint "$LABEL" \
       PRI_RUNNER_TARBALL_SHA256=<64-hex from the release notes> \
       /Users/Shared/pri-ci/pri-mac-runner-once.sh run "$LABEL"
 
-# Terminal B — once terminal A shows "Listening for Jobs":
+# Terminal B — once terminal A prints "runner is listening for jobs; dispatch the workflow now":
 gh workflow run pri-mac-v1-acceptance.yml --ref main -f sha="$SHA" -f runner_label="$LABEL"
 gh run watch "$(gh run list --workflow pri-mac-v1-acceptance.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```

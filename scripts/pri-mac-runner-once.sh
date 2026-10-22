@@ -132,8 +132,35 @@ descendants() {
 }
 
 # Live, non-zombie PIDs that belong to the runner: its process group, the group
-# leader's descendants, and anything whose command line names the run directory
-# (which also catches double-forked processes that left the group).
+# leader's descendants, and anything that names the run directory in its
+# command line or has its working directory in it (which also catches
+# double-forked processes that left the group). Paths are compared as fixed
+# strings, never as regular expressions.
+# shellcheck disable=SC2317
+pids_naming_run_dir() {
+  ps ax -o pid= -o command= 2>/dev/null |
+    PRI_SWEEP_DIR="$RUN_DIR" awk 'index($0, ENVIRON["PRI_SWEEP_DIR"]) { print $1 }'
+}
+
+# shellcheck disable=SC2317
+pids_with_cwd_in_run_dir() {
+  local proc cwd
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -w -a -u "$(id -u)" -d cwd -F pn 2>/dev/null |
+      PRI_SWEEP_DIR="$RUN_DIR" awk '
+        /^p/ { pid = substr($0, 2) }
+        /^n/ { path = substr($0, 2); d = ENVIRON["PRI_SWEEP_DIR"];
+               if (path == d || index(path, d "/") == 1) print pid }'
+  elif [[ -d /proc ]]; then
+    for proc in /proc/[0-9]*; do
+      cwd="$(readlink "$proc/cwd" 2>/dev/null || true)"
+      if [[ -n "$cwd" && ( "$cwd" == "$RUN_DIR" || "$cwd" == "$RUN_DIR"/* ) ]]; then
+        printf '%s\n' "${proc#/proc/}"
+      fi
+    done
+  fi
+}
+
 # shellcheck disable=SC2317
 runner_pids() {
   [[ -n "$RUNNER_PGID" ]] || return 0
@@ -142,7 +169,8 @@ runner_pids() {
     pgrep -g "$RUNNER_PGID" 2>/dev/null || true
     descendants "$RUNNER_PGID"
     if [[ -n "$RUN_DIR" ]]; then
-      pgrep -f -- "$RUN_DIR" 2>/dev/null || true
+      pids_naming_run_dir
+      pids_with_cwd_in_run_dir
     fi
   } | sort -un | while read -r pid; do
     [[ -n "$pid" && "$pid" != "$$" ]] || continue
@@ -275,29 +303,42 @@ DIAG_DEST=''
 RUNNER_DIR=''
 RUNNER_PID=''
 RUNNER_PGID=''
+CONSOLE_LOG=''
+
+# Copy IN to OUT with the JIT config and anything shaped like a credential
+# redacted. The perl program is deliberately single-quoted (perl, not bash,
+# expands it).
+# shellcheck disable=SC2016,SC2317
+redact_file() {
+  PRI_REDACT="${jit_config:-}" perl -pe '
+    BEGIN { $s = $ENV{PRI_REDACT} // ""; }
+    s/\Q$s\E/[REDACTED-JITCONFIG]/g if length $s;
+    s/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}/[REDACTED-GITHUB-TOKEN]/g;
+    s/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[REDACTED-JWT]/g;
+    s/(bearer|token|basic)\s+(?!\[REDACTED)[A-Za-z0-9._~+\/=-]{16,}/$1 [REDACTED]/gi;
+    s/((?<![A-Za-z0-9])"?[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)"?\s*[:=]\s*)"[^"]*"/${1}"[REDACTED]"/gi;
+    s/((?<![A-Za-z0-9])[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)\s*[:=]\s*)\x27[^\x27]*\x27/${1}\x27[REDACTED]\x27/gi;
+    s/((?<![A-Za-z0-9])[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)\s*[:=]\s*)(?!["\x27\[])[^\s,;"\x27}\]]+/${1}[REDACTED]/gi;
+    s/[A-Za-z0-9+\/]{80,}={0,2}/[REDACTED-BLOB]/g;
+  ' "$1" > "$2"
+}
 
 # Called only from the EXIT trap of `run`.
 # shellcheck disable=SC2317
 preserve_diag() {
-  [[ -n "$RUNNER_DIR" && -d "$RUNNER_DIR/_diag" && -n "$DIAG_DEST" ]] || return 0
+  [[ -n "$DIAG_DEST" ]] || return 0
   mkdir -p -m 700 "$DIAG_DEST"
   local log
-  for log in "$RUNNER_DIR"/_diag/*.log; do
-    [[ -f "$log" ]] || continue
-    # Redact the JIT config itself plus anything shaped like a credential.
-    # The perl program is deliberately single-quoted (perl, not bash, expands it).
-    # shellcheck disable=SC2016
-    PRI_REDACT="${jit_config:-}" perl -pe '
-      BEGIN { $s = $ENV{PRI_REDACT} // ""; }
-      s/\Q$s\E/[REDACTED-JITCONFIG]/g if length $s;
-      s/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}/[REDACTED-GITHUB-TOKEN]/g;
-      s/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[REDACTED-JWT]/g;
-      s/(bearer|token|basic)\s+(?!\[REDACTED)[A-Za-z0-9._~+\/=-]{16,}/$1 [REDACTED]/gi;
-      s/((?<![A-Za-z0-9])"?[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)"?\s*[:=]\s*)"[^"]*"/${1}"[REDACTED]"/gi;
-      s/((?<![A-Za-z0-9])[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)\s*[:=]\s*)(?!["\[])[^\s,;"\x27}\]]+/${1}[REDACTED]/gi;
-      s/[A-Za-z0-9+\/]{80,}={0,2}/[REDACTED-BLOB]/g;
-    ' "$log" > "$DIAG_DEST/$(basename "$log")"
-  done
+  if [[ -n "$RUNNER_DIR" && -d "$RUNNER_DIR/_diag" ]]; then
+    for log in "$RUNNER_DIR"/_diag/*.log; do
+      [[ -f "$log" ]] || continue
+      redact_file "$log" "$DIAG_DEST/$(basename "$log")"
+    done
+  fi
+  if [[ -n "$CONSOLE_LOG" && -f "$CONSOLE_LOG" ]]; then
+    redact_file "$CONSOLE_LOG" "$DIAG_DEST/runner-console.log"
+    rm -f "$CONSOLE_LOG"
+  fi
   note "diagnostic logs (redacted) preserved in $DIAG_DEST"
 }
 
@@ -310,6 +351,7 @@ cleanup_run() {
   stop_runner && stopped=0
   [[ "$stopped" -eq 0 || "$rc" -ne 0 ]] || rc=1
   preserve_diag
+  [[ -z "$CONSOLE_LOG" ]] || rm -f "$CONSOLE_LOG"
   if [[ -n "$RUNNER_DIR" ]]; then
     rm -f "$RUNNER_DIR/.credentials" "$RUNNER_DIR/.credentials_rsaparams" "$RUNNER_DIR/.runner"
   fi
@@ -369,6 +411,9 @@ cmd_run() {
   trap cleanup_run EXIT
   trap 'exit 130' INT TERM HUP
   RUN_DIR="$(mktemp -d "$RUNS_ROOT/run.XXXXXXXXXX")"
+  # The runner's console goes to a private file outside the work directory, so
+  # the background runner never owns (or is stopped by) the terminal.
+  CONSOLE_LOG="$(mktemp "$RUNS_ROOT/console.XXXXXXXXXX")"
   RUNNER_DIR="$RUN_DIR/runner"
   mkdir -m 700 "$RUNNER_DIR"
   tar -xzf "$tarball" -C "$RUNNER_DIR"
@@ -388,14 +433,18 @@ cmd_run() {
     chdir(shift @ARGV) or die "chdir: $!\n";
     setpgrp(0, 0) or die "setpgrp: $!\n";
     exec { $ARGV[0] } @ARGV or die "exec: $!\n";
-  ' "$RUNNER_DIR" ./run.sh &
+  ' "$RUNNER_DIR" ./run.sh </dev/null >"$CONSOLE_LOG" 2>&1 &
   RUNNER_PID=$!
   RUNNER_PGID=$RUNNER_PID
 
   # The runner starts a Worker (and its _diag/Worker_*.log) only when a job is
   # assigned. Bound how long an idle, listening runner may stay exposed.
-  local waited=0
+  local waited=0 listening=0
   while kill -0 "$RUNNER_PID" 2>/dev/null; do
+    if [[ "$listening" -eq 0 ]] && grep -q 'Listening for Jobs' "$CONSOLE_LOG" 2>/dev/null; then
+      listening=1
+      note "runner is listening for jobs; dispatch the workflow now"
+    fi
     if compgen -G "$RUNNER_DIR/_diag/Worker_*.log" >/dev/null; then
       note "job assigned to $label; waiting for it to finish"
       break

@@ -57,6 +57,125 @@ const escapeRe = s => s.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 const hasLine = (run, line, prefix = false) =>
   new RegExp(`^\\s*${escapeRe(line)}${prefix ? '' : '\\s*$'}`, 'm').test(run ?? '');
 
+// ------------------------------------------------------------ canonical ---
+// The reviewed text of the guard job and of the Mac job up to and including
+// its third step (checkout, HEAD assertion, isolation), compared exactly after
+// trailing-whitespace normalisation. A deny-list cannot enumerate every way a
+// shell script can exit 0 early (`exit`, `exec true`, `if false; then`, a
+// heredoc, `shell: true {0}`, ...), so ANY edit to these blocks must change
+// this checker too, which puts it in front of an independent reviewer.
+const CANONICAL_GUARD_JOB = `  guard:
+    name: Trusted dispatch guard (owner, repository, SHA on main, runner label)
+    # Never allocate the Pri Mac for PRs, forks, branches, bots or schedules.
+    # This job deliberately never receives the runner label.
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Priysharan19/Final-Pri-learning' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate inputs, owner, canonical repository and that the SHA is on main
+        shell: bash
+        env:
+          GH_TOKEN: \${{ github.token }}
+          INPUT_SHA: \${{ inputs.sha }}
+          EVENT_NAME: \${{ github.event_name }}
+          REPO: \${{ github.repository }}
+          REPO_OWNER: \${{ github.repository_owner }}
+          ACTOR: \${{ github.actor }}
+          TRIGGERING_ACTOR: \${{ github.triggering_actor }}
+          DISPATCH_REF: \${{ github.ref }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$EVENT_NAME" == 'workflow_dispatch' ]] || fail "only a manual dispatch may reach the Pri Mac"
+          [[ "$REPO" == 'Priysharan19/Final-Pri-learning' ]] || fail "refusing non-canonical repository $REPO (forks never reach the Pri Mac)"
+          [[ "$ACTOR" == "$REPO_OWNER" && "$TRIGGERING_ACTOR" == "$REPO_OWNER" ]] || fail "only the repository owner may dispatch the Pri Mac lane"
+          [[ "$DISPATCH_REF" == 'refs/heads/main' ]] || fail "dispatch from main only (got $DISPATCH_REF)"
+          [[ "$INPUT_SHA" =~ ^[0-9a-f]{40}$ ]] || fail "sha must be a full 40-hex lowercase commit SHA"
+          # compare/{sha}...main: "identical" or "ahead" with behind_by 0 means
+          # the SHA is main itself or an ancestor of main. A fork or unmerged
+          # branch commit is "diverged"/"behind" and is refused.
+          status="$(gh api "repos/$REPO/compare/$INPUT_SHA...main" --jq '.status + " " + (.behind_by | tostring)')"
+          [[ "$status" == 'identical 0' || "$status" == 'ahead 0' ]] || fail "sha $INPUT_SHA is not reachable from main ($status)"
+          echo "Trusted dispatch: $INPUT_SHA is on main"
+`;
+const CANONICAL_MAC_JOB_HEAD = `  apple-v1:
+    name: iPhone + iPad native acceptance on Pri Mac
+    needs: guard
+    # Defence in depth: the same owner/repository/ref gate as the guard job,
+    # plus a shape check of the label (the exact check is RUNNER_NAME below).
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'Priysharan19/Final-Pri-learning' &&
+      github.actor == github.repository_owner &&
+      github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/main' &&
+      startsWith(inputs.runner_label, 'pri-mac-')
+    # The per-run label exists only while the owner's one-job runner is up.
+    runs-on: [self-hosted, macOS, ARM64, '\${{ inputs.runner_label }}']
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - name: Checkout the dispatched SHA without persisting credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: \${{ inputs.sha }}
+          persist-credentials: false
+          clean: true
+
+      - name: Assert HEAD is exactly the dispatched SHA before any repository code runs
+        shell: bash
+        env:
+          EXPECTED_SHA: \${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          if ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then
+            echo "::error::checked-out HEAD $(git rev-parse HEAD) is not the dispatched SHA $EXPECTED_SHA"
+            exit 1
+          fi
+          test -z "$(git status --porcelain)"
+
+      - name: Verify one-job runner isolation and clean release identity
+        shell: bash
+        env:
+          EXPECTED_LABEL: \${{ inputs.runner_label }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_LABEL" =~ ^pri-mac-[0-9a-f]{16}$ ]] || { echo "::error::runner_label is not a pri-mac-<16 hex> label"; exit 1; }
+          test "$RUNNER_NAME" = "$EXPECTED_LABEL"
+          test "$RUNNER_OS" = 'macOS'
+          test "$RUNNER_ARCH" = 'ARM64'
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$GITHUB_REPOSITORY" = 'Priysharan19/Final-Pri-learning'
+          test "$(uname -m)" = 'arm64'
+          # Isolation: never root, never a macOS admin, never inside the launcher clone.
+          test "$(id -u)" -ne 0
+          if id -Gn | tr ' ' '\\n' | grep -qx 'admin'; then
+            echo "::error::runner account $(id -un) is a macOS admin; use the non-admin pri-ci account"
+            exit 1
+          fi
+          case "$GITHUB_WORKSPACE:$RUNNER_TEMP" in
+            *PriLearningLauncher*) echo "::error::job workspace is inside the PriLearningLauncher clone"; exit 1 ;;
+          esac
+          # The one-job runner credential must not leak into the job environment.
+          test -z "\${ACTIONS_RUNNER_INPUT_JITCONFIG:-}"
+          test -z "\${ACTIONS_RUNNER_INPUT_TOKEN:-}"
+          id -un
+          test -f ios/PriLearning.swiftpm/Package.swift
+          test -f scripts/iphone-journey.mjs
+          node --version
+          npm --version
+          xcodebuild -version
+          git rev-parse HEAD
+          df -h .
+`;
+
 // ---------------------------------------------------------------- YAML-ish ---
 const indentOf = line => line.match(/^ */)[0].length;
 const isBlank = line => /^\s*(#.*)?$/.test(line);
@@ -104,6 +223,39 @@ function entries(lines) {
 }
 
 const get = (list, key) => list.find(e => e.key === key);
+
+// Raw lines of each job (key line included), keyed by job id.
+function jobBlocks(lines) {
+  const out = new Map();
+  const start = lines.findIndex(l => /^jobs:\s*$/.test(l));
+  if (start === -1) return out;
+  let id = null;
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const l = lines[i];
+    if (/^\S/.test(l) && !/^#/.test(l)) break;
+    const m = l.match(/^  ([A-Za-z0-9_-]+):\s*$/);
+    if (m) { id = m[1]; out.set(id, []); }
+    if (id) out.get(id).push(l);
+  }
+  return out;
+}
+
+// Every mapping key that appears twice at the same level, anywhere outside
+// block scalars; and flow mappings, whose keys this parser cannot see.
+function duplicateKeys(lines, where = '') {
+  const found = [];
+  const seen = new Set();
+  for (const e of entries(lines)) {
+    if (seen.has(e.key)) found.push(`${where}${e.key}`);
+    seen.add(e.key);
+    if (/^\{/.test(stripComment(e.value))) found.push(`${where}${e.key} (flow mapping)`);
+    if (/^[|>]/.test(e.value) || !e.sub.length) continue;
+    const list = items(e.sub);
+    if (list.length) list.forEach((item, i) => found.push(...duplicateKeys(item, `${where}${e.key}[${i}].`)));
+    else found.push(...duplicateKeys(e.sub, `${where}${e.key}.`));
+  }
+  return found;
+}
 // An if: expression without the YAML comment lines that follow it.
 const ifSource = entry => (entry ? [entry.value, ...entry.sub.filter(l => !/^\s*#/.test(l))].join('\n') : '');
 const text = entry => (entry ? [entry.value, ...entry.sub].join('\n') : '');
@@ -192,6 +344,50 @@ export function analyzeWorkflow(name, source) {
   const wf = parseWorkflow(source);
   const selfHosted = wf.jobs.filter(job => !job.hosted);
   if (!selfHosted.length) return { selfHosted: false, failures };
+
+  // Reviewed blocks must match exactly; nothing may be added around them.
+  const normText = t => t.split(/\r?\n/).map(l => l.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '');
+  const firstDiff = (got, want) => {
+    const g = got.split('\n'), w = want.split('\n');
+    for (let i = 0; i < Math.max(g.length, w.length); i += 1) {
+      if (g[i] !== w[i]) return `line ${i + 1}: expected ${JSON.stringify(w[i] ?? '<end>')}, got ${JSON.stringify(g[i] ?? '<end>')}`;
+    }
+    return 'identical';
+  };
+  const blocks = jobBlocks(wf.lines);
+  const guardBlock = blocks.get('guard');
+  const macBlock = blocks.get('apple-v1');
+  if (selfHosted.map(j => j.id).join(',') !== 'apple-v1') {
+    fail(`the only self-hosted job allowed is apple-v1 (got ${selfHosted.map(j => j.id).join(', ')}); a new self-hosted lane needs a reviewed change to this checker`);
+  }
+  if (!guardBlock) {
+    fail('the guard job is missing');
+  } else if (normText(guardBlock.join('\n')) !== normText(CANONICAL_GUARD_JOB)) {
+    fail(`the guard job must match the reviewed canonical text exactly (${firstDiff(normText(guardBlock.join('\n')), normText(CANONICAL_GUARD_JOB))})`);
+  }
+  if (macBlock) {
+    const stepStarts = macBlock.map((l, i) => (/^      - /.test(l) ? i : -1)).filter(i => i >= 0);
+    const head = normText(macBlock.slice(0, stepStarts[3] ?? macBlock.length).join('\n'));
+    if (head !== normText(CANONICAL_MAC_JOB_HEAD)) {
+      fail(`the Mac job up to its third step (checkout, HEAD assertion, isolation) must match the reviewed canonical text exactly (${firstDiff(head, normText(CANONICAL_MAC_JOB_HEAD))})`);
+    }
+  }
+  const topKeys = wf.top.map(e => e.key);
+  const extraTop = topKeys.filter(k => !['name', 'on', 'permissions', 'concurrency', 'jobs'].includes(k));
+  if (extraTop.length) fail(`top-level keys other than name/on/permissions/concurrency/jobs are forbidden (found ${extraTop.join(', ')})`);
+  if (/^\s*(-\s+)?['"]?defaults['"]?\s*:/m.test(source)) fail('defaults: is forbidden at top and job level (it can replace the shell of every run step)');
+  const macJob = wf.jobs.find(j => j.id === 'apple-v1');
+  if (macJob) {
+    const extraKeys = macJob.body.map(e => e.key).filter(k => !['name', 'needs', 'if', 'runs-on', 'timeout-minutes', 'env', 'steps'].includes(k));
+    if (extraKeys.length) fail(`job apple-v1: keys other than name/needs/if/runs-on/timeout-minutes/env/steps are forbidden (found ${extraKeys.join(', ')})`);
+  }
+  for (const dup of duplicateKeys(wf.lines)) fail(`duplicate key ${dup} (YAML keeps only one of them)`);
+  for (const job of wf.jobs) {
+    for (const [i, step] of job.steps.entries()) {
+      const shell = get(step.fields, 'shell');
+      if (shell && scalar(shell.value) !== 'bash') fail(`job ${job.id} step ${i + 1}: shell must be bash (got ${scalar(shell.value) || 'a block'})`);
+    }
+  }
 
   const on = triggers(wf.top);
   const extra = on.filter(t => t !== 'workflow_dispatch');
@@ -335,6 +531,11 @@ export function analyzeRunnerScript(source) {
   need(/setpgrp\(0, 0\)/.test(code) && /kill "-\$sig" -- "-\$RUNNER_PGID"/.test(code), 'the runner must run in its own process group and cleanup must signal the group');
   need(/signal_runner TERM "\$pids"/.test(code) && /signal_runner KILL "\$pids"/.test(code), 'cleanup must TERM the runner and escalate to KILL');
   need(/survived cleanup/.test(code), 'cleanup must report surviving runner processes');
+  need(/\.\/run\.sh <\/dev\/null >"\$CONSOLE_LOG" 2>&1 &/.test(code), "the runner's stdin/stdout/stderr must not be the terminal");
+  need(/redact_file "\$CONSOLE_LOG"/.test(code), "the runner's console log must be kept redacted");
+  need(/ENVIRON\["PRI_SWEEP_DIR"\]/.test(code) && !/pgrep -f/.test(code), 'the run-directory sweep must match paths as fixed strings, not regexes');
+  need(/-d cwd/.test(code) && /\/proc\/\[0-9\]\*/.test(code) && /^\s*pids_with_cwd_in_run_dir$/m.test(code) && /^\s*pids_naming_run_dir$/m.test(code),
+    'the sweep must include processes that name the run directory or have their working directory in it');
   need(/^\s*stop_runner && stopped=0$/m.test(code), 'the exit trap must stop the runner');
   need(/^\s*trap '' INT TERM HUP$/m.test(code), 'cleanup must ignore a second Ctrl-C');
   need(/^\s*trap cleanup_run EXIT$/m.test(code), 'must install the cleanup trap on EXIT');
@@ -353,6 +554,37 @@ export function analyzeRunnerScript(source) {
   }
   return failures;
 }
+
+// Run argv on a fresh pseudo-terminal (stdin, stdout and stderr all the pty),
+// copy its output to stdout and exit with its status. Self-contained instead of
+// pty.spawn, whose stdin handling hangs on some Python versions (macOS 3.9).
+const PTY_DRIVER = [
+  'import os, pty, select, sys',
+  'pid, fd = pty.fork()',
+  'if pid == 0:',
+  '    os.execvp(sys.argv[1], sys.argv[1:])',
+  'status = None',
+  'while True:',
+  '    ready, _, _ = select.select([fd], [], [], 0.2)',
+  '    if ready:',
+  '        try:',
+  '            data = os.read(fd, 65536)',
+  '        except OSError:',
+  '            data = b""',
+  '        if not data:',
+  '            break',
+  '        sys.stdout.buffer.write(data)',
+  '    elif status is None:',
+  '        done, st = os.waitpid(pid, os.WNOHANG)',
+  '        if done:',
+  '            status = st',
+  '    else:',
+  '        break',
+  'if status is None:',
+  '    status = os.waitpid(pid, 0)[1]',
+  'sys.stdout.flush()',
+  'sys.exit(os.WEXITSTATUS(status) if os.WIFEXITED(status) else 128)'
+].join('\n');
 
 function sh(args, { env, input } = {}) {
   const r = spawnSync('bash', [RUNNER_SCRIPT, ...args], { env, input, encoding: 'utf8', timeout: 60000 });
@@ -434,14 +666,19 @@ function behaviour(check) {
       'for a in "$@"; do case "$a" in *"$ACTIONS_RUNNER_INPUT_JITCONFIG"*) exit 42;; esac; done',
       'printf %s "$ACTIONS_RUNNER_INPUT_JITCONFIG" | shasum -a 256 | cut -d" " -f1 > "$PRI_FAKE_SEEN"',
       'pwd -P > "$PRI_FAKE_RUNDIR"',
+      'if [ -n "${PRI_FAKE_TTY:-}" ]; then t=""; [ -t 0 ] && t="$t stdin"; [ -t 1 ] && t="$t stdout"; [ -t 2 ] && t="$t stderr"; printf "%s" "$t" > "$PRI_FAKE_TTY"; fi',
+      'echo "Connected to GitHub"; echo "Listening for Jobs"; echo "console token=consoletok999"',
+      'if [ -n "${PRI_FAKE_DELAY:-}" ]; then sleep "$PRI_FAKE_DELAY"; fi',
       'printf x > .credentials; printf x > .credentials_rsaparams; printf x > .runner',
       'mkdir -p _diag _work/repo',
-      `printf "config %s\\nAuthorization: Bearer abcdefghijklmnopqrstuvwxyz0123\\nusing ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345\\nsettings token=unquotedtok123 jitconfig: unquotedjit456, password = unquotedpw789\\nenv RUNNER_TOKEN=runnertokval1 mytoken=mytokval2\\nACTIONS_RUNTIME_TOKEN: ${fakeJwt('eDE')}\\nsaw ${fakeJwt('eTI')} in prose\\nJob pri-mac completed\\n" "$ACTIONS_RUNNER_INPUT_JITCONFIG" > _diag/Runner_1.log`,
+      `printf "config %s\\nAuthorization: Bearer abcdefghijklmnopqrstuvwxyz0123\\nusing ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345\\nheader x-api-secret='sqval123' done\nsettings token=unquotedtok123 jitconfig: unquotedjit456, password = unquotedpw789\\nenv RUNNER_TOKEN=runnertokval1 mytoken=mytokval2\\nACTIONS_RUNTIME_TOKEN: ${fakeJwt('eDE')}\\nsaw ${fakeJwt('eTI')} in prose\\nJob pri-mac completed\\n" "$ACTIONS_RUNNER_INPUT_JITCONFIG" > _diag/Runner_1.log`,
       'if [ -n "${PRI_FAKE_HANG:-}" ]; then sleep 300 & echo $! > "$PRI_FAKE_CHILD"; wait; fi',
       // A TERM-ignoring child in the group, and a double-forked one that left the group.
       'if [ -n "${PRI_FAKE_STUBBORN:-}" ]; then',
       '  bash -c \'trap "" TERM; while :; do sleep 1; done\' & echo $! > "$PRI_FAKE_CHILD"',
       '  ( perl -e \'setpgrp(0, 0); $SIG{TERM} = "IGNORE"; open(my $f, ">", $ARGV[1]) or die; print $f $$; close $f; sleep 300\' "$(pwd -P)" "$PRI_FAKE_ESCAPED" & )',
+      // ...and one that left the group with only its working directory inside the run directory.
+      '  ( cd _work && perl -e \'setpgrp(0, 0); $SIG{TERM} = "IGNORE"; open(my $f, ">", $ARGV[0]) or die; print $f $$; close $f; exec "sleep", "300"\' "$PRI_FAKE_CWD_ESCAPED" & )',
       '  sleep 300',
       'fi',
       'printf "job\\n" > _diag/Worker_1.log',
@@ -467,7 +704,7 @@ function behaviour(check) {
     const noJit = sh(['run', label], { env: runEnv, input: 'not a jit config\n' });
     check(noJit.status === 2 && /did not contain an encoded JIT/.test(noJit.stderr), 'run refuses stdin that is not a JIT config');
 
-    const ok = sh(['run', label], { env: runEnv, input: `${jit}\n` });
+    const ok = sh(['run', label], { env: { ...runEnv, PRI_FAKE_DELAY: '2' }, input: `${jit}\n` });
     check(ok.status === 0, `run completes one fake job (exit ${ok.status}: ${ok.stderr.trim().split('\n').pop()})`);
     check(ok.stdout.includes(`PRI_RUNNER_LABEL=${label}`), 'run prints the label for the dispatch');
     check(!ok.stdout.includes(jit) && !ok.stderr.includes(jit), 'run never prints the JIT config');
@@ -485,6 +722,13 @@ function behaviour(check) {
       /REDACTED-JITCONFIG/.test(diagLog), 'preserved _diag logs are redacted (JIT config, GitHub token, bearer token)');
     check(/settings token=\[REDACTED\] jitconfig: \[REDACTED\], password = \[REDACTED\]/.test(diagLog) && !/unquoted(tok|jit|pw)/.test(diagLog),
       'unquoted token=, jitconfig: and password = values are redacted too');
+    check(/x-api-secret='\[REDACTED\]' done/.test(diagLog) && !/sqval123/.test(diagLog), 'single-quoted secret values are redacted');
+    check(/runner is listening for jobs/.test(ok.stderr), 'run reports when the runner is listening (from its private console log)');
+    const consoleLog = diagDirs.length === 1 && existsSync(path.join(root, 'diag', diagDirs[0], 'runner-console.log'))
+      ? readFileSync(path.join(root, 'diag', diagDirs[0], 'runner-console.log'), 'utf8') : '';
+    check(/Listening for Jobs/.test(consoleLog) && /console token=\[REDACTED\]/.test(consoleLog) && !/consoletok999/.test(consoleLog) &&
+      !ok.stdout.includes('Listening for Jobs'),
+    "the runner's console goes to a redacted log in the kept diag, not to the terminal");
     check(/RUNNER_TOKEN=\[REDACTED\] mytoken=\[REDACTED\]/.test(diagLog) && /ACTIONS_RUNTIME_TOKEN: \[REDACTED-JWT\]/.test(diagLog) &&
       /saw \[REDACTED-JWT\] in prose/.test(diagLog) && !/runnertokval1|mytokval2|eyJ/.test(diagLog),
     'prefixed keys (RUNNER_TOKEN=, mytoken=) and dotted JWTs are redacted');
@@ -512,15 +756,37 @@ function behaviour(check) {
     const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
     const readPid = f => (existsSync(f) ? Number(readFileSync(f, 'utf8').trim()) : 0);
     const escapedFile = path.join(tmp, 'escaped');
+    const cwdEscapedFile = path.join(tmp, 'cwd-escaped');
     rmSync(childFile, { force: true });
-    const stubborn = sh(['run', label], { env: { ...runEnv, PRI_FAKE_STUBBORN: '1', PRI_FAKE_CHILD: childFile, PRI_FAKE_ESCAPED: escapedFile, PRI_RUNNER_JOB_WAIT_SECONDS: '2' }, input: `${jit}\n` });
+    const stubborn = sh(['run', label], { env: { ...runEnv, PRI_FAKE_STUBBORN: '1', PRI_FAKE_CHILD: childFile, PRI_FAKE_ESCAPED: escapedFile, PRI_FAKE_CWD_ESCAPED: cwdEscapedFile, PRI_RUNNER_JOB_WAIT_SECONDS: '2' }, input: `${jit}\n` });
     const stubbornChild = readPid(childFile);
     const escaped = readPid(escapedFile);
+    const cwdEscaped = readPid(cwdEscapedFile);
     check(stubborn.status === 3 && /sending KILL/.test(stubborn.stderr) && /no runner process is left running/.test(stubborn.stderr),
       `a runner tree that ignores TERM is KILLed after 10 s and cleanup says nothing is left (exit ${stubborn.status})`);
     check(stubbornChild > 0 && !alive(stubbornChild), 'a TERM-ignoring child in the runner process group does not survive cleanup');
     check(escaped > 0 && !alive(escaped), 'a double-forked child that left the process group (but names the run directory) does not survive cleanup');
-    for (const pid of [stubbornChild, escaped]) if (pid && alive(pid)) process.kill(pid, 'SIGKILL');
+    check(cwdEscaped > 0 && !alive(cwdEscaped), 'a child that left the process group with only its working directory in the run directory does not survive cleanup');
+    for (const pid of [stubbornChild, escaped, cwdEscaped]) if (pid && alive(pid)) process.kill(pid, 'SIGKILL');
+
+    // Under a real terminal (as with sudo's pty), the runner must not own it:
+    // a background process group writing to or configuring the tty would be
+    // stopped by SIGTTOU.
+    const py = spawnSync('python3', ['-c', 'import sys'], { encoding: 'utf8' });
+    if (py.error || py.status !== 0) {
+      check(true, 'python3 not available: pty check skipped');
+    } else {
+      const ttyFile = path.join(tmp, 'runner-tty');
+      const controlFile = path.join(tmp, 'control-tty');
+      const ptyRun = spawnSync('python3', ['-c', PTY_DRIVER,
+        'bash', '-c', '[ -t 1 ] && echo tty > "$PRI_CONTROL"; printf "%s\\n" "$PRI_TEST_JIT" | bash "$0" run "$1"', RUNNER_SCRIPT, label],
+      { env: { ...runEnv, PRI_FAKE_TTY: ttyFile, PRI_CONTROL: controlFile, PRI_TEST_JIT: jit }, input: '', encoding: 'utf8', timeout: 60000 });
+      const control = existsSync(controlFile) ? readFileSync(controlFile, 'utf8').trim() : '';
+      const runnerTty = existsSync(ttyFile) ? readFileSync(ttyFile, 'utf8').trim() : 'missing';
+      check(ptyRun.status === 0 && control === 'tty' && runnerTty === '',
+        `under a terminal the runner's stdin/stdout/stderr are not the tty (control: ${control || 'none'}; runner tty: ${runnerTty || 'none'}; exit ${ptyRun.status})`);
+      check(!(ptyRun.stdout ?? '').includes(jit), 'the JIT config never reaches the terminal');
+    }
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -623,6 +889,30 @@ if (existsSync(macPath)) {
   mutate('secret read', '          GH_TOKEN: ${{ github.token }}', '          GH_TOKEN: ${{ secrets.PAT }}', /secrets/);
   mutate('second checkout', '      - name: Canonical native source', '      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n        with:\n          persist-credentials: false\n\n      - name: Canonical native source', /exactly one checkout/);
   mutate('no timeout', '    timeout-minutes: 90\n', '', /timeout-minutes/);
+
+  // Round 3: early exits and dead code that a deny-list cannot enumerate are
+  // caught by the exact canonical text of the guard job and the Mac job head.
+  const canon = /must match the reviewed canonical text exactly/;
+  const afterGuardSetE = '          set -euo pipefail\n          fail()';
+  for (const [label, stmt] of [['bare exit', 'exit'], ['exit 00', 'exit 00'], ['exit $((0))', 'exit $((0))'], ['exec true', 'exec true']]) {
+    mutate(`${label} at the top of the guard`, afterGuardSetE, `          set -euo pipefail\n          ${stmt}\n          fail()`, canon);
+  }
+  mutate('guard checks inside if false', s => s.replace('          [[ "$EVENT_NAME" ==', '          if false; then\n          [[ "$EVENT_NAME" ==').replace('          echo "Trusted dispatch:', '          fi\n          echo "Trusted dispatch:'), null, canon);
+  mutate('guard checks inside a heredoc', s => s.replace('          [[ "$EVENT_NAME" ==', "          : <<'SKIP'\n          [[ \"$EVENT_NAME\" ==").replace('          echo "Trusted dispatch:', '          SKIP\n          echo "Trusted dispatch:'), null, canon);
+  mutate('HEAD assertion behind if false &&', 'if ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then', 'if false && ! test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"; then', canon);
+  mutate('isolation checks inside if false', s => s.replace('          test "$RUNNER_NAME" = "$EXPECTED_LABEL"\n', '          if false; then\n          test "$RUNNER_NAME" = "$EXPECTED_LABEL"\n').replace('          id -un\n', '          fi\n          id -un\n'), null, canon);
+  mutate("shell: 'true {0}' on the guard step", '        shell: bash\n        env:\n          GH_TOKEN', "        shell: 'true {0}'\n        env:\n          GH_TOKEN", /shell must be bash|canonical/);
+  mutate("shell: 'true {0}' on the isolation step", /(      - name: Verify one-job runner isolation[^\n]*\n)        shell: bash\n/, "$1        shell: 'true {0}'\n", /shell must be bash|canonical/);
+  mutate('top-level defaults', 'permissions:\n  contents: read\n', 'permissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: true {0}\n', /defaults: is forbidden/);
+  mutate('job-level defaults on the Mac job', s => s.replace('    timeout-minutes: 90\n', '    timeout-minutes: 90\n    defaults:\n      run:\n        shell: true {0}\n'), null, /defaults: is forbidden/);
+  mutate('job-level defaults after the Mac steps', s => `${s}    defaults:\n      run:\n        shell: true {0}\n`, null, /defaults: is forbidden/);
+  mutate('duplicate if: after the Mac steps', s => `${s}    if: always()\n`, null, /duplicate key jobs\.apple-v1\.if/);
+  mutate('duplicate if: in the guard', "      github.ref == 'refs/heads/main'\n    runs-on: ubuntu-latest\n", "      github.ref == 'refs/heads/main'\n    runs-on: ubuntu-latest\n    if: always()\n", /duplicate key jobs\.guard\.if|canonical/);
+  mutate('duplicate run: in the HEAD step', s => s.replace('          test -z "$(git status --porcelain)"\n', '          test -z "$(git status --porcelain)"\n        run: "true"\n'), null, /duplicate key|canonical/);
+  mutate('non-bash shell on a later step', '        run: npm run test:ink:bridge\n', '        run: npm run test:ink:bridge\n        shell: sh\n', /shell must be bash/);
+  mutate('flow mapping', 'concurrency:\n  group: pri-mac-v1-${{ github.ref }}\n  cancel-in-progress: false\n', 'concurrency: {group: a, group: b}\n', /flow mapping/);
+  mutate('top-level env (BASH_ENV)', 'permissions:\n  contents: read\n', 'permissions:\n  contents: read\n\nenv:\n  BASH_ENV: ./evil.sh\n', /top-level keys other than/);
+  mutate('a second self-hosted job name', '  apple-v1:\n', '  apple-v2:\n', /only self-hosted job allowed is apple-v1/);
 }
 
 // 3. Classification fixtures: hosted workflows are out of scope; any other
@@ -642,7 +932,10 @@ for (const [label, from, to] of [
   ['admin refusal removed', /  if id -Gn[\s\S]*?\n  fi\n/, ''],
   ['trap removed', '  trap cleanup_run EXIT\n', ''],
   ['credential echoed', '  printf \'PRI_RUNNER_LABEL=%s\\n\' "$label"\n', '  echo "$jit_config"\n'],
-  ['credential in argv', `' "$RUNNER_DIR" ./run.sh &`, `' "$RUNNER_DIR" ./run.sh --jitconfig "$jit_config" &`],
+  ['credential in argv', `' "$RUNNER_DIR" ./run.sh </dev/null`, `' "$RUNNER_DIR" ./run.sh --jitconfig "$jit_config" </dev/null`],
+  ['runner owns the terminal', `./run.sh </dev/null >"$CONSOLE_LOG" 2>&1 &`, './run.sh &'],
+  ['regex sweep', `PRI_SWEEP_DIR="$RUN_DIR" awk 'index($0, ENVIRON["PRI_SWEEP_DIR"]) { print $1 }'`, 'pgrep -f -- "$RUN_DIR"'],
+  ['no cwd sweep', '      pids_with_cwd_in_run_dir\n', ''],
   ['xtrace enabled', 'set -euo pipefail\n', 'set -euxo pipefail\n'],
   ['no fresh work dir', 'mktemp -d', 'echo'],
   ['credentials kept', '"$RUNNER_DIR/.credentials" ', ''],
