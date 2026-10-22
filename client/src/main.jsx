@@ -45,15 +45,6 @@ const GUARDIAN_MODE = window.location.pathname === '/guardian/consent';
 // account"): no profile, no session, reachable by someone without the app.
 const DELETE_REQUEST_MODE = window.location.pathname === '/account/delete-request';
 if (DELETE_REQUEST_MODE && !window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
-// The parent's own page for the weekly report email (confirm / stop): no
-// profile, no session; the token is in the fragment and stripped the same way.
-const PARENT_EMAIL_MODE = window.location.pathname === '/parent/report-email';
-let parentEmailData = null;
-if (PARENT_EMAIL_MODE) {
-  parentEmailData = parseParentEmailFragment(window.location.hash);
-  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
-  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
-}
 let guardianToken = null;
 if (GUARDIAN_MODE) {
   const data = parseAccountActionFragment(window.location.hash);
@@ -64,6 +55,16 @@ if (GUARDIAN_MODE) {
 let accountActionData = null;
 if (ACCOUNT_ACTION_MODE) {
   accountActionData = parseAccountActionFragment(window.location.hash);
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
+
+// The parent's own page for the weekly report email (confirm / stop): no
+// profile, no session; the token is in the fragment and stripped the same way.
+const PARENT_EMAIL_MODE = window.location.pathname === '/parent/report-email';
+let parentEmailData = null;
+if (PARENT_EMAIL_MODE) {
+  parentEmailData = parseParentEmailFragment(window.location.hash);
   window.history.replaceState(null, '', accountActionCleanUrl(window.location));
   if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
 }
