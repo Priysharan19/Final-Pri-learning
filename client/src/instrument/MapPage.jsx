@@ -34,7 +34,7 @@ const STRAND_KEY = {
 // is measured. In map units this scales with the rendered map width, and the
 // card floats only while that reserve is a modest share of the map.
 const CARD_PX = { w: 310 + 24 + 18, pad: 24 + 18 };
-const FLOAT_MIN_W = 1300;
+const MIN_COL_PX = 168;   // mapLayout's narrowest readable column
 // "Most lost marks are in …" is said of a dot point only once it has at least
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
@@ -137,7 +137,11 @@ export default function MapPage() {
   // The map is laid out in real pixels (so 14px type is 14px). The card floats
   // at the right only where all the strand columns still fit beside it.
   const W = wrapW > 0 ? Math.floor(wrapW / 10) * 10 : MAP_W;
-  const floating = wrapW >= FLOAT_MIN_W;
+  const strandCount = useMemo(() => {
+    const scope = scopeFor(curriculum, user);
+    return new Set((scope?.chapters || scope?.subtopics || []).map(r => mapStrandOf(r.id) || 'algebra')).size || 1;
+  }, [curriculum, user]);
+  const floating = wrapW > 0 && wrapW >= strandCount * MIN_COL_PX + CARD_PX.w + 34;
   const reserve = floating ? { w: CARD_PX.w, h: cardH + CARD_PX.pad } : null;
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
