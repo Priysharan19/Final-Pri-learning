@@ -49,6 +49,7 @@ import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
+import { PRIMARY } from '../instrument/primary.js';
 // v1.1 instrument: the student's own equations, drawn under the reading.
 const INSTRUMENT_PLOT = featureEnabled('instrument');
 
@@ -621,7 +622,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           notice stays the one sentence it is announced as. */}
       {canAskToRead && (
         <div className="ink-status-action ink-read-action">
-          <button type="button" className="btn btn-primary" data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
+          <button type="button" className={PRIMARY} data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
             {t(stale ? 'ink.readAgain' : 'ink.readMyAnswer')}
           </button>
           <span className="muted ink-read-hint">{t(stale ? (expired ? 'ink.readExpiredHint' : 'ink.readAgainHint') : 'ink.readMyAnswerHint')}</span>
@@ -693,7 +694,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                   <input autoFocus value={correcting.text} aria-label={t('ink.correctionAria', { n: li + 1 })}
                     inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={400}
                     onChange={e => setCorrecting({ index: li, text: e.target.value })} />
-                  <button type="submit" className="btn btn-primary btn-sm">{t('ink.correctionUse')}</button>
+                  <button type="submit" className={`${PRIMARY} btn-sm`}>{t('ink.correctionUse')}</button>
                   <button type="button" className="btn btn-quiet btn-sm" onClick={() => setCorrecting(null)}>{t('common.cancel')}</button>
                 </form>
               )}

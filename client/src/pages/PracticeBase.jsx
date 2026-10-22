@@ -20,6 +20,7 @@ import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js'
 import { queueTelemetry } from '../platform/telemetry.js';
 import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -504,7 +505,7 @@ function ProfilePractice() {
           </div>}
           {assignmentCompleteLocally && !assignmentSubmitted.current && <div className="notice" role="status" style={{ marginTop: 10 }}>
             {t('assignment.targetReached')}
-            <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" onClick={retryAssignmentSubmission}>{t('assignment.retrySubmission')}</button></div>
+            <div style={{ marginTop: 8 }}><button className={`${PRIMARY} btn-sm`} onClick={retryAssignmentSubmission}>{t('assignment.retrySubmission')}</button></div>
           </div>}
         </div>}
 
@@ -542,7 +543,7 @@ function ProfilePractice() {
             <strong>{t('practice.emptyTitle')}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <PageLink className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
+              <PageLink className={`${PRIMARY} btn-sm`} to="/">{t('practice.emptyChooseTopic')}</PageLink>
               {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
               )}
@@ -564,7 +565,7 @@ function ProfilePractice() {
             </p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
               {difficultyGap.available.map(d => (
-                <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
+                <button key={d} type="button" className={`${PRIMARY} btn-sm`} data-difficulty-choice={d}
                   onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
                   {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
                 </button>
@@ -603,7 +604,7 @@ function ProfilePractice() {
               )}
               {errorCode === 'AUTH_REQUIRED' && cloudAvailable() && (
                 <div data-practice-auth-recovery style={{ marginTop: 10 }}>
-                  <button type="button" className="btn btn-primary btn-sm"
+                  <button type="button" className={`${PRIMARY} btn-sm`}
                     data-testid="practice-sign-in" aria-expanded={accountRecoveryOpen}
                     onClick={() => setAccountRecoveryOpen(open => !open)}>
                     {t('login.cloudSignIn')}
@@ -618,7 +619,7 @@ function ProfilePractice() {
               <div style={{ marginTop: 10 }}>
                 {errorCode === 'INDIA_PYQ_UNAVAILABLE'
                   ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'} btn-sm`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
-                  : <button className="btn btn-primary btn-sm" onClick={load}>{t('common.tryAgain')}</button>}
+                  : <button className={`${PRIMARY} btn-sm`} onClick={load}>{t('common.tryAgain')}</button>}
               </div>
             </div>
           </div>
@@ -649,7 +650,7 @@ function ProfilePractice() {
             <h2 id="session-done-title">{t('practice.goalReachedTitle', { count: sessionDone.goal, n: sessionDone.goal })}</h2>
             <p>{t('practice.goalReachedBody', { correct: session.correct, answered: session.answered })}</p>
             <div className="session-done-actions">
-              <button className="btn btn-primary" onClick={() => navigate('/')}>{t('practice.doneForToday')}</button>
+              <button className={PRIMARY} onClick={() => navigate('/')}>{t('practice.doneForToday')}</button>
               <button className="btn btn-ghost" onClick={() => setSessionDone(null)}>{t('practice.keepGoing')}</button>
             </div>
           </section>

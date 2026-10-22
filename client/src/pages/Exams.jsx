@@ -11,6 +11,7 @@ import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -116,7 +117,7 @@ export default function Exams() {
             </select>
           </div>
         </div>
-        <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 8 }} onClick={start} disabled={busy}>
+        <button className={`${PRIMARY} btn-lg`} style={{ width: '100%', marginTop: 8 }} onClick={start} disabled={busy}>
           {busy ? t('exams.building') : t('exams.startPractice')}
         </button>
       </div>
@@ -157,7 +158,7 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
           <p className="muted" style={{ marginBottom: 16 }}>
             {t('exams.jeeArchiveNote')}
           </p>
-          <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={start} disabled={busy}>
+          <button className={`${PRIMARY} btn-lg`} style={{ width: '100%' }} onClick={start} disabled={busy}>
             {busy ? t('exams.buildingJee') : t('exams.startJee')}
           </button>
         </> : <>
@@ -242,7 +243,7 @@ export function PrintPaper({ paper, onClose }) {
   return (
     <div className="paper-overlay">
       <div className="row no-print" style={{ padding: 14, justifyContent: 'flex-end', gap: 10 }}>
-        <button className="btn btn-primary" onClick={() => { printPage().catch(() => {}); }}>{t('exams.printButton')}</button>
+        <button className={PRIMARY} onClick={() => { printPage().catch(() => {}); }}>{t('exams.printButton')}</button>
         <button className="btn btn-ghost" onClick={onClose}>{t('nav.close')}</button>
       </div>
       <div className="paper-sheet">

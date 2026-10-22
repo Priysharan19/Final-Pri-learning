@@ -8,6 +8,7 @@ import PageLink from './PageLink.jsx';
 import { useLanguage, useT } from '../i18n/index.js';
 import { checkRefusalCopy } from './checkAccess.js';
 import { completeInkOtpRecovery, inkRecoveryWords } from './signedOutInkRecovery.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 // Fetched only when a student asks to sign in.
 const SignInCard = React.lazy(() => import('./SignUpFlow.jsx'));
@@ -84,7 +85,7 @@ export function CheckSignIn({ user, refreshUser, ready = true, waitText = null, 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn btn-primary" data-check-sign-in
+      <button type="button" className={PRIMARY} data-check-sign-in
         disabled={!ready} aria-expanded={open && ready} onClick={() => setOpen(v => !v)}>
         {label || t('check.signInAction')}
       </button>

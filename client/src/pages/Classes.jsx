@@ -6,6 +6,7 @@ import AssignmentInboxPanel from '../components/AssignmentInboxPanel.jsx';
 import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { useT } from '../i18n/index.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 export default function Classes() {
   const { user, toast } = useApp();
@@ -42,7 +43,7 @@ export default function Classes() {
     <div>
       <div className="spread" style={{ marginBottom: 6 }}>
         <h1>{t('classes.title')}</h1>
-        <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>{t('classes.importPack')}</button>
+        <button className={PRIMARY} onClick={() => fileRef.current?.click()}>{t('classes.importPack')}</button>
       </div>
       <p className="muted" style={{ marginBottom: 20 }}>{t('classes.sub')}</p>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{ display: 'none' }} onChange={importPack} />
@@ -64,7 +65,7 @@ export default function Classes() {
             <div className="card locked-card" style={{ padding: 40 }}>
               <div className="locked-title">{t('classes.emptyTitle')}</div>
               <div className="locked-sub">{t('classes.emptySub')}</div>
-              <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>{t('classes.emptyImport')}</button>
+              <button className={PRIMARY} onClick={() => fileRef.current?.click()}>{t('classes.emptyImport')}</button>
               <div className="muted" style={{ marginTop: 16, fontSize: 12.5 }}>{t('classes.cloudNote')}</div>
             </div>
           </div>
@@ -81,7 +82,7 @@ export default function Classes() {
                   {task.dueAt ? t('classes.dueOn', { date: new Date(task.dueAt).toLocaleDateString(user.locale) }) : ''}
                 </p>
                 <div className="row">
-                  <button className="btn btn-primary btn-sm" onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>
+                  <button className={`${PRIMARY} btn-sm`} onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>
                   <button className="btn btn-quiet btn-sm" onClick={() => nav('/tasks')}>{t('classes.allTasks')}</button>
                 </div>
               </div>

@@ -10,6 +10,7 @@ import { Ring } from '../components/Charts.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { assignmentSections, defaultSectionKey, describeTaskTargets } from '../platform/assignmentTarget.js';
 import { useT } from '../i18n/index.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 export default function Tasks() {
   const { user, toast } = useApp();
@@ -83,7 +84,7 @@ export default function Tasks() {
               is not focusable and a label is not a control */}
           <button className="btn btn-ghost" onClick={() => packRef.current?.click()}>{t('tasks.importPack')}</button>
           <input ref={packRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importPack} />
-          <button className="btn btn-primary" onClick={() => setCreating(c => !c)}>{creating ? t('common.cancel') : t('tasks.setMyself')}</button>
+          <button className={PRIMARY} onClick={() => setCreating(c => !c)}>{creating ? t('common.cancel') : t('tasks.setMyself')}</button>
         </div>
       </div>
 
@@ -153,7 +154,7 @@ export default function Tasks() {
             <input type="range" id="task-count" min="5" max="30" step="5" value={form.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
               onChange={e => setForm(f => ({ ...f, count: Number(e.target.value) }))} />
           </div>
-          <button className="btn btn-primary" disabled={!canCreate} onClick={create}>{t('tasks.create')}</button>
+          <button className={PRIMARY} disabled={!canCreate} onClick={create}>{t('tasks.create')}</button>
         </div>
       )}
 

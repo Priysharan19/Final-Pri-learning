@@ -24,6 +24,7 @@ import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
 import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
+import { PRIMARY } from '../instrument/primary.js';
 
 const GRADES = [7, 8, 9, 10, 11, 12];
 const PHASE_KEY = {
@@ -176,7 +177,7 @@ export default function Placement() {
         />
         {answered && (
           <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <button ref={nextRef} className="btn btn-primary btn-lg" onClick={advance} data-placement-next>
+            <button ref={nextRef} className={`${PRIMARY} btn-lg`} onClick={advance} data-placement-next>
               {t(answered.done ? 'placement.seeResult' : 'placement.next')}
             </button>
           </div>
@@ -198,7 +199,7 @@ export default function Placement() {
         {error && <div className="error-box" role="alert">{error}</div>}
         {startRefused}
         <div className="row" style={{ gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
-          <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => start(false)} data-placement-start>{t('placement.start')}</button>
+          <button className={`${PRIMARY} btn-lg`} disabled={busy} onClick={() => start(false)} data-placement-start>{t('placement.start')}</button>
           <button className="btn btn-quiet" disabled={busy} onClick={skip}>{t('placement.notNow')}</button>
         </div>
       </div>
