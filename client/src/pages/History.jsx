@@ -13,7 +13,7 @@ import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
 import ErrorNotebook from '../components/ErrorNotebook.jsx';
-import { createHistoryLoadGate } from './historyLoadLifecycle.js';
+import { createHistoryLoadGate, historyListKey, historyListRequest, historyRowsFor } from './historyLoadLifecycle.js';
 import { transcriptIsAnswer } from '../components/attemptEvidence.js';
 import { featureEnabled } from '../platform/features.js';
 import MarkStrip from '../instrument/MarkStrip.jsx';
@@ -102,8 +102,8 @@ function HistoryForProfile() {
   const searchRef = useRef(null);
   const searching = INSTRUMENT_STRIP && query.trim() !== '';
   const [page, setPage] = useState(0);
-  const [data, setData] = useState(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [loaded, setLoaded] = useState(null);   // { key, rows }: rows answer that request
+  const [failedKey, setFailedKey] = useState(null);
   const [refresh, setRefresh] = useState(0);
   const [open, setOpen] = useState(null);       // {id, detail}
   const detailGate = useRef(null);
@@ -139,19 +139,25 @@ function HistoryForProfile() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  const listBody = historyListRequest({ instrument: INSTRUMENT_STRIP, filter, sort, subtopic, searching, page, searchPageSize: SEARCH_PAGE });
+  const listKey = historyListKey(listBody);
+  // Only rows fetched for this exact request render; until they arrive the
+  // list is loading, never the previous query's rows under the new one.
+  const data = historyRowsFor(loaded, listKey);
+  const loadFailed = failedKey === listKey && !data;
+  const setData = update => setLoaded(l => l && l.key === listKey ? { key: listKey, rows: update(l.rows) } : l);
   useEffect(() => {
     const gate = createHistoryLoadGate();
     detailGate.current?.cancel();
-    setData(null); setLoadFailed(false); setOpen(null);
-    const body = INSTRUMENT_STRIP
-      ? { filter, sort, ...(subtopic ? { subtopic } : {}), ...(searching ? { page: 0, pageSize: SEARCH_PAGE } : { page }) }
-      : { filter, page };
-    api.post('/history/list', body).then(
-      rows => { if (gate.current()) setData(rows); },
-      () => { if (gate.current()) setLoadFailed(true); }
+    setFailedKey(null); setOpen(null);
+    api.post('/history/list', listBody).then(
+      rows => { if (gate.current()) setLoaded({ key: listKey, rows }); },
+      () => { if (gate.current()) setFailedKey(listKey); }
     );
     return () => gate.cancel();
-  }, [filter, page, refresh, subtopic, sort, searching]);
+    // listBody is fully described by listKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listKey, refresh]);
 
   async function toggleBookmark(id) {
     try {
