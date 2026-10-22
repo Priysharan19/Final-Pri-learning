@@ -97,7 +97,7 @@ const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PR
 const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
 const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index }) {
   const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
-  const wantsInk = !!item.viaInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
+  const wantsInk = !!item.hasInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
   const ref = useRef(null);
   // idle → loading (on screen, fetching) → ok | empty (no strokes saved) | error.
   const [ink, setInk] = useState({ state: 'idle', strokes: null });
@@ -135,7 +135,7 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
           {ink.strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
         </svg>
       ) : ink.state === 'loading' ? <span className="in-scr-wait"><i /><i /><i /></span>
-        : ink.state === 'error' || ink.state === 'empty' || (ink.state === 'idle' && item.viaInk && !typed) ? <span className={`in-scr-none${ink.state === 'error' ? ' is-error' : ''}`}><Icon name="pen" size={14} /></span>
+        : ink.state === 'error' || ink.state === 'empty' || (ink.state === 'idle' && item.hasInk && !typed) ? <span className={`in-scr-none${ink.state === 'error' ? ' is-error' : ''}`}><Icon name="pen" size={14} /></span>
           : typed ? <span className="in-scr-typed"><MathText text={typed} /></span> : null}
       {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
     </span>
@@ -507,7 +507,7 @@ function HistoryForProfile() {
       {INSTRUMENT_STRIP && <ErrorNotebook />}
 
       {pages > 1 && (
-        <div className="row" style={{ justifyContent: 'center' }}>
+        <div className={`row${INSTRUMENT_STRIP ? ' in-hist-pages' : ''}`} style={{ justifyContent: 'center' }}>
           <button className="btn btn-quiet btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('history.newer')}</button>
           <span className="muted">{t('history.pageOf', { page: page + 1, total: pages })}</span>
           <button className="btn btn-quiet btn-sm" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>{t('history.older')}</button>
