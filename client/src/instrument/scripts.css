@@ -57,7 +57,7 @@ html.ui-instrument .in-scr-th {
 }
 html.ui-instrument .in-scr-th svg { position: absolute; inset: 10px 64px 10px 12px; width: calc(100% - 76px); height: calc(100% - 20px); }
 html.ui-instrument .in-scr-th polyline { fill: none; stroke: var(--c-pen); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-html.ui-instrument .in-scr-typed { position: absolute; left: 12px; right: 64px; top: 22px; font: italic 400 20px/1.2 var(--c-text); color: var(--c-pen); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-instrument .in-scr-typed { position: absolute; left: 12px; right: 64px; top: 22px; font: italic 400 20px/1.2 var(--c-italic); color: var(--c-pen); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.ui-instrument .in-scr-score { position: absolute; right: 10px; bottom: 6px; font: 400 26px/1 var(--c-serif); color: var(--c-copper); font-variant-numeric: tabular-nums; }
 html.ui-instrument .in-scr-score small { font-size: 17px; }
 html.ui-instrument .in-scr-score.is-full { color: var(--c-teal); }
