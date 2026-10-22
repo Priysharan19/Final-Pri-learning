@@ -44,7 +44,7 @@ html.ui-instrument[data-theme="dark"] { --wc-glaze: #fff; --wc-glaze-a: .3; }
 }
 
 .ink-verdict[data-wc-stamped], .ink-line:has(> .wc-plane) .ink-line-verdict > svg { display: none; }
-.ink-line > .wc-plane { margin-inline-start: auto; order: 9; }
+.ink-line > .wc-plane { margin-inline: 4px; }   /* right after the expression it marks */
 [data-wc-row] { perspective: var(--wc-depth); }   /* the plane the mark rises on */
 .wc-plane { position: relative; display: grid; width: var(--wc-mark); height: var(--wc-mark); transform: translateZ(var(--wc-rise-z)); }
 .wc-stamp { width: 100%; height: 100%; overflow: visible; opacity: 0; filter: drop-shadow(0 var(--c-line) 0 var(--c-emboss-hi)) drop-shadow(0 calc(-1 * var(--c-line)) 0 var(--c-emboss-lo)); }
@@ -87,6 +87,6 @@ html.ui-instrument .ink-toolbar { background: var(--c-sheet); border-radius: var
 @media (prefers-reduced-transparency: reduce) { html.ui-instrument .ink-toolbar { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--c-sheet); } }
 /* The hint ladder: small caps, engraved hairlines, STIX numerals. */
 html.ui-instrument .hints-block-title { font: var(--c-t-label); letter-spacing: .14em; text-transform: none; color: var(--c-ink-2); }
-html.ui-instrument .hints-block > *, html.ui-instrument .in-ladder .in-rung { border-radius: var(--c-radius-lg); box-shadow: inset 0 0 0 var(--c-line) var(--c-hair); }
-html.ui-instrument .hints-block > *::before { font-family: var(--c-text); font-variant-numeric: tabular-nums; border-radius: var(--c-radius); }
+html.ui-instrument .hints-block > :not(.hints-block-title), html.ui-instrument .in-ladder .in-rung { border-radius: var(--c-radius-lg); box-shadow: inset 0 0 0 var(--c-line) var(--c-hair); }
+html.ui-instrument .hints-block > :not(.hints-block-title)::before { font-family: var(--c-text); font-variant-numeric: tabular-nums; border-radius: var(--c-radius); }
 html.ui-instrument .wc-datewin { margin-inline-start: var(--wc-row-pad); }
