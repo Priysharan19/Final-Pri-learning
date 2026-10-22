@@ -159,3 +159,9 @@ html.ui-instrument [data-c-surface] :is(.chip, .pill-opt, .pill-select, .tag):no
 html.ui-instrument [data-c-surface] :is(.notice.error, .error-box):not(.qpage *)::before { content: "\25C7\00A0"; color: var(--c-copper); }
 html.ui-instrument [data-c-surface] :lang(hi) :is(.btn, .chip, .tag, .mcq-mark, .pill-opt):not(.qpage *), html.ui-instrument [data-c-surface] :lang(hi) .mcq-mark { letter-spacing: 0; }
 @media (max-width: 560px) { html.ui-instrument [data-c-surface] .btn.c-btn-primary:not(.qpage *) { letter-spacing: 0.06em; padding: 0 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; } }
+/* Phones: the paper room's header must not widen the page (tracked capitals). */
+@media (max-width: 560px) {
+  html.ui-instrument [data-c-surface] .exam-head .btn:not(.qpage *) { letter-spacing: 0.04em; padding: 0 12px; white-space: nowrap; }
+  html.ui-instrument [data-c-surface] .exam-head-title:not(.qpage *) { min-width: 0; }
+  html.ui-instrument [data-c-surface] :is(.exam-body, .exam-paper, .exam-nav):not(.qpage *) { min-width: 0; max-width: 100%; }
+}
