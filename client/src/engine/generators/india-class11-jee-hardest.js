@@ -2044,6 +2044,161 @@ function sampleSpaceReasoning(rng) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// 17 · Complex Numbers — quadratic equations with complex roots
+//
+// Added after tranche 2 to replace the chapter's routine D4 form for this dot
+// point ("solve x² + bx + c = 0, give the imaginary part"), which issue #408
+// found was the quadratic formula and nothing more. The coverage table retires
+// that rung (curriculum-in-hardest-covers.js, INDIA_RETIRED_RUNGS). Each form
+// here needs an idea the formula does not supply: the conjugate root of a real
+// quadratic, De Moivre on the roots, or |α|² = αβ with a candidate rejected
+// because it makes the roots real.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** a + bi as it is written: 3 - 2i, -i, 4i, 5. */
+function cTex(re, im) {
+  if (im === 0) return String(re);
+  const imPart = Math.abs(im) === 1 ? 'i' : `${Math.abs(im)}i`;
+  if (re === 0) return `${im < 0 ? '-' : ''}${imPart}`;
+  return `${re} ${im < 0 ? '-' : '+'} ${imPart}`;
+}
+
+/**
+ * x² + bx + c with non-real roots r·e^{±iθ} at a standard angle (θ = π/3, 2π/3,
+ * π/2, π/4, 3π/4), scaled by k. The roots are never written in the prompt.
+ */
+const ROOT_PAIRS = Object.freeze([1, 2, 3].flatMap(k => [
+  { b: -k, c: k * k, t: [1, 3] }, { b: k, c: k * k, t: [2, 3] }, { b: 0, c: k * k, t: [1, 2] },
+  { b: -2 * k, c: 2 * k * k, t: [1, 4] }, { b: 2 * k, c: 2 * k * k, t: [3, 4] },
+  { b: -2 * k, c: 4 * k * k, t: [1, 3] }, { b: 2 * k, c: 4 * k * k, t: [2, 3] }
+].map(Object.freeze)));
+
+/** √c with its square factor taken out: 3, 2\\sqrt{2}, \\sqrt{2}. */
+function sqrtTex(c) {
+  let out = 1, rest = c;
+  for (let f = 2; f * f <= rest; f++) while (rest % (f * f) === 0) { rest /= f * f; out *= f; }
+  if (rest === 1) return String(out);
+  return `${out === 1 ? '' : out}\\sqrt{${rest}}`;
+}
+
+/** αⁿ + βⁿ for the roots of x² + bx + c, by Newton's recurrence in exact integers. */
+function powerSum(b, c, n) {
+  let prev = 2, cur = -b;                       // s₀ = 2, s₁ = α + β = −b
+  if (n === 0) return prev;
+  for (let i = 2; i <= n; i++) [prev, cur] = [cur, -b * cur - c * prev];
+  return cur;
+}
+
+function complexQuadraticReasoning(rng) {
+  const kind = rc(rng, ['conjugate-root', 'root-powers', 'roots-on-circle']);
+  for (let guard = 0; guard < 400; guard++) {
+    if (kind === 'conjugate-root') {
+      // The root is shown as a quotient (a + bi)/(c + di) that simplifies to u + vi.
+      const u = ri(rng, -6, 6), v = nz(rng, -6, 6);
+      const c = ri(rng, 1, 4), d = nz(rng, -4, 4);
+      const a = u * c - v * d, b = u * d + v * c;
+      if (b === 0) continue;
+      const askP = rng() < 0.5;
+      if (askP && u === 0) continue;
+      const p = -2 * u, qv = u * u + v * v;
+      const value = askP ? p : qv;
+      return {
+        prompt: `The quadratic equation $x^2 + px + q = 0$, in which $p$ and $q$ are real numbers, has $\\dfrac{${cTex(a, b)}}{${cTex(c, d)}}$ as one of its roots. Find $${askP ? 'p' : 'q'}$.`,
+        answerType: 'numeric', answer: { value },
+        traps: traps(value, askP
+          ? [
+            { value: -p, why: 'The sum of the roots is $-p$, not $p$.' },
+            { value: -u, why: 'Only one root was used. Because $p$ and $q$ are real, the conjugate of the given root is the other root, and the sum is twice the real part.' },
+            { value: -2 * a, why: 'The given root has to be simplified first: divide by $c + di$ by multiplying top and bottom by its conjugate.' }
+          ]
+          : [
+            { value: u * u - v * v, why: 'That is the real part of the square of the root. The product of a root and its conjugate is $|z|^2 = x^2 + y^2$.' },
+            { value: a * a + b * b, why: 'That is the squared modulus of the numerator only; it must be divided by the squared modulus of the denominator.' },
+            { value: -qv, why: 'The product of the roots of $x^2 + px + q = 0$ is $+q$.' }
+          ]),
+        hints: [
+          'Simplify the given root to the form $x + yi$ by multiplying top and bottom by the conjugate of the denominator.',
+          'A quadratic with real coefficients has its non-real roots in conjugate pairs, so you know the other root too.',
+          `Use ${askP ? 'the sum of the roots, which is $-p$' : 'the product of the roots, which is $q$'}.`
+        ],
+        steps: [
+          { h: 'Simplify the root', d: `$\\dfrac{${cTex(a, b)}}{${cTex(c, d)}} = \\dfrac{(${cTex(a, b)})(${cTex(c, -d)})}{${c * c + d * d}} = ${cTex(u, v)}$` },
+          { h: 'The other root', d: `$p$ and $q$ are real, so the conjugate $${cTex(u, -v)}$ is the other root` },
+          askP
+            ? { h: 'Sum of the roots', d: `$-p = (${cTex(u, v)}) + (${cTex(u, -v)}) = ${2 * u}$` }
+            : { h: 'Product of the roots', d: `$q = (${cTex(u, v)})(${cTex(u, -v)}) = ${u * u} + ${v * v}$` },
+          { h: 'Answer', d: `$${askP ? 'p' : 'q'} = ${value}$` }
+        ],
+        reasoning: 'conjugate-root'
+      };
+    }
+    if (kind === 'root-powers') {
+      const { b, c, t } = rc(rng, ROOT_PAIRS);           // θ = (t[0]/t[1])π
+      const n = ri(rng, 5, 15);
+      const value = powerSum(b, c, n);
+      if (value === 0 || Math.abs(value) > 50000) continue;
+      const sumPower = (-b) ** n;
+      const turns = mod(n * t[0], 2 * t[1]);                // nθ reduced into [0, 2π), in units of π/t[1]
+      return {
+        prompt: `Let $\\alpha$ and $\\beta$ be the roots of $${polyTex([1, b, c])} = 0$. Find $\\alpha^{${n}} + \\beta^{${n}}$.`,
+        answerType: 'numeric', answer: { value },
+        traps: traps(value, [
+          { value: sumPower, why: '$\\alpha^n + \\beta^n$ is not $(\\alpha + \\beta)^n$: the cross terms of the binomial expansion do not vanish.' },
+          { value: -value, why: 'The size is right; recheck the angle $n\\theta$ and the sign of its cosine.' },
+          { value: 2 * c ** Math.floor(n / 2), why: 'The modulus alone is not enough: $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$ needs the cosine of $n\\theta$.' }
+        ]),
+        hints: [
+          'The roots are non-real conjugates, so write them as $r(\\cos\\theta \\pm i\\sin\\theta)$: $r^2$ is their product and $2r\\cos\\theta$ their sum.',
+          'By De Moivre, $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$.',
+          'Reduce $n\\theta$ by whole turns before taking the cosine.'
+        ],
+        steps: [
+          { h: 'Roots in polar form', d: `$\\alpha\\beta = ${c}$ and $\\alpha + \\beta = ${-b}$, so $r = ${sqrtTex(c)}$ and $\\cos\\theta = ${b === 0 ? '0' : `\\dfrac{${-b}}{2 \\times ${sqrtTex(c)}}`}$, which gives $\\theta = ${piTex(t[0], t[1])}$` },
+          { h: 'De Moivre', d: `$\\alpha^{${n}} + \\beta^{${n}} = 2\\left(${sqrtTex(c)}\\right)^{${n}}\\cos ${piTex(n * t[0], t[1])}$, and $${piTex(n * t[0], t[1])}$ is $${piTex(turns, t[1])}$ after whole turns` },
+          { h: 'Check by recurrence', d: `With $s_k = \\alpha^k + \\beta^k$: $s_k = ${b === 0 ? '' : `${cx(-b, 's_{k-1}')} `}- ${c}s_{k-2}$, $s_0 = 2$, $s_1 = ${-b}$` },
+          { h: 'Answer', d: `$\\alpha^{${n}} + \\beta^{${n}} = ${value}$` }
+        ],
+        reasoning: 'root-powers'
+      };
+    }
+    // Both roots non-real and on |z| = r. For a real quadratic the non-real roots
+    // are conjugates, so |α|² = αβ = C(k) = r²; that has two solutions k₁, k₂, and
+    // the discriminant B(k)² − 4r² < 0 keeps exactly one of them.
+    const r = ri(rng, 1, 5);
+    const k1 = ri(rng, -6, 6), k2 = ri(rng, -6, 6);
+    if (k1 === k2) continue;
+    const m = nz(rng, -3, 3), n0 = ri(rng, -8, 8);
+    const B = k => m * k + n0;
+    const good = rng() < 0.5 ? k1 : k2, bad = good === k1 ? k2 : k1;
+    if (!(B(good) ** 2 < 4 * r * r) || !(B(bad) ** 2 > 4 * r * r)) continue;
+    const c1 = -(k1 + k2), c0 = k1 * k2 + r * r;
+    return {
+      prompt: `Find the real number $k$ for which the roots of $x^2 + (${lin(m, n0, 'k')})x + (${polyTex([1, c1, c0], 'k')}) = 0$ are non-real and both lie on the circle $|z| = ${r}$.`,
+      answerType: 'numeric', answer: { value: good },
+      traps: traps(good, [
+        { value: bad, why: `That value also makes the product of the roots $${r * r}$, but then the discriminant is positive and the roots are real, not non-real.` },
+        { value: k1 + k2, why: 'That is the sum of the two candidate values, not a value of $k$.' },
+        ...(Number.isInteger(-n0 / m) ? [{ value: -n0 / m, why: 'That makes the coefficient of $x$ zero; it does not put the roots on the circle.' }] : [])
+      ]),
+      hints: [
+        'Non-real roots of a quadratic with real coefficients are a conjugate pair $\\alpha$, $\\bar{\\alpha}$.',
+        'For a conjugate pair, $|\\alpha|^2 = \\alpha\\bar{\\alpha}$, which is the product of the roots.',
+        'Each value of $k$ that makes the product right must still give non-real roots: check the discriminant.'
+      ],
+      steps: [
+        { h: 'Modulus from the product', d: `Both roots on $|z| = ${r}$ and conjugate: $\\alpha\\bar{\\alpha} = ${r * r}$, so $${polyTex([1, c1, c0], 'k')} = ${r * r}$` },
+        { h: 'Candidates', d: `$${polyTex([1, c1, k1 * k2], 'k')} = 0$, so $k = ${Math.min(k1, k2)}$ or $k = ${Math.max(k1, k2)}$` },
+        { h: 'Reject', d: `At $k = ${bad}$ the coefficient of $x$ is $${B(bad)}$ and $${par(B(bad))}^2 - 4(${r * r}) = ${B(bad) ** 2 - 4 * r * r} > 0$: the roots are real` },
+        { h: 'Keep', d: `At $k = ${good}$: $${par(B(good))}^2 - 4(${r * r}) = ${B(good) ** 2 - 4 * r * r} < 0$, so the roots are non-real with modulus $${r}$` },
+        { h: 'Answer', d: `$k = ${good}$` }
+      ],
+      reasoning: 'roots-on-circle'
+    };
+  }
+  return complexQuadraticReasoning(makeRng(FALLBACK_SEED));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 
 /** One rung, D4: every other rung returns the same form (see the header). */
 const d4 = form => (rng, _diff) => form(rng);
@@ -2064,7 +2219,8 @@ export const class11JeeHardestForms = Object.freeze({
   'c11-first-principles-reasoning': d4(firstPrinciplesReasoning),
   'c11-mean-deviation-jee-reasoning': d4(meanDeviationReasoning),
   'c11-variance-reasoning': d4(varianceReasoning),
-  'c11-sample-space-jee-reasoning': d4(sampleSpaceReasoning)
+  'c11-sample-space-jee-reasoning': d4(sampleSpaceReasoning),
+  'c11-complex-quadratic-jee-reasoning': d4(complexQuadraticReasoning)
 });
 
 // Exposed for the independent check, which asserts the tables are non-empty.
