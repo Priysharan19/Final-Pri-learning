@@ -64,7 +64,7 @@ html.ui-instrument [data-c-surface] .btn:focus-visible:not(.qpage *) { outline: 
 html.ui-instrument [data-c-surface] .btn.c-btn-primary:not(.qpage *) {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px;
   border-radius: var(--radius-pill); border: var(--c-line) solid var(--c-teal); background: var(--c-teal); color: var(--c-on-teal);
-  font: var(--c-t-button); letter-spacing: 0.12em; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18); filter: none;
+  font: var(--c-t-button); letter-spacing: 0.12em; box-shadow: none; filter: none; white-space: nowrap;
   transition: transform var(--c-d-press) var(--c-ease-press), background-color var(--c-d-press) var(--c-ease-press);
 }
 html.ui-instrument [data-c-surface] .btn.c-btn-primary:hover:not(:disabled):not(.qpage *) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--c-on-teal); }
@@ -96,7 +96,7 @@ html.ui-instrument [data-c-surface] .mcq { gap: 0; border-top: var(--c-line) sol
 html.ui-instrument [data-c-surface] .mcq-opt {
   position: relative; min-height: 56px; margin: 0; padding: 12px 10px 12px 8px; gap: 18px;
   background: transparent; border: 0; border-bottom: var(--c-line) solid var(--c-hair); border-radius: 0;
-  box-shadow: 0 1px 0 var(--c-emboss-hi); font: 400 19px/1.35 var(--c-text); color: var(--c-ink);
+  font: 400 19px/1.35 var(--c-text); color: var(--c-ink);
   transition: background-color var(--c-d-press) var(--c-ease-press);
 }
 html.ui-instrument [data-c-surface] .mcq-key {
@@ -104,14 +104,17 @@ html.ui-instrument [data-c-surface] .mcq-key {
   font: 600 18px/1 var(--c-sc); letter-spacing: 0; color: var(--c-ink-3); transition: color var(--c-d-press) var(--c-ease-press);
 }
 @media (hover: hover) { html.ui-instrument [data-c-surface] .mcq-opt:hover:not(:disabled) { background: var(--in-l2); border-color: var(--c-hair); } }
-html.ui-instrument [data-c-surface] .mcq-opt:active:not(:disabled) { background: var(--c-paper-2); }
+html.ui-instrument [data-c-surface] .mcq-opt:active:not(:disabled) { background: var(--in-l4); }
 html.ui-instrument [data-c-surface] .mcq-opt:focus-visible { outline: 2px solid var(--c-teal); outline-offset: -2px; }
 /* Chosen, not yet marked: a teal rule at the edge and a teal letter. */
-html.ui-instrument [data-c-surface] .mcq-opt.sel { background: var(--c-teal-soft); box-shadow: inset 2px 0 0 var(--c-teal), 0 1px 0 var(--c-emboss-hi); }
+html.ui-instrument [data-c-surface] .mcq-opt.sel { background: var(--c-teal-soft); box-shadow: inset 2px 0 0 var(--c-teal); }
 html.ui-instrument [data-c-surface] .mcq-opt.sel .mcq-key { color: var(--c-teal); }
 /* Marked by the engine: the rows rest; only the shape and word speak. */
 html.ui-instrument [data-c-surface] .mcq-opt:disabled { cursor: default; opacity: 1; color: var(--c-ink-2); }
-html.ui-instrument [data-c-surface] .mcq-opt.right { color: var(--c-ink); }
+html.ui-instrument [data-c-surface] :is(.mcq-opt.right, .mcq-opt.wrong) { color: var(--c-ink); }
+html.ui-instrument [data-c-surface] .mcq-opt.wrong { box-shadow: inset 2px 0 0 var(--c-copper); }
+html.ui-instrument [data-c-surface] .mcq-opt.right { box-shadow: inset 2px 0 0 var(--c-teal); }
+html.ui-instrument [data-c-surface] .mcq-opt.sel:hover:not(:disabled) { background: var(--c-teal-soft); }
 html.ui-instrument [data-c-surface] .mcq-opt.right .mcq-key { color: var(--c-teal); }
 html.ui-instrument [data-c-surface] .mcq-opt.wrong .mcq-key { color: var(--c-copper); }
 html.ui-instrument [data-c-surface] .mcq-mark { gap: 8px; font: 600 13px/1 var(--c-sc); letter-spacing: 0.12em; white-space: nowrap; }
@@ -142,3 +145,17 @@ html.ui-instrument [data-c-surface] .exam-head { background: var(--c-paper); bor
 @media (forced-colors: active) {
   html.ui-instrument [data-c-surface] .mcq-opt.sel { outline: 2px solid Highlight; outline-offset: -2px; }
 }
+
+/* Slop-review fixes: sizes, busy, glow, one rule colour per role, Hindi. */
+html.ui-instrument [data-c-surface] .btn.c-btn-primary.btn-sm:not(.qpage *) { padding: 0 16px; }
+html.ui-instrument [data-c-surface] .btn.btn-lg:not(.qpage *) { min-height: 52px; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary[aria-busy="true"]:not(.qpage *) { opacity: 0.72; }
+html.ui-instrument [data-c-surface] .btn-glow:not(.qpage *) { animation: none; }
+html.ui-instrument [data-c-surface] :is(.notice, .error-box, .verdict):not(.qpage *) { border-bottom-color: var(--c-hair); }
+html.ui-instrument [data-c-surface] :is(.btn-ghost, .btn-secondary):not(.qpage *) { background: transparent; }
+html.ui-instrument [data-c-surface] .btn:disabled:not(.c-btn-primary):not(.qpage *) { opacity: 1; color: var(--c-ink-3); border-color: var(--c-hair-2); }
+html.ui-instrument [data-c-surface] :is(.chip, .pill-opt, .pill-select):hover:not(.qpage *) { border-color: var(--c-hair); color: var(--c-ink); }
+html.ui-instrument [data-c-surface] :is(.chip, .pill-opt, .pill-select, .tag):not(.qpage *) { font-size: 13px; }
+html.ui-instrument [data-c-surface] :is(.notice.error, .error-box):not(.qpage *)::before { content: "\25C7\00A0"; color: var(--c-copper); }
+html.ui-instrument [data-c-surface] :lang(hi) :is(.btn, .chip, .tag, .mcq-mark, .pill-opt):not(.qpage *), html.ui-instrument [data-c-surface] :lang(hi) .mcq-mark { letter-spacing: 0; }
+@media (max-width: 560px) { html.ui-instrument [data-c-surface] .btn.c-btn-primary:not(.qpage *) { letter-spacing: 0.06em; padding: 0 16px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; } }

@@ -82,7 +82,7 @@ export default function Classes() {
                   {task.dueAt ? t('classes.dueOn', { date: new Date(task.dueAt).toLocaleDateString(user.locale) }) : ''}
                 </p>
                 <div className="row">
-                  <button className={`${PRIMARY} btn-sm`} onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>
+                  <button className="btn btn-primary btn-sm" onClick={() => nav(`/practice?task=${task.id}`)}>{t('classes.continue')}</button>
                   <button className="btn btn-quiet btn-sm" onClick={() => nav('/tasks')}>{t('classes.allTasks')}</button>
                 </div>
               </div>

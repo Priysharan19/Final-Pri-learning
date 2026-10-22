@@ -565,7 +565,7 @@ function ProfilePractice() {
             </p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
               {difficultyGap.available.map(d => (
-                <button key={d} type="button" className={`${PRIMARY} btn-sm`} data-difficulty-choice={d}
+                <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
                   onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
                   {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
                 </button>

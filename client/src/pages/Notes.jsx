@@ -787,7 +787,7 @@ function Flashcards({ chapter, points, onClose }) {
           <div className="nt-cards-done">
             <p>{t('notes.cardsDone')}</p>
             <button type="button" className="btn btn-secondary" onClick={() => { setI(0); setFlipped(false); }}>{t('notes.again')}</button>
-            <button type="button" className={PRIMARY} onClick={onClose}>{t('notes.close')}</button>
+            <button type="button" className="btn btn-primary" onClick={onClose}>{t('notes.close')}</button>
           </div>
         )}
       </div>
