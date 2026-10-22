@@ -1123,6 +1123,12 @@ async function run() {
       await wait(page, 800);
     });
 
+    await step('for parents · the weekly report (or its premium/consent answer)', '/parent-report', async () => {
+      await goTo(page, BASE, '/parent-report');
+      await page.waitForSelector('[data-parent-report], [data-parent-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
