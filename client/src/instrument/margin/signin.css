@@ -105,3 +105,14 @@ html.ui-instrument:root .auth-col .pill-opt.c-chip { font: var(--c-t-label); let
 html.ui-instrument:root .auth-col .pill-opt.c-chip:lang(hi) { font-family: var(--c-text); letter-spacing: 0; }
 html.ui-instrument:root .auth-col .pill-opt.c-chip[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); border-color: var(--c-ink); }
 html.ui-instrument:root .auth-col .pill-opt.c-chip:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+/* Wide screens: the three doors fit one line. Narrow: they wrap, centred, and
+   a dot never starts a line (the separator is a gap, not a glyph, there). */
+@media (min-width: 861px) {
+  html.ui-instrument:root .auth-col > .signin-landing { max-width: 460px; }
+  html.ui-instrument:root .signin-landing .signup-alt { flex-wrap: nowrap; }
+  html.ui-instrument:root .signin-landing .signup-alt .linklike { font-size: 12px; letter-spacing: 0.04em; }
+}
+@media (max-width: 860px) {
+  html.ui-instrument:root .signin-landing .signup-alt .linklike + .linklike::before { content: none; }
+  html.ui-instrument:root .signin-landing .signup-alt { gap: 0 18px; }
+}
