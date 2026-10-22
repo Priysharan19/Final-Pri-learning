@@ -52,7 +52,12 @@ const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const PLACEMENT_ON = featureEnabled('placement');
 // The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
 // the owner flips it. Its code and stylesheet load only when the flag is on.
-const INSTRUMENT_ON = featureEnabled('instrument');
+// The build constant is read directly here (not through featureEnabled) so the
+// bundler can see which branch survives: an instrument build then drops the
+// v1.0 Home page, the v1.0 sidebar and everything only they import.
+/* global __PRI_FEATURE_INSTRUMENT__ */
+const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__ && import.meta.env?.PROD === true;
+const INSTRUMENT_ON = INSTRUMENT_BUILD || featureEnabled('instrument');
 const InstrumentBar = INSTRUMENT_ON ? React.lazy(() => import('./instrument/InstrumentBar.jsx')) : null;
 const IndexPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/IndexPage.jsx')) : null;
 const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.jsx')) : null;

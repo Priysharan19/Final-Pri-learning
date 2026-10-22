@@ -124,6 +124,10 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
+// The instrument build (PRI_FEATURE_INSTRUMENT=1) changes what is warmed: see
+// the instrument rules in ON_DEMAND and BOOT_FONTS.
+const INSTRUMENT_BUILD = process.env.PRI_FEATURE_INSTRUMENT === '1';
+
 export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
@@ -199,7 +203,28 @@ export const ON_DEMAND = [
   // build. Warming them would spend the install on code no student of that
   // build can run. A build made with the flag on warms them as usual, so the
   // instrument stays offline-ready where it is the interface.
-  ...(process.env.PRI_FEATURE_INSTRUMENT === '1' ? [] : [
+  //
+  // A build made with the flag on is the opposite case, and it pays for its
+  // own interface by not warming what that interface leaves unpainted or
+  // reaches only by an explicit visit:
+  //   · Inter. Every interface token (--font, --font-display) is remapped to
+  //     Instrument Sans in instrument.css, so no rule of this build paints in
+  //     'Inter Variable'. Instrument Sans takes Inter's place in the install
+  //     (BOOT_FONTS below); Inter is still declared, so a browser that ever
+  //     asks for it fetches it and keeps it.
+  //   · Instrument Sans's Latin Extended subset, by the Inter script-subset
+  //     argument above: fetched only when a glyph in its range appears.
+  //   · The Map, the Report (ReportHead with the Progress page under it) and
+  //     Scripts (the History page, at /review).
+  //     Each is one tab a student opens deliberately, after the Index; the
+  //     first open online keeps it offline from then on, and a first open
+  //     offline shows the route's ordinary chunk-load failure — the same
+  //     promise the placement check and the archive already make.
+  ...(INSTRUMENT_BUILD ? [
+    [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
+    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
+    [/(^|\/)(MapPage|ReportHead|Progress|History)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+  ] : [
     [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
 
@@ -281,7 +306,8 @@ export const ON_DEMAND = [
 // every word of UI, and the KaTeX faces a rendered question uses. The rest of
 // KaTeX's faces are ON_DEMAND above; these are the ones a student meets in
 // their first minute, so they belong in the install with the shell.
-const BOOT_FONTS = /(^|\/)(inter-latin-wght-normal|KaTeX_(Main|Math|AMS|Size\d)-[A-Za-z]+)-[^/]*\.woff2$/;
+// In the instrument build the interface face is Instrument Sans, not Inter.
+const BOOT_FONTS = new RegExp(`(^|/)(${INSTRUMENT_BUILD ? 'instrument-sans-latin-wght-normal' : 'inter-latin-wght-normal'}|KaTeX_(Main|Math|AMS|Size\\d)-[A-Za-z]+)-[^/]*\\.woff2$`);
 
 // On-demand, but worth having in advance where the bytes are cheap — a browser
 // that reports an unmetered 4G link, or a shell reading them off an app bundle.

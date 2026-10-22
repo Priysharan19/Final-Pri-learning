@@ -20,6 +20,7 @@ import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
+import '../instrument/ledger.css';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = featureEnabled('instrument');

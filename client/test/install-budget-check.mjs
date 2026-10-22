@@ -203,8 +203,19 @@ eq(absent.length, 0, `every file the first paint blocks on is in the install (${
 
 ok(PRECACHE.includes('/') && PRECACHE.includes('/index.html'),
   'the shell is installed under both the names a navigation can arrive at');
-ok(PRECACHE.some(url => /inter-latin-wght-normal/.test(url)),
-  'the Latin Inter subset is installed — it paints every word of the interface');
+// The interface face's Latin subset paints every word of the interface, so it
+// is installed. Which face that is depends on the build: Inter in the
+// interface production ships, Instrument Sans where the v1.1 instrument
+// interface is built in (features.json records the flag; instrument.css remaps
+// every interface font token to Instrument Sans). Same promise, per build.
+{
+  const instrumentBuild = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')).instrument === true;
+  const [face, name] = instrumentBuild
+    ? [/instrument-sans-latin-wght-normal/, 'Instrument Sans']
+    : [/inter-latin-wght-normal/, 'Inter'];
+  ok(PRECACHE.some(url => face.test(url)),
+    `the Latin ${name} subset is installed — it paints every word of the interface in this build`);
+}
 ok(PRECACHE.some(url => /KaTeX_Main-Regular/.test(url)) && PRECACHE.some(url => /KaTeX_Math-Italic/.test(url)),
   'and the KaTeX faces a rendered question is set in');
 ok(PRECACHE.includes('/manifest.webmanifest'), 'the web manifest is installed, so the app can be added to a home screen offline');

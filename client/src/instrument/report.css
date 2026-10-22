@@ -1,0 +1,63 @@
+/* The Report head (ReportHead.jsx) — split from instrument.css so it travels with its screen's chunk
+   (ON_DEMAND in client/vite.config.js) instead of every instrument install.
+   Rules keep their original order; the craft-layer rule that followed them
+   in instrument.css is carried at the end so it still wins where it did. */
+
+.in-report { display: grid; gap: 22px; margin-bottom: 28px; }
+.in-report-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 22px; flex-wrap: wrap; }
+.in-report-title { margin: 0; font: 500 34px/1.05 var(--in-ui); letter-spacing: -0.045em; color: var(--in-tx); }
+.in-report-lede { margin: 6px 0 0; color: var(--in-tx-2); font-weight: 300; font-size: 16px; line-height: 1.5; max-width: 38em; }
+.in-segc { display: inline-flex; padding: 3px; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); gap: 2px; flex: none; }
+.in-segc button { padding: 5px 12px; min-height: 30px; border: 0; border-radius: 3px; background: transparent; font: 500 13px var(--in-ui); color: var(--in-tx-2); cursor: pointer; }
+.in-segc button[aria-pressed="true"] { background: var(--in-l5); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi); }
+.in-segc button:focus-visible { outline: 2px solid var(--in-signal); outline-offset: 1px; }
+.in-report-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.in-report-figs > div, .in-report-heat { border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+.in-report-figs > div { padding: 16px; }
+.in-report-figs b { display: block; font: 500 34px/1 var(--in-ui); letter-spacing: -0.05em; font-variant-numeric: tabular-nums; color: var(--in-tx); }
+.in-report-figs b span { font-size: 20px; color: var(--in-tx-3); letter-spacing: -0.02em; }
+.in-report-figs small { color: var(--in-tx-3); font-size: 12.5px; }
+.in-report-figs em { font: 500 11.5px var(--in-mono); font-style: normal; color: var(--in-good); }
+.in-report-figs em.is-down { color: var(--in-tx-3); }
+.in-rp { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
+.in-chart { position: relative; height: 300px; border-radius: 6px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); overflow: hidden; }
+.in-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.in-chart-grid line { stroke: var(--in-edge); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.in-chart-area { fill: var(--in-tx); fill-opacity: 0.12; animation: in-chart-fade 1.4s cubic-bezier(.2, 0, 0, 1) both; }
+.in-chart-line { fill: none; stroke-width: 2.4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.in-chart-line.is-method { stroke: var(--in-tx); stroke-dasharray: 1; stroke-dashoffset: 0; animation: in-chart-draw 1.4s cubic-bezier(.2, 0, 0, 1) both; }
+.in-chart-line.is-accuracy { stroke: var(--in-slip); stroke-dasharray: 6 5; animation: in-chart-fade 1.4s cubic-bezier(.2, 0, 0, 1) both; }
+.in-chart-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--in-tx); }
+.in-chart-dot.is-accuracy { background: var(--in-slip); }
+.in-chart-dot.is-end.is-method { width: 10px; height: 10px; }
+.in-chart-dot.is-end { animation: in-chart-fade 0.3s 1.3s both; }
+@keyframes in-chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes in-chart-fade { from { opacity: 0; } to { opacity: 1; } }
+.in-chart-text { position: absolute; inset: 0; pointer-events: none; font: 400 11.5px var(--in-mono); color: var(--in-tx-3); }
+.in-chart-tick { position: absolute; bottom: 8px; transform: translateX(-50%); white-space: nowrap; }
+.in-chart-val { position: absolute; font-variant-numeric: tabular-nums; }
+.in-chart-val.is-above { transform: translate(-115%, -170%); }
+.in-chart-val.is-below { transform: translate(-115%, 60%); }
+.in-chart-val.is-method { color: var(--in-tx); }
+.in-chart-val.is-accuracy { color: var(--in-slip); }
+.in-chart-lg { position: absolute; left: 16px; top: 12px; display: flex; gap: 14px; font: 500 11.5px var(--in-mono); color: var(--in-tx-2); }
+.in-chart-lg i { display: inline-block; width: 12px; height: 2px; margin-right: 6px; vertical-align: 3px; background: var(--in-tx); }
+.in-chart-lg i.is-accuracy { background: var(--in-slip); }
+.in-chart-empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); margin: 0; padding: 8px 12px; border-radius: 4px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13px; color: var(--in-tx-2); text-align: center; max-width: 80%; }
+.in-report-heat { padding: 16px; }
+.in-report-heat h2, .in-report-lost h3 { margin: 0 0 12px; font: 500 12px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-report-lost { margin-top: 16px; }
+.in-report-lost h3 { font-size: 11px; }
+.in-heat { display: grid; grid-template-columns: repeat(15, minmax(0, 1fr)); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: 4px; }
+.in-heat i { aspect-ratio: 1; border-radius: 2px; background: var(--in-l3); }
+.in-heat i.is-on { background: color-mix(in srgb, var(--in-tx) calc(var(--v) * 100%), var(--in-l3)); }
+.in-report-lost ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.in-report-lost li { display: grid; grid-template-columns: 8px 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 4px; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge); font-size: 13.5px; color: var(--in-tx); }
+.in-report-lost li i { width: 8px; height: 8px; border-radius: 50%; background: var(--cc); }
+.in-report-lost li small { font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
+@media (max-width: 1100px) { .in-rp { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 760px) { .in-segc { width: 100%; } .in-segc button { flex: 1; min-height: 44px; } .in-chart { height: 240px; } }
+@media (prefers-reduced-motion: reduce) { .in-chart-area, .in-chart-line, .in-chart-dot { animation: none; } }
+
+.in-chart-empty { box-shadow: var(--in-sh-1); background: var(--in-l1); color: var(--in-tx-2); }
