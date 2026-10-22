@@ -1,0 +1,1 @@
+import"./rolldown-runtime-CbXtAM7H.js";import{m as e,t}from"./vendor-react-Dtm3F6TO.js";import{t as n}from"./MistakeNotebook-JJ_OdEzU.js";e();var r=t();function i(){return(0,r.jsx)(`div`,{className:`qpage`,"data-notebook-page":!0,style:{maxWidth:760},children:(0,r.jsx)(n,{})})}export{i as default};

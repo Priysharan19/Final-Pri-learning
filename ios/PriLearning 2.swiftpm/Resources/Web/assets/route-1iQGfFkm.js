@@ -1,0 +1,1 @@
+var e=`/premium`;export{e as t};
