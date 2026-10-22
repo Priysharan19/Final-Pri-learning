@@ -520,7 +520,7 @@ export const cloud = Object.freeze({
   // A guardian answering the email has no account and no session — the token in
   // their link is the whole authority, which is why it is single-use, hashed at
   // rest and expires in an hour.
-  guardianConfirm: token => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token } }),
+  guardianConfirm: (token, noticeVersion) => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion } }),
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   // Staff second factor (server/platform/mfa.js). The secret and the recovery

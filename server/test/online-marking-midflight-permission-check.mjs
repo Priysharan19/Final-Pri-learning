@@ -109,7 +109,7 @@ try{
  const childId=registration.data.account.id;
  eq((await verifyEmail(h,childId)).status,200,'minor email verified');
  const guardianConsentToken=await guardianToken(childId,'guardian-consent');
- const confirmed=await h.request('/v1/account/guardian/confirm',{method:'POST',body:{token:guardianConsentToken}});
+ const confirmed=await h.request('/v1/account/guardian/confirm',{method:'POST',body: { token: guardianConsentToken, approve: true, noticeVersion: '2026-10-22' }});
  eq(confirmed.status,200,'guardian confirmation accepted');
  eq(confirmed.data?.confirmed,true,'guardian consent granted');
  const childQuestion=await issue(childJar);

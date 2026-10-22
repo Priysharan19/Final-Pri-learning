@@ -1,0 +1,37 @@
+/* Scripts: the ledger (History.jsx, design s8) — split from instrument.css so
+   it travels with the Scripts chunk (ON_DEMAND in client/vite.config.js in an
+   instrument build) instead of every instrument install. Every class here is
+   rendered only by the instrument branch of History.jsx. Rules keep their
+   original order; the later instrument.css rules that touch these classes
+   (.in-led-tools, .in-bar-slot .in-led-search) are more specific or disjoint. */
+
+html.ui-instrument .in-led-bar { padding-bottom: 14px; border-bottom: 1px solid var(--in-edge); }
+html.ui-instrument .in-led-bar .pill-opt { min-height: 30px; padding: 0 11px; border-radius: 3px; }
+html.ui-instrument .in-led-bar .pill-opt.on, html.ui-instrument .in-led-bar .pill-opt[aria-pressed="true"] { background: var(--in-l3); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument .card.in-led { padding: 4px 0; border: 0; border-radius: 0; background: transparent; }
+.in-led-dayh { display: flex; gap: 10px; margin: 0; padding: 14px 22px 6px; font: 500 11.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+html.ui-instrument .hist-row.in-led-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; padding: 0 8px 0 0; border-bottom: 1px solid var(--in-edge); }
+html.ui-instrument .hist-row.in-led-row.is-sel { background: var(--in-l2); }
+html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: absolute; left: 0; top: 10px; height: 32px; width: 2px; background: var(--in-signal); }
+.in-led-main {
+  display: grid; grid-template-columns: 10px 40px minmax(0, 1fr) 170px 112px 52px; gap: 16px; align-items: center;
+  min-height: 52px; padding: 0 0 0 22px; border: 0; background: none; color: var(--in-tx); text-align: left; cursor: pointer; font: inherit;
+}
+.in-led-main:focus-visible { outline: 2px solid var(--in-signal); outline-offset: -2px; border-radius: 2px; }
+.in-led-cc { width: 8px; height: 8px; border-radius: 2px; background: var(--cc); }
+.in-led-id, .in-led-tm { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+.in-led-tm { text-align: right; font-variant-numeric: tabular-nums; }
+.in-led-q { font: 400 16px var(--font-math); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-led-q * { white-space: nowrap; }
+.in-led-ch { color: var(--in-tx-2); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-led-res { display: flex; align-items: center; gap: 8px; font: 500 12px var(--in-mono); color: var(--in-tx-2); }
+.in-led-ic { display: inline-flex; color: var(--in-tx-3); }
+.in-led-open { grid-column: 1 / -1; padding: 4px 22px 16px 48px; display: grid; gap: 10px; }
+@media (hover: hover) { html.ui-instrument .hist-row.in-led-row:hover { background: var(--in-l1); } html.ui-instrument .hist-row.in-led-row.is-sel:hover { background: var(--in-l2); } }
+@media (max-width: 860px) {
+  .in-led-main { grid-template-columns: 10px minmax(0, 1fr) auto; grid-template-areas: "cc q tm" "cc ch res"; gap: 4px 12px; padding: 10px 0 10px 14px; }
+  .in-led-cc { grid-area: cc; } .in-led-id { display: none; } .in-led-q { grid-area: q; } .in-led-ch { grid-area: ch; }
+  .in-led-res { grid-area: res; justify-content: flex-end; } .in-led-tm { grid-area: tm; }
+  .in-led-dayh { padding: 14px 14px 6px; }
+  .in-led-open { padding: 4px 14px 14px; }
+}

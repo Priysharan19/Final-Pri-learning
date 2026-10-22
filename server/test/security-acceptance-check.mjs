@@ -353,7 +353,7 @@ try {
     c.ok(resetToken, 'reset token queued');
     // Purpose binding: a reset token is not an email-verification or guardian token.
     c.eq((await h.request('/v1/account/email/verify', { method: 'POST', body: { token: resetToken } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot verify email');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: resetToken } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot confirm guardian consent');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: resetToken, approve: true, noticeVersion: '2026-10-22' } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot confirm guardian consent');
     c.eq((await h.request('/v1/account/me', { jar: { pri_cloud_session: resetToken } })).status, 401, 'a reset token is not a session');
     c.eq((await h.request('/v1/account/password/reset', { method: 'POST', body: { token: resetToken, password: 'reset-password-value-1' } })).status, 200, 'reset succeeds');
     c.eq((await h.request('/v1/account/me', { jar: before })).status, 401, 'reset signs out every existing session');
@@ -504,7 +504,7 @@ try {
     } });
     const childTwoId = reg.data.account.id;
     const firstGuardian = await outboxToken(child.id, 'guardian-consent');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: firstGuardian } })).data.confirmed, true, 'guardian one confirms child one');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: firstGuardian, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed, true, 'guardian one confirms child one');
     c.eq((await h.request('/v1/account/guardian/state', { jar: otherChild })).data.state, 'pending', 'child two is untouched by guardian one');
     c.ok(!(await h.request('/v1/account/guardian/state', { jar: otherChild })).text.includes('guardian.one'), 'child two never sees guardian one\'s address');
     c.eq((await h.request('/v1/account/guardian/withdraw', { method: 'POST', body: { token: firstGuardian } })).data.withdrawn, true, 'guardian one withdraws');

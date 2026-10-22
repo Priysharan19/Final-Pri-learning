@@ -55,7 +55,18 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // server no longer holds this page's read. A number only; it makes the
   // surface label its own transcript "read again". It carries nothing about
   // the question or its answer and never reaches the reader request.
-  'readExpired'
+  'readExpired',
+  // Reviewed 2026-10-22 (v1.1 instrument, display only): a ref the surface
+  // FILLS with one function, clear(), so the footer's Reset can press the
+  // toolbar's own Clear (with its undo). Nothing flows into the surface
+  // through it: no question, no answer, nothing for the reader request.
+  'controlRef',
+  // Reviewed 2026-10-22 (#627 follow-up): a boolean, true while a relaunch
+  // replay of an earlier typed or photo submission is in flight. It only
+  // shows "Checking your earlier answer…" and holds back Read; it carries
+  // nothing about the question, the submission's content or its mark, and
+  // never reaches the reader request.
+  'checkingEarlier'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([

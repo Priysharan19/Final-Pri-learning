@@ -3,5 +3,6 @@
   "tutor": false,
   "australia": false,
   "extendedTracks": false,
-  "examHandwriting": false
+  "examHandwriting": false,
+  "instrument": false
 }

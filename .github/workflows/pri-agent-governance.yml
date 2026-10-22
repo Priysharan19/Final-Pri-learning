@@ -272,13 +272,31 @@ jobs:
           [
             {
               "number": 1,
+              "state": "open",
               "title": "[PRI-MISSION] smoke",
               "updated_at": "$now",
-              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none"
+              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: server/test/concurrency-contract-check.mjs\nPri-Lease-Heartbeat-At: $now\nPri-Lease-Heartbeat-Ref: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Lease-Heartbeat-By: qa-release"
             }
           ]
           JSON
-          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2 8458a735fda3637656a8e9e23329f235b5277fb6
+
+      - name: Signed admission, path and independent-review regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/pri-admission-state.mjs
+          node --check scripts/pri-admission-github.mjs
+          node --check scripts/pri-admission-paths.mjs
+          node --check scripts/pri-trusted-merge-policy.mjs
+          node --check scripts/pri-trusted-github-verifier.mjs
+          node --check scripts/pri-manual-authorization.mjs
+          node client/test/pri-mission-control-regression.mjs
+          node client/test/pri-admission-state-check.mjs
+          node client/test/pri-source-provenance-check.mjs
+          node client/test/pri-trusted-merge-policy-check.mjs
+          node client/test/pri-admission-paths-check.mjs
+          node client/test/pri-manual-authorization-check.mjs
 
       - name: PR lane classifier self-test
         shell: bash
@@ -313,8 +331,31 @@ jobs:
           : > /tmp/pri-pin-empty.diff
           node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-empty.diff | grep -q '"lane":"governed-required"'
 
+      - name: Release automation safety contract self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/release-automation-contract-check.mjs
+
+      # A PR from main into deploy/production is a RELEASE POINTER proposal,
+      # not an autonomous writer mission and not a protected-main push. It may
+      # not merge through the ordinary PR lane: doing so could deploy on Railway.
+      - name: Block production-pointer PR merges (release authorization is external)
+        if: github.event_name == 'pull_request' && github.base_ref == 'deploy/production'
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$HEAD_REF" != "main" ]]; then
+            echo "::error::Production pointer PR has unexpected head '$HEAD_REF'; only an exact certified main SHA can ever be promoted."
+            exit 1
+          fi
+          echo "::error::main → deploy/production is a RELEASE PROMOTION, not a writer-leased mission. No PR merge is authorized: this path would trigger Railway production. Leave the PR draft; use the separately approved release runbook after all external release gates pass."
+          exit 1
+
       - name: Classify PR diff and parse autonomous metadata
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.base_ref != 'deploy/production'
         id: meta
         shell: bash
         env:
@@ -408,6 +449,7 @@ jobs:
           EXPECTED_MISSION: ${{ steps.meta.outputs.mission }}
           EXPECTED_BRANCH: ${{ github.head_ref }}
           EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK"
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK" "$EXPECTED_HEAD"
