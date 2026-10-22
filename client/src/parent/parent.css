@@ -1,0 +1,20 @@
+/* The parent weekly report. Shared instrument tokens only (instrument.css,
+   theme.css); no new colours, type sizes or spacing scales are defined here. */
+.parent-page { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+.parent-page h1 { margin-bottom: 4px; }
+.parent-report, .parent-link { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--in-edge); }
+.parent-honest { padding: 12px 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; }
+.parent-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; margin: 16px 0; }
+.parent-fact dt { color: var(--in-l2); font-size: 0.85em; }
+.parent-fact dd { margin: 2px 0 0; color: var(--in-ink); font-variant-numeric: tabular-nums; }
+.parent-sub { display: block; margin-top: 2px; }
+.parent-trend { display: flex; gap: 16px; align-items: flex-end; list-style: none; padding: 0; margin: 8px 0 16px; }
+.parent-trend li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 44px; }
+.parent-trend-bar { display: flex; align-items: flex-end; width: 24px; height: 72px; border-bottom: 1px solid var(--in-edge-2); }
+.parent-trend-bar i { display: block; width: 100%; background: var(--in-c1); border-radius: 3px 3px 0 0; }
+.parent-trend-value { font-variant-numeric: tabular-nums; color: var(--in-l2); font-size: 0.85em; }
+.parent-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.parent-topics, .parent-plan { padding-left: 18px; }
+.parent-topics b { font-variant-numeric: tabular-nums; }
+.parent-link-form { display: grid; gap: 8px; max-width: 420px; }
+.parent-email-page h1 { margin-bottom: 12px; }

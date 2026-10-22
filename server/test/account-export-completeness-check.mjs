@@ -31,7 +31,9 @@ const COVERED = {
   'entitlement_snapshots.account_id': 'entitlement',
   'guardian_consents.account_id': 'guardianConsent',
   'idempotency_keys.account_id': 'receipts',
-  'account_phones.account_id': 'phones'
+  'account_phones.account_id': 'phones',
+  'parent_report_links.account_id': 'parentReport',
+  'parent_report_sends.account_id': 'parentReport'
 };
 // table.column → why it is not in the export.
 const EXCLUDED = {
@@ -119,6 +121,10 @@ try {
     await db.run('INSERT INTO guardian_consents(account_id,guardian_name,guardian_email,guardian_phone,notice_version,requested_at,confirmed_at,method) VALUES (?,?,?,?,?,?,?,?)',
       [id, `${tag} Parent`, '', guardianPhone, '2026-10', now, now, 'guardian-phone-otp']);
     await db.run('INSERT INTO account_phones(account_id,phone_e164,verified_at) VALUES (?,?,?)', [id, phone, now]);
+    await db.run("INSERT INTO parent_report_links(account_id,recipient_email,status,unsubscribe_token_hash,unsubscribe_token_envelope,requested_at,confirmed_at) VALUES (?,?,'active',?,?,?,?)",
+      [id, `${tag.toLowerCase()}.parent@example.test`, `${tag}-UNSUB-HASH-SECRET`, `${tag}-UNSUB-ENVELOPE-SECRET`, now, now]);
+    await db.run("INSERT INTO parent_report_sends(account_id,week_start,status,provider_message_id,created_at,updated_at,sent_at) VALUES (?,?,'sent',?,?,?,?)",
+      [id, now - 7 * 86400000, `${tag}-PROVIDER-ID`, now, now, now]);
     const receipt = (scope, key, body) => db.run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)',
       [id, scope, key, JSON.stringify(body), `${tag}-DIGEST-${scope}-${key}`, now, now + 86400000]);
     await receipt('exam-paper', `${tag}-exam-open`, { answer: `${tag}-PAPER-OPEN-SECRET` });
@@ -161,6 +167,8 @@ try {
   c.eq(x.guardianConsent?.state != null, true, 'the guardian consent record is exported');
   c.eq(x.guardianConsent.guardianPhone, '+91 ••••• 111', 'the guardian phone is exported masked, as the guardian email is');
   c.ok(!text.includes('+919876511111'), 'the guardian\'s full number is not in the export');
+  c.eq(x.parentReport?.link?.recipient, 'a•••••••••••@example.test', 'the parent report recipient is exported masked');
+  c.deq(x.parentReport?.sends?.map(row => row.status), ['sent'], 'each week\'s parent report send is exported');
 
   const receipts = x.receipts;
   c.ok(Array.isArray(receipts) && receipts.length === 9, 'all nine of Alice\'s idempotency rows are listed');
@@ -171,7 +179,7 @@ try {
   c.eq(r('exam-layout', 'ALICE-layout')?.withheld, 'internal', 'internal machinery (the layout seed) is withheld');
 
   // ── Redacted: secrets and sealed answers ───────────────────────────────────
-  const secrets = ['ALICE-PAPER-OPEN-SECRET', 'ALICE-ANSWER-OPEN-SECRET', 'ALICE-LAYOUT-SEED-SECRET', 'ALICE-DIGEST', 'ALICE-TOTP-CIPHERTEXT',
+  const secrets = ['ALICE-UNSUB-HASH-SECRET', 'ALICE-UNSUB-ENVELOPE-SECRET', 'alice.parent@example.test', 'ALICE-PROVIDER-ID', 'ALICE-PAPER-OPEN-SECRET', 'ALICE-ANSWER-OPEN-SECRET', 'ALICE-LAYOUT-SEED-SECRET', 'ALICE-DIGEST', 'ALICE-TOTP-CIPHERTEXT',
     'ALICE-RECOVERY-HASH', 'ALICE-OTP-HASH', 'ALICE-DEST-HMAC', 'join-code-hash-SECRET'];
   const realHashes = [
     ...(await db.all('SELECT password_hash AS v FROM accounts WHERE id=?', [A])),

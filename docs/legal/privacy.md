@@ -117,6 +117,19 @@ device can open a profile that has no password.
   anything you typed), a one-way hash of your browser's user-agent string, and
   the times you signed in and were last seen.
 - **Subscription status** from your payment provider, if you subscribe.
+- **A parent's email address for the weekly report**, only if you (or your
+  parent) ask for it on a Premium account. We send that address one email
+  asking them to confirm, and nothing else until they do. For an account of
+  someone under 18 it can only be the parent or guardian who confirmed the
+  account. We keep the address, whether and when it was confirmed or stopped,
+  and which weeks a report was sent. The report itself is worked out from your
+  marked answers each time and is not stored: it says how many questions were
+  answered and marked, on how many days, at least how many minutes, the share
+  of marks earned, which chapters went well or need another look, how many
+  earlier mistakes were put right, and a short plan for the next week. It never
+  includes your answers, working, handwriting, photos, or your name. Every
+  report has a link that stops them at once without signing in, and you can
+  stop them yourself in the app.
 
 ## Children
 
@@ -164,8 +177,8 @@ choosing the next maths question.
 
 Only the services needed to run the parts you use:
 
-- **Email delivery** for verification links, password reset links and one-time
-  codes, and **SMS delivery** for one-time codes sent to a mobile number. The
+- **Email delivery** for verification links, password reset links, one-time
+  codes and, if a parent asked for it, the weekly report described above, and **SMS delivery** for one-time codes sent to a mobile number. The
   delivery service sees the address or number and the message, as a postal
   service sees an envelope.
 - **Payment providers** if you subscribe. We never see or store your card
@@ -186,7 +199,8 @@ We do not sell your data. We do not share it for advertising.
 - When you delete your account it is deleted at once — there is no waiting
   period. That removes your profile, your sign-in details and every session,
   your synced work, your class memberships and submissions, your subscription
-  link, your telemetry and any guardian's details. Your email address can then
+  link, your telemetry, any guardian's details and any weekly-report address
+  and its record of sent weeks. Your email address can then
   be used to create a new, empty account.
 - Three things are kept after deletion, with nothing in them that identifies
   you: the record of any payment you made (amount, currency, date and the

@@ -81,6 +81,9 @@ export const ENGINE_SUITES = [
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   'guardian-notice-version-check.mjs',
+  // The parent weekly report: account-scoped reads under RLS, the send ledger
+  // and the lease on Postgres.
+  'parent-report-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

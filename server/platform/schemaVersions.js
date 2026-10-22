@@ -34,7 +34,11 @@
 //    (supabase/migrations/20261019000000_rls_account_coverage.sql). No SQLite
 //    structural change; the version moves so a server refuses to boot on a
 //    database without these policies (fail closed).
-export const SCHEMA_VERSION = 13;
+// 14: the parent weekly report — parent_report_links (a recipient who confirmed
+//    by email, and their unsubscribe credential) and parent_report_sends (one
+//    row per account and week: the send is idempotent), both account-scoped
+//    under RLS (supabase/migrations/20261022000000_parent_report.sql).
+export const SCHEMA_VERSION = 14;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

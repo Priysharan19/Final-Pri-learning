@@ -2468,6 +2468,118 @@
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/confirm",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "single-use parent-report confirm token (purpose-bound, 7 days, hash-stored); acts only on the token's account link; re-checks the recipient rule (a child's report goes only to the guardian whose consent is given) before activating",
+      "rateLimits": [
+        {
+          "key": "parent-report-confirm",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/unsubscribe",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "parent-report unsubscribe token (hash-stored); permission-reducing only: it can stop the token's account link and nothing else; idempotent",
+      "rateLimits": [
+        {
+          "key": "parent-report-unsubscribe",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/unsubscribe/one-click",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "RFC 8058 one-click: the mailbox provider POSTs with no Origin or cookie, so origin is exempt (router.js ONE_CLICK_UNSUBSCRIBE); the unsubscribe token in the URL is the only authority and is permission-reducing only: it can stop the token's account link and nothing else; its own wide per-IP bucket (not shared with the page route): mailbox providers send one-click POSTs from a few shared addresses and a refused unsubscribe breaks RFC 8058",
+      "rateLimits": [
+        {
+          "key": "parent-report-one-click",
+          "limit": 2000,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "exempt-one-click-unsubscribe",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/parent-report/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id, read in the account's RLS scope; premium-gated server-side (entitlement_snapshots, advanced-analytics); built only from server-grader graded-attempt rows; the recipient address is masked",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/link",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id; premium-gated server-side; a child account may name only the guardian whose consent is given; the address must confirm by emailed link before any report is sent",
+      "rateLimits": [
+        {
+          "key": "parent-report-link",
+          "limit": 5,
+          "windowMs": 86400000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/link/stop",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id; permission-reducing only (stops the account's own parent report link)",
+      "rateLimits": [],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     }
   ]
 }
