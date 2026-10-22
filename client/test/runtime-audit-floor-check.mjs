@@ -23,6 +23,13 @@ ok(advisories.kind === 'advisories' && advisories.total === 1 && advisories.name
 const clean = classifyAudit({ status: 0, stdout: JSON.stringify({ vulnerabilities: {}, metadata: { vulnerabilities: { low: 0, moderate: 0, high: 0, critical: 0, total: 0 } } }), stderr: '' });
 ok(clean.kind === 'clean', 'zero vulnerabilities passes');
 
+// 4b. An error object that names nothing is an unevaluated outage, never a pass and never a
+// silent "could not run: :"; a named non-outage error is still a hard failure.
+const unnamed = classifyAudit({ status: 1, stdout: JSON.stringify({ error: {} }), stderr: '' });
+ok(unnamed.kind === 'outage' && /unnamed npm audit error/.test(unnamed.detail), 'an empty npm error object is retried as an outage, with the raw report shown');
+const named = classifyAudit({ status: 1, stdout: JSON.stringify({ error: { code: 'ENOLOCK', summary: 'This command requires an existing lockfile.' } }), stderr: '' });
+ok(named.kind === 'error', 'a named non-outage npm error is still a hard failure');
+
 // 5. End-to-end exit codes through the CLI with a fake npm: outage → 2 after retries, advisories → 1, clean → 0.
 const script = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'tools', 'runtime-audit-floor.mjs');
 const run = cmd => spawnSync(process.execPath, [script, 'server', '--attempts', '2', '--base-delay-ms', '0'], { encoding: 'utf8', env: { ...process.env, PRI_AUDIT_COMMAND: cmd } });
@@ -32,6 +39,9 @@ const advisoryRun = run(`printf '%s' '{"vulnerabilities":{"qs":{"severity":"high
 ok(advisoryRun.status === 1 && /FAIL/.test(advisoryRun.stderr), 'CLI exits 1 on advisories');
 const cleanRun = run(`printf '%s' '{"vulnerabilities":{},"metadata":{"vulnerabilities":{"total":0}}}'; exit 0`);
 ok(cleanRun.status === 0 && /PASS/.test(cleanRun.stdout), 'CLI exits 0 on clean');
+
+const unnamedRun = run(`printf '%s' '{"error":{}}'; exit 1`);
+ok(unnamedRun.status === 2 && /UNEVALUATED/.test(unnamedRun.stderr), 'CLI exits 2 (unevaluated, non-zero) when the empty error never clears');
 
 console.log(`RUNTIME AUDIT FLOOR CONTRACT: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks`);
 process.exit(fail ? 1 : 0);

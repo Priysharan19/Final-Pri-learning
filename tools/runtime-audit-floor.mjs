@@ -49,6 +49,13 @@ export function classifyAudit({ status, stdout, stderr }) {
     if (OUTAGE_CODES.has(code) || /audit endpoint returned an error|service unavailable|5\d\d/i.test(summary)) {
       return { kind: 'outage', detail: `${code || 'registry error'}: ${summary}`.trim() };
     }
+    // An error object that names nothing (no code, no summary; seen on CI on
+    // 2026-10-22 as "could not run: :") carries no report and no reason: it is
+    // the audit endpoint failing, not a verdict. Retried like an outage, it
+    // still ends non-zero (UNEVALUATED) if it never yields a report.
+    if (!code && !summary) {
+      return { kind: 'outage', detail: `unnamed npm audit error: ${text.slice(0, 200)}` };
+    }
     return { kind: 'error', detail: `${code}: ${summary}`.trim() };
   }
   if (json && json.metadata && json.metadata.vulnerabilities) {
