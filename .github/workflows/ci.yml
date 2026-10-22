@@ -123,6 +123,8 @@ jobs:
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-exam-duplicate-check.mjs
           node client/test/india-progress-product-check.mjs
+          # #300: legacy generator-keyed rows count on dot points and the predicted paper.
+          node client/test/india-legacy-rows-check.mjs
           node tools/india-production-census.mjs
       - name: Real ink diagnostic (advisory in PR CI)
         if: always()
