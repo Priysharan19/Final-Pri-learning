@@ -1368,6 +1368,22 @@ async function run() {
       await wait(page, 700);
     });
 
+    // The marked script view (client/src/mock), read back over the paper the
+    // server just marked; then the mocks page, which for this JEE profile says
+    // board mocks are set for CBSE Class X and XII.
+    await step('board mock · marked script', '/mock/:id', async () => {
+      const id = new URL(page.url()).pathname.split('/').pop();
+      await page.evaluate(path => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); }, `/mock/${id}`);
+      await page.waitForSelector('[data-mock-script]', { timeout: 30000 });
+      await wait(page, 500);
+    });
+
+    await step('board mocks', '/mock', async () => {
+      await page.evaluate(() => { history.pushState({}, '', '/mock'); dispatchEvent(new PopStateEvent('popstate')); });
+      await page.waitForSelector('[data-mock-page]', { timeout: 30000 });
+      await wait(page, 400);
+    });
+
     // ── teacher-only workspace, exercised under a real teacher profile ──────
     await step('teacher studio', '/teach', async () => {
       await insideLive('/');

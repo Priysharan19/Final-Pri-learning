@@ -167,6 +167,7 @@ import {
 import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engine/curriculum.js';
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
+import { boardMockOf, mockTitleOf, FREE_SAMPLE_MOCKS, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
@@ -197,7 +198,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -292,7 +293,7 @@ function publicQuestion(sq) {
 
 function publicPaper(paper, now) {
   return {
-    id: paper.id, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+    id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title, durationMin: paper.durationMin,
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
@@ -514,6 +515,12 @@ function readSpec(body) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
+  // A board mock ("Pri mock in board format", boardMock.js) is a full blueprint
+  // paper on a board blueprint, under its own allowance and its own title.
+  if (body.mock !== undefined) {
+    if (body.mock !== true || read.kind !== 'india' || !boardMockOf(read.blueprint)) return INVALID('A board mock is a CBSE Class X Standard or Class XII paper.');
+    return { ...read, mock: true, title: mockTitleOf(read.blueprint) };
+  }
   // The title of a certified paper is the server's, from the blueprint. A
   // device may call the paper what it likes locally; that name is never here.
   return { ...read, title: read.defaultTitle };
@@ -946,6 +953,8 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           ...(r.pending ? {} : { answerText: keyedAnswer(chosen), steps: chosen.steps || [] }), subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
           ...(repeat ? { repeat: true } : {}),
           ...cutOffFlags(r),
+          // The examiner's margin: the engine's verdict per line of working.
+          ...(r.script && !r.pending ? { script: r.script } : {}),
           // Both versions of a part that offered a choice, now that it is marked.
           ...(part.alt && !r.pending ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
             prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, figure: it.figure || null,
@@ -990,6 +999,8 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         ...(r.pending ? {} : { solution: solutionOf(chosen, marks, sq.marking) }), attemptId,
         ...(repeat ? { repeat: true } : {}),
         ...cutOffFlags(r),
+        // The examiner's margin: the engine's verdict per line of working.
+        ...(r.script && !r.pending ? { script: r.script } : {}),
         // Both questions of an internal choice, now that the paper is marked.
         ...(q.alt && !r.pending ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
           prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, matchList: it.matchList || null,
@@ -1031,7 +1042,17 @@ async function entitlementRefusal(db, accountId, spec, now) {
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
   }
   if (capabilities.includes('premium-exams')) return null;
-  const recent = await db.all("SELECT created_at FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
+  // A board mock is Premium, with one free sample for the life of the account.
+  // It is counted on its own (the account's `exam-mock` rows, written in the
+  // transaction that seals the paper), not against the simulation window.
+  if (spec.mock) {
+    const used = Number((await db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='exam-mock'", [accountId]))?.n || 0);
+    if (used < FREE_SAMPLE_MOCKS) return null;
+    return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams', used, limit: FREE_SAMPLE_MOCKS,
+      message: 'Your free sample board mock has been used. Pri Learning Premium includes every board mock.' };
+  }
+  const recent = await db.all(`SELECT p.created_at FROM idempotency_keys p WHERE p.account_id=? AND p.scope='exam-paper' AND p.created_at>?
+    AND NOT EXISTS (SELECT 1 FROM idempotency_keys m WHERE m.account_id=p.account_id AND m.scope='exam-mock' AND m.key=p.key) ORDER BY p.created_at`,
     [accountId, now - EXAM_WINDOW_MS]);
   if (recent.length < FREE_EXAM_ALLOWANCE.examsPerWindow) return null;
   const nextAt = Number(recent[0].created_at) + EXAM_WINDOW_MS;
@@ -1214,7 +1235,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     let next = 0;
     const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
-      authoritative: true, examId: id, kind: paper.kind, title: paper.title,
+      authoritative: true, examId: id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title,
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1251,7 +1272,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
     await event(id, 'exam-result', id, {
-      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), title: paper.title, durationMin: paper.durationMin,
       year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
@@ -1303,7 +1324,7 @@ export function resultView(result, now) {
 /** A marker response rebuilt from a stored line or part: what was decided stands. */
 const responseOfLine = d => ({
   unanswered: d.unanswered === true, correct: d.correct === true, awarded: d.awarded, feedback: d.feedback, partial: d.partial ?? null,
-  markingScheme: d.markingScheme, outcome: d.outcome, ...cutOffFlags(d)
+  markingScheme: d.markingScheme, outcome: d.outcome, ...cutOffFlags(d), ...(d.script ? { script: d.script } : {})
 });
 
 /** The answer key a stored line or part was marked under. */
@@ -1695,6 +1716,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
+      ...(spec.mock ? { mock: true } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };
@@ -1718,6 +1740,9 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
         await db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='exam-layout' AND key=?", [accountId, layoutKeyOf(spec.blueprint)]);
       }
       await db.run(INSERT, [accountId, 'exam-paper', id, sealed, digest(sealed), startedAt, startedAt + RECORD_TTL]);
+      // The board-mock ledger: the free sample is counted from these rows. It
+      // lives as long as any paper record, so the sample cannot come back.
+      if (spec.mock) await db.run(INSERT, [accountId, 'exam-mock', id, '{}', digest('{}'), startedAt, startedAt + RECORD_TTL]);
       await db.run(INSERT, [accountId, 'exam-create', idem, JSON.stringify({ examId: id }), requestDigest, startedAt, startedAt + RECORD_TTL]);
       return {};
     }, { accountScope: accountId, lock: 'exam-create:' + accountId });

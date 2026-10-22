@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { scriptLinesOf } from '../../client/src/engine/boardMock.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -133,14 +134,23 @@ export function examWorkingStage(q, working, grid, stage) {
   if (stage.final) return stage.response;
   const marks = Number(grid.correct);
   const response = { ...stage.response };
+  let method = null;
   try {
-    const method = methodMarks({ meta: stage.meta, working: String(working), marks, prompt: q.prompt });
+    method = methodMarks({ meta: stage.meta, working: String(working), marks, prompt: q.prompt });
     if (method && method.awarded > 0) {
       response.awarded = Math.max(0, Math.min(marks - 1, method.awarded));
       response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note, lost: method.lost };
     }
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }
+  // The examiner's margin (board mocks' result script): the engine's own
+  // verdict on each line and the first line it refuted. Read after the mark is
+  // decided and from the same report; it never changes `awarded`.
+  try {
+    const report = method?.report || stepCheck(stage.meta, String(working), { prompt: q.prompt });
+    const script = scriptLinesOf(report, method, response.partial ? response.awarded : 0);
+    if (script) response.script = script;
+  } catch { /* no margin; the mark stands */ }
   return response;
 }
 
