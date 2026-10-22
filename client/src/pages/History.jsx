@@ -135,7 +135,7 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
           {ink.strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
         </svg>
       ) : ink.state === 'loading' ? <span className="in-scr-wait"><i /><i /><i /></span>
-        : ink.state === 'error' || (ink.state === 'idle' && item.viaInk && !typed) ? <span className="in-scr-none"><Icon name="pen" size={14} /></span>
+        : ink.state === 'error' || ink.state === 'empty' || (ink.state === 'idle' && item.viaInk && !typed) ? <span className={`in-scr-none${ink.state === 'error' ? ' is-error' : ''}`}><Icon name="pen" size={14} /></span>
           : typed ? <span className="in-scr-typed"><MathText text={typed} /></span> : null}
       {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
     </span>

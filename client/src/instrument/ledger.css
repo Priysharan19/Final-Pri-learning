@@ -96,7 +96,7 @@ html.ui-instrument .in-scr-th {
 /* Ruled paper: four engraved 1px rules (box-shadows of one hairline), no gradient. */
 html.ui-instrument .in-scr-th::before { content: ""; position: absolute; left: 0; right: 0; top: 19px; height: 1px; background: var(--c-hair-2);
   box-shadow: 0 20px 0 var(--c-hair-2), 0 40px 0 var(--c-hair-2), 0 60px 0 var(--c-hair-2), 0 80px 0 var(--c-hair-2); }
-html.ui-instrument .in-scr-th svg { position: absolute; inset: 10px 64px 10px 12px; width: calc(100% - 76px); height: calc(100% - 20px); }
+html.ui-instrument .in-scr-th > svg { position: absolute; inset: 10px 64px 10px 12px; width: calc(100% - 76px); height: calc(100% - 20px); }
 html.ui-instrument .in-scr-th polyline { fill: none; stroke: var(--c-pen); stroke-width: var(--lux-pen-w); stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 html.ui-instrument .in-scr-typed { position: absolute; left: 12px; right: 64px; top: 22px; font: italic 400 20px/1.2 var(--c-italic); color: var(--c-pen); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html.ui-instrument .in-scr-score { position: absolute; right: 10px; bottom: 6px; font: 400 26px/1 var(--c-serif); color: var(--c-copper); font-variant-numeric: tabular-nums; }
@@ -144,7 +144,10 @@ html.ui-instrument .in-scr-wait i { display: block; height: 1px; background: var
 html.ui-instrument .in-scr-wait i:nth-child(2) { animation-delay: 150ms; width: 80%; }
 html.ui-instrument .in-scr-wait i:nth-child(3) { animation-delay: 300ms; width: 60%; }
 @keyframes lux-scr-engrave { from { transform: scaleX(.15); opacity: .35; } to { transform: scaleX(1); opacity: .8; } }
-html.ui-instrument .in-scr-none { position: absolute; left: 12px; top: 14px; color: var(--c-ink-3); }
+html.ui-instrument .in-scr-none { position: absolute; left: 12px; top: 12px; display: inline-flex; color: var(--c-ink-3); }
+/* A fetch that failed (offline): the pen over a dashed engraved rule, so it
+   never reads as a blank script. */
+html.ui-instrument .in-scr-none.is-error { padding-bottom: 6px; border-bottom: 1px dashed var(--c-ink-3); }
 
 /* Selects, search and count in C. */
 html.ui-instrument .in-flt.is-menu { min-height: 44px; box-shadow: inset 0 0 0 1px var(--c-hair); background: var(--c-sheet); color: var(--c-ink); font: 400 15px var(--c-text); letter-spacing: 0; }
