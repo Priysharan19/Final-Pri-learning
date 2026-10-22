@@ -26,7 +26,7 @@ levels that do exist, and serves a question only after the student chooses one.
 | Olympiad (PRMO → RMO → INMO) | D1–D4 | 7 | 0 | 21 | 0 | 0 |
 | **All** | | **138** | **0** | **420** | **0** | **0** |
 
-Chapter × track cells where the hardest level rests on a **single** authored form: 49 of 138.
+Chapter × track cells where the hardest level rests on a **single** authored form: 34 of 138.
 
 ## Chapter × track cells with no authored form at the hardest level
 

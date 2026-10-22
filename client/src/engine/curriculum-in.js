@@ -210,11 +210,13 @@ installHardestCovers(INDIA_HARDEST_COVERS);
 installHardestCovers(INDIA_JEE_HARDEST_COVERS);
 
 // Issue #408: a routine form claimed at the hardest level is replaced, then its
-// rung retired (see INDIA_RETIRED_RUNGS). Only the named rung goes; the cover's
-// other rungs and dot points stay. Load-time errors, not silent no-ops, when a
-// retirement names a rung the chapter does not have, or would leave the dot
-// point with no form at that rung, or when the named replacement is not what
-// now serves it.
+// rung retired (see INDIA_RETIRED_RUNGS). Only the named rung at the named dot
+// point goes: a cover that spans several dot points is split, so the rung stays
+// claimed for the others until they are retired too, and every other rung of
+// the cover stays. Load-time errors, not silent no-ops, when a retirement names
+// a rung the chapter does not have, or would leave the dot point with no form
+// at that rung, or when the named replacement is not what now serves it.
+const retiredLog = [];
 function retireRungs(table) {
   for (const [chapterId, retirements] of Object.entries(table)) {
     const views = new Set([
@@ -223,25 +225,29 @@ function retireRungs(table) {
       IN_CHAPTERS.find(chapter => chapter.id === chapterId)
     ].filter(Boolean));
     if (!views.size) throw new Error(`${chapterId} is not a chapter of this curriculum`);
+    let first = true;
     for (const chapter of views) {
       for (const { gen, dp, diff, replacedBy } of retirements) {
         const at = chapter.covers.findIndex(c => c.gen === gen && c.dp.includes(dp) && (c.diff || []).includes(diff));
         if (at < 0) throw new Error(`${chapterId}: no cover ${gen} at dot point ${dp}, D${diff} to retire`);
         const cover = chapter.covers[at];
-        if (cover.dp.length !== 1) throw new Error(`${chapterId}: ${gen} covers several dot points; retire a rung of a single-dot-point cover`);
-        const kept = { ...cover, dp: [...cover.dp], diff: cover.diff.filter(d => d !== diff) };
-        chapter.covers = kept.diff.length
-          ? chapter.covers.map((c, i) => (i === at ? kept : c))
-          : chapter.covers.filter((_, i) => i !== at);
+        if (first) retiredLog.push(Object.freeze({ chapterId, gen, dp, diff, replacedBy, claimed: Object.freeze({ dp: [...cover.dp], diff: [...cover.diff] }) }));
+        const here = { gen, dp: [dp], diff: cover.diff.filter(d => d !== diff) };
+        const others = { gen, dp: cover.dp.filter(i => i !== dp), diff: [...cover.diff] };
+        const split = [here, others].filter(c => c.dp.length && c.diff.length);
+        chapter.covers = [...chapter.covers.slice(0, at), ...split, ...chapter.covers.slice(at + 1)];
         const still = chapter.covers.filter(c => c.dp.includes(dp) && (c.diff || []).includes(diff)).map(c => c.gen);
         if (!still.length) throw new Error(`${chapterId}: retiring ${gen} D${diff} would leave dot point ${dp} with no form at D${diff}`);
         if (!still.includes(replacedBy)) throw new Error(`${chapterId}: ${replacedBy} does not serve dot point ${dp} at D${diff}`);
       }
+      first = false;
     }
   }
 }
 
 installHardestCovers(INDIA_JEE_REPLACEMENT_COVERS);
 retireRungs(INDIA_RETIRED_RUNGS);
+/** What each retirement removed, recorded at load: the cover as it was claimed before its rung went. */
+export const INDIA_RETIRED_LOG = Object.freeze(retiredLog);
 
 export * from './curriculum-in-base.js';

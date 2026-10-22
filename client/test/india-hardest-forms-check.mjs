@@ -44,9 +44,8 @@ const SRC = new URL('../src/', import.meta.url).href;
 const { inspect } = await import('../../server/test/selfcheck.mjs');
 const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
-const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR } = await import(`${SRC}engine/curriculum-in.js`);
+const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
 const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_COVERS, INDIA_JEE_REPLACEMENT_PROVENANCE, INDIA_RETIRED_RUNGS } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
-const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
 const { SOLVE_JEE_C11 } = await import('./india-hardest-solvers-jee-c11.mjs');
 const { SOLVE_JEE_C12 } = await import('./india-hardest-solvers-jee-c12.mjs');
 const { indiaRequestableDifficulties, indiaChapterGrade, indiaDifficultyWindow, resolveIndiaTarget } = await import(`${SRC}engine/indiaProduct.js`);
@@ -713,8 +712,11 @@ const SOLVE_T1 = {
 // answers a student could plausibly write that must be marked WRONG.
 const TRANCHE3 = await Promise.all(['class7', 'class7-part2', 'class8', 'class11']
   .map(name => import(`./support/india-hardest-${name}-solvers.mjs`)));
-const SOLVE = Object.assign({}, SOLVE_T1, SOLVE_JEE_C11, SOLVE_JEE_C12, ...TRANCHE3.map(m => m.SOLVE));
-const NEAR_MISS = Object.assign({}, ...TRANCHE3.map(m => m.NEAR_MISS || {}));
+// The #408 Class 11 single-template chapters: one solver module per chapter.
+const JEE_D4 = await Promise.all(['sets', 'inequalities', 'binomial', 'conics', '3d']
+  .map(name => import(`./support/india-jee-d4-${name}-solvers.mjs`)));
+const SOLVE = Object.assign({}, SOLVE_T1, SOLVE_JEE_C11, SOLVE_JEE_C12, ...TRANCHE3.map(m => m.SOLVE), ...JEE_D4.map(m => m.SOLVE));
+const NEAR_MISS = Object.assign({}, ...TRANCHE3.map(m => m.NEAR_MISS || {}), ...JEE_D4.map(m => m.NEAR_MISS || {}));
 /** The bank each class's CBSE (D3) hardest forms live in. */
 const BANK_FOR_GRADE = { 7: 'india-class7-hardest', 8: 'india-class8-hardest', 10: 'india-class10', 11: 'india-class11-hardest', 12: 'india-class12' };
 const TRANCHE1_GRADES = new Set([10, 12]);
@@ -725,10 +727,12 @@ const TRANCHE1_GRADES = new Set([10, 12]);
 const TRANCHES = [
   { name: 'CBSE D3 (tranches 1 and 3)', table: INDIA_HARDEST_COVERS, rung: 3, tracks: ['cbse'], grades: [7, 8, 10, 11, 12], count: 103 },
   { name: 'tranche 2', table: INDIA_JEE_HARDEST_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 23 },
-  // Issue #408: an original D4 form for a dot point whose only D4 form was
-  // routine. That rung is retired (section 1b), so the "gap was real" check
-  // below holds against the live chapter after retirement.
-  { name: 'issue #408 replacements', table: INDIA_JEE_REPLACEMENT_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 1 }
+  // Issue #408: an original D4 form for each dot point whose only D4 form was
+  // routine — Complex Numbers dot point 2, and the three dot points of each
+  // Class 11 chapter whose one whole-chapter template was claimed at D4. Those
+  // rungs are retired (section 1b), so the "gap was real" check below holds
+  // against the live chapter after retirement.
+  { name: 'issue #408 replacements', table: INDIA_JEE_REPLACEMENT_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 16 }
 ];
 const entries = TRANCHES.flatMap(t => Object.entries(t.table).flatMap(([chapterId, covers]) => covers.map(c => ({ chapterId, tranche: t, ...c }))));
 const ids = entries.map(e => e.gen);
@@ -776,15 +780,16 @@ for (const chapter of IN_CHAPTERS) {
 
 // ── 1b · Retired rungs (issue #408) are replaced, gone, and harmless to CBSE ─
 const retirements = Object.entries(INDIA_RETIRED_RUNGS).flatMap(([chapterId, list]) => list.map(r => ({ chapterId, ...r })));
-ok('at least one rung is retired', retirements.length >= 1, String(retirements.length));
+ok('every retirement is logged once', retirements.length >= 1 && INDIA_RETIRED_LOG.length === retirements.length, `${retirements.length} vs ${INDIA_RETIRED_LOG.length}`);
 for (const r of retirements) {
   const where = `${r.chapterId}#${r.dp} ${r.gen}@D${r.diff}`;
   const chapter = IN_CHAPTER_BY_ID[r.chapterId];
   if (!ok(`${where}: a live chapter`, !!chapter)) continue;
   const grade = indiaChapterGrade(chapter);
   ok(`${where}: the retirement gives a reason`, typeof r.reason === 'string' && r.reason.length > 20);
-  // It was really there: the chapter's own coverage table claimed it.
-  ok(`${where}: the native table claimed the rung`, (INDIA_NATIVE_COVERS[r.chapterId] || []).some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff)));
+  // It was really there: the load-time log records the cover as claimed before the rung went.
+  const logged = INDIA_RETIRED_LOG.find(l => l.chapterId === r.chapterId && l.gen === r.gen && l.dp === r.dp && l.diff === r.diff);
+  ok(`${where}: the chapter claimed the rung before it was retired`, !!logged && logged.claimed.dp.includes(r.dp) && logged.claimed.diff.includes(r.diff), JSON.stringify(logged));
   // It is gone from the live chapter, and only that rung: the generator's other covers stay.
   ok(`${where}: no live cover claims the rung`, !chapter.covers.some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff)));
   ok(`${where}: the generator still serves the chapter's other covers`, chapter.covers.some(c => c.gen === r.gen));
