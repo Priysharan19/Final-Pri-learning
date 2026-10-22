@@ -91,6 +91,9 @@ function Chart({ series, labels, t, spoken, failed }) {
   const area = run => `${path(run, 'methodPct')} L${X(run[run.length - 1]).toFixed(1)} ${CH - PADB} L${X(run[0]).toFixed(1)} ${CH - PADB} Z`;
   const any = series.some(p => p.methodPct != null || p.accuracyPct != null);
   const qMax = Math.max(0, ...series.map(p => Number(p.questions) || 0));
+  // Bars are scaled to the ruled gridlines: the top rule is a round count.
+  const qTop = qMax > 0 ? Math.ceil(qMax / 5) * 5 : 0;
+  const QY = q => CH - PADB - (q / (qTop || 1)) * (CH - PADB - PADT);
   const last = key => { for (let i = n - 1; i >= 0; i--) if (series[i][key] != null) return i; return -1; };
   const lm = last('methodPct'); const la = last('accuracyPct');
   // The two end values never collide: the higher line's value goes above its
@@ -112,7 +115,7 @@ function Chart({ series, labels, t, spoken, failed }) {
         {/* Below the floor, what is allowed: questions answered per point, as
             hairline bars, the latest in lume. Never a withheld percentage. */}
         {!any && qMax > 0 && series.map((p, i) => p.questions > 0 && (
-          <line key={`q${i}`} className={`in-chart-bar${i === n - 1 ? ' is-today' : ''}`} x1={X(i)} x2={X(i)} y1={CH - PADB} y2={CH - PADB - (p.questions / qMax) * (CH - PADB - PADT)} data-chart-bar={p.questions} />
+          <line key={`q${i}`} className={`in-chart-bar${i === n - 1 ? ' is-today' : ''}`} x1={X(i)} x2={X(i)} y1={CH - PADB} y2={QY(p.questions)} data-chart-bar={p.questions} />
         ))}
         {runs('methodPct').map((r, k) => r.length > 1 && <path key={`a${k}`} className="in-chart-area" d={area(r)} fill={`url(#${hatch})`} />)}
         {runs('methodPct').map((r, k) => r.length > 1
@@ -132,9 +135,14 @@ function Chart({ series, labels, t, spoken, failed }) {
         {la >= 0 && <i className="in-chart-dot is-end is-accuracy" style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }} />}
         {lm >= 0 && <span className={`in-chart-val is-method${side(methodAbove)}`} style={{ left: `${(X(lm) / CW) * 100}%`, top: `${(Y(series[lm].methodPct) / CH) * 100}%` }}>{fmtPct(series[lm].methodPct)}</span>}
         {la >= 0 && <span className={`in-chart-val is-accuracy${side(!methodAbove)}`} style={{ left: `${(X(la) / CW) * 100}%`, top: `${(Y(series[la].accuracyPct) / CH) * 100}%` }}>{fmtPct(series[la].accuracyPct)}</span>}
+        {!any && qMax > 0 && series.map((p, i) => p.questions > 0 && (
+          <span key={`qn${i}`} className="in-chart-qn" style={{ left: `${(X(i) / CW) * 100}%`, top: `${(QY(p.questions) / CH) * 100}%` }}>{p.questions}</span>
+        ))}
         {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
       </div>
-      <div className="in-chart-lg" aria-hidden="true"><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></div>
+      <div className="in-chart-lg" aria-hidden="true">{any
+        ? <><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></>
+        : qMax > 0 && <span><i className="is-bar" />{t('inst.chartQuestions')}</span>}</div>
       {!any && !failed && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')}</p>}
     </div>
   );

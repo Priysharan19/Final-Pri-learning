@@ -35,6 +35,7 @@ const STRAND_KEY = {
 // card floats only while that reserve is a modest share of the map.
 const CARD_PX = { w: 310 + 24 + 18, pad: 24 + 18 };
 const MIN_COL_PX = 168;   // mapLayout's narrowest readable column
+const LANDSCAPE_W = 1000; // map width from which the card sits beside the columns
 // "Most lost marks are in …" is said of a dot point only once it has at least
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
@@ -141,8 +142,12 @@ export default function MapPage() {
     const scope = scopeFor(curriculum, user);
     return new Set((scope?.chapters || scope?.subtopics || []).map(r => mapStrandOf(r.id) || 'algebra')).size || 1;
   }, [curriculum, user]);
-  const floating = wrapW > 0 && wrapW >= strandCount * MIN_COL_PX + CARD_PX.w + 34;
-  const reserve = floating ? { w: CARD_PX.w, h: cardH + CARD_PX.pad } : null;
+  // On a landscape-wide map the card takes the right third, beside the
+  // columns (which wrap into rows to fit the other two thirds); on a wide
+  // desktop it keeps its own width when every column still fits beside it.
+  const floating = wrapW >= LANDSCAPE_W;
+  const besideW = wrapW >= strandCount * MIN_COL_PX + CARD_PX.w + 34 ? CARD_PX.w : Math.round(W / 3);
+  const reserve = floating ? { w: besideW, h: cardH + CARD_PX.pad } : null;
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
@@ -252,7 +257,7 @@ export default function MapPage() {
                 <circle className={`in-map-ring${node.evidence.attempts === 0 ? ' is-new' : ''}`} cx={node.x} cy={node.y} r={node.r} />
                 {node.evidence.accuracy != null && node.evidence.mastery > 0 && (
                   <circle className="in-map-arc" cx={node.x} cy={node.y} r={node.r} pathLength="100"
-                    strokeDasharray={`${node.evidence.mastery} 100`} transform={`rotate(-90 ${node.x} ${node.y})`} />
+                      strokeDasharray={`${node.evidence.mastery} 100`} transform={`rotate(-90 ${node.x} ${node.y})`} />
                 )}
                 <circle className="in-map-dot" cx={node.x} cy={node.y} r={2.5} />
                 <text x={node.x + node.r + 14} y={node.y + 3} className="in-map-name" lang="en">
@@ -297,7 +302,7 @@ export default function MapPage() {
         </div>
 
         {current && (
-          <aside ref={cardRef} className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
+          <aside ref={cardRef} className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})`, ...(reserve ? { width: reserve.w - 24 - 18 } : {}) }} data-map-card={current.row.id}>
             <div className="in-map-card-in" key={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
             <h2 lang="en"><TermGloss text={current.row.name} /></h2>

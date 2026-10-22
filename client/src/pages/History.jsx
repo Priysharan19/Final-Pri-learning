@@ -355,13 +355,25 @@ function HistoryForProfile() {
       if (!groups.length || groups[groups.length - 1].key !== key) groups.push({ key, items: [] });
       groups[groups.length - 1].items.push(item);
     }
+    // Repeat attempts of one question (the same prompt, one after another) are
+    // shown as one card with its tries; presentation only, every attempt
+    // stays one tap away. The lead is the latest attempt.
+    for (const g of groups) {
+      g.cards = [];
+      for (const item of g.items) {
+        const last = g.cards[g.cards.length - 1];
+        if (last && last.item.prompt === item.prompt && last.item.subtopic === item.subtopic) last.tries.push(item);
+        else g.cards.push({ item, tries: [item] });
+      }
+    }
+    const timeOf = x => formatDate(x.answeredAt, user, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     return (
       <div className="in-led-list" onKeyDown={onLedgerKey}>
         {groups.map(g => (
           <section key={g.key} className="in-led-day" aria-labelledby={g.key ? `in-led-day-${g.key}` : undefined}>
             {g.key && <h3 className="in-led-dayh" id={`in-led-day-${g.key}`}>{dayLabel(g.key)}</h3>}
-            {g.items.map(item => (
-              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}${ScriptThumb && paperOf(item) && scoredOf(item) ? ' has-score' : ''}${ScriptThumb && !paperOf(item) ? ' is-text' : ''}`} data-question-id={item.id}
+            {g.cards.map(({ item, tries }) => { const openItem = tries.find(x => x.id === open?.id); return (
+              <div key={item.id} className={`hist-row in-led-row${openItem ? ' is-sel' : ''}${tries.length > 1 ? ' is-grouped' : ''}${ScriptThumb && paperOf(item) && scoredOf(item) ? ' has-score' : ''}${ScriptThumb && !paperOf(item) ? ' is-text' : ''}`} data-question-id={item.id}
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
@@ -388,9 +400,18 @@ function HistoryForProfile() {
                   aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
                   aria-pressed={!!item.bookmarked}
                   onClick={() => toggleBookmark(item.id)}><Icon name="bookmark" size={16} /></button>
-                {open?.id === item.id && <div className="in-led-open">{renderActions(item)}{renderDetail(item)}</div>}
+                {tries.length > 1 && (
+                  <div className="in-led-tries" data-history-tries={tries.length}>
+                    <span>{t('inst.scriptsTries', { n: tries.length, from: timeOf(tries[tries.length - 1]), to: timeOf(tries[0]) })}</span>
+                    {tries.map(x => (
+                      <button key={x.id} type="button" className="in-led-try" aria-pressed={open?.id === x.id} data-question-id={x.id}
+                        aria-label={t('inst.scriptsOpenTry', { time: timeOf(x) })} onClick={() => openDetail(x.id)}>{timeOf(x)}</button>
+                    ))}
+                  </div>
+                )}
+                {openItem && <div className="in-led-open">{renderActions(openItem)}{renderDetail(openItem)}</div>}
               </div>
-            ))}
+            ); })}
           </section>
         ))}
       </div>

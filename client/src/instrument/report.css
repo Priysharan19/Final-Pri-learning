@@ -210,3 +210,8 @@ html.ui-instrument .in-chart-bar { stroke: var(--c-ink-2); stroke-width: 1; vect
 html.ui-instrument .in-chart-bar.is-today { stroke: var(--c-lume); stroke-width: 1.5; }
 html.ui-instrument .in-chart[data-report-chart="empty"] .in-chart-empty { top: auto; bottom: -34px; left: 0; transform: none; max-width: none; text-align: left; }
 html.ui-instrument .in-chart[data-report-chart="empty"] { margin-bottom: 40px; }
+/* ── Jury round 3: per-day bars below the floor ── */
+html.ui-instrument .in-chart-bar { stroke: var(--c-ink-2); stroke-width: 6px; stroke-linecap: butt; vector-effect: non-scaling-stroke; }
+html.ui-instrument .in-chart-bar.is-today { stroke: var(--c-lume); stroke-width: 6px; }
+html.ui-instrument .in-chart-qn { position: absolute; transform: translate(-50%, -150%); font: 600 12px var(--c-sc); letter-spacing: .06em; color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
+html.ui-instrument .in-chart-lg i.is-bar { width: 6px; height: 10px; vertical-align: -1px; background: var(--c-ink-2); border: 0; }

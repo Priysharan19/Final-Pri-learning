@@ -203,3 +203,9 @@ html.ui-instrument .in-scr-mode { position: absolute; left: 12px; top: 26px; dis
 /* No paper (no ink, no answer): a compact text card, clear of the bookmark. */
 html.ui-instrument .hist-row.in-led-row.is-text { align-self: start; }
 html.ui-instrument .hist-row.in-led-row.is-text .in-led-q { padding-right: 48px; min-height: 0; }
+/* Repeat attempts of one question: one card, its tries as small-caps times. */
+html.ui-instrument .in-led-tries { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 0 12px 10px; border-top: 1px solid var(--c-hair-2); }
+html.ui-instrument .in-led-tries > span { flex-basis: 100%; padding-top: 8px; font: 600 12px var(--c-sc); letter-spacing: .1em; color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
+html.ui-instrument .in-led-try { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; border-radius: 4px; background: none; box-shadow: inset 0 0 0 1px var(--c-hair); font: 400 13px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; cursor: pointer; }
+html.ui-instrument .in-led-try[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--c-teal); }
+html.ui-instrument .in-led-try:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
