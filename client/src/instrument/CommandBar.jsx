@@ -7,6 +7,7 @@ import { colourFor, practiceTrack, scopeFor } from './chapters.js';
 import { MathText } from '../lib/latex.jsx';
 import Glyph from './Glyph.jsx';
 
+const dayOf = at => { const d = new Date(at); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || undefined, { day: 'numeric', month: 'short' }).format(d) : ''; };
 const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress': 'chart', '/review': 'doc', '/history': 'doc' };
 
 // ⌘K / Ctrl+K anywhere, or the field in the bar: one list for chapters (in
@@ -14,13 +15,65 @@ const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress
 // focus returns to whatever opened it. A modal dialog, so the page behind is
 // inert to assistive tech while it is open.
 
+// The last lists, kept for the next opening, so the sheet draws complete on
+// its first frame. They are filled from the Index's own /curriculum read
+// (noteCurriculum) or an idle prewarm, and refreshed only once they are older
+// than STALE_MS: opening the sheet does not refetch warm lists.
+const STALE_MS = 5 * 60 * 1000;
+const formulaMemo = new Map();
+const memo = { key: '', chapters: [], at: 0, scriptsKey: '', scripts: [], scriptsAt: 0 };
+const sameIds = (a, b) => a.length === b.length && a.every((x, i) => (x.row?.id ?? x.id) === (b[i].row?.id ?? b[i].id));
+const fresh = at => Date.now() - at < STALE_MS;
+
+const scopeKeyOf = user => `${user?.id}|${user?.year}|${user?.indiaTrack}|${user?.country}|${user?.course}`;
+const chapterRows = (c, user) => { const scope = scopeFor(c, user); return (scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })); };
+
+/** The Index hands over the /curriculum it already read. */
+export function noteCurriculum(curriculum, user) {
+  if (!curriculum || !user) return;
+  memo.key = scopeKeyOf(user); memo.chapters = chapterRows(curriculum, user); memo.at = Date.now();
+}
+
+// One request in flight per list: the prewarm, an opening and the Index share it.
+const pending = {};
+const once = (key, run) => (pending[key] ||= run().finally(() => { delete pending[key]; }));
+const loadChapters = user => once(`c:${scopeKeyOf(user)}`, () => api.get('/curriculum').then(c => { noteCurriculum(c, user); return memo.chapters; }));
+const loadScripts = user => once(`s:${user?.id}`, () => api.post('/history/list', { page: 0, pageSize: 5 }).then(r => {
+  memo.scriptsKey = String(user?.id); memo.scripts = r?.items || []; memo.scriptsAt = Date.now(); return memo.scripts;
+}));
+
+/** Fill whatever is missing or stale, in idle time (the shell decides when). */
+export function prewarmCommandBar(user) {
+  if (!user) return;
+  if (!(memo.key === scopeKeyOf(user) && fresh(memo.at))) loadChapters(user).catch(() => { });
+  if (!(memo.scriptsKey === String(user.id) && fresh(memo.scriptsAt))) loadScripts(user).catch(() => { });
+}
+
 export default function CommandBar({ open, onClose, user, pages, actions, returnFocus }) {
   const t = useT();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
-  const [chapters, setChapters] = useState([]);
-  const [scripts, setScripts] = useState([]);
+  const scopeKey = scopeKeyOf(user);
+  const warm = memo.key === scopeKey;
+  const warmScripts = memo.scriptsKey === String(user?.id);
+  const [chapters, setChapters] = useState(() => (warm ? memo.chapters : []));
+  const [scripts, setScripts] = useState(() => (warmScripts ? memo.scripts : []));
+  const [loaded, setLoaded] = useState(warm);
+  // Maths the sheet knows: the formulas of the student's shipped Notes, loaded
+  // on the first keystroke (never at open), searched by label and note.
+  const [formulas, setFormulas] = useState(() => formulaMemo.get(user?.year) || null);
+  useEffect(() => {
+    if (!q.trim() || formulas || !user?.year) return;
+    import('../notes/notesIndex.js').then(m => m.loadNotesForGrade(user.year)).then(notes => {
+      const list = [];
+      for (const [chapterId, n] of Object.entries(notes || {})) {
+        for (const f of n?.formulas || []) if (f?.tex && f?.label) list.push({ chapterId, label: f.label, tex: f.tex, find: `${f.label} ${f.note || ''}`.toLowerCase() });
+      }
+      formulaMemo.set(user.year, list);
+      setFormulas(list);
+    }).catch(() => setFormulas([]));
+  }, [q, formulas, user?.year]);
   const input = useRef(null);
 
   useEffect(() => {
@@ -28,15 +81,19 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     setQ(''); setSel(0);
     const id = requestAnimationFrame(() => input.current?.focus());
     let live = true;
-    api.get('/curriculum').then(c => {
-      if (!live) return;
-      const scope = scopeFor(c, user);
-      setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })));
-    }).catch(() => { });
-    api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
+    if (!(memo.key === scopeKey && fresh(memo.at))) {
+      loadChapters(user).then(next => { if (live) { setChapters(prev => (prev.length && sameIds(prev, next) ? prev : next)); setLoaded(true); } })
+        .catch(() => { if (live) setLoaded(true); });
+    }
+    // A cold or stale list is fetched after the 140ms arrival, so its render
+    // never lands mid-animation.
+    let later = 0;
+    if (!(memo.scriptsKey === String(user?.id) && fresh(memo.scriptsAt))) {
+      later = setTimeout(() => loadScripts(user).then(next => { if (live) setScripts(prev => (prev.length && sameIds(prev, next) ? prev : next)); }).catch(() => { }), 160);
+    }
     // Focus goes back to whatever opened the bar (recorded by the opener,
     // since the field has already taken focus by the time this runs).
-    return () => { live = false; cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
+    return () => { live = false; clearTimeout(later); cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, user?.year, user?.indiaTrack, user?.country, user?.course]);
 
@@ -48,12 +105,17 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     const track = practiceTrack(user);
     const groups = [
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
-        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, meta: t('inst.chapterN', { n: c.index + 1 }),
+        id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, num: String(c.index + 1).padStart(2, '0'),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
+      { key: 'formulas', label: t('inst.cmdFormulas'), rows: needle.length > 2 && !commands ? (formulas || []).filter(f => f.find.includes(needle)).slice(0, 3).map((f, i) => ({
+        id: `fx-${f.chapterId}-${i}`, label: `$${f.tex}$`, math: true, content: true, meta: f.label, glyph: 'doc', hint: t('inst.openInNotes'),
+        run: () => nav(`/notes/${f.chapterId}`)
+      })) : [] },
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
-        id: `sc-${s.id}`, label: String(s.prompt || '').replace(/\s+/g, ' ').trim() || s.subtopicName, math: !!s.prompt, glyph: 'doc',
-        hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
+        // What tells two scripts apart: the chapter, the day, the certified mark.
+        id: `sc-${s.id}`, label: s.subtopicName || '', glyph: 'doc', meta: dayOf(s.answeredAt),
+        hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '—', content: true,
         run: () => nav('/review')
       })) },
       { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, glyph: PAGE_GLYPH[p.to] || 'doc', run: () => nav(p.to) })) },
@@ -61,7 +123,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     ];
     return groups.filter(g => g.rows.length && (!commands || g.key === 'actions'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, scripts, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
+  }, [q, chapters, scripts, formulas, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
@@ -85,12 +147,13 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
           <Glyph name="search" size={20} />
           {/* autoFocus: keys typed the moment the bar opens land in the field. */}
           <input ref={input} autoFocus value={q} onChange={e => { setQ(e.target.value); setSel(0); }}
-            placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
+            placeholder={t('inst.cmdShort')} aria-label={t('inst.cmdPlaceholder')}
             role="combobox" aria-expanded="true" aria-controls="in-pal-list"
             aria-activedescendant={flat[sel] ? `in-pal-${flat[sel].id}` : undefined} />
           <span className="in-kbd">esc</span>
         </div>
         <div className="in-pal-list" id="in-pal-list" role="listbox" aria-label={t('inst.cmdLabel')}>
+          {!loaded && !q && <div className="in-pal-empty k-wait" role="status">{t('inst.cmdLoading')}</div>}
           {!flat.length && <div className="in-pal-empty">{t('inst.cmdNone', { q })}</div>}
           {items.map(g => (
             <div key={g.key} role="group" aria-label={g.label}>
@@ -100,8 +163,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
                 return (
                   <button key={row.id} id={`in-pal-${row.id}`} type="button" role="option" aria-selected={sel === mine}
                     className="in-pal-item" tabIndex={-1} onMouseMove={() => setSel(mine)} onClick={() => choose(row)}
-                    style={row.colour ? { '--cc': `var(${row.colour})` } : undefined}>
-                    {row.colour ? <i className="in-pal-swatch" aria-hidden="true" /> : row.glyph && <Glyph name={row.glyph} />}
+                    >
+                    {row.num ? <span className="in-pal-num" aria-hidden="true">{row.num}</span> : row.glyph && <Glyph name={row.glyph} />}
                     <b lang={row.colour || row.content ? 'en' : undefined} className={row.math ? 'is-math' : undefined}>{row.math ? <MathText text={row.label} /> : row.label}</b>
                     {row.meta && <span className="in-pal-meta">· {row.meta}</span>}
                     <span className="in-pal-r">{row.hint && <small>{row.hint}</small>}<span className="in-kbd" aria-hidden="true">↵</span></span>

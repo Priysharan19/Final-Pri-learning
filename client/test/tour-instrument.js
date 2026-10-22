@@ -6,7 +6,7 @@
 //   · the flag is really on: html.ui-instrument, the tab bar, no rail;
 //   · the Index lists the syllabus from the server, a chapter opens its plate,
 //     the plate's figures are the server's (answers / correct), accuracy is
-//     withheld below the floor, and the scope actually draws;
+//     withheld below the floor, and nothing invented is plotted;
 //   · Practise this chapter opens Practice for that chapter;
 //   · ⌘K opens the command bar, typing filters, ↵ opens, esc closes and focus
 //     returns to where it was;
@@ -95,14 +95,11 @@ export const flow = {
     await check('the plate has the three figures: marks, questions, covered', kpis.length === 3 && await page.locator('.in-kpis [data-plate-marks], .in-kpis [data-plate-questions], .in-kpis [data-plate-covered]').count() === 3, JSON.stringify(kpis));
     await check('a new student’s plate states no certified marks, 0 questions and 0% covered', kpis[0] === '—' && kpis[1] === '0' && /^(0%|—)$/.test(kpis[2]), JSON.stringify(kpis));
     await check('accuracy stays behind the floor: no topic states a percentage for a new student', !/\d%/.test(await page.locator('.in-exs').textContent().catch(() => '')));
-    const drawn = await page.evaluate(() => {
-      const c = document.querySelector('[data-instrument-scope] canvas'); if (!c || !c.width) return 0;
-      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0;
-      for (let i = 3; i < d.length; i += 16) if (d[i] > 0) ink++;
-      return ink;
-    });
-    await check('the scope draws the chapter’s mathematics', drawn > 200, `${drawn} painted samples`);
-    await check('the scope is labelled for assistive tech', !!(await page.locator('[data-instrument-scope]').getAttribute('aria-label')));
+    // Evidence only: a chapter with no answers draws nothing invented, just a
+    // clean ruled frame (the slot the empty plot fills).
+    await check('a new student’s plate plots nothing invented (no scope canvas)', await page.locator('[data-instrument-plate] [data-instrument-scope] canvas').count() === 0);
+    await check('a new student’s plate shows the empty ruled frame', await page.locator('[data-instrument-plate] [data-empty-plot]').count() === 1);
+    await check('a new student has a Begin action for chapter 1 above the fold', await page.locator('[data-instrument-begin] a[href*="subtopic="]').count() === 1);
     writeFileSync(join(outDir, 'index-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
 
     // The plate's topic row: the chapter's own dot points, each a way into practice.
@@ -220,6 +217,17 @@ export const flow = {
     }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+    // Nothing on any instrument route is wider than the screen: the bar and the
+    // page fit a portrait iPad (820) and a phone (390) with no sideways scroll.
+    for (const width of [820, 390]) {
+      await page.setViewportSize({ width, height: width === 820 ? 1180 : 844 });
+      for (const route of ['/', '/practice', '/map', '/progress', '/review', '/notes', '/settings']) {
+        await goto(route); await settle();
+        const fit = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
+        await check(`${route}@${width}: no horizontal overflow`, fit.sw === fit.iw, JSON.stringify(fit));
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
   }
 };
 

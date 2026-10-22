@@ -1,0 +1,129 @@
+/* Pri luxury · the shell and Index pieces that are new in direction C
+   (luxury-direction-spec.md, wow-reference/c-editorial.html). Restyles of
+   existing rules live in instrument.css itself; this file holds only what
+   instrument.css never had: the tab rule, the phone dock, the register dial,
+   the ledger, the tick meters and the shared-element names. Imported by the
+   lazy InstrumentBar and IndexPage chunks, so the flag-off build has none. */
+
+/* The active tab's rule: one 2px ink line moved by transform alone. */
+.k-tab-ind { position: absolute; left: 0; bottom: -1px; width: 100px; height: 2px; background: var(--c-ink); transform-origin: 0 0; pointer-events: none; opacity: 0; transition: transform 280ms var(--c-ease-row), opacity 120ms linear; }
+.k-tab-ind.is-on { opacity: 1; }
+
+/* Phone: the floating dock, the shell's only glass (.c-glass). */
+.k-dock { display: none; }
+@media (max-width: 760px) {
+  .ui-instrument .mobilenav { display: none !important; }
+  .k-dock { position: fixed; z-index: 70; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: 8px; }
+  .k-dock > * { position: relative; display: grid; place-items: center; width: 50px; height: 48px; border: 0; padding: 0; border-radius: 6px; background: none; color: var(--c-ink-3); cursor: pointer; transition: transform var(--c-d-press) var(--c-ease-press); }
+  .k-dock > :active { transform: scale(.94); }
+  .k-dock [aria-current="page"] { color: var(--c-ink); }
+  .k-dock [aria-current="page"]::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--c-teal); }
+  .shell.is-focus .k-dock { display: none; }
+  .in-cmd { background: none; box-shadow: none; }
+}
+
+/* The register dial. */
+.m-dial { margin: 18px 0 6px; }
+.m-dial-box { position: relative; width: 100%; max-width: 460px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%; }
+.m-dial-box svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.m-dial-guil { opacity: .2; }
+.m-dial-num { font-family: var(--c-serif); fill: var(--c-ink); }
+.m-dial-sc { font: 600 12px var(--c-sc); letter-spacing: 2.4px; text-transform: uppercase; fill: var(--c-ink-2); }
+.m-dial-hand { transform-box: view-box; transform-origin: 200px 200px; }
+/* The seconds hand beats at 6 Hz for ten seconds after the hero, then rests:
+   a running hand kept the main thread restyling every frame (measured). */
+.m-dial-box > .m-dial-sec { position: absolute; inset: 0; pointer-events: none; animation: k-beat 10s steps(60) 2.4s forwards; }
+@keyframes k-beat { to { transform: rotate(60deg); } }
+.m-datewin { position: absolute; left: 66.5%; top: 47%; width: 13.5%; height: 6%; display: flex; align-items: center; justify-content: center; background: var(--c-sheet); border: 1px solid var(--c-dial-line); box-shadow: var(--c-deboss); font: 400 clamp(11px, 1.3vw, 16px)/1 var(--c-text); font-variant-numeric: tabular-nums; color: var(--c-ink); perspective: 200px; overflow: hidden; }
+.m-flip { display: inline-grid; }
+.m-flip > span { grid-area: 1 / 1; backface-visibility: hidden; }
+.m-dial-cap { display: grid; justify-content: center; gap: 2px; margin: 12px 0 0; font: 400 15px/20px var(--c-text); color: var(--c-ink); font-variant-numeric: tabular-nums; }
+.m-dial-cap span { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); margin-right: 8px; }
+@media (max-width: 760px) { .m-dial-box { max-width: 340px; } .m-dial-cap span { letter-spacing: .06em; margin-right: 6px; } .m-dial-cap div { white-space: nowrap; } .ui-instrument :lang(hi) .m-dial-cap div { white-space: normal; } }
+
+/* The ledger: three figures that roll like an odometer. */
+/* Whole-pixel columns, so the engraved dividers never straddle a device pixel. */
+/* (Plain thirds first, for engines without round().) */
+.k-ledger { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-columns: round(down, 33.333%, 1px) round(down, 33.333%, 1px) 1fr; margin: 18px 0 4px; border-block: 1px solid var(--c-hair); }
+.k-ledger > div { padding: 10px 0 9px; }
+.k-ledger > div + div { border-left: 1px solid var(--c-hair-2); padding-left: 14px; }
+.k-ledger dt { font: var(--c-t-label); line-height: 16px; letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-2); }
+.k-ledger dd { margin: 2px 0 0; font: 400 34px/38px var(--c-serif); color: var(--c-ink); }
+.k-odo, .k-odo > span { display: inline-flex; height: 38px; overflow: clip; contain: paint; vertical-align: top; }
+/* The drum starts on a blank cell (never a false zero), turns once, and waits
+   for the dial's hands to settle; it plays once per page load. */
+.k-odo > span > span { display: flex; flex-direction: column; transform: translateY(calc(var(--d) * -38px)); animation: k-roll 480ms var(--c-ease-sweep) 1300ms backwards; }
+.k-ledger.k-still .k-odo > span > span { animation: none; }
+.k-odo i { flex: none; font-style: normal; height: 38px; line-height: 38px; text-align: center; }
+@keyframes k-roll { from { transform: translateY(0); } }
+/* The lock-up never wraps; on a portrait iPad the bar's command field and
+   lamp step down to their icons so the six tabs keep one line. */
+.in-bar .c-wordmark { white-space: nowrap; }
+.in-bar .in-mark { flex: none; }
+.k-hero .m-dial { width: min(100%, 460px); }
+@media (min-width: 761px) and (max-width: 900px) {
+  .in-bar { gap: 12px; }
+  .in-tab { padding: 0 9px; }
+  .in-cmd { width: 44px; padding: 0; justify-content: center; background: none; box-shadow: none; }
+  .in-cmd > span, .in-status-t { display: none; }
+}
+/* Below the hero, the long list and the plate skip rendering work while off
+   screen, so a forced style pass (the ⌘K field taking focus) stays cheap. */
+.k-body { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
+/* The chapter register: every topic a hairline row (arc, name, figure). */
+.k-sub { width: 32px; height: 32px; }
+.k-sub.is-new circle { stroke-dasharray: 2 3; }
+.k-sub circle { fill: none; stroke: var(--c-hair); stroke-width: 1.5; }
+.k-sub .on { stroke: var(--c-lume); stroke-width: 3; stroke-linecap: round; }
+.ui-instrument :lang(hi) .k-next small { text-transform: none; letter-spacing: 0; }
+.ui-instrument .in-pal-meta { font: 600 12px var(--c-sc); letter-spacing: .1em; font-variant-numeric: lining-nums tabular-nums; }
+/* A chapter with no answers: a clean ruled frame, nothing plotted. */
+.k-slot { min-height: 240px; background: repeating-linear-gradient(to bottom, transparent 0 31px, var(--c-hair-2) 31px 32px), var(--c-sheet); }
+/* The account: initials in Cormorant SC on paper-2, ringed by a hairline. */
+.in-bar .user-chip .user-avatar { font: 600 12px var(--c-sc); letter-spacing: .06em; background: var(--c-paper-2); color: var(--c-ink); box-shadow: inset 0 0 0 1px var(--c-hair); }
+/* ⌘K's field: borderless; its underline turns teal while it has focus. */
+.ui-instrument .in-pal-q:focus-within { border-bottom-color: var(--c-teal); }
+.ui-instrument .in-pal-q input:focus-visible { outline: none; }
+.ui-instrument :lang(hi) .in-greet h1 { line-height: 1.2; letter-spacing: 0; word-spacing: .1em; font-family: 'Kohinoor Devanagari', 'Noto Serif Devanagari', var(--c-serif); font-weight: 400; }
+
+/* Chapter mastery as ten engraved ticks. */
+.k-ticks { display: grid; grid-template-columns: repeat(10, 2px); gap: 3px; align-items: end; height: 14px; }
+.k-ticks i { height: 8px; background: var(--c-ink-3); opacity: .45; }
+.k-ticks i.on { background: var(--c-teal); opacity: 1; }
+
+/* The resume card's action is the screen's one primary (pill) control. */
+.k-next .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
+
+/* Resume → Write. The old page and the Index block vanish at once; the
+   chapter title alone travels into Write's chapter crumb (a CSS hook on the
+   existing crumb, so Write's markup is untouched); the new page fades in over
+   160ms with its prompt already in its final place. */
+html[data-vt="question"]::view-transition-old(root), html[data-vt="question"]::view-transition-old(pri-question) { animation: none; opacity: 0; }
+html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 160ms var(--c-ease-row) both; }
+html[data-vt="question"] .ws-bar .ctx-pill-name { view-transition-name: pri-chapter; }
+::view-transition-group(pri-chapter) { animation-duration: 280ms; animation-timing-function: var(--c-ease-sweep); }
+/* The large title gives way within 120ms and the crumb fades in for the last
+   stretch, so the travelling text never sits over the prompt as a double image. */
+html[data-vt="question"]::view-transition-old(pri-chapter) { animation: k-vt-out 120ms linear both; }
+html[data-vt="question"]::view-transition-new(pri-chapter) { animation: k-vt-in 140ms linear 140ms both; }
+@keyframes k-vt-out { to { opacity: 0; } }
+@keyframes k-vt-in { from { opacity: 0; } }
+
+
+
+/* States. Focus: the teal ring, inset where the control is flush to a rule.
+   Disabled: engraved but unlit (40% ink, no press). Loading: the outline
+   holds its place, quiet text, never a shimmer. */
+html.ui-instrument .in-bar :is(.in-tab, .in-mark, .in-cmd), html.ui-instrument .k-dock > * { border-radius: 4px; }
+html.ui-instrument :is(.in-bar .in-tab, .in-bar .in-mark, .in-bar .in-cmd, .k-dock > *):focus-visible { outline-offset: 3px; }
+:is(.in-tab, .k-dock > *, .in-pal-item, .c-btn-primary):is(:disabled, [aria-disabled="true"]) { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none; }
+.k-next.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
+.k-next.k-wait i + i { width: 38%; }
+.in-pal-empty.k-wait { font: italic 400 15px var(--c-italic); }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-tab-ind, .k-dock > * { transition: none; }
+  .k-odo > span > span, .m-dial-box > .m-dial-sec { animation: none; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
+@media (forced-colors: active) { .k-ticks i.on, .k-tab-ind { background: Highlight; } }
