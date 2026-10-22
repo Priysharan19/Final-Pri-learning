@@ -13,12 +13,18 @@ import './report.css';
  *  itself is read once, by its label; Reduce Motion cross-fades instead. */
 function Roll({ text }) {
   const [on, setOn] = useState(false);
-  useEffect(() => { setOn(false); const id = requestAnimationFrame(() => requestAnimationFrame(() => setOn(true))); return () => cancelAnimationFrame(id); }, [text]);
+  useEffect(() => {
+    setOn(false);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => { inner = requestAnimationFrame(() => setOn(true)); });
+    return () => { cancelAnimationFrame(outer); cancelAnimationFrame(inner); };
+  }, [text]);
   const chars = String(text).split('');
   const digits = chars.filter(c => /\d/.test(c)).length;
   let seen = 0;
   return (
-    <span className={`lux-roll${on ? ' is-on' : ''}`} role="img" aria-label={String(text)} key={text}>
+    <span className={`lux-roll${on ? ' is-on' : ''}`}>
+      <span className="sr-only">{String(text)}</span>
       {chars.map((c, i) => {
         if (!/\d/.test(c)) return <span key={i} className="lux-roll-c" aria-hidden="true">{c}</span>;
         const order = digits - 1 - seen++;

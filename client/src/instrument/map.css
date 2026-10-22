@@ -72,7 +72,6 @@
 .in-map-graph-wrap:not(.is-floating) .in-map-card { position: static; width: auto; margin-top: 18px; }
 .in-map-graph-wrap:not(.is-floating) .in-map-card .in-btn { justify-self: stretch; min-height: 44px; }
 
-.in-map-graph.is-still .in-map-stars rect, .in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
 
 /* Pri luxury · Map (direction C, engraved hairlines on cotton paper).
    Instrument build only: imported by the lazily loaded MapPage.
@@ -85,11 +84,9 @@ html.ui-instrument .in-map { color: var(--c-ink); }
 html.ui-instrument .in-map-head h1 { font: 400 clamp(30px, 3.4vw, 40px)/1 var(--c-serif); letter-spacing: -.01em; color: var(--c-ink); }
 html.ui-instrument .in-map-head p { font: 400 15px/1.5 var(--c-text); color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
 
-/* The field of points is decoration C does not have: paper is quiet. */
-html.ui-instrument .in-map-stars { display: none; }
 
 html.ui-instrument .in-map-edge { stroke: var(--c-ink-3); stroke-width: 1; vector-effect: non-scaling-stroke; }
-html.ui-instrument .in-map-edge.is-toward { stroke: var(--c-teal); stroke-opacity: 1 !important; stroke-width: 1.4; }
+html.ui-instrument .in-map-edge.is-toward { stroke: var(--c-teal); stroke-width: 1.5; stroke-dasharray: 3 3; }
 html.ui-instrument .in-map-pulse { fill: var(--c-teal); filter: none; }
 
 /* Nodes: ink dots filled by mastery (fill-opacity stays inline), an engraved
@@ -97,7 +94,7 @@ html.ui-instrument .in-map-pulse { fill: var(--c-teal); filter: none; }
 html.ui-instrument .in-map-dot { fill: var(--c-ink); stroke: var(--c-ink); stroke-width: 1; stroke-opacity: .9; }
 html.ui-instrument .in-map-ring { stroke: var(--c-hair); stroke-opacity: 1; stroke-width: 1; }
 html.ui-instrument .in-map-node.is-next .in-map-ring { stroke: var(--c-teal); stroke-dasharray: 2 3; }
-html.ui-instrument .in-map-node.is-on .in-map-ring { stroke: var(--c-lume); stroke-width: 1.6; stroke-dasharray: none; animation: none; }
+html.ui-instrument .in-map-node.is-on .in-map-ring { stroke: var(--c-lume); stroke-width: 1.5; stroke-dasharray: none; animation: none; }
 html.ui-instrument .in-map-node.is-on .in-map-dot { fill: var(--c-lume); stroke: var(--c-lume); }
 html.ui-instrument .in-map-name { font: 400 14px var(--c-text); fill: var(--c-ink); }
 html.ui-instrument .in-map-label { font: 600 12px var(--c-sc); letter-spacing: .12em; fill: var(--c-ink-2); font-variant-numeric: tabular-nums; }
@@ -136,7 +133,6 @@ html.ui-instrument .in-map-foot { font: 400 13px/1.5 var(--c-text); color: var(-
 @keyframes lux-map-engrave { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes lux-map-appear { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lux-map-settle { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
-@keyframes lux-map-flow { to { stroke-dashoffset: -1; } }
 
 html.ui-instrument .in-map-graph.is-arriving .in-map-edge {
   stroke-dasharray: 1; stroke-dashoffset: 1;
@@ -145,16 +141,13 @@ html.ui-instrument .in-map-graph.is-arriving .in-map-edge {
 html.ui-instrument .in-map-graph.is-arriving .in-map-node {
   opacity: 0; animation: lux-map-appear 300ms cubic-bezier(.2, .8, .2, 1) calc(200ms + var(--hop, 0) * 60ms) forwards;
 }
-/* The route to the next chapter: a fine dash that keeps moving once arrived. */
-html.ui-instrument .in-map-graph.is-arrived:not(.is-still) .in-map-edge.is-toward {
-  stroke-dasharray: .02 .018; animation: lux-map-flow 9s linear infinite;
-}
+/* The route to the next chapter is a fixed teal dash; the pulse dots on it
+   (animateMotion, transform only) carry the flow once the map has arrived. */
 html.ui-instrument .in-map-card-in { animation: lux-map-settle 600ms var(--c-ease-row) both; }
 
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument .in-map-graph.is-arriving .in-map-edge,
   html.ui-instrument .in-map-graph.is-arriving .in-map-node { animation: none; stroke-dashoffset: 0; opacity: 1; }
-  html.ui-instrument .in-map-graph.is-arrived .in-map-edge.is-toward { animation: none; stroke-dasharray: none; }
-  html.ui-instrument .in-map-graph { animation: lux-map-appear 200ms linear both; }
+  html.ui-instrument .in-map-graph.is-arriving { animation: lux-map-appear 200ms linear both; }
   html.ui-instrument .in-map-card-in { animation: lux-map-appear 200ms linear both; }
 }

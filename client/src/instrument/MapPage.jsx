@@ -42,8 +42,6 @@ const LOST_DOTPOINT_MIN_QUESTIONS = 3;
 const fillOf = node => 0.14 + (node.evidence.mastery / 100) * 0.86;
 const secureOf = node => node.evidence.accuracy == null ? 0 : node.evidence.mastery / 100;
 
-// A faint fixed field of points behind the drawing (deterministic, decorative).
-const STARS = Array.from({ length: 90 }, (_, i) => ({ x: (Math.sin(i * 91.7) * 0.5 + 0.5), y: (Math.cos(i * 37.3) * 0.5 + 0.5), d: (i % 9) * 0.37 }));
 
 // Whether the map may move: the reduced-motion preference (followed live), the
 // map being on screen, and the tab being visible. Off-screen or hidden, every
@@ -79,7 +77,7 @@ function useMapMotion(ref, ready) {
 // Arrival choreography (presentation only): how many prerequisite hops each
 // chapter is from the one the map opens on, over the drawn edges in either
 // direction. Edges draw outward from that chapter and nodes fade in by it.
-const ARRIVE_MS = 700;
+const ARRIVE_MS = 760;
 function hopsFrom(originId, nodes, edges) {
   const out = new Map([[originId, 0]]);
   const near = new Map(nodes.map(n => [n.row.id, []]));
@@ -226,12 +224,9 @@ export default function MapPage() {
         </header>
         <div className={`in-map-graph${motion.running ? '' : ' is-still'}${arrived ? ' is-arrived' : ' is-arriving'}`} ref={graphRef} data-map-arrived={arrived ? 'true' : 'false'}>
           <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-            <g className="in-map-stars">
-              {STARS.map((st, i) => <rect key={i} x={st.x * MAP_W} y={st.y * H} width={1.3} height={1.3} style={{ animationDelay: `${-st.d}s` }} />)}
-            </g>
             {layout.edges.map((e, i) => (
               <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}`} pathLength="1"
-                d={outward(e)} style={{ strokeOpacity: 0.45 + 0.55 * e.opacity, '--hop': Math.min(hopOf(e.from.row.id), hopOf(e.to.row.id)) }} />
+                d={outward(e)} style={{ strokeOpacity: isRecommended(e.to) ? undefined : 0.45 + 0.55 * e.opacity, '--hop': Math.min(hopOf(e.from.row.id), hopOf(e.to.row.id)) }} />
             ))}
             {pulse && arrived && layout.edges.filter(e => isRecommended(e.to)).map((e, i) => [0, 1].map(k => (
               <circle key={`${i}-${k}`} className="in-map-pulse" r={2.6} style={{ '--cc': `var(${e.to.colour})` }}>

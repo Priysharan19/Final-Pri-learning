@@ -88,11 +88,16 @@ function InkReplay({ strokes, height = 160, label }) {
 // saved-attempt detail the row opens, fetched only when the card is on screen
 // and only for attempts written in ink; anything else shows the ruled paper
 // with the answer the student gave. Display only, nothing is recomputed.
-function ScriptThumb({ item, strokesFor }) {
+const THUMB_MAX = 24;
+const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
+function ScriptThumb({ item, strokesFor, index }) {
+  const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
   const ref = useRef(null);
   const [strokes, setStrokes] = useState(null);
   useEffect(() => {
-    if (!item.viaInk || typeof IntersectionObserver === 'undefined') return undefined;
+    // Thumbnails are a nicety: skipped on a Save-Data connection, and only
+    // the first THUMB_MAX cards on a page fetch their strokes.
+    if (!item.viaInk || !thumbAllowed || typeof IntersectionObserver === 'undefined') return undefined;
     let live = true;
     const io = new IntersectionObserver(entries => {
       if (!entries.some(e => e.isIntersecting)) return;
@@ -116,7 +121,7 @@ function ScriptThumb({ item, strokesFor }) {
         <svg viewBox={box} preserveAspectRatio="xMinYMid meet">
           {strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
         </svg>
-      ) : item.answerGiven ? <span className="in-scr-typed"><MathText text={String(item.answerGiven)} /></span> : null}
+      ) : item.answerGiven && !STATUS_WORD.test(String(item.answerGiven).trim()) ? <span className="in-scr-typed"><MathText text={String(item.answerGiven)} /></span> : null}
       {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
     </span>
   );
@@ -332,7 +337,7 @@ function HistoryForProfile() {
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
-                  <ScriptThumb item={item} strokesFor={strokesFor} />
+                  <ScriptThumb item={item} strokesFor={strokesFor} index={items.indexOf(item)} />
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={item.prompt} /></span>

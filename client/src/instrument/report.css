@@ -71,7 +71,7 @@ html.ui-instrument .in-report-title { font: 400 clamp(40px, 7vw, 84px)/.95 var(-
 html.ui-instrument .in-report-lede { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
 
 html.ui-instrument .in-segc { border-radius: 8px; background: transparent; box-shadow: inset 0 0 0 1px var(--c-hair); padding: 3px; }
-html.ui-instrument .in-segc button.c-chip { border-radius: var(--radius-pill); border: 0; background: transparent; font: 600 14px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); min-height: 38px; padding: 6px 16px; }
+html.ui-instrument .in-segc button.c-chip { border-radius: var(--radius-pill); border: 0; background: transparent; font: 600 14px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); min-height: 44px; padding: 6px 16px; }
 html.ui-instrument .in-segc button[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); box-shadow: none; }
 html.ui-instrument .in-segc button:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
 
@@ -83,7 +83,8 @@ html.ui-instrument .in-report-figs b span { font-size: 22px; color: var(--c-ink-
 html.ui-instrument .in-report-figs small { display: block; margin-top: 6px; font: 600 13px var(--c-sc); letter-spacing: .14em; color: var(--c-ink-2); }
 html.ui-instrument .in-report-figs em { font: 400 14px var(--c-text); color: var(--c-teal); }
 html.ui-instrument .in-report-figs em.is-down { color: var(--c-ink-2); }
-html.ui-instrument .lux-report-hero { grid-column: 1 / -1; order: -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding-top: 18px !important; }
+html.ui-instrument .lux-report-hero { grid-column: 1 / -1; order: -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+html.ui-instrument .in-report-figs > .lux-report-hero { padding-top: 18px; }
 html.ui-instrument .lux-report-hero b:has(.lux-roll) { font-size: clamp(72px, 12vw, 140px); line-height: .9; }
 html.ui-instrument .lux-report-hero small { order: -1; flex-basis: 100%; margin: 0 0 4px; }
 html.ui-instrument .lux-report-hero em { font-size: 16px; }
@@ -105,11 +106,11 @@ html.ui-instrument .in-chart { background: var(--c-sheet); border-radius: 3px; b
 html.ui-instrument .in-chart-grid line { stroke: var(--c-hair-2); }
 html.ui-instrument #lux-chart-hatch line { stroke: var(--c-teal); stroke-width: .5; opacity: .45; }
 html.ui-instrument .in-chart-area { fill: url(#lux-chart-hatch); fill-opacity: 1; animation: in-chart-fade 700ms cubic-bezier(.2, .8, .2, 1) 700ms both; }
-html.ui-instrument .in-chart-line { stroke-width: 1.8; }
+html.ui-instrument .in-chart-line { stroke-width: 1.5; }
 html.ui-instrument .in-chart-line.is-method { stroke: var(--c-teal); animation: in-chart-draw 1100ms cubic-bezier(.5, 0, .2, 1) 120ms both; }
 html.ui-instrument .in-chart-line.is-accuracy { stroke: var(--c-ink-2); stroke-dasharray: 4 4; animation: in-chart-fade 700ms cubic-bezier(.2, .8, .2, 1) 700ms both; }
-html.ui-instrument .in-chart-dot { background: var(--c-sheet); box-shadow: 0 0 0 1.4px var(--c-teal); }
-html.ui-instrument .in-chart-dot.is-accuracy { box-shadow: 0 0 0 1.4px var(--c-ink-2); }
+html.ui-instrument .in-chart-dot { background: var(--c-sheet); box-shadow: 0 0 0 1.5px var(--c-teal); }
+html.ui-instrument .in-chart-dot.is-accuracy { box-shadow: 0 0 0 1.5px var(--c-ink-2); }
 html.ui-instrument .in-chart-dot.is-end.is-method { background: var(--c-teal); }
 html.ui-instrument .in-chart-dot.is-end { animation: lux-chart-land 340ms cubic-bezier(.7, 0, .9, .6) 1180ms both; }
 html.ui-instrument .in-chart-text { font: 400 12px var(--c-text); color: var(--c-ink-2); }
@@ -118,8 +119,8 @@ html.ui-instrument .in-chart-val.is-method { color: var(--c-ink); }
 html.ui-instrument .in-chart-val.is-accuracy { color: var(--c-ink-2); }
 html.ui-instrument .in-chart-val { animation: in-chart-fade 260ms linear 1220ms both; }
 html.ui-instrument .in-chart-lg { font: 600 12px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); }
-html.ui-instrument .in-chart-lg i { height: 1.4px; background: var(--c-teal); }
-html.ui-instrument .in-chart-lg i.is-accuracy { background: none; border-top: 1.4px dashed var(--c-ink-2); }
+html.ui-instrument .in-chart-lg i { height: 1.5px; background: var(--c-teal); }
+html.ui-instrument .in-chart-lg i.is-accuracy { background: none; border-top: 1.5px dashed var(--c-ink-2); }
 html.ui-instrument .in-chart-empty { background: var(--c-sheet); box-shadow: 0 0 0 1px var(--c-hair); border-radius: 3px; font: 400 14px var(--c-text); color: var(--c-ink-2); }
 
 @keyframes lux-chart-land {
