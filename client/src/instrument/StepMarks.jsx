@@ -56,10 +56,14 @@ export function useCheckCeremony(stageRef, key) {
     // Nothing to strike (stale, unsure or unmarked lines): no ceremony, and
     // the date window, seeing none running, shows the score at once.
     if (!rows.length) return undefined;
-    // Phone: the margin is the reading list under the sheet; bring its rows
-    // into view so the marks are seen being struck, not below the fold.
-    const still0 = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (rows[0].classList.contains('ink-line')) rows[rows.length - 1].scrollIntoView?.({ block: 'nearest', behavior: still0 ? 'auto' : 'smooth' });
+    // Phone: the margin is the reading list under the sheet. Bring the first
+    // error (or the first mark) into view only if it is below the fold, so
+    // the strike is seen; a row already on screen never moves the page.
+    if (rows[0].classList.contains('ink-line')) {
+      const focus = rows.find(r => r.querySelector('.c-mark-x')) || rows[0];
+      const box = focus.getBoundingClientRect();
+      if (box.top < 0 || box.bottom > innerHeight) focus.scrollIntoView?.({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
     running++;
     let on = true;
     const stop = () => { if (on) { on = false; running--; } };

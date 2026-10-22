@@ -26,6 +26,9 @@ check('unknown lines stay untagged', tagged[3].source === undefined);
 check('stamps from tagged verdicts', tagged.map(engineMark).join() === 'ok,x,ecf,', tagged.map(engineMark));
 check('the input is not mutated', base.every(v => v.source === undefined));
 
+check('a cloud verdict passed through tagging is never relabelled or stamped', engineMark(tagEngineVerdicts([{ status: 'break', source: CLOUD_WORKING_ENGINE }], null)[0]) === null);
+check('an engine status of ecf is the capsule too', engineMark({ status: 'ecf', source: 'engine' }) === 'ecf');
+
 // The rebuild after the second read keeps the marker on engine lines.
 const merged = mergeVerdicts(tagged, { firstBreak: 3, lines: [{ index: 3, status: 'break', why: 'w' }] }, { lineCount: 4 });
 check('merging with the second read keeps engine provenance', merged.slice(0, 3).every(v => v.source === 'engine'), merged);

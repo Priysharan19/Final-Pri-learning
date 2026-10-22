@@ -10,7 +10,9 @@
 export function tagEngineVerdicts(base, report) {
   if (!Array.isArray(base)) return base;
   return base.map((v, i) => {
-    if (!v || v.status === 'unknown' || v.status === 'note') return v;
+    // Only untagged lines are the engine's here; an existing source (the
+    // second read's 'cloud-working') is never relabelled.
+    if (!v || v.source != null || v.status === 'unknown' || v.status === 'note') return v;
     const ecf = v.status === 'ok' && report?.lines?.[i]?.ecf === true;
     return { ...v, source: 'engine', ...(ecf ? { ecf: true } : null) };
   });
@@ -19,6 +21,7 @@ export function tagEngineVerdicts(base, report) {
 /** 'ok' (teal circle ✓), 'x' (copper diamond ✗), 'ecf' (dashed capsule) or null. */
 export function engineMark(v) {
   if (!v || v.source !== 'engine') return null;
-  if (v.status === 'ok') return v.ecf === true ? 'ecf' : 'ok';
+  if (v.status === 'ecf' || (v.status === 'ok' && v.ecf === true)) return 'ecf';
+  if (v.status === 'ok') return 'ok';
   return v.status === 'break' || v.status === 'wrong' ? 'x' : null;
 }
