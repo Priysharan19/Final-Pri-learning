@@ -5,7 +5,7 @@
  * receipts are retained separately for restricted reviewer consumption.
  */
 import assert from 'node:assert/strict';
-import {readFileSync,readdirSync,statSync} from 'node:fs';
+import {readFileSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import {CBSE_202627_ORIGINAL_EXAM_BLIND as pack} from '../src/engine/ncert/cbse-2026-27-exam-original-blind.js';
 assert.equal(pack.questions.length,12);
@@ -43,7 +43,18 @@ assert.deepEqual(pack.questions.filter(q=>q.track==='CBSE-enrichment-hold-from-c
 // Review-only: nothing in the app or the server imports the pack until a human examiner signs it off.
 const root=new URL('../..',import.meta.url).pathname;
 const importers=[];
-const walk=d=>{for(const n of readdirSync(d)){if(n==='node_modules'||n.startsWith('.'))continue;const p=join(d,n);if(statSync(p).isDirectory())walk(p);else if(/\.([cm]?js|jsx|tsx?)$/.test(n)&&p!==join(root,'client/src/engine/ncert/cbse-2026-27-exam-original-blind.js')&&/cbse-2026-27-exam-original-blind|CBSE_202627_ORIGINAL_EXAM_BLIND/.test(readFileSync(p,'utf8')))importers.push(p);}};
+// The directory entry says what each path is (no separate stat), and each
+// source file is read once, so nothing can change between a check and its use.
+const walk=d=>{
+ for(const e of readdirSync(d,{withFileTypes:true})){
+  if(e.name==='node_modules'||e.name.startsWith('.'))continue;
+  const p=join(d,e.name);
+  if(e.isDirectory()){walk(p);continue;}
+  if(!e.isFile()||!/\.([cm]?js|jsx|tsx?)$/.test(e.name)||p===join(root,'client/src/engine/ncert/cbse-2026-27-exam-original-blind.js'))continue;
+  const text=readFileSync(p,'utf8');
+  if(/cbse-2026-27-exam-original-blind|CBSE_202627_ORIGINAL_EXAM_BLIND/.test(text))importers.push(p);
+ }
+};
 for(const d of ['client/src','server'])walk(join(root,d));
 assert.deepEqual(importers,[],'the review-only pack is imported: '+importers.join(', '));
 console.log('PASS 12 original CBSE X/XII questions, 12 distinct archetype identities, 6 each by grade; zero privileged solution/rubric fields in exported student items.');
