@@ -3060,7 +3060,7 @@ export default {
   "inst.kpiCovered": "covered",
   "inst.cmdLoading": "Reading your syllabus…",
   "inst.dockLabel": "Quick navigation",
-  "inst.dialLong": "Long hand · accuracy",
+  "inst.dialLong": "Long hand · accuracy in your syllabus",
   "inst.dialShort": "Short hand · chapters started",
   "inst.beginFirst": "Your first question is ready.",
   "inst.begin": "Begin",
