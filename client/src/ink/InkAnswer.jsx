@@ -32,7 +32,8 @@ import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { retryClock } from './readerFailure.js';
-import { Link, useInRouterContext } from 'react-router-dom';
+import { useInRouterContext } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
@@ -640,7 +641,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       {shownStatus?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(shownStatus.key) && (
         <div className="ink-status-action">
           {inRouter
-            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</Link>
+            ? <PageLink className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</PageLink>
             : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
       )}
