@@ -7,6 +7,7 @@ import { colourFor, practiceTrack, scopeFor } from './chapters.js';
 import { MathText } from '../lib/latex.jsx';
 import Glyph from './Glyph.jsx';
 
+const dayOf = at => { const d = new Date(at); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat(document.documentElement.lang || undefined, { day: 'numeric', month: 'short' }).format(d) : ''; };
 const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress': 'chart', '/review': 'doc', '/history': 'doc' };
 
 // ⌘K / Ctrl+K anywhere, or the field in the bar: one list for chapters (in
@@ -93,7 +94,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
-        id: `sc-${s.id}`, label: String(s.prompt || '').replace(/\s+/g, ' ').trim() || s.subtopicName, math: !!s.prompt, glyph: 'doc',
+        // What tells two scripts apart: the chapter, the day, the certified mark.
+        id: `sc-${s.id}`, label: s.subtopicName || '', glyph: 'doc', meta: dayOf(s.answeredAt),
         hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
         run: () => nav('/review')
       })) },

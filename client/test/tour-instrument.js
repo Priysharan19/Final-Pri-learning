@@ -6,7 +6,7 @@
 //   · the flag is really on: html.ui-instrument, the tab bar, no rail;
 //   · the Index lists the syllabus from the server, a chapter opens its plate,
 //     the plate's figures are the server's (answers / correct), accuracy is
-//     withheld below the floor, and the scope actually draws;
+//     withheld below the floor, and nothing invented is plotted;
 //   · Practise this chapter opens Practice for that chapter;
 //   · ⌘K opens the command bar, typing filters, ↵ opens, esc closes and focus
 //     returns to where it was;
