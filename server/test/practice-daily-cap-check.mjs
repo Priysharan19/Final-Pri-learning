@@ -180,6 +180,16 @@ try {
     c.deq([g.status, await counted(a.account.id)], [200, LIMIT], `a ${mode} answer is still marked at the limit, and does not count`);
   }
 
+  // A drill question sent WITH working is examiner marking, whatever mode it
+  // was issued in: counted, so refused at the limit.
+  for (const mode of ['rush', 'match', 'placement']) {
+    const q = await issue(a.jar, { mode });
+    const sid = nextSid();
+    const g = await post(`/v1/practice/${q.data.question.id}/submit`, { submissionId: sid, answer: WRONG, mode: 'typed', steps: ['x = 1', 'x = 2'] }, a.jar, { 'Idempotency-Key': sid });
+    c.deq([g.status, g.data?.error?.capability, 'stepReport' in (g.data || {}), await counted(a.account.id)], [402, 'unlimited-marking', false, LIMIT],
+      `a ${mode} answer sent with working is a script: refused at the limit, nothing marked`);
+  }
+
   // ── another account's day is its own ────────────────────────────────────────
   const bq = await issue(b.jar);
   c.deq([(await grade(b.jar, bq.data.question.id, WRONG)).status, await counted(b.account.id)], [200, 1], 'another free account is marked as its own first script');

@@ -34,7 +34,7 @@ export function planOffers(products, ids) {
 /** The yearly price divided by twelve, rounded to a whole unit; null without a numeric price. */
 export function perMonthEquivalent(annual) {
   const price = numericPrice(annual);
-  return price == null ? null : Math.round(price / 12);
+  return price == null ? null : Math.ceil(price / 12);
 }
 
 /** A whole-unit amount in the product's currency; null when it cannot be said. */

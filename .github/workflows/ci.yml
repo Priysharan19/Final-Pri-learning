@@ -438,7 +438,7 @@ jobs:
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/notebook-paywall-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
-          grep -Fq 'DAILY MARKING ALLOWANCE: PASS — 77/77 checks' practice-http.log
+          grep -Fq 'DAILY MARKING ALLOWANCE: PASS — 80/80 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 39/39 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log

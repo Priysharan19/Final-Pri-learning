@@ -886,6 +886,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
     const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // A script is examiner marking: every answer issued in a Practice-surface
+    // mode, and — whatever mode the question was issued in — any answer that
+    // brings working, ink or a photo for the examiner to read. A Rush, Match or
+    // placement answer typed alone is a drill and stays uncounted; the same
+    // question sent with working is the paid feature and is counted.
+    const scriptCounted = q => practiceModeCounted(q._practiceMode || 'practice') || mode !== 'typed' || working.trim() !== '';
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -992,7 +998,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // The free plan's marking allowance, forecast before anything is read or
       // marked, so a refused script never costs a reading or a marker run. The
       // commit below decides again under the lock.
-      if (practiceModeCounted(forecast.q._practiceMode || 'practice')) {
+      if (scriptCounted(forecast.q)) {
         const allowance = await markingAllowanceVerdict(db, { accountId, questionId: qid, now, env });
         if (!allowance.allowed) return refuseMarkingCap(res, allowance, now);
       }
@@ -1104,7 +1110,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const { q, priorTry, tries, spent, hintLevel } = state;
         // The authoritative allowance decision, under the account's sync lock:
         // two devices racing for the last free script cannot both be marked.
-        const countsToward = practiceModeCounted(q._practiceMode || 'practice');
+        const countsToward = scriptCounted(q);
         const allowance = countsToward ? await markingAllowanceVerdict(db, { accountId, questionId: qid, now, env }) : null;
         if (allowance && !allowance.allowed) return { capped: allowance };
       // Only after submission may authored misconception feedback be revealed.
