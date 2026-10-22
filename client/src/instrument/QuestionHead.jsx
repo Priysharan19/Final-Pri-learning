@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
+import { flip, reduced } from './margin/motion.js';
 
 // v1.1 instrument: the question header's right side (design s4 `.qh`). The
 // number is a real count — the questions shown in this visit to Practice, or
@@ -16,7 +17,6 @@ const clock = ms => {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
-const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
  * The date window (Pri Luxury, direction C): "– /3" until the engine has
@@ -40,17 +40,21 @@ function DateWindow({ score, outOf }) {
     const fallback = setTimeout(go, hasRows && !reduced() ? 6000 : 0);
     return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); };
   }, [score]);
+  // The window's faces are owned by flip() (motion.js): React renders the
+  // empty frame and never reconciles inside it.
+  const face = shown == null ? `– /${outOf}` : `${shown} /${outOf}`;
   useEffect(() => {
-    const el = flipRef.current?.lastElementChild;
-    if (!el || shown == null || reduced() || !el.animate) return undefined;
-    const a = el.animate([{ transform: 'rotateX(-90deg)' }, { transform: 'rotateX(8deg)', offset: 0.75 }, { transform: 'rotateX(0)' }],
-      { duration: 170, delay: 110, easing: 'cubic-bezier(0,0,.3,1)', fill: 'backwards' });
-    return () => a.cancel();
-  }, [shown]);
+    const win = flipRef.current;
+    if (!win) return undefined;
+    if (!win.firstChild) { const f = document.createElement('span'); f.textContent = face; win.appendChild(f); return undefined; }
+    if (win.lastElementChild?.textContent === face) return undefined;
+    const h = flip(win, face);
+    return () => h.finish();
+  }, [face]);
   if (!Number.isInteger(outOf) || outOf < 1) return null;
   return (
     <span className="wc-datewin" aria-hidden="true" data-date-window={shown == null ? 'pending' : `${shown}/${outOf}`}>
-      <span className="wc-flip" ref={flipRef}><span key={shown == null ? 'p' : 's'}>{shown == null ? '–' : shown}<span className="wc-dw-of"> /{outOf}</span></span></span>
+      <span className="wc-flip" ref={flipRef} />
     </span>
   );
 }

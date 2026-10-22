@@ -2,38 +2,7 @@
    Lazily loaded by StepMarks.jsx in the instrument build only (`write` is in the
    flag-off skip list in vite.config.js). Presentation only: every mark drawn
    here is the deterministic engine's verdict, never a model's.
-   Written against PR1's C token names; the fallbacks are the reference's own
-   values (wow-reference/c-editorial.html) until those tokens land. */
-
-html.ui-instrument {
-  --wc-pen: var(--c-pen, #1f2a44);
-  --wc-teal: var(--c-teal, #0b6e69);
-  --wc-teal-soft: var(--c-teal-soft, rgba(11, 110, 105, .10));
-  --wc-copper: var(--c-copper, #b4470f);
-  --wc-copper-soft: var(--c-copper-soft, rgba(180, 71, 15, .09));
-  --wc-ink: var(--c-ink, var(--m-tx, #1a1916));
-  --wc-ink-3: var(--c-ink-3, #6b6457);
-  --wc-sheet: var(--c-sheet, #fbf9f4);
-  --wc-dial-line: var(--c-dial-line, #2a2823);
-  --wc-hair: var(--c-hair, #b9ae99);
-  --wc-emboss-hi: var(--c-emboss-hi, rgba(255, 255, 255, .85));
-  --wc-emboss-lo: var(--c-emboss-lo, rgba(60, 45, 20, .22));
-  --wc-text: var(--c-text, "STIX Two Text", var(--font-math, Georgia), serif);
-}
-html.ui-instrument[data-theme="dark"] {
-  --wc-pen: var(--c-pen, #e7e1d2);
-  --wc-teal: var(--c-teal, #63d2c4);
-  --wc-teal-soft: var(--c-teal-soft, rgba(99, 210, 196, .10));
-  --wc-copper: var(--c-copper, #ee9b63);
-  --wc-copper-soft: var(--c-copper-soft, rgba(238, 155, 99, .10));
-  --wc-ink: var(--c-ink, #ece6d8);
-  --wc-ink-3: var(--c-ink-3, #9a9586);
-  --wc-sheet: var(--c-sheet, #0d171c);
-  --wc-dial-line: var(--c-dial-line, #cbc4b2);
-  --wc-hair: var(--c-hair, #3d4c51);
-  --wc-emboss-hi: var(--c-emboss-hi, rgba(255, 255, 255, .07));
-  --wc-emboss-lo: var(--c-emboss-lo, rgba(0, 0, 0, .6));
-}
+   Tokens are PR1's --c-* set; no new colours. */
 
 /* ── Margin rows: the typeset transcription with its struck mark ─────────── */
 html.ui-instrument .in-read[data-wc-row] {
@@ -43,7 +12,7 @@ html.ui-instrument .in-read[data-wc-row] {
   perspective: 1400px;
   perspective-origin: 50% 40%;
 }
-html.ui-instrument .in-read[data-wc-row] .in-read-m { font-family: var(--wc-text); color: var(--wc-ink); }
+html.ui-instrument .in-read[data-wc-row] .in-read-m { font-family: var(--c-text); color: var(--c-ink); }
 /* The stamp replaces the line-end badge: one mark per line, in the margin. */
 html.ui-instrument .ink-verdict-layer .ink-verdict { display: none; }
 
@@ -57,21 +26,16 @@ html.ui-instrument .ink-verdict-layer .ink-verdict { display: none; }
 .wc-stamp {
   width: 34px; height: 34px; display: block; overflow: visible;
   /* deboss: a one-pixel light edge below and a shade above, no blur */
-  filter: drop-shadow(0 1px 0 var(--wc-emboss-hi)) drop-shadow(0 -1px 0 var(--wc-emboss-lo));
+  filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo));
 }
 .wc-ring {
   position: absolute; inset: -3px; border-radius: 50%;
-  border: 1px solid var(--wc-ink-3); opacity: 0; pointer-events: none;
+  border: var(--c-line) solid var(--c-ink-3); opacity: 0; pointer-events: none;
 }
-.wc-f-teal { fill: var(--wc-teal-soft); stroke: var(--wc-teal); }
-.wc-s-teal { stroke: var(--wc-teal); }
-.wc-f-copper { fill: var(--wc-copper-soft); stroke: var(--wc-copper); }
-.wc-s-copper { stroke: var(--wc-copper); }
-.wc-ecf { font: italic 14px var(--wc-text); fill: var(--wc-copper); }
 
 /* The first error, underlined in copper; drawn left to right by the ceremony. */
 html.ui-instrument .ink-underline[data-wc-first-error] {
-  border-bottom: 1.5px solid var(--wc-copper);
+  border-bottom: 1.5px solid var(--c-copper);
   transform-origin: 0 50%;
   animation: none;
 }
@@ -80,26 +44,26 @@ html.ui-instrument .ink-underline[data-wc-first-error] {
 .wc-datewin {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 52px; height: 24px; padding: 0 8px;
-  background: var(--wc-sheet);
-  border: 1px solid var(--wc-dial-line);
+  background: var(--c-sheet);
+  border: var(--c-line) solid var(--c-dial-line);
   border-radius: 2px;
-  box-shadow: inset 0 1px 2px var(--wc-emboss-lo);
-  font: 600 14px/1 var(--wc-text);
+  box-shadow: var(--c-deboss);
+  font: 600 14px/1 var(--c-text);
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
-  color: var(--wc-ink);
+  color: var(--c-ink);
   perspective: 200px;
   overflow: hidden;
 }
 .wc-flip, .wc-flip > span { display: inline-block; transform-origin: 50% 50%; backface-visibility: hidden; }
-.wc-dw-of { color: var(--wc-ink-3); font-weight: 400; }
-.wc-datewin[data-date-window="pending"] { color: var(--wc-ink-3); }
+.wc-dw-of { color: var(--c-ink-3); font-weight: 400; }
+.wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
 
 /* ── History mark strip: shape as well as colour ─────────────────────────── */
-html.ui-instrument .in-strip i.is-earned { border-radius: 50%; background: var(--wc-teal); }
+html.ui-instrument .in-strip i.is-earned { border-radius: 50%; background: var(--c-teal); }
 html.ui-instrument .in-strip i.is-lost {
   border-radius: 1px; background: transparent;
-  box-shadow: inset 0 0 0 1px var(--wc-copper);
+  box-shadow: inset 0 0 0 var(--c-line) var(--c-copper);
   transform: rotate(45deg) scale(.82);
 }
 
@@ -107,8 +71,7 @@ html.ui-instrument .in-strip i.is-lost {
   .wc-plane, .wc-stamp, .wc-flip > span { animation: none; }
 }
 @media (forced-colors: active) {
-  .wc-f-teal, .wc-f-copper { fill: Canvas; stroke: CanvasText; }
-  .wc-s-teal, .wc-s-copper { stroke: CanvasText; }
-  .wc-ecf { fill: CanvasText; }
+  .wc-stamp :is(circle, rect, path) { stroke: CanvasText; }
+  .wc-stamp text { fill: CanvasText; }
   .wc-datewin { border-color: CanvasText; }
 }
