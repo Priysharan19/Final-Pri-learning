@@ -233,6 +233,7 @@
     "test:idb:lifecycle": "node client/test/idb-lifecycle-check.mjs",
     "test:practice:state": "node client/test/practice-state-invariants-check.mjs",
     "test:golden-journey": "node client/test/golden-student-journey.mjs",
+    "test:first-open": "node client/test/tour-first-open.js",
     "verify:deployment": "node tools/verify-deployment.mjs",
     "test:deploy": "node tools/deployment-contract.test.mjs",
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",

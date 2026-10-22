@@ -38,7 +38,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
-import { createVerifiedProfile } from './support/verified-onboarding.mjs';
+import { createVerifiedProfile, passFirstOpen } from './support/verified-onboarding.mjs';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -301,6 +301,8 @@ async function runFlow(flow, { browser, opts }) {
     // Playwright, not intercepted first by a service worker (WebKit too).
     ...(flow.inspectNetwork ? { serviceWorkers: 'block' } : {})
   });
+  // Journeys start past the first-open moment unless the flow is about it.
+  if (!flow.firstOpen) await passFirstOpen(ctx);
   const page = await ctx.newPage();
   const crashes = [];
   // WebKit, tearing a page down for a navigation, cancels its in-flight

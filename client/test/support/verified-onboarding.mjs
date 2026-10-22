@@ -123,6 +123,20 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
  * or an Australian syllabus is not something the card asks for and is noted,
  * never silently honoured with a different identity.
  */
+/**
+ * Start a browser context past the instrument build's once-only first-open
+ * moment (instrument/FirstOpen.jsx): it is a modal that makes the sign-in page
+ * inert while it shows, so journeys that are about sign-in begin as a returning
+ * device would. A no-op in the flag-off build (nothing reads the key). The
+ * moment itself is covered by tour-first-open.js.
+ */
+export async function passFirstOpen(target) {
+  const ctx = typeof target?.context === 'function' ? target.context() : target;
+  if (!ctx || ctx.__priFirstOpenSeeded) return;
+  ctx.__priFirstOpenSeeded = true;
+  await ctx.addInitScript(() => { try { localStorage.setItem('pri.firstOpen.v1', '1'); } catch { /* storage blocked */ } });
+}
+
 export async function createVerifiedProfile(page, platform, {
   name = 'E2E Student', year = 9, email = null, track = null, course = 'nsw', role = 'student',
   language = 'en', fromPicker = false, age = 18, landing = 'home', note = null
@@ -132,6 +146,13 @@ export async function createVerifiedProfile(page, platform, {
   if (role === 'teacher') return createTeacherProfile(page, platform, { name, year: classOf, email, language, note });
 
   const address = (email || freshEmail()).toLowerCase();
+  await passFirstOpen(page);
+  // A page already open on the moment (seeded too late for it): pass it the
+  // way a returning device would, by reloading with the flag set.
+  if (await page.locator('[data-first-open]').count()) {
+    await page.evaluate(() => { try { localStorage.setItem('pri.firstOpen.v1', '1'); } catch { /* storage blocked */ } });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+  }
   if (fromPicker) {
     await page.getByTestId('picker-create-account').click();
   }

@@ -33,7 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { onlinePlatform } from './support/online-session.mjs';
-import { createVerifiedProfile, freshEmail, lastEmailCode, resetOtpLimits, signInOnCard, typeCode } from './support/verified-onboarding.mjs';
+import { createVerifiedProfile, passFirstOpen, freshEmail, lastEmailCode, resetOtpLimits, signInOnCard, typeCode } from './support/verified-onboarding.mjs';
 
 const GATE = '[data-testid="account-activation-gate"]';
 const CARD = '[data-signin-card="page"]';
@@ -52,6 +52,7 @@ const gateStatus = page => page.locator(GATE).getAttribute('data-activation-stat
 /** The parent, on their own device: a separate context, no profile, no session. */
 async function approveAsParent(ctx, base, platform, parentEmail, childName) {
   const parentCtx = await ctx.browser().newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  await passFirstOpen(parentCtx);
   try {
     const parent = await parentCtx.newPage();
     await parent.goto(`${base}/guardian/consent`, { waitUntil: 'domcontentloaded' });
@@ -172,6 +173,7 @@ export const flow = {
 
     // ── 2 · a new under-18, on the landing card ──────────────────────────────
     const childCtx = await ctx.browser().newContext({ viewport: { width: 1024, height: 1366 }, reducedMotion: 'reduce', hasTouch: true });
+    await passFirstOpen(childCtx);
     try {
       const child = await childCtx.newPage();
       const childEmail = freshEmail('child');
@@ -466,6 +468,7 @@ export const flow = {
 
       // 5c · past 72 hours: the gate's retry; the connection's return lets them in
       const staleCtx = await ctx.browser().newContext({ viewport: { width: 1180, height: 820 }, reducedMotion: 'reduce' });
+      await passFirstOpen(staleCtx);
       try {
         await staleCtx.clock.install({ time: new Date() });
         const stale = await staleCtx.newPage();
