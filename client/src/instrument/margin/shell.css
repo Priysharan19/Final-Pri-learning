@@ -61,7 +61,6 @@
 .in-bar .c-wordmark { white-space: nowrap; }
 .in-bar .in-mark { flex: none; }
 .k-hero .m-dial { width: min(100%, 460px); }
-@media (max-width: 900px) { .k-hero .m-dial { width: min(100%, 300px); } }
 @media (min-width: 761px) and (max-width: 900px) {
   .in-bar { gap: 12px; }
   .in-tab { padding: 0 9px; }
@@ -105,13 +104,7 @@ html[data-vt="question"] .ws-bar .ctx-pill-name { view-transition-name: pri-chap
 ::view-transition-group(pri-chapter) { animation-duration: 380ms; animation-timing-function: var(--c-ease-sweep); }
 @keyframes k-vt-in { from { opacity: 0; } }
 
-/* The key result: the chapter's first Notes formula at equation size. */
-.k-key { display: grid; gap: 4px; justify-items: start; animation: k-key-in 420ms var(--c-ease-set) both; }
-.k-key small { font: var(--c-t-label); letter-spacing: .14em; text-transform: uppercase; color: var(--c-ink-3); }
-.k-eq { margin: 0; font-size: clamp(26px, 3.2vw, 40px); color: var(--c-ink); }
-.k-eq .katex { font-size: 1em; }
-.k-notes { font: 600 13px var(--c-sc); letter-spacing: .12em; text-transform: uppercase; color: var(--c-teal); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
-@keyframes k-key-in { from { opacity: 0; transform: translateY(-.18em); } }
+
 
 /* States. Focus: the teal ring, inset where the control is flush to a rule.
    Disabled: engraved but unlit (40% ink, no press). Loading: the outline
@@ -125,7 +118,7 @@ html.ui-instrument :is(.in-bar .in-tab, .in-bar .in-mark, .in-bar .in-cmd, .k-do
 
 @media (prefers-reduced-motion: reduce) {
   .k-tab-ind, .k-dock > * { transition: none; }
-  .k-odo > span > span, .m-dial-box > .m-dial-sec, .k-key { animation: none; }
+  .k-odo > span > span, .m-dial-box > .m-dial-sec { animation: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 @media (forced-colors: active) { .k-ticks i.on, .k-tab-ind { background: Highlight; } }

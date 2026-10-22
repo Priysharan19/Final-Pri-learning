@@ -104,14 +104,14 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     const match = s => !needle || String(s).toLowerCase().includes(needle);
     const track = practiceTrack(user);
     const groups = [
-      { key: 'formulas', label: t('inst.cmdFormulas'), rows: needle.length > 2 && !commands ? (formulas || []).filter(f => f.find.includes(needle)).slice(0, 3).map((f, i) => ({
-        id: `fx-${f.chapterId}-${i}`, label: `$${f.tex}$`, math: true, content: true, meta: f.label, glyph: 'doc', hint: t('inst.openInNotes'),
-        run: () => nav(`/notes/${f.chapterId}`)
-      })) : [] },
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
         id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, num: String(c.index + 1).padStart(2, '0'),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
+      { key: 'formulas', label: t('inst.cmdFormulas'), rows: needle.length > 2 && !commands ? (formulas || []).filter(f => f.find.includes(needle)).slice(0, 3).map((f, i) => ({
+        id: `fx-${f.chapterId}-${i}`, label: `$${f.tex}$`, math: true, content: true, meta: f.label, glyph: 'doc', hint: t('inst.openInNotes'),
+        run: () => nav(`/notes/${f.chapterId}`)
+      })) : [] },
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
         // What tells two scripts apart: the chapter, the day, the certified mark.
         id: `sc-${s.id}`, label: s.subtopicName || '', glyph: 'doc', meta: dayOf(s.answeredAt),
