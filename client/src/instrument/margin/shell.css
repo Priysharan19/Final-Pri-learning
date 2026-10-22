@@ -70,8 +70,9 @@
 /* Below the hero, the long list and the plate skip rendering work while off
    screen, so a forced style pass (the ⌘K field taking focus) stays cheap. */
 .k-body { content-visibility: auto; contain-intrinsic-size: auto 1400px; }
-/* The chapter register: one sub-dial per topic. */
-.k-sub { grid-row: span 2; width: 40px; height: 40px; }
+/* The chapter register: every topic a hairline row (arc, name, figure). */
+.k-sub { width: 32px; height: 32px; }
+.k-sub.is-new circle { stroke-dasharray: 2 3; }
 .k-sub circle { fill: none; stroke: var(--c-hair); stroke-width: 1.5; }
 .k-sub .on { stroke: var(--c-lume); stroke-width: 3; stroke-linecap: round; }
 .ui-instrument :lang(hi) .k-next small { text-transform: none; letter-spacing: 0; }
@@ -93,22 +94,21 @@
 /* The resume card's action is the screen's one primary (pill) control. */
 .k-next .c-btn-primary { border-radius: var(--radius-pill); min-height: 44px; padding: 0 20px; font: var(--c-t-button); letter-spacing: .12em; text-transform: uppercase; }
 
-/* Shared element: the Index's next question → Write's question prompt. */
-html[data-vt="question"] .q-prompt { view-transition-name: pri-question; }
-/* No double exposure: the old page holds still underneath, the new one fades in over 120ms. */
-html[data-vt="question"]::view-transition-old(root) { animation: none; }
-/* Only the block's box morphs: its old text is gone in 80ms, the prompt arrives as the box lands. */
-html[data-vt="question"]::view-transition-old(pri-question) { animation: k-vt-out 80ms linear both; }
-html[data-vt="question"]::view-transition-new(pri-question) { animation: k-vt-in 160ms var(--c-ease-row) 220ms both; }
-@keyframes k-vt-out { to { opacity: 0; } }
-html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 120ms var(--c-ease-row) both; }
+/* Resume → Write. Only the Index block is named, and only on the old side: it
+   lingers 120ms where it was while the old page is gone at once and the new
+   page fades in over 160ms, so nothing ghosts and the prompt is in its final
+   place from the first frame. */
+html[data-vt="question"]::view-transition-old(root) { animation: none; opacity: 0; }
+html[data-vt="question"]::view-transition-new(root) { animation: k-vt-in 160ms var(--c-ease-row) both; }
+html[data-vt="question"]::view-transition-old(pri-question) { animation: k-vt-out 120ms linear both; }
 @keyframes k-vt-in { from { opacity: 0; } }
-::view-transition-group(pri-question) { animation-duration: 380ms; animation-timing-function: var(--c-ease-sweep); }
+@keyframes k-vt-out { to { opacity: 0; } }
 
 /* States. Focus: the teal ring, inset where the control is flush to a rule.
    Disabled: engraved but unlit (40% ink, no press). Loading: the outline
    holds its place, quiet text, never a shimmer. */
-.ui-instrument :is(.in-tab, .in-mark, .in-cmd, .k-dock > *):focus-visible { outline-offset: 3px; border-radius: 4px; }
+html.ui-instrument .in-bar :is(.in-tab, .in-mark, .in-cmd), html.ui-instrument .k-dock > * { border-radius: 4px; }
+html.ui-instrument :is(.in-bar .in-tab, .in-bar .in-mark, .in-bar .in-cmd, .k-dock > *):focus-visible { outline-offset: 3px; }
 :is(.in-tab, .k-dock > *, .in-pal-item, .c-btn-primary):is(:disabled, [aria-disabled="true"]) { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none; }
 .k-next.k-wait i { display: block; height: 1px; width: 62%; background: var(--c-hair); }
 .k-next.k-wait i + i { width: 38%; }

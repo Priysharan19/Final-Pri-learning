@@ -25,10 +25,11 @@ import './margin/shell.css';
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
 
 // The chapter register (C): one engraved sub-dial per topic, its arc the
-// topic's mastery, drawn only where accuracy may be stated (else a bare track).
-function SubDial({ value }) {
+// topic's mastery, drawn only where accuracy may be stated (else a bare track;
+// dashed for a topic not yet started).
+function SubDial({ value, fresh }) {
   return (
-    <svg className="k-sub" viewBox="0 0 40 40" aria-hidden="true">
+    <svg className={`k-sub${fresh ? ' is-new' : ''}`} viewBox="0 0 40 40" aria-hidden="true">
       <circle cx="20" cy="20" r="17" />
       {value > 0 && <circle className="on" cx="20" cy="20" r="17" pathLength="100" strokeDasharray={`${value} 100`} transform="rotate(-90 20 20)" />}
     </svg>
@@ -58,11 +59,10 @@ function Odometer({ value }) {
   );
 }
 
-// The shared element (design v3 05): the next question on the Index becomes
-// Write's question prompt. With the View Transitions API the card is named for the old snapshot
-// and the new page's .q-prompt carries the same name (shell.css); the update
-// waits briefly for that prompt to mount so the two can be matched, and falls
-// back to a cross-fade if it does not arrive. No API, or Reduce Motion: a cut.
+// Resume → Write (design v3 05): a View Transition in which the old page is
+// gone at once, the Index block lingers briefly where it was, and Write fades
+// in with its prompt already in place (shell.css). The update waits briefly for
+// the prompt to mount. No API, or Reduce Motion: a cut.
 function morphTo(card, go) {
   if (typeof document.startViewTransition !== 'function' || reduced() || !card) { go(); return; }
   const root = document.documentElement;
@@ -70,7 +70,6 @@ function morphTo(card, go) {
   try {
     const vt = document.startViewTransition(() => {
       card.style.viewTransitionName = '';
-      // Only now, and only for this transition, does the prompt take the name.
       root.dataset.vt = 'question';
       flushSync(go);
     return new Promise(resolve => {
@@ -292,13 +291,14 @@ export default function IndexPage() {
                 // A dot point is a string (India) or a row with its own evidence.
                 const text = typeof dp === 'string' ? dp : String(dp?.text || '');
                 const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
-                const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : '—';
+                // Mastery, floored, only past the floor; otherwise how many answered, or —.
+                const figure = ev?.accuracy != null ? `${Math.floor(ev.mastery)}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : '—';
                 return (
                   <li key={i}>
                     <PageLink className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
-                      <SubDial value={ev?.accuracy != null ? ev.mastery : 0} />
-                      <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
-                      <b lang="en"><TermGloss text={text} /></b>
+                      <SubDial value={ev?.accuracy != null ? ev.mastery : 0} fresh={!ev?.attempts} />
+                      <b lang="en"><span className="in-ex-n">{`${current.index + 1}.${i + 1}`}</span><TermGloss text={text} /></b>
+                      <span className="in-ex-f">{figure}</span>
                     </PageLink>
                   </li>
                 );

@@ -96,7 +96,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
       { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
         // What tells two scripts apart: the chapter, the day, the certified mark.
         id: `sc-${s.id}`, label: s.subtopicName || '', glyph: 'doc', meta: dayOf(s.answeredAt),
-        hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
+        hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '—', content: true,
         run: () => nav('/review')
       })) },
       { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, glyph: PAGE_GLYPH[p.to] || 'doc', run: () => nav(p.to) })) },
