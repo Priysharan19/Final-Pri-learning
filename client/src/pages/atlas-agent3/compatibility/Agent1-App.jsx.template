@@ -1,0 +1,39 @@
+// Temporary uncommitted three-agent compatibility proof, never production code.
+import React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { NavigationProvider, useAtlasNavigation } from './lib/navigation.jsx';
+import Shell from './components/Shell.jsx';
+import CommandPage from './pages/Command.jsx';
+import { AtlasExperience, LaboratoryExperience } from '../../../../client/src/atlas/agent2/index.js';
+import AtlasAgent3Demo from '../../../../client/src/pages/atlas-agent3/index.jsx';
+
+function RealAtlasBridge() {
+  const { context, go } = useAtlasNavigation();
+  return <AtlasExperience
+    initialConceptId={context.concept?.startsWith('c') ? context.concept : 'c10-pair-linear-equations'}
+    onSelectConcept={({ conceptId }) => go('atlas', { concept: conceptId })}
+    onOpenLaboratory={({ conceptId }) => go('laboratory', { concept: conceptId })}
+    onOpenPaper={({ conceptId }) => go('paper', { concept: conceptId })} />;
+}
+function RealLaboratoryBridge() {
+  const { go } = useAtlasNavigation();
+  return <LaboratoryExperience onBackToAtlas={() => go('atlas', { concept: 'c10-pair-linear-equations' })}
+    onOpenPaper={({ conceptId }) => go('paper', { concept: conceptId })} />;
+}
+function RealPaperBridge({ destination }) {
+  const { go, context } = useAtlasNavigation();
+  return <AtlasAgent3Demo embedded initialConceptId={context.concept || 'c10-pair-linear-equations'}
+    initialView={destination}
+    onNavigate={(next, detail) => go(next, { concept: detail.conceptId })}
+    onDestinationChange={next => { if (next !== destination) go(next, { concept: context.concept }); }} />;
+}
+export default function App() {
+  return <NavigationProvider><Shell><Routes>
+    <Route path="/" element={<CommandPage />} />
+    <Route path="/atlas" element={<RealAtlasBridge />} />
+    <Route path="/laboratory" element={<RealLaboratoryBridge />} />
+    <Route path="/paper" element={<RealPaperBridge destination="paper" />} />
+    <Route path="/insight" element={<RealPaperBridge destination="insight" />} />
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes></Shell></NavigationProvider>;
+}
