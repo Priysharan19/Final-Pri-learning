@@ -183,9 +183,7 @@ html.ui-instrument .in-led-q { display: -webkit-box; -webkit-box-orient: vertica
 html.ui-instrument .in-led-q > span { white-space: normal; }
 html.ui-instrument .in-led-q .katex { white-space: nowrap; }
 html.ui-instrument .in-led-ch { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; overflow: hidden; line-height: 1.3; }
-/* The question's first lines on the ruling when there is no ink or answer. */
-html.ui-instrument .in-scr-qline { position: absolute; left: 12px; right: 64px; top: 4px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; font: 400 15px/20px var(--c-text); color: var(--c-ink-2); }
-html.ui-instrument .in-scr-qline .in-scr-none { position: static; display: inline-flex; margin-right: 6px; vertical-align: -2px; }
+html.ui-instrument .in-scr-mode .in-scr-none { position: static; display: inline-flex; margin-right: 6px; vertical-align: -2px; }
 /* Masthead eyebrow: the counts in small caps, tabular. */
 html.ui-instrument .in-hist-eyebrow { margin: 0 0 6px; font: 600 13px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); font-variant-numeric: tabular-nums; }
 /* Selects as C ghost chips: small caps on a hairline underline, an engraved chevron. */
@@ -200,3 +198,5 @@ html.ui-instrument .in-flt.c-chip { letter-spacing: .08em; }
   html.ui-instrument .in-led-bar::-webkit-scrollbar { display: none; }
   html.ui-instrument .in-led-bar .in-flt { flex: none; }
 }
+/* No ink and no answer: quiet ruled paper with the attempt's mode. */
+html.ui-instrument .in-scr-mode { position: absolute; left: 12px; top: 26px; display: inline-flex; align-items: center; font: 600 13px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-3); }

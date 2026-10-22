@@ -100,7 +100,7 @@ const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PR
 const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
 // Marks in the instrument build are C's shapes (✓ circle, ✗ diamond).
 const MarkGlyph = INSTRUMENT_BUILD ? InstrumentMark : null;
-const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index }) {
+const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index, modeLabel }) {
   const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
   const wantsInk = !!item.hasInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
   const ref = useRef(null);
@@ -141,9 +141,10 @@ const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, 
         </svg>
       ) : ink.state === 'loading' ? <span className="in-scr-wait"><i /><i /><i /></span>
         : typed ? <span className="in-scr-typed"><MathText text={typed} /></span>
-          // Never a blank sheet: without ink or a typed answer, the question's
-          // first line sits on the ruling (a failed fetch adds a dashed pen).
-          : <span className="in-scr-qline">{ink.state === 'error' && <span className="in-scr-none is-error"><Icon name="pen" size={13} /></span>}<MathText text={flatTitle(item.prompt)} /></span>}
+          // Never blank and never the title again: without ink or an answer,
+          // quiet ruled paper carries the attempt's mode (a failed ink fetch
+          // adds a dashed pen).
+          : <span className="in-scr-mode">{ink.state === 'error' && <span className="in-scr-none is-error"><Icon name="pen" size={13} /></span>}{modeLabel}</span>}
       {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
     </span>
   );
@@ -360,7 +361,7 @@ function HistoryForProfile() {
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
-                  {ScriptThumb && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} />}
+                  {ScriptThumb && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} modeLabel={MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : t('history.modePractice')} />}
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={INSTRUMENT_BUILD ? flatTitle(item.prompt) : item.prompt} /></span>
