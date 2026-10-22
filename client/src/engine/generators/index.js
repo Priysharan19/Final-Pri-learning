@@ -40,10 +40,11 @@ const BANKS = {
   // or Extension generator for their central dot points. They are their own
   // banks rather than an overlay on india-senior, because india-senior is the
   // "corners nothing else covered" bank and these are whole chapters.
-  'india-class11': () => Promise.all([import('./india-class11.js'), import('./india-class11-jee-hardest.js')])
-    // The JEE hardest-level (D4) forms of tranche 2 (curriculum-in-hardest-covers.js)
-    // ride in the same bank: they serve the same chapters.
-    .then(([base, jee]) => ({ ...base.indiaClass11, ...jee.class11JeeHardestForms })),
+  'india-class11': () => Promise.all([import('./india-class11.js'), import('./india-class11-jee-hardest.js'), import('./india-class11-jee-d4.js')])
+    // The JEE hardest-level (D4) forms of tranche 2 and of the single-template
+    // chapters (curriculum-in-hardest-covers.js) ride in the same bank: they
+    // serve the same chapters.
+    .then(([base, jee, d4]) => ({ ...base.indiaClass11, ...jee.class11JeeHardestForms, ...d4.class11JeeD4Forms })),
   'india-class12': () => Promise.all([import('./india-class12.js'), import('./india-class12-hardest.js'), import('./india-class12-jee-hardest.js')])
     // The hardest-level forms — CBSE D3 (tranche 1) and JEE D4 (tranche 2),
     // curriculum-in-hardest-covers.js — ride in the same bank: they serve the
@@ -243,6 +244,22 @@ const INDIA_BANK_OF = {
   'c12-vector-direction-reasoning': 'india-class12',
   // JEE D4 replacement for a retired routine rung (#408).
   'c11-complex-quadratic-jee-reasoning': 'india-class11',
+  // JEE D4 forms for the single-template Class 11 chapters (one per dot point).
+  'c11-set-notation-jee-reasoning': 'india-class11',
+  'c11-set-operations-jee-reasoning': 'india-class11',
+  'c11-inclusion-exclusion-jee-reasoning': 'india-class11',
+  'c11-linear-inequality-jee-reasoning': 'india-class11',
+  'c11-inequality-system-jee-reasoning': 'india-class11',
+  'c11-inequality-region-jee-reasoning': 'india-class11',
+  'c11-binomial-expansion-jee-reasoning': 'india-class11',
+  'c11-binomial-general-term-jee-reasoning': 'india-class11',
+  'c11-binomial-middle-term-jee-reasoning': 'india-class11',
+  'c11-circle-jee-reasoning': 'india-class11',
+  'c11-parabola-jee-reasoning': 'india-class11',
+  'c11-ellipse-hyperbola-jee-reasoning': 'india-class11',
+  'c11-3d-point-jee-reasoning': 'india-class11',
+  'c11-3d-distance-jee-reasoning': 'india-class11',
+  'c11-3d-section-jee-reasoning': 'india-class11',
   // Hardest-level (D3) forms, tranche 3 (Classes VII, VIII, XI).
   'c7-place-value-systems-reasoning': 'india-class7-hardest',
   'c7-rounding-bounds-reasoning': 'india-class7-hardest',
