@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import postcss from 'postcss';
 import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -443,6 +444,46 @@ export function featureDefines(command, env = process.env) {
   };
 }
 
+// The instrument build stops shipping v1.0 rules it can never paint
+// (PR 0b, issue #658). src/instrument/legacy-css-unused.json lists, per
+// global sheet, the rules (at-rule context ## selector) that:
+//   · matched nothing in a Chromium CSS-coverage pass over the instrument
+//     tour (client/test/tour-instrument.js) AND the whole e2e suite run
+//     against an instrument build, which walks the v1.0 screens the
+//     instrument build still shows (Practice, Notes, exams, Settings …); and
+//   · name, in every selector, a class that no source file the instrument
+//     build can render ever writes: the classic Home (pages/Home.jsx and its
+//     PlanCard), the classic topbar and sidebar branches of App.jsx, and
+//     nothing else.
+// Only those rules are removed, and only from a production build made with
+// PRI_FEATURE_INSTRUMENT=1. A flag-off build never runs this transform, so
+// its CSS is byte-identical. A listed rule that no longer exists fails the
+// build, so the list cannot rot silently behind an edited sheet.
+const LEGACY_UNUSED = JSON.parse(readFileSync(new URL('./src/instrument/legacy-css-unused.json', import.meta.url), 'utf8'));
+function instrumentLegacyCss(enabled) {
+  const norm = s => s.replace(/\s+/g, ' ').replace(/\s*([>+~,])\s*/g, '$1').trim();
+  const context = node => { const at = []; for (let p = node.parent; p && p.type !== 'root'; p = p.parent) if (p.type === 'atrule') at.unshift(`@${p.name} ${norm(p.params)}`); return at.join('|'); };
+  return {
+    name: 'pri-instrument-legacy-css',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!enabled) return null;
+      const sheet = Object.keys(LEGACY_UNUSED).find(name => id.split('?')[0].endsWith(`/src/${name}`));
+      if (!sheet) return null;
+      const wanted = new Set(LEGACY_UNUSED[sheet]);
+      const found = new Set();
+      const root = postcss.parse(code, { from: id });
+      root.walkRules(rule => {
+        const key = `${context(rule)}##${norm(rule.selector)}`;
+        if (wanted.has(key)) { found.add(key); rule.remove(); }
+      });
+      const stale = [...wanted].filter(key => !found.has(key));
+      if (stale.length) this.error(`legacy-css-unused.json lists rules ${sheet} no longer has: ${stale.slice(0, 5).join(' · ')}`);
+      return { code: root.toString(), map: null };
+    }
+  };
+}
+
 // The flags a build was made with, written beside it as features.json so the
 // tracked iPad bundles can be checked for a flag-on test build committed by
 // mistake (client/test/ios-bundle-features-check.mjs). Records every known
@@ -469,7 +510,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [instrumentLegacyCss(command === 'build' && INSTRUMENT_BUILD), react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',
