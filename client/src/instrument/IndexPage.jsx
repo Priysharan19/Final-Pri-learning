@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { flushSync } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
+import { isCurrentUrl } from '../platform/pageLink.js';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT, tLater } from '../i18n/index.js';
@@ -8,7 +11,13 @@ import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
 import EmptyPlot from './EmptyPlot.jsx';
 import TermGloss from '../components/TermGloss.jsx';
+import { MathText } from '../lib/latex.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
+import IndexDial from './margin/IndexDial.jsx';
+import { registerOf } from './margin/register.js';
+import { noteCurriculum } from './CommandBar.jsx';
+import { reduced, rowReveal } from './margin/motion.js';
+import './margin/shell.css';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
 // the coloured tabs choose a chapter; its plate shows what the evidence says
@@ -28,15 +37,53 @@ const isPhone = () => !!window.matchMedia?.(PHONE).matches;
 
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
 
-function Ring({ value, colourVar }) {
-  const r = 10; const length = 2 * Math.PI * r;
+// A chapter's mastery as a ten-tick meter (only where accuracy may be stated:
+// chapterEvidence already holds mastery at 0 below the floor).
+function Ticks({ value }) {
+  const lit = Math.round(value / 10);
+  return <span className="k-ticks" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < lit ? 'on' : undefined} />)}</span>;
+}
+
+// A figure whose digits roll into place like an odometer (CSS, Settle, 300ms
+// in). Screen readers get the plain figure.
+let ledgerRolled = false;
+function Odometer({ value }) {
+  const text = String(value);
   return (
-    <svg className="in-ring" viewBox="0 0 26 26" aria-hidden="true">
-      <circle cx="13" cy="13" r={r} fill="none" stroke="var(--in-l4)" strokeWidth="2.5" />
-      <circle cx="13" cy="13" r={r} fill="none" stroke={`var(${colourVar})`} strokeWidth="2.5" strokeLinecap="round"
-        strokeDasharray={length} strokeDashoffset={length * (1 - value / 100)} transform="rotate(-90 13 13)" />
-    </svg>
+    <span className="k-odo">
+      <span className="sr-only">{text}</span>
+      {/* A blank cell, then the drum: it starts empty, never on a false 0. */}
+      {[...text].map((ch, i) => /\d/.test(ch)
+        ? <span key={i} aria-hidden="true"><span style={{ '--d': 1 + Number(ch) }}>{['', 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <i key={n}>{n}</i>)}</span></span>
+        : <span key={i} aria-hidden="true">{ch}</span>)}
+    </span>
   );
+}
+
+// The shared element (design v3 05): the next question on the Index becomes
+// Write's question prompt. With the View Transitions API the card is named for the old snapshot
+// and the new page's .q-prompt carries the same name (shell.css); the update
+// waits briefly for that prompt to mount so the two can be matched, and falls
+// back to a cross-fade if it does not arrive. No API, or Reduce Motion: a cut.
+function morphTo(card, go) {
+  if (typeof document.startViewTransition !== 'function' || reduced() || !card) { go(); return; }
+  const root = document.documentElement;
+  card.style.viewTransitionName = 'pri-question';
+  try {
+    const vt = document.startViewTransition(() => {
+      card.style.viewTransitionName = '';
+      // Only now, and only for this transition, does the prompt take the name.
+      root.dataset.vt = 'question';
+      flushSync(go);
+    return new Promise(resolve => {
+      const t0 = performance.now();
+      // Rendering (and so rAF) is paused while the update runs: poll on a timer.
+      const look = () => (document.querySelector('.q-prompt') || performance.now() - t0 > 300 ? resolve() : setTimeout(look, 16));
+      look();
+    });
+    });
+    vt.finished.finally(() => { delete root.dataset.vt; });
+  } catch { card.style.viewTransitionName = ''; delete root.dataset.vt; go(); }
 }
 
 export default function IndexPage() {
@@ -58,6 +105,9 @@ export default function IndexPage() {
     return () => { live = false; };
   }, []);
 
+  // The command sheet reuses this read instead of fetching /curriculum again.
+  useEffect(() => { if (curriculum) noteCurriculum(curriculum, user); }, [curriculum, user]);
+
   const track = practiceTrack(user);
   const chapters = useMemo(() => {
     const scope = scopeFor(curriculum, user);
@@ -78,6 +128,35 @@ export default function IndexPage() {
   }, [chapters, pick, recent]);
 
   const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
+  const nav = useNavigate();
+  const root = useRef(null);
+  const resumeCard = useRef(null);
+
+  // The register: every figure is a sum of the server's own evidence.
+  const register = useMemo(() => registerOf(chapters, accuracyClaim, PROGRESS_THRESHOLDS), [chapters]);
+
+  // The entrance (v3 choreography 05, in C's row-reveal motion): the greeting
+  // fades at 0ms, the resume card rises at 40ms, the rows follow 40ms apart
+  // (at most five staggered), the ledger digits roll at 300ms (CSS). Once.
+  const entered = useRef({ greet: false, resume: false, rows: false });
+  // The ledger rolls on the first Index of a page load only; decided at mount.
+  const rolls = useRef(!ledgerRolled);
+  useEffect(() => { if (chapters.length) ledgerRolled = true; }, [chapters.length]);
+  useLayoutEffect(() => {
+    const el = root.current; const done = entered.current;
+    if (!el || reduced()) return;
+    const greet = el.querySelector('.in-greet');
+    if (greet && !done.greet) { done.greet = true; greet.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 340, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }); }
+    const card = el.querySelector('.k-next');
+    if (card && !done.resume) { done.resume = true; rowReveal([card], { delay: 40, stagger: 0 }); }
+    const rows = el.querySelectorAll('.in-chs > li');
+    if (rows.length && !done.rows) {
+      done.rows = true;
+      const list = [...rows];
+      rowReveal(list.slice(0, 5), { delay: 80, stagger: 40 });
+      rowReveal(list.slice(5), { delay: 80 + 4 * 40, stagger: 0 });
+    }
+  });
   const name = (user.name || '').split(' ')[0];
   const markOf = id => (marks[id]?.possible ? marks[id] : null);
   const chapterSub = c => {
@@ -99,7 +178,7 @@ export default function IndexPage() {
       const key = typeof dp === 'object' && dp?.id ? String(dp.id) : String(i);
       return own > 0 || Number(seen[key]?.questions) > 0 || Number(seen[String(i)]?.questions) > 0;
     }).length;
-    return `${Math.round((100 * n) / dps.length)}%`;
+    return `${Math.floor((100 * n) / dps.length)}%`;
   };
   // The resume card's ten segments: the last attempt's own marks, nothing more.
   const resumeMarks = recent && Number.isInteger(recent.marksPossible) && recent.marksPossible > 0 && !recent.repeat
@@ -109,48 +188,61 @@ export default function IndexPage() {
   if (error) return <div className="card" role="alert">{t('inst.indexError')} {error}</div>;
 
   return (
-    <div className="in-index" data-instrument-index>
-      <div className="in-spine">
-        <div className="in-greet">
-          <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
-          <h1>{t(greetingKey(hour), { name })}</h1>
-        </div>
-
-        {recent && (
-          <div className="in-resume" data-instrument-resume>
-            <div>
-              <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
-              <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
-            </div>
-            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
-            {resumeMarks && resumeMarks.possible <= 10 && (
-              <div className="in-seg10" aria-hidden="true">
-                {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
-              </div>
-            )}
+    <div className="in-index" data-instrument-index ref={root}>
+      <header className="k-hero">
+        {curriculum && chapters.length > 0 ? (
+          <IndexDial accuracy={register.accuracy} covered={register.covered} label={t('inst.dialLabel')}
+            caption={<><span>{t('inst.dialLong')}</span>{register.accuracy == null ? '—' : `${register.accuracy}%`}<span>{t('inst.dialShort')}</span>{`${register.covered}%`}</>}
+            ariaLabel={register.accuracy == null
+              ? t('inst.dialAriaHeld', { started: register.started, total: register.total })
+              : t('inst.dialAria', { accuracy: register.accuracy, started: register.started, total: register.total })} />
+        ) : <div className="m-dial" aria-hidden="true" />}
+        <div>
+          <div className="in-greet">
+            <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
+            <h1>{t(greetingKey(hour), { name })}</h1>
           </div>
-        )}
-
-        {phone && current && (
-          <>
-            <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}>
-              <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
-              <span className="in-next-ghost" aria-hidden="true">{String(current.index + 1).padStart(2, '0')}</span>
-              <div className="in-next-label">
-                <small>{t('inst.chapterN', { n: current.index + 1 })}{markOf(current.row.id) ? ` · ${markOf(current.row.id).earned}/${markOf(current.row.id).possible}` : ''}</small>
-                <b lang="en"><TermGloss text={current.row.name} /></b>
-              </div>
+          {/* Loading: the block's engraved rules hold its place (no shimmer). */}
+          {recent === undefined && <div className="k-next k-wait" aria-hidden="true"><i /><i /></div>}
+          {recent && (
+            <div className="k-next" data-instrument-resume ref={resumeCard}>
+              <small>{t('inst.resumePrefix')} · <span lang="en">{recent.subtopicName || ''}</span></small>
+              {recent.prompt ? <p className="k-q" lang="en"><MathText text={recent.prompt} /></p> : <p className="k-q" lang="en"><TermGloss text={recent.subtopicName || ''} /></p>}
+              {resumeMarks && <small>{t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible })}</small>}
+              {resumeMarks && resumeMarks.possible <= 10 && (
+                <div className="in-seg10" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
+                </div>
+              )}
+              <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: recent.subtopic, track })}
+                onClick={e => {
+                  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                  e.preventDefault();
+                  const to = practiceHref({ subtopic: recent.subtopic, track });
+                  morphTo(resumeCard.current?.querySelector('.k-q'), () => nav(to, { replace: isCurrentUrl(to) }));
+                }}>{t('inst.resume')}</PageLink>
             </div>
-            <div className="in-strip" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} style={{ '--cc': `var(${c.colour})` }}
-                  className={c.evidence.attempts ? undefined : 'is-new'}
-                  aria-current={current.row.id === c.row.id ? 'true' : undefined} onClick={() => setPick(c.row.id)} />
-              ))}
+          )}
+          {/* A new student: chapter 1's first question, one tap away. */}
+          {recent === null && chapters[0] && (
+            <div className="k-next" data-instrument-begin>
+              <small>{t('inst.chapterN', { n: 1 })} · <span lang="en">{chapters[0].row.name}</span></small>
+              <p className="k-q">{t('inst.beginFirst')}</p>
+              <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: chapters[0].row.id, track })}>{t('inst.begin')}</PageLink>
             </div>
-          </>
-        )}
+          )}
+          {curriculum && chapters.length > 0 && (
+            <dl className={`k-ledger${rolls.current ? '' : ' k-still'}`} data-instrument-ledger>
+              <div><dt>{t('inst.ledgerAnswers')}</dt><dd><Odometer value={register.answers} /></dd></div>
+              <div><dt>{t('inst.ledgerCorrect')}</dt><dd><Odometer value={register.correct == null ? '—' : register.correct} /></dd></div>
+              <div><dt>{t('inst.ledgerChapters')}</dt><dd><Odometer value={`${register.started}/${register.total}`} /></dd></div>
+            </dl>
+          )}
+        </div>
+      </header>
 
+      <div className="k-body">
+      <div className="in-spine">
         {!curriculum && <div className="skeleton" style={{ height: 380, marginTop: 18 }} aria-hidden="true" />}
 
         {curriculum && (
@@ -167,26 +259,18 @@ export default function IndexPage() {
                       <span className="in-ch-t"><span lang="en"><TermGloss text={c.row.name} /></span>
                         <small>{chapterSub(c)}</small>
                       </span>
-                      <Ring value={c.evidence.mastery} colourVar={c.colour} />
+                      <Ticks value={c.evidence.mastery} />
                     </button>
                   </li>
                 );
               })}
             </ul>
-            <div className="in-thumbs" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} className="in-thumb" style={{ '--cc': `var(${c.colour})` }}
-                  aria-current={current?.row.id === c.row.id ? 'true' : undefined}
-                  onMouseEnter={() => setPick(c.row.id)} onClick={() => setPick(c.row.id)}><span>{c.index + 1}</span></button>
-              ))}
-            </div>
           </nav>
         )}
       </div>
 
       {current && (
         <section className="in-plate" style={{ '--cc': `var(${current.colour})` }} aria-labelledby="in-plate-title" data-instrument-plate={current.row.id}>
-          <span className="in-ghost" aria-hidden="true">{String(current.index + 1).padStart(2, '0')}</span>
           <div className="in-plate-head">
             <div>
               <small>{t('inst.chapterN', { n: current.index + 1 })}</small>
@@ -198,11 +282,13 @@ export default function IndexPage() {
               <div data-plate-questions><b>{current.evidence.attempts}</b><small>{t('inst.kpiQuestions')}</small></div>
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
-            {/* A new student sees the empty state above the fold: one line
-                under the figures; the ruled plot sits after the topics. */}
-            {chapters.every(c => !c.evidence.attempts) && <p className="c-empty-note" data-empty-note>{t('inst.emptyPlot')}</p>}
           </div>
-          {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
+          {/* Evidence only: a chapter with no answers has nothing to plot, so it
+              gets a clean ruled frame (the slot PR5's empty plot fills), never an
+              invented curve. */}
+          {current.evidence.attempts > 0
+            ? !phone && <ChapterScope figure={current.figure} colourVar="--c-lume" label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
+            : <EmptyPlot className="in-scope k-slot" />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
               {current.row.dotpoints.slice(0, 4).map((dp, i) => {
@@ -222,18 +308,15 @@ export default function IndexPage() {
               })}
             </ul>
           )}
-          {/* The empty first plot sits after the topics, not stacked on the
-              chapter's scope: the scope is the chapter's mathematics, this is
-              where the student's own first checked answer will go. */}
-          {chapters.every(c => !c.evidence.attempts) && <EmptyPlot bare />}
           <div>
             <div className="in-plate-acts">
-              <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
+              <PageLink className="c-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
             </div>
             {current.evidence.attempts > 0 && current.evidence.accuracy == null && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.accuracyHeld')}</p>}
           </div>
         </section>
       )}
+      </div>
       {curriculum && !chapters.length && <p className="in-empty">{t('inst.noChapters')}</p>}
     </div>
   );

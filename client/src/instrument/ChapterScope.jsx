@@ -5,8 +5,12 @@ import { MathText } from '../lib/latex.jsx';
 // face, with a tracer the student can steer and a numeric readout. Decorative
 // for marks (it never reads or sets one), but labelled for assistive tech.
 //
-// Drawn on a canvas so it costs nothing to React; one requestAnimationFrame
-// loop while the plate is on screen, none under reduced motion.
+// Drawn on a canvas so it costs nothing to React. The loop runs only while
+// the figure is arriving and the tracer makes its slow sweep (SETTLE seconds),
+// only while the plate is on screen and the tab visible, and never under
+// reduced motion; then it rests on its last frame. A pointer over the scope
+// draws one frame per move. Theme colours are read once per run, not per frame,
+// so a settled scope costs the main thread nothing (battery on school iPads).
 
 const FN = {
   wave: x => Math.sin(x * 1.3) * 1.6,
@@ -41,23 +45,35 @@ const EQN = {
 };
 
 const css = (el, name) => getComputedStyle(el).getPropertyValue(name).trim();
+const SETTLE = 6;
 
 export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', label, tracerHint = '', probeHint = '' }) {
   const wrap = useRef(null);
   const canvas = useRef(null);
   const readout = useRef(null);
   const probe = useRef(-1);
+  // The hints live in a ref so a language switch relabels without replaying.
+  const hints = useRef({ tracerHint, probeHint });
+  hints.current = { tracerHint, probeHint };
 
   useEffect(() => {
     const el = canvas.current;
     const box = wrap.current;
     if (!el || !box) return undefined;
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const start = performance.now();
+    // The arrival clock starts when the scope is first seen, not at mount.
+    let start = null;
     let frame = 0;
+    let pal = null;
+    let lastReadout = '';
+    const setReadout = html => { if (html !== lastReadout && readout.current) { lastReadout = html; readout.current.innerHTML = html; } };
+    const readPalette = () => {
+      pal = { col: css(box, colourVar) || css(box, '--c-ink-3'), second: css(box, '--c-ink-2'), edge: css(box, '--in-edge'), tick: css(box, '--in-tx-3'), ink: css(box, '--in-tx'), mono: css(box, '--c-text') || 'serif' };
+      pal.second = pal.second || pal.col;
+    };
 
     const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const hint = () => { const text = probe.current >= 0 ? probeHint : tracerHint; return text ? `<span class="in-readout-hint">${esc(text)}</span>` : ''; };
+    const hint = () => { const text = probe.current >= 0 ? hints.current.probeHint : hints.current.tracerHint; return text ? `<span class="in-readout-hint">${esc(text)}</span>` : ''; };
     const draw = now => {
       const dpr = window.devicePixelRatio || 1;
       const w = el.offsetWidth; const h = el.offsetHeight;
@@ -66,12 +82,8 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
       const c = el.getContext('2d');
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.clearRect(0, 0, w, h);
-      const col = css(box, colourVar) || '#888';
-      const second = css(box, '--in-c3') || col;
-      const edge = css(box, '--in-edge');
-      const tick = css(box, '--in-tx-3');
-      const ink = css(box, '--in-tx');
-      const mono = css(box, '--in-mono') || 'monospace';
+      if (!pal) readPalette();
+      const { col, second, edge, tick, ink, mono } = pal;
       const sx = w / 12; const sy = h / 8;
       const X = x => w / 2 + x * sx; const Y = y => h / 2 - y * sy;
 
@@ -94,7 +106,8 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
         if (major && v && Math.abs(v) < 4) c.fillText(String(v), X(0) + 8, y + 3);
       }
 
-      const t = (now - start) / 1000;
+      if (start === null) start = now;
+      const t = Math.min(SETTLE, (now - start) / 1000);
       const grow = reduce ? 1 : Math.min(1, t / 1.1);
       const curve = (fn, colour) => {
         c.strokeStyle = colour; c.lineWidth = 2.4; c.lineJoin = 'round'; c.beginPath();
@@ -115,7 +128,7 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
         c.strokeStyle = col; c.lineWidth = 2.4; c.beginPath();
         c.moveTo(w / 2, h / 2); c.lineTo(w / 2 + Math.cos(a) * r, h / 2 - Math.sin(a) * r); c.lineTo(w / 2 + Math.cos(a) * r, h / 2); c.closePath(); c.stroke();
         dot(w / 2 + Math.cos(a) * r, h / 2 - Math.sin(a) * r, 4.5, col);
-        readout.current && (readout.current.innerHTML = `<span>θ = <b>${Math.round(((a % (Math.PI * 2)) * 180) / Math.PI)}°</b></span><span>sin θ = <b>${Math.sin(a).toFixed(2)}</b></span>`);
+        setReadout(`<span>θ = <b>${Math.round(((a % (Math.PI * 2)) * 180) / Math.PI)}°</b></span><span>sin θ = <b>${Math.sin(a).toFixed(2)}</b></span>`);
       } else {
         const fn = FN[figure] || FN.wave;
         curve(fn, col);
@@ -130,29 +143,40 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
           c.strokeStyle = edge; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(px, 0); c.lineTo(px, h); c.moveTo(0, Y(readY)); c.lineTo(w, Y(readY)); c.stroke(); c.setLineDash([]);
           dot(px, Y(readY), 5, col);
         }
-        readout.current && (readout.current.innerHTML = `<span>x = <b>${readX.toFixed(2)}</b></span><span>y = <b>${Number.isFinite(readY) ? readY.toFixed(2) : '—'}</b></span>${hint()}`);
+        setReadout(`<span>x = <b>${readX.toFixed(2)}</b></span><span>y = <b>${Number.isFinite(readY) ? readY.toFixed(2) : '—'}</b></span>${hint()}`);
       }
     };
 
-    // Runs only while the scope is on screen and the tab is visible.
+    // Runs only while the scope is on screen, the tab is visible and the
+    // figure has not yet settled; afterwards it draws on demand.
     let visible = true;
-    const loop = now => { draw(now); if (!reduce && visible && !document.hidden) frame = requestAnimationFrame(loop); };
+    const settled = now => reduce || (start !== null && (now - start) / 1000 >= SETTLE);
+    const loop = now => { frame = 0; draw(now); if (!settled(now) && visible && !document.hidden) frame = requestAnimationFrame(loop); };
     const resume = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(loop); };
+    const once = () => { if (!frame) frame = requestAnimationFrame(loop); };
     const io = typeof IntersectionObserver === 'function'
-      ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) resume(); })
+      ? new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) resume(); else if (start !== null && !settled(performance.now())) start = null; })
       : null;
     io?.observe(box);
     const onVisibility = () => { if (!document.hidden && visible) resume(); };
     document.addEventListener('visibilitychange', onVisibility);
     frame = requestAnimationFrame(loop);
-    const move = e => { const r = el.getBoundingClientRect(); probe.current = (e.clientX - r.left) / r.width; if (reduce) draw(performance.now()); };
-    const leave = () => { probe.current = -1; if (reduce) draw(performance.now()); };
+    const move = e => { const r = el.getBoundingClientRect(); probe.current = (e.clientX - r.left) / r.width; once(); };
+    const leave = () => { probe.current = -1; once(); };
     box.addEventListener('pointermove', move);
     box.addEventListener('pointerleave', leave);
-    const resize = () => reduce && draw(performance.now());
+    const resize = () => { pal = null; once(); };
+    // A theme change restyles the box: read the palette again and redraw once.
+    // Only a real change counts: other code rewrites html's class to the same
+    // value (a no-op classList.remove still queues a record), and redrawing on
+    // those would loop through the readout's own DOM writes.
+    const look = () => `${document.documentElement.className}|${document.documentElement.dataset.theme}`;
+    let seen = look();
+    const themeWatch = typeof MutationObserver === 'function' ? new MutationObserver(() => { const now = look(); if (now !== seen) { seen = now; resize(); } }) : null;
+    themeWatch?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
     window.addEventListener('resize', resize);
-    return () => { cancelAnimationFrame(frame); io?.disconnect(); document.removeEventListener('visibilitychange', onVisibility); box.removeEventListener('pointermove', move); box.removeEventListener('pointerleave', leave); window.removeEventListener('resize', resize); };
-  }, [figure, colourVar, tracerHint, probeHint]);
+    return () => { cancelAnimationFrame(frame); io?.disconnect(); themeWatch?.disconnect(); document.removeEventListener('visibilitychange', onVisibility); box.removeEventListener('pointermove', move); box.removeEventListener('pointerleave', leave); window.removeEventListener('resize', resize); };
+  }, [figure, colourVar]);
 
   return (
     <div className="in-scope" ref={wrap} role="img" aria-label={label} data-instrument-scope={figure}>

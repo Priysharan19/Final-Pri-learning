@@ -21,7 +21,7 @@
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
     "test:engine:thorough": "node server/test/selfcheck.mjs --thorough",
     "test:gateway": "node client/test/gateway-check.mjs",
-    "test:dream": "node client/test/dream-interface-check.mjs && node client/test/design-system-check.mjs && node client/test/margin-design-check.mjs",
+    "test:dream": "node client/test/dream-interface-check.mjs && node client/test/design-system-check.mjs && node client/test/margin-design-check.mjs && node client/test/index-register-check.mjs",
     "test:outbox": "node client/test/outbox-check.mjs",
     "test:backend": "node client/test/backend-check.mjs && node client/test/report-series-check.mjs",
     "test:security": "node client/test/security-check.mjs",
