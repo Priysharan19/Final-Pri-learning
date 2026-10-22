@@ -5,6 +5,9 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { LineChart, HBars, Calendar, StatTile, Sparkline, MASTERY_FILLS } from '../components/Charts.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import { featureEnabled } from '../platform/features.js';
+
+const INSTRUMENT_ON = featureEnabled('instrument');
 
 // Mastery band names, as catalogue keys resolved with t() at render time.
 const BAND_KEY = { unseen: 'progressAu.bandUnseen', emerging: 'progressAu.bandEmerging', developing: 'progressAu.bandDeveloping', strong: 'progressAu.bandStrong', mastered: 'progressAu.bandMastered' };
@@ -137,8 +140,10 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
           delta={band
             ? t('progressAu.bandRange', { band: band.scale === 'grade' ? t('progressAu.gradeLabel', { label: band.label }) : band.label, low: stats.predicted.low, high: stats.predicted.high })
             : t('progressAu.range', { low: stats.predicted.low, high: stats.predicted.high })} deltaGood />
-        <StatTile label={t('app.dayStreak')} value={stats.streak} suffix={t('progressAu.daysUnit', { count: stats.streak })}
-          delta={stats.streak > 0 ? t('progressAu.keepAlive') : t('progressAu.answerToStart')} deltaGood={stats.streak > 0} />
+        {/* No streak pressure in the instrument build (luxury brief); the
+            streak itself is unchanged and still computed for other surfaces. */}
+        {!INSTRUMENT_ON && <StatTile label={t('app.dayStreak')} value={stats.streak} suffix={t('progressAu.daysUnit', { count: stats.streak })}
+          delta={stats.streak > 0 ? t('progressAu.keepAlive') : t('progressAu.answerToStart')} deltaGood={stats.streak > 0} />}
         <StatTile label={t('progress.questionsAnswered')} value={stats.totals.attempts.toLocaleString()}
           spark={stats.activity.slice(-12).map(a => a.questions)} />
         <StatTile label={t('progressAu.timePractising')} value={t('progressAu.hours', { n: Math.round((stats.totals.ms || 0) / 3600000 * 10) / 10 })}

@@ -19,6 +19,8 @@ import { featureEnabled } from '../platform/features.js';
 import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
+import { flatTitle } from '../instrument/flatTitle.js';
+import { MarkGlyph as InstrumentMark } from '../instrument/margin/MarginIcon.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
@@ -82,6 +84,75 @@ function InkReplay({ strokes, height = 160, label }) {
     </div>
   );
 }
+
+// Scripts (instrument): a paper thumbnail of the student's own ink with the
+// examiner's certified score in the corner. The strokes come from the same
+// saved-attempt detail the row opens, fetched only when the card is on screen
+// and only for attempts written in ink; anything else shows the ruled paper
+// with the answer the student gave. Display only, nothing is recomputed.
+
+const THUMB_MAX = 24;
+const STATUS_WORD = /^(correct|incorrect|wrong|right)$/i;
+// The thumbnail exists only in an instrument build: the build constant (not
+// the runtime flag) is false elsewhere, so the component tree-shakes out.
+/* global __PRI_FEATURE_INSTRUMENT__ */
+const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
+// The student's own typed answer, when the list row has one (not a status word).
+const typedOf = item => (item.answerGiven && !STATUS_WORD.test(String(item.answerGiven).trim()) ? String(item.answerGiven) : null);
+// Paper only when it will hold the student's own work: saved ink or an answer.
+const paperOf = item => !!(item.hasInk || typedOf(item));
+const scoredOf = item => !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
+// Marks in the instrument build are C's shapes (✓ circle, ✗ diamond).
+const MarkGlyph = INSTRUMENT_BUILD ? InstrumentMark : null;
+const ScriptThumb = INSTRUMENT_BUILD ? function ScriptThumb({ item, strokesFor, index, modeLabel }) {
+  const thumbAllowed = index < THUMB_MAX && !(typeof navigator !== 'undefined' && navigator.connection?.saveData);
+  const wantsInk = !!item.hasInk && thumbAllowed && typeof IntersectionObserver !== 'undefined';
+  const ref = useRef(null);
+  // idle → loading (on screen, fetching) → ok | empty (no strokes saved) | error.
+  const [ink, setInk] = useState({ state: 'idle', strokes: null });
+  useEffect(() => {
+    // Thumbnails are a nicety: skipped on a Save-Data connection, and only
+    // the first THUMB_MAX cards on a page fetch their strokes.
+    if (!wantsInk) return undefined;
+    let live = true;
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      io.disconnect();
+      setInk({ state: 'loading', strokes: null });
+      strokesFor(item.id).then(r => {
+        if (!live) return;
+        if (r.error) setInk({ state: 'error', strokes: null });
+        else setInk({ state: r.strokes?.length ? 'ok' : 'empty', strokes: r.strokes });
+      });
+    }, { rootMargin: '200px' });
+    if (ref.current) io.observe(ref.current);
+    return () => { live = false; io.disconnect(); };
+  }, [item.id, wantsInk]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const scored = scoredOf(item);
+  const full = scored && item.marksEarned === item.marksPossible;
+  let box = null;
+  if (ink.state === 'ok') {
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const st of ink.strokes) for (const pt of st.points || []) { x1 = Math.min(x1, pt.x); y1 = Math.min(y1, pt.y); x2 = Math.max(x2, pt.x); y2 = Math.max(y2, pt.y); }
+    if (isFinite(x1)) box = `${x1 - 8} ${y1 - 8} ${x2 - x1 + 16} ${y2 - y1 + 16}`;
+  }
+  const typed = typedOf(item);
+  return (
+    <span className={`in-scr-th is-${box ? 'ok' : ink.state}`} ref={ref} aria-hidden="true" data-thumb={box ? 'ok' : ink.state}>
+      {box ? (
+        <svg viewBox={box} preserveAspectRatio="xMinYMid meet">
+          {ink.strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
+        </svg>
+      ) : ink.state === 'loading' ? <span className="in-scr-wait"><i /><i /><i /></span>
+        : typed ? <span className="in-scr-typed"><MathText text={typed} /></span>
+          // Never blank and never the title again: without ink or an answer,
+          // quiet ruled paper carries the attempt's mode (a failed ink fetch
+          // adds a dashed pen).
+          : <span className="in-scr-mode">{ink.state === 'error' && <span className="in-scr-none is-error"><Icon name="pen" size={13} /></span>}{modeLabel}</span>}
+      {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
+    </span>
+  );
+} : null;
 
 export default function History() {
   const { user } = useApp();
@@ -253,6 +324,13 @@ function HistoryForProfile() {
     return formatDate(`${key}T12:00:00Z`, user, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
 
+  // One fetch per attempt for the thumbnails, shared with nothing else.
+  const thumbCache = useRef(new Map());
+  function strokesFor(id) {
+    if (!thumbCache.current.has(id)) thumbCache.current.set(id, api.get(`/history/${id}/detail`).then(d => ({ strokes: d?.ink?.strokes || null })).catch(() => { thumbCache.current.delete(id); return { error: true }; }));
+    return thumbCache.current.get(id);
+  }
+
   function onLedgerKey(e) {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || !e.target.classList?.contains('in-led-main')) return;
     const rows = [...e.currentTarget.querySelectorAll('.in-led-main')];
@@ -266,6 +344,7 @@ function HistoryForProfile() {
     const tz = timezoneOf(user);
     // Roving tabindex: one row button is in the Tab order; arrows move it.
     const activeId = items.some(x => x.id === activeRow) ? activeRow : items[0]?.id;
+    const indexOf = new Map(items.map((x, i) => [x.id, i]));
     const groups = [];
     // Sorted by marks lost, rows are not in date order: one flat list with no
     // day headings (a day would otherwise repeat, with duplicate ids).
@@ -276,24 +355,39 @@ function HistoryForProfile() {
       if (!groups.length || groups[groups.length - 1].key !== key) groups.push({ key, items: [] });
       groups[groups.length - 1].items.push(item);
     }
+    // Repeat attempts of one question (the same prompt, one after another) are
+    // shown as one card with its tries; presentation only, every attempt
+    // stays one tap away. The lead is the latest attempt.
+    for (const g of groups) {
+      g.cards = [];
+      for (const item of g.items) {
+        const last = g.cards[g.cards.length - 1];
+        if (last && last.item.prompt === item.prompt && last.item.subtopic === item.subtopic) last.tries.push(item);
+        else g.cards.push({ item, tries: [item] });
+      }
+    }
+    const timeOf = x => formatDate(x.answeredAt, user, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
     return (
       <div className="in-led-list" onKeyDown={onLedgerKey}>
         {groups.map(g => (
           <section key={g.key} className="in-led-day" aria-labelledby={g.key ? `in-led-day-${g.key}` : undefined}>
             {g.key && <h3 className="in-led-dayh" id={`in-led-day-${g.key}`}>{dayLabel(g.key)}</h3>}
-            {g.items.map(item => (
-              <div key={item.id} className={`hist-row in-led-row${open?.id === item.id ? ' is-sel' : ''}`} data-question-id={item.id}
+            {g.cards.map(({ item, tries }) => { const openItem = tries.find(x => x.id === open?.id); return (
+              <div key={item.id} className={`hist-row in-led-row${openItem ? ' is-sel' : ''}${tries.length > 1 ? ' is-grouped' : ''}${ScriptThumb && paperOf(item) && scoredOf(item) ? ' has-score' : ''}${ScriptThumb && !paperOf(item) ? ' is-text' : ''}`} data-question-id={item.id}
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
+                  {ScriptThumb && paperOf(item) && <ScriptThumb item={item} strokesFor={strokesFor} index={indexOf.get(item.id)} modeLabel={MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : t('history.modePractice')} />}
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
-                  <span className="in-led-q"><MathText text={item.prompt} /></span>
+                  <span className="in-led-q"><MathText text={INSTRUMENT_BUILD ? flatTitle(item.prompt) : item.prompt} /></span>
                   <span className="in-led-ch" lang="en"><TermGloss text={item.subtopicName} /></span>
                   <span className="in-led-res">
                     {!item.repeat && Number.isInteger(item.marksPossible) ? <MarkStrip earned={item.marksEarned} possible={item.marksPossible} /> : (
                       <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
-                        {item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·'}
+                        {item.correct == null ? '·' : MarkGlyph
+                          ? <span aria-hidden="true"><MarkGlyph kind={item.correct ? 'ok' : 'x'} label="" size={20} /></span>
+                          : item.correct ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
                       </span>
                     )}
                     <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
@@ -306,9 +400,18 @@ function HistoryForProfile() {
                   aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
                   aria-pressed={!!item.bookmarked}
                   onClick={() => toggleBookmark(item.id)}><Icon name="bookmark" size={16} /></button>
-                {open?.id === item.id && <div className="in-led-open">{renderActions(item)}{renderDetail(item)}</div>}
+                {tries.length > 1 && (
+                  <div className="in-led-tries" data-history-tries={tries.length}>
+                    <span>{t('inst.scriptsTries', { n: tries.length, from: timeOf(tries[tries.length - 1]), to: timeOf(tries[0]) })}</span>
+                    {tries.map(x => (
+                      <button key={x.id} type="button" className="in-led-try" aria-pressed={open?.id === x.id} data-question-id={x.id}
+                        aria-label={t('inst.scriptsOpenTry', { time: timeOf(x) })} onClick={() => openDetail(x.id)}>{timeOf(x)}</button>
+                    ))}
+                  </div>
+                )}
+                {openItem && <div className="in-led-open">{renderActions(openItem)}{renderDetail(openItem)}</div>}
               </div>
-            ))}
+            ); })}
           </section>
         ))}
       </div>
@@ -326,14 +429,15 @@ function HistoryForProfile() {
   const scopeRows = INSTRUMENT_STRIP ? (scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || []) : [];
 
   return (
-    <div className="grid" style={{ gap: 18 }}>
+    <div className={`grid${INSTRUMENT_STRIP ? ' in-hist' : ''}`} style={{ gap: 18 }}>
       <h1 className="sr-only">{t('history.title')}</h1>
       <div className="spread" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h2>{t('history.heading')}</h2>
-          <p className="sub" style={{ marginTop: 3 }}>{t('history.sub')}</p>
+          {INSTRUMENT_STRIP && <p className="in-hist-eyebrow" data-history-eyebrow>{counts ? t('inst.scriptsEyebrow', { n: formatNumber(counts.all ?? 0, user), look: formatNumber(counts.needsLook ?? 0, user) }) : '…'}</p>}
+          <h2>{INSTRUMENT_STRIP ? t('inst.scriptsTitle') : t('history.heading')}</h2>
+          {!INSTRUMENT_STRIP && <p className="sub" style={{ marginTop: 3 }}>{t('history.sub')}</p>}
         </div>
-        <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>
+        {!INSTRUMENT_STRIP && <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>}
       </div>
 
       {!INSTRUMENT_STRIP && <ErrorNotebook />}
@@ -342,7 +446,7 @@ function HistoryForProfile() {
         <div className="in-led-tools">
           <div className="in-led-bar in-hsb" role="group" aria-label={t('history.filterGroup')} id="in-hist-filters">
             {INSTRUMENT_FILTERS.map(([k, key]) => (
-              <button key={k} type="button" className="in-flt" aria-pressed={filter === k} data-history-filter={k}
+              <button key={k} type="button" className="in-flt c-chip" aria-pressed={filter === k} data-history-filter={k}
                 onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>
                 {t(key)} <b data-history-count={k}>{counts ? formatNumber(counts[k] ?? 0, user) : '·'}</b>
               </button>
@@ -439,7 +543,7 @@ function HistoryForProfile() {
       {INSTRUMENT_STRIP && <ErrorNotebook />}
 
       {pages > 1 && (
-        <div className="row" style={{ justifyContent: 'center' }}>
+        <div className={`row${INSTRUMENT_STRIP ? ' in-hist-pages' : ''}`} style={{ justifyContent: 'center' }}>
           <button className="btn btn-quiet btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>{t('history.newer')}</button>
           <span className="muted">{t('history.pageOf', { page: page + 1, total: pages })}</span>
           <button className="btn btn-quiet btn-sm" disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}>{t('history.older')}</button>
