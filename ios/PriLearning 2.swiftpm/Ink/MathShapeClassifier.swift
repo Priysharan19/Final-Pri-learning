@@ -420,8 +420,65 @@ enum MathShapeClassifier {
         let stroke = strokes[0]
         let box = stroke.bounds
         guard box.height >= 0.60 * glyphHeight,
-              box.width <= 0.62 * max(box.height, 1) else { return nil }
+              box.width <= 0.62 * max(box.height, 1),
+              sweepsEndToEnd(stroke) else { return nil }
         return bow(of: stroke)
+    }
+
+    /// A one-sided bow is not, on its own, proof of a bracket: a one-stroke
+    /// `3` bows one way too, and so does a `0` whose ends almost meet. This
+    /// pass may overwrite whatever OCR said about a mark, so it needs the
+    /// shape only a bracket has: one sweep from one end of the mark to the
+    /// other. Its ends are its top and bottom, and it never turns back on
+    /// itself vertically. A `3` starts with a hook that rises before the
+    /// stroke comes down; a `0` comes back to where it started. Geometry
+    /// only: nothing here knows what answer is expected.
+    private static func sweepsEndToEnd(_ stroke: InkStroke) -> Bool {
+        guard let first = stroke.points.first, let last = stroke.points.last else { return false }
+        let height = stroke.bounds.height
+        guard height > 0, abs(last.y - first.y) >= 0.85 * height else { return false }
+        let downward = last.y >= first.y
+        var furthest = first.y
+        var retreat: CGFloat = 0
+        for point in stroke.points {
+            if downward {
+                furthest = max(furthest, point.y)
+                retreat = max(retreat, furthest - point.y)
+            } else {
+                furthest = min(furthest, point.y)
+                retreat = max(retreat, point.y - furthest)
+            }
+        }
+        return retreat <= 0.05 * height
+    }
+
+    /// Deterministic regression for the structural bracket proof (issue #6,
+    /// iOS 27 simulator: `x=3` read `x=)`, `=0` read `=(`). When OCR drops a
+    /// character the surviving glyphs are only approximately owned, and this
+    /// proof decides the mark on its own. A drawn `(` and `)` must still be
+    /// proven; a one-stroke `3` and a nearly closed `0` — both of which bow
+    /// one way — must not be.
+    static func bracketProofInvariant() -> Bool {
+        func arc(bulge: CGFloat) -> InkStroke {
+            InkStroke(points: (0...14).map { i -> InkPoint in
+                let t = CGFloat(i) / 14
+                return InkPoint(x: 100 + bulge * sin(.pi * t), y: 20 + 60 * t, w: 3)
+            })
+        }
+        let three = InkStroke(points: [
+            (90, 30), (95, 22), (102, 20), (110, 23), (114, 30), (114, 38),
+            (102, 50), (111, 54), (116, 62), (116, 70), (111, 77), (103, 80), (96, 79)
+        ].map { InkPoint(x: $0.0, y: $0.1, w: 3) })
+        let zero = InkStroke(points: (0...16).map { i -> InkPoint in
+            // Starts at the top and comes back round to 2 pt short of its start.
+            let angle = -CGFloat.pi / 2 + 2 * .pi * CGFloat(i) / 16 * 0.985
+            return InkPoint(x: 100 + 12 * cos(angle), y: 50 + 30 * sin(angle), w: 3)
+        })
+        let glyphHeight: CGFloat = 60
+        return bracket([arc(bulge: 8)], glyphHeight: glyphHeight) == ")"
+            && bracket([arc(bulge: -8)], glyphHeight: glyphHeight) == "("
+            && bracket([three], glyphHeight: glyphHeight) == nil
+            && bracket([zero], glyphHeight: glyphHeight) == nil
     }
 
     private static func bow(of stroke: InkStroke) -> String? {

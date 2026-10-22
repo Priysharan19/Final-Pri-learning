@@ -193,5 +193,12 @@ enum InkSegmentationRegression {
         )
         precondition(ok,
             "Native handwriting line segmentation violated 2D maths / line separation invariant")
+
+        // A structural proof that overrides OCR must not turn a digit into a
+        // bracket (issue #6: `x=3` read `x=)` on the iOS 27 simulator).
+        let bracketProof = MathShapeClassifier.bracketProofInvariant()
+        NSLog("PRIINK structure bracketProof=%@", bracketProof ? "PASS" : "FAIL")
+        precondition(bracketProof,
+            "Native structural bracket proof accepted a digit-shaped stroke or rejected a drawn bracket")
     }
 }
