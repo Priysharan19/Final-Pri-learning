@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
+import { DateWindow } from './StepMarks.jsx';
 
 // v1.1 instrument: the question header's right side (design s4 `.qh`). The
 // number is a real count — the questions shown in this visit to Practice, or
@@ -17,9 +18,6 @@ const clock = ms => {
 };
 
 
-// The date window and the margin marks live in StepMarks.jsx, a chunk of the
-// instrument build only, so the classic build carries none of their motion.
-const DateWindow = React.lazy(() => import('./StepMarks.jsx').then(m => ({ default: m.DateWindow })));
 
 export default function QuestionHead({ index, length = null, answered = 0, startedAt, stopped = false, score = null, outOf = null }) {
   const t = useT();
@@ -48,7 +46,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
       {!bounded && answered > 0 && <span className="in-qh-a">{t('inst.answeredSession', { n: answered })}</span>}
       <span className="in-qh-sep" aria-hidden="true">·</span>
       <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer>{clock(now - startedAt)}</span>
-      <React.Suspense fallback={null}><DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} /></React.Suspense>
+      <DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} />
     </span>
   );
 }

@@ -1,85 +1,40 @@
-/* Pri Luxury · Write & Check (direction C "Examiner's Chronograph", depth from A).
-   Lazily loaded by StepMarks.jsx in the instrument build only (`write` is in the
-   flag-off skip list in vite.config.js). Presentation only: every mark drawn
-   here is the deterministic engine's verdict, never a model's.
-   Tokens are PR1's --c-* set; no new colours. */
+/* Pri Luxury · Write & Check (C "Examiner's Chronograph", depth from A).
+   Instrument build only (loaded by StepMarks.jsx; `write` is in the flag-off
+   skip list). Every mark drawn here is the deterministic engine's verdict. */
 
-/* ── Margin rows: the typeset transcription with its struck mark ─────────── */
-html.ui-instrument .in-read[data-wc-row] {
-  padding-right: 6px;
-  gap: 10px;
-  transform-style: preserve-3d;
-  perspective: 1400px;
-  perspective-origin: 50% 40%;
-}
-html.ui-instrument .in-read[data-wc-row] .in-read-m { font-family: var(--c-text); color: var(--c-ink); }
-/* The stamp replaces the line-end badge: one mark per line, in the margin. */
+/* Margin rows: the typeset transcription, then its struck mark. */
+.in-read[data-wc-row] { gap: 10px; padding-right: 6px; perspective: 1400px; }
+.in-read[data-wc-row] .in-read-m { font-family: var(--c-text); color: var(--c-ink); }
 html.ui-instrument .ink-verdict-layer .ink-verdict { display: none; }
 
-.wc-plane {
-  position: relative; flex: none;
-  width: 34px; height: 34px;
-  display: grid; place-items: center;
-  transform: translateZ(36px);       /* rests raised on its own plane (A) */
-  backface-visibility: hidden;
-}
-.wc-stamp {
-  width: 34px; height: 34px; display: block; overflow: visible;
-  /* deboss: a one-pixel light edge below and a shade above, no blur */
-  filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo));
-}
-.wc-ring {
-  position: absolute; inset: -3px; border-radius: 50%;
-  border: var(--c-line) solid var(--c-ink-3); opacity: 0; pointer-events: none;
-}
+/* The mark sits on its own plane and rises 36px once struck (A). */
+.wc-plane { position: relative; flex: none; display: grid; place-items: center; width: 34px; height: 34px; }
+.wc-rise .wc-plane { transform: translateZ(36px); transition: transform 600ms var(--c-ease-row) var(--wc-d, 0ms); }
+.wc-risen .wc-plane { transition: none; }
+.wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
+.wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
 
-/* The first error, underlined in copper; drawn left to right by the ceremony. */
-html.ui-instrument .ink-underline[data-wc-first-error] {
-  border-bottom: 1.5px solid var(--c-copper);
-  transform-origin: 0 50%;
-  animation: none;
-}
+html.ui-instrument .ink-underline[data-wc-first-error] { border-bottom: 1.5px solid var(--c-copper); transform-origin: 0 50%; animation: none; }
 
-/* ── Date window: the score flips in like a calendar complication ────────── */
+/* Date window: STIX 400 tabular, a calendar complication. */
 .wc-datewin {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 52px; height: 24px; padding: 0 8px;
-  background: var(--c-sheet);
-  border: var(--c-line) solid var(--c-dial-line);
-  border-radius: 2px;
-  box-shadow: var(--c-deboss);
-  font: 600 14px/1 var(--c-text);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-feature-settings: "tnum" 1, "lnum" 1;
-  color: var(--c-ink);
-  perspective: 200px;
-  overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 24px; padding: 0 8px;
+  background: var(--c-sheet); border: var(--c-line) solid var(--c-dial-line); border-radius: 2px; box-shadow: var(--c-deboss);
+  font: 400 14px/1 var(--c-text); font-variant-numeric: tabular-nums lining-nums; color: var(--c-ink);
+  perspective: 200px; overflow: hidden;
 }
-.wc-flip, .wc-flip > span { display: inline-block; transform-origin: 50% 50%; backface-visibility: hidden; }
-.wc-dw-of { color: var(--c-ink-3); font-weight: 400; }
+.wc-flip, .wc-flip > span { display: inline-block; backface-visibility: hidden; }
 .wc-datewin[data-date-window="pending"] { color: var(--c-ink-3); }
 
-/* ── History mark strip: shape as well as colour ─────────────────────────── */
+/* History strip: shape as well as colour. */
 html.ui-instrument .in-strip i.is-earned { border-radius: 50%; background: var(--c-teal); }
-html.ui-instrument .in-strip i.is-lost {
-  border-radius: 1px; background: transparent;
-  box-shadow: inset 0 0 0 var(--c-line) var(--c-copper);
-  transform: rotate(45deg) scale(.82);
-}
+html.ui-instrument .in-strip i.is-lost { border-radius: 1px; background: none; box-shadow: inset 0 0 0 var(--c-line) var(--c-copper); transform: rotate(45deg) scale(.82); }
 
-@media (prefers-reduced-motion: reduce) {
-  .wc-plane, .wc-stamp, .wc-flip > span { animation: none; }
-}
-@media (forced-colors: active) {
-  .wc-stamp :is(circle, rect, path) { stroke: CanvasText; }
-  .wc-stamp text { fill: CanvasText; }
-  .wc-datewin { border-color: CanvasText; }
-}
-
-/* Phone: the reading list is the margin (the chips beside the ink are hidden
-   at this width), so its rows carry the struck mark instead of the badge. */
+/* Phone: the chips are hidden, so the reading list is the margin. */
 .wc-list-stamp { display: none; }
 @media (max-width: 560px) {
   html.ui-instrument .ink-line-verdict:has(.wc-list-stamp) > svg { display: none; }
   html.ui-instrument .wc-list-stamp { display: inline-flex; perspective: 1400px; }
 }
+@media (prefers-reduced-motion: reduce) { .wc-rise .wc-plane { transition: none; } }
+@media (forced-colors: active) { .wc-stamp * { stroke: CanvasText; } .wc-datewin { border-color: CanvasText; } }
