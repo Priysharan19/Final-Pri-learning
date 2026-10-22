@@ -37,7 +37,7 @@ The blueprints are labelled `authenticity: 'reference-pattern'`. Their own relea
 - **Written items (B–E).** These are marked by `markResponse` (`server/platform/markerOps.js`). A correct final answer earns full marks. A wrong final answer with working earns method marks under the rule practice uses (`methodMarks` in `checker.js`): one mark per verified line that moves the solution on, capped one below the question's marks. This is Pri's step-marking rule in the spirit of CBSE "value points". It is **not** CBSE's marking scheme, and no surface says it is.
 - **The examiner's margin.** This is new in this change: `scriptLinesOf` in `boardMock.js`, attached as `script` by `examWorkingStage`.
   - It is read off the same `stepCheck` report and `methodMarks` vector that decided the mark, *after* the mark is decided. It changes no mark. `client/test/board-mock-check.mjs` compares 864 markings across every Class X/XII generator before and after the change and finds them identical.
-  - The margin marks always add up to the method marks awarded. Where the engine's per-row vector under-reports a capped progress line, the margin places the rest beside the verified progress lines held back by the cap; the total is still the engine's.
+  - The margin marks add up to the method marks awarded and never exceed them (only the first 40 lines are shown; credit on a later line is not drawn). Where the engine's per-row vector under-reports a capped progress line, the margin places the rest beside the verified progress lines held back by the cap; the total is still the engine's.
   - The first-error line is the first line `stepCheck` refuted (`status: 'break'`).
 - **AI.** AI never sets a mark. Handwriting is read answer-blind by the existing exam reading path, and only the transcript the student sees is marked.
 
@@ -45,6 +45,7 @@ The blueprints are labelled `authenticity: 'reference-pattern'`. Their own relea
 
 - Premium (`premium-exams`, from `serverEntitlementCapabilities` on the server's own `entitlement_snapshots` row) sits any number of mocks.
 - A free account gets **one sample mock for the life of the account** (`FREE_SAMPLE_MOCKS`). It is counted from the account's `exam-mock` ledger rows, which are written in the same transaction and under the same lock that seals the paper. A finished or abandoned sample still counts.
+- "Lifetime" is bounded by the record TTL (5 years, as for every exam record). The sample belongs to the account: a deleted account takes its ledger with it, which is the same limit every per-account allowance has. A mock sat while Premium also writes a ledger row, so it uses up the sample if Premium lapses.
 - The sample is counted apart from the free 30-day exam-simulation window, and does not spend it.
 - A refusal is `402 PREMIUM_REQUIRED` with `capability: 'premium-exams'`, the shape the device paywall already reads.
 - `server/test/board-mock-check.mjs` covers all of the above over real HTTP.

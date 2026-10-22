@@ -52,7 +52,9 @@ export function mockSpecOf(blueprint) {
 
 const MAX_SCRIPT_LINES = 40;
 const MAX_LINE_TEXT = 160;
-const VERDICTS = new Set(['ok', 'break', 'note', 'unverified']);
+const VERDICTS = new Set(['ok', 'void', 'break', 'note', 'unverified']);
+// Method-row reasons under which a verified line moves the solution on.
+const PROGRESS = new Set(['progress', 'cap']);
 
 /**
  * The margin of one written response: each line of working as the engine read
@@ -60,8 +62,9 @@ const VERDICTS = new Set(['ok', 'break', 'note', 'unverified']);
  * refuted. `report` is stepCheck's report, `method` methodMarks' result (or
  * null), `awarded` the method marks the response was finally given. Margin
  * marks are the engine's own per-line credits, taken in order and stopped at
- * `awarded`, so they always add up to the marks given for working — never
- * more. Nothing here changes a mark.
+ * `awarded`, so they add up to the marks given for working and never more
+ * (less only when a credited line lies past the lines shown). Nothing here
+ * changes a mark.
  */
 export function scriptLinesOf(report, method, awarded) {
   if (!report || !Array.isArray(report.lines) || !report.lines.length) return null;
@@ -80,13 +83,19 @@ export function scriptLinesOf(report, method, awarded) {
   // left of it beside those verified progress lines, in order.
   for (const row of rows) {
     if (left <= 0) break;
-    if (row?.reason === 'cap' && row.status === 'ok' && Number.isInteger(row.index) && !credit.has(row.index)) { credit.set(row.index, 1); left -= 1; }
+    if (row?.reason === 'cap' && row.status === 'ok' && Number.isInteger(row.index) && !credit.has(row.index)) { const m = Math.min(1, left); credit.set(row.index, m); left -= m; }
   }
-  const lines = report.lines.slice(0, MAX_SCRIPT_LINES).map((l, index) => ({
-    text: String(l?.text ?? '').slice(0, MAX_LINE_TEXT),
-    verdict: VERDICTS.has(l?.status) ? l.status : 'note',
-    mark: credit.get(index) || 0
-  }));
+  // The verdict is methodMarks' where it judged the line (it re-checks some
+  // lines and voids others): a true line that earns nothing — a restatement,
+  // a repeat, one of a sweep or of several middle-term splits — is 'void',
+  // never shown as a step that checks out.
+  const byIndex = new Map(rows.filter(r => Number.isInteger(r?.index)).map(r => [r.index, r]));
+  const lines = report.lines.slice(0, MAX_SCRIPT_LINES).map((l, index) => {
+    const row = byIndex.get(index);
+    let verdict = row ? row.status : l?.status;
+    if (verdict === 'ok' && row && !PROGRESS.has(row.reason) && !credit.has(index)) verdict = 'void';
+    return { text: String(l?.text ?? '').slice(0, MAX_LINE_TEXT), verdict: VERDICTS.has(verdict) ? verdict : 'note', mark: credit.get(index) || 0 };
+  });
   const fb = Number.isInteger(report.firstBreak) ? report.firstBreak : -1;
   return { lines, firstError: fb >= 0 && fb < lines.length ? fb : -1, truncated: report.lines.length > MAX_SCRIPT_LINES };
 }

@@ -3145,7 +3145,7 @@ export default {
   // ── Board mock papers (client/src/mock) ──
   "mock.title": "बोर्ड मॉक पेपर",
   "mock.label": "बोर्ड प्रारूप में Pri मॉक",
-  "mock.intro": "पूरा, समयबद्ध पेपर, CBSE के प्रकाशित सैंपल प्रश्न पत्र के खंडों, अंकों और आंतरिक विकल्पों के अनुसार। इसे हाथ से लिखें; Pri का मार्किंग इंजन हर चरण जाँचता है। यह CBSE का आधिकारिक पेपर नहीं है।",
+  "mock.intro": "पूरा, समयबद्ध पेपर, CBSE के प्रकाशित सैंपल प्रश्न पत्र के खंडों, अंकों और आंतरिक विकल्पों के अनुसार। इसे हाथ से लिखें; Pri का मार्किंग इंजन आपका हल पंक्ति दर पंक्ति जाँचता है। यह CBSE का आधिकारिक पेपर नहीं है।",
   "mock.class10": "CBSE कक्षा X गणित (स्टैंडर्ड)",
   "mock.class12": "CBSE कक्षा XII गणित",
   "mock.shape": "{min} मिनट · {marks} अंक · {n} प्रश्न",
@@ -3187,7 +3187,8 @@ export default {
   "mock.outcomeWrong": "कोई अंक नहीं",
   "mock.outcomeUnanswered": "हल नहीं किया",
   "mock.outcomePending": "लिखावट पढ़ी जानी है",
-  "mock.verdictOk": "सही",
+  "mock.verdictOk": "जाँच में ठीक",
+  "mock.verdictVoid": "सही कथन, पर अंक नहीं",
   "mock.verdictBreak": "गलती",
   "mock.verdictNote": "जाँचा नहीं गया",
   "mock.stillOpen": "यह मॉक अभी खुला है।",

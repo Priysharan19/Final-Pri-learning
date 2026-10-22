@@ -68,7 +68,7 @@ export default function MockPapers() {
                 {spec.sections.map(s => (
                   <tr key={s.id} data-mock-section={s.id}>
                     <th scope="row">{s.id}</th><td>{s.questions}</td><td>{s.marksEach}</td><td>{s.marks}</td>
-                    <td>{s.internalChoice ? t('mock.choiceN', { n: s.internalChoice }) : t('mock.choiceNone')}</td>
+                    <td>{s.internalChoice ? t('mock.choiceN', { count: s.internalChoice, n: s.internalChoice }) : t('mock.choiceNone')}</td>
                   </tr>
                 ))}
               </tbody>

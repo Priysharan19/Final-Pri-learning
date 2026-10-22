@@ -3082,7 +3082,7 @@ export default {
   // ── Board mock papers (client/src/mock) ──
   "mock.title": "Board mock papers",
   "mock.label": "Pri mock in board format",
-  "mock.intro": "A full-length, timed paper set out in the sections, marks and internal choices of CBSE’s published sample question paper. Write it by hand; Pri’s marking engine marks every step. It is not an official CBSE paper.",
+  "mock.intro": "A full-length, timed paper set out in the sections, marks and internal choices of CBSE’s published sample question paper. Write it by hand; Pri’s marking engine checks your working line by line. It is not an official CBSE paper.",
   "mock.class10": "CBSE Class X Mathematics (Standard)",
   "mock.class12": "CBSE Class XII Mathematics",
   "mock.shape": "{min} minutes · {marks} marks · {n} questions",
@@ -3125,6 +3125,7 @@ export default {
   "mock.outcomeUnanswered": "Not attempted",
   "mock.outcomePending": "Waiting for handwriting",
   "mock.verdictOk": "Checks out",
+  "mock.verdictVoid": "True, earns no mark",
   "mock.verdictBreak": "Error",
   "mock.verdictNote": "Not checked",
   "mock.stillOpen": "This mock is still open.",

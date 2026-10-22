@@ -90,7 +90,7 @@ for (const gen of gens) {
           withMargin++;
           const sum = script.lines.reduce((n, l) => n + l.mark, 0);
           assert.equal(sum, after.partial ? after.awarded : 0, `${gen}: margin marks add up to the method marks awarded`);
-          assert.ok(script.lines.every(l => ['ok', 'break', 'note', 'unverified'].includes(l.verdict) && l.mark >= 0 && l.text.length <= 160), `${gen}: margin lines are well-formed`);
+          assert.ok(script.lines.every(l => ['ok', 'void', 'break', 'note', 'unverified'].includes(l.verdict) && l.mark >= 0 && l.text.length <= 160), `${gen}: margin lines are well-formed`);
           assert.ok(script.lines.every(l => l.mark === 0 || l.verdict === 'ok'), `${gen}: only a verified line carries a margin mark`);
           if (script.firstError >= 0) {
             refuted++;

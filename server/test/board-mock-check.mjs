@@ -151,11 +151,12 @@ try {
   let margins = 0;
   for (const [id, want] of expected) {
     const line = result.detail.find(d => d.id === id);
-    eq([line.awarded, line.markingScheme], [want.awarded, want.markingScheme], 'the server marked it as the engine does');
-    eq(line.script ?? null, want.script ?? null, 'and returned the engine\'s margin');
+    // Per question, uncounted: how many a paper holds depends on the draw.
+    assert.deepEqual([line.awarded, line.markingScheme], [want.awarded, want.markingScheme], 'the server marked it as the engine does');
+    assert.deepEqual(line.script ?? null, want.script ?? null, 'and returned the engine\'s margin');
     if (line.script) {
       margins++;
-      ok(line.script.lines.reduce((n, l) => n + l.mark, 0) <= line.awarded, 'margin marks never exceed the marks');
+      assert.ok(line.script.lines.reduce((n, l) => n + l.mark, 0) <= line.awarded, 'margin marks never exceed the marks');
     }
   }
   ok(margins >= 1, `margins returned: ${margins}`);

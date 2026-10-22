@@ -13,7 +13,7 @@ import './mock.css';
 // result (engine/boardMock.js mockScript); nothing here marks anything.
 
 const OUTCOME = { correct: 'mock.outcomeCorrect', 'part-marks': 'mock.outcomePart', wrong: 'mock.outcomeWrong', unanswered: 'mock.outcomeUnanswered', pending: 'mock.outcomePending' };
-const VERDICT = { ok: 'mock.verdictOk', break: 'mock.verdictBreak' };
+const VERDICT = { ok: 'mock.verdictOk', void: 'mock.verdictVoid', break: 'mock.verdictBreak' };
 
 function clock(ms) {
   const s = Math.round(Math.max(0, ms) / 1000);
