@@ -36,15 +36,26 @@ function proxyTo(h, seen = []) {
     for (const name of ['cookie', 'content-type', 'x-pri-csrf', 'x-pri-client', 'x-pri-request-id', 'idempotency-key']) {
       if (incoming[name]) headers[name] = incoming[name];
     }
-    const response = await fetch(`${h.origin}${url.pathname}${url.search}`, {
-      method: request.method(), headers, body: ['GET', 'HEAD'].includes(request.method()) ? undefined : request.postData() ?? undefined
-    });
+    // A request still in flight when a flow closes the server (its page's
+    // own background calls) must not reject here: an unhandled rejection in a
+    // route handler kills the whole run before any result is printed. The
+    // browser sees the connection reset, as it would from a real server.
+    let response;
+    let body;
+    try {
+      response = await fetch(`${h.origin}${url.pathname}${url.search}`, {
+        method: request.method(), headers, body: ['GET', 'HEAD'].includes(request.method()) ? undefined : request.postData() ?? undefined
+      });
+      body = Buffer.from(await response.arrayBuffer());
+    } catch {
+      return route.abort('connectionreset').catch(() => {});
+    }
     const outHeaders = { 'content-type': response.headers.get('content-type') || 'application/json' };
     const cookies = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
     if (cookies.length) outHeaders['set-cookie'] = cookies.join('\n');
     const retry = response.headers.get('retry-after');
     if (retry) outHeaders['retry-after'] = retry;
-    return route.fulfill({ status: response.status, headers: outHeaders, body: Buffer.from(await response.arrayBuffer()) });
+    return route.fulfill({ status: response.status, headers: outHeaders, body }).catch(() => {});
   };
 }
 
@@ -351,6 +362,10 @@ export const flows = [
         await page.locator('[data-testid="account-activation-gate"]').waitFor({ timeout: 20000 });
         await check('a deep link after it is the gate, not the page', await page.locator('.shell').count() === 0);
       } finally {
+        // The gate's own requests from that last deep link may still be in
+        // flight: stop routing and leave the page before the server closes.
+        await ctx.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => {});
+        await page.goto('about:blank').catch(() => {});
         await h.close();
       }
     }
