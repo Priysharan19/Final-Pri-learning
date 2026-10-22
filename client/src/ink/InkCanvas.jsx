@@ -27,7 +27,7 @@ import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputM
 import { makePenFilter } from './smooth.js';
 import { penWantsEraser } from './penButtons.js';
 import { useT } from '../i18n/index.js';
-import { paintOutlineStroke, darken, wetness } from './inkOutline.js';
+import { paintOutline } from './inkOutline.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
 const MIN_W = 1.5, MAX_W = 7.5;
@@ -37,7 +37,8 @@ const RAW_UPDATE = typeof window !== 'undefined' && 'onpointerrawupdate' in wind
 // stored, read and marked are the same in both renderers.
 const outlineInkOn = () => typeof document !== 'undefined' && document.documentElement.classList.contains('ui-instrument');
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const WET_DARKEN = 0.88, WET_SWELL = 0.08, PRED_ALPHA = 0.3;
+// Wet ink: 12% darker (a black glaze at .12) and 8% wider, settling over 400ms.
+const WET_MS = 400, WET_SWELL = 0.08;
 
 const InkCanvas = forwardRef(function InkCanvas({
   height = 260, guides = true, tool = 'pen', fingerMode = 'auto',
@@ -147,8 +148,13 @@ const InkCanvas = forwardRef(function InkCanvas({
   };
 
   const paintStroke = (ctx, pts, color, alpha = 1) => (outlineRef.current
-    ? paintOutlineStroke(ctx, pts, color, { alpha, base: BASE_W })
+    ? paintOutline(ctx, pts, color, alpha)
     : paintRange(ctx, pts, 1, pts.length, color, alpha));
+  // k: wetness 1 → 0. The glaze is a second fill of the same outline.
+  const paintWet = (ctx, pts, ink, k, taper) => {
+    paintOutline(ctx, pts, ink, 1, 1 + WET_SWELL * k, taper);
+    if (k > 0) paintOutline(ctx, pts, '#000', 0.12 * k, 1 + WET_SWELL * k, taper);
+  };
 
   const redrawBase = useCallback(() => {
     const ctx = ctxRef.current.base;
@@ -190,26 +196,23 @@ const InkCanvas = forwardRef(function InkCanvas({
     const dpr = window.devicePixelRatio || 1;
     ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     const ink = inkRef.current;
-    const wetInk = darken(ink, WET_DARKEN);
     const now = performance.now();
     const alive = new Set(strokesRef.current);
     const still = [];
-    const baked = [];
     for (const w of wetRef.current) {
       if (!alive.has(w.stroke)) continue;          // undone or erased while wet
-      const k = wetness(now - w.at);
-      if (k <= 0) { baked.push(w.stroke); continue; }
+      const x = (now - w.at) / WET_MS;
+      if (x >= 1) { paintStroke(ctxRef.current.base, w.stroke.points, ink); continue; }
       still.push(w);
-      paintOutlineStroke(ctx, w.stroke.points, darken(ink, 1 - (1 - WET_DARKEN) * k), { scale: 1 + WET_SWELL * k, base: BASE_W });
+      paintWet(ctx, w.stroke.points, ink, 1 - x * x * (3 - 2 * x), true);   // smoothstep: ink never bounces
     }
     wetRef.current = still;
-    for (const s of baked) paintStroke(ctxRef.current.base, s.points, ink);
     const cur = currentRef.current;
     if (cur && cur.points.length) {
-      const wet = !reducedMotion();
-      paintOutlineStroke(ctx, cur.points, wet ? wetInk : ink, { scale: wet ? 1 + WET_SWELL : 1, base: BASE_W, taperEnd: false });
-      const pred = predictedRef.current;
-      if (pred.length) paintOutlineStroke(ctx, [cur.points[cur.points.length - 1], ...pred], wet ? wetInk : ink, { alpha: PRED_ALPHA, base: BASE_W, taperEnd: false });
+      const k = reducedMotion() ? 0 : 1;
+      paintWet(ctx, cur.points, ink, k, false);
+      const pred = predictedRef.current;   // a faint segment ahead of the nib
+      if (pred.length) paintOutline(ctx, [cur.points[cur.points.length - 1], ...pred], ink, 0.3, 1, false);
     }
     if (still.length) { dirtyRef.current = true; rafRef.current = requestAnimationFrame(renderLive); }
   };

@@ -1,16 +1,17 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { featureEnabled } from '../platform/features.js';
 import { MarkGlyph } from './margin/MarginIcon.jsx';
-import { reduced, rowReveal, embossStamp, flip } from './margin/motion.js';
 
 // Write & Check (Pri Luxury, direction C): the margin's engine marks, the
-// Check ceremony and the date window. Display only: every mark here is the
-// deterministic engine's line verdict. The stylesheet is a CSS chunk of the
-// instrument build only (`write` in the flag-off skip list).
-const INSTRUMENT = featureEnabled('instrument');
-if (INSTRUMENT && typeof document !== 'undefined') import('./margin/write.css');
+// Check ceremony and the date window. Display only: every mark is the
+// deterministic engine's line verdict. The motion is CSS keyframes in
+// margin/write.css (C's row reveal, emboss stamp, press ring and calendar
+// flip, same curves and durations as motion.js) so the ceremony costs the
+// install a few hundred bytes; write.css is a CSS chunk of the instrument
+// build only (`write` in the flag-off skip list).
+if (featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
 
 /** The stamp a line earns. A line the second (model) read judged
  *  (source 'cloud-working') is never stamped: an opinion is not a mark. */
@@ -20,22 +21,20 @@ export function engineMark(v) {
 }
 
 export function MarkStamp({ kind }) {
-  return kind ? <span className="wc-plane" aria-hidden="true"><span className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
+  return kind ? <span className="wc-plane" aria-hidden="true"><i className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
 }
 
-// How many ceremonies are striking marks now; the date window waits for
-// `pri:check-marked` only while one is.
+// Ceremonies striking marks now; the date window waits only while one is.
 let running = 0;
-// C section 5: a row is set (260ms), its mark struck (340ms), 220ms rest.
-const PER = 860, UNDER = 320;
+const PER = 860;   // C section 5: set a row 260ms, strike 340ms, rest 220ms
 
 /**
- * The Check ceremony over the InkAnswer root: each visible [data-wc-row] has
- * its transcription set (rowReveal), then its engine mark struck
- * (embossStamp) while the plane rises (a CSS transition, write.css); then the
- * first error's copper underline draws; then `pri:check-marked`. Scheduled at
- * once, interruptible (cleanup jumps to the final frame). Reduce Motion: the
- * helpers land on the final frame.
+ * The Check ceremony over the InkAnswer root. Each visible [data-wc-row] gets
+ * its slot (--wc-d); `wc-go` on the root runs write.css's keyframes: the
+ * transcription is set, the engine mark struck and raised on its own plane,
+ * then the first error's copper underline draws; then `pri:check-marked`.
+ * Interruptible: a new verdict restarts it, unmount ends it. Reduce Motion:
+ * write.css drops the animations, so the marks are simply there.
  */
 export function useCheckCeremony(stageRef, key) {
   useLayoutEffect(() => {
@@ -43,52 +42,33 @@ export function useCheckCeremony(stageRef, key) {
     if (!root || !key) return undefined;
     // Visible rows only: the chips on a tablet, the reading list on a phone.
     const rows = [...root.querySelectorAll('[data-wc-row]')].filter(r => r.querySelector('.wc-plane')?.getClientRects().length);
+    rows.forEach((r, i) => r.style.setProperty('--wc-d', `${i * PER}ms`));
+    root.style.setProperty('--wc-u', `${rows.length * PER}ms`);
+    root.classList.remove('wc-go'); void root.offsetWidth; root.classList.add('wc-go');
     running++;
-    let ended = false;
-    const end = () => { if (!ended) { ended = true; running--; root.classList.add('wc-risen'); window.dispatchEvent(new Event('pri:check-marked')); } };
-    root.classList.remove('wc-risen');
-    const hs = [];
-    rows.forEach((row, i) => {
-      const text = row.querySelector('.in-read-m, .ink-line-math');
-      if (text) hs.push(rowReveal([text], { delay: i * PER }));
-      const st = row.querySelector('.wc-stamp');
-      if (st) hs.push(embossStamp(st, row.querySelector('.wc-ring'), { delay: i * PER + 300 }));
-      row.style.setProperty('--wc-d', `${i * PER + 490}ms`);
-    });
-    const t = reduced() ? 0 : rows.length * PER;
-    root.querySelectorAll('[data-wc-first-error]').forEach(u => { if (!reduced() && u.animate) { const a = u.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }], { duration: UNDER, delay: t, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }); hs.push({ finish: () => a.finish() }); } });
-    requestAnimationFrame(() => root.classList.add('wc-rise'));
-    const timer = setTimeout(end, t && t + UNDER);
-    return () => { clearTimeout(timer); hs.forEach(h => { try { h.finish(); } catch { /* gone */ } }); end(); };
+    let on = true;
+    const end = () => { if (on) { on = false; running--; window.dispatchEvent(new Event('pri:check-marked')); } };
+    const t = setTimeout(end, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : rows.length * PER + 320);
+    return () => { clearTimeout(t); end(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 }
 
-/**
- * The date window: "– /3" until the engine has decided, then the score flips
- * in (motion.js flip) once the marks are struck, or at once when no ceremony
- * is running. aria-hidden: the verdict is announced once, by the card.
- */
+/** The date window: "– /3" until the engine has decided, then the score
+ *  flips in once the marks are struck (or at once with no ceremony running).
+ *  aria-hidden: the verdict is announced once, by the card's live region. */
 export function DateWindow({ score, outOf }) {
   const [shown, setShown] = useState(null);
-  const win = useRef(null);
   useEffect(() => {
-    if (score == null) { setShown(null); return undefined; }
+    setShown(null);
+    if (score == null) return undefined;
     const go = () => setShown(score);
-    window.addEventListener('pri:check-marked', go);
-    const raf = requestAnimationFrame(() => { if (!running) go(); });
+    addEventListener('pri:check-marked', go);
+    const f = requestAnimationFrame(() => running || go());
     const cap = setTimeout(go, 6000);
-    return () => { window.removeEventListener('pri:check-marked', go); cancelAnimationFrame(raf); clearTimeout(cap); };
+    return () => { removeEventListener('pri:check-marked', go); cancelAnimationFrame(f); clearTimeout(cap); };
   }, [score]);
-  const face = `${shown == null ? '–' : shown} /${outOf}`;
-  useEffect(() => {
-    const w = win.current;
-    if (!w || w.textContent === face) return undefined;
-    if (!w.firstChild) { w.textContent = ''; w.append(Object.assign(document.createElement('span'), { textContent: face })); return undefined; }
-    return flip(w, face).finish;
-  }, [face]);
-  if (!(outOf >= 1)) return null;
-  return <span className="wc-datewin" aria-hidden="true" data-date-window={shown == null ? 'pending' : `${shown}/${outOf}`}><span className="wc-flip" ref={win} /></span>;
+  return outOf >= 1 ? <span className="wc-datewin" aria-hidden="true" data-date-window={shown ?? 'pending'}><span key={shown ?? '-'}>{shown ?? '–'} /{outOf}</span></span> : null;
 }
 
 export default function StepMarks({ markRows }) {
