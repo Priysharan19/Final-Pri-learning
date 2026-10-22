@@ -1,1 +1,0 @@
-import"./rolldown-runtime-CbXtAM7H.js";import{m as e,t}from"./vendor-react-Dtm3F6TO.js";import{t as n}from"./PMark-COnqNIE_.js";e();var r=t();function i(){return(0,r.jsx)(`div`,{className:`c-signin-mark`,children:(0,r.jsx)(n,{size:40,wordmark:!0})})}export{i as default};
