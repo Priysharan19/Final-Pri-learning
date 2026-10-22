@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
 
 // v1.1 instrument: the question header's right side (design s4 `.qh`). The
@@ -16,7 +16,46 @@ const clock = ms => {
   return `${String(m).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 };
 
-export default function QuestionHead({ index, length = null, answered = 0, startedAt, stopped = false }) {
+const reduced = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * The date window (Pri Luxury, direction C): "– /3" until the engine has
+ * decided, then the score flips in like a calendar complication, after the
+ * margin's marks are struck (`pri:check-marked`), or at once when there is no
+ * ceremony to wait for (typed answers, Reduce Motion). Display only and
+ * aria-hidden: the verdict is announced once, by the card's own live region.
+ */
+function DateWindow({ score, outOf }) {
+  const [shown, setShown] = useState(score);
+  const flipRef = useRef(null);
+  useEffect(() => {
+    if (score == null) { setShown(null); return undefined; }
+    let fired = false;
+    const go = () => { if (!fired) { fired = true; setShown(score); } };
+    const onMarked = () => go();
+    window.addEventListener('pri:check-marked', onMarked);
+    // No margin ceremony is coming (nothing was written, or it already ran):
+    // the figure lands after the longest ceremony could take, never before.
+    const hasRows = typeof document !== 'undefined' && document.querySelector('[data-wc-row]');
+    const fallback = setTimeout(go, hasRows && !reduced() ? 6000 : 0);
+    return () => { window.removeEventListener('pri:check-marked', onMarked); clearTimeout(fallback); };
+  }, [score]);
+  useEffect(() => {
+    const el = flipRef.current?.lastElementChild;
+    if (!el || shown == null || reduced() || !el.animate) return undefined;
+    const a = el.animate([{ transform: 'rotateX(-90deg)' }, { transform: 'rotateX(8deg)', offset: 0.75 }, { transform: 'rotateX(0)' }],
+      { duration: 170, delay: 110, easing: 'cubic-bezier(0,0,.3,1)', fill: 'backwards' });
+    return () => a.cancel();
+  }, [shown]);
+  if (!Number.isInteger(outOf) || outOf < 1) return null;
+  return (
+    <span className="wc-datewin" aria-hidden="true" data-date-window={shown == null ? 'pending' : `${shown}/${outOf}`}>
+      <span className="wc-flip" ref={flipRef}><span key={shown == null ? 'p' : 's'}>{shown == null ? '–' : shown}<span className="wc-dw-of"> /{outOf}</span></span></span>
+    </span>
+  );
+}
+
+export default function QuestionHead({ index, length = null, answered = 0, startedAt, stopped = false, score = null, outOf = null }) {
   const t = useT();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -43,6 +82,7 @@ export default function QuestionHead({ index, length = null, answered = 0, start
       {!bounded && answered > 0 && <span className="in-qh-a">{t('inst.answeredSession', { n: answered })}</span>}
       <span className="in-qh-sep" aria-hidden="true">·</span>
       <span className="in-qh-t" role="timer" aria-label={t('inst.timerSr')} data-question-timer>{clock(now - startedAt)}</span>
+      <DateWindow score={Number.isFinite(score) ? score : null} outOf={outOf} />
     </span>
   );
 }

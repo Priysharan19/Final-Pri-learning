@@ -2249,7 +2249,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               v1.1 instrument design shows one, owner-approved; display only.) */}
           {INSTRUMENT && !diagnostic && (
             <QuestionHead index={sessionIndex} length={sessionLength} answered={sessionAnswered}
-              startedAt={startRef.current} stopped={resolved} />
+              startedAt={startRef.current} stopped={resolved}
+              outOf={Number(shownGrade?.possible) || Number(totalMarks) || null}
+              score={instrumentScore ? Number(shownGrade.awarded) : null} />
           )}
         </div>
         {/* A practice question's marks are the server's alone to state, so the

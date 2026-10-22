@@ -49,6 +49,7 @@ import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
+import { MarkStamp, engineMark, useCheckCeremony } from '../instrument/StepMarks.jsx';
 // v1.1 instrument: the student's own equations, drawn under the reading.
 const INSTRUMENT_PLOT = featureEnabled('instrument');
 
@@ -107,6 +108,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const formFactor = useFormFactor();
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
+  // Pri Luxury Write & Check: the engine's marks are struck in the margin once
+  // per verdict. The key changes only when the engine's marks do.
+  const stageRef = useRef(null);
+  const ceremonyKey = INSTRUMENT_PLOT && Array.isArray(lineVerdicts) && lineVerdicts.some(engineMark)
+    ? lineVerdicts.map(v => engineMark(v) || '-').join('') : null;
+  useCheckCeremony(stageRef, ceremonyKey);
   const { user } = useApp();
   const inRouter = useInRouterContext();
   const userRef = useRef(user);
@@ -518,7 +525,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           : <span className="ink-hint">{t('ink.hint')}</span>}
       </div>
 
-      <div className="ink-stage">
+      <div className="ink-stage" ref={stageRef}>
         <Surface
           ref={canvasRef}
           height={pageHeight * pages}
@@ -544,6 +551,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 const bad = v.status === 'break' || v.status === 'wrong';
                 if (!good && !bad) return null;
                 const showNote = bad && !noted;
+                const firstError = showNote && engineMark(v) === 'x';
                 if (showNote) noted = true;
                 const geometry = feedbackGeometry(line);
                 const b = geometry.anchor || line.box;
@@ -558,7 +566,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
                       title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
-                      <span key={`underline-${gi}`} className="ink-underline"
+                      <span key={`underline-${gi}`} className="ink-underline" data-wc-first-error={firstError ? '' : undefined}
                         style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
                     ))}
                     {showNote && (
@@ -590,10 +598,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               // so 0 is drawn as no bar rather than as an empty one.
               const conf = line.conf == null || Number(line.conf) <= 0 ? NaN : Number(line.conf);
               const tag = low ? t('inst.readUnsure') : slip ? t('inst.readSlip') : ok ? t('inst.readOk') : null;
+              const mark = low ? null : engineMark(v);
               return (
                 <React.Fragment key={li}>
                   {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
-                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} style={{ top: b.y + b.h / 2 }}>
+                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} data-wc-row={mark ? li : undefined} style={{ top: b.y + b.h / 2 }}>
                     <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
                     {Number.isFinite(conf) && (
                       <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
@@ -601,6 +610,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                       </span>
                     )}
                     {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
+                    <MarkStamp kind={mark} />
                   </span>
                 </React.Fragment>
               );
