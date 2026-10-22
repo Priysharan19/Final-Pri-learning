@@ -15,118 +15,81 @@
 
 /* ── Page furniture ──────────────────────────────────────────────────────── */
 html.ui-instrument [data-c-surface] { font-family: var(--c-text); font-variant-numeric: lining-nums; color: var(--c-ink); }
-html.ui-instrument [data-c-surface] :is(h1, h2) { font-family: var(--c-serif); font-weight: 400; letter-spacing: -0.01em; color: var(--c-ink); }
-html.ui-instrument [data-c-surface] h1 { font-size: clamp(32px, 3vw + 18px, 48px); line-height: 1; }
-html.ui-instrument [data-c-surface] h2 { font-size: 24px; line-height: 1.1; }
-html.ui-instrument [data-c-surface] :is(.card-title, .sc-label, .label, .hints-block-title, .solution-panel-title, .notebook-title, .exam-legend) {
+html.ui-instrument [data-c-surface] :is(h1, h2):not(.qpage *) { font-family: var(--c-serif); font-weight: 400; letter-spacing: -0.01em; color: var(--c-ink); }
+html.ui-instrument [data-c-surface] h1:not(.qpage *) { font-size: clamp(32px, 3vw + 18px, 48px); line-height: 1; }
+html.ui-instrument [data-c-surface] h2:not(.qpage *) { font-size: 24px; line-height: 1.1; }
+html.ui-instrument [data-c-surface] :is(.card-title, .sc-label, .label, .notebook-title, .exam-legend):not(.qpage *) {
   font: var(--c-t-label); letter-spacing: 0.14em; text-transform: none; color: var(--c-ink-2);
 }
-html.ui-instrument [data-c-surface] :lang(hi) :is(.card-title, .sc-label, .label, .hints-block-title) { letter-spacing: 0; line-height: 1.35; }
+html.ui-instrument [data-c-surface] :lang(hi) :is(.card-title, .sc-label, .label):not(.qpage *) { letter-spacing: 0; line-height: 1.35; }
 
 /* A card is a section under an engraved rule, not a box. */
-html.ui-instrument [data-c-surface] .card {
+html.ui-instrument [data-c-surface] .card:not(.qpage *) {
   background: transparent; border: 0; border-top: var(--c-line) solid var(--c-hair); border-radius: 0; box-shadow: none; padding: 16px 0 20px;
 }
-html.ui-instrument [data-c-surface] :is(.stat-tile, .big, .hero-num, .race-score, .lb-score) { font-family: var(--c-serif); font-weight: 400; font-variant-numeric: tabular-nums lining-nums; }
+html.ui-instrument [data-c-surface] :is(.stat-tile, .big, .hero-num, .race-score, .lb-score):not(.qpage *) { font-family: var(--c-serif); font-weight: 400; font-variant-numeric: tabular-nums lining-nums; }
 
 /* Tags and chips: small capitals on a hairline, 4px corners. */
-html.ui-instrument [data-c-surface] :is(.tag, .chip, .pill-select, .pill-opt) {
+html.ui-instrument [data-c-surface] :is(.tag, .chip, .pill-select, .pill-opt):not(.qpage *) {
   font: 600 12.5px/1.2 var(--c-sc); letter-spacing: 0.1em; border-radius: var(--c-radius); background: transparent; box-shadow: none;
   border: var(--c-line) solid var(--c-hair-2); color: var(--c-ink-2);
 }
-html.ui-instrument [data-c-surface] :is(.chip, .pill-select, .pill-opt):is(.on, [aria-pressed="true"]) { background: var(--c-ink); border-color: var(--c-ink); color: var(--c-sheet); }
+html.ui-instrument [data-c-surface] :is(.chip, .pill-select, .pill-opt):is(.on, [aria-pressed="true"]):not(.qpage *) { background: var(--c-ink); border-color: var(--c-ink); color: var(--c-sheet); }
 
 /* Fields are engraved lines: a sheet with one rule under it. */
-html.ui-instrument [data-c-surface] :is(.input, select.input, textarea.input, .answer-input) {
+html.ui-instrument [data-c-surface] :is(.input, select.input, textarea.input, .answer-input):not(.qpage *) {
   font: 400 17px/1.3 var(--c-text); font-variant-numeric: tabular-nums lining-nums; color: var(--c-ink);
   background: var(--c-sheet); border: 0; border-bottom: var(--c-line) solid var(--c-hair); border-radius: var(--c-radius) var(--c-radius) 0 0; box-shadow: none;
 }
-html.ui-instrument [data-c-surface] :is(.input, .answer-input):hover:not(:disabled) { border-bottom-color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] :is(.input, .answer-input):focus { border-bottom-color: var(--c-teal); box-shadow: inset 0 -1px 0 var(--c-teal); }
-html.ui-instrument [data-c-surface] :is(.input, .answer-input):disabled { color: var(--c-ink-3); background: transparent; }
+html.ui-instrument [data-c-surface] :is(.input, .answer-input):hover:not(:disabled):not(.qpage *) { border-bottom-color: var(--c-ink-3); }
+html.ui-instrument [data-c-surface] :is(.input, .answer-input):focus:not(.qpage *) { border-bottom-color: var(--c-teal); box-shadow: inset 0 -1px 0 var(--c-teal); }
+html.ui-instrument [data-c-surface] :is(.input, .answer-input):disabled:not(.qpage *) { color: var(--c-ink-3); background: transparent; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 /* Secondary actions take margin.css's .c-btn: small capitals on a hairline. */
-html.ui-instrument [data-c-surface] .btn:not(.c-btn-primary) {
+html.ui-instrument [data-c-surface] .btn:not(.c-btn-primary):not(.qpage *) {
   min-height: 44px; border-radius: var(--c-radius); font: var(--c-t-button); letter-spacing: 0.12em; box-shadow: none; filter: none;
   transition: transform var(--c-d-press) var(--c-ease-press), background-color var(--c-d-press) var(--c-ease-press), color var(--c-d-press) var(--c-ease-press);
 }
-html.ui-instrument [data-c-surface] :is(.btn-ghost, .btn-secondary, .btn:not([class*="btn-"])) { background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); color: var(--c-ink); }
-html.ui-instrument [data-c-surface] .btn-quiet { background: transparent; border-color: transparent; color: var(--c-ink-2); }
-html.ui-instrument [data-c-surface] .btn-primary:not(.c-btn-primary) { background: var(--c-ink); border: var(--c-line) solid var(--c-ink); color: var(--c-sheet); }
-html.ui-instrument [data-c-surface] .btn:not(.c-btn-primary):hover:not(:disabled) { background: var(--in-l2); color: var(--c-ink); }
-html.ui-instrument [data-c-surface] .btn-primary:not(.c-btn-primary):hover:not(:disabled) { background: var(--c-ink-2); border-color: var(--c-ink-2); color: var(--c-sheet); }
-html.ui-instrument [data-c-surface] .btn:active:not(:disabled) { transform: scale(0.97); }
-html.ui-instrument [data-c-surface] .btn:disabled { opacity: 0.55; cursor: default; transform: none; }
-html.ui-instrument [data-c-surface] .btn:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument [data-c-surface] :is(.btn-ghost, .btn-secondary, .btn:not([class*="btn-"])):not(.qpage *) { background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); color: var(--c-ink); }
+html.ui-instrument [data-c-surface] .btn-quiet:not(.qpage *) { background: transparent; border-color: transparent; color: var(--c-ink-2); }
+html.ui-instrument [data-c-surface] .btn-primary:not(.c-btn-primary):not(.qpage *) { background: var(--c-ink); border: var(--c-line) solid var(--c-ink); color: var(--c-sheet); }
+html.ui-instrument [data-c-surface] .btn:not(.c-btn-primary):hover:not(:disabled):not(.qpage *) { background: var(--in-l2); color: var(--c-ink); }
+html.ui-instrument [data-c-surface] .btn-primary:not(.c-btn-primary):hover:not(:disabled):not(.qpage *) { background: var(--c-ink-2); border-color: var(--c-ink-2); color: var(--c-sheet); }
+html.ui-instrument [data-c-surface] .btn:active:not(:disabled):not(.qpage *) { transform: scale(0.97); }
+html.ui-instrument [data-c-surface] .btn:disabled:not(.qpage *) { opacity: 0.55; cursor: default; transform: none; }
+html.ui-instrument [data-c-surface] .btn:focus-visible:not(.qpage *) { outline: 2px solid var(--c-teal); outline-offset: 3px; }
 
 /* The one primary: the teal pill. Its own states, no green, no glow. */
-html.ui-instrument [data-c-surface] .btn.c-btn-primary {
+html.ui-instrument [data-c-surface] .btn.c-btn-primary:not(.qpage *) {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px;
   border-radius: var(--radius-pill); border: var(--c-line) solid var(--c-teal); background: var(--c-teal); color: var(--c-on-teal);
   font: var(--c-t-button); letter-spacing: 0.12em; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18); filter: none;
   transition: transform var(--c-d-press) var(--c-ease-press), background-color var(--c-d-press) var(--c-ease-press);
 }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--c-on-teal); }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary:active:not(:disabled) { background: var(--accent-pressed); border-color: var(--accent-pressed); transform: scale(0.97); }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary:disabled { opacity: 1; background: transparent; border-color: var(--c-hair); color: var(--c-ink-3); box-shadow: none; transform: none; cursor: default; }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary[aria-busy="true"] { cursor: progress; }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary .in-kbd { font: 400 12px var(--c-text); background: transparent; color: inherit; box-shadow: 0 0 0 var(--c-line) currentColor; opacity: 0.7; }
-html.ui-instrument [data-c-surface] .btn.c-btn-primary svg { width: 16px; height: 16px; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary:hover:not(:disabled):not(.qpage *) { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--c-on-teal); }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary:active:not(:disabled):not(.qpage *) { background: var(--accent-pressed); border-color: var(--accent-pressed); transform: scale(0.97); }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary:focus-visible:not(.qpage *) { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary:disabled:not(.qpage *) { opacity: 1; background: transparent; border-color: var(--c-hair); color: var(--c-ink-3); box-shadow: none; transform: none; cursor: default; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary[aria-busy="true"]:not(.qpage *) { cursor: progress; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary .in-kbd:not(.qpage *) { font: 400 12px var(--c-text); background: transparent; color: inherit; box-shadow: 0 0 0 var(--c-line) currentColor; opacity: 0.7; }
+html.ui-instrument [data-c-surface] .btn.c-btn-primary svg:not(.qpage *) { width: 16px; height: 16px; }
 
 /* ── States: loading, notices, errors, offline ───────────────────────────── */
 /* Loading is a ruled blank, never a shimmer. */
-html.ui-instrument [data-c-surface] .skeleton { animation: none; background: none; border-radius: 0; border-bottom: var(--c-line) solid var(--c-hair-2); color: transparent; }
-html.ui-instrument [data-c-surface] :is(.notice, .error-box) {
+html.ui-instrument [data-c-surface] .skeleton:not(.qpage *) { animation: none; background: none; border-radius: 0; border-bottom: var(--c-line) solid var(--c-hair-2); color: transparent; }
+html.ui-instrument [data-c-surface] :is(.notice, .error-box):not(.qpage *) {
   background: transparent; border: 0; border-top: var(--c-line) solid var(--c-hair); border-bottom: var(--c-line) solid var(--c-hair-2);
   border-radius: 0; box-shadow: none; padding: 12px 2px; font: 400 15px/1.5 var(--c-text); color: var(--c-ink-2);
 }
-html.ui-instrument [data-c-surface] :is(.notice.error, .error-box) { border-top-color: var(--c-copper); color: var(--c-ink); }
-html.ui-instrument [data-c-surface] .notice.success { border-top-color: var(--c-teal); }
-html.ui-instrument [data-c-surface] .notice.offline { border-top-style: dashed; border-top-color: var(--c-ink-3); }
+html.ui-instrument [data-c-surface] :is(.notice.error, .error-box):not(.qpage *) { border-top-color: var(--c-copper); color: var(--c-ink); }
+html.ui-instrument [data-c-surface] .notice.success:not(.qpage *) { border-top-color: var(--c-teal); }
+html.ui-instrument [data-c-surface] .notice.offline:not(.qpage *) { border-top-style: dashed; border-top-color: var(--c-ink-3); }
 
-/* ── The question ────────────────────────────────────────────────────────── */
-html.ui-instrument [data-c-surface] .q-prompt {
-  font: var(--c-t-wq); font-size: clamp(22px, 1.3vw + 15px, 32px); line-height: 1.28; letter-spacing: -0.005em; color: var(--c-ink); text-wrap: pretty;
-}
-html.ui-instrument [data-c-surface] :is(.q-prompt, .hintbox, .mcq-opt) .katex { font-size: 1.04em; }
-/* The meta line: small capitals separated by points, not boxed chips. */
-html.ui-instrument [data-c-surface] .q-topmeta .tag { border: 0; padding: 0; min-height: 0; font-size: 13px; letter-spacing: 0.12em; color: var(--c-ink-2); }
-html.ui-instrument [data-c-surface] .q-topmeta .tag + .tag::before { content: "·"; margin: 0 9px 0 1px; color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] .q-topmeta .tag-brand { color: var(--c-teal); }
-/* Figures: STIX tabular for the clock, the count and the marks. */
-html.ui-instrument [data-c-surface] :is(.in-qh, .q-marks, .q-meta, .exam-timer, .rush-timer, .q-credit) { font-family: var(--c-text); font-variant-numeric: tabular-nums lining-nums; }
-html.ui-instrument [data-c-surface] .in-qh { font-size: 15px; font-weight: 400; color: var(--c-ink-2); }
-html.ui-instrument [data-c-surface] .in-qh-t { color: var(--c-ink); min-width: 4.2ch; }
-html.ui-instrument [data-c-surface] .in-prog10 i { height: 2px; border-radius: 0; background: var(--c-hair-2); }
-html.ui-instrument [data-c-surface] .in-prog10 i.d { background: var(--c-teal); }
-html.ui-instrument [data-c-surface] .in-prog10 i.n { background: var(--c-ink); }
-html.ui-instrument [data-c-surface] .q-why { border-left: var(--c-line) solid var(--c-copper); font: italic 400 16px/1.5 var(--c-italic); color: var(--c-ink-2); }
-
-/* ── The hint ladder: rungs ruled on the paper ───────────────────────────── */
-html.ui-instrument [data-c-surface] .in-ladder { gap: 0; border-bottom: var(--c-line) solid var(--c-hair-2); }
-html.ui-instrument [data-c-surface] .in-ladder .hints-block-title { padding-bottom: 8px; }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung:not(.hintbox), html.ui-instrument [data-c-surface] .hintbox {
-  background: transparent; border: 0; border-top: var(--c-line) solid var(--c-hair-2); border-radius: 0; box-shadow: none; color: var(--c-ink);
-}
-html.ui-instrument [data-c-surface] .in-ladder .in-rung:not(.hintbox) { min-height: 48px; padding: 0 4px; gap: 14px; font: 400 17px/1.3 var(--c-text); text-align: left; }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung b { font-weight: 400; }
-html.ui-instrument [data-c-surface] .in-rung-k { width: 1.4em; height: auto; background: none; border-radius: 0; font: 400 17px/1 var(--c-text); font-variant-numeric: tabular-nums lining-nums; color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] .in-ladder :is(.in-rung small, .in-rung-cost) { font: 600 12.5px/1 var(--c-sc); letter-spacing: 0.1em; color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung.is-next .in-rung-k { color: var(--c-teal); }
-html.ui-instrument [data-c-surface] .in-ladder button.in-rung { transition: background-color var(--c-d-press) var(--c-ease-press); }
-html.ui-instrument [data-c-surface] .in-ladder button.in-rung:hover:not(:disabled) { background: var(--in-l2); box-shadow: none; }
-html.ui-instrument [data-c-surface] .in-ladder button.in-rung:active:not(:disabled) { background: var(--c-paper-2); }
-html.ui-instrument [data-c-surface] .in-ladder button.in-rung:focus-visible { outline: 2px solid var(--c-teal); outline-offset: -2px; }
-html.ui-instrument [data-c-surface] .in-ladder button.in-rung:disabled { color: var(--c-ink-3); cursor: default; }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung.is-armed { box-shadow: inset 0 -1px 0 var(--c-copper); color: var(--c-copper); }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung.is-armed .in-rung-k { color: var(--c-copper); }
-html.ui-instrument [data-c-surface] .in-ladder .in-rung.is-locked { color: var(--c-ink-3); }
-/* An opened rung reads as a note on the page. */
-html.ui-instrument [data-c-surface] .hintbox { padding: 12px 4px 14px 36px; font: 400 17px/1.5 var(--c-text); }
-html.ui-instrument [data-c-surface] .hintbox::before { background: none; box-shadow: none; border-radius: 0; left: 4px; top: 12px; width: auto; height: auto; font: 400 17px/1.5 var(--c-text); color: var(--c-teal); }
-html.ui-instrument [data-c-surface] .hintbox .h-n { font: 600 12.5px/1.4 var(--c-sc); letter-spacing: 0.1em; color: var(--c-ink-2); }
+/* Figures in the paper room and the games: STIX tabular. QuestionCard's own
+   chrome (header, ladder, feedback, footer) belongs to Write & Check. */
+html.ui-instrument [data-c-surface] .q-prompt:not(.qpage *) { font: var(--c-t-wq); font-size: clamp(22px, 1.3vw + 15px, 32px); line-height: 1.28; letter-spacing: -0.005em; text-wrap: pretty; }
+html.ui-instrument [data-c-surface] :is(.q-meta, .exam-timer, .rush-timer):not(.qpage *) { font-family: var(--c-text); font-variant-numeric: tabular-nums lining-nums; }
 
 /* ── Multiple choice: engraved rows, the letter in small capitals ─────────── */
 html.ui-instrument [data-c-surface] .mcq { gap: 0; border-top: var(--c-line) solid var(--c-hair); }
@@ -155,29 +118,11 @@ html.ui-instrument [data-c-surface] .mcq-mark { gap: 8px; font: 600 13px/1 var(-
 html.ui-instrument [data-c-surface] .mcq-glyph { display: inline-flex; }
 html.ui-instrument [data-c-surface] .mcq-glyph svg { filter: drop-shadow(0 1px 0 var(--c-emboss-hi)); }
 
-/* ── Feedback, the worked solution and the action bar ────────────────────── */
-html.ui-instrument [data-c-surface] .verdict {
-  background: transparent; border: 0; border-top: var(--c-line) solid var(--c-hair); border-bottom: var(--c-line) solid var(--c-hair-2);
-  border-radius: 0; box-shadow: none; outline: 0; padding: 14px 2px;
-}
-html.ui-instrument [data-c-surface] .verdict-good { border-top-color: var(--c-teal); }
-html.ui-instrument [data-c-surface] :is(.verdict-bad, .verdict-technical) { border-top-color: var(--c-copper); }
-html.ui-instrument [data-c-surface] .verdict-unsure { border-top: var(--c-line) dashed var(--c-copper); }
-html.ui-instrument [data-c-surface] .verdict-title { font: 400 24px/1.15 var(--c-serif); letter-spacing: -0.005em; }
-html.ui-instrument [data-c-surface] .verdict-body { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
-html.ui-instrument [data-c-surface] :is(.solution-panel, .final-answer) { background: transparent; border: 0; border-top: var(--c-line) solid var(--c-hair); border-radius: 0; box-shadow: none; }
-html.ui-instrument [data-c-surface] .final-answer { font: 400 19px/1.4 var(--c-text); padding: 12px 2px; }
-html.ui-instrument [data-c-surface] .step-n { background: none; box-shadow: none; border: 0; border-radius: 0; font: 400 17px/22px var(--c-text); font-variant-numeric: tabular-nums lining-nums; color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] .step:not(:last-child)::before { background: var(--c-hair-2); }
-html.ui-instrument [data-c-surface] .step-h { font: 400 17px/1.35 var(--c-text); }
-html.ui-instrument [data-c-surface] :is(.criteria-table, .table) { border: 0; border-top: var(--c-line) solid var(--c-hair); }
-html.ui-instrument [data-c-surface] :is(.criteria-table, .table) :is(th, td) { border: 0; border-bottom: var(--c-line) solid var(--c-hair-2); }
-html.ui-instrument [data-c-surface] :is(.criteria-table, .table) th { font: 600 12.5px var(--c-sc); letter-spacing: 0.1em; text-transform: none; }
-html.ui-instrument [data-c-surface] .ws-actions { background: var(--c-paper); border-top-color: var(--c-hair); }
-html.ui-instrument [data-c-surface] .ws-actions :is(.status-line, .ws-submit-reason) { font: 400 14px/1.35 var(--c-text); color: var(--c-ink-3); }
-html.ui-instrument [data-c-surface] .ws-actions .btn-quiet { font: var(--c-t-button); letter-spacing: 0.12em; }
-
 /* ── Papers, the paper room and the games ────────────────────────────────── */
+html.ui-instrument [data-c-surface] .verdict:not(.qpage *) {
+  background: transparent; border: 0; border-top: var(--c-line) solid var(--c-copper); border-bottom: var(--c-line) solid var(--c-hair-2);
+  border-radius: 0; box-shadow: none; padding: 14px 2px;
+}
 html.ui-instrument [data-c-surface] .exam-paper { background: var(--c-sheet); border: 0; border-radius: var(--c-radius-lg); box-shadow: var(--c-lift); }
 html.ui-instrument [data-c-surface] :is(.exam-timer, .rush-timer) { font-size: 17px; font-weight: 400; color: var(--c-ink); border-color: var(--c-hair); border-radius: var(--c-radius); }
 html.ui-instrument [data-c-surface] .exam-timer.low { border-color: var(--c-copper); box-shadow: inset 0 -1px 0 var(--c-copper); }
@@ -193,7 +138,6 @@ html.ui-instrument [data-c-surface] .exam-head { background: var(--c-paper); bor
 /* Phones: the option rows keep a 56px reach; the question steps down. */
 @media (max-width: 560px) {
   html.ui-instrument [data-c-surface] .mcq-opt { font-size: 18px; padding-inline: 4px 8px; gap: 14px; }
-  html.ui-instrument [data-c-surface] .in-ladder .in-rung:not(.hintbox) { font-size: 16px; }
 }
 @media (forced-colors: active) {
   html.ui-instrument [data-c-surface] .mcq-opt.sel { outline: 2px solid Highlight; outline-offset: -2px; }

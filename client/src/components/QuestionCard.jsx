@@ -55,7 +55,6 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
-import { PRIMARY } from '../instrument/primary.js';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
@@ -2489,7 +2488,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               {photoReadExpired && !resolved && (
                                 <div data-photo-read-expired role="status" style={{ marginBottom: 8 }}>
                                   <p style={{ fontSize: 13, margin: '0 0 6px' }}>{t('photo.readExpired')}</p>
-                                  <button type="button" className={`${PRIMARY} btn-sm`} data-photo-read-again
+                                  <button type="button" className="btn btn-primary btn-sm" data-photo-read-again
                                     onClick={() => { setPhotoReadExpired(false); if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo); }}>
                                     {t('ink.readAgain')}
                                   </button>
@@ -2545,7 +2544,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           )}
                           {photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                             <div style={{ marginTop: 10 }}>
-                              <button className={PRIMARY} type="button" data-photo-sign-in
+                              <button className="btn btn-primary" type="button" data-photo-sign-in
                                 aria-expanded={photoSignInOpen} onClick={() => setPhotoSignInOpen(v => !v)}>
                                 {sessionEnded ? t('check.signInAgainAction') : t('check.signInAction')}
                               </button>
@@ -2556,7 +2555,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           )}
                           {photoOCR.phase === 'idle' && (cloudReadingEnabled(user) && !offline && !resolved ? (
                             <div data-photo-unread>
-                              <button type="button" className={PRIMARY} data-photo-read
+                              <button type="button" className="btn btn-primary" data-photo-read
                                 onClick={() => {
                                   // One press, one read: a second press in the same moment finds the read started.
                                   if (photoReadStarting.current) return;
@@ -2693,7 +2692,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
                   {inkReaderState?.blocker === 'ink.waitingSignIn' && (
                     <>
-                      <button type="button" className={PRIMARY} data-ink-sign-in
+                      <button type="button" className="btn btn-primary" data-ink-sign-in
                         disabled={!inkSignInReady} aria-expanded={inkSignInOpen}
                         onClick={() => setInkSignInOpen(v => !v)}>
                         {sessionEnded ? t('check.signInAgainAction') : inkRecoveryCopy.action}
@@ -3148,7 +3147,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
             )}
             {!(diagnostic && resolved) && primary && (
-              <button className={PRIMARY} data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
+              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
                 aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
                 aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
                 {instrumentCheckKey && <Icon name="scan" size={16} />}
@@ -3166,7 +3165,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="sheet" role="dialog" aria-modal="true" aria-label={t('verdict.questionRegion')} ref={peekRef}>
             <MathText block text={question.prompt} />
             {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
-            <div className="sheet-actions"><button className={PRIMARY} onClick={() => setPeekOpen(false)}>{t('verdict.backToWork')}</button></div>
+            <div className="sheet-actions"><button className="btn btn-primary" onClick={() => setPeekOpen(false)}>{t('verdict.backToWork')}</button></div>
           </div>
         </>
       )}
