@@ -149,3 +149,6 @@ html.ui-instrument:root .signin-landing .otp-box { width: 100%; }
 @media (max-width: 860px) {
   html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { justify-content: center; min-height: 100dvh; }
 }
+html.ui-instrument:root .auth-col > p.muted { text-align: left !important; }
+html.ui-instrument:root .signin-landing .signup-alt { flex-wrap: wrap !important; gap: 0 14px; }
+html.ui-instrument:root .signin-landing .signup-alt .linklike + .linklike::before { content: none; }
