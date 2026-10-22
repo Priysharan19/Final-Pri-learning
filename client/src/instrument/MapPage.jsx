@@ -15,7 +15,7 @@ import './map.css';
 // The syllabus map (v1.1 instrument, design s6): the student's chapters as a
 // free constellation (instrument/mapLayout.js — column by prerequisite depth,
 // syllabus order within it, no randomness, no overlapping labels), joined by
-// straight gradient links along Pri's authored prerequisite edges
+// straight engraved hairlines along Pri's authored prerequisite edges
 // (engine/prerequisites.js — Pri's map, not an NCERT one). A node's size and
 // fill are mastery behind the evidence floor; its marks are the server-
 // certified totals (GET /marks/by-chapter). The recommended chapter is the
@@ -74,6 +74,22 @@ function useMapMotion(ref, ready) {
     return () => io.disconnect();
   }, [ready]);   // the graph mounts once the curriculum has loaded
   return { reduced, running: !reduced && onScreen && tabVisible };
+}
+
+// Arrival choreography (presentation only): how many prerequisite hops each
+// chapter is from the one the map opens on, over the drawn edges in either
+// direction. Edges draw outward from that chapter and nodes fade in by it.
+const ARRIVE_MS = 700;
+function hopsFrom(originId, nodes, edges) {
+  const out = new Map([[originId, 0]]);
+  const near = new Map(nodes.map(n => [n.row.id, []]));
+  for (const e of edges) { near.get(e.from.row.id)?.push(e.to.row.id); near.get(e.to.row.id)?.push(e.from.row.id); }
+  const queue = [originId];
+  while (queue.length) {
+    const id = queue.shift();
+    for (const next of near.get(id) || []) if (!out.has(next)) { out.set(next, out.get(id) + 1); queue.push(next); }
+  }
+  return out;
 }
 
 export default function MapPage() {
@@ -156,12 +172,27 @@ export default function MapPage() {
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
   const isRecommended = node => !!recommended && node.row.id === recommended;
-  const pulse = motion.running;
+  const pulse = motion.running;  // the next route flows once the map has arrived (see below)
   const scopeName = user?.indiaTrack === 'jee-main' ? 'JEE Main'
     : user?.indiaTrack === 'jee-advanced' ? 'JEE Advanced'
       : user?.year ? t('common.classNumber', { n: user.year }) : null;
   const percentOf = node => node.evidence.accuracy == null ? '—' : `${node.evidence.mastery}%`;
   const H = layout.height;
+
+  // The map arrives once, from the chapter it opens on; later picks only move
+  // the inspector. Hops are fixed at arrival so a re-layout never replays it.
+  const origin = useRef(null);
+  const [arrived, setArrived] = useState(false);
+  if (!origin.current && current && curriculum) origin.current = current.row.id;
+  useEffect(() => {
+    if (!origin.current || arrived) return undefined;
+    const id = setTimeout(() => setArrived(true), motion.reduced ? 0 : ARRIVE_MS);
+    return () => clearTimeout(id);
+  }, [!!origin.current, arrived, motion.reduced]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const hops = useMemo(() => (origin.current ? hopsFrom(origin.current, layout.nodes, layout.edges) : new Map()), [layout, !!origin.current]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const hopOf = id => Math.min(5, hops.has(id) ? hops.get(id) : 5);
+  // An edge is drawn from its end nearer the origin, so the lines grow outward.
+  const outward = e => (hopOf(e.to.row.id) < hopOf(e.from.row.id) ? `M${e.to.x} ${e.to.y} L ${e.from.x} ${e.from.y}` : e.d);
 
   // The card's prose: fixed sentences over the chapter's own figures.
   const lostDotpoint = node => {
@@ -192,30 +223,22 @@ export default function MapPage() {
             {layout.monthly && layout.monthly.possible > 0 && <> · {t('inst.mapMonth', { earned: layout.monthly.earned, possible: layout.monthly.possible })}</>}
           </p>
         </header>
-        <div className={`in-map-graph${motion.running ? '' : ' is-still'}`} ref={graphRef}>
+        <div className={`in-map-graph${motion.running ? '' : ' is-still'}${arrived ? ' is-arrived' : ' is-arriving'}`} ref={graphRef} data-map-arrived={arrived ? 'true' : 'false'}>
           <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
-            <defs>
-              {layout.edges.map((e, i) => (
-                <linearGradient key={i} id={`in-map-g${i}`} gradientUnits="userSpaceOnUse" x1={e.from.x} y1={e.from.y} x2={e.to.x} y2={e.to.y}>
-                  <stop offset="0" stopColor={`var(${e.from.colour})`} />
-                  <stop offset="1" stopColor={`var(${e.to.colour})`} />
-                </linearGradient>
-              ))}
-            </defs>
             <g className="in-map-stars">
               {STARS.map((st, i) => <rect key={i} x={st.x * MAP_W} y={st.y * H} width={1.3} height={1.3} style={{ animationDelay: `${-st.d}s` }} />)}
             </g>
             {layout.edges.map((e, i) => (
-              <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}`}
-                d={e.d} style={{ stroke: `url(#in-map-g${i})`, strokeOpacity: e.opacity }} />
+              <path key={i} className={`in-map-edge${isRecommended(e.to) ? ' is-toward' : ''}`} pathLength="1"
+                d={outward(e)} style={{ strokeOpacity: 0.45 + 0.55 * e.opacity, '--hop': Math.min(hopOf(e.from.row.id), hopOf(e.to.row.id)) }} />
             ))}
-            {pulse && layout.edges.filter(e => isRecommended(e.to)).map((e, i) => [0, 1].map(k => (
+            {pulse && arrived && layout.edges.filter(e => isRecommended(e.to)).map((e, i) => [0, 1].map(k => (
               <circle key={`${i}-${k}`} className="in-map-pulse" r={2.6} style={{ '--cc': `var(${e.to.colour})` }}>
                 <animateMotion dur="2.4s" begin={`${-(k * 1.2 + i * 0.31)}s`} repeatCount="indefinite" path={e.d} />
               </circle>
             )))}
             {layout.nodes.map(node => (
-              <g key={node.row.id} className={`in-map-node${current?.row.id === node.row.id ? ' is-on' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})` }} data-map-node={node.row.id}>
+              <g key={node.row.id} className={`in-map-node${current?.row.id === node.row.id ? ' is-on' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})`, '--hop': hopOf(node.row.id) }} data-map-node={node.row.id}>
                 <circle className="in-map-dot" cx={node.x} cy={node.y} r={node.r} style={{ fillOpacity: fillOf(node) }} />
                 <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 7} />
                 <text x={node.x + node.r + 14} y={node.y + 3} className="in-map-name" lang="en">
@@ -257,6 +280,7 @@ export default function MapPage() {
 
         {current && (
           <aside ref={cardRef} className="in-map-card" id="in-map-card" style={{ '--cc': `var(${current.colour})` }} data-map-card={current.row.id}>
+            <div className="in-map-card-in" key={current.row.id}>
             <small>{isRecommended(current) ? t('inst.mapNext') : t('inst.chapterN', { n: current.index + 1 })}</small>
             <h2 lang="en"><TermGloss text={current.row.name} /></h2>
             <p className="in-map-prose">
@@ -272,6 +296,7 @@ export default function MapPage() {
             </p>
             <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-map-practise>{current.evidence.attempts === 0 ? t('inst.mapStart') : t('inst.practise')}</PageLink>
             {isRecommended(current) && <p className="in-note">{t('inst.mapNextWhy')}</p>}
+            </div>
           </aside>
         )}
       </div>

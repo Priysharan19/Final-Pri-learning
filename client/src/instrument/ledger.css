@@ -1,3 +1,5 @@
+/* Scripts' paper cards (direction C), carried in the same on-demand chunk. */
+@import './scripts.css';
 /* Scripts: the ledger (History.jsx, design s8) — split from instrument.css so
    it travels with the Scripts chunk (ON_DEMAND in client/vite.config.js in an
    instrument build) instead of every instrument install. Every class here is

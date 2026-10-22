@@ -8,6 +8,31 @@ import TermGloss from '../components/TermGloss.jsx';
 import BarSlot from './BarSlot.jsx';
 import './report.css';
 
+/** The headline figure, rolled digit by digit (presentation only): each digit
+ *  is a column 0–9 that settles on its value, the last digit first. The text
+ *  itself is read once, by its label; Reduce Motion cross-fades instead. */
+function Roll({ text }) {
+  const [on, setOn] = useState(false);
+  useEffect(() => { setOn(false); const id = requestAnimationFrame(() => requestAnimationFrame(() => setOn(true))); return () => cancelAnimationFrame(id); }, [text]);
+  const chars = String(text).split('');
+  const digits = chars.filter(c => /\d/.test(c)).length;
+  let seen = 0;
+  return (
+    <span className={`lux-roll${on ? ' is-on' : ''}`} role="img" aria-label={String(text)} key={text}>
+      {chars.map((c, i) => {
+        if (!/\d/.test(c)) return <span key={i} className="lux-roll-c" aria-hidden="true">{c}</span>;
+        const order = digits - 1 - seen++;
+        return (
+          <span key={i} className="lux-roll-d" aria-hidden="true" style={{ '--v': Number(c), '--o': order }}>
+            <span className="lux-roll-col">{'0123456789'.split('').map(d => <span key={d}>{d}</span>)}</span>
+            <span className="lux-roll-sizer">{c}</span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the
 // window before, the method/accuracy chart, the practice heat-map and where
@@ -70,6 +95,7 @@ function Chart({ series, labels, t, spoken, failed }) {
   return (
     <div className="in-chart" data-report-chart={any ? 'drawn' : failed ? 'failed' : 'empty'}>
       <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" role="img" aria-label={spoken}>
+        <defs><pattern id="lux-chart-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" /></pattern></defs>
         <g className="in-chart-grid" aria-hidden="true">
           {gridX.map(x => <line key={`x${x}`} x1={x} y1={0} x2={x} y2={CH} />)}
           {gridY.map(y => <line key={`y${y}`} x1={0} y1={y} x2={CW} y2={y} />)}
@@ -194,7 +220,7 @@ export default function ReportHead() {
         </div>
         <BarSlot><div className="in-segc" role="group" aria-label={t('inst.periodGroup')} data-report-periods>
           {PERIODS.map(p => (
-            <button key={p} type="button" aria-pressed={period === p} data-report-period-btn={p} onClick={() => setPeriod(p)}>
+            <button key={p} type="button" className="c-chip" aria-pressed={period === p} data-report-period-btn={p} onClick={() => setPeriod(p)}>
               {p === 'week' ? t('inst.periodWeek') : p === 'month' ? t('inst.periodMonth') : t('inst.periodTerm')}
             </button>
           ))}
@@ -206,7 +232,7 @@ export default function ReportHead() {
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
           {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
-        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+        <div data-report-method className="lux-report-hero"><b>{cur?.methodPct != null ? <Roll text={fmtPct(cur.methodPct)} /> : '—'}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">

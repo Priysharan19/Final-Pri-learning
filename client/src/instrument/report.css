@@ -23,14 +23,12 @@
 .in-chart { position: relative; height: 300px; border-radius: 6px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); overflow: hidden; }
 .in-chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .in-chart-grid line { stroke: var(--in-edge); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.in-chart-area { fill: var(--in-tx); fill-opacity: 0.12; animation: in-chart-fade 1.4s cubic-bezier(.2, 0, 0, 1) both; }
 .in-chart-line { fill: none; stroke-width: 2.4; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
-.in-chart-line.is-method { stroke: var(--in-tx); stroke-dasharray: 1; stroke-dashoffset: 0; animation: in-chart-draw 1.4s cubic-bezier(.2, 0, 0, 1) both; }
-.in-chart-line.is-accuracy { stroke: var(--in-slip); stroke-dasharray: 6 5; animation: in-chart-fade 1.4s cubic-bezier(.2, 0, 0, 1) both; }
+.in-chart-line.is-method { stroke: var(--in-tx); stroke-dasharray: 1; stroke-dashoffset: 0; }
+.in-chart-line.is-accuracy { stroke: var(--in-slip); stroke-dasharray: 6 5; }
 .in-chart-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; transform: translate(-50%, -50%); background: var(--in-tx); }
 .in-chart-dot.is-accuracy { background: var(--in-slip); }
 .in-chart-dot.is-end.is-method { width: 10px; height: 10px; }
-.in-chart-dot.is-end { animation: in-chart-fade 0.3s 1.3s both; }
 @keyframes in-chart-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes in-chart-fade { from { opacity: 0; } to { opacity: 1; } }
 .in-chart-text { position: absolute; inset: 0; pointer-events: none; font: 400 11.5px var(--in-mono); color: var(--in-tx-3); }
@@ -58,6 +56,93 @@
 @media (max-width: 1100px) { .in-rp { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .in-report-figs { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) { .in-segc { width: 100%; } .in-segc button { flex: 1; min-height: 44px; } .in-chart { height: 240px; } }
-@media (prefers-reduced-motion: reduce) { .in-chart-area, .in-chart-line, .in-chart-dot { animation: none; } }
 
 .in-chart-empty { box-shadow: var(--in-sh-1); background: var(--in-l1); color: var(--in-tx-2); }
+
+/* Pri luxury · Report (direction C). Instrument build only: imported by the
+   lazily loaded ReportHead. One giant Instrument Serif figure (tabular) that
+   rolls digit by digit; the line plots left to right like a pen plotter
+   (1100ms from 120ms), the hatched area settles behind it (700ms after
+   700ms), and the endpoint dot lands as the pen lifts. Reduce Motion: the
+   final frame, cross-faded in. */
+
+html.ui-instrument .in-report { color: var(--c-ink); font-family: var(--c-text); }
+html.ui-instrument .in-report-title { font: 400 clamp(40px, 7vw, 84px)/.95 var(--c-serif); letter-spacing: -.01em; color: var(--c-ink); }
+html.ui-instrument .in-report-lede { font: 400 16px/1.5 var(--c-text); color: var(--c-ink-2); }
+
+html.ui-instrument .in-segc { border-radius: 8px; background: transparent; box-shadow: inset 0 0 0 1px var(--c-hair); padding: 3px; }
+html.ui-instrument .in-segc button.c-chip { border-radius: var(--radius-pill); border: 0; font: 600 14px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); min-height: 38px; padding: 6px 16px; }
+html.ui-instrument .in-segc button[aria-pressed="true"] { background: var(--c-ink); color: var(--c-paper); box-shadow: none; }
+html.ui-instrument .in-segc button:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 2px; }
+
+/* Figures: no cards, engraved rules between them; the method figure leads. */
+html.ui-instrument .in-report-figs { gap: 0; border-top: 1px solid var(--c-hair); }
+html.ui-instrument .in-report-figs > div { background: none; box-shadow: none; border-radius: 0; padding: 14px 16px 12px 0; border-bottom: 1px solid var(--c-hair-2); }
+html.ui-instrument .in-report-figs b { font: 400 40px/1 var(--c-serif); letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--c-ink); }
+html.ui-instrument .in-report-figs b span { font-size: 22px; color: var(--c-ink-3); letter-spacing: 0; }
+html.ui-instrument .in-report-figs small { display: block; margin-top: 6px; font: 600 13px var(--c-sc); letter-spacing: .14em; color: var(--c-ink-2); }
+html.ui-instrument .in-report-figs em { font: 400 14px var(--c-text); color: var(--c-teal); }
+html.ui-instrument .in-report-figs em.is-down { color: var(--c-ink-2); }
+html.ui-instrument .lux-report-hero { grid-column: 1 / -1; order: -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding-top: 18px !important; }
+html.ui-instrument .lux-report-hero b:has(.lux-roll) { font-size: clamp(72px, 12vw, 140px); line-height: .9; }
+html.ui-instrument .lux-report-hero small { order: -1; flex-basis: 100%; margin: 0 0 4px; }
+html.ui-instrument .lux-report-hero em { font-size: 16px; }
+
+/* The roll: each digit is a 0–9 column under a fixed-width window. */
+.lux-roll { display: inline-flex; font-variant-numeric: tabular-nums; }
+.lux-roll-d { position: relative; display: inline-block; overflow: hidden; height: 1em; line-height: 1; vertical-align: top; }
+.lux-roll-sizer { visibility: hidden; }
+.lux-roll-col { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; transform: translateY(0); }
+.lux-roll-col span { height: 1em; line-height: 1; }
+.lux-roll-c { line-height: 1; }
+.lux-roll.is-on .lux-roll-col {
+  transform: translateY(calc(var(--v) * -10%));
+  transition: transform 900ms cubic-bezier(.45, 0, .2, 1) calc(var(--o) * 90ms);
+}
+
+/* Chart: paper, engraved grid, a teal pen line, hatched area. */
+html.ui-instrument .in-chart { background: var(--c-sheet); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--c-hair); }
+html.ui-instrument .in-chart-grid line { stroke: var(--c-hair-2); }
+html.ui-instrument #lux-chart-hatch line { stroke: var(--c-teal); stroke-width: .5; opacity: .45; }
+html.ui-instrument .in-chart-area { fill: url(#lux-chart-hatch); fill-opacity: 1; animation: in-chart-fade 700ms cubic-bezier(.2, .8, .2, 1) 700ms both; }
+html.ui-instrument .in-chart-line { stroke-width: 1.8; }
+html.ui-instrument .in-chart-line.is-method { stroke: var(--c-teal); animation: in-chart-draw 1100ms cubic-bezier(.5, 0, .2, 1) 120ms both; }
+html.ui-instrument .in-chart-line.is-accuracy { stroke: var(--c-ink-2); stroke-dasharray: 4 4; animation: in-chart-fade 700ms cubic-bezier(.2, .8, .2, 1) 700ms both; }
+html.ui-instrument .in-chart-dot { background: var(--c-sheet); box-shadow: 0 0 0 1.4px var(--c-teal); }
+html.ui-instrument .in-chart-dot.is-accuracy { box-shadow: 0 0 0 1.4px var(--c-ink-2); }
+html.ui-instrument .in-chart-dot.is-end.is-method { background: var(--c-teal); }
+html.ui-instrument .in-chart-dot.is-end { animation: lux-chart-land 340ms cubic-bezier(.7, 0, .9, .6) 1180ms both; }
+html.ui-instrument .in-chart-text { font: 400 12px var(--c-text); color: var(--c-ink-2); }
+html.ui-instrument .in-chart-val { font: 400 20px var(--c-serif); }
+html.ui-instrument .in-chart-val.is-method { color: var(--c-ink); }
+html.ui-instrument .in-chart-val.is-accuracy { color: var(--c-ink-2); }
+html.ui-instrument .in-chart-val { animation: in-chart-fade 260ms linear 1220ms both; }
+html.ui-instrument .in-chart-lg { font: 600 12px var(--c-sc); letter-spacing: .12em; color: var(--c-ink-2); }
+html.ui-instrument .in-chart-lg i { height: 1.4px; background: var(--c-teal); }
+html.ui-instrument .in-chart-lg i.is-accuracy { background: none; border-top: 1.4px dashed var(--c-ink-2); }
+html.ui-instrument .in-chart-empty { background: var(--c-sheet); box-shadow: 0 0 0 1px var(--c-hair); border-radius: 3px; font: 400 14px var(--c-text); color: var(--c-ink-2); }
+
+@keyframes lux-chart-land {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); }
+  55% { opacity: 1; transform: translate(-50%, -50%) scale(.9); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* Heat-map and lost marks, in the same paper language. */
+html.ui-instrument .in-report-heat { background: none; box-shadow: none; border-top: 1px solid var(--c-hair); border-radius: 0; padding: 14px 0 0; }
+html.ui-instrument .in-report-heat h2, html.ui-instrument .in-report-lost h3 { font: 600 13px var(--c-sc); letter-spacing: .14em; text-transform: none; color: var(--c-ink-2); }
+html.ui-instrument .in-heat i { border-radius: 1px; background: var(--c-hair-2); }
+html.ui-instrument .in-heat i.is-on { background: color-mix(in srgb, var(--c-teal) calc(var(--v) * 100%), var(--c-hair-2)); }
+html.ui-instrument .in-report-lost li { background: none; box-shadow: none; border-radius: 0; border-bottom: 1px solid var(--c-hair-2); padding: 8px 0; font: 400 15px var(--c-text); color: var(--c-ink); }
+html.ui-instrument .in-report-lost li i { border-radius: 0; transform: rotate(45deg) scale(.8); background: var(--c-copper); }
+html.ui-instrument .in-report-lost li small { font: 400 20px var(--c-serif); color: var(--c-copper); font-variant-numeric: tabular-nums; }
+
+/* The student's own equations, drawn: a paper plate with a hairline. */
+html.ui-instrument .in-reading-plot { margin: 12px 0 0; padding: 12px; background: var(--c-sheet); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--c-hair); }
+html.ui-instrument .in-reading-plot figcaption { font: 600 13px var(--c-sc); letter-spacing: .14em; color: var(--c-ink-2); margin-bottom: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lux-roll.is-on .lux-roll-col { transition: none; }
+  html.ui-instrument .lux-report-hero b { animation: in-chart-fade 200ms linear both; }
+  html.ui-instrument .in-chart-area, html.ui-instrument .in-chart-line, html.ui-instrument .in-chart-dot.is-end, html.ui-instrument .in-chart-val { animation: in-chart-fade 200ms linear both; }
+}

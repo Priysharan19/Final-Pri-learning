@@ -83,6 +83,45 @@ function InkReplay({ strokes, height = 160, label }) {
   );
 }
 
+// Scripts (instrument): a paper thumbnail of the student's own ink with the
+// examiner's certified score in the corner. The strokes come from the same
+// saved-attempt detail the row opens, fetched only when the card is on screen
+// and only for attempts written in ink; anything else shows the ruled paper
+// with the answer the student gave. Display only, nothing is recomputed.
+function ScriptThumb({ item, strokesFor }) {
+  const ref = useRef(null);
+  const [strokes, setStrokes] = useState(null);
+  useEffect(() => {
+    if (!item.viaInk || typeof IntersectionObserver === 'undefined') return undefined;
+    let live = true;
+    const io = new IntersectionObserver(entries => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      io.disconnect();
+      strokesFor(item.id).then(s => { if (live) setStrokes(s); });
+    }, { rootMargin: '200px' });
+    if (ref.current) io.observe(ref.current);
+    return () => { live = false; io.disconnect(); };
+  }, [item.id, item.viaInk]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const scored = !item.repeat && Number.isInteger(item.marksPossible) && item.marksPossible > 0;
+  const full = scored && item.marksEarned === item.marksPossible;
+  let box = null;
+  if (strokes?.length) {
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (const st of strokes) for (const pt of st.points || []) { x1 = Math.min(x1, pt.x); y1 = Math.min(y1, pt.y); x2 = Math.max(x2, pt.x); y2 = Math.max(y2, pt.y); }
+    if (isFinite(x1)) box = `${x1 - 8} ${y1 - 8} ${x2 - x1 + 16} ${y2 - y1 + 16}`;
+  }
+  return (
+    <span className="in-scr-th" ref={ref} aria-hidden="true">
+      {box ? (
+        <svg viewBox={box} preserveAspectRatio="xMinYMid meet">
+          {strokes.map((st, i) => <polyline key={i} points={(st.points || []).map(pt => `${pt.x},${pt.y}`).join(' ')} />)}
+        </svg>
+      ) : item.answerGiven ? <span className="in-scr-typed"><MathText text={String(item.answerGiven)} /></span> : null}
+      {scored && <span className={`in-scr-score${full ? ' is-full' : ''}`}>{item.marksEarned}<small>{` / ${item.marksPossible}`}</small></span>}
+    </span>
+  );
+}
+
 export default function History() {
   const { user } = useApp();
   // Saved attempts contain private ink, transcripts and photographs. A profile
@@ -253,6 +292,13 @@ function HistoryForProfile() {
     return formatDate(`${key}T12:00:00Z`, user, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
 
+  // One fetch per attempt for the thumbnails, shared with nothing else.
+  const thumbCache = useRef(new Map());
+  function strokesFor(id) {
+    if (!thumbCache.current.has(id)) thumbCache.current.set(id, api.get(`/history/${id}/detail`).then(d => d?.ink?.strokes || null).catch(() => null));
+    return thumbCache.current.get(id);
+  }
+
   function onLedgerKey(e) {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key) || !e.target.classList?.contains('in-led-main')) return;
     const rows = [...e.currentTarget.querySelectorAll('.in-led-main')];
@@ -286,6 +332,7 @@ function HistoryForProfile() {
                 style={{ '--cc': `var(${chapterColour(item.subtopic)})` }}>
                 <button className="hist-main in-led-main" aria-expanded={open?.id === item.id} tabIndex={item.id === activeId ? 0 : -1}
                   onFocus={() => setActiveRow(item.id)} onClick={() => openDetail(item.id)}>
+                  <ScriptThumb item={item} strokesFor={strokesFor} />
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={item.prompt} /></span>
@@ -342,7 +389,7 @@ function HistoryForProfile() {
         <div className="in-led-tools">
           <div className="in-led-bar in-hsb" role="group" aria-label={t('history.filterGroup')} id="in-hist-filters">
             {INSTRUMENT_FILTERS.map(([k, key]) => (
-              <button key={k} type="button" className="in-flt" aria-pressed={filter === k} data-history-filter={k}
+              <button key={k} type="button" className="in-flt c-chip" aria-pressed={filter === k} data-history-filter={k}
                 onClick={() => { setPage(0); setParams(k === 'all' ? {} : { filter: k }); }}>
                 {t(key)} <b data-history-count={k}>{counts ? formatNumber(counts[k] ?? 0, user) : '·'}</b>
               </button>
