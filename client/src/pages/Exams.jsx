@@ -170,9 +170,11 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
           {track === 'jee-advanced' && <p className="muted">
             {t('exams.jeeAdvancedNote')}
           </p>}
-          <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
-            {t('exams.notReleased')}
-          </button>
+          {track === 'cbse' && (user.year === 10 || user.year === 12)
+            ? <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 16 }} onClick={() => nav('/mock')} data-exam-board-mock>{t('mock.title')}</button>
+            : <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
+              {t('exams.notReleased')}
+            </button>}
         </>}
         {startRefused}
         {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}

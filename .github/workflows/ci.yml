@@ -190,6 +190,8 @@ jobs:
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
           grep -Eq 'EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
+          # Board mocks: the examiner's margin changes no mark, and margin marks add up to the marks.
+          grep -Eq 'BOARD MOCK: PASS — [0-9]+ checks \(864 markings compared' suites.log
           grep -Fq 'VERIFIED STEP MARKS: PASS' suites.log
           grep -Fq 'VERIFIED STEP MARKS CLIENT: PASS' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
@@ -534,6 +536,11 @@ jobs:
           node server/test/exam-handwriting-check.mjs 2>&1 | tee exam-handwriting.log
           grep -Fq 'EXAM HANDWRITING: PASS — 109/109 checks' exam-handwriting.log
           grep -Fq 'SYNTHETIC-READER EVIDENCE' exam-handwriting.log
+      - name: Board mock papers — labels, one free sample, Premium, the examiner's margin (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
+          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 44/44 checks' board-mock.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -555,12 +562,13 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-handwriting-check.mjs' platform-postgres.log
+          grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
           grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log

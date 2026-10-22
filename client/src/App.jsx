@@ -30,6 +30,8 @@ import { BrandWordmark } from './components/BrandMark.jsx';
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
+const MockPapers = React.lazy(() => import('./mock/MockPapers.jsx'));
+const MockScript = React.lazy(() => import('./mock/MockScript.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
 const Match = React.lazy(() => import('./pages/Match.jsx'));
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
@@ -600,6 +602,8 @@ export default function App() {
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/mock" element={studentOnly(<MockPapers />)} />
+                    <Route path="/mock/:id" element={studentOnly(<MockScript />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     <Route path="/rush" element={studentOnly(<Rush />)} />
