@@ -778,7 +778,7 @@ export default {
   // {br} is a slot, not a fixed line break: the English sentence breaks after
   // "by hand", and the Hindi one breaks where the Hindi sentence breaks.
   'login.heroSub': 'NCERT कक्षा 7–12, JEE Main और Advanced तथा ओलंपियाड का गणित — आपका हल पंक्ति दर पंक्ति जाँचा जाता है, और साथ में विस्तृत हल मिलता है। उत्तर Pri का सर्वर जाँचता है, इसलिए जाँच के लिए Pri खाता और कनेक्शन चाहिए।',
-  'login.heroPrivacy': 'निजी: प्रोफ़ाइल, ड्राफ़्ट और हैंडराइटिंग इसी डिवाइस पर रखी जाती हैं। उत्तर जाँचने के लिए Pri खाता और कनेक्शन चाहिए। कोई विज्ञापन नहीं।',
+  'login.heroPrivacy': 'निजी: प्रोफ़ाइल, ड्राफ़्ट और हैंडराइटिंग इसी डिवाइस पर रहती हैं, और कोई विज्ञापन नहीं है।',
   'login.cloudSignIn': 'अपने Pri क्लाउड खाते में लॉग इन करें',
   'login.cloudIntent': 'Pri क्लाउड खाता — पहले इस डिवाइस पर वह प्रोफ़ाइल खोलिए या बनाइए जिसे यह खाता सिंक करेगा। उसके बाद आप लॉग इन करने के लिए खाता सेटिंग्स पर पहुँचेंगे।',
   'login.privacy': 'निजता',

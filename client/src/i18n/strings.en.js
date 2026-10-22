@@ -715,7 +715,7 @@ export default {
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
   // Public account entry and explicit offline entry are load-bearing browser contracts.
   'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
-  'login.heroPrivacy': 'Private: profiles, drafts and handwriting are stored on this device. Checking answers needs a Pri account and a connection. No ads.',
+  'login.heroPrivacy': 'Private: profiles, drafts and handwriting stay on this device, and there are no ads.',
   'login.cloudSignIn': 'Sign in to your Pri cloud account',
   'login.cloudIntent': 'Pri cloud account — first open or create the profile on this device that the account will sync. You’ll land in Account settings to sign in.',
   'login.privacy': 'Privacy',

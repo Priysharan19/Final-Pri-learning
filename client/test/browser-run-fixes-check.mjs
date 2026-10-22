@@ -40,6 +40,10 @@ for (const key of ['settings.helpBody', 'settings.helpBodyIndia']) {
 // no offline or on-device marking, and says what checking needs.
 ok(!/offline|on your device/i.test(en['login.heroSub']) && /checked by Pri’s server/.test(en['login.heroSub']) && /Pri account and a connection/.test(en['login.heroSub']), 'the welcome line says answers are checked by the server with an account and a connection (EN)');
 ok(!/बिना इंटरनेट/.test(hi['login.heroSub']) && /Pri का सर्वर जाँचता है/.test(hi['login.heroSub']) && /Pri खाता और कनेक्शन चाहिए/.test(hi['login.heroSub']), 'and in Hindi');
+// The sign-in footnote says the account-and-connection requirement once (in
+// login.heroSub); the privacy line no longer repeats it.
+ok(en['login.heroPrivacy'] === "Private: profiles, drafts and handwriting stay on this device, and there are no ads." && !/Pri account/.test(en['login.heroPrivacy']), 'the privacy line states privacy once and does not repeat the account requirement (EN)');
+ok(hi['login.heroPrivacy'] === "निजी: प्रोफ़ाइल, ड्राफ़्ट और हैंडराइटिंग इसी डिवाइस पर रहती हैं, और कोई विज्ञापन नहीं है।" && !/Pri खाता/.test(hi['login.heroPrivacy']), 'and in Hindi');
 
 // ── 3 · The editor footer names who reads, accurately ────────────────────────
 const card = read('client/src/components/QuestionCard.jsx');
