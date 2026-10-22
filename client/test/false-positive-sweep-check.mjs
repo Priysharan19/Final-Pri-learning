@@ -128,6 +128,15 @@ function numericProbes(q, a) {
     const u = wrongUnit(q.answerSuffix);
     if (u) out.push({ input: `${fmt(v)} ${u}`, why: `wrong unit ${u} (asked ${String(q.answerSuffix).trim()})`, unit: true });
   }
+  // The word "percent" is a sign too, wherever it stands: 100 times the key
+  // with the word and a unit, braces or a second sign is never the key (#670).
+  // (Off a percentage question a key in −1…1 may be written as a percentage —
+  // 100% is 1, 44% is 0.44 — so only the doubled sign is probed there.)
+  const asksPercent = a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '');
+  if (v !== 0) {
+    const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`] : [`${fmt(v * 100)} percent %`];
+    for (const input of spellings) out.push({ input, why: 'a hundred times the key, with the word percent' });
+  }
   if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
   // On a percentage question a typed % is the answer's unit: 100 times the key
   // with the sign is 100 times too big, never the key read as ÷100.
@@ -432,6 +441,22 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   expect('label: "b^2 = 67" accepted', verdict(tri, 'b^2 = 67').correct);
   const henceB = { answerType: 'numeric', prompt: 'Find $b^2$ and hence $b$.', answer: { value: 5 } };
   expect('label: "Find $b^2$ and hence $b$" asks for b too: "b = 5" accepted', verdict(henceB, 'b = 5').correct);
+  // "Solve 3x = -18": the equation does not GIVE x; "x = -6" is the answer (#670 final review).
+  const solve = { answerType: 'numeric', prompt: 'Solve $3x = -18$.', answer: { value: -6 } };
+  expect('label: "x = -6" answers "Solve 3x = -18"', verdict(solve, 'x = -6').correct);
+  const evalAt = { answerType: 'numeric', prompt: 'Evaluate $4x + 9$ when $x = 7$.', answer: { value: 37 } };
+  expect('label: "x = 37" names the given x, refused', !verdict(evalAt, 'x = 37').correct);
+  for (const [id, d] of [['c7-finding-unknown-current', 2], ['c8-linear-equations-both-sides', 2], ['y7-equations', 1], ['c8-rational-numbers-foundations', 2]]) {
+    if (!GENERATORS[id]) continue;
+    for (let i = 1; i <= 12; i++) {
+      const q = generateQuestion(id, d, i * 7919);
+      if (q.answerType !== 'numeric' || !/\bsolve\b/i.test(q.prompt)) continue;
+      const letters = (String(q.prompt).match(/\$[^$]*\$/g) || []).join(' ').match(/(?<![A-Za-z\\])[a-z](?![A-Za-z])/g) || [];
+      const unknown = letters.sort((x, y) => letters.filter(l => l === y).length - letters.filter(l => l === x).length)[0];
+      if (unknown) expect(`label: "${unknown} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${unknown} = ${fmt(q.answer.value)}`).correct);
+    }
+  }
+  for (const input of ['65%.', '{65%}']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
   const bold = { answerType: 'numeric', prompt: 'Find the **median** of the data.', answer: { value: 6 } };
   expect('label: bold markup does not hide the asked noun: "median = 6" accepted', verdict(bold, 'median = 6').correct);
   expect('label: "Answer = 6" accepted', verdict(bold, 'Answer = 6').correct);

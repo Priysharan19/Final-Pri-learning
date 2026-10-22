@@ -424,8 +424,11 @@ export function answerFromLine(line, question = {}) {
 
 /** Does the label in front of a final line (if any) name what the question asks for? */
 function labelNamesTheAsk(text, answer, question) {
-  // An "=" that is a relation, not part of an arrow ("least value => 6").
-  const m = stripSentence(text).match(/^\s*([^=≈<>⇒→]{1,40}?)\s*(?:=(?![>=])|≈)/);
+  // "Ans: Perimeter = 72", "Answer: b = 50": the announcement is not the label.
+  const line = stripSentence(text).replace(/^\s*(?:final\s+answer|answer|ans|उत्तर)\s*[:=-]?\s*/iu, '');
+  // The label before the value, however it is joined on: "=", "≈", an arrow,
+  // "is" or a colon (a ratio's "2:3" has no letters before it, so is no label).
+  const m = line.match(/^\s*([^=≈<>⇒→:]{1,40}?)\s*(?:=>|⇒|→|->|=(?!=)|≈|:|\s+is\s+)/u);
   if (!m || !/\p{L}/u.test(m[1]) || STRONG_WORDS.test(m[1])) return true;
   const label = m[1].trim();
   const read = readAnswerLabel(question, `${label} = ${answer}`);

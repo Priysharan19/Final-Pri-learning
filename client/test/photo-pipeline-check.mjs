@@ -148,6 +148,10 @@ for (const [lines, question, want] of FINALS) {
   const SUM = { answerType: 'numeric', prompt: 'Find $a + b$.' };
   eq(only(proposeFinalAnswer(['a = 7'], SUM)), { status: 'none' }, 'photo label: "a = 7" under "Find a + b" proposes nothing');
   eq(only(proposeFinalAnswer(['x = 5'], { answerType: 'numeric', prompt: 'Find $x$.' })), proposed('5'), 'photo label: "x = 5" under "Find x" proposes 5');
+  for (const line of ['Ans: Perimeter = 72', 'Perimeter: 72', 'Perimeter → 72', 'Perimeter => 72', 'Perimeter is 72']) eq(only(proposeFinalAnswer([line], AREA)), { status: 'none' }, `photo label: "${line}" under "Find the area" proposes nothing`);
+  for (const line of ['Area of PQR = 72', 'Area: 72', 'Ans: 72']) eq(only(proposeFinalAnswer([line], AREA)), proposed('72'), `photo label: "${line}" proposes 72`);
+  eq(only(proposeFinalAnswer(['Answer: b = 50'], B2)), { status: 'none' }, 'photo label: "Answer: b = 50" under "Find b²" proposes nothing');
+  eq(only(proposeFinalAnswer(['3x = -18', 'x = -6'], { answerType: 'numeric', prompt: 'Solve $3x = -18$.' })), proposed('-6'), 'photo label: "x = -6" answers "Solve 3x = -18"');
 }
 // Whatever is proposed is something the typed field's own parser reads, and it
 // is never a sentence and never ends in a sentence's full stop.

@@ -189,7 +189,7 @@ const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s
 // Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
 const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
 const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
-const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per)$/;
+const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|taken|obtained|formed|made|attained|reached)$/;
 const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
 /** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
 function quantityKey(text) {
@@ -229,17 +229,19 @@ function askedFor(question) {
   // else: "mean" is not the mean deviation, "cube" is not the cube root.
   const nouns = [];
   for (const m of tail.matchAll(ASK_NOUN)) {
-    const words = [];
+    const words = [], lead = [];
     for (const word of m[1].toLowerCase().split(/\s+/)) {
       if (PHRASE_ENDS.test(word)) break;
       if (!words.length && NOT_A_NAME.has(word)) {
         // "the total cost": "total" on its own names the asked total too.
-        if (QUANTITY_MODIFIERS.has(word)) nouns.push(word);
+        if (QUANTITY_MODIFIERS.has(word)) { nouns.push(word); lead.push(word); }
         continue;
       }
       words.push(word);
     }
     for (let i = 0; i < words.length; i++) if (!NOT_A_NAME.has(words[i])) nouns.push(words.slice(i).join(''));
+    // …and with its modifiers kept: "least value" for "the least value of f".
+    for (let j = 1; lead.length && j <= words.length; j++) nouns.push([...lead, ...words.slice(0, j)].join(''));
   }
   return { math, nouns };
 }
@@ -264,7 +266,12 @@ export function readAnswerLabel(question, raw) {
   if (/^[a-zθ]$/i.test(label)) {
     // A letter the question GIVES a value ("In triangle ABC, a = 7, c = 9 …
     // Find b²") names that given, not the answer, unless the letter itself is asked.
-    const given = new RegExp(`(^|[^A-Za-z\\\\])${label.replace(/[^A-Za-zθ]/g, '')}\\s*=\\s*-?\\d`).test(String(question?.prompt ?? '').replace(/\$/g, ''));
+    // Only a letter standing alone and set equal to a plain number is given
+    // ("a = 7,", "when x = 3"); "3x = -18" or "4^x = 281" is the equation to
+    // solve, and on a "Solve …" question the letter is the unknown.
+    const promptText = String(question?.prompt ?? '').replace(/\$/g, ' ');
+    const given = !/\bsolve\b/i.test(promptText)
+      && new RegExp(`(^|[\\s,(;:])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?=[\\s,.;:)]|$)`).test(promptText);
     if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
     // A one-letter label is read off as it always was — unless the question
     // asks, and only asks, for a plainly different quantity on that letter: a
@@ -281,7 +288,11 @@ export function readAnswerLabel(question, raw) {
     }
     return { input: raw };
   }
-  if (math.includes(key) || nouns.includes(key)) return { input: m[2], asked };
+  // "Area of PQR = 72": the label's own head phrase, up to "of", names the quantity.
+  const headWords = [];
+  for (const w of label.split(/\s+/)) { if (PHRASE_ENDS.test(w.toLowerCase())) break; headWords.push(w); }
+  const head = quantityKey(headWords.join(' '));
+  if (math.includes(key) || nouns.includes(key) || (head && head !== key && nouns.includes(head))) return { input: m[2], asked };
   return { input: raw, asked };
 }
 
@@ -396,8 +407,6 @@ export function parseNumericInput(raw) {
   // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567 ·
   // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
   // lists, not 123.
-  // "65 percent" / "65 per cent" is "65%".
-  s = s.replace(/\s*\bper\s?cent\b\.?$/i, '%');
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
   const meta = { isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
 
@@ -574,11 +583,15 @@ function checkAnswerWithinBudget(question, rawInput) {
         // Any other % — "(6500%)" read as 65, "6500%%", "6500% + 0" — is a
         // percentage sign used as arithmetic, never the answer's unit (P0).
         if (typeof rawInput === 'string') {
-          let pct = rawInput.trim().replace(/\s*\bper\s?cent\b\.?$/i, '%').replace(/[％٪]/g, '%');
+          // Every "percent"/"per cent" is a sign wherever it stands, so the word
+          // cannot slip a ÷100 past this guard ("6500 percent cm"); a sentence's
+          // full stop and one outer pair of brackets or braces are not part of it.
+          let pct = rawInput.trim().replace(/\s*\bper\s?cent\b/gi, '%').replace(/[％٪]/g, '%')
+            .replace(/(?<!\.)\.\s*$/, '').trim();
           const signs = (pct.match(/%/g) || []).length;
           if (signs) {
-            const outer = pct.match(/^\((.*)\)$/s);
-            if (outer && !/[()]/.test(outer[1])) pct = outer[1].trim();
+            const outer = pct.match(/^\((.*)\)$/s) || pct.match(/^\{(.*)\}$/s) || pct.match(/^\[(.*)\]$/s);
+            if (outer && !/[(){}[\]]/.test(outer[1])) pct = outer[1].trim();
             if (signs !== 1 || !/%\s*$/.test(pct)) {
               return { correct: false, feedback: 'Write a percentage once, at the end — like 65%.' };
             }
