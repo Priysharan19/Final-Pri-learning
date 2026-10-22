@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import { detent, flip, reduced, rot } from './motion.js';
+import { startLight } from './light.js';
 
 async function flipSeq(win, values, gap = 60, alive = () => true) {
   for (const v of values) {
@@ -69,6 +70,10 @@ let playedThisPageLoad = false;
 
 export default function IndexDial({ accuracy, covered, label, caption, ariaLabel }) {
   const svg = useRef(null);
+  const lit = useRef(null);
+  // A's key light, scoped to the dial: written on the whole document, every
+  // pointer move restyled the page (traced: the cause of ⌘K's first-open drops).
+  useLayoutEffect(() => startLight(lit.current), []);
   const bezel = useRef(null);
   const minute = useRef(null);
   const hour = useRef(null);
@@ -119,7 +124,7 @@ export default function IndexDial({ accuracy, covered, label, caption, ariaLabel
   return (
     <figure className="m-dial" data-instrument-dial>
       <p className="sr-only">{ariaLabel}</p>
-      <div className="m-dial-box c-rim">
+      <div className="m-dial-box c-rim" ref={lit}>
         <svg ref={svg} viewBox="0 0 400 400" aria-hidden="true" focusable="false">
           <circle cx="200" cy="200" r="197" fill="var(--c-bezel)" stroke="var(--c-bezel-2)" strokeWidth="1" />
           <circle ref={bezel} cx="200" cy="200" r="190" fill="none" stroke="var(--c-dial-line)" strokeWidth=".5" pathLength="1" strokeDasharray="1" />
