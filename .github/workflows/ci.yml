@@ -540,7 +540,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
-          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 35/35 checks' board-mock.log
+          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 33/33 checks' board-mock.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)

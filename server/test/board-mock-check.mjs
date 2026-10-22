@@ -129,38 +129,59 @@ try {
   eq((await create(free.jar, await spec(free.jar, 10))).data?.error?.code, 'FREE_CAP_REACHED', 'the window itself still holds');
 
   // ── The margin on the result equals the engine's ───────────────────────────
-  const paper = await sealed(exam.id);
-  const answers = {}, workings = {}, times = {};
-  const expected = new Map();
-  for (const sq of paper.questions) {
-    times[sq.id] = 30000 + sq.order * 1000;
-    const q = sq.payload;
-    if (q.multipart || q.alt || ['mcq', 'multi-mcq'].includes(q.answerType) || !stepMetaFor(q)) continue;
-    const steps = (q.steps || []).map(s => String(s.d ?? '').replace(/\$|\\left|\\right/g, '').split('\n')[0]).filter(Boolean);
-    if (!steps.length) continue;
-    answers[sq.id] = '987654';
-    workings[sq.id] = [...steps, 'x = 987654'].join('\n');
-    expected.set(sq.id, markResponse(q, answers[sq.id], workings[sq.id], sq.marking));
-  }
-  ok(expected.size >= 1, `the paper holds written questions to work (${expected.size})`);
-  await h.db.run('DELETE FROM rate_limits');
-  const done = await finish(free.jar, exam.id, { answers, workings, times, ms: 60 * 60000, reason: 'student', submissionKey: 'mock-sub-0001' });
-  eq(done.status, 200, `the mock is marked: ${done.text?.slice(0, 200)}`);
-  const result = done.data.result ?? done.data;
-  eq([result.mock, result.label], [true, MOCK_LABEL], 'the result is labelled a mock');
-  let margins = 0;
-  for (const [id, want] of expected) {
-    const line = result.detail.find(d => d.id === id);
-    // Per question, uncounted: how many a paper holds depends on the draw.
-    assert.deepEqual([line.awarded, line.markingScheme], [want.awarded, want.markingScheme], 'the server marked it as the engine does');
-    assert.deepEqual(line.script ?? null, want.script ?? null, 'and returned the engine\'s margin');
-    if (line.script) {
-      margins++;
-      assert.ok(line.script.lines.reduce((n, l) => n + l.mark, 0) <= line.awarded, 'margin marks never exceed the marks');
+  // Every written question, internal-choice question (its first version) and
+  // case-study part the engine can step-check is answered wrongly with its
+  // authored working; the result must carry exactly what the engine gives.
+  // How many a paper holds depends on the draw, so the per-item comparisons
+  // are uncounted, and Premium papers are drawn below until margins are seen.
+  const stepsOf = q => (q.steps || []).map(s => String(s.d ?? '').replace(/\$|\\left|\\right/g, '').split('\n')[0]).filter(Boolean);
+  async function sitAndCompare(jar, id) {
+    const paper = await sealed(id);
+    const answers = {}, workings = {}, times = {};
+    const expected = new Map();
+    const work = (key, q, grid) => {
+      if (['mcq', 'multi-mcq'].includes(q.answerType) || !stepMetaFor(q) || !stepsOf(q).length) return;
+      answers[key] = '987654';
+      workings[key] = [...stepsOf(q), 'x = 987654'].join('\n');
+      expected.set(key, markResponse(q, answers[key], workings[key], grid));
+    };
+    for (const sq of paper.questions) {
+      times[sq.id] = 30000 + sq.order * 1000;
+      if (sq.payload.multipart) for (const part of sq.payload.parts || []) work(`${sq.id}::${part.key}`, part, { correct: part.marks, incorrect: 0, unanswered: 0 });
+      else work(sq.id, sq.payload, sq.marking);
     }
+    await h.db.run('DELETE FROM rate_limits');
+    const done = await finish(jar, id, { answers, workings, times, ms: 60 * 60000, reason: 'student', submissionKey: `mock-sub-${id.slice(0, 8)}` });
+    assert.equal(done.status, 200, `the mock is marked: ${done.text?.slice(0, 200)}`);
+    const result = done.data.result ?? done.data;
+    let margins = 0;
+    for (const [key, want] of expected) {
+      const [qid, partKey] = key.split('::');
+      const d = result.detail.find(x => x.id === qid);
+      const line = partKey ? d.parts.find(p => String(p.key) === partKey) : d;
+      assert.deepEqual([line.awarded, line.markingScheme], [want.awarded, want.markingScheme], 'the server marked it as the engine does');
+      assert.deepEqual(line.script ?? null, want.script ?? null, 'and returned the engine\'s margin');
+      if (line.script) {
+        margins++;
+        assert.ok(line.script.lines.reduce((n, l) => n + l.mark, 0) <= line.awarded, 'margin marks never exceed the marks');
+      }
+    }
+    assert.equal(result.detail.filter(d => d.section === 'B').reduce((n, d) => n + d.ms, 0),
+      paper.questions.filter(q => q.section === 'B').reduce((n, q) => n + times[q.id], 0), 'time per question is recorded for the section clock');
+    return { result, margins };
   }
-  ok(margins >= 1, `margins returned: ${margins}`);
-  eq(result.detail.filter(d => d.section === 'B').reduce((n, d) => n + d.ms, 0), paper.questions.filter(q => q.section === 'B').reduce((n, q) => n + times[q.id], 0), 'time per question is recorded for the section clock');
+  const sat = await sitAndCompare(free.jar, exam.id);
+  eq([sat.result.mock, sat.result.label], [true, MOCK_LABEL], 'the result is labelled a mock');
+  ok(sat.result.detail.length === 38 && sat.result.total === 80, 'the sample is marked in full: 38 questions, 80 marks');
+  let margins = sat.margins, extraPapers = 0;
+  for (let n = 0; margins < 1 && n < 10; n++) {
+    await h.db.run('DELETE FROM rate_limits');
+    const r = await create(paid.jar, { ...(await spec(paid.jar, n % 2 ? 12 : 10)), mock: true });
+    assert.equal(r.status, 201, `a Premium mock to compare margins on: ${r.status}`);
+    extraPapers++;
+    margins += (await sitAndCompare(paid.jar, r.data.exam.id)).margins;
+  }
+  ok(margins >= 1, 'the server returned the engine\'s margin, line for line');
 
   const event = await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='exam-result' AND entity_id=?", [free.account.id, exam.id]);
   ok(JSON.parse(event.payload_json).mock === true, 'the exam-result event says it was a mock');
@@ -180,7 +201,7 @@ try {
     eq(r.status, 201, `Premium sits a Class ${grade} mock`);
     await finish(paid.jar, r.data.exam.id, {});
   }
-  eq(await rows(paid.account.id, 'exam-mock'), 3, 'three mocks on the Premium ledger');
+  eq(await rows(paid.account.id, 'exam-mock'), 3 + extraPapers, 'every Premium mock is on the ledger');
 } finally {
   await h.close();
   if (raw?.open) raw.close(); else if (!raw) await store.close();
