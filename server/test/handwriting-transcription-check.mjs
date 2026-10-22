@@ -184,6 +184,23 @@ eq(normalizeResult({ lines: [], confidence: 1, needs_confirmation: false }, { mo
     eq([long.error?.code, long.error?.status, long.error?.retryable], ['HANDWRITING_MALFORMED', 422, false],
       `a line of ${length} characters is refused as malformed, not to be resent by itself`);
   }
+  // #196 review L2 — maxLength counts code points, as JSON Schema does, not
+  // UTF-16 code units: 400 mathematical italic x (U+1D465) is 800 code units.
+  const astral = n => '\u{1D465}'.repeat(n);
+  eq([astral(TEXT_MAX).length, [...astral(TEXT_MAX)].length], [2 * TEXT_MAX, TEXT_MAX], 'the astral fixture is two code units per character');
+  const astralAt = settle(goodReply([goodLine(astral(TEXT_MAX))]));
+  eq([astralAt.error?.code ?? null, astralAt.result?.lines[0].text, astralAt.result?.needsConfirmation], [null, astral(TEXT_MAX), false],
+    `${TEXT_MAX} astral characters (${2 * TEXT_MAX} code units) are inside the schema and read in full`);
+  const astralOver = settle(goodReply([goodLine(astral(TEXT_MAX + 1))]));
+  eq([astralOver.error?.code, astralOver.error?.status, !!astralOver.result], ['HANDWRITING_MALFORMED', 422, false],
+    `${TEXT_MAX + 1} astral characters are refused`);
+  const huge = settle(goodReply([goodLine('x'.repeat(5_000_000))]));
+  eq(huge.error?.code, 'HANDWRITING_MALFORMED', 'a multi-megabyte line is refused too (the count stops at the limit)');
+  const astralLatex = settle(goodReply([{ ...goodLine(), latex: astral(lineSchema.latex.maxLength) }])).result;
+  eq(astralLatex?.lines[0].latex, astral(lineSchema.latex.maxLength), 'display latex is measured in code points as well');
+  const astralDoubt = settle(goodReply([{ ...goodLine(), uncertain: true, doubt: astral(lineSchema.doubt.maxLength + 30) }])).result;
+  eq([[...astralDoubt.lines[0].doubt].length, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(astralDoubt.lines[0].doubt)], [lineSchema.doubt.maxLength, false],
+    'a doubt label is shortened by code points, never leaving half a surrogate pair');
   const LATEX_MAX = lineSchema.latex.maxLength;
   const atLatex = settle(goodReply([{ ...goodLine(), latex: 'x'.repeat(LATEX_MAX) }])).result;
   eq([atLatex?.lines[0].latex?.length, atLatex?.needsConfirmation], [LATEX_MAX, false], `display latex of exactly ${LATEX_MAX} characters is kept`);

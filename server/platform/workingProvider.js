@@ -167,7 +167,15 @@ export function validateWorking(lines) {
 // confidence that is not a finite number in [0, 1] counts as 0, so the
 // judgement is a second opinion that puts no cross on any line.
 const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
-const textOr = (value, max) => (typeof value === 'string' ? value.slice(0, max).trim() : '');
+// Bounded by code points, as the schema's maxLength is (a code-unit slice can
+// also split a surrogate pair into a lone half). Walks at most max code points.
+const textOr = (value, max) => {
+  if (typeof value !== 'string') return '';
+  let out = '';
+  let count = 0;
+  for (const char of value) { if (count === max) break; out += char; count += 1; }
+  return out.trim();
+};
 
 /**
  * Bring a model's judgement back inside the rules, whatever it returned.

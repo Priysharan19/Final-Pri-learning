@@ -369,23 +369,40 @@ const doubtFlag = value => value !== false;
 /** A stated confidence, or 0 when it is not a finite number in [0, 1]. */
 const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
 
+// JSON Schema maxLength counts code points, not UTF-16 code units: a line of
+// mathematical italic 𝑥 (U+1D465) is one character per letter to the schema
+// and two to String#length. Both helpers walk at most max + 1 code points, so
+// a hostile multi-megabyte string costs no more than a conforming one.
+export function exceedsCodePoints(value, max) {
+  let count = 0;
+  for (const _ of value) { count += 1; if (count > max) return true; }
+  return false;
+}
+export function firstCodePoints(value, max) {
+  if (!exceedsCodePoints(value, max)) return value;
+  let out = '';
+  let count = 0;
+  for (const char of value) { if (count === max) break; out += char; count += 1; }
+  return out;
+}
+
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
   if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`, { overLimit: true });
   return raw
     .map(line => {
       if (!line || typeof line !== 'object' || typeof line.text !== 'string') throw malformedReply('a line without text');
-      if (line.text.length > MAX_LINE_TEXT_CHARS) throw malformedReply(`a line of ${line.text.length} characters, at most ${MAX_LINE_TEXT_CHARS}`, { overLimit: true });
+      if (exceedsCodePoints(line.text, MAX_LINE_TEXT_CHARS)) throw malformedReply(`a line of more than ${MAX_LINE_TEXT_CHARS} characters`, { overLimit: true });
       const uncertain = doubtFlag(line.uncertain);
       return {
         text: line.text.trim(),
-        latex: typeof line.latex === 'string' && line.latex && line.latex.length <= MAX_LINE_LATEX_CHARS ? line.latex.trim() : null,
+        latex: typeof line.latex === 'string' && line.latex && !exceedsCodePoints(line.latex, MAX_LINE_LATEX_CHARS) ? line.latex.trim() : null,
         confidence: unitConfidence(line.confidence),
         // The reader's own per-line doubt, passed on exactly as it was given.
         // Nothing here re-reads or repairs the line: the text is never changed.
         uncertain,
         doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
-          ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, MAX_LINE_DOUBT_CHARS)
+          ? firstCodePoints(line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim(), MAX_LINE_DOUBT_CHARS)
           : null,
         gapBefore: line.gap_before === true
       };
