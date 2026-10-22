@@ -868,12 +868,15 @@ jobs:
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
-          # public page (Apple 5.1.1(v), Play "Delete account"). Two flows. The
-          # in-app flow also proves the persisted account link is gone after the
-          # deletion and after a reload (#500).
+          # public page (Apple 5.1.1(v), Play "Delete account"). The in-app flow
+          # also proves the persisted account link is gone after the deletion
+          # and after a reload (#500). The third flow: Settings "Sign out
+          # everywhere" ends every session of the account, after a confirmation,
+          # and returns to the sign-in card (#481).
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*2 flows' browser.log
+          grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
+          grep -Eq 'E2E SUITE.*45/45.*3 flows' browser.log
           # Account first (issue #477): a child signs up on the one card and a
           # parent approves on their own page; the gate journey in both engines.
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log
