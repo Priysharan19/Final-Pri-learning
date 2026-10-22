@@ -152,14 +152,44 @@ eq(normalizeResult({ lines: [], confidence: 1, needs_confirmation: false }, { mo
   for (const count of [LIMIT + 1, 500]) {
     const over = settle(goodReply(Array.from({ length: count }, (_, i) => goodLine(`x = ${i}`))));
     ok(!over.result, `${count} lines is never returned as a reading, confident or otherwise`);
-    eq([over.error?.code, over.error?.status, over.error?.retryable], ['HANDWRITING_MALFORMED', 502, true],
-      `${count} lines is refused through the existing malformed-reply code`);
+    // 422 and not retryable (#196 review N4): the same page would be read the
+    // same way again, so the device must not resend it and pay again by itself.
+    eq([over.error?.code, over.error?.status, over.error?.retryable], ['HANDWRITING_MALFORMED', 422, false],
+      `${count} lines is refused through the existing malformed-reply code, as a refusal not to resend by itself`);
   }
   for (const [label, bad] of [['a number', 7], ['an object', { toString: () => 'x = 4' }], ['missing', undefined], ['null', null]]) {
     const reply = goodReply([{ ...goodLine(), text: bad }]);
     eq(settle(reply).error?.code, 'HANDWRITING_MALFORMED', `a line whose text is ${label} is refused, not coerced or silently dropped`);
   }
   eq(settle(goodReply(['x = 4'])).error?.code, 'HANDWRITING_MALFORMED', 'a line that is not an object is refused');
+  eq([settle(goodReply([{ ...goodLine(), text: 7 }])).error?.status, settle(goodReply([{ ...goodLine(), text: 7 }])).error?.retryable], [502, true],
+    'a garbled line is a 502 the reader may answer differently next time, so it stays retryable');
+
+  // #196 review N1 — a line is never cut short. Truncated text would be marked
+  // as though the student had written it, so a line past the schema's
+  // maxLength is a malformed reply, like a page past maxItems.
+  eq([provider.MAX_TRANSCRIPTION_LINES, provider.MAX_LINE_TEXT_CHARS, provider.MAX_LINE_LATEX_CHARS, provider.MAX_LINE_DOUBT_CHARS], [40, 400, 600, 120],
+    'the pinned limits: 40 lines, 400 characters of text, 600 of latex, 120 of doubt');
+  const lineSchema = TRANSCRIPTION_SCHEMA.properties.lines.items.properties;
+  eq([LIMIT, lineSchema.text.maxLength, lineSchema.latex.maxLength, lineSchema.doubt.maxLength],
+    [provider.MAX_TRANSCRIPTION_LINES, provider.MAX_LINE_TEXT_CHARS, provider.MAX_LINE_LATEX_CHARS, provider.MAX_LINE_DOUBT_CHARS],
+    'and the schema states exactly the limits the server enforces (one constant each, no second copy)');
+  const TEXT_MAX = lineSchema.text.maxLength;
+  const atText = settle(goodReply([goodLine('x'.repeat(TEXT_MAX))]));
+  eq([atText.error?.code ?? null, atText.result?.lines[0].text.length, atText.result?.needsConfirmation], [null, TEXT_MAX, false],
+    `a line of exactly ${TEXT_MAX} characters reads in full`);
+  for (const length of [TEXT_MAX + 1, 506]) {
+    const long = settle(goodReply([goodLine('2'.repeat(length))]));
+    ok(!long.result, `a line of ${length} characters is never returned — not whole, and not cut to ${TEXT_MAX}`);
+    eq([long.error?.code, long.error?.status, long.error?.retryable], ['HANDWRITING_MALFORMED', 422, false],
+      `a line of ${length} characters is refused as malformed, not to be resent by itself`);
+  }
+  const LATEX_MAX = lineSchema.latex.maxLength;
+  const atLatex = settle(goodReply([{ ...goodLine(), latex: 'x'.repeat(LATEX_MAX) }])).result;
+  eq([atLatex?.lines[0].latex?.length, atLatex?.needsConfirmation], [LATEX_MAX, false], `display latex of exactly ${LATEX_MAX} characters is kept`);
+  const longLatex = settle(goodReply([{ ...goodLine('x = 4'), latex: '\\frac{1}{2}'.repeat(80) }])).result;
+  eq([longLatex?.lines[0].latex, longLatex?.lines[0].text, longLatex?.lines[0].confidence], [null, 'x = 4', 0.97],
+    'display latex past its limit is dropped, never cut into broken mathematics; the line keeps its text');
 
   // D2 — a doubt flag that is not exactly false is a doubt.
   for (const [label, value] of [['the string "true"', 'true'], ['the string "false"', 'false'], ['1', 1], ['0', 0], ['null', null], ['missing', undefined]]) {
@@ -227,6 +257,58 @@ const unsureThenSure = async (url, init) => {
 const escalated = await transcribeHandwriting(PNG, { env, fetchImpl: unsureThenSure });
 eq(calls, 2, 'an unconfident read escalates to the second model');
 ok(escalated.escalated && !escalated.needsConfirmation, 'and the better read is the one returned');
+
+// ── 6b · A malformed reply on either model (#196 review N2) ──────────────────
+// Modelled on unsureThenSure: each case scripts the primary and the fallback.
+{
+  const conforming = (text, confidence) => ({ text, latex: '', confidence, uncertain: false, doubt: '', gap_before: false });
+  const tooLong = { lines: Array.from({ length: 41 }, (_, i) => conforming(`x = ${i}`, 0.97)), confidence: 0.97, needs_confirmation: false };
+  const scripted = (byModel) => {
+    const seen = [];
+    const fetchImpl = async (_url, init) => {
+      const model = JSON.parse(init.body).model;
+      seen.push(model);
+      const reply = byModel[model];
+      if (reply === 'hang') {
+        return new Promise((_resolve, reject) => {
+          const fail = () => reject(new DOMException('Aborted', 'AbortError'));
+          if (init.signal.aborted) fail(); else init.signal.addEventListener('abort', fail, { once: true });
+        });
+      }
+      return { ok: true, status: 200, json: async () => ({ output_text: JSON.stringify(reply) }) };
+    };
+    return { seen, fetchImpl };
+  };
+  const attempt = async (byModel, extra = {}) => {
+    const { seen, fetchImpl } = scripted(byModel);
+    let authorised = 0;
+    try {
+      const result = await transcribeHandwriting(PNG, { env: { ...env, ...extra }, fetchImpl, authorizeFallback: () => { authorised += 1; return null; } });
+      return { result, seen, authorised };
+    } catch (error) { return { error, seen, authorised }; }
+  };
+
+  const primaryMalformed = await attempt({ 'test-primary': tooLong, 'test-fallback': { lines: [conforming('x = 4', 0.97)], confidence: 0.97, needs_confirmation: false } });
+  eq([primaryMalformed.error?.code, primaryMalformed.error?.status, !!primaryMalformed.result], ['HANDWRITING_MALFORMED', 422, false],
+    'a malformed primary reply is the refusal, not a reading');
+  eq([primaryMalformed.seen, primaryMalformed.authorised], [['test-primary'], 0],
+    'and no fallback is asked for or sent: a malformed reply is not an unsure one');
+
+  const doubtedThenMalformed = await attempt({
+    'test-primary': { lines: [conforming('x = 4', 0.4)], confidence: 0.4, needs_confirmation: true },
+    'test-fallback': tooLong
+  });
+  eq(doubtedThenMalformed.seen, ['test-primary', 'test-fallback'], 'a doubted primary escalates to the fallback');
+  eq([doubtedThenMalformed.result?.text, doubtedThenMalformed.result?.needsConfirmation, doubtedThenMalformed.result?.escalated,
+    doubtedThenMalformed.result?.fallbackAttempted, doubtedThenMalformed.result?.fallbackFailureCode],
+  ['x = 4', true, false, true, 'HANDWRITING_MALFORMED'],
+  'a malformed fallback keeps the doubted primary reading — still to be confirmed — and names the fallback failure');
+
+  const rescueMalformed = await attempt({ 'test-primary': 'hang', 'test-fallback': tooLong }, { PRI_HANDWRITING_TIMEOUT_MS: '5000' });
+  eq(rescueMalformed.seen, ['test-primary', 'test-fallback'], 'a primary timeout tries the fallback once');
+  eq([rescueMalformed.error?.code, !!rescueMalformed.result], ['HANDWRITING_MALFORMED', false],
+    'and a malformed fallback after a timeout is a refusal: there is no reading to fall back to');
+}
 
 // ── 7 · Failures are refusals, not crashes ───────────────────────────────────
 let notConfigured = null;
@@ -725,8 +807,12 @@ try {
     const conforming = { text: 'x = 4', latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false };
     scripted = { lines: Array.from({ length: TRANSCRIPTION_SCHEMA.properties.lines.maxItems + 1 }, (_, i) => ({ ...conforming, text: `x = ${i}` })), confidence: 0.97, needs_confirmation: false };
     const tooMany = await post('too-many-lines');
-    eq([tooMany.status, tooMany.json?.error?.code, tooMany.json?.error?.retryable], [502, 'HANDWRITING_MALFORMED', true],
-      'over the line limit the route answers the existing coded malformed-reply refusal');
+    eq([tooMany.status, tooMany.json?.error?.code, tooMany.json?.error?.retryable], [422, 'HANDWRITING_MALFORMED', false],
+      'over the line limit the route answers the existing coded malformed-reply refusal, as one not to resend by itself');
+    scripted = { lines: [{ ...conforming, text: '2'.repeat(TRANSCRIPTION_SCHEMA.properties.lines.items.properties.text.maxLength + 106) }], confidence: 0.99, needs_confirmation: false };
+    const tooWide = await post('too-long-line');
+    eq([tooWide.status, tooWide.json?.error?.code, tooWide.json?.error?.retryable, !!tooWide.json?.transcription], [422, 'HANDWRITING_MALFORMED', false, false],
+      'a line past its length limit reaches the device as the same refusal — never as a confident, shortened line');
     ok(!tooMany.json?.transcription && !tooMany.json?.receipt, 'with no transcription and no read receipt');
     for (const [label, reply] of [
       ['string-doubt', { lines: [conforming], confidence: 0.97, needs_confirmation: 'true' }],
