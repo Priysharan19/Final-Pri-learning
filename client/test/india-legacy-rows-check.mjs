@@ -17,8 +17,9 @@
 // The converse is held too: a chapter never practised has no answers on any
 // dot point and leaves its unit uncovered (the untouched-dot contract).
 //
-// Driven through the real local backend (GET /curriculum, GET /stats) on the
-// deterministic demo history and on a minimal hand-written legacy row.
+// Driven through the real local backend (GET /curriculum, GET /stats, and
+// POST /practice/next for the dot-point picker) on the demo history and on a
+// minimal hand-written legacy row.
 //
 // Usage: node client/test/india-legacy-rows-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +97,28 @@ eq('legacy: the chapter shows the 12 legacy answers', real?.attempts, 12);
 ok('legacy: its dot points carry those answers, not "untouched"', dpAnswers(real || {}) > 0, JSON.stringify(real?.dotpoints));
 eq('legacy: every other chapter is untouched', chapters.filter(c => c.id !== CHAPTER && c.attempts > 0).map(c => c.id), []);
 eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1);
+
+// ── C · the dot-point picker reads the legacy evidence (R3 learning logic) ──
+// indiaDotpointState also feeds the practice picker and the difficulty basis
+// (backend.js, POST /practice/next). Real Numbers has two dot points: the
+// generator c10-real-numbers covers dot point 0 and c10-irrationality-proofs
+// dot point 1. With 12 legacy answers on dot point 0 and none on dot point 1,
+// the picker (adaptive.js pickDotpoint) must treat 0 as practised ground and
+// serve 1, the new ground — a margin about twice the picker's ±10 % jitter.
+// Reading the legacy row as an empty chapter row (the #300 bug) made both
+// look untouched and the choice a coin toss: on that code ten fresh profiles
+// picking dot point 1 every time happens about once in a thousand runs.
+{
+  const picks = [];
+  for (let i = 0; i < 10; i++) {
+    resetStorage();
+    const fresh = (await dispatch('POST', '/profiles', { name: `Legacy Picker ${i}`, year: 10, course: 'in' }))?.user?.id;
+    await put('ratings', { key: `${fresh}:${CHAPTER}`, pid: fresh, subtopic: CHAPTER, rating: 1350, attempts: 12, correct: 9, last_at: Date.now() - 3600e3 });
+    const served = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: CHAPTER });
+    picks.push(served?.question?.dotpoint ?? null);
+  }
+  eq('picker: with legacy answers on dot point 0 only, ten fresh profiles are each served dot point 1 (new ground)', picks, Array(10).fill(1));
+}
 
 console.log(`india-legacy-rows-check: ${pass}/${pass + failures.length} checks passed`);
 if (failures.length) {
