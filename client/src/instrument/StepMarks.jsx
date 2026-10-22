@@ -17,13 +17,7 @@ import { MarkGlyph } from './margin/MarginIcon.jsx';
 const ON = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__;
 if (ON && featureEnabled('instrument') && typeof document !== 'undefined') import('./margin/write.css');
 
-/** The stamp a line earns. Allowlist: only the on-device deterministic
- *  engine's verdicts, which carry no `source`. Anything with a source (the
- *  second, model read is 'cloud-working') is never stamped. */
-export function engineMark(v) {
-  if (!ON || !v || v.source != null) return null;
-  return v.status === 'ok' ? 'ok' : v.status === 'break' || v.status === 'wrong' ? 'x' : v.status === 'ecf' ? 'ecf' : null;
-}
+export { engineMark } from './margin/engineMark.js';
 
 export function MarkStamp({ kind }) {
   return ON && kind ? <span className="wc-plane" aria-hidden="true"><i className="wc-ring" /><MarkGlyph kind={kind} size={34} className="wc-stamp" /></span> : null;
@@ -48,6 +42,8 @@ const slot = cs => ['--c-d-row', '--wc-d-gap', '--wc-d-stamp', '--wc-d-rest'].re
 export function useCheckCeremony(stageRef, key) {
   useLayoutEffect(() => {
     const root = stageRef.current?.parentElement;
+    // Back to no verdict: nothing may stay mid-ceremony.
+    if (root && !key) root.classList.remove('wc-go', 'wc-done');
     if (!ON || !root || !key) return undefined;
     // Visible rows only: the chips on a tablet, the reading list on a phone.
     const cs = getComputedStyle(root);
@@ -60,6 +56,10 @@ export function useCheckCeremony(stageRef, key) {
     // Nothing to strike (stale, unsure or unmarked lines): no ceremony, and
     // the date window, seeing none running, shows the score at once.
     if (!rows.length) return undefined;
+    // Phone: the margin is the reading list under the sheet; bring its rows
+    // into view so the marks are seen being struck, not below the fold.
+    const still0 = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (rows[0].classList.contains('ink-line')) rows[rows.length - 1].scrollIntoView?.({ block: 'nearest', behavior: still0 ? 'auto' : 'smooth' });
     running++;
     let on = true;
     const stop = () => { if (on) { on = false; running--; } };

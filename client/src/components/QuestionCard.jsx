@@ -36,7 +36,8 @@ import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { strokeSignature } from '../ink/strokeSignature.js';
-import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
+import { tagEngineVerdicts } from '../instrument/margin/engineMark.js';
+import { annotationsLive, inkLineVerdicts, reportForLines, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
 
@@ -1807,8 +1808,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       live: judgedLive && inkResult?.stale !== true, answeredByWorking: isWorking
     });
     if (!base) return null;
-    return base.map(v => (v.noteKind ? {
-      status: v.status,
+    // Display boundary: these are the deterministic engine's verdicts, so they
+    // carry that provenance (and its ecf credit) for the margin's stamps.
+    // Presentation only; no status changes.
+    return tagEngineVerdicts(base, reportForLines(state.res?.stepReport, judged?.lines || [])).map(v => (v.noteKind ? {
+      status: v.status, source: v.source,
       note: v.noteKind === 'conclude' && res?.solution?.answerText
         ? `this line should conclude ${String(res.solution.answerText)}`
         : 'this line doesn’t reach the right answer — rework it'
