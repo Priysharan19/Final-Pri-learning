@@ -468,6 +468,8 @@ export const examOfflineFinish = {
     await goto('/');
     await createProfile({ name: 'Offline Finisher', year: 9 });
     const account = await online.signIn({ name: 'Offline Finisher' });
+    // Mock papers are Premium-only; this journey is about sitting one, so the account holds real Premium (admin grant).
+    await online.grantPremium();
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Start practice paper' }).waitFor({ timeout: 30000 });
     await page.getByRole('button', { name: 'Start practice paper' }).click();
@@ -725,6 +727,8 @@ export const sessionEndedStarts = {
     await goto('/');
     await createProfile({ name: 'Ended Starter', year: 9 });
     const account = await online.signIn({ name: 'Ended Starter' });
+    // Mock papers are Premium-only; this journey is about sitting one, so the account holds real Premium (admin grant).
+    await online.grantPremium();
     const endSession = () => online.platform.h.db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(account.id).changes;
     const storedExams = () => page.evaluate(() => new Promise(done => {
       const open = indexedDB.open('pri-learning');

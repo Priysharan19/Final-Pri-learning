@@ -272,7 +272,7 @@ jobs:
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
           grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 21/21 checks' suites.log
-          grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
+          grep -Fq 'JEE ADVANCED GATE: PASS — 28/28 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
           grep -Fq 'BAD INPUT: PASS — 44/44 checks' suites.log

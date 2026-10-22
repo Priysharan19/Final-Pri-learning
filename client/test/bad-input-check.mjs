@@ -83,7 +83,8 @@ ok('a route with no body contract is not silently given an object',
   validateRequest('POST', '/auth/logout', null).body === null,
   JSON.stringify(validateRequest('POST', '/auth/logout', null).body));
 
-await online.link((await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' })).user.id);
+// Mock papers are Premium-only; this suite breaks a real exam, so the account holds real Premium (server grant + snapshot).
+await online.link((await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' })).user.id, { entitlement: 'premium' });
 for (const path of ['/rush/finish', '/match/finish', '/classes', '/tasks', '/history/list', '/practice/next']) {
   await shaped(`POST ${path} with a null body comes back shaped`, () => api.post(path, null));
 }

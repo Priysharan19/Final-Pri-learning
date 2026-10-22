@@ -125,6 +125,8 @@ export const flow = {
     // still marked by the bundled engine at the end of the sitting, which is
     // why this flow's oracle can still read the stored paper.
     await online.signIn({ name: 'Emmy Noether' });
+    // Mock papers are Premium-only; this journey is about sitting one, so the account holds real Premium (admin grant).
+    await online.grantPremium();
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('button:has-text("Start practice paper")', { timeout: 30000 });
     await page.locator('.card').first().locator('select').nth(1).selectOption(String(LENGTH));

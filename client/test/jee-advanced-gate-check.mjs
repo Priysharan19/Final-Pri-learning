@@ -194,8 +194,22 @@ await POST(`/practice/${viaMainTask.question.id}/reveal`, { ms: 1000 });
 await allowed('retrying a jee-main question is allowed on the free plan',
   POST(`/history/${viaMainTask.question.id}/retry`, { variant: 'fresh' }),
   value => value?.question?.indiaTrack === 'jee-main');
-await allowed('a jee-main exam simulation is allowed on the free plan',
-  dispatchIndiaExam((await GET('/me')).user, 'POST', '/exams', {}), value => value?.exam?.questions?.length > 0);
+// Mock papers are Premium-only (FREE_EXAM_ALLOWANCE.examsPerWindow = 0): a free
+// jee-main paper is refused as the premium-exams paywall — not as JEE Advanced —
+// and the same account sits it once it holds Premium.
+try {
+  await dispatchIndiaExam((await GET('/me')).user, 'POST', '/exams', {});
+  ok('a jee-main exam simulation on the free plan is refused as premium-exams', false, 'the call was allowed');
+} catch (err) {
+  ok('a jee-main exam simulation on the free plan is refused as premium-exams',
+    err.status === 402 && err.code === 'PREMIUM_REQUIRED' && err.capability === ENTITLEMENTS.PREMIUM_EXAMS,
+    `status ${err.status} code ${err.code} capability ${err.capability}: ${err.message}`);
+}
+await grantPremium(asha.id);
+await allowed('Premium allows a jee-main exam simulation',
+  dispatchIndiaExam((await GET('/me')).user, 'POST', '/exams', {}),
+  value => value?.exam?.questions?.length > 0 && value?.exam?.indiaExam?.track === 'jee-main');
+await revokePremium(asha.id);
 
 const ravi = (await POST('/profiles', { name: 'Ravi', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
 // Ravi has no account at all: the free tracks are served signed out too.

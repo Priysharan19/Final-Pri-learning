@@ -41,6 +41,8 @@ export const flow = {
     await createProfile({ name: 'Kavya Nair', year: 12, course: 'in', track: 'jee-main' });
     // An exam is marked work: it is sat by a signed-in account.
     await online.signIn({ name: 'Kavya Nair' });
+    // Mock papers are Premium-only; this journey is about sitting one, so the account holds real Premium (admin grant).
+    await online.grantPremium();
 
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
