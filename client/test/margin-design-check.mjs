@@ -117,6 +117,11 @@ check('copper appears only on marking icons', [...icons.matchAll(/^\s{2}([a-z]+)
 check('marks differ by shape: circle, diamond, dashed capsule', /ok: <><circle/.test(icons) && /x: <><rect[^>]*rotate\(45/.test(icons) && /ecf: <><rect[^>]*strokeDasharray/.test(icons));
 check('marks are images named by their caller', /role="img" aria-label=\{label\}/.test(icons));
 
+// One brand mark.
+const pmark = readFileSync(join(dir, 'margin/PMark.jsx'), 'utf8');
+check('the brand mark is one Instrument Serif P′ in an engraved bezel', /Instrument Serif/.test(pmark) && /P<tspan[^>]*>′/.test(pmark) && /reduced\(\)/.test(pmark));
+check('the lock-up wordmark is "Pri Learning" in the C serif, as real text', />Pri Learning</.test(pmark) && /var\(--c-serif\)/.test(pmark));
+
 // Motion.
 const s = simulateSpring({ from: -1400, to: 0 }, 1.2);
 check('the plane spring (k170 c22) settles within 1.2 s, as in the reference', Math.abs(s.x) < 1400 * 0.0015 && Math.abs(s.v) < 1400 * 0.01, `${s.x.toFixed(2)} ${s.v.toFixed(2)}`);
