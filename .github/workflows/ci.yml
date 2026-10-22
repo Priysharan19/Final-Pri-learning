@@ -76,6 +76,8 @@ jobs:
         run: node tools/ci-runner-policy-check.mjs
       - name: Workflow supply-chain policy (least privilege, pinned actions, no privileged PR-head execution)
         run: node tools/ci-workflow-policy-check.mjs
+      - name: Self-hosted runner contract (owner-dispatch-only, exact SHA, one-job label; runner script refuses admin and cleans up)
+        run: node tools/ci-self-hosted-runner-check.mjs
       - name: Native Ink lane keeps one booted simulator, one Swift build and bounded installs
         run: node client/test/simulator-fleet-check.mjs
       - name: Main Integrity retries the merged-PR lookup and still requires every PR workflow green
