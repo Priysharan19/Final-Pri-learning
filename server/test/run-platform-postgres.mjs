@@ -80,6 +80,10 @@ export const ENGINE_SUITES = [
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // Pending, given and withdrawn consent through the production /v1 chain:
+  // telemetry, classes, assignments and reports refuse a child and write
+  // nothing, never touch an adult, and leave staff routes open (#292).
+  'guardian-consent-coverage-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
