@@ -3006,7 +3006,6 @@ export default {
   "inst.greetAfternoon": "नमस्ते, {name}।",
   "inst.greetEvening": "शुभ संध्या, {name}।",
   "inst.resumePrefix": "जारी रखें",
-  "inst.resumeSub": "जहाँ रुके थे, वहीं से शुरू करें",
   "inst.resume": "जारी रखें",
   "inst.chapters": "अध्याय",
   "inst.answered": "{n} उत्तर दिए",
