@@ -56,6 +56,15 @@
 .k-ledger.k-still .k-odo > span > span { animation: none; }
 .k-odo i { font-style: normal; height: 38px; line-height: 38px; text-align: center; }
 @keyframes k-roll { from { transform: translateY(0); } }
+/* The lock-up never wraps; on a portrait iPad the bar's command field and
+   lamp step down to their icons so the six tabs keep one line. */
+.in-bar .c-wordmark { white-space: nowrap; }
+@media (min-width: 761px) and (max-width: 900px) {
+  .in-bar { gap: 12px; }
+  .in-tab { padding: 0 9px; }
+  .in-cmd { width: 44px; padding: 0; justify-content: center; background: none; box-shadow: none; }
+  .in-cmd > span, .in-status-t { display: none; }
+}
 /* A chapter with no answers: a clean ruled frame, nothing plotted. */
 .k-slot { min-height: 240px; background: repeating-linear-gradient(to bottom, transparent 0 31px, var(--c-hair-2) 31px 32px), var(--c-sheet); }
 /* The account: initials in Cormorant SC on paper-2, ringed by a hairline. */
