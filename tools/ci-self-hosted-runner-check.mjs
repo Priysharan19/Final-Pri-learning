@@ -44,6 +44,13 @@ const CANONICAL_REPO = 'Priysharan19/Final-Pri-learning';
 const LABEL_INPUT = '${{ inputs.runner_label }}';
 const SHA_INPUT = '${{ inputs.sha }}';
 const GITHUB_HOSTED = /^(ubuntu|macos|windows)-[0-9a-z][0-9a-z.-]*$/;
+const SWALLOW = [
+  /\|\|\s*(true|:)\s*($|[;)}#])/m,
+  /\|\|\s*\{?\s*(exit|return)\b/,
+  /\bexit\s+0\b/,
+  /^\s*set\s+(\+e\b|\+o\s+errexit)/m,
+  /(^|[\s;])trap\b/m
+];
 const STATUS_LINE = 'status="$(gh api "repos/$REPO/compare/$INPUT_SHA...main" --jq \'.status + " " + (.behind_by | tostring)\')"';
 const escapeRe = s => s.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
 // A run-script line that is exactly `line` (or starts with it when prefix).
@@ -97,6 +104,8 @@ function entries(lines) {
 }
 
 const get = (list, key) => list.find(e => e.key === key);
+// An if: expression without the YAML comment lines that follow it.
+const ifSource = entry => (entry ? [entry.value, ...entry.sub.filter(l => !/^\s*#/.test(l))].join('\n') : '');
 const text = entry => (entry ? [entry.value, ...entry.sub].join('\n') : '');
 
 // Sequence items at the shallowest indentation; each item's first line has its
@@ -160,7 +169,8 @@ function parseWorkflow(source) {
       labels,
       hosted: isGitHubHosted(labels),
       needs: listValue(get(body, 'needs')),
-      ifText: text(get(body, 'if')).replace(/\s+/g, ' '),
+      ifText: ifSource(get(body, 'if')).replace(/\s+/g, ' '),
+      ifNorm: ifSource(get(body, 'if')).replace(/\s+/g, ' ').trim().replace(/^[>|][-+]? */, '').replace(/^\$\{\{\s*(.*?)\s*\}\}$/, '$1').trim(),
       steps
     };
   });
@@ -205,17 +215,21 @@ export function analyzeWorkflow(name, source) {
   if (/^\s*[a-z-]+:\s*write\b/m.test(source) || /write-all/.test(source)) fail('no permission may be write in a self-hosted workflow');
   if (/persist-credentials:\s*true/.test(source)) fail('credentials must never be persisted into a checkout');
   if (/\bsecrets\./.test(source)) fail('a self-hosted workflow must not read repository secrets');
-  if (/^\s*(-\s+)?['"]?continue-on-error['"]?\s*:/m.test(source)) fail('continue-on-error is forbidden in a self-hosted workflow (it would turn a failed guard into a pass)');
+  if (/continue-on-error/.test(source)) fail('continue-on-error is forbidden in a self-hosted workflow (it would turn a failed guard into a pass)');
+  if (/^\s*(-\s+)?['"]?<<['"]?\s*:/m.test(source)) fail('YAML merge keys (<<:) are forbidden in a self-hosted workflow');
+  if (/(?::|^\s*-)\s+[&*][A-Za-z_][A-Za-z0-9_-]*(\s|$)/m.test(source)) fail('YAML anchors and aliases are forbidden in a self-hosted workflow');
 
   for (const job of wf.jobs) {
     for (const [i, step] of job.steps.entries()) {
       if (step.run !== null && /\$\{\{/.test(step.run)) {
         fail(`job ${job.id} step ${i + 1}: no \${{ }} expression inside a run script; pass inputs through env`);
       }
-      if (step.run !== null && (/\|\|\s*(true|:)\s*($|[;)}#])/m.test(step.run) || /^\s*set \+e\b/m.test(step.run))) {
-        fail(`job ${job.id} step ${i + 1}: a run script may not swallow failures (|| true, || :, set +e)`);
+      if (step.run !== null && SWALLOW.some(re => re.test(step.run))) {
+        fail(`job ${job.id} step ${i + 1}: a run script may not swallow failures (|| true, || :, || exit, || return, exit 0, set +e, trap)`);
       }
     }
+    const failDefs = job.steps.reduce((n, st) => n + ((st.run ?? '').match(/(^|[\s;])(function\s+)?fail\s*\(\s*\)/g) ?? []).length, 0);
+    if (failDefs > 1) fail(`job ${job.id}: fail() may be defined only once (found ${failDefs})`);
   }
 
   const ownerGate = [
@@ -225,6 +239,8 @@ export function analyzeWorkflow(name, source) {
     'github.triggering_actor == github.repository_owner',
     "github.ref == 'refs/heads/main'"
   ];
+  const GUARD_IF = ownerGate.join(' && ');
+  const MAC_IF = `${GUARD_IF} && startsWith(inputs.runner_label, 'pri-mac-')`;
   const envIs = (step, key, value) => scalar(get(step?.env ?? [], key)?.value) === value;
   const firstLineSafe = run => /^\s*set -euo pipefail\s*$/.test((run ?? '').split('\n').find(l => l.trim() && !/^\s*[|>][-+]?\s*$/.test(l)) ?? '');
 
@@ -233,9 +249,9 @@ export function analyzeWorkflow(name, source) {
     for (const label of ['self-hosted', 'macOS', 'ARM64', LABEL_INPUT]) {
       if (!job.labels.includes(label)) fail(`${where}: runs-on must include ${label} (got [${job.labels.join(', ')}])`);
     }
-    for (const needle of [...ownerGate, "startsWith(inputs.runner_label, 'pri-mac-')"]) {
-      if (!job.ifText.includes(needle)) fail(`${where}: job if: must require ${needle}`);
-    }
+    // Exact match: always(), !cancelled(), failure(), success() || ... or any
+    // || would let the job run without (or around) the guard.
+    if (job.ifNorm !== MAC_IF) fail(`${where}: job if: must be exactly "${MAC_IF}" (got "${job.ifNorm}")`);
     if (!get(job.body, 'timeout-minutes')) fail(`${where}: must set timeout-minutes`);
 
     const guards = job.needs.map(id => wf.jobs.find(j => j.id === id)).filter(j => j && j.hosted);
@@ -248,7 +264,7 @@ export function analyzeWorkflow(name, source) {
         const run = step?.run ?? '';
         const code = guard.raw.split('\n').filter(l => !/^\s*#/.test(l)).join('\n');
         return [
-          ...ownerGate.map(n => [`if: ${n}`, guard.ifText.includes(n)]),
+          [`if: exactly "${GUARD_IF}" (got "${guard.ifNorm}")`, guard.ifNorm === GUARD_IF],
           ['a run script starting with set -euo pipefail', firstLineSafe(run)],
           ['fail() that exits 1', hasLine(run, 'fail() { echo "::error::$*"; exit 1; }')],
           ['env INPUT_SHA bound to inputs.sha', envIs(step, 'INPUT_SHA', SHA_INPUT)],
@@ -316,7 +332,11 @@ export function analyzeRunnerScript(source) {
   need(/mktemp -d/.test(code), 'must create a fresh mktemp work directory per run');
   need(/\[\[ -e "\$dir\/\.git" \]\] && return 0/.test(code) && /if inside_git_tree "\$root"/.test(code), 'the git work-tree refusal must walk parent directories for .git, independent of git');
   need(/PRI_RUNNER_JOB_WAIT_SECONDS:-900/.test(code) && /no job was assigned within/.test(code) && /exit 3/.test(code), 'run must stop an idle runner after PRI_RUNNER_JOB_WAIT_SECONDS (default 900)');
-  need(/kill_tree "\$RUNNER_PID"/.test(code), 'cleanup must stop the runner process tree');
+  need(/setpgrp\(0, 0\)/.test(code) && /kill "-\$sig" -- "-\$RUNNER_PGID"/.test(code), 'the runner must run in its own process group and cleanup must signal the group');
+  need(/signal_runner TERM "\$pids"/.test(code) && /signal_runner KILL "\$pids"/.test(code), 'cleanup must TERM the runner and escalate to KILL');
+  need(/survived cleanup/.test(code), 'cleanup must report surviving runner processes');
+  need(/^\s*stop_runner && stopped=0$/m.test(code), 'the exit trap must stop the runner');
+  need(/^\s*trap '' INT TERM HUP$/m.test(code), 'cleanup must ignore a second Ctrl-C');
   need(/^\s*trap cleanup_run EXIT$/m.test(code), 'must install the cleanup trap on EXIT');
   need(/rm -f "\$RUNNER_DIR\/\.credentials" "\$RUNNER_DIR\/\.credentials_rsaparams" "\$RUNNER_DIR\/\.runner"/.test(code), 'cleanup must delete .credentials, .credentials_rsaparams and .runner');
   need(/rm -rf "\$RUN_DIR"/.test(code), 'cleanup must delete the work directory');
@@ -403,6 +423,8 @@ function behaviour(check) {
 
     // A fake actions/runner release: records what it received, writes the
     // files a real runner writes, and a diagnostic log containing secrets.
+    // Assembled at run time so the repository secret scan never sees a JWT-shaped literal.
+    const fakeJwt = tail => ['ey' + 'JhbGciOiJub25lIn0', 'ey' + 'Jzd' + tail + 'In0', 'bm90LWEtc2lnbmF0dXJl'].join('.');
     const dist = path.join(tmp, 'dist');
     mkdirSync(dist);
     writeFileSync(path.join(dist, 'run.sh'), [
@@ -414,8 +436,14 @@ function behaviour(check) {
       'pwd -P > "$PRI_FAKE_RUNDIR"',
       'printf x > .credentials; printf x > .credentials_rsaparams; printf x > .runner',
       'mkdir -p _diag _work/repo',
-      'printf "config %s\\nAuthorization: Bearer abcdefghijklmnopqrstuvwxyz0123\\nusing ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345\\nsettings token=unquotedtok123 jitconfig: unquotedjit456, password = unquotedpw789\\nJob pri-mac completed\\n" "$ACTIONS_RUNNER_INPUT_JITCONFIG" > _diag/Runner_1.log',
+      `printf "config %s\\nAuthorization: Bearer abcdefghijklmnopqrstuvwxyz0123\\nusing ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345\\nsettings token=unquotedtok123 jitconfig: unquotedjit456, password = unquotedpw789\\nenv RUNNER_TOKEN=runnertokval1 mytoken=mytokval2\\nACTIONS_RUNTIME_TOKEN: ${fakeJwt('eDE')}\\nsaw ${fakeJwt('eTI')} in prose\\nJob pri-mac completed\\n" "$ACTIONS_RUNNER_INPUT_JITCONFIG" > _diag/Runner_1.log`,
       'if [ -n "${PRI_FAKE_HANG:-}" ]; then sleep 300 & echo $! > "$PRI_FAKE_CHILD"; wait; fi',
+      // A TERM-ignoring child in the group, and a double-forked one that left the group.
+      'if [ -n "${PRI_FAKE_STUBBORN:-}" ]; then',
+      '  bash -c \'trap "" TERM; while :; do sleep 1; done\' & echo $! > "$PRI_FAKE_CHILD"',
+      '  ( perl -e \'setpgrp(0, 0); $SIG{TERM} = "IGNORE"; open(my $f, ">", $ARGV[1]) or die; print $f $$; close $f; sleep 300\' "$(pwd -P)" "$PRI_FAKE_ESCAPED" & )',
+      '  sleep 300',
+      'fi',
       'printf "job\\n" > _diag/Worker_1.log',
       'exit "${PRI_FAKE_EXIT:-0}"',
       ''
@@ -457,6 +485,9 @@ function behaviour(check) {
       /REDACTED-JITCONFIG/.test(diagLog), 'preserved _diag logs are redacted (JIT config, GitHub token, bearer token)');
     check(/settings token=\[REDACTED\] jitconfig: \[REDACTED\], password = \[REDACTED\]/.test(diagLog) && !/unquoted(tok|jit|pw)/.test(diagLog),
       'unquoted token=, jitconfig: and password = values are redacted too');
+    check(/RUNNER_TOKEN=\[REDACTED\] mytoken=\[REDACTED\]/.test(diagLog) && /ACTIONS_RUNTIME_TOKEN: \[REDACTED-JWT\]/.test(diagLog) &&
+      /saw \[REDACTED-JWT\] in prose/.test(diagLog) && !/runnertokval1|mytokval2|eyJ/.test(diagLog),
+    'prefixed keys (RUNNER_TOKEN=, mytoken=) and dotted JWTs are redacted');
 
     rmSync(runEnv.PRI_FAKE_RUNDIR, { force: true });
     const failed = sh(['run', label], { env: { ...runEnv, PRI_FAKE_EXIT: '7' }, input: `${jit}\n` });
@@ -477,6 +508,19 @@ function behaviour(check) {
       `an idle runner with no job assigned is stopped after PRI_RUNNER_JOB_WAIT_SECONDS (exit ${idle.status})`);
     check(child > 0 && !childAlive, 'the timeout kills the whole runner process tree');
     check(idleDir && !existsSync(idleDir) && readdirSync(path.join(root, 'runs')).length === 0, 'the timeout still deletes the run directory');
+
+    const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    const readPid = f => (existsSync(f) ? Number(readFileSync(f, 'utf8').trim()) : 0);
+    const escapedFile = path.join(tmp, 'escaped');
+    rmSync(childFile, { force: true });
+    const stubborn = sh(['run', label], { env: { ...runEnv, PRI_FAKE_STUBBORN: '1', PRI_FAKE_CHILD: childFile, PRI_FAKE_ESCAPED: escapedFile, PRI_RUNNER_JOB_WAIT_SECONDS: '2' }, input: `${jit}\n` });
+    const stubbornChild = readPid(childFile);
+    const escaped = readPid(escapedFile);
+    check(stubborn.status === 3 && /sending KILL/.test(stubborn.stderr) && /no runner process is left running/.test(stubborn.stderr),
+      `a runner tree that ignores TERM is KILLed after 10 s and cleanup says nothing is left (exit ${stubborn.status})`);
+    check(stubbornChild > 0 && !alive(stubbornChild), 'a TERM-ignoring child in the runner process group does not survive cleanup');
+    check(escaped > 0 && !alive(escaped), 'a double-forked child that left the process group (but names the run directory) does not survive cleanup');
+    for (const pid of [stubbornChild, escaped]) if (pid && alive(pid)) process.kill(pid, 'SIGKILL');
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -542,7 +586,27 @@ if (existsSync(macPath)) {
   mutate('status accepts diverged', `"$status" == 'ahead 0' ]]`, `"$status" == 'ahead 0' || "$status" == diverged* ]]`, /identical\/ahead reachability assertion/);
   mutate('set +e in guard', '          fail() { echo', '          set +e\n          fail() { echo', /swallow failures/);
   mutate('triggering_actor removed from both ifs', s => s.replace(/      github\.triggering_actor == github\.repository_owner &&\n/g, ''), null, /github\.triggering_actor == github\.repository_owner/);
-  mutate('triggering_actor removed from the guard if only', s => s.replace('      github.triggering_actor == github.repository_owner &&\n', ''), null, /guard job lacks if: github\.triggering_actor/);
+  mutate('triggering_actor removed from the guard if only', s => s.replace('      github.triggering_actor == github.repository_owner &&\n', ''), null, /guard job lacks if: exactly/);
+  const MAC_IF_HEAD = "    if: >-\n      github.event_name == 'workflow_dispatch' &&\n";
+  const atMac = (s, to) => { const i = s.lastIndexOf(MAC_IF_HEAD); return s.slice(0, i) + to + s.slice(i + MAC_IF_HEAD.length); };
+  const atGuard = (s, to) => s.replace(MAC_IF_HEAD, to);
+  const macIf = /job apple-v1: job if: must be exactly/;
+  mutate('always() on the Mac job', s => atMac(s, "    if: >-\n      always() && github.event_name == 'workflow_dispatch' &&\n"), null, macIf);
+  mutate('!cancelled() on the Mac job', s => atMac(s, "    if: >-\n      !cancelled() && (needs.guard.result != 'x' || true) && github.event_name == 'workflow_dispatch' &&\n"), null, macIf);
+  mutate('|| true appended to the Mac if', s => s.replace("      startsWith(inputs.runner_label, 'pri-mac-')\n", "      startsWith(inputs.runner_label, 'pri-mac-') || true\n"), null, macIf);
+  mutate('failure() || on the Mac job', s => atMac(s, "    if: >-\n      failure() || github.event_name == 'workflow_dispatch' &&\n"), null, macIf);
+  mutate('success() || on the Mac job', s => atMac(s, "    if: >-\n      success() || github.event_name == 'workflow_dispatch' &&\n"), null, macIf);
+  mutate('guard if widened', s => s.replace("      github.ref == 'refs/heads/main'\n    runs-on: ubuntu-latest", "      github.ref == 'refs/heads/main' || github.actor != ''\n    runs-on: ubuntu-latest"), null, /guard job lacks if: exactly/);
+  mutate('always() on the guard', s => atGuard(s, "    if: >-\n      always() && github.event_name == 'workflow_dispatch' &&\n"), null, /guard job lacks if: exactly/);
+  mutate('trap exit 0 in the guard', '          fail() { echo', '          trap "exit 0" EXIT\n          fail() { echo', /swallow failures/);
+  mutate('fail() redefined', '          [[ "$EVENT_NAME" ==', '          fail() { echo "::warning::$*"; }\n          [[ "$EVENT_NAME" ==', /fail\(\) may be defined only once/);
+  mutate('function fail redefined', '          [[ "$EVENT_NAME" ==', '          function fail() { :; }\n          [[ "$EVENT_NAME" ==', /fail\(\) may be defined only once|swallow/);
+  mutate('|| exit 0 on reachability', `--jq '.status + " " + (.behind_by | tostring)')"`, `--jq '.status + " " + (.behind_by | tostring)')" || exit 0`, /swallow failures|reachability query/);
+  mutate('exit 0 at the end of the guard', '          echo "Trusted dispatch: $INPUT_SHA is on main"', '          echo "Trusted dispatch: $INPUT_SHA is on main"\n          exit 0', /swallow failures/);
+  mutate('set +o errexit', '          fail() { echo', '          set +o errexit\n          fail() { echo', /swallow failures/);
+  mutate('merge key on the guard step', '      - name: Validate inputs, owner,', '      - <<: {timeout-minutes: 1}\n        name: Validate inputs, owner,', /merge keys/);
+  mutate('merge key with continue-on-error', '      - name: Validate inputs, owner,', '      - <<: {continue-on-error: true}\n        name: Validate inputs, owner,', /merge keys|continue-on-error/);
+  mutate('anchor and alias', s => s.replace('    timeout-minutes: 5\n', '    timeout-minutes: &t 5\n').replace('    timeout-minutes: 90\n', '    timeout-minutes: *t\n'), null, /anchors and aliases/);
   mutate('ref main removed from both ifs', s => s.replace(/      github\.ref == 'refs\/heads\/main'( &&)?\n/g, (m, and) => (and ? '' : '      true\n')), null, /github\.ref == 'refs\/heads\/main'/);
   mutate('label shape check removed from the Mac if', " &&\n      startsWith(inputs.runner_label, 'pri-mac-')", '', /startsWith\(inputs\.runner_label/);
   mutate('label passed into the guard', '          INPUT_SHA: ${{ inputs.sha }}\n', '          INPUT_SHA: ${{ inputs.sha }}\n          INPUT_LABEL: ${{ inputs.runner_label }}\n', /runner label/);
@@ -578,12 +642,15 @@ for (const [label, from, to] of [
   ['admin refusal removed', /  if id -Gn[\s\S]*?\n  fi\n/, ''],
   ['trap removed', '  trap cleanup_run EXIT\n', ''],
   ['credential echoed', '  printf \'PRI_RUNNER_LABEL=%s\\n\' "$label"\n', '  echo "$jit_config"\n'],
-  ['credential in argv', 'ACTIONS_RUNNER_INPUT_JITCONFIG="$jit_config" ./run.sh', './run.sh --jitconfig "$jit_config"'],
+  ['credential in argv', `' "$RUNNER_DIR" ./run.sh &`, `' "$RUNNER_DIR" ./run.sh --jitconfig "$jit_config" &`],
   ['xtrace enabled', 'set -euo pipefail\n', 'set -euxo pipefail\n'],
   ['no fresh work dir', 'mktemp -d', 'echo'],
   ['credentials kept', '"$RUNNER_DIR/.credentials" ', ''],
   ['no idle timeout', '      exit 3\n', '      break\n'],
-  ['git-only work-tree check', 'if inside_git_tree "$root" || git', 'if git']
+  ['git-only work-tree check', 'if inside_git_tree "$root" || git', 'if git'],
+  ['no KILL escalation', '      signal_runner KILL "$pids"\n', '      true\n'],
+  ['no process group', '    setpgrp(0, 0) or die "setpgrp: $!\\n";\n', ''],
+  ['interruptible cleanup', "  trap '' INT TERM HUP\n", '']
 ]) {
   const mutated = script.replace(from, to);
   check(mutated !== script, `script fixture "${label}" must actually change the script`);

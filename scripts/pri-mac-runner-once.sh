@@ -119,15 +119,80 @@ inside_git_tree() {
   done
 }
 
-# Send TERM to a process and all its descendants (children first). Used from
-# the EXIT trap.
+# The runner runs in its own process group (RUNNER_PGID, see cmd_run). These
+# helpers are used from the EXIT trap.
 # shellcheck disable=SC2317
-kill_tree() {
-  local pid="$1" child
-  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
-    kill_tree "$child"
+descendants() {
+  local child
+  while read -r child; do
+    [[ -n "$child" ]] || continue
+    printf '%s\n' "$child"
+    descendants "$child"
+  done <<< "$(pgrep -P "$1" 2>/dev/null || true)"
+}
+
+# Live, non-zombie PIDs that belong to the runner: its process group, the group
+# leader's descendants, and anything whose command line names the run directory
+# (which also catches double-forked processes that left the group).
+# shellcheck disable=SC2317
+runner_pids() {
+  [[ -n "$RUNNER_PGID" ]] || return 0
+  local pid stat
+  {
+    pgrep -g "$RUNNER_PGID" 2>/dev/null || true
+    descendants "$RUNNER_PGID"
+    if [[ -n "$RUN_DIR" ]]; then
+      pgrep -f -- "$RUN_DIR" 2>/dev/null || true
+    fi
+  } | sort -un | while read -r pid; do
+    [[ -n "$pid" && "$pid" != "$$" ]] || continue
+    kill -0 "$pid" 2>/dev/null || continue
+    stat="$(ps -o stat= -p "$pid" 2>/dev/null || true)"
+    [[ "$stat" == Z* ]] && continue
+    printf '%s\n' "$pid"
   done
-  kill -TERM "$pid" 2>/dev/null || true
+}
+
+# shellcheck disable=SC2317
+signal_runner() {
+  local sig="$1" pids="$2" pid
+  kill "-$sig" -- "-$RUNNER_PGID" 2>/dev/null || true
+  while read -r pid; do
+    [[ -n "$pid" ]] && kill "-$sig" "$pid" 2>/dev/null
+  done <<< "$pids"
+}
+
+# TERM the runner's processes, KILL whatever is left after 10 s, and fail if
+# anything still survives.
+# shellcheck disable=SC2317
+stop_runner() {
+  [[ -n "$RUNNER_PGID" ]] || return 0
+  local pids waited=0
+  pids="$(runner_pids)"
+  if [[ -n "$pids" ]]; then
+    signal_runner TERM "$pids"
+    while [[ "$waited" -lt 10 ]]; do
+      pids="$(runner_pids)"
+      [[ -n "$pids" ]] || break
+      sleep 1
+      waited=$((waited + 1))
+    done
+    pids="$(runner_pids)"
+    if [[ -n "$pids" ]]; then
+      note "runner processes ignored TERM for 10s; sending KILL to: $(tr '\n' ' ' <<< "$pids")"
+      signal_runner KILL "$pids"
+      sleep 1
+    fi
+  fi
+  if [[ -n "$RUNNER_PID" ]]; then
+    wait "$RUNNER_PID" 2>/dev/null
+  fi
+  pids="$(runner_pids)"
+  if [[ -n "$pids" ]]; then
+    note "ERROR: runner processes survived cleanup: $(tr '\n' ' ' <<< "$pids")"
+    return 1
+  fi
+  return 0
 }
 
 refuse_admin_account() {
@@ -209,6 +274,7 @@ RUNS_ROOT=''
 DIAG_DEST=''
 RUNNER_DIR=''
 RUNNER_PID=''
+RUNNER_PGID=''
 
 # Called only from the EXIT trap of `run`.
 # shellcheck disable=SC2317
@@ -225,9 +291,10 @@ preserve_diag() {
       BEGIN { $s = $ENV{PRI_REDACT} // ""; }
       s/\Q$s\E/[REDACTED-JITCONFIG]/g if length $s;
       s/\b(gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}/[REDACTED-GITHUB-TOKEN]/g;
-      s/(bearer|token|basic)\s+[A-Za-z0-9._~+\/=-]{16,}/$1 [REDACTED]/gi;
-      s/("?(?:access_?token|accessToken|token|password|secret|privateKey|jitconfig|encoded_jit_config)"?\s*[:=]\s*)"[^"]*"/$1"[REDACTED]"/gi;
-      s/\b((?:access_?token|accessToken|token|password|secret|privateKey|jitconfig|encoded_jit_config)\s*[:=]\s*)(?!["\[])[^\s,;"\x27}\]]+/${1}[REDACTED]/gi;
+      s/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[REDACTED-JWT]/g;
+      s/(bearer|token|basic)\s+(?!\[REDACTED)[A-Za-z0-9._~+\/=-]{16,}/$1 [REDACTED]/gi;
+      s/((?<![A-Za-z0-9])"?[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)"?\s*[:=]\s*)"[^"]*"/${1}"[REDACTED]"/gi;
+      s/((?<![A-Za-z0-9])[A-Za-z0-9_-]*(?:token|password|secret|private_?key|jit_?config)\s*[:=]\s*)(?!["\[])[^\s,;"\x27}\]]+/${1}[REDACTED]/gi;
       s/[A-Za-z0-9+\/]{80,}={0,2}/[REDACTED-BLOB]/g;
     ' "$log" > "$DIAG_DEST/$(basename "$log")"
   done
@@ -236,12 +303,12 @@ preserve_diag() {
 
 # shellcheck disable=SC2317
 cleanup_run() {
-  local rc=$?
+  local rc=$? stopped=1
+  # A second Ctrl-C must not cut cleanup short.
+  trap '' INT TERM HUP
   set +e
-  if [[ -n "$RUNNER_PID" ]] && kill -0 "$RUNNER_PID" 2>/dev/null; then
-    kill_tree "$RUNNER_PID"
-    wait "$RUNNER_PID" 2>/dev/null
-  fi
+  stop_runner && stopped=0
+  [[ "$stopped" -eq 0 || "$rc" -ne 0 ]] || rc=1
   preserve_diag
   if [[ -n "$RUNNER_DIR" ]]; then
     rm -f "$RUNNER_DIR/.credentials" "$RUNNER_DIR/.credentials_rsaparams" "$RUNNER_DIR/.runner"
@@ -256,6 +323,11 @@ cleanup_run() {
     rc=1
   else
     note "work directory, .credentials and .runner deleted"
+  fi
+  if [[ "$stopped" -ne 0 ]]; then
+    note "ERROR: cleanup could not stop every runner process (listed above); kill them by hand"
+  elif [[ -n "$RUNNER_PGID" ]]; then
+    note "no runner process is left running"
   fi
   exit "$rc"
 }
@@ -308,8 +380,17 @@ cmd_run() {
   # The runner reads ACTIONS_RUNNER_INPUT_<ARG> as --<arg>; passing it through
   # the environment keeps the credential out of argv. A JIT runner is ephemeral:
   # it accepts exactly one job and GitHub de-registers it afterwards.
-  (cd "$RUNNER_DIR" && ACTIONS_RUNNER_INPUT_JITCONFIG="$jit_config" ./run.sh) &
+  # perl puts the runner in its own process group (setpgrp) before exec, so
+  # cleanup can signal the whole tree; this works on macOS bash 3.2 without
+  # job control. Only the directory and ./run.sh appear in argv.
+  # shellcheck disable=SC2016
+  ACTIONS_RUNNER_INPUT_JITCONFIG="$jit_config" perl -e '
+    chdir(shift @ARGV) or die "chdir: $!\n";
+    setpgrp(0, 0) or die "setpgrp: $!\n";
+    exec { $ARGV[0] } @ARGV or die "exec: $!\n";
+  ' "$RUNNER_DIR" ./run.sh &
   RUNNER_PID=$!
+  RUNNER_PGID=$RUNNER_PID
 
   # The runner starts a Worker (and its _diag/Worker_*.log) only when a job is
   # assigned. Bound how long an idle, listening runner may stay exposed.
