@@ -7,6 +7,7 @@ import { useT } from '../i18n/index.js';
 import CommandBar from './CommandBar.jsx';
 import Glyph from './Glyph.jsx';
 import { setBarSlot } from './BarSlot.jsx';
+import './margin/states.css';
 
 // The v1.1 shell bar: the mark, five tabs, the command field and the online
 // state. It replaces the rail and the old top bar when the instrument flag is
@@ -90,6 +91,21 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" /><span className="in-status-t">{online ? t('inst.online') : t('inst.offline')}</span></span>
         {accountMenu}
       </header>
+      {/* Offline: a copper rule and what still works, said plainly. Checking
+          needs the server, so it is not on the list; what happens to work
+          in progress is its own line. Notes: the service worker's runtime
+          /assets/ rule keeps any notes chunk opened online. */}
+      {!online && (
+        <aside className="c-offline" aria-labelledby="c-offline-h" data-offline-banner>
+          <p className="c-offline-h" id="c-offline-h"><b>{t('inst.offline')}</b>{t('inst.offlineBanner')}</p>
+          <ul aria-label={t('inst.offlineStill')}>
+            <li>{t('inst.offlineItemHistory')}</li>
+            <li>{t('inst.offlineItemProgress')}</li>
+            <li>{t('inst.offlineItemNotes')}</li>
+          </ul>
+          <p className="c-offline-kept">{t('inst.offlineKept')}</p>
+        </aside>
+      )}
       {/* Mounted only while open: every opening starts from an empty query. */}
       {open && <CommandBar open onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />}
     </>

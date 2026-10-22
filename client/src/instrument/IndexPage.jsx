@@ -6,6 +6,7 @@ import { useT, tLater } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
+import EmptyPlot from './EmptyPlot.jsx';
 import TermGloss from '../components/TermGloss.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
@@ -198,7 +199,7 @@ export default function IndexPage() {
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
-          {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
+          {chapters.every(c => !c.evidence.attempts) ? <EmptyPlot /> : !phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
               {current.row.dotpoints.slice(0, 4).map((dp, i) => {

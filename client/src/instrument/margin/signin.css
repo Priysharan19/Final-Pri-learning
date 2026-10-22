@@ -1,0 +1,98 @@
+/* Sign-in in direction C, loaded by App.jsx behind the flag (instrument build only).
+   Left: an engraved sheet with the instrument's lines in ink. Right: one calm
+   form, small-caps labels, a pill primary action (.c-btn-primary), and six code cells with a
+   teal caret that lock in left to right once the code is accepted.
+   Transform and opacity only; Reduce Motion gives the final frame. */
+
+html.ui-instrument:root .auth-wrap { background: var(--c-paper); color: var(--c-ink); font-family: var(--c-text); }
+html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { background: var(--c-paper); box-shadow: inset var(--c-line) 0 0 var(--c-hair); }
+html.ui-instrument:root .in-signin-plot { background: var(--c-sheet); }
+html.ui-instrument:root .in-signin-line {
+  font-family: var(--c-serif); font-weight: 400; font-size: clamp(30px, 3.4vw, 46px); line-height: 1; letter-spacing: -0.01em; color: var(--c-ink);
+  border-top: var(--c-line) solid var(--c-hair); padding-top: 14px;
+}
+html.ui-instrument:root .auth-col .hero-kicker { font-family: var(--c-sc); font-weight: 600; font-size: 13px; letter-spacing: 0.14em; color: var(--c-ink-2); }
+html.ui-instrument:root .auth-col .hero-title,
+html.ui-instrument:root .signup-title { font-family: var(--c-serif); font-weight: 400; font-size: 34px; line-height: 1.05; letter-spacing: -0.01em; color: var(--c-ink); }
+html.ui-instrument:root .auth-col .hero-sub,
+html.ui-instrument:root .signup-lead { color: var(--c-ink-2); font-size: 15px; }
+html.ui-instrument:root .auth-col > p.muted, html.ui-instrument:root .signup-hint { color: var(--c-ink-3); }
+html.ui-instrument:root .signin-landing,
+html.ui-instrument:root .auth-card { background: transparent; box-shadow: none; border: 0; }
+html.ui-instrument:root .signin-landing .label { font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.14em; font-size: 13px; color: var(--c-ink-2); }
+html.ui-instrument:root .signin-landing .input, html.ui-instrument:root .auth-card .input {
+  height: 48px; border-radius: 4px; background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); color: var(--c-ink);
+  font-family: var(--c-text); font-size: 16px; caret-color: var(--c-teal); box-shadow: inset 0 1px 2px var(--c-emboss-lo);
+}
+html.ui-instrument:root .signin-landing .btn-primary, html.ui-instrument:root .auth-card .btn-primary {
+  min-height: 48px; border-radius: 6px; background: var(--c-teal); border: 0; color: var(--c-paper);
+  font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 15px;
+}
+
+html.ui-instrument:root .signin-landing .btn-ghost, html.ui-instrument:root .signin-landing .btn-quiet {
+  border-radius: 6px; background: transparent; box-shadow: none; border: var(--c-line) solid var(--c-hair); color: var(--c-ink);
+}
+html.ui-instrument:root .signin-landing .linklike { color: var(--c-teal); }
+html.ui-instrument:root .signup-choice { border-radius: 6px; border-color: var(--c-hair); background: var(--c-sheet); }
+html.ui-instrument:root .signup-choice.is-selected { border-color: var(--c-ink); background: var(--c-paper-2); box-shadow: inset 0 0 0 1px var(--c-ink); }
+
+/* The six cells: recessed into the sheet, real tabular figures, teal caret. */
+html.ui-instrument:root .otp-boxes { gap: 8px; }
+html.ui-instrument:root .otp-box {
+  width: 46px; height: 56px; border-radius: 4px; border: var(--c-line) solid var(--c-hair); background: var(--c-sheet); color: var(--c-ink);
+  font-family: var(--c-text); font-weight: 600; font-size: 26px; font-variant-numeric: tabular-nums lining-nums; font-feature-settings: "tnum", "lnum"; text-align: center;
+  caret-color: var(--c-teal); box-shadow: inset 0 1px 2px var(--c-emboss-lo);
+}
+html.ui-instrument:root .otp-box:focus { outline: 2px solid var(--c-teal); outline-offset: 1px; border-color: var(--c-teal); }
+html.ui-instrument:root .otp-invalid .otp-box { border-color: var(--c-ink); border-width: 2px; }
+/* Accepted: each cell locks in turn, left to right, 70ms apart: a 1px
+   deboss press and a teal underline drawn by scaleX. */
+html.ui-instrument:root .otp-box { background-image: none; }
+html.ui-instrument:root .otp-boxes { position: relative; }
+html.ui-instrument:root .otp-locked .otp-box {
+  border-color: var(--c-teal); color: var(--c-ink); opacity: 1;
+  animation: otp-lock 340ms var(--c-ease-row) both;
+}
+html.ui-instrument:root .otp-locked .otp-box:nth-child(2) { animation-delay: 70ms; }
+html.ui-instrument:root .otp-locked .otp-box:nth-child(3) { animation-delay: 140ms; }
+html.ui-instrument:root .otp-locked .otp-box:nth-child(4) { animation-delay: 210ms; }
+html.ui-instrument:root .otp-locked .otp-box:nth-child(5) { animation-delay: 280ms; }
+html.ui-instrument:root .otp-locked .otp-box:nth-child(6) { animation-delay: 350ms; }
+@keyframes otp-lock { 0% { transform: translateY(0); } 45% { transform: translateY(1px); } 100% { transform: translateY(0); } }
+@media (forced-colors: active) {
+  html.ui-instrument:root .otp-box { border-color: CanvasText; }
+  html.ui-instrument:root .otp-locked .otp-box { border-color: Highlight; border-width: 2px; }
+}
+@media (max-width: 400px) { html.ui-instrument:root .otp-box { width: 42px; height: 52px; } }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument:root .otp-locked .otp-box { animation: none; } }
+
+/* The primary action is C's pill (the one named radius, primary actions only). */
+html.ui-instrument:root .signin-landing .c-btn-primary, html.ui-instrument:root .auth-card .c-btn-primary { border-radius: var(--radius-pill); }
+
+@media (hover: hover) { html.ui-instrument:root .signin-landing .btn-primary:hover:not(:disabled) { filter: none; background: var(--accent-hover, var(--c-teal)); } }
+html.ui-instrument:root .signin-landing .btn-primary:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument:root .signin-landing .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) { html.ui-instrument:root .signin-landing .btn-primary:active { transform: none; } }
+html.ui-instrument:root .signin-landing .linklike { text-decoration-thickness: var(--c-line); text-underline-offset: 3px; }
+@media (hover: hover) { html.ui-instrument:root .signin-landing .btn-ghost:hover, html.ui-instrument:root .signin-landing .btn-quiet:hover { background: var(--c-paper-2); } }
+
+/* Before an address is typed, the primary reads as a real secondary button,
+   not a dead one: hairline border, ink text (ink on sheet is 15:1). */
+html.ui-instrument:root .signin-landing .btn-primary:disabled,
+html.ui-instrument:root .auth-card .btn-primary:disabled {
+  background: var(--c-sheet); color: var(--c-ink); border: var(--c-line) solid var(--c-hair); border-radius: 6px; opacity: 1; cursor: default;
+}
+/* The side doors: one quiet small-caps row. */
+html.ui-instrument:root .signin-landing .signup-alt { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 14px; margin-top: 14px; }
+html.ui-instrument:root .signin-landing .signup-alt + .signup-alt { margin-top: 0; }
+html.ui-instrument:root .signin-landing .signup-alt .linklike {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; font: var(--c-t-label); font-size: 12.5px; letter-spacing: 0.06em;
+  white-space: nowrap; color: var(--c-ink-2); text-decoration: none;
+}
+@media (hover: hover) { html.ui-instrument:root .signin-landing .signup-alt .linklike:hover { color: var(--c-teal); } }
+/* The two privacy paragraphs are pinned wording (tests hold both); they are
+   typeset as one quiet footnote block under a single engraved rule. */
+html.ui-instrument:root .auth-col > p.muted { max-width: 34em; margin: 4px auto 0 !important; font-size: 12.5px !important; line-height: 1.5; color: var(--c-ink-3); text-align: center; }
+html.ui-instrument:root .auth-col > p.muted:has(+ p.muted) { margin-top: 22px !important; padding-top: 14px; border-top: var(--c-line) solid var(--c-hair-2); }
+html.ui-instrument:root .auth-col > .signin-landing { max-width: 380px; width: 100%; }
+@media (max-width: 860px) { html.ui-instrument:root .auth-wrap:has(> .in-signin-plot) > .auth-col { box-shadow: none; } }

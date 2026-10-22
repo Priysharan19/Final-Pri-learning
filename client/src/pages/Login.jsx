@@ -18,10 +18,13 @@ import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
+import { firstOpenSeen } from '../instrument/firstOpenSeen.js';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
 const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+// The first-open moment (instrument build only), shown once before sign-in.
+const FirstOpen = featureEnabled('instrument') ? React.lazy(() => import('../instrument/FirstOpen.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -274,6 +277,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
   const [stage, setStage] = useState(initialStage);   // hero | pick | create
+  const [firstOpen, setFirstOpen] = useState(() => !!FirstOpen && !firstOpenSeen());
   const [cardStep, setCardStep] = useState('method');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
@@ -562,6 +566,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
       <div className="auth-wrap">
         <MathField />
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
+        {FirstOpen && firstOpen && <React.Suspense fallback={null}><FirstOpen onDone={() => setFirstOpen(false)} /></React.Suspense>}
         <div className="auth-col fade-in">
           <Logo large />
           {atStart && (

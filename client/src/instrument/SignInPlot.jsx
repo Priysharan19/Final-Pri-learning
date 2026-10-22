@@ -6,12 +6,14 @@ import { useT } from '../i18n/index.js';
 // (one frame, no animation) under prefers-reduced-motion. Loaded only in the
 // instrument build.
 
+// Direction C: ink on cotton paper. One teal line (the live reading), the
+// rest in graduated inks; no rainbow.
 const CURVES = [
-  ['--in-c3', (x, h, t) => h * 0.42 + Math.sin(x * 0.012 + t) * h * 0.1],
-  ['--in-c1', (x, h, t, w) => h * 0.28 + ((x - w * (0.55 + Math.sin(t) * 0.05)) / w) ** 2 * h * 1.1],
-  ['--in-c2', (x, h, t, w) => h * 0.72 - (x / w) * h * 0.32],
-  ['--in-c5', (x, h, t) => h * 0.56 + Math.sin(x * 0.02 + t * 1.3) * h * 0.035],
-  ['--in-c7', (x, h, t) => h * 0.84 + Math.sin(x * 0.03 + t) * 12]
+  ['--c-teal', (x, h, t) => h * 0.42 + Math.sin(x * 0.012 + t) * h * 0.1],
+  ['--c-ink-2', (x, h, t, w) => h * 0.28 + ((x - w * (0.55 + Math.sin(t) * 0.05)) / w) ** 2 * h * 1.1],
+  ['--c-ink-3', (x, h, t, w) => h * 0.72 - (x / w) * h * 0.32],
+  ['--c-hair', (x, h, t) => h * 0.56 + Math.sin(x * 0.02 + t * 1.3) * h * 0.035],
+  ['--c-hair', (x, h, t) => h * 0.84 + Math.sin(x * 0.03 + t) * 12]
 ];
 
 export default function SignInPlot() {
@@ -34,7 +36,7 @@ export default function SignInPlot() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
       const css = getComputedStyle(canvas);
-      ctx.strokeStyle = css.getPropertyValue('--in-edge').trim() || 'rgba(128,128,128,.1)';
+      ctx.strokeStyle = css.getPropertyValue('--c-hair-2').trim() || 'rgba(128,128,128,.1)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = 0.5; x < w; x += 29) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }

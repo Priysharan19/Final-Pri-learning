@@ -20,7 +20,7 @@ import { OTP_LENGTH, otpAfterInput, otpDigits } from './otpCode.js';
 export { OTP_LENGTH, otpAfterInput, otpDigits };
 
 export default function OtpInput({
-  value, onChange, onComplete, disabled = false, invalid = false, autoFocus = true,
+  value, onChange, onComplete, disabled = false, invalid = false, locked = false, autoFocus = true,
   idPrefix = 'otp', labelledBy, describedBy
 }) {
   const t = useT();
@@ -81,7 +81,7 @@ export default function OtpInput({
   };
 
   return (
-    <div className={`otp-boxes${invalid ? ' otp-invalid' : ''}`} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy}>
+    <div className={`otp-boxes${invalid ? ' otp-invalid' : ''}${locked ? ' otp-locked' : ''}`} role="group" aria-labelledby={labelledBy} aria-describedby={describedBy}>
       {digits.map((digit, index) => (
         <input
           key={index}

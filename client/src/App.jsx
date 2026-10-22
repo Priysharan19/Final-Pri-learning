@@ -71,7 +71,11 @@ if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   // The luxury layer remaps the instrument's tokens, so it must land after
   // instrument.css in the cascade.
-  import('./instrument/instrument.css').then(() => import('./instrument/margin/margin.css'));
+  import('./instrument/instrument.css').then(() => import('./instrument/margin/margin.css'))
+    // Sign-in and first-open skins (direction C). Loaded here, not from their
+    // components, because the sign-in screen is also bundled bare by the
+    // onboarding checks, whose bundler takes no stylesheets.
+    .then(() => Promise.all([import('./instrument/margin/signin.css'), import('./instrument/margin/firstopen.css')]));
   // The Map, Report and Scripts tabs are on demand in this build; after an
   // online launch, at idle and only on a cheap link, fetch them so the service
   // worker keeps them for offline (local/offlineWarm.js, issue #658).

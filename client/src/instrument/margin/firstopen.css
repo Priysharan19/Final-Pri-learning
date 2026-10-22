@@ -1,0 +1,59 @@
+/* First open, direction C. The bezel engraves (stroke-dashoffset 1 -> 0,
+   800ms, cubic-bezier(.6,0,.2,1)), the P' mark writes itself on the same
+   curve, the line fades in, then the pad. Opacity and stroke-dashoffset only.
+   Reduce Motion: the final frame at once. Loaded by App.jsx behind the flag. */
+
+html.ui-instrument .fo {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-content: center; justify-items: center; gap: 20px;
+  padding: 32px 16px; background: var(--c-paper); color: var(--c-ink); font-family: var(--c-text); text-align: center; overflow-y: auto;
+}
+html.ui-instrument .fo-mark { width: 120px; height: 120px; overflow: visible; }
+html.ui-instrument .fo-bezel { fill: var(--c-bezel); stroke: var(--c-dial-line); stroke-width: 0.6; stroke-dasharray: 1; stroke-dashoffset: 1; animation: fo-write var(--c-d-engrave) var(--c-ease-engrave) forwards; }
+html.ui-instrument .fo-bezel-in { fill: var(--c-dial); stroke: var(--c-bezel-2); stroke-width: 1; opacity: 0; animation: fo-in 300ms 200ms ease-out forwards; }
+html.ui-instrument .fo-p, html.ui-instrument .fo-prime {
+  fill: none; stroke: var(--c-ink); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1; stroke-dashoffset: 1; animation: fo-write 600ms 300ms var(--c-ease-engrave) forwards;
+}
+html.ui-instrument .fo-prime { stroke: var(--c-teal); animation-delay: 900ms; animation-duration: 200ms; }
+html.ui-instrument .fo-line {
+  margin: 0; max-width: 16em; font-family: var(--c-serif); font-weight: 400; font-size: clamp(28px, 4.6vw, 40px); line-height: 1.05; letter-spacing: -0.01em;
+  opacity: 0; animation: fo-in 400ms 900ms var(--c-ease-row) forwards;
+}
+html.ui-instrument .fo-ask { display: grid; justify-items: center; gap: 10px; opacity: 0; animation: fo-in 400ms 1200ms var(--c-ease-row) forwards; }
+html.ui-instrument .fo-ask .c-label { margin: 8px 0 0; }
+html.ui-instrument .fo-sheet {
+  width: 168px; height: 168px; background: var(--c-sheet); border: var(--c-line) solid var(--c-hair); border-radius: 4px;
+  box-shadow: inset 0 1px 2px var(--c-emboss-lo);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 55px, var(--c-hair-2) 55px 56px);
+}
+html.ui-instrument .fo-pad { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+html.ui-instrument .fo-ack { margin: 0; min-height: 1.5em; max-width: 22em; font-size: 15px; color: var(--c-ink-2); }
+html.ui-instrument .fo-acts { display: flex; gap: 10px; align-items: center; }
+html.ui-instrument .fo-go.c-btn-primary {
+  min-height: 44px; padding: 0 22px; border-radius: var(--radius-pill); border: var(--c-line) solid var(--c-teal); background: var(--c-teal); color: var(--c-paper);
+  font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 15px; cursor: pointer;
+}
+html.ui-instrument .fo-quiet {
+  min-height: 44px; padding: 0 16px; border-radius: 6px; border: var(--c-line) solid var(--c-hair); background: transparent; color: var(--c-ink);
+  font-family: var(--c-sc); font-weight: 600; letter-spacing: 0.12em; font-size: 15px; cursor: pointer;
+}
+html.ui-instrument .fo-skip {
+  min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--c-ink-2); cursor: pointer;
+  font: var(--c-t-button); letter-spacing: 0.12em; text-decoration: underline; text-decoration-thickness: var(--c-line); text-underline-offset: 4px; text-decoration-color: var(--c-hair);
+}
+@media (hover: hover) { html.ui-instrument .fo-skip:hover { color: var(--c-ink); text-decoration-color: var(--c-ink-2); } }
+html.ui-instrument .fo-skip:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+html.ui-instrument .fo-go:focus-visible, html.ui-instrument .fo-quiet:focus-visible { outline: 2px solid var(--c-teal); outline-offset: 3px; }
+@media (hover: hover) { html.ui-instrument .fo-quiet:hover { background: var(--c-paper-2); } }
+html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transform: translateY(1px); }
+@media (forced-colors: active) {
+  html.ui-instrument .fo-sheet { border-color: CanvasText; background-image: none; }
+  html.ui-instrument .fo-p, html.ui-instrument .fo-prime, html.ui-instrument .fo-bezel { stroke: CanvasText; }
+}
+@keyframes fo-write { to { stroke-dashoffset: 0; } }
+@keyframes fo-in { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument .fo-bezel, html.ui-instrument .fo-p, html.ui-instrument .fo-prime { animation: none; stroke-dashoffset: 0; }
+  html.ui-instrument .fo-bezel-in, html.ui-instrument .fo-line, html.ui-instrument .fo-ask { animation: none; opacity: 1; }
+  html.ui-instrument .fo-go:active, html.ui-instrument .fo-quiet:active { transform: none; }
+}

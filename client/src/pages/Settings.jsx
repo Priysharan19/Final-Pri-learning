@@ -18,6 +18,10 @@ import { useApp } from '../App.jsx';
 // changes; this gate only decides whether its code is worth asking for.
 const StaffOperationsPanel = React.lazy(() => import('../components/StaffOperationsPanel.jsx'));
 const STAFF_ROLES = ['support', 'admin'];
+// The instrument build's Settings skin (direction C). Fetched only when the
+// flag is on, so the flag-off build gains nothing (vite.config.js skips the
+// chunk by name).
+if (featureEnabled('instrument') && typeof document !== 'undefined') import('../instrument/margin/settings.css').catch(() => {});
 
 function StaffOperations() {
   const [staff, setStaff] = useState(false);
