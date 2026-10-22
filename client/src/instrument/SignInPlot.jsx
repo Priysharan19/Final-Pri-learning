@@ -61,7 +61,14 @@ export default function SignInPlot() {
       if (!still) raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
+    // The inks are read from tokens: when the theme changes, a still frame is
+    // redrawn in the new inks (an animated one picks them up next frame).
+    const mo = new MutationObserver(() => { if (still) { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); } });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const onScheme = () => { if (still) { cancelAnimationFrame(raf); raf = requestAnimationFrame(draw); } };
+    mq?.addEventListener?.('change', onScheme);
+    return () => { cancelAnimationFrame(raf); mo.disconnect(); mq?.removeEventListener?.('change', onScheme); };
   }, []);
   return (
     <div className="in-signin-plot" aria-hidden="true">
