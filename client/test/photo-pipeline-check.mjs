@@ -149,7 +149,12 @@ for (const [lines, question, want] of FINALS) {
   eq(only(proposeFinalAnswer(['a = 7'], SUM)), { status: 'none' }, 'photo label: "a = 7" under "Find a + b" proposes nothing');
   eq(only(proposeFinalAnswer(['x = 5'], { answerType: 'numeric', prompt: 'Find $x$.' })), proposed('5'), 'photo label: "x = 5" under "Find x" proposes 5');
   for (const line of ['Ans: Perimeter = 72', 'Perimeter: 72', 'Perimeter → 72', 'Perimeter => 72', 'Perimeter is 72']) eq(only(proposeFinalAnswer([line], AREA)), { status: 'none' }, `photo label: "${line}" under "Find the area" proposes nothing`);
-  for (const line of ['Area of PQR = 72', 'Area: 72', 'Ans: 72', 'Hence area = 72', 'The area is 72', 'Total area = 72']) eq(only(proposeFinalAnswer([line], AREA)), proposed('72'), `photo label: "${line}" proposes 72`);
+  for (const line of ['Area of PQR = 72', 'Area: 72', 'Ans: 72', 'Hence area = 72', 'The area is 72']) eq(only(proposeFinalAnswer([line], AREA)), proposed('72'), `photo label: "${line}" proposes 72`);
+  // "Total …" is not dropped from a label ("Total cost" is not "the cost of one
+  // kilogram"), so "Total area" proposes nothing and the student is asked.
+  eq(only(proposeFinalAnswer(['Total area = 72'], AREA)), { status: 'none' }, 'photo label: "Total area = 72" is not read as the area; the student is asked');
+  // A phrase that points back names nothing new: "What is that number?" leaves the label to the student.
+  eq(only(proposeFinalAnswer(['CF = 23.5'], { answerType: 'numeric', prompt: 'The median class is 20–30. What is that number?' })), proposed('23.5'), 'photo label: "that number" names nothing, so "CF = 23.5" is proposed');
   const ENCLOSED = { answerType: 'numeric', prompt: 'Find the area enclosed between the curve and the x-axis.' };
   for (const line of ['Area = 72', 'Area: 72', 'Ans: Area = 72']) eq(only(proposeFinalAnswer([line], ENCLOSED)), proposed('72'), `photo label: "${line}" under "the area enclosed between" proposes 72`);
   eq(only(proposeFinalAnswer(['Probability = 23/40'], { answerType: 'numeric', prompt: 'Find the probability the Hawks win.' })), proposed('23/40'), 'photo label: "Probability = 23/40" names the asked probability');

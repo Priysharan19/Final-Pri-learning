@@ -183,15 +183,19 @@ function namedPrecisionBand(question) {
 // A label naming something else is never stripped, and a one-letter label
 // that names a different quantity built on that letter — "b = 5" when the
 // question asks for b² — is a different claim, refused with a reason.
-const ASK_MATH = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/gi;
-const ASK_VERB = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\b/gi;
-const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+((?:[a-z]+\s+){0,4}[a-z]+)/gi;
+// "Give your answer to 2 d.p." is an instruction, not an ask.
+const ASK_VERBS = String.raw`(?:find|evaluate|calculate|compute|determine|what is|give(?!\s+(?:your|the)\s+answers?\b))`;
+const ASK_MATH = new RegExp(String.raw`\b${ASK_VERBS}\s+(?:the\s+(?:[a-z]+\s+){0,6}?values?\s+of\s+)?\$([^$]{1,60})\$`, 'gi');
+const ASK_VERB = new RegExp(String.raw`\b${ASK_VERBS}\b`, 'gi');
+const ASK_NOUN = new RegExp(String.raw`\b${ASK_VERBS}\s+((?:[a-z]+\s+){0,4}[a-z]+)`, 'gi');
+// A phrase that points back ("that number", "which step") names nothing new.
+const POINTS_BACK = /^(?:that|which|this|these|those|it)$/;
 // Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
 const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
 const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
 const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|after|before|taken|obtained|formed|made|attained|reached|enclosed|bounded|the|a|an|it|its)$/;
 // Words a student puts before a label that are not part of it: "Hence area = 72", "The area is 72".
-const LABEL_LEAD = /^(?:(?:hence|so|thus|therefore|the|a|an|total|required|final)\s+)+/i;
+const LABEL_LEAD = /^(?:(?:hence|so|thus|therefore|the|a|an)\s+)+/i;
 const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
 /** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
 function quantityKey(text) {
@@ -201,6 +205,7 @@ function quantityKey(text) {
     .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, '$1')
     .replace(/\\ge(?:q)?\b/g, '≥').replace(/\\le(?:q)?\b/g, '≤').replace(/>=/g, '≥').replace(/<=/g, '≤')
     .replace(/\\(sin|cos|tan|cot|sec|cosec|csc|log|ln|mid)\b/g, (_, f) => (f === 'mid' ? '|' : f))
+    .replace(/\\angle\s*/g, '')
     .replace(/\\(alpha|beta|gamma|delta|theta|lambda|mu|pi|omega|Delta)\b/g, (_, g) => GREEK[g])
     .replace(/²/g, '^2').replace(/³/g, '^3')
     .replace(/[{}\s]/g, '')
@@ -234,6 +239,7 @@ function askedFor(question) {
     const words = [], lead = [];
     for (const word of m[1].toLowerCase().split(/\s+/)) {
       if (words.length && PHRASE_ENDS.test(word)) break;
+      if (!words.length && POINTS_BACK.test(word)) break;
       if (!words.length && NOT_A_NAME.has(word)) {
         // "the total cost": "total" on its own names the asked total too.
         if (QUANTITY_MODIFIERS.has(word)) { nouns.push(word); lead.push(word); }
@@ -275,15 +281,14 @@ export function readAnswerLabel(question, raw) {
     // find c" or "∠A : ∠B = 7 : 5" (a ratio), nor one the asking sentence names.
     const prompt = String(question?.prompt ?? '');
     const promptText = prompt.replace(/\$/g, ' ');
-    const named = new RegExp(`\\$\\s*(?:\\\\angle\\s*)?${label}\\s*\\$`).test(askingSentences(prompt));
     let given = false;
-    for (const g of promptText.matchAll(new RegExp(`(^|[\\s,(;])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?!\\s*:)(?=[\\s,.;)]|$)`, 'g'))) {
+    for (const g of promptText.matchAll(new RegExp(`(^|[\\s,(;])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?!\\s*:\\s*-?\\d)(?=[\\s,.;)]|$)`, 'g'))) {
       const before = promptText.slice(0, g.index + g[1].length).replace(/\s+$/, '');
-      if (/[+\-*/^=<>:·×÷\d)]$/.test(before) || /\\[A-Za-z]+$/.test(before)) continue;
+      if (/[+\-*/^=<>·×÷\d)]$/.test(before) || /\\(?:angle|vec|hat|bar|overline|overrightarrow)$/.test(before)) continue;
       given = true;
       break;
     }
-    given = given && !/\bsolve\b/i.test(promptText) && !named;
+    given = given && !/\bsolve\b/i.test(promptText);
     if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
     // A one-letter label is read off as it always was — unless the question
     // asks, and only asks, for a plainly different quantity on that letter: a

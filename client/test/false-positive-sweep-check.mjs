@@ -459,6 +459,20 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
       if (unknown) expect(`label: "${unknown} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${unknown} = ${fmt(q.answer.value)}`).correct);
     }
   }
+  // Round-5 check of #670: a value followed by a colon is not a ratio unless a number follows;
+  // "Given:" does not hide a given; "the … values of $c$" and "$\\angle B$" are asks;
+  // "Give your answer to 2 d.p." is not the ask; "Total cost" is not "the cost of one kilogram".
+  const colon = { answerType: 'numeric', prompt: 'For $x = 4$: find the value of $2x + 3$.', answer: { value: 11 } };
+  expect('label: "x = 11" names the given x (a colon is not a ratio)', !verdict(colon, 'x = 11').correct);
+  const givenColon = { answerType: 'numeric', prompt: 'Given: $a = 7$, $c = 9$. Find $b^2$.', answer: { value: 67 } };
+  expect('label: "a = 67" names the given a after "Given:"', !verdict(givenColon, 'a = 67').correct);
+  const sideA = { answerType: 'numeric', prompt: 'The triangle has sides $a = 9$, $b = 7$. Find the angle $A$ opposite side $a$.', answer: { value: 40 } };
+  expect('label: "a = 40" names the given side a, not the angle A', !verdict(sideA, 'a = 40').correct);
+  const decimals = { answerType: 'numeric', prompt: 'Find the area of the region. Give your answer to 2 decimal places.', answer: { value: 72.25 } };
+  expect('label: "Area = 72.25" — "give your answer" is not the ask', verdict(decimals, 'Area = 72.25').correct);
+  const perKg = { answerType: 'numeric', prompt: 'Find the cost of one kilogram of tur dal.', answer: { value: 72 } };
+  expect('label: "Total cost = 72" is not the cost of one kilogram', !verdict(perKg, 'Total cost = 72').correct);
+  expect('label: "cost = 72" is', verdict(perKg, 'cost = 72').correct);
   for (const input of ['65%.', '{65%}', '{65 percent}', '(65 percent)']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
   expect('percent: "6500 percents" is not 65 %', !verdict(own, '6500 percents').correct);
   // A letter inside an expression or a ratio is not GIVEN (#670 final review): the
