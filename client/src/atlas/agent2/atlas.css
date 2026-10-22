@@ -1,0 +1,128 @@
+/* Scoped prototype visual system. Never remaps production theme tokens. */
+.pa2-experience, .pa2-demo-root {
+  --pa2-bg: #0b0e13; --pa2-surface: #151a22; --pa2-raise: #1e2530;
+  --pa2-ink: #f0f1f2; --pa2-muted: #a5b0bf; --pa2-hairline: #3b4653;
+  --pa2-signal: #d3dce8;
+  color: var(--pa2-ink); background: var(--pa2-bg);
+  font-family: "Instrument Sans", Inter, system-ui, sans-serif;
+  font-size: 15px; line-height: 1.5; color-scheme: dark;
+}
+.pa2-experience { padding: clamp(20px, 3vw, 46px); max-width: 1640px; margin: auto; }
+.pa2-experience *, .pa2-demo-root * { box-sizing: border-box; }
+.pa2-experience button, .pa2-demo-root button { font: inherit; cursor: pointer; }
+.pa2-experience button:focus-visible, .pa2-demo-root button:focus-visible, .pa2-experience input:focus-visible {
+  outline: 3px solid #9ecbc8; outline-offset: 4px;
+}
+.pa2-experience button:disabled { opacity: 0.35; cursor: not-allowed; }
+.pa2-experience h1, .pa2-experience h2, .pa2-experience h3, .pa2-experience p { margin-top: 0; }
+.pa2-overline { font-size: 12px; font-weight: 620; letter-spacing: 0.14em; color: #a7b4c4; }
+.pa2-titleline { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin: 14px 0 30px; }
+.pa2-titleline h1 { font-size: clamp(32px, 3.6vw, 54px); line-height: 1.1; font-weight: 590; letter-spacing: -0.045em; margin-bottom: 12px; }
+.pa2-titleline p { color: var(--pa2-muted); font-size: 16px; margin-bottom: 0; }
+.pa2-tag { font-size: 12px; padding: 8px 12px; border: 1px solid #455363; color: #cbd6e1; white-space: nowrap; }
+.pa2-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 350px); gap: 20px; align-items: start; }
+.pa2-pane { min-width: 0; background: #10141b; border: 1px solid #2d3641; }
+.pa2-toolbar, .pa2-lab-preset { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px; border-bottom: 1px solid #333c47; }
+.pa2-toolbar button, .pa2-lab-preset button { background: transparent; color: #b8c4d0; border: 1px solid #46515f; padding: 8px 14px; min-height: 42px; border-radius: 4px; }
+.pa2-toolbar button:hover, .pa2-lab-preset button:hover, .pa2-toolbar button.is-active { background: #26313d; color: white; border-color: #8c9bac; }
+.pa2-explain { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; min-height: 48px; padding: 8px 18px; color: #afbac8; }
+.pa2-explain label { display: flex; align-items: center; gap: 9px; cursor: pointer; white-space: nowrap; }
+.pa2-explain input { width: 18px; height: 18px; accent-color: #91bfb8; }
+.pa2-demo { padding: 7px 18px; border-block: 1px dashed #786348; color: #f0c88a; font: 12px/1.5 "IBM Plex Mono", monospace; }
+.pa2-viewport { position: relative; overflow: hidden; background: #10151d; }
+.pa2-graph { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 740; touch-action: none; cursor: grab; }
+.pa2-graph:active { cursor: grabbing; }
+.pa2-camera:not(.is-dragging) { transition: transform 360ms cubic-bezier(.2,.75,.2,1); }
+.pa2-graph .pa2-node { cursor: pointer; transition: opacity 200ms ease; }
+.pa2-graph .pa2-node:focus-visible { outline: none; }
+.pa2-graph .pa2-node:focus-visible > circle:nth-child(2) { stroke: white; stroke-width: 3; }
+.pa2-node-name { font-size: 20px; font-weight: 570; fill: #edf1f5; }
+.pa2-node-meta { fill: #a8b7c6; font-family: "IBM Plex Mono", monospace; font-size: 13px; }
+.pa2-map-controls { position: absolute; bottom: 18px; right: 18px; display: flex; gap: 4px; align-items: center; padding: 4px; border: 1px solid #4d5a69; background: #1c242d; }
+.pa2-map-controls button { background: transparent; border: 0; color: #f3f4f5; font-size: 16px; min-width: 36px; min-height: 37px; }
+.pa2-map-controls span { font: 12px "IBM Plex Mono", monospace; min-width: 42px; text-align: center; }
+.pa2-legend { padding: 15px 18px; display: flex; flex-wrap: wrap; gap: 8px 20px; color: #c2cbd5; font-size: 12px; border-top: 1px solid #333c47; }
+.pa2-legend span { white-space: nowrap; }
+.pa2-legend i { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border-radius: 2px; }
+.pa2-list-area { border-top: 1px solid #343c47; padding: 20px; }
+.pa2-list-area h3 { font-size: 16px; margin-bottom: 4px; }
+.pa2-list-area > p { font-size: 13px; color: #b5c0cd; }
+.pa2-concept-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 7px; max-height: 245px; overflow-y: auto; }
+.pa2-concept-list button { border: 1px solid #3b4857; color: #ebeff4; background: #18202a; text-align: left; font-size: 13px; min-height: 48px; padding: 8px 11px; display: flex; justify-content: space-between; gap: 5px; }
+.pa2-concept-list button[aria-current="true"] { border-color: #9dc9c4; background: #26363b; }
+.pa2-concept-list small { color: #a5b3c1; white-space: nowrap; }
+.pa2-inspector { background: #191f28; border: 1px solid #46515e; padding: 26px 24px; min-width: 0; }
+.pa2-inspector h2 { font-size: 25px; font-weight: 575; letter-spacing: -0.03em; margin: 13px 0 10px; }
+.pa2-inspector h3 { font-size: 14px; font-weight: 620; margin: 0 0 10px; }
+.pa2-inspector p, .pa2-inspector li { font-size: 13px; color: #c1cbd6; line-height: 1.65; }
+.pa2-subtitle { color: #9caec0 !important; overflow-wrap: anywhere; font-family: "IBM Plex Mono", monospace; font-size: 12px !important; }
+.pa2-rule { border-bottom: 1px solid #43505e; margin: 22px 0; }
+.pa2-state { display: block; font-size: 13px; font-weight: 550; color: #f1c68d; margin-bottom: 6px; }
+.pa2-prereqs { list-style: none; padding: 0; margin: 0; }
+.pa2-prereqs li { padding: 12px 0; border-bottom: 1px solid #374250; }
+.pa2-prereqs span, .pa2-prereqs small { display: block; }
+.pa2-prereqs span { color: #f2f3f5; font-weight: 540; }
+.pa2-prereqs small { color: #a9b6c5; margin-top: 4px; }
+.pa2-prereqs button { border: 1px solid #667587; background: transparent; color: #e7ecf1; min-height: 32px; padding: 3px 10px; margin-top: 8px; }
+.pa2-actions { display: grid; gap: 10px; }
+.pa2-actions button, .pa2-inspector > button.pa2-primary, .pa2-secondary { width: 100%; min-height: 44px; text-align: center; padding: 9px 12px; border: 1px solid #7b8c9e; background: transparent; color: #edf0f4; }
+.pa2-inspector .pa2-primary, .pa2-actions button.pa2-primary { background: #d4dfe8; color: #0f1822; font-weight: 650; border-color: #d4dfe8; }
+.pa2-fineprint { color: #a9b3bf !important; font-size: 12px !important; padding-top: 18px; }
+.pa2-footnote { margin: 24px 0 0; font-size: 12px; color: #aab5c2; }
+.pa2-line-controls { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin: 14px; }
+.pa2-line-card { margin: 0; padding: 12px; min-width: 0; border: 1px solid #495563; }
+.pa2-line-card legend { padding: 0 8px; color: #f3f4f6; font-size: 13px; }
+.pa2-line-card legend strong { display: block; font: 15px "IBM Plex Mono", monospace; padding-top: 6px; }
+.pa2-swatch { display: inline-block; width: 12px; height: 3px; margin: 0 8px 4px 0; background: #90c5ee; }
+.pa2-swatch.is-line-1 { background: #dea977; }
+.pa2-three-sliders { display: flex; flex-direction: column; gap: 10px; }
+.pa2-control { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; }
+.pa2-control span { display: flex; justify-content: space-between; font: 13px "IBM Plex Mono", monospace; color: #e4ebf3; }
+.pa2-control small { font-size: 13px; color: #cbd5e0; }
+.pa2-control input { width: 100%; min-height: 30px; accent-color: #aac4dc; }
+.pa2-lab-plot { display: block; margin: 0 auto; max-width: 100%; width: 100%; background: #10151c; border-block: 1px solid #3d4753; }
+.pa2-tick { font: 12px "IBM Plex Mono", monospace; fill: #b5c1ce; }
+.pa2-axis { font: 17px "IBM Plex Mono", monospace; fill: #eef1f5; }
+.pa2-point-label { fill: #f6ecdb; font: 18px "IBM Plex Mono", monospace; paint-order: stroke; stroke: #10151c; stroke-width: 5px; }
+.pa2-plot-caption { font-size: 12px; padding: 11px 16px; color: #b4bfcd; }
+.pa2-coordinate { display: flex; gap: 16px; color: #f6dec1; font: 18px "IBM Plex Mono", monospace; }
+.pa2-explanation-toggle { width: 100%; text-align: left; border: 0; color: #f0f4f8; background: transparent; padding: 4px 0 14px; font-weight: 600 !important; }
+.pa2-explanation { padding: 10px 12px; background: #121821; border-left: 2px solid #8da4b9; }
+.pa2-determinant { color: #ebd3af; font: 14px "IBM Plex Mono", monospace; padding: 9px 0 12px; }
+.pa2-question { margin-top: 18px; background: #111922; padding: 14px; border: 1px solid #4c5c6a; }
+.pa2-question small { color: #b9c5d1; }
+.pa2-secondary { display: block; margin-top: 15px; }
+.pa2-demo-root { min-height: 100vh; }
+.pa2-demo-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 15px; padding: 17px clamp(20px, 3vw, 46px); border-bottom: 1px solid #3a4652; }
+.pa2-demo-brand { font-weight: 650; letter-spacing: 0.13em; }
+.pa2-demo-nav button { color: #e1e8ef; background: transparent; border: 1px solid #637184; min-height: 40px; padding: 8px 18px; margin-left: 8px; }
+.pa2-demo-nav button[aria-current="page"] { background: #d4dfe8; color: #131b24; }
+@media (max-width: 1020px) {
+  .pa2-layout { grid-template-columns: 1fr; }
+  .pa2-inspector { max-width: none; }
+  .pa2-titleline { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 620px) {
+  .pa2-experience { padding: 20px 12px; }
+  .pa2-tag { white-space: normal; }
+  .pa2-viewport { display: none; }
+  .pa2-concept-list { grid-template-columns: 1fr; max-height: none; }
+  .pa2-line-controls { grid-template-columns: 1fr; }
+  .pa2-inspector { padding: 20px 16px; }
+  .pa2-toolbar button, .pa2-lab-preset button { flex: 1; }
+  .pa2-coordinate { flex-direction: column; gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pa2-experience *, .pa2-experience *::before, .pa2-experience *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.pa2-lab-paper h1 {font-weight:580;font-size:clamp(30px,3vw,48px);letter-spacing:-.04em;}
+.pa2-paper-sheet { max-width:800px;background:#f9f7f1;color:#1c2430;
+  padding:clamp(24px,4vw,60px);border:1px solid #bebbb0;font:19px/1.7 Georgia,serif; }
+.pa2-paper-sheet .pa2-overline {color:#4e5b68;font:600 12px/1.5 system-ui,sans-serif;}
+.pa2-paper-sheet h2 {font:600 23px/1.3 system-ui,sans-serif;margin:20px 0;}
+.pa2-paper-sheet li {padding:7px 0 7px 8px;}
+.pa2-paper-sheet .pa2-rule {border-color:#c7c9c7;}
+.pa2-paper-sheet .pa2-fineprint {color:#52606e !important;}
+.pa2-return {margin-top:24px;padding:12px 20px;min-height:44px;border:1px solid #7e91a2;background:#202b38;color:#f2f5f8;}
+@media (max-width:620px){.pa2-paper-sheet {font-size:17px;}}
