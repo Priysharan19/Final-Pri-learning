@@ -199,7 +199,7 @@ export default function IndexPage() {
               <div data-plate-covered><b>{coveredOf(current)}</b><small>{t('inst.kpiCovered')}</small></div>
             </div>
           </div>
-          {chapters.every(c => !c.evidence.attempts) ? <EmptyPlot /> : !phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
+          {!phone && <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />}
           {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
             <ul className="in-exs" aria-label={t('inst.dotpoints')}>
               {current.row.dotpoints.slice(0, 4).map((dp, i) => {
@@ -219,6 +219,10 @@ export default function IndexPage() {
               })}
             </ul>
           )}
+          {/* The empty first plot sits after the topics, not stacked on the
+              chapter's scope: the scope is the chapter's mathematics, this is
+              where the student's own first checked answer will go. */}
+          {chapters.every(c => !c.evidence.attempts) && <EmptyPlot />}
           <div>
             <div className="in-plate-acts">
               <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>

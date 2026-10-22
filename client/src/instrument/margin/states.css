@@ -6,10 +6,10 @@
    (no card), the ruled graph filling it edge to edge, and the promise set in
    STIX Two italic (--c-italic) beneath the rule. */
 html.ui-instrument .c-empty-plot {
-  display: flex; flex-direction: column; align-self: stretch; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0;
+  display: flex; flex-direction: column; align-self: start; margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0;
 }
 html.ui-instrument .c-empty-plot svg {
-  display: block; flex: none; width: 100%; height: auto; aspect-ratio: 2 / 1; max-height: 260px; background: var(--c-paper);
+  display: block; flex: none; width: 100%; height: auto; aspect-ratio: 3 / 1; max-height: 200px; background: var(--c-paper);
   border: var(--c-line) solid var(--c-hair); box-shadow: inset 0 1px 0 var(--c-emboss-lo), 0 1px 0 var(--c-emboss-hi);
 }
 html.ui-instrument .c-ep-rule { stroke: var(--c-hair-2); stroke-width: 1; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
