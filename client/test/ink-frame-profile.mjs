@@ -12,7 +12,7 @@ import { chromium } from '@playwright/test';
 
 const clientRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STROKES = Number(process.env.STROKES || 120), PTS = Number(process.env.PTS || 80);
-const server = await createServer({ root: clientRoot, configFile: false, plugins: [react()], logLevel: 'silent', server: { host: '127.0.0.1', port: 0 } });
+const server = await createServer({ root: clientRoot, configFile: false, plugins: [react()], define: { __PRI_FEATURE_INSTRUMENT__: 'true' }, logLevel: 'silent', server: { host: '127.0.0.1', port: 0 } });
 await server.listen();
 const url = `http://127.0.0.1:${server.httpServer.address().port}/test/fixtures/ink-canvas-loss.html?height=700&width=1000`;
 const browser = await chromium.launch();
