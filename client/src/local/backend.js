@@ -65,6 +65,8 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
+import { buildPilotSummary } from './pilotSummary.js';
 import { withMutationLock } from './mutationLock.js';
 import { serveAvoidingRepeat, chapterRetarget } from './retargetOnRepeat.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
@@ -5023,6 +5025,25 @@ const routes = {
       ratings: Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, { rating: v.rating, attempts: v.attempts, correct: v.correct, last_at: v.last_at, traps: trimTraps(v.traps || {}) }])),
       taskProgress: tps.map(tp => ({ taskId: tp.taskId, done: tp.done, correct: tp.correct, finished: !!tp.finishedAt }))
     };
+  },
+
+  // A study programme's anonymous summary (local/pilotSummary.js). Read-only:
+  // it reads this profile's attempt and activity rows and writes nothing. A
+  // protected profile must be open (requireProfile), as for every other read.
+  'POST /data/pilot-summary': async (body) => {
+    if (!featureEnabled('pilotSummary')) {
+      throw Object.assign(new Error('The study programme summary is not available in this build.'), { status: 404, code: 'FEATURE_DISABLED' });
+    }
+    const p = await requireProfile();
+    const tz = timezoneOf(p);
+    return buildPilotSummary({
+      request: body || {},
+      attempts: await byIndex('attempts', 'pid', p.id),
+      activity: await byIndex('activity', 'pid', p.id),
+      dayOf: ms => dayKey(ms, tz),
+      now: Date.now(),
+      release: currentReleaseIdentity()
+    });
   },
 
   'POST /classes/:id/import-progress': async (body, params) => {

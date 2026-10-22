@@ -310,6 +310,13 @@ const BODY_RULES = [
     if (body.profile !== undefined && !plainObject(body.profile)) throw apiError('profile must be an object.', 400, 'INVALID_FIELD');
     if (body.stores !== undefined && !plainObject(body.stores)) throw apiError('stores must be an object.', 400, 'INVALID_FIELD');
   }],
+  [/^POST \/data\/pilot-summary$/, body => {
+    requireObject(body, 'POST /data/pilot-summary');
+    for (const key of ['participant', 'pilot', 'from', 'to']) optionalString(body, key, 40);
+    for (const key of ['baseline', 'post']) {
+      if (body[key] !== undefined && body[key] !== null && body[key] !== '') optionalNumber(body, key);
+    }
+  }],
   [/^POST \/tasks\/import-pack$/, body => {
     requireObject(body, 'POST /tasks/import-pack'); optionalString(body, 'format', 80);
     if (body.task !== undefined && !plainObject(body.task)) throw apiError('task must be an object.', 400, 'INVALID_FIELD');

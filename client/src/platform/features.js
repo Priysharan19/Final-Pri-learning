@@ -26,6 +26,10 @@
 //                             chapter Index and the command bar. ON in staging,
 //                             OFF in production until the owner flips it
 //                             after the v1.0 App Store review.
+//   PRI_FEATURE_PILOT_SUMMARY=1
+//                             the study-programme summary file in Settings
+//                             (#141): anonymous totals the student saves and
+//                             hands over themselves
 //   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
 //                             (V1 is India-only; existing Australian profiles
 //                             keep working either way)
@@ -44,7 +48,7 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PILOT_SUMMARY__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
@@ -55,7 +59,11 @@ const BUILT = {
   // PRI_FEATURE_INSTRUMENT=1 — the v1.1 interface. Unlike the others it is OFF
   // in the Node suites (no build constant), so they keep testing the interface
   // production ships; the instrument tours build with it on.
-  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : false
+  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : false,
+  // PRI_FEATURE_PILOT_SUMMARY=1 — a study programme's anonymous summary file
+  // in Settings (#141, local/pilotSummary.js). OFF in a production build until
+  // a programme that uses it starts.
+  pilotSummary: typeof __PRI_FEATURE_PILOT_SUMMARY__ === 'boolean' ? __PRI_FEATURE_PILOT_SUMMARY__ : null
 };
 
 const productionBuild = () => {

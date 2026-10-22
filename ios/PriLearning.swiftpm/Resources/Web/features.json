@@ -4,5 +4,6 @@
   "australia": false,
   "extendedTracks": false,
   "examHandwriting": false,
-  "instrument": false
+  "instrument": false,
+  "pilotSummary": false
 }

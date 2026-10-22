@@ -2381,6 +2381,14 @@ async function run() {
     eq('the progress file names the student', progress.student.name, 'Ada Lovelace');
     ok('the progress file carries ratings', Object.keys(progress.ratings).length >= 1, `${Object.keys(progress.ratings).length} ratings`);
     ok('the progress file carries totals', progress.totals.attempts >= 1, show(progress.totals));
+    // A study programme's anonymous summary (#141; client/test/pilot-summary-check.mjs
+    // holds its own suite) over the past year quotes the progress file's totals.
+    // The period ends two UTC days ahead so it holds "today" in any timezone.
+    const isoDay = ms => new Date(ms).toISOString().slice(0, 10);
+    const pilot = await GATED_POST('/data/pilot-summary', { participant: 'S001', from: isoDay(Date.now() - 360 * 86400000), to: isoDay(Date.now() + 2 * 86400000) });
+    eq('the pilot summary counts what the progress file counts', [pilot.questionsAttempted, pilot.correctAttempts, pilot.repeatAttempts],
+      [progress.totals.attempts, progress.totals.correct, progress.totals.repeats]);
+    ok('the pilot summary carries no name', !JSON.stringify(pilot).includes('Ada'), show(pilot));
 
     await POST('/profiles/select', { id: teacher.id });
     const otherClass = (await POST('/classes', { name: 'Imports' })).class;

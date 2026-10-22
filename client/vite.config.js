@@ -423,9 +423,10 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 //   "Write by hand"). Off: a paper offers Type only, so no path can leave
 //   unread handwriting on a paper. On: the frozen-page / pending / Retry
 //   checking flow of server/platform/exams.js applies.
+//   PILOT_SUMMARY — the study-programme summary file in Settings (#141).
 // INSTRUMENT (v1.1 interface) is opt-in everywhere, the dev server included,
 // so the interface production ships stays the one developers see by default.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT', 'PILOT_SUMMARY']);
 const OPT_IN_FLAGS = new Set(['INSTRUMENT']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
@@ -439,7 +440,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
-    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument)
+    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
+    __PRI_FEATURE_PILOT_SUMMARY__: JSON.stringify(states.pilotSummary)
   };
 }
 
