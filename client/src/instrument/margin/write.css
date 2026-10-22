@@ -6,7 +6,7 @@
 [data-wc-row] .in-read-m { font-family: var(--c-text); }
 .ink-verdict-layer .ink-verdict, .ink-line-verdict:has(.wc-plane) > svg:first-child { display: none; }
 .wc-plane { position: relative; display: grid; transform: translateZ(36px); }
-.wc-stamp { filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
+.wc-stamp { overflow: visible; filter: drop-shadow(0 1px 0 var(--c-emboss-hi)) drop-shadow(0 -1px 0 var(--c-emboss-lo)); }
 .wc-ring { position: absolute; inset: -3px; border: var(--c-line) solid var(--c-ink-3); border-radius: 50%; opacity: 0; }
 [data-wc-first-error] { border-bottom-color: var(--c-copper) !important; transform-origin: 0; }
 .wc-go [data-wc-row] :is(.in-read-m, .ink-line-math) { animation: wc-row .26s cubic-bezier(.2,.8,.2,1) var(--wc-d) both; }
