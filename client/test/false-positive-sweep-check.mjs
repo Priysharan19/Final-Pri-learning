@@ -128,7 +128,23 @@ function numericProbes(q, a) {
     const u = wrongUnit(q.answerSuffix);
     if (u) out.push({ input: `${fmt(v)} ${u}`, why: `wrong unit ${u} (asked ${String(q.answerSuffix).trim()})`, unit: true });
   }
+  // The word "percent" is a sign too, wherever it stands: 100 times the key
+  // with the word and a unit, braces or a second sign is never the key (#670).
+  // (Off a percentage question a key in −1…1 may be written as a percentage —
+  // 100% is 1, 44% is 0.44 — so only the doubled sign is probed there.)
+  const asksPercent = a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '');
+  if (v !== 0) {
+    const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`] : [`${fmt(v * 100)} percent %`];
+    for (const input of spellings) out.push({ input, why: 'a hundred times the key, with the word percent' });
+  }
   if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  // On a percentage question a typed % is the answer's unit: 100 times the key
+  // with the sign is 100 times too big, never the key read as ÷100.
+  if ((a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) {
+    out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' },
+      { input: `(${fmt(v * 100)}%)`, why: 'a hundred times the percentage, bracketed with the sign' }, { input: `${fmt(v * 100)}%%`, why: 'a hundred times the percentage, two signs' },
+      { input: `${fmt(v * 100)}% + 0`, why: 'a hundred times the percentage, the sign used as arithmetic' });
+  }
   return out;
 }
 
@@ -389,6 +405,83 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const ix = w => methodMarks({ meta: { kind: 'expression', canonical: 'x^1' }, working: w, marks: 2, prompt: 'Simplify $x^{6} \\div x^{5}$.' })?.awarded || 0;
   expect('method: x = x earns nothing on x^6 ÷ x^5', ix('0 = 0\n1 = 1\nx = x') === 0);
   expect('method: a genuine step still earns on x^6 ÷ x^5', ix('x^6/x^5 = x^(6-5)\nx^(6-5) = x') >= 1);
+  // (e) On a percentage question a typed % is the unit (P0, owner review of #667's batch 2):
+  // "6500%" was read as 6500 ÷ 100 and marked right for 65.
+  const own = { answerType: 'numeric', prompt: 'What is the least possible percentage of households that own all three?', answerSuffix: '%', answer: { value: 65 } };
+  for (const input of ['6500%', '6500 %', '13/20%', '0.65%', '0.65', '6500 percent']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  for (const input of ['65', '65%', '65 %', '65 percent', '65 per cent']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  const bySuffix = { answerType: 'numeric', prompt: 'Find the combined mean mark.', answerSuffix: '%', answer: { value: 66.3 } };
+  expect('percent: a % beside the box asks for a percentage, so 66.3% is 66.3', verdict(bySuffix, '66.3%').correct);
+  expect('percent: and 6630% is not', !verdict(bySuffix, '6630%').correct);
+  // The sign anywhere but once at the end is arithmetic, not the unit (#670 review).
+  for (const input of ['(6500%)', '6500%%', '6500% + 0', '6500%·1', 'percentage = (6500%)']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  expect('percent: "(65%)" is 65 %', verdict(own, '(65%)').correct);
+  const cv = { answerType: 'numeric', prompt: 'Find its coefficient of variation, as a percentage.', answerSuffix: '%', answer: { value: 20 / 3, simplestFraction: { n: 20, d: 3 }, requireFraction: false } };
+  for (const input of ['20/3%', '(20/3)%', '6 2/3%']) expect(`percent: "${input}" is 20/3 %`, verdict(cv, input).correct);
+  expect('percent: "2000/3%" is not 20/3 %', !verdict(cv, '2000/3%').correct);
+  const asSymbol = { answerType: 'numeric', prompt: 'Express 13/20 as a %.', answer: { value: 65 } };
+  expect('percent: "as a %" asks for a percentage: 65% accepted', verdict(asSymbol, '65%').correct);
+  expect('percent: and 6500% refused', !verdict(asSymbol, '6500%').correct);
+  const areaPct = { answerType: 'numeric', prompt: 'Find the area.', answer: { value: 72 } };
+  for (const input of ['7200%', '7200 percent']) expect(`percent: "${input}" is a wrong unit for an area of 72`, !verdict(areaPct, input).correct);
+  const accurate = { answerType: 'numeric', prompt: 'A test is 95 percent accurate. Find the probability that it gives a correct result twice.', answer: { value: 0.44 } };
+  expect('percent: a "percent" in the data does not make the question ask for one: 44% is 0.44', verdict(accurate, '44%').correct);
+  expect('percent: and 0.44% is not', !verdict(accurate, '0.44%').correct);
+  const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
+  expect('percent: on a question not asking for a percentage, 44% is still 0.44', verdict(prob, '44%').correct);
+  // (f) A label is read off only when it names the asked quantity.
+  const b2 = { answerType: 'numeric', prompt: 'Find $b^2$.', answer: { value: 50 } };
+  for (const input of ['b^2 = 50', 'b² = 50', 'B^2=50']) expect(`label: "${input}" names b², accepted`, verdict(b2, input).correct);
+  for (const input of ['b = 50', 'a^2 = 50']) expect(`label: "${input}" is not b² = 50`, !verdict(b2, input).correct);
+  // Legacy, undecided: a one-letter label on an unrelated letter the question
+  // neither asks for nor gives is still read off as it always was.
+  expect('label (legacy): "c = 50" on a question that never mentions c is still read off', verdict(b2, 'c = 50').correct);
+  const tri = { answerType: 'numeric', prompt: 'In triangle ABC, $a = 7$ and $c = 9$. Find $b^2$.', answer: { value: 67 } };
+  expect('label: "c = 67" names the given c, refused', !verdict(tri, 'c = 67').correct);
+  expect('label: "b^2 = 67" accepted', verdict(tri, 'b^2 = 67').correct);
+  const henceB = { answerType: 'numeric', prompt: 'Find $b^2$ and hence $b$.', answer: { value: 5 } };
+  expect('label: "Find $b^2$ and hence $b$" asks for b too: "b = 5" accepted', verdict(henceB, 'b = 5').correct);
+  // "Solve 3x = -18": the equation does not GIVE x; "x = -6" is the answer (#670 final review).
+  const solve = { answerType: 'numeric', prompt: 'Solve $3x = -18$.', answer: { value: -6 } };
+  expect('label: "x = -6" answers "Solve 3x = -18"', verdict(solve, 'x = -6').correct);
+  const evalAt = { answerType: 'numeric', prompt: 'Evaluate $4x + 9$ when $x = 7$.', answer: { value: 37 } };
+  expect('label: "x = 37" names the given x, refused', !verdict(evalAt, 'x = 37').correct);
+  for (const [id, d] of [['c7-finding-unknown-current', 2], ['c8-linear-equations-both-sides', 2], ['y7-equations', 1], ['c8-rational-numbers-foundations', 2]]) {
+    if (!GENERATORS[id]) continue;
+    for (let i = 1; i <= 12; i++) {
+      const q = generateQuestion(id, d, i * 7919);
+      if (q.answerType !== 'numeric' || !/\bsolve\b/i.test(q.prompt)) continue;
+      const letters = (String(q.prompt).match(/\$[^$]*\$/g) || []).join(' ').match(/(?<![A-Za-z\\])[a-z](?![A-Za-z])/g) || [];
+      const unknown = letters.sort((x, y) => letters.filter(l => l === y).length - letters.filter(l => l === x).length)[0];
+      if (unknown) expect(`label: "${unknown} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${unknown} = ${fmt(q.answer.value)}`).correct);
+    }
+  }
+  for (const input of ['65%.', '{65%}']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  const bold = { answerType: 'numeric', prompt: 'Find the **median** of the data.', answer: { value: 6 } };
+  expect('label: bold markup does not hide the asked noun: "median = 6" accepted', verdict(bold, 'median = 6').correct);
+  expect('label: "Answer = 6" accepted', verdict(bold, 'Answer = 6').correct);
+  const pq = { answerType: 'numeric', prompt: 'Find $PQ^2$.', answer: { value: 87.2, simplestFraction: { n: 436, d: 5 }, requireFraction: false } };
+  expect('label: "PQ² = 436/5" accepted', verdict(pq, 'PQ² = 436/5').correct);
+  expect('label: "AB^2 = 436/5" (another length) refused', !verdict(pq, 'AB^2 = 436/5').correct);
+  const area = { answerType: 'numeric', prompt: 'Find the area of triangle PQR.', answer: { value: 72 } };
+  expect('label: "Area = 72" accepted', verdict(area, 'Area = 72').correct);
+  expect('label: "Perimeter = 72" refused', !verdict(area, 'Perimeter = 72').correct);
+  // A noun label must be the whole asked phrase or its trailing part (#670 review).
+  const md = { answerType: 'numeric', prompt: 'Find the mean deviation about the mean of the data.', answer: { value: 2.4 } };
+  expect('label: "Mean = 2.4" is not the mean deviation', !verdict(md, 'Mean = 2.4').correct);
+  expect('label: "mean deviation = 2.4" accepted', verdict(md, 'mean deviation = 2.4').correct);
+  const root = { answerType: 'numeric', prompt: 'Find the cube root of 91125.', answer: { value: 45 } };
+  expect('label: "Cube = 45" is not the cube root', !verdict(root, 'Cube = 45').correct);
+  expect('label: "cube root = 45" accepted', verdict(root, 'cube root = 45').correct);
+  const hence = { answerType: 'numeric', prompt: 'Find the area of triangle ABC, and hence find the height from A.', answer: { value: 8 } };
+  expect('label: only the last ask counts: "area = 8" refused', !verdict(hence, 'area = 8').correct);
+  expect('label: "height = 8" accepted', verdict(hence, 'height = 8').correct);
+  const sum = { answerType: 'numeric', prompt: 'Find $a + b$.', answer: { value: 7 } };
+  expect('label: "a = 7" claims a = 7, refused for a + b', !verdict(sum, 'a = 7').correct);
+  expect('label: "a + b = 7" accepted', verdict(sum, 'a + b = 7').correct);
+  const red = { answerType: 'numeric', prompt: 'Find $P(\\text{red})$ as a fraction in simplest form.', answer: { value: 0.4, simplestFraction: { n: 2, d: 5 } } };
+  expect('label: "P(red) = 2/5" accepted', verdict(red, 'P(red) = 2/5').correct);
+  expect('label: "P = 2/5" still accepted', verdict(red, 'P = 2/5').correct);
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────

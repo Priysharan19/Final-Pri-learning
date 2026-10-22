@@ -175,9 +175,141 @@ function namedPrecisionBand(question) {
   return places == null ? null : 0.5 * 10 ** -places * (1 + 1e-9);
 }
 
+// ── A label the student wrote before the answer ─────────────────────────────
+// "b^2 = 50", "PQ² = 436/5", "Area = 24", "sum = -146/7": a student names what
+// they found. A label is read off only when it names what the question asks
+// for — the quantity written right after "Find …" (or "Evaluate", "What is",
+// "the value of"), or the noun that sentence asks for ("Find the area …").
+// A label naming something else is never stripped, and a one-letter label
+// that names a different quantity built on that letter — "b = 5" when the
+// question asks for b² — is a different claim, refused with a reason.
+const ASK_MATH = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/gi;
+const ASK_VERB = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\b/gi;
+const ASK_NOUN = /\b(?:find|evaluate|calculate|compute|determine|what is|give)\s+((?:[a-z]+\s+){0,4}[a-z]+)/gi;
+// Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
+const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
+const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
+const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|taken|obtained|formed|made|attained|reached)$/;
+const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
+/** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
+function quantityKey(text) {
+  return String(text)
+    .replace(/\$/g, '')
+    .replace(/\\(?:left|right|,|;|!|\s)/g, '')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, '$1')
+    .replace(/\\ge(?:q)?\b/g, '≥').replace(/\\le(?:q)?\b/g, '≤').replace(/>=/g, '≥').replace(/<=/g, '≤')
+    .replace(/\\(sin|cos|tan|cot|sec|cosec|csc|log|ln|mid)\b/g, (_, f) => (f === 'mid' ? '|' : f))
+    .replace(/\\(alpha|beta|gamma|delta|theta|lambda|mu|pi|omega|Delta)\b/g, (_, g) => GREEK[g])
+    .replace(/²/g, '^2').replace(/³/g, '^3')
+    .replace(/[{}\s]/g, '')
+    .replace(/\*\*/g, '^')
+    .toLowerCase();
+}
+/** What the question asks for: written quantities and asked-for nouns. */
+function askedFor(question) {
+  const prompt = String(question?.prompt ?? '');
+  // Only the last ask counts: in "Find the area …, and hence find the height"
+  // the answer is the height, so "area = 8" names the wrong thing.
+  const verbs = [...prompt.matchAll(ASK_VERB)];
+  const from = verbs.length ? verbs[verbs.length - 1].index : 0;
+  const tail = prompt.slice(from).replace(/\*\*|__/g, '');
+  const math = [];
+  for (const m of tail.matchAll(ASK_MATH)) {
+    math.push(m[1]);
+    // "Find $b^2$ and hence $b$", "find $x$, $y$ and $x + y$": each $…$ joined on is asked too.
+    let rest = tail.slice(m.index + m[0].length);
+    for (let next; (next = rest.match(/^\s*(?:,|and(?:\s+hence)?|hence|then)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/i)); rest = rest.slice(next[0].length)) math.push(next[1]);
+  }
+  for (let i = 0; i < math.length; i++) math[i] = quantityKey(math[i]);
+  math.splice(0, math.length, ...math.filter(k => k && !/[=<>]/.test(k)));
+  // The asked noun phrase, without its leading article and modifiers: "the
+  // least possible mean deviation about the mean" asks for "mean deviation".
+  // A label must be the whole phrase or a trailing part of it ("deviation",
+  // "interest rate", "rate") — never a leading word, which names something
+  // else: "mean" is not the mean deviation, "cube" is not the cube root.
+  const nouns = [];
+  for (const m of tail.matchAll(ASK_NOUN)) {
+    const words = [], lead = [];
+    for (const word of m[1].toLowerCase().split(/\s+/)) {
+      if (PHRASE_ENDS.test(word)) break;
+      if (!words.length && NOT_A_NAME.has(word)) {
+        // "the total cost": "total" on its own names the asked total too.
+        if (QUANTITY_MODIFIERS.has(word)) { nouns.push(word); lead.push(word); }
+        continue;
+      }
+      words.push(word);
+    }
+    for (let i = 0; i < words.length; i++) if (!NOT_A_NAME.has(words[i])) nouns.push(words.slice(i).join(''));
+    // …and with its modifiers kept: "least value" for "the least value of f".
+    for (let j = 1; lead.length && j <= words.length; j++) nouns.push([...lead, ...words.slice(0, j)].join(''));
+  }
+  return { math, nouns };
+}
+const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;
+/**
+ * Read a label off the answer when it names what the question asks for.
+ * Returns { input } with the label removed (or unchanged when there is none or
+ * it is not ours to judge), or { refuse } with a reason.
+ */
+export function readAnswerLabel(question, raw) {
+  if (typeof raw !== 'string') return { input: raw };
+  const m = raw.match(LABELLED);
+  if (!m) return { input: raw };
+  const label = m[1].trim();
+  // Only a name is a label: "2 + 3 = 5" is working, not a label.
+  if (!/[A-Za-zα-ωΔθ]/.test(label)) return { input: raw };
+  const { math, nouns } = askedFor(question);
+  const asked = math.length + nouns.length;
+  const key = quantityKey(label);
+  // "Answer = 5", "Ans = 5": the label is the answer itself.
+  if (/^(?:final\s+)?(?:answer|ans|result)$/i.test(label)) return { input: m[2] };
+  if (/^[a-zθ]$/i.test(label)) {
+    // A letter the question GIVES a value ("In triangle ABC, a = 7, c = 9 …
+    // Find b²") names that given, not the answer, unless the letter itself is asked.
+    // Only a letter standing alone and set equal to a plain number is given
+    // ("a = 7,", "when x = 3"); "3x = -18" or "4^x = 281" is the equation to
+    // solve, and on a "Solve …" question the letter is the unknown.
+    const promptText = String(question?.prompt ?? '').replace(/\$/g, ' ');
+    const given = !/\bsolve\b/i.test(promptText)
+      && new RegExp(`(^|[\\s,(;:])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?=[\\s,.;:)]|$)`).test(promptText);
+    if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
+    // A one-letter label is read off as it always was — unless the question
+    // asks, and only asks, for a plainly different quantity on that letter: a
+    // power or multiple of it (b², 2b) or a sum or difference of single letters
+    // that includes it (a + b, p + q + r + s). "P = 2/5" for P(red), "E = 1.05"
+    // for E(X) or "f = 7" for f(−1) stay readable as before.
+    const letter = key;
+    const plainlyOther = q => q !== letter && (
+      new RegExp(`^\\d*${letter}(\\^\\d+)?$`).test(q) ||
+      (/^[a-z](?:[+-][a-z])+$/.test(q) && q.split(/[+-]/).includes(letter)));
+    const built = math.filter(plainlyOther);
+    if (built.length && !math.includes(letter)) {
+      return { refuse: `The question asks for $${built[0]}$, but this answer is labelled ${label}.` };
+    }
+    return { input: raw };
+  }
+  // "Area of PQR = 72": the label's own head phrase, up to "of", names the quantity.
+  const headWords = [];
+  for (const w of label.split(/\s+/)) { if (PHRASE_ENDS.test(w.toLowerCase())) break; headWords.push(w); }
+  const head = quantityKey(headWords.join(' '));
+  if (math.includes(key) || nouns.includes(key) || (head && head !== key && nouns.includes(head))) return { input: m[2], asked };
+  return { input: raw, asked };
+}
+
 function percentAnswerWanted(question, ans) {
   if (ans && typeof ans.percent === 'boolean') return ans.percent;
-  return ASKS_PERCENT.test(String(question?.prompt ?? ''));
+  // A "%" beside the answer box asks for a percentage whatever the prompt says.
+  if (/%/.test(String(question?.answerSuffix ?? ''))) return true;
+  // The word counts only where the question asks for its answer: "a test that
+  // is 95 percent accurate … find the probability" asks for a probability.
+  const asking = askingSentences(String(question?.prompt ?? ''));
+  return ASKS_PERCENT.test(asking) || /\bas\s+an?\s+\\?%/i.test(asking);
+}
+/** The sentences of a prompt that ask for the answer (the last one when none says so). */
+function askingSentences(prompt) {
+  const sentences = prompt.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const asking = sentences.filter(x => /\?\s*$/.test(x) || /\b(?:find|what|express|calculate|give|how|state|determine|work out|evaluate|compute|write)\b/i.test(x));
+  return (asking.length ? asking : sentences.slice(-1)).join(' ');
 }
 
 // One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
@@ -442,6 +574,40 @@ function checkAnswerWithinBudget(question, rawInput) {
       }
 
       case 'numeric': {
+        // "b^2 = 50": a label that names the asked quantity is read off; one that
+        // names a different quantity on the same letter is refused.
+        const labelled = readAnswerLabel(question, rawInput);
+        if (labelled.refuse) return { correct: false, feedback: labelled.refuse };
+        rawInput = labelled.input;
+        // A percentage is written once, at the end: "65%", "65 percent", "(65%)".
+        // Any other % — "(6500%)" read as 65, "6500%%", "6500% + 0" — is a
+        // percentage sign used as arithmetic, never the answer's unit (P0).
+        if (typeof rawInput === 'string') {
+          // Every "percent"/"per cent" is a sign wherever it stands, so the word
+          // cannot slip a ÷100 past this guard ("6500 percent cm"); a sentence's
+          // full stop and one outer pair of brackets or braces are not part of it.
+          let pct = rawInput.trim().replace(/\s*\bper\s?cent\b/gi, '%').replace(/[％٪]/g, '%')
+            .replace(/(?<!\.)\.\s*$/, '').trim();
+          const signs = (pct.match(/%/g) || []).length;
+          if (signs) {
+            const outer = pct.match(/^\((.*)\)$/s) || pct.match(/^\{(.*)\}$/s) || pct.match(/^\[(.*)\]$/s);
+            if (outer && !/[(){}[\]]/.test(outer[1])) pct = outer[1].trim();
+            if (signs !== 1 || !/%\s*$/.test(pct)) {
+              return { correct: false, feedback: 'Write a percentage once, at the end — like 65%.' };
+            }
+            if (percentAnswerWanted(question, ans)) {
+              // The sign is the answer's unit: what stands before it is the
+              // percentage, evaluated whole — "20/3%" is 20/3 per cent.
+              rawInput = pct.replace(/\s*%\s*$/, '');
+            } else if (!(Math.abs(Number(ans.value)) <= 1)) {
+              // A % beside an answer outside 0–1 (an area, a count, money) on a
+              // question that does not ask for a percentage is a wrong unit.
+              return { correct: false, feedback: 'This question does not ask for a percentage.' };
+            } else {
+              rawInput = pct;               // 44% is 0.44 on a probability question
+            }
+          }
+        }
         // A unit the student wrote that contradicts the question's unit is a
         // wrong answer, never stripped and ignored: 12 cm is not 12 m.
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
@@ -463,6 +629,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         const { meta } = parsed;
         let value = parsed.value;
         if (angleUnit && angleRead && angleRead !== angleUnit) value = convertAngle(value, angleRead, angleUnit);
+        // (A % on a question that asks for a percentage was removed above as the
+        // answer's unit, so "6500%" is 6500 there, never 65; a bare 0.65 is 0.65%.)
         // "975 paise" on a question priced in rupees is ₹9.75: the word names a
         // hundredth of the rupee, so the value is divided. On a question that
         // asks in paise the word is the question's own unit and nothing moves.
@@ -530,16 +698,6 @@ function checkAnswerWithinBudget(question, rawInput) {
             }
             return { correct: true };
           }
-        }
-        // Percentage forgiveness: expected 25 (%) but student typed 0.25, or
-        // vice versa. A student who writes the % sign on a question that asked
-        // for a percentage has answered it, whether or not the author thought
-        // to set ans.percent — but the sign alone earns nothing: the value is
-        // still compared, and a bare 0.25 is not a second chance at 25.
-        // Only the sign earns the second reading: the box shows "%", so a bare
-        // 0.6 on a question asking for a percentage is 0.6%, not 60%.
-        if (!ok && meta.isPercent && percentAnswerWanted(question, ans)) {
-          if (numsClose(value * 100, target, tolUsed)) { ok = true; matched = value * 100; }
         }
         const exactTol = Math.max(1e-9, Math.abs(target) * 1e-9);
         if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
