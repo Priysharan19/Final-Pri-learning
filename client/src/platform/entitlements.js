@@ -11,7 +11,11 @@ export const ENTITLEMENTS = Object.freeze({
   PREMIUM_EXAMS: 'premium-exams',
   JEE_ADVANCED: 'jee-advanced-content',
   ADVANCED_ANALYTICS: 'advanced-analytics',
-  EXTRA_AI: 'additional-ai-usage'
+  EXTRA_AI: 'additional-ai-usage',
+  UNLIMITED_MARKING: 'unlimited-marking',
+  FULL_NOTEBOOK: 'full-notebook',
+  PARENT_REPORT: 'parent-report',
+  TARGET_PLAN: 'target-plan'
 });
 
 // Defined in the engine folder so the server's image can import it too.

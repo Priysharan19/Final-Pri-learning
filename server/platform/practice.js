@@ -38,11 +38,16 @@ import {
 import { authoredRegion, formatRegion, formatMatrix, formatVector, formatComplex } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
-// The free plan's daily cap is decided here, per account, where a creditable
-// question is issued (#537): practiceAllowance.js reads the server's own
-// entitlement record and its own count, inside the issue transaction.
-import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
+// The free plan's daily allowance is examiner MARKING, decided here, per
+// account, where an answer is marked (#537, re-scoped by the paywall split):
+// practiceAllowance.js reads the server's own entitlement record and its own
+// count, before the marker runs and again inside the commit transaction.
+// Practice itself is unlimited: issuing a question is never refused for plan.
+import { markingAllowanceVerdict, practiceModeCounted, recordMarkedScript, refuseMarkingCap } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
+import { serverEntitlementCapabilities } from './entitlements.js';
+import { buildNotebook, isMistake } from '../../client/src/engine/mistakeNotebook.js';
+import { FREE_NOTEBOOK_PREVIEW } from '../../client/src/engine/practiceAllowance.js';
 import { verifyReadReceipt } from './readReceipt.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -167,6 +172,20 @@ function acceptableWorking(steps) {
 // copy of that content the account holds or is later issued, until the content
 // resolves. `triesLeft: 1` on an issue response says so, so the card is honest
 // about the copy it shows; a copy with both tries in hand says nothing.
+
+/**
+ * The mistake notebook's evidence from a step report: the index of the first
+ * broken line, the student's own text of that line, and the examiner's note on
+ * it. Only what the deterministic step check reported; empty when it found no
+ * break (a wrong final answer under sound working, or no working at all).
+ */
+export function notebookEvidence(stepReport) {
+  const lines = Array.isArray(stepReport?.lines) ? stepReport.lines : [];
+  const index = Number.isInteger(stepReport?.firstBreak) ? stepReport.firstBreak : -1;
+  const line = index >= 0 ? lines[index] : null;
+  if (!line || line.status !== 'break') return {};
+  return { firstError: { line: index + 1, text: String(line.text || '').slice(0, 400), note: String(line.note || '').slice(0, 600) } };
+}
 
 function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
@@ -498,16 +517,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const payload = JSON.stringify(q);
     const id = randomUUID();
     const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
-    // The free plan's daily cap counts the Practice surface's own modes; Rush,
-    // Match and the placement check are "everything else", unlimited.
-    const counted = practiceModeCounted(practiceMode);
     const response = await db.transaction(async () => {
-      // Replays come first: a question already issued is handed back whatever
-      // today's count says. Then the account's standing against the free daily
-      // cap (#537), read under the same lock that serialises its issues, so two
-      // devices on one account cannot both be the twentieth question — and
-      // before anything is written, so a capped bind never burns a prepared
-      // token and a capped issue escrows nothing.
+      // Replays come first: a question already issued is handed back. Practice
+      // is unlimited on every plan, so nothing here counts against a cap.
       if (preparedNonce) {
         // One account, once — decided in the same transaction as the issue it
         // allows, so a failed issue never burns the token and a retry by the
@@ -523,10 +535,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           return JSON.parse(before.response_json);
         }
       }
-      if (counted) {
-        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
-        if (!allowance.allowed) return { capped: allowance };
-      }
       if (preparedNonce) {
         const claim = await db.run("INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1) ON CONFLICT(bucket) DO NOTHING",
           ['practice-prepared-claim:' + preparedNonce, now]);
@@ -538,13 +546,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",
         [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, Math.max(preparedExpiry, now) + PREPARED_TTL]);
-      // Counted only now: this question was really issued, in this transaction.
-      if (counted) await recordPracticeIssue(db, { accountId, now });
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
     if (response.preparedUsed) return reject(res, 409, 'PRACTICE_PREPARED_USED', 'This prepared question has already been taken up.');
-    if (response.capped) return refusePracticeCap(res, response.capped, now);
     // The account that owns this issue, so a device holding several profiles
     // can refuse a question issued under another profile's session.
     return res.status(201).json({ ...response, accountId: String(accountId) });
@@ -571,18 +576,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     q._repeat = true;
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    // A repeat is a practice question the account is issued, so it counts
-    // toward the free day exactly as a retry from History does on the device
-    // (#537) — decided and counted under the account's issue lock.
-    const outcome = await db.transaction(async () => {
-      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
-      if (!allowance.allowed) return { capped: allowance };
+    // A repeat is unlimited practice; marking it is counted at submit.
+    await db.transaction(async () => {
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
-      await recordPracticeIssue(db, { accountId, now });
-      return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
-    if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
   });
 
@@ -888,6 +886,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
     const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+    // A script is examiner marking: every answer issued in a Practice-surface
+    // mode, and — whatever mode the question was issued in — any answer that
+    // brings working, ink or a photo for the examiner to read. A Rush, Match or
+    // placement answer typed alone is a drill and stays uncounted; the same
+    // question sent with working is the paid feature and is counted.
+    const scriptCounted = q => practiceModeCounted(q._practiceMode || 'practice') || mode !== 'typed' || working.trim() !== '';
 
     // ── Mark first, with no transaction open; then commit under the lock ────
     // The marker runs in a worker thread (markerPool.js) and is awaited, so it
@@ -991,6 +995,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // waits (markerPool.js MARKER_COOLDOWN). A committed receipt is replayed
       // above regardless: recovering a reply costs no marking.
       if (cooling) return sendMarkerCooldown(res, cooling);
+      // The free plan's marking allowance, forecast before anything is read or
+      // marked, so a refused script never costs a reading or a marker run. The
+      // commit below decides again under the lock.
+      if (scriptCounted(forecast.q)) {
+        const allowance = await markingAllowanceVerdict(db, { accountId, questionId: qid, now, env });
+        if (!allowance.allowed) return refuseMarkingCap(res, allowance, now);
+      }
 
       // ── 1b. Read the picture, when the submission carries one ───────────
       // After the replay above, so recovering a committed reply never reads
@@ -1097,6 +1108,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (state.status || state.response) return state;
         if (state.sealedJson !== forecast.sealedJson) return { again: true };
         const { q, priorTry, tries, spent, hintLevel } = state;
+        // The authoritative allowance decision, under the account's sync lock:
+        // two devices racing for the last free script cannot both be marked.
+        const countsToward = scriptCounted(q);
+        const allowance = countsToward ? await markingAllowanceVerdict(db, { accountId, questionId: qid, now, env }) : null;
+        if (allowance && !allowance.allowed) return { capped: allowance };
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
       // correctness from a withheld canonical answer.
@@ -1236,6 +1252,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES '
         + records.map(() => '(?,?,?,?,?,?,?)').join(','),
       records.flatMap(([scope, key, json, requestDigest]) => [accountId, scope, key, json, requestDigest, now, now + MAX_AGE]));
+      // One marked script of the free day, counted with the mark it counts. An
+      // unreadable entry spent no try and is not a script.
+      if (allowance && !allowance.unlimited && !allowance.counted && !invalid) await recordMarkedScript(db, { accountId, questionId: qid, now, verdict: allowance });
       if (resolved) {
         await markContentSeen(db, accountId, q, now);
         if (!recordsProgress(q)) return { response };
@@ -1265,6 +1284,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             ...ladder, creditedMarks,
             ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
               ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),
+            // The mistake notebook's evidence for a wrong resolution: the
+            // student's own first broken line and the examiner's note on it,
+            // exactly as the deterministic step check reported them.
+            ...(!response.correct ? notebookEvidence(stepReport) : {}),
+            // A notebook retry names the mistake it retries, so a right answer
+            // here marks that mistake fixed (derived, never stored as a flag).
+            ...(typeof q._twinOf === 'string' ? { twinOf: q._twinOf } : {}),
             createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
@@ -1276,6 +1302,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       return { response };
       }, { accountScope: accountId, lock: syncLockKey(accountId) }));
       if (outcome.again) { evidenceForced = evidenceForced || outcome.needEvidence === true; continue; }
+      if (outcome.capped) return refuseMarkingCap(res, outcome.capped, now);
       if (outcome.status) return refuse(outcome);
       return res.status(200).json(outcome.response);
     }
@@ -1284,54 +1311,49 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return sendMarkerBusy(res);
   });
 
-  // ── The error notebook ──────────────────────────────────────────────────
-  // Wrong resolutions of THIS account's server-marked practice, filed under
-  // the misconception the deterministic engine diagnosed when it committed
-  // the mark (`misconception` on the graded-attempt event). A wrong answer the
-  // engine named no misconception for is not filed: nothing is inferred here.
-  // Each filed entry is a hypothesis about a slip, not a verdict on the
-  // student (docs/research/MISCONCEPTION_ERROR_ONTOLOGY_DIAGNOSTIC_EVIDENCE_V7.md §4).
-  const NOTEBOOK_SCAN = 1000;
-  const NOTEBOOK_GROUPS = 40;
-  const NOTEBOOK_ITEMS = 12;
-  const NOTEBOOK_MODES = new Set(['practice', 'review', 'task']);
+  // ── The mistake notebook ────────────────────────────────────────────────
+  // Every wrong resolution of THIS account's server-marked practice, with the
+  // first broken line and the examiner's note the deterministic engine
+  // reported, grouped by topic and misconception, fixed by a correct notebook
+  // retry, and scheduled for spaced review — all derived by the shared pure
+  // engine (engine/mistakeNotebook.js) from the graded-attempt events. The
+  // free plan sees the newest FREE_NOTEBOOK_PREVIEW mistakes; the rest are a
+  // count only and are never sent. Premium (`full-notebook`, the server's own
+  // entitlement record) sees all of them.
+  const NOTEBOOK_SCAN = 2000;
   const serverAttempts = async (accountId, limit) => (await db.all(
     "SELECT id,occurred_at,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' ORDER BY server_cursor DESC LIMIT ?",
     [accountId, limit])).map(row => { try { return { id: row.id, at: Number(row.occurred_at), ...JSON.parse(row.payload_json) }; } catch { return null; } }).filter(Boolean);
-  const filed = a => a.correct !== true && a.revealed !== true && typeof a.misconception === 'string' && a.misconception &&
-    NOTEBOOK_MODES.has(a.mode || 'practice') && typeof a.subtopic === 'string' && a.subtopic;
+  const notebookFor = async (accountId, now) => {
+    const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+    const full = serverEntitlementCapabilities(snapshot, now).includes('full-notebook');
+    const book = buildNotebook(await serverAttempts(accountId, NOTEBOOK_SCAN), { now, preview: full ? null : FREE_NOTEBOOK_PREVIEW });
+    return { full, book };
+  };
 
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const now = Date.now();
-    const groups = new Map();
-    for (const a of await serverAttempts(accountId, NOTEBOOK_SCAN)) {
-      if (!filed(a)) continue;
-      const g = groups.get(a.misconception) || (groups.size < NOTEBOOK_GROUPS ? groups.set(a.misconception, {
-        key: a.misconception, misconception: { id: a.misconception, nameKey: misconceptionById(a.misconception)?.name || null,
-          label: a.misconceptionLabel || null, source: a.misconceptionSource || null },
-        subtopics: [], count: 0, lastAt: 0, items: [] }).get(a.misconception) : null);
-      if (!g) continue;
-      g.count++;
-      g.lastAt = Math.max(g.lastAt, a.at);
-      if (!g.subtopics.includes(a.subtopic)) g.subtopics.push(a.subtopic);
-      if (g.items.length < NOTEBOOK_ITEMS) g.items.push({ id: a.id, questionId: a.questionId, subtopic: a.subtopic,
-        dotpoint: a.dotpoint || null, difficulty: Number(a.difficulty) || 2, answeredAt: a.at });
-    }
+    const { full, book } = await notebookFor(accountId, now);
     // The prompt of a resolved question is the student's own history; it is
     // read from this account's escrow and is gone once that has expired.
-    for (const g of groups.values()) {
-      for (const item of g.items) {
-        const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
-          [accountId, item.questionId, now]);
-        let q = null;
-        try { q = sealed ? JSON.parse(sealed.response_json) : null; } catch { q = null; }
-        item.prompt = q ? String(q.prompt || '') : null;
-        item.canTwin = !!q && !q.multipart && !q.custom;
-      }
+    for (const item of book.entries) {
+      const sealed = item.questionId ? await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
+        [accountId, item.questionId, now]) : null;
+      let q = null;
+      try { q = sealed ? JSON.parse(sealed.response_json) : null; } catch { q = null; }
+      item.prompt = q ? String(q.prompt || '') : null;
+      item.canTwin = !!q && !q.multipart && !q.custom;
+      if (item.misconception) item.misconception.nameKey = misconceptionById(item.misconception.id)?.name || null;
     }
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt) });
+    return res.status(200).json({
+      plan: full ? 'premium' : 'free', capability: 'full-notebook',
+      preview: full ? null : FREE_NOTEBOOK_PREVIEW,
+      total: book.total, shown: book.shown, hidden: book.hidden,
+      dueCount: book.dueCount, nextDueAt: book.nextDueAt,
+      groups: book.groups, at: now
+    });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same
@@ -1347,10 +1369,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     const accountId = req.platformSession.account_id;
     const now = Date.now();
-    const row = await db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='graded-attempt'", [accountId, attemptId]);
-    let attempt = null;
-    try { attempt = row ? JSON.parse(row.payload_json) : null; } catch { attempt = null; }
-    if (!attempt || !filed(attempt)) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    // Only an entry this account's notebook shows it may be retried: a free
+    // account's hidden entries are as unreachable here as in the listing.
+    const { book } = await notebookFor(accountId, now);
+    const entry = book.entries.find(e => e.id === attemptId);
+    if (!entry) {
+      const hidden = book.hidden > 0 && (await serverAttempts(accountId, NOTEBOOK_SCAN)).some(a => a.attemptId === attemptId && isMistake(a));
+      if (hidden) return res.status(402).json({ error: { code: 'PREMIUM_REQUIRED', capability: 'full-notebook', message: 'Older mistakes are part of the full notebook in Premium.' } });
+      return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    }
+    const attempt = { questionId: entry.questionId, misconception: entry.misconception?.id || null };
     const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, attempt.questionId, now]);
     if (!sealed) return reject(res, 410, 'NOTEBOOK_TWIN_EXPIRED', 'The original question is no longer held, so no twin can be drawn.');
     const original = JSON.parse(sealed.response_json);
@@ -1362,11 +1390,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
         dotpoint: typeof original.dotpoint === 'string' ? original.dotpoint : undefined,
         avoid: new Set([opaqueContentHash(original.contentHash)]),
-        trap: { owner: original.subtopic, key: attempt.misconception } });
+        ...(attempt.misconception ? { trap: { owner: original.subtopic, key: attempt.misconception } } : {}) });
     } catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
     const q = chosen.q;
     q._practiceMode = 'review';
     q._generator = generator;
+    // Sealed with the question: a correct answer to it marks this mistake fixed.
+    q._twinOf = attemptId;
     let repeat = chosen.repeat;
     if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
     const trySpent = !repeat && await contentTried(db, accountId, q, now);

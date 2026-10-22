@@ -1,37 +1,37 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · the free plan's daily practice cap, enforced where questions
-// are issued (#537)
+// Pri Learning · the free plan's daily MARKING allowance, enforced where a
+// practice answer is marked (#537, re-scoped by the notebook/paywall split)
 //
-// Since #418 every creditable question is issued by this server, so the cap on
-// the free plan — 20 practice questions a day — is decided here, per ACCOUNT,
-// from the server's own entitlement record (entitlement_snapshots, written only
-// by verified billing events and support grants). A modified client, a second
-// device or a cleared IndexedDB changes nothing: the device's counter is a
-// courtesy to the student (local/entitlementGate.js), not the limit. Premium's
-// `unlimited-practice` lifts it; nothing the device sends is read here.
+// Practice is unlimited on the free plan: every question is issued. What the
+// free plan rations is examiner marking — 5 marked scripts a day — decided
+// here, per ACCOUNT, from the server's own entitlement record
+// (entitlement_snapshots, written only by verified billing events and support
+// grants). A modified client, a second device or a cleared IndexedDB changes
+// nothing; nothing the device sends is read here. Premium's
+// `unlimited-marking` lifts it.
 //
 // THE DAY is the Indian calendar day — Asia/Kolkata, UTC+05:30, no daylight
-// saving — because the practice route serves only the India curriculum and the
-// device's own gate uses the same calendar for every India profile by default.
-// A fixed offset, not Intl: deterministic on every runtime, and the instant a
-// cap lifts is exactly local midnight, which is what the student is told.
+// saving. A fixed offset, not Intl: deterministic on every runtime, and the
+// instant the allowance lifts is exactly local midnight.
 //
-// THE COUNT is one row per account and day in idempotency_keys (scope
-// 'practice-daily', key the day), written in the SAME transaction as the
-// question it counts, under the account's issue lock. Only a question that is
-// actually issued is counted: a replayed issue (same Idempotency-Key, or the
-// same account re-binding a prepared question) returns the stored reply and
-// counts nothing; a refusal writes nothing and never burns a prepared token.
-// Rush, Match and the placement check are not counted, on either side: the
-// free plan's copy is "20 practice questions a day, and everything else
-// unlimited" (CAPPED_PRACTICE_MODES).
+// A SCRIPT is one question marked by the deterministic engine. The day's
+// count is one row per account and day in idempotency_keys (scope
+// 'marking-daily', key the day) holding the question ids marked that day,
+// written in the SAME transaction as the mark it counts, under the account's
+// sync lock. So:
+//   · the second try on a question already counted today is not counted again
+//     and is never refused;
+//   · a replayed submission returns its stored reply and counts nothing;
+//   · an unreadable entry (no try spent, nothing written) counts nothing;
+//   · a refusal is decided BEFORE the marker runs and writes nothing.
+// Rush, Match and the placement check are not counted (CAPPED_PRACTICE_MODES).
 // ─────────────────────────────────────────────────────────────────────────────
-import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
+import { CAPPED_PRACTICE_MODES, FREE_MARKING_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { asStore } from './store.js';
 
-export const PRACTICE_DAY_TIME_ZONE = FREE_PRACTICE_ALLOWANCE.timeZone;
-export const PRACTICE_DAILY_SCOPE = 'practice-daily';
+export const PRACTICE_DAY_TIME_ZONE = FREE_MARKING_ALLOWANCE.timeZone;
+export const MARKING_DAILY_SCOPE = 'marking-daily';
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 // A day's counter outlives its day by one more, so a student's "used today" can
@@ -62,68 +62,83 @@ function parse(raw) {
 
 /** Configuration mistakes production must not boot with (config.js). */
 export function practiceAllowanceConfigProblems(env = process.env) {
-  const free = parse(env.PRI_FREE_PRACTICE_PER_DAY);
-  return free.set && free.value === null ? ['PRI_FREE_PRACTICE_PER_DAY (a positive integer up to 100000)'] : [];
+  const free = parse(env.PRI_FREE_MARKED_PER_DAY);
+  return free.set && free.value === null ? ['PRI_FREE_MARKED_PER_DAY (a positive integer up to 100000)'] : [];
 }
 
-/** Capped questions a free account may be issued per day (deployment-tunable). */
-export function freePracticePerDay(env = process.env) {
-  return parse(env.PRI_FREE_PRACTICE_PER_DAY).value ?? FREE_PRACTICE_ALLOWANCE.perDay;
+/** Marked scripts a free account may have per day (deployment-tunable). */
+export function freeMarkedPerDay(env = process.env) {
+  return parse(env.PRI_FREE_MARKED_PER_DAY).value ?? FREE_MARKING_ALLOWANCE.scriptsPerDay;
 }
 
-/** Whether an issue in `mode` counts toward (and is refused by) the cap. */
+/** Whether marking an answer issued in `mode` counts toward (and is refused by) the allowance. */
 export const practiceModeCounted = mode => CAPPED_PRACTICE_MODES.includes(mode);
 
-function issuedOf(row) {
-  if (!row) return 0;
-  try { return Math.max(0, Math.floor(Number(JSON.parse(row.response_json).issued) || 0)); } catch { return 0; }
+function markedOf(row) {
+  if (!row) return [];
+  try {
+    const list = JSON.parse(row.response_json).marked;
+    return Array.isArray(list) ? list.filter(id => typeof id === 'string') : [];
+  } catch { return []; }
 }
 
 const COUNTER = 'SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?';
 
 /**
- * Read only: this account's standing against the cap at `now`. Decided from
- * the server's entitlement record and the server's own count. Call it inside
- * the issue transaction (account scope, under the account's issue lock) so the
- * verdict and the count it leads to cannot be split by a concurrent issue
- * from another device.
+ * Read only: whether this account may have question `questionId` marked at
+ * `now`. Decided from the server's entitlement record and the server's own
+ * count. Call it inside the commit transaction (account scope, under the
+ * account's sync lock) so the verdict and the count it leads to cannot be split
+ * by a concurrent submission from another device; it may also be called before
+ * marking as a forecast, so a refused script never costs a marker run.
  */
-export async function practiceAllowanceVerdict(db, { accountId, now = Date.now(), env = process.env }) {
+export async function markingAllowanceVerdict(db, { accountId, questionId, now = Date.now(), env = process.env }) {
   db = asStore(db);
   const day = practiceDay(now);
-  const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
-  const premium = serverEntitlementCapabilities(snapshot, now).includes('unlimited-practice');
-  const used = issuedOf(await db.get(COUNTER, [accountId, PRACTICE_DAILY_SCOPE, day.key]));
-  const base = { used, resetsAt: day.end, timeZone: day.timeZone, day: day.key };
-  if (premium) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null };
-  const limit = freePracticePerDay(env);
-  return { ...base, allowed: used < limit, plan: 'free', unlimited: false, limit };
+  // One statement: the entitlement record and today's count together.
+  const row = await db.get(`SELECT s.plan AS plan, s.status AS status, s.current_period_end AS current_period_end, s.grace_until AS grace_until,
+      (SELECT k.response_json FROM idempotency_keys k WHERE k.account_id=? AND k.scope=? AND k.key=?) AS response_json
+    FROM (SELECT 1 AS one) base LEFT JOIN entitlement_snapshots s ON s.account_id=?`, [accountId, MARKING_DAILY_SCOPE, day.key, accountId]);
+  const premium = serverEntitlementCapabilities(row?.plan ? row : null, now).includes('unlimited-marking');
+  const marked = markedOf(row?.response_json ? row : null);
+  const base = { used: marked.length, resetsAt: day.end, timeZone: day.timeZone, day: day.key, marked };
+  if (premium) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null, counted: false };
+  const limit = freeMarkedPerDay(env);
+  const already = marked.includes(questionId);
+  return { ...base, allowed: already || marked.length < limit, plan: 'free', unlimited: false, limit, counted: already };
 }
 
 /**
- * Count one issued capped question for `accountId`'s day. In the same
- * transaction as the question it counts, after every replay check has
- * returned, so a counted question is one the account was really issued now.
- * Returns the day's count including this one.
+ * Count question `questionId` as one of today's marked scripts for a free
+ * account. In the same transaction as the mark it counts, after every replay
+ * check has returned. Idempotent per question and day. `verdict` is the
+ * decision this transaction already read (markingAllowanceVerdict), so the
+ * count is not read twice; without it the count is read here. Returns the
+ * day's count.
  */
-export async function recordPracticeIssue(db, { accountId, now = Date.now() }) {
+export async function recordMarkedScript(db, { accountId, questionId, now = Date.now(), verdict = null }) {
   db = asStore(db);
   const day = practiceDay(now);
-  const issued = issuedOf(await db.get(COUNTER, [accountId, PRACTICE_DAILY_SCOPE, day.key])) + 1;
+  if (verdict && (verdict.unlimited || verdict.day !== day.key)) {
+    if (verdict.unlimited) return verdict.used;
+    verdict = null;
+  }
+  const marked = verdict ? [...verdict.marked] : markedOf(await db.get(COUNTER, [accountId, MARKING_DAILY_SCOPE, day.key]));
+  if (marked.includes(questionId)) return marked.length;
+  marked.push(questionId);
   await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)
     ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json`,
-  [accountId, PRACTICE_DAILY_SCOPE, day.key, JSON.stringify({ issued }), 'practice-daily', now, day.end + COUNTER_TTL_MS]);
-  return issued;
+  [accountId, MARKING_DAILY_SCOPE, day.key, JSON.stringify({ marked }), 'marking-daily', now, day.end + COUNTER_TTL_MS]);
+  return marked.length;
 }
 
 /**
- * The refusal, in the code and fields the device's own gate uses (402
- * FREE_CAP_REACHED, local/entitlementGate.js) so the same paywall copy
- * applies, plus RFC 9110 Retry-After at the day's end. `resetAt` is the
- * transport's name for "when a refusal lifts" (cloudTransport.js copies it);
- * the device maps it onto its gate's `resetsAt`.
+ * The refusal, in the code the device's own gate uses (402 FREE_CAP_REACHED,
+ * local/entitlementGate.js) so the same paywall applies, plus RFC 9110
+ * Retry-After at the day's end. Nothing about the answer is disclosed: the
+ * refusal is decided before marking and is the same whatever was written.
  */
-export function refusePracticeCap(res, verdict, now = Date.now()) {
+export function refuseMarkingCap(res, verdict, now = Date.now()) {
   res.set('Retry-After', String(Math.max(1, Math.ceil((verdict.resetsAt - now) / 1000))));
   res.set('RateLimit-Remaining', '0');
   res.set('RateLimit-Reset', String(Math.ceil(verdict.resetsAt / 1000)));
@@ -131,8 +146,8 @@ export function refusePracticeCap(res, verdict, now = Date.now()) {
   return res.status(402).json({
     error: {
       code: 'FREE_CAP_REACHED',
-      message: `You have used today's ${verdict.limit} free practice questions. They reset at midnight (${verdict.timeZone}), and Premium removes the daily cap.`,
-      capability: 'unlimited-practice',
+      message: `You have used today's ${verdict.limit} free marked answers. Practice stays unlimited and your work is kept on this device; marking resets at midnight (${verdict.timeZone}), and Premium removes the daily limit.`,
+      capability: 'unlimited-marking',
       plan: 'free',
       used: verdict.used,
       limit: verdict.limit,

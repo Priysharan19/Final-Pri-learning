@@ -53,6 +53,10 @@ final class StoreKitBillingBridge {
                             "displayName": product.displayName,
                             "description": product.description,
                             "displayPrice": product.displayPrice,
+                            // Numeric price and currency, so the paywall can derive an
+                            // honest "about ... a month" from the storefront's own figure.
+                            "price": NSDecimalNumber(decimal: product.price).doubleValue,
+                            "currencyCode": product.priceFormatStyle.currencyCode,
                             "subscription": product.subscription != nil
                         ]
                     }

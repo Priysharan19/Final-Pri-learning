@@ -3,6 +3,8 @@
 // and next step for each reason a check was refused. Presentation only —
 // account linking, eligibility and marking stay with the platform modules.
 import React, { useEffect, useRef, useState } from 'react';
+import { FREE_MARKING_ALLOWANCE } from '../engine/practiceAllowance.js';
+import { PAYWALL_ROUTE } from '../paywall/route.js';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from './PageLink.jsx';
 import { useLanguage, useT } from '../i18n/index.js';
@@ -115,7 +117,7 @@ export function CheckRefusal({
   return (
     <>
       <div className="verdict-title" data-check-refusal={kind}>{t(copy.titleKey)}</div>
-      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : copy.hintKey)}</span></div>
+      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : copy.hintKey, { n: FREE_MARKING_ALLOWANCE.scriptsPerDay, count: FREE_MARKING_ALLOWANCE.scriptsPerDay })}</span></div>
       {copy.action === 'sign-in' && (
         <div style={{ marginTop: 10 }} data-check-session-ended={sessionEnded ? '' : undefined}>
           <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText}
@@ -127,8 +129,8 @@ export function CheckRefusal({
           ? <PageLink to="/settings" {...settings}>{t('app.accountSettings')}</PageLink>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
         {copy.action === 'premium' && (inRouter
-          ? <PageLink to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</PageLink>
-          : <a href="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</a>)}
+          ? <PageLink to={PAYWALL_ROUTE} state={{ from: context === 'exam' ? 'exams' : 'marking' }} {...settings}>{t('freeCap.seePremium')}</PageLink>
+          : <a href={PAYWALL_ROUTE} {...settings}>{t('freeCap.seePremium')}</a>)}
         {onRetry && (copy.action === 'retry' || copy.action === 'account') && (
           <button type="button" className="btn btn-ghost btn-sm" data-check-retry disabled={busy} onClick={onRetry}>
             {t('common.tryAgain')}

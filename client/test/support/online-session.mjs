@@ -59,7 +59,11 @@ const ENV = {
   // browser, by tour-free-cap.js — which boots this platform with the default
   // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
   // the cap raised by configuration so it is never read as a fault.
-  PRI_FREE_PRACTICE_PER_DAY: '100000'
+  PRI_FREE_PRACTICE_PER_DAY: '100000',
+  // The free plan's 5 marked scripts a day is proved at its shipped default by
+  // server/test/practice-daily-cap-check.mjs; flows that mark more answers on
+  // one free account raise it by configuration.
+  PRI_FREE_MARKED_PER_DAY: '100000'
 };
 // PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
 // page's own origin, which is this server's ephemeral loopback port.
@@ -233,7 +237,35 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   // from, and what a Submit that carries its picture reuses), newest first.
   const keptReadResults = accountId => h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>? ORDER BY created_at DESC")
     .all(accountId, Date.now()).map(r => { try { return JSON.parse(r.response_json).result || null; } catch { return null; } }).filter(Boolean);
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, keptReadResults, close };
+  /**
+   * TEST DESK ONLY. Real Premium for an account, granted through the product's
+   * own audited support-grant route (POST /v1/entitlements/admin/grant) by a
+   * real admin account with a real second factor — the same path
+   * online-authority.mjs uses. Mock papers and the target plan are Premium-only.
+   */
+  let admin = null;
+  async function grantPremium(accountId, { days = 30 } = {}) {
+    h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%' OR bucket LIKE 'login%'").run();
+    if (!admin) {
+      const serial = ++accountSerial;
+      const email = `e2e.admin.${process.pid}.${serial}.${Date.now().toString(36)}@example.test`;
+      const reg = await desk(() => harness.registerAccount(h, { name: 'Suite Admin', email, password: PASSWORD, deviceId: `e2e-desk-admin-${serial}` }));
+      if (reg.status !== 201) throw new Error(`online-session: admin register answered ${reg.status} ${reg.text}`);
+      const verified = await desk(() => harness.verifyEmail(h, reg.account.id));
+      if (verified.status >= 300) throw new Error(`online-session: admin verify-email answered ${verified.status} ${verified.text}`);
+      const mfa = await harness.promoteRole(h, reg.jar, reg.account.id, 'admin');
+      admin = { jar: reg.jar, secret: mfa.secret };
+    }
+    const grant = () => desk(() => h.request('/v1/entitlements/admin/grant', { method: 'POST', jar: admin.jar, body: { accountId: String(accountId), durationMs: days * 86400000 } }));
+    let granted = await grant();
+    if (granted.status === 403 && granted.data?.error?.code === 'MFA_STEP_UP_REQUIRED') {
+      await harness.verifyMfa(h, admin.jar, admin.secret);
+      granted = await grant();
+    }
+    if (granted.status !== 200) throw new Error(`online-session: Premium grant answered ${granted.status} ${granted.text}`);
+    return granted.data;
+  }
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, keptReadResults, grantPremium, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
@@ -501,8 +533,41 @@ function onlineSession(platform, ctx, page) {
     cut = null;
   }
 
+  /**
+   * Real Premium for the signed-in account: the server grants it (above), then
+   * the device learns it the way the product does — Settings verifies the
+   * session and refreshes the entitlement (refreshCloudEntitlement). Resolves
+   * once this device's link row holds the Premium snapshot. Leaves the page on
+   * /settings; the caller navigates on.
+   */
+  async function grantPremium() {
+    if (!session.account?.id) throw new Error('online-session: grantPremium() needs a signed-in account');
+    await platform.grantPremium(session.account.id);
+    await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
+    const deadline = Date.now() + 30000;
+    let opened = Date.now();
+    for (;;) {
+      const plan = await page.evaluate(accountId => new Promise(done => {
+        const open = indexedDB.open('pri-learning');
+        open.onerror = () => done(null);
+        open.onsuccess = () => {
+          const db = open.result;
+          const req = db.transaction('device').objectStore('device').getAll();
+          req.onsuccess = () => { db.close(); const row = req.result.find(r => String(r.id).startsWith('pri-cloud-account-link-v1:') && String(r.accountId) === accountId); done(row?.entitlement?.plan || null); };
+          req.onerror = () => { db.close(); done(null); };
+        };
+      }), String(session.account.id));
+      if (plan === 'premium') return;
+      if (Date.now() > deadline) throw new Error(`online-session: the device never learned the Premium grant (plan ${plan}; ${JSON.stringify(calls.filter(c => /entitlements|account\/me/.test(c.path)).slice(-4).map(c => `${c.status} ${c.path}`))})`);
+      await page.waitForTimeout(250);
+      // Settings verifies the session as it opens; a load that raced the
+      // profile's own start is opened again, never short-cut on the device.
+      if (Date.now() - opened > 5000) { await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' }); opened = Date.now(); }
+    }
+  }
+
   const session = {
-    platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
+    platform, grantPremium, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
     settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId),
     /** Test desk only: the stand-in reader was re-scripted — forget this account's kept reads. */

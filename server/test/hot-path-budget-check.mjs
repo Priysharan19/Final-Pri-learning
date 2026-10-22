@@ -74,13 +74,15 @@ await new Promise(resolve => fake.listen(0, '127.0.0.1', resolve));
 
 const vars = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_HANDWRITING_API_KEY',
   'PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_MODEL', 'PRI_HANDWRITING_FALLBACK_MODEL', 'PRI_HANDWRITING_TIMEOUT_MS',
-  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_SERVER_TIMING'];
+  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_SERVER_TIMING', 'PRI_FREE_MARKED_PER_DAY'];
 const previous = Object.fromEntries(vars.map(name => [name, process.env[name]]));
 Object.assign(process.env, {
   NODE_ENV: 'test', PRI_PLATFORM_DB: join(dir, 'test.sqlite'), PRI_AUTH_DELIVERY_KEY: 'eb'.repeat(32),
   PRI_HANDWRITING_API_KEY: 'local-synthetic-fixture', PRI_HANDWRITING_ENDPOINT: `http://127.0.0.1:${fake.address().port}/v1/responses`,
   PRI_HANDWRITING_MODEL: 'fixture-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'fixture-fallback', PRI_HANDWRITING_TIMEOUT_MS: '20000',
-  PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
+  PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000',
+  // The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs.
+  PRI_FREE_MARKED_PER_DAY: '100000'
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_SERVER_TIMING']) delete process.env[name];
 
@@ -422,29 +424,34 @@ try {
   // (#537, practiceAllowance.js) reads the entitlement snapshot and today's
   // count, then counts the issue, inside the issue transaction — 7 -> 11 on
   // sqlite and 9 -> 13 on postgres, measured with --report on both engines.
+  // Notebook/paywall split, --report on both engines: practice is unlimited, so
+  // issue no longer reads or writes the cap (11 -> 7 sqlite, 13 -> 9 postgres);
+  // the free plan's MARKING allowance is decided at submit — one combined read
+  // before the marker, one under the lock, one count write: +3 on every submit
+  // path (typed 19 -> 22 / 21 -> 24, ink 37 -> 40 / 43 -> 46, 21 -> 24 / 23 -> 26).
   const PINS = {
     sqlite: {
-      'POST /v1/practice/issue': 11,                                     // was 13 (7 before the #537 cap)
+      'POST /v1/practice/issue': 7,                                      // 11 with the #537 issue cap; was 13
       // Train 10, --report on both engines: +2 per submit for the server-charged
       // hint ladder (#584, the rung served so far) and misconception targeting
       // (#586) — 17 -> 19 sqlite, 19 -> 21 postgres; the ink paths likewise.
-      'POST /v1/practice/:id/submit (typed, resolves)': 19,              // was 34
+      'POST /v1/practice/:id/submit (typed, resolves)': 22,              // 19 before the marking allowance; was 34
       // #440 read on request: the paid read is Read my answer (/handwriting/transcribe,
       // not counted here); /recognize at Submit replays it — 45 -> 35, --report on sqlite.
-      'ink Submit, three requests (recognize + confirm + submit)': 37,   // was 86
-      'ink Submit, one request (picture with the submission)': 21,       // 29 before #440 (the read moved to Read my answer); was 86
+      'ink Submit, three requests (recognize + confirm + submit)': 40,   // 37 before the marking allowance; was 86
+      'ink Submit, one request (picture with the submission)': 24,       // 21 before the marking allowance; 29 before #440 (the read moved to Read my answer); was 86
       'POST /v1/sync/push (5 events + 1 entity)': 32,                    // was 37
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1
       'GET /v1/account/guardian/state': 2                                // was 4
     },
     postgres: {
-      'POST /v1/practice/issue': 13,                                     // was 15 (9 before the #537 cap)
-      'POST /v1/practice/:id/submit (typed, resolves)': 21,              // was 37
+      'POST /v1/practice/issue': 9,                                      // 13 with the #537 issue cap; was 15
+      'POST /v1/practice/:id/submit (typed, resolves)': 24,              // 21 before the marking allowance; was 37
       // #440 moved the paid read to Read my answer (its sqlite pins fell 10);
       // postgres measured here with the train-10 +2: 51 -> 43 and 31 -> 23.
-      'ink Submit, three requests (recognize + confirm + submit)': 43,   // was 94
-      'ink Submit, one request (picture with the submission)': 23,       // was 94 (three requests)
+      'ink Submit, three requests (recognize + confirm + submit)': 46,   // 43 before the marking allowance; was 94
+      'ink Submit, one request (picture with the submission)': 26,       // 23 before the marking allowance; was 94 (three requests)
       'POST /v1/sync/push (5 events + 1 entity)': 34,                    // was 39
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1

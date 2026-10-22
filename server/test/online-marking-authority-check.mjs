@@ -12,6 +12,9 @@ const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-online-grading-'));
 process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
+// The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs;
+// this suite marks many answers on one free account, so it raises it by configuration.
+process.env.PRI_FREE_MARKED_PER_DAY = '100000';
 process.env.PRI_AUTH_DELIVERY_KEY = 'd3'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');

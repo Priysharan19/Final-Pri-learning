@@ -239,8 +239,11 @@ for (const [lang, cat] of [['en', en], ['hi', hi]]) {
   const plan = Object.entries(cat).filter(([k]) => k.startsWith('settings.')).map(([, v]) => v).join(' \n ');
   ok(!/everything else unlimited|all courses|all features|बाकी सब असीमित|सभी कोर्स/i.test(plan),
     `${lang}: settings plan copy never promises "everything else unlimited", "all courses" or "all features"`);
-  ok(/\{limit\}/.test(cat['settings.localPlanSub']) && /\{exams\}/.test(cat['settings.localPlanSub']) && /\{days\}/.test(cat['settings.localPlanSub']),
-    `${lang}: the free-plan line takes its daily cap and exam allowance from FREE_TIER`);
+  // Free/Premium split: practice is unlimited, marking is FREE_TIER.markedPerDay
+  // a day and the notebook previews FREE_NOTEBOOK_PREVIEW mistakes; the free
+  // plan has no exam allowance to promise.
+  ok(/\{marked\}/.test(cat['settings.localPlanSub']) && /\{notebook\}/.test(cat['settings.localPlanSub']) && !/\{limit\}|\{exams\}|\{days\}|\d/.test(cat['settings.localPlanSub']),
+    `${lang}: the free-plan line takes its marking allowance and notebook preview from FREE_TIER / FREE_NOTEBOOK_PREVIEW, with no literal numbers and no exam promise`);
   ok(!/additional AI|extra AI|अतिरिक्त/i.test(cat['settings.premiumAdds'] || ''),
     `${lang}: Premium copy does not advertise the reserved additional-ai-usage capability`);
 }

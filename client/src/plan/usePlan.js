@@ -19,6 +19,7 @@ import { loadPlanSettings, savePlanSettings, loadTodayPin, saveTodayPin } from '
 import { computeReminders, zonedMs } from '../reminders/schedule.js';
 import { loadReminderSettings } from '../reminders/settings.js';
 import { reminderRuntime } from '../reminders/index.js';
+import { api } from '../api.js';
 
 /** Minutes practised today from the activity rows GET /stats returns. */
 function minutesToday(activity, today) {
@@ -51,6 +52,18 @@ export function usePlan(user, { stats = null, now = null } = {}) {
 
   useEffect(() => { let live = true; reload().then(() => { if (!live) return; }); return () => { live = false; }; }, [reload]);
 
+  // The mistake notebook's review state, for its reminder. Only the server's
+  // two numbers are kept; a profile without an account or a connection has none.
+  const [notebook, setNotebook] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (!pid || user?.role === 'teacher') { setNotebook(null); return () => { live = false; }; }
+    api.get('/notebook')
+      .then(r => { if (live) setNotebook(r?.available ? { dueCount: Number(r.dueCount) || 0, nextDueAt: r.nextDueAt ?? null } : null); })
+      .catch(() => { if (live) setNotebook(null); });
+    return () => { live = false; };
+  }, [pid, user?.role]);
+
   const plan = useMemo(() => {
     if (!evidence || !user || user.role === 'teacher') return null;
     const previous = loadTodayPin(pid, today);
@@ -81,11 +94,11 @@ export function usePlan(user, { stats = null, now = null } = {}) {
     const items = computeReminders({
       now: nowMs, timezone: tz, settings: { ...rs, sessionHour: settings.sessionHour },
       plan, reviews: evidence?.reviews || [], streak: Number(user?.streak) || 0,
-      attemptedToday: Number(user?.today?.questions) > 0
+      attemptedToday: Number(user?.today?.questions) > 0, notebook
     });
     if (!rs.enabled && !reminderRuntime().supported()) return;
     reminderRuntime().sync(pid, items).catch(() => {});
-  }, [plan, pid, tz, nowMs, settings.sessionHour, evidence, user?.streak, user?.today?.questions]);
+  }, [plan, pid, tz, nowMs, settings.sessionHour, evidence, user?.streak, user?.today?.questions, notebook]);
 
   const update = useCallback(patch => {
     const next = savePlanSettings(pid, patch);

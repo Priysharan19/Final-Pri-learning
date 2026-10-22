@@ -2543,7 +2543,15 @@ async function run() {
       ink: { strokes: [{ points: [{ x: 5, y: 6 }] }], recognized: 'x=1' }
     });
     await POST(`/history/${taskQ.question.id}/bookmark`, {});
+    // Mock papers are Premium (the free/Premium split: the free plan has no
+    // exam allowance); this fixture needs a paper in the exams store, not the
+    // gate, which is entitlement-enforcement-check's subject.
+    await online.setEntitlement(doomed.id, 'premium');
     const doomedExam = (await POST('/exams', { length: 10 })).exam;
+    // The notebook's local copy of the student's ink (notebook/inkStore.js) is
+    // the profile's too, and must go with it.
+    const { saveMistakeInk } = await import('../src/notebook/inkStore.js');
+    eq('the doomed profile keeps a notebook ink copy', await saveMistakeInk(doomed.id, 'attempt-doomed-1', [{ points: [[0, 0], [10, 12]] }]), true);
     await POST(`/exams/${doomedExam.id}/submit`, { answers: {}, ms: 60000 });
     await POST('/rush/finish', { correct: 4, total: 20, bestCombo: 2 });
     await POST('/match/finish', { won: false, playerScore: 3, rivalScore: 7, rival: 'Robo-Rookie', ms: 60000 });
@@ -2565,7 +2573,7 @@ async function run() {
     if ((await idb.all('tasks')).some(t => t.ownerPid === doomed.id)) sealedOccupied.add('tasks');
     const occupied = new Set([...rawOccupied, ...sealedOccupied]);
     const mustReach = ['profiles', 'ratings', 'attempts', 'questions', 'exams', 'activity',
-      'rushRuns', 'matchRuns', 'inks', 'bookmarks', 'customQs', 'progressImports', 'classes', 'tasks'];
+      'rushRuns', 'matchRuns', 'inks', 'mistakeInks', 'bookmarks', 'customQs', 'progressImports', 'classes', 'tasks'];
     const missing = mustReach.filter(name => !occupied.has(name));
     eq('the doomed profile has a row in every store the delete must reach', missing, []);
 
@@ -2653,7 +2661,7 @@ async function run() {
   try {
     await POST('/profiles/select', { id: ada.id });
     const book = await GET('/notebook');
-    eq('a signed-in profile reads its notebook from the server', [book.available, Array.isArray(book.entries)], [true, true]);
+    eq('a signed-in profile reads its notebook from the server', [book.available, Array.isArray(book.groups), typeof book.hidden === 'number', ['free', 'premium'].includes(book.plan)], [true, true, true, true]);
     const twinsBefore = (await idb.byIndex('questions', 'pid', ada.id)).length;
     await rejects('a twin of an entry this account does not own is refused',
       POST('/notebook/00000000-0000-4000-8000-000000000000/twin', {}), { status: 404, code: 'NOTEBOOK_ENTRY_NOT_FOUND' });

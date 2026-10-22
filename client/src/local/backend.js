@@ -4047,22 +4047,44 @@ const routes = {
   // deterministic engine diagnosed; this device names what it is sent.
   'GET /notebook': async () => {
     const p = await requireProfile();
-    if (!(await profileCloudAccountId(p.id).catch(() => null))) return { entries: [], available: false, reason: 'sign-in' };
+    const none = reason => ({ available: false, reason, plan: 'free', preview: null, total: 0, shown: 0, hidden: 0, dueCount: 0, nextDueAt: null, groups: [] });
+    if (!(await profileCloudAccountId(p.id).catch(() => null))) return none('sign-in');
     let out;
-    try { out = await cloud.practiceNotebook(); } catch { return { entries: [], available: false, reason: 'offline' }; }
-    const entries = (Array.isArray(out?.entries) ? out.entries : []).map(g => ({
-      key: String(g.key || ''),
-      misconception: { id: misconceptionById(g.misconception?.id)?.id || null, nameKey: misconceptionById(g.misconception?.id)?.name || null,
-        label: typeof g.misconception?.label === 'string' ? g.misconception.label : null },
-      count: Number(g.count) || 0, lastAt: Number(g.lastAt) || 0,
-      chapterNames: [...new Set((g.subtopics || []).map(s => namedDotpoint(p, s, null).chapterName))],
-      items: (g.items || []).map(item => ({
-        id: item.id, prompt: typeof item.prompt === 'string' ? item.prompt : null, difficulty: Number(item.difficulty) || 2,
-        answeredAt: Number(item.answeredAt) || 0, canTwin: item.canTwin === true,
-        dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
-      }))
-    }));
-    return { entries, available: true };
+    try { out = await cloud.practiceNotebook(); } catch { return none('offline'); }
+    const n = v => (Number.isFinite(Number(v)) ? Number(v) : 0);
+    const text = (v, max) => (typeof v === 'string' ? sanitizeText(v, max) : '');
+    // The server's notebook (engine/mistakeNotebook.js) as it was sent, with
+    // this device's names for the chapter and dot point added. Nothing is
+    // computed here: what is filed, fixed and due is the server's.
+    const groups = (Array.isArray(out?.groups) ? out.groups : []).map(g => {
+      const known = misconceptionById(g.misconception?.id);
+      return {
+        key: String(g.key || ''), subtopic: String(g.subtopic || ''),
+        chapterName: g.subtopic ? namedDotpoint(p, g.subtopic, null).chapterName || null : null,
+        misconception: g.misconception ? { id: known?.id || null, nameKey: known?.name || null,
+          label: typeof g.misconception.label === 'string' ? g.misconception.label : null } : null,
+        count: n(g.count), open: n(g.open), lastAt: n(g.lastAt),
+        items: (Array.isArray(g.items) ? g.items : []).map(item => ({
+          id: String(item.id || ''), questionId: typeof item.questionId === 'string' ? item.questionId : null,
+          subtopic: String(item.subtopic || ''), dotpoint: typeof item.dotpoint === 'string' ? item.dotpoint : null,
+          dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text,
+          difficulty: n(item.difficulty) || 2, answeredAt: n(item.answeredAt),
+          marksEarned: n(item.marksEarned), marksPossible: n(item.marksPossible),
+          misconception: item.misconception ? { id: misconceptionById(item.misconception.id)?.id || null, nameKey: misconceptionById(item.misconception.id)?.name || null } : null,
+          firstError: item.firstError ? { line: Number.isInteger(item.firstError.line) ? item.firstError.line : null,
+            text: text(item.firstError.text, 300), note: text(item.firstError.note, 500) } : null,
+          retries: n(item.retries), fixed: item.fixed === true, fixedAt: item.fixedAt == null ? null : n(item.fixedAt),
+          review: { stage: item.review?.stage ?? null, dueAt: item.review?.dueAt == null ? null : n(item.review.dueAt), due: item.review?.due === true },
+          prompt: typeof item.prompt === 'string' ? item.prompt : null, canTwin: item.canTwin === true
+        })).filter(item => item.id)
+      };
+    });
+    return {
+      available: true, plan: out?.plan === 'premium' ? 'premium' : 'free',
+      preview: Number.isInteger(out?.preview) ? out.preview : null,
+      total: n(out?.total), shown: n(out?.shown), hidden: n(out?.hidden),
+      dueCount: n(out?.dueCount), nextDueAt: out?.nextDueAt == null ? null : n(out.nextDueAt), groups
+    };
   },
 
   // A twin is drawn and issued by the server; this device keeps the row it
@@ -6119,6 +6141,18 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         await put('questions', row).catch(() => {});
         throw notMarked(readerRefusal(cause));
       }
+    }
+    // The free plan's daily marking allowance (402 FREE_CAP_REACHED,
+    // unlimited-marking) is decided by the server before it marks: this
+    // script was not marked, and the refusal reaches the card as the same
+    // gate error FreeCapNotice explains. A resend of a script already counted
+    // is never refused this way (it is the same script), so this proves
+    // nothing was marked even after an earlier send.
+    const capGate = serverGateRefusal(cause);
+    if (capGate) {
+      row.pendingGrade = { ...row.pendingGrade, notSent: true };
+      await put('questions', row).catch(() => {});
+      throw capGate;
     }
     // The server's own refusal to mark (no session, account not eligible) is
     // stamped by checkUnavailable. Beyond that, only a web build with no

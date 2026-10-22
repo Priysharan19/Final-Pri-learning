@@ -90,6 +90,8 @@ export const flow = {
     await goto('/');
     await createProfile({ name: 'Chitra Rao', year: 12, course: 'in', track: 'jee-main' });
     await online.signIn({ name: 'Chitra Rao' });
+    // Mock papers are Premium-only; this journey is about sitting one, so the account holds real Premium (admin grant).
+    await online.grantPremium();
     await check('server reading is on for this signed-in profile', await turnOnServerReading(page, base));
 
     // ── 1 · the paper starts, with a clock read off a stored deadline ────────

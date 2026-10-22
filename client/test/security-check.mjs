@@ -605,6 +605,8 @@ async function run() {
     const q = (await POST('/practice/next', { mode: 'smart' })).question;
     await POST(`/practice/${q.id}/reveal`, { ms: 900 });
     await POST(`/history/${q.id}/bookmark`, {});
+    // Mock papers are Premium (free/Premium split); the backup needs one in it.
+    await online.setEntitlement(victim.id, 'premium');
     const exam = (await POST('/exams', { length: 10 })).exam;
     await POST(`/exams/${exam.id}/submit`, { answers: {}, ms: 60000 });
 

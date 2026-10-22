@@ -267,12 +267,12 @@ jobs:
           grep -Eq 'INSTALL BUDGET: PASS — 68/68 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
-          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
+          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 60/60 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
-          grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 27/27 checks' suites.log
-          grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
+          grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 21/21 checks' suites.log
+          grep -Fq 'JEE ADVANCED GATE: PASS — 28/28 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
           grep -Fq 'BAD INPUT: PASS — 44/44 checks' suites.log
@@ -436,15 +436,17 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/notebook-paywall-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
-          grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
+          grep -Fq 'DAILY MARKING ALLOWANCE: PASS — 80/80 checks' practice-http.log
+          grep -Fq 'MISTAKE NOTEBOOK: PASS — 39/39 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
-          grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
+          grep -Fq 'HINTS AND NOTEBOOK: PASS — 63/63 checks' practice-http.log
           grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
@@ -527,7 +529,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
-          grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 374/374 checks' exam-authority.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -555,7 +557,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -568,6 +570,7 @@ jobs:
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
+          grep -Fq '✓ notebook-paywall-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ admin-mfa-class-routes-check.mjs' platform-postgres.log
           grep -Fq '✓ account-export-completeness-check.mjs' platform-postgres.log

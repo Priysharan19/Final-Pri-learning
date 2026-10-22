@@ -44,11 +44,18 @@ const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-marker-isolation-'));
 process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
+// Mock papers are Premium at the shipped default (exam-authority-check.mjs
+// proves it); this suite's free accounts sit one paper each, as before, so the
+// deployment knob restores the one-paper free window here.
+process.env.PRI_FREE_EXAMS_PER_WINDOW = '1';
 process.env.PRI_AUTH_DELIVERY_KEY = 'a7'.repeat(32);
 // This suite is about marking, not the free plan: its accounts are issued far
 // more than twenty questions a day. The cap itself is proved by
 // practice-daily-cap-check.mjs; here it is raised by configuration.
 process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
+// The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs;
+// suites that mark many answers on one free account raise it by configuration.
+process.env.PRI_FREE_MARKED_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, checks, registerAccount, verifyEmail, cookieHeader } = await import('./support/app-harness.mjs');

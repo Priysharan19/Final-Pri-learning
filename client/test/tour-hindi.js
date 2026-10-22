@@ -201,6 +201,8 @@ export const flow = {
     // real platform server through Settings (in Hindi), and Practice is opened
     // again: what follows is marked by the server.
     await online.signIn({ name: STUDENT.name });
+    // Mock papers are Premium-only; this journey audits the exam room, so the account holds real Premium (admin grant).
+    await online.grantPremium();
     await audit('Settings, signed in');
     await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });

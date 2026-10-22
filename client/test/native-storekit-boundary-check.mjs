@@ -6,7 +6,12 @@ const shell = readFileSync(new URL('../../ios/PriLearning.swiftpm/WebShell.swift
 const native = readFileSync(new URL('../src/platform/nativeBilling.js', import.meta.url), 'utf8');
 const legacy = readFileSync(new URL('../src/platform/native/legacyApple.js', import.meta.url), 'utf8');
 const transport = readFileSync(new URL('../src/platform/cloudTransport.js', import.meta.url), 'utf8');
-const panel = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
+// The App Store purchase/restore flow lives in a hook shared by Settings and
+// the Premium screen; the panel must use it, and the assertions below read both.
+const panelSrc = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
+const storeKitHook = readFileSync(new URL('../src/paywall/useStoreKitPurchase.js', import.meta.url), 'utf8');
+assert.match(panelSrc, /useStoreKitPurchase\(\{/, 'Settings runs the shared StoreKit purchase hook');
+const panel = panelSrc + '\n' + storeKitHook;
 
 assert.match(shell, /__PRI_NATIVE_BILLING__\s*=\s*true/, 'native shell must explicitly advertise StoreKit capability');
 assert.match(shell, /name:\s*"priBilling"/, 'WKWebView must install a dedicated billing message handler');

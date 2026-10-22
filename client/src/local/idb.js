@@ -8,7 +8,7 @@ import {
 } from './auth.js';
 
 const DB_NAME = 'pri-learning';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise = null;
 let dbHandle = null;
@@ -64,6 +64,7 @@ export function openDB() {
       mk('bookmarks', { keyPath: 'key' }, [['pid', 'pid']]);                    // `${pid}:${questionId}`
       mk('device', { keyPath: 'id' });                                          // this install's own secrets
       mk('inkDrafts', { keyPath: 'id' }, [['pid', 'pid']]);                     // `${pid}:${questionId}` — handwriting waiting to be read (local/inkDrafts.js)
+      mk('mistakeInks', { keyPath: 'id' }, [['pid', 'pid']]);                   // `${pid}:${attemptId}` — a small copy of the ink of a wrong answer, for the mistake notebook (notebook/inkStore.js)
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -226,6 +227,7 @@ const SEALED_STORES = {
   matchRuns: { owner: 'pid', clear: ['id', 'pid'], ownKey: true },
   inks: { owner: 'pid', clear: ['id', 'pid'] },
   inkDrafts: { owner: 'pid', clear: ['id', 'pid'] },
+  mistakeInks: { owner: 'pid', clear: ['id', 'pid'] },
   taskProgress: { owner: 'pid', clear: ['key', 'pid'], blind: 'tail' },
   bookmarks: { owner: 'pid', clear: ['key', 'pid'], blind: 'head' },
   progressImports: { owner: 'teacherPid', clear: ['id', 'teacherPid'] },
@@ -1479,7 +1481,7 @@ export async function rawByIndex(store, index, value) {
 const PROFILE_STORES = [
   ['ratings', 'pid'], ['attempts', 'pid'], ['questions', 'pid'], ['reviews', 'pid'],
   ['exams', 'pid'], ['badges', 'pid'], ['activity', 'pid'], ['rushRuns', 'pid'],
-  ['matchRuns', 'pid'], ['inks', 'pid'], ['inkDrafts', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
+  ['matchRuns', 'pid'], ['inks', 'pid'], ['inkDrafts', 'pid'], ['mistakeInks', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
   ['customQs', 'ownerPid'], ['progressImports', 'teacherPid']
 ];
 

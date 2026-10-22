@@ -14,6 +14,9 @@ process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
 // more than twenty questions a day. The cap itself is proved by
 // practice-daily-cap-check.mjs; here it is raised by configuration.
 process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
+// The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs;
+// suites that mark many answers on one free account raise it by configuration.
+process.env.PRI_FREE_MARKED_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');

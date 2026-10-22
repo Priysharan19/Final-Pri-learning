@@ -21,13 +21,15 @@
 import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
-import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
+import { FREE_MARKING_ALLOWANCE } from '../engine/practiceAllowance.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
 
 export const FREE_TIER = Object.freeze({
-  practicePerDay: FREE_PRACTICE_ALLOWANCE.perDay,
+  // Practice is unlimited on the free plan (the free/Premium split).
+  practicePerDay: null,
+  markedPerDay: FREE_MARKING_ALLOWANCE.scriptsPerDay,
   examsPerWindow: FREE_EXAM_ALLOWANCE.examsPerWindow,
   examWindowDays: FREE_EXAM_ALLOWANCE.examWindowDays,
   explain: 'basic'
@@ -39,7 +41,11 @@ export const FREE_TIER = Object.freeze({
  * enforcement suite checks every ENTITLEMENTS value has an entry here.
  */
 export const CAPABILITY_ENFORCEMENT = Object.freeze({
-  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'server · POST /v1/practice/issue and /v1/practice/:id/repeat refuse the twenty-first practice question of the account\'s day (server/platform/practiceAllowance.js, from the server\'s own entitlement record, #537); the local backend\'s POST /practice/next and /history/:id/retry pre-check is the device\'s courtesy copy',
+  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'none · practice is unlimited on every plan (the free/Premium split); the capability stays in the Premium list for older builds that still read it',
+  [ENTITLEMENTS.UNLIMITED_MARKING]: 'server · POST /v1/practice/:id/submit refuses the sixth marked script of the account\'s day before the marker runs, and again under the account lock where the mark commits (server/platform/practiceAllowance.js, from the server\'s own entitlement record)',
+  [ENTITLEMENTS.FULL_NOTEBOOK]: 'server · GET /v1/practice/notebook returns only the newest FREE_NOTEBOOK_PREVIEW mistakes to a free account and never sends the rest; POST /v1/practice/notebook/:id/twin refuses a hidden entry with 402 (server/platform/practice.js)',
+  [ENTITLEMENTS.PARENT_REPORT]: 'client · the parent report surface asks requireCapability before it renders; server enforcement belongs with the parent-report route when it ships',
+  [ENTITLEMENTS.TARGET_PLAN]: 'client · the target plan is computed on the device from the student\'s own local data (plan/studyPlan.js), so the gate is the device\'s check of the server-issued entitlement snapshot; no server-held content or cost is behind it',
   [ENTITLEMENTS.PREMIUM_EXAMS]: 'server · POST /v1/exams counts the account\'s own sealed papers (server/platform/exams.js); local backend · POST /exams (HSC paper builder and India exam module) pre-checks beyond the free simulation',
   [ENTITLEMENTS.JEE_ADVANCED]: 'local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'client · PriExplainV5 adaptive teaching plan, retrieval checkpoints and follow-up (basic playback stays free)',
@@ -146,8 +152,9 @@ export async function practiceAllowance(profile, now = clock()) {
   const used = usage.practice?.day === day ? Math.max(0, Number(usage.practice.served) || 0) : 0;
   const resetsAt = nextDayStart(now, timeZone);
   const base = { used, resetsAt, timeZone, day, reason: decision.reason, refreshRequired: !!decision.refreshRequired };
-  if (decision.allowed) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null };
-  return { ...base, allowed: used < FREE_TIER.practicePerDay, plan: 'free', unlimited: false, limit: FREE_TIER.practicePerDay };
+  // Practice is unlimited on every plan; examiner marking is what the free plan
+  // rations, and only the server counts and decides that (practiceAllowance.js).
+  return { ...base, allowed: true, plan: decision.allowed ? 'premium' : 'free', unlimited: true, limit: null };
 }
 
 export async function assertPracticeAllowed(profile, now = clock()) {
@@ -185,6 +192,11 @@ export async function assertExamAllowed(profile, now = clock()) {
   const allowance = await examAllowance(profile, now);
   if (allowance.allowed) return allowance;
   const timeZone = profileTimeZone(profile);
+  // Mock papers are Premium: with no free papers there is no unlock date to give.
+  if (FREE_TIER.examsPerWindow <= 0) {
+    throw gateError('PREMIUM_REQUIRED', `${CAPABILITY_COPY[ENTITLEMENTS.PREMIUM_EXAMS]}${offlineNote({ reason: allowance.reason })}`,
+      { capability: ENTITLEMENTS.PREMIUM_EXAMS, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
+  }
   throw gateError('FREE_CAP_REACHED',
     `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
     { capability: ENTITLEMENTS.PREMIUM_EXAMS, used: allowance.used, limit: allowance.limit, nextAt: allowance.nextAt, windowDays: allowance.windowDays, timeZone, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
@@ -203,8 +215,12 @@ const CAPABILITY_COPY = Object.freeze({
   [ENTITLEMENTS.JEE_ADVANCED]: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'Adaptive Pri Explain teaching is part of Pri Learning Premium.',
   [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'Priorities, the knowledge map and teacher analytics exports are part of Pri Learning Premium.',
-  [ENTITLEMENTS.PREMIUM_EXAMS]: 'Further exam simulations are part of Pri Learning Premium.',
-  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'Unlimited daily practice is part of Pri Learning Premium.',
+  [ENTITLEMENTS.PREMIUM_EXAMS]: 'Mock papers are part of Pri Learning Premium.',
+  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'Practice is unlimited on every plan.',
+  [ENTITLEMENTS.UNLIMITED_MARKING]: 'More than 5 marked answers a day is part of Pri Learning Premium.',
+  [ENTITLEMENTS.FULL_NOTEBOOK]: 'The full mistake notebook is part of Pri Learning Premium.',
+  [ENTITLEMENTS.PARENT_REPORT]: 'The parent report is part of Pri Learning Premium.',
+  [ENTITLEMENTS.TARGET_PLAN]: 'The target plan is part of Pri Learning Premium.',
   [ENTITLEMENTS.EXTRA_AI]: 'Additional AI usage is reserved for Pri Learning Premium.'
 });
 

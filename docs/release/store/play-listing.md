@@ -43,9 +43,10 @@ production-ready claims.
 > • Follow your progress chapter by chapter
 >
 > FREE AND PREMIUM
-> The free plan includes 20 practice questions a day and one exam simulation every 30 days, for
-> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily practice limit and the
-> exam-simulation limit, and includes the JEE Advanced track. Premium is ₹199 a month or ₹1,499
+> The free plan includes unlimited practice and 5 answers marked by the examiner each day,
+> for CBSE / NCERT and JEE Main. Pri Learning Premium adds unlimited marking, mock papers, the
+> full mistake notebook, the parent report, the target plan and the JEE Advanced track.
+> Premium is ₹199 a month or ₹1,499
 > a year, billed through Google Play
 > and renewing automatically until you cancel in Google Play.
 >

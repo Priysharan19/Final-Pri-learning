@@ -4,7 +4,11 @@
 // or a disabled Restore button that cannot work (App Review 2.1).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const src = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
+// The StoreKit bootstrap lives in the shared hook (paywall/useStoreKitPurchase.js);
+// the panel's render conditions stay in the panel. Both are read.
+const panelSrc = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
+assert.match(panelSrc, /useStoreKitPurchase\(\{/);
+const src = panelSrc + '\n' + readFileSync(new URL('../src/paywall/useStoreKitPurchase.js', import.meta.url), 'utf8');
 const en = readFileSync(new URL('../src/i18n/strings.en.js', import.meta.url), 'utf8');
 const hi = readFileSync(new URL('../src/i18n/strings.hi.js', import.meta.url), 'utf8');
 assert.match(src, /err\?\.code === 'BILLING_PROVIDER_NOT_CONFIGURED'\) return \{ notOnSale: true \}/);

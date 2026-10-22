@@ -11,6 +11,9 @@ import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
+import PageLink from '../components/PageLink.jsx';
+import { PAYWALL_ROUTE } from '../paywall/route.js';
+import { FREE_MARKING_ALLOWANCE } from '../engine/practiceAllowance.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -28,6 +31,8 @@ export default function Exams() {
   // Why a paper could not start: a paper is marked work, so it needs a
   // signed-in eligible account and a connection, like checking an answer.
   const [refusal, setRefusal] = useState(null);
+  // Mock papers are Premium: the server refuses a free account's paper with 402.
+  const [premiumGate, setPremiumGate] = useState(false);
   // A local paper the server says is still open, when that is why a start was refused.
   const [stillOpen, setStillOpen] = useState(null);
   const nav = useNavigate();
@@ -56,6 +61,7 @@ export default function Exams() {
     setBusy(true);
     setError('');
     setRefusal(null);
+    setPremiumGate(false);
     setStillOpen(null);
     try {
       const body = user.course === 'in' ? { year: user.year } : cfg;
@@ -63,14 +69,25 @@ export default function Exams() {
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
       const kind = checkRefusal(err);
-      if (checkRefusalCopy(kind, 'exam')) setRefusal(kind);
+      if (Number(err?.status) === 402 && (err?.capability === 'premium-exams' || err?.code === 'PREMIUM_REQUIRED' || err?.code === 'FREE_EXAM_CAP_REACHED')) setPremiumGate(true);
+      else if (checkRefusalCopy(kind, 'exam')) setRefusal(kind);
       // The account already has its limit of papers open: point at one.
       else if (err?.code === 'EXAM_OPEN_PAPER_LIMIT') { setStillOpen(err.openExamId || true); setError(tLater('exams.openPaperLimit')); }
       else setError(err.message || tLater('exams.formatNotReady'));
     } finally { setBusy(false); }
   }
 
-  const startRefused = refusal ? (
+  const startRefused = premiumGate ? (
+    <div className="verdict verdict-technical" role="status" data-exam-premium style={{ marginTop: 14, gridColumn: '1 / -1' }}>
+      <div>
+        <div className="verdict-title">{t('freeCap.examTitle')}</div>
+        <div className="verdict-body">{t('freeCap.examUsed', { n: FREE_MARKING_ALLOWANCE.scriptsPerDay, count: FREE_MARKING_ALLOWANCE.scriptsPerDay })}</div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <PageLink className="btn btn-ghost btn-sm" to={PAYWALL_ROUTE} state={{ from: 'exams' }}>{t('freeCap.seePremium')}</PageLink>
+        </div>
+      </div>
+    </div>
+  ) : refusal ? (
     <div className="verdict verdict-technical" role="alert" data-exam-start-refused={refusal} style={{ marginTop: 14, gridColumn: '1 / -1' }}>
       <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('exams.notStartedLabel')}</span></span>
       <div>

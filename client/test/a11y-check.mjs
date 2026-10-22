@@ -1070,6 +1070,45 @@ async function run() {
       await click(page, 'button.btn-primary', { text: 'Set myself a task' });
     });
 
+    // ── the free plan: what Premium adds, the mistake notebook, the plan's invitation ──
+    await step('premium · the free plan, compared with Premium', '/premium', async () => {
+      await goTo(page, BASE, '/premium');
+      await page.waitForSelector('[data-paywall-compare]', { timeout: 20000 });
+      if (await page.locator('[data-paywall-premium]').count()) throw new Error('a free account was told it already has Premium');
+      await wait(page, 500);
+    });
+
+    await step('notebook · the mistake notebook, free plan', '/notebook', async () => {
+      await goTo(page, BASE, '/notebook');
+      await page.waitForSelector('[data-notebook-page] [data-mistake-notebook]', { timeout: 20000 });
+      await wait(page, 500);
+    });
+
+    await step('plan · free: the target plan is Premium', '/plan', async () => {
+      await goTo(page, BASE, '/plan');
+      await page.waitForSelector('[data-plan-premium]', { timeout: 20000 });
+      await wait(page, 400);
+    });
+
+    // Mock papers and the target plan are Premium-only: from here the student
+    // holds real Premium, granted by an admin through the server's own audited
+    // support-grant route and learned by the device as the product learns it.
+    try { await online.grantPremium(); }
+    catch (err) { skipped.push(`granting Premium — ${String(err.message || err).split('\n')[0].slice(0, 620)}`); }
+
+    await step('premium · already Premium', '/premium', async () => {
+      await goTo(page, BASE, '/premium');
+      await page.waitForSelector('[data-paywall-premium]', { timeout: 20000 });
+      await wait(page, 400);
+    });
+
+    await step('notebook · the mistake notebook, Premium', '/notebook', async () => {
+      await goTo(page, BASE, '/notebook');
+      await page.waitForSelector('[data-notebook-page] [data-mistake-notebook]', { timeout: 20000 });
+      if (await page.locator('[data-notebook-premium-line]').count()) throw new Error('a Premium account was shown the free notebook limit');
+      await wait(page, 500);
+    });
+
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
@@ -1287,6 +1326,8 @@ async function run() {
       await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-jee'), age: 18 });
       await page.waitForSelector('.shell', { timeout: 60000 });
       await online.signIn({ name: 'Accessibility JEE Student' });
+      // Mock papers are Premium-only; this student sits JEE Main papers, so the account holds real Premium (admin grant).
+      await online.grantPremium();
       // The session ended, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
       endSession();
