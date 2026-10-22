@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -7,6 +7,42 @@ import { usePlan } from './usePlan.js';
 import { PLAN_LIMITS } from './studyPlan.js';
 import { SESSION_TYPE_KEYS, reasonText, sessionHref } from './copy.js';
 import Icon from '../components/Icon.jsx';
+import PageLink from '../components/PageLink.jsx';
+import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { capabilityDecision } from '../local/entitlementGate.js';
+import { PAYWALL_ROUTE } from '../paywall/route.js';
+
+/**
+ * Whether this profile may use the target plan: the server-issued entitlement
+ * snapshot, read through the shared contract (platform/entitlements.js). null
+ * while it is being read.
+ */
+export function useTargetPlanAccess(pid) {
+  const [allowed, setAllowed] = useState(null);
+  useEffect(() => {
+    let live = true;
+    if (!pid) { setAllowed(false); return () => { live = false; }; }
+    capabilityDecision(pid, ENTITLEMENTS.TARGET_PLAN)
+      .then(d => { if (live) setAllowed(d?.allowed === true); })
+      .catch(() => { if (live) setAllowed(false); });
+    return () => { live = false; };
+  }, [pid]);
+  return allowed;
+}
+
+/** What a free profile sees instead of the plan: what it is, and the way to Premium. */
+export function TargetPlanPremium({ t }) {
+  return (
+    <div className="plan-page" data-plan-premium style={{ maxWidth: 680 }}>
+      <h1 style={{ marginBottom: 6 }}>{t('plan.title')}</h1>
+      <section className="card">
+        <div className="sc-label">{t('plan.premiumTitle')}</div>
+        <p style={{ lineHeight: 1.5 }}>{t('plan.premiumBody')}</p>
+        <PageLink className="btn btn-primary btn-sm" to={PAYWALL_ROUTE} state={{ from: 'plan' }}>{t('freeCap.seePremium')}</PageLink>
+      </section>
+    </div>
+  );
+}
 
 // The Plan page: every week of the plan as a list of days, each day's sessions
 // with the reason each was chosen, and the three settings that shape it. Days
@@ -19,6 +55,13 @@ const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 export default function PlanPage() {
   const { user } = useApp();
   const t = useT();
+  const access = useTargetPlanAccess(user?.id || null);
+  if (access === null) return <div className="plan-page muted">…</div>;
+  if (!access) return <TargetPlanPremium t={t} />;
+  return <TargetPlan user={user} t={t} />;
+}
+
+function TargetPlan({ user, t }) {
   const nav = useNavigate();
   const { plan, progress, settings, update, loading } = usePlan(user);
   const [week, setWeek] = useState(0);

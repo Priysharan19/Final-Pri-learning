@@ -2,17 +2,18 @@
 //
 // Drives the real dispatcher (client/src/local/backend.js) and the India exam
 // module over the in-memory IndexedDB that backend-check.mjs stands up. Proves:
-//   · 20 practice questions a day on the free plan, counted per profile
-//   · the day resets on the PROFILE's calendar (Asia/Kolkata for India profiles,
-//     Australia/Sydney otherwise) — the same instant is a new day in one and
-//     not the other
-//   · a server-issued Premium snapshot lifts the cap; a forged plan label does not
+//   · practice is unlimited on every plan (the free/Premium split): the free
+//     plan's daily allowance is examiner marking (5 marked scripts a day),
+//     which the SERVER counts and refuses (server-daily-cap-client-check.mjs);
+//     the device still counts served questions per profile on the PROFILE's
+//     calendar (Asia/Kolkata for India profiles, Australia/Sydney otherwise)
+//   · a server-issued Premium snapshot is Premium; a forged plan label is not
 //   · the 7-day offline window is honoured (expired → free; valid → premium)
-//   · one exam simulation per 30 days, in both the HSC paper builder and the
-//     India exam module, lifted by premium-exams
+//   · mock papers are Premium: no free exam allowance, in both the HSC paper
+//     builder and the India exam module, lifted by premium-exams
 //   · the JEE Advanced track needs jee-advanced-content
 //   · every declared capability has a named enforcement point
-//   · retries from History count toward the same cap (no loophole)
+//   · retries from History are counted like any served question
 //   · usage rows carry no personal data
 //
 // Usage: node client/test/entitlement-enforcement-check.mjs
@@ -112,7 +113,7 @@ same('India profiles live in Asia/Kolkata', gate.profileTimeZone({ course: 'in' 
 same('Australian profiles keep Australia/Sydney', gate.profileTimeZone({ course: 'nsw' }), 'Australia/Sydney');
 same('an explicit profile timezone wins', gate.profileTimeZone({ course: 'in', timezone: 'Europe/London' }), 'Europe/London');
 same('an invalid profile timezone falls back to the course default', gate.profileTimeZone({ course: 'in', timezone: 'Mars/Olympus' }), 'Asia/Kolkata');
-same('the free tier is 20 questions a day and one exam per 30 days', [gate.FREE_TIER.practicePerDay, gate.FREE_TIER.examsPerWindow, gate.FREE_TIER.examWindowDays], [20, 1, 30]);
+same('the free tier is unlimited practice, 5 marked answers a day and no exam allowance', [gate.FREE_TIER.practicePerDay, gate.FREE_TIER.markedPerDay, gate.FREE_TIER.examsPerWindow, gate.FREE_TIER.examWindowDays], [null, 5, 0, 30]);
 for (const capability of Object.values(ENTITLEMENTS)) {
   ok(`${capability} has a named enforcement point`, typeof gate.CAPABILITY_ENFORCEMENT[capability] === 'string' && gate.CAPABILITY_ENFORCEMENT[capability].length > 10);
 }
@@ -132,29 +133,25 @@ for (const capability of Object.values(ENTITLEMENTS)) {
     /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
 }
 
-// ── B · India profile: 20 a day, reset on the Kolkata calendar ───────────────
+// ── B · India profile: unlimited practice, counted on the Kolkata calendar ──
 const asha = (await POST('/profiles', { name: 'Asha', year: 9, course: 'in' })).user;
 same('a fresh profile is on the free plan', asha.plan.tier, 'free');
-same('the free practice allowance is 20 with none used', [asha.usage.practice.used, asha.usage.practice.limit], [0, 20]);
-same('the allowance is kept on the profile calendar', asha.usage.practice.timeZone, 'Asia/Kolkata');
-same('the allowance says when it resets', asha.usage.practice.resetsAt, Date.UTC(2026, 8, 5, 18, 30));
+same('free practice has no limit and none used', [asha.usage.practice.used, asha.usage.practice.limit, asha.usage.practice.unlimited], [0, null, true]);
+same('the count is kept on the profile calendar', asha.usage.practice.timeZone, 'Asia/Kolkata');
+same('the count says when its day ends', asha.usage.practice.resetsAt, Date.UTC(2026, 8, 5, 18, 30));
 
 let lastQuestion = null;
 let usedSequence = [];
-for (let i = 0; i < 20; i++) {
+// Past the old twenty-a-day cap: practice is never refused on the free plan.
+for (let i = 0; i < 25; i++) {
   const served = await POST('/practice/next', { mode: 'smart' });
   lastQuestion = served.question;
-  usedSequence.push(served.allowance.used);
+  usedSequence.push([served.allowance.used, served.allowance.allowed, served.allowance.limit, served.allowance.plan]);
 }
-same('every served question reports the running count', usedSequence, Array.from({ length: 20 }, (_, i) => i + 1));
-const capped = await gated('the 21st question of the day is refused on the free plan', POST('/practice/next', { mode: 'smart' }),
-  { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.UNLIMITED_PRACTICE });
-same('the refusal names the reset instant', capped?.resetsAt, Date.UTC(2026, 8, 5, 18, 30));
-same('the refusal reports 20 of 20 used', [capped?.used, capped?.limit], [20, 20]);
-ok('the refusal is plain copy a student can act on', /20 free practice questions/.test(capped?.message || '') && /midnight/.test(capped?.message || ''), capped?.message);
-await gated('a fresh variant from History counts toward the same cap', POST(`/history/${lastQuestion.id}/retry`, { variant: 'fresh' }),
-  { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.UNLIMITED_PRACTICE });
-same('/me reports the exhausted allowance', (await GET('/me')).user.usage.practice.used, 20);
+same('every served question reports the running count, allowed, with no limit, on the free plan', usedSequence, Array.from({ length: 25 }, (_, i) => [i + 1, true, null, 'free']));
+const retried = await POST(`/history/${lastQuestion.id}/retry`, { variant: 'fresh' });
+ok('a fresh variant from History is served on the free plan', !!retried?.question?.id, JSON.stringify(retried).slice(0, 200));
+same('/me reports every question served, with no limit', [(await GET('/me')).user.usage.practice.used, (await GET('/me')).user.usage.practice.limit], [26, null]);
 
 now = T0 + 31 * MIN; // 00:01 on 6 Sep in Kolkata; still 04:31 on 6 Sep in Sydney
 const fresh = await POST('/practice/next', { mode: 'smart' });
@@ -164,93 +161,63 @@ same('one minute past Kolkata midnight the India profile starts a new day', [fre
 now = T0;
 let ned = (await POST('/profiles', { name: 'Ned', year: 9 })).user;
 // Asha above has no account at all; Ned is a signed-in account on the free
-// plan. The cap is the same for both.
+// plan. Practice is unlimited for both.
 await signIn(ned.id);
 ned = (await GET('/me')).user;
 same('an Australian profile counts on the Sydney calendar', ned.usage.practice.timeZone, 'Australia/Sydney');
-for (let i = 0; i < 20; i++) await POST('/practice/next', { mode: 'smart' });
-await gated('Ned hits the same 20-a-day cap', POST('/practice/next', { mode: 'smart' }), { code: 'FREE_CAP_REACHED' });
+for (let i = 0; i < 25; i++) await POST('/practice/next', { mode: 'smart' });
+const ned26 = await POST('/practice/next', { mode: 'smart' });
+same('Ned is served a 26th question on the free plan', [ned26.allowance.used, ned26.allowance.allowed, ned26.allowance.plan], [26, true, 'free']);
 now = T0 + 31 * MIN;
-await gated('Kolkata midnight is not a new day in Sydney — Ned stays capped', POST('/practice/next', { mode: 'smart' }), { code: 'FREE_CAP_REACHED' });
+same('Kolkata midnight is not a new day in Sydney', (await POST('/practice/next', { mode: 'smart' })).allowance.used, 27);
 now = Date.UTC(2026, 8, 6, 14, 0); // 00:00 on 7 Sep in Sydney
-same('Sydney midnight resets Ned', (await POST('/practice/next', { mode: 'smart' })).allowance.used, 1);
+same('Sydney midnight starts Ned\'s new day', (await POST('/practice/next', { mode: 'smart' })).allowance.used, 1);
 
-// ── D · Premium lifts the cap; a forged label does not ───────────────────────
-// Ned has used one of today's twenty on the Sydney calendar; spend the rest so
-// he is capped again at the current instant. The clock is never rewound: the
-// counter holds one day, because no student travels backwards through midnight.
-for (let i = 0; i < 19; i++) await POST('/practice/next', { mode: 'smart' });
-await gated('spending the rest of the day caps Ned again', POST('/practice/next', { mode: 'smart' }), { code: 'FREE_CAP_REACHED' });
+// ── D · a server snapshot is Premium; a forged label is not ──────────────────
 await link(ned.id, { plan: 'premium', status: 'active', provider: 'web' });
-await gated('a plan label with no server window is not Premium', POST('/practice/next', { mode: 'smart' }), { code: 'FREE_CAP_REACHED' });
+same('a plan label with no server window is not Premium', (await POST('/practice/next', { mode: 'smart' })).allowance.plan, 'free');
+same('and /me still says free', (await GET('/me')).user.plan.tier, 'free');
 await link(ned.id, premiumSnapshot());
 const lifted = await POST('/practice/next', { mode: 'smart' });
-same('a server-issued Premium snapshot lifts the daily cap', [lifted.allowance.allowed, lifted.allowance.unlimited, lifted.allowance.plan], [true, true, 'premium']);
+same('a server-issued Premium snapshot is Premium', [lifted.allowance.allowed, lifted.allowance.unlimited, lifted.allowance.plan], [true, true, 'premium']);
 const nedMe = (await GET('/me')).user;
-same('/me reports Premium with no practice limit', [nedMe.plan.tier, nedMe.usage.practice.limit, nedMe.usage.exams.limit], ['premium', null, null]);
-ok('/me exposes the six Premium capabilities', Object.values(ENTITLEMENTS).every(c => nedMe.plan.capabilities.includes(c)), JSON.stringify(nedMe.plan.capabilities));
+same('/me reports Premium with no practice or exam limit', [nedMe.plan.tier, nedMe.usage.practice.limit, nedMe.usage.exams.limit], ['premium', null, null]);
+ok('/me exposes every Premium capability', Object.values(ENTITLEMENTS).every(c => nedMe.plan.capabilities.includes(c)), JSON.stringify(nedMe.plan.capabilities));
 
 // ── E · the 7-day offline window ─────────────────────────────────────────────
 await link(ned.id, premiumSnapshot({ offlineUntil: now - 1 }));
 online = false;
-const offlineExpired = await gated('offline past the 7-day window, Premium falls back to the free cap', POST('/practice/next', { mode: 'smart' }),
-  { code: 'FREE_CAP_REACHED', reason: 'offline-entitlement-expired' });
-ok('the refusal asks the student to reconnect', offlineExpired?.refreshRequired === true && /reconnect/.test(offlineExpired?.message || ''), offlineExpired?.message);
+const offlineExpired = await POST('/practice/next', { mode: 'smart' });
+same('offline past the 7-day window, Premium falls back to the free plan (practice still served)', [offlineExpired.allowance.plan, offlineExpired.allowance.reason, offlineExpired.allowance.refreshRequired, offlineExpired.allowance.allowed], ['free', 'offline-entitlement-expired', true, true]);
+await gated('offline past the window, a mock paper is refused and asks to reconnect', POST('/exams', { length: 10 }),
+  { code: 'PREMIUM_REQUIRED', capability: ENTITLEMENTS.PREMIUM_EXAMS, reason: 'offline-entitlement-expired' });
 online = true;
-await gated('online with an expired offline window the server snapshot must be refreshed first', POST('/practice/next', { mode: 'smart' }),
-  { code: 'FREE_CAP_REACHED', reason: 'not-entitled' });
+same('online with an expired offline window the server snapshot must be refreshed first', (await POST('/practice/next', { mode: 'smart' })).allowance.reason, 'not-entitled');
 await link(ned.id, premiumSnapshot({ offlineUntil: now + 6 * DAY }));
 online = false;
 const offlineValid = await POST('/practice/next', { mode: 'smart' });
-same('inside the offline window Premium keeps working without a network', [offlineValid.allowance.unlimited, offlineValid.allowance.reason], [true, 'offline-cache-valid']);
+same('inside the offline window Premium keeps working without a network', [offlineValid.allowance.plan, offlineValid.allowance.reason], ['premium', 'offline-cache-valid']);
 online = true;
 
-// ── F · one exam simulation per 30 days (HSC paper builder) ──────────────────
+// ── F · mock papers are Premium (HSC paper builder) ──────────────────────────
 await backToFree(ned.id);
 now = T0;
-const firstPaper = await POST('/exams', { length: 10 });
-same('the first exam simulation is free', [firstPaper.allowance.used, firstPaper.allowance.limit], [1, 1]);
-const nedAfterExam = (await GET('/me')).user;
-same('/me reports the exam allowance and when the next one unlocks', [nedAfterExam.usage.exams.used, nedAfterExam.usage.exams.nextAt], [1, T0 + 30 * DAY]);
-const examCapped = await gated('a second simulation inside 30 days is refused on the free plan', POST('/exams', { length: 10 }),
-  { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
-same('the refusal says when the next free simulation unlocks', examCapped?.nextAt, T0 + 30 * DAY);
+const examRefused = await gated('a free account\'s first mock paper is refused', POST('/exams', { length: 10 }),
+  { code: 'PREMIUM_REQUIRED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
+same('the refusal says plainly that mock papers are Premium, with no unlock date to wait for', [examRefused?.message, examRefused?.nextAt ?? null], ['Mock papers are part of Pri Learning Premium.', null]);
+same('/me reports a zero exam allowance on the free plan', [(await GET('/me')).user.usage.exams.used, (await GET('/me')).user.usage.exams.limit], [0, 0]);
 now = T0 + 30 * DAY + MIN;
-// The server counts its own sealed papers on its own clock, and it is the
-// authority: with only the device's clock moved it still refuses, and the
-// device shows the server's refusal.
-{
-  let serverSays = null;
-  try { await POST('/exams', { length: 10 }); } catch (err) { serverSays = err; }
-  same('a device whose own counter has lapsed is still refused by the server', [serverSays?.status, serverSays?.code, serverSays?.capability, serverSays?.reason], [402, 'FREE_CAP_REACHED', ENTITLEMENTS.PREMIUM_EXAMS, 'server-refused']);
-  ok('the server says when its own window unlocks', Number.isFinite(serverSays?.nextAt) && serverSays.nextAt > Date.now());
-  same('a start the server refused is not counted on the device either', (await gate.examAllowance(ned)).used, 0);
-}
-// Thirty days pass for the server too.
-await authority.ageExamPapers(ned.id, 30 * DAY + MIN);
-same('30 days later a simulation is free again', (await POST('/exams', { length: 10 })).allowance.used, 1);
-// A device that wipes its own counter gains nothing: the server still counts.
-{
-  const usageId = (await idb.all('device')).find(r => r?.pid === ned.id && Array.isArray(r.exams))?.id;
-  const usage = await idb.get('device', usageId);
-  await idb.put('device', { ...usage, exams: [] });
-  same('with its counter wiped the device believes a simulation is free', (await gate.examAllowance(ned)).allowed, true);
-  let bypass = null;
-  try { await POST('/exams', { length: 10 }); } catch (err) { bypass = err; }
-  same('but the server refuses the paper', [bypass?.status, bypass?.code], [402, 'FREE_CAP_REACHED']);
-  await idb.put('device', usage);
-}
+await gated('thirty days later it is still refused: there is no free window to wait for', POST('/exams', { length: 10 }),
+  { code: 'PREMIUM_REQUIRED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
+same('a refused paper is not counted on the device', (await gate.examAllowance(ned)).used, 0);
 await link(ned.id, premiumSnapshot());
 const premiumPapers = [await POST('/exams', { length: 10 }), await POST('/exams', { length: 10 })];
-ok('premium-exams lifts the 30-day cap', premiumPapers.every(r => r.allowance.unlimited === true && r.exam?.id));
+ok('premium-exams builds mock papers', premiumPapers.every(r => r.allowance.unlimited === true && r.exam?.id));
 await backToFree(ned.id);
 
-// ── G · the India exam module shares the same rule and counter ───────────────
+// ── G · the India exam module shares the same rule ───────────────────────────
 now = T0;
 const jai = (await POST('/profiles', { name: 'Jai', year: 12, course: 'in', indiaTrack: 'jee-main' })).user;
-// A paper is marked by the server, so the India path starts one only for a
-// signed-in account — the same refusal the practice paper gives. It used to
-// start for anyone. A refused start spends nothing.
 {
   let refusal = null;
   try { await dispatchIndiaExam(jai, 'POST', '/exams', {}); } catch (err) { refusal = err; }
@@ -258,13 +225,12 @@ const jai = (await POST('/profiles', { name: 'Jai', year: 12, course: 'in', indi
   same('a refused start is not counted as a simulation', (await gate.examAllowance(jai)).used, 0);
 }
 await backToFree(jai.id);   // signed in to a real account, on the free plan
-const jeeSection = await dispatchIndiaExam(jai, 'POST', '/exams', {});
-ok('a JEE Main mathematics section is built for a free Class 12 profile', jeeSection.exam?.indiaExam?.track === 'jee-main' && jeeSection.allowance?.used === 1,
-  JSON.stringify({ track: jeeSection.exam?.indiaExam?.track, allowance: jeeSection.allowance }));
-await gated('a second JEE section inside 30 days is refused on the free plan', dispatchIndiaExam(jai, 'POST', '/exams', {}),
-  { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
+await gated('a JEE Main section is refused on the free plan', dispatchIndiaExam(jai, 'POST', '/exams', {}),
+  { code: 'PREMIUM_REQUIRED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
 await link(jai.id, premiumSnapshot());
-ok('premium-exams lifts the India exam cap too', (await dispatchIndiaExam(jai, 'POST', '/exams', {})).allowance.unlimited === true);
+const jeeSection = await dispatchIndiaExam(jai, 'POST', '/exams', {});
+ok('with premium-exams a JEE Main mathematics section is built for a Class 12 profile', jeeSection.exam?.indiaExam?.track === 'jee-main' && jeeSection.allowance?.unlimited === true,
+  JSON.stringify({ track: jeeSection.exam?.indiaExam?.track, allowance: jeeSection.allowance }));
 await backToFree(jai.id);
 
 // ── H · JEE Advanced is Premium content ──────────────────────────────────────

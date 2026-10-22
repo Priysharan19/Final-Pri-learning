@@ -1,11 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · what a student sees when the free tier runs out
+// Pri Learning · what a student sees when a free-plan limit is reached
 //
-// The cap is enforced in the local backend, which throws a gate error. Without
-// this the student would meet that error as raw text, which reads like a fault
-// in the app rather than the end of today's free questions. So it is said
-// plainly: what ran out, when it comes back, and what Premium changes — with no
-// countdown pressure and no dark pattern.
+// Practice is unlimited on every plan. What the free plan rations is examiner
+// marking — FREE_MARKING_ALLOWANCE.scriptsPerDay marked answers a day, counted
+// and refused by the server (402 FREE_CAP_REACHED) — and mock papers are
+// Premium (402 PREMIUM_REQUIRED, capability premium-exams). Without this the
+// student would meet that refusal as raw text, which reads like a fault in the
+// app. So it is said plainly: what ran out, when it comes back, and what
+// Premium changes — with no countdown pressure and no dark pattern.
 //
 // It never invents a price. Prices come from the deployment's billing
 // configuration, and where none is configured it simply does not mention one.
@@ -13,6 +15,8 @@
 import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import { FREE_MARKING_ALLOWANCE } from '../engine/practiceAllowance.js';
+import { PAYWALL_ROUTE } from '../paywall/route.js';
 
 function whenItResets(resetsAt, timeZone) {
   if (!Number.isFinite(resetsAt)) return null;
@@ -34,7 +38,9 @@ export default function FreeCapNotice({ gate, onRetry }) {
   const tx = useTx();
   if (!gate) return null;
   const isExam = gate.code === 'FREE_EXAM_CAP_REACHED' || gate.capability === 'premium-exams';
-  const resets = whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone);
+  // Mock papers have no free allowance to come back; marking returns at midnight.
+  const resets = isExam ? null : whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone);
+  const limit = Number.isFinite(gate.limit) && gate.limit > 0 ? gate.limit : FREE_MARKING_ALLOWANCE.scriptsPerDay;
 
   return (
     <div className="qpage">
@@ -45,13 +51,13 @@ export default function FreeCapNotice({ gate, onRetry }) {
 
         <p style={{ marginTop: 0 }}>
           {isExam
-            ? t('freeCap.examUsed')
-            : t('freeCap.questionsUsed', { count: gate.limit ?? 20, n: gate.limit ?? 20 })}
+            ? t('freeCap.examUsed', { n: FREE_MARKING_ALLOWANCE.scriptsPerDay, count: FREE_MARKING_ALLOWANCE.scriptsPerDay })
+            : t('freeCap.questionsUsed', { count: limit, n: limit })}
         </p>
 
         {resets && (
           <p className="muted">
-            {tx(isExam ? 'freeCap.examUnlocks' : 'freeCap.questionsReturn', {
+            {tx('freeCap.questionsReturn', {
               when: <><b>{resets}</b>{gate.timeZone ? ` (${gate.timeZone.replace('_', ' ')})` : ''}</>
             })}
           </p>
@@ -68,9 +74,9 @@ export default function FreeCapNotice({ gate, onRetry }) {
         </p>
 
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <PageLink className="btn btn-primary" to="/settings#cloud-account-title">
-            {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
-          </PageLink>
+          {gate.refreshRequired
+            ? <PageLink className="btn btn-primary" to="/settings#cloud-account-title">{t('freeCap.reconnect')}</PageLink>
+            : <PageLink className="btn btn-primary" data-free-cap-premium to={PAYWALL_ROUTE} state={{ from: isExam ? 'exams' : 'marking' }}>{t('freeCap.seePremium')}</PageLink>}
           {onRetry && (
             <button className="btn btn-quiet" onClick={onRetry}>{t('common.tryAgain')}</button>
           )}

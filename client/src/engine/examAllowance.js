@@ -8,4 +8,7 @@
  * production image carries; a server import from anywhere else in client/src
  * fails at boot in the container.
  */
-export const FREE_EXAM_ALLOWANCE = Object.freeze({ examsPerWindow: 1, examWindowDays: 30 });
+//
+// Mock papers are Premium (the free/Premium split): the free plan's allowance
+// is zero papers. The window is kept so a deployment or test can raise it.
+export const FREE_EXAM_ALLOWANCE = Object.freeze({ examsPerWindow: 0, examWindowDays: 30 });

@@ -55,6 +55,7 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
+import { saveMistakeInk } from '../notebook/inkStore.js';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
@@ -1461,6 +1462,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         clearInkDraft(question.id);
         const bound = { questionId: String(question.id), submissionId: r.submissionId || body.submissionId, attemptId: r.attemptId || null, lines: Array.isArray(lines) ? lines : null, viaInk: body.viaInk === true };
         attemptRef.current = bound;
+        // A wrong answer the server resolved goes into the mistake notebook,
+        // which the server keeps without pictures. A small copy of the
+        // student's own strokes is kept on this device for it, under the
+        // server's attemptId — display only, never read or sent.
+        if (!diagnostic && r.correct === false && bound.attemptId && body.ink?.strokes?.length) {
+          void saveMistakeInk(user?.id, bound.attemptId, body.ink.strokes);
+        }
         if (live) {
           setAttempt(bound);
           setJudged(submitted); setJudgedStale(false);

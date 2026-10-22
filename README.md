@@ -627,9 +627,11 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   still shows an empty history.
 
 - **Free and Premium.** The free tier (`FREE_TIER` in `client/src/local/entitlementGate.js`) is
-  CBSE / NCERT and JEE Main with 20 practice questions a day, one exam simulation every 30 days and
-  basic Pri Explain. Premium (`client/src/platform/entitlements.js`) removes the practice and exam
-  limits and unlocks JEE Advanced, advanced Pri Explain and advanced analytics. The reserved
+  CBSE / NCERT and JEE Main with unlimited practice, 5 marked answers a day (counted and refused
+  by the server at submit), the newest 3 mistakes in the mistake notebook and basic Pri Explain.
+  Premium (`client/src/platform/entitlements.js`) adds unlimited marking, mock papers, the full
+  mistake notebook, the parent report and the target plan, and unlocks JEE Advanced, advanced Pri
+  Explain and advanced analytics. The reserved
   `additional-ai-usage` capability has no consumer and is not marketed. No price is configured in
   the repository.
 

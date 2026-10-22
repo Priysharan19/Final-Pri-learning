@@ -1017,6 +1017,27 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const EXAM_WINDOW_MS = FREE_EXAM_ALLOWANCE.examWindowDays * DAY_MS;
 
 /**
+ * Free papers per window. The shipped plan is zero — mock papers are Premium
+ * (the free/Premium split) — and a deployment may raise it with
+ * PRI_FREE_EXAMS_PER_WINDOW (a non-negative integer; config.js refuses to boot
+ * production on anything else). Read per request, from the server's env only.
+ */
+export function freeExamsPerWindow(env = process.env) {
+  const text = String(env.PRI_FREE_EXAMS_PER_WINDOW ?? '').trim();
+  if (!text) return FREE_EXAM_ALLOWANCE.examsPerWindow;
+  const n = Number(text);
+  return Number.isSafeInteger(n) && n >= 0 && n <= 1000 ? n : FREE_EXAM_ALLOWANCE.examsPerWindow;
+}
+
+/** Configuration mistakes production must not boot with (config.js). */
+export function examAllowanceConfigProblems(env = process.env) {
+  const text = String(env.PRI_FREE_EXAMS_PER_WINDOW ?? '').trim();
+  if (!text) return [];
+  const n = Number(text);
+  return Number.isSafeInteger(n) && n >= 0 && n <= 1000 ? [] : ['PRI_FREE_EXAMS_PER_WINDOW (a non-negative integer up to 1000)'];
+}
+
+/**
  * Null when this account may start this paper now; otherwise the refusal, in
  * the codes the device's own gate uses (402 FREE_CAP_REACHED / PREMIUM_REQUIRED)
  * so the same paywall copy applies. Reads only; consumes nothing.
@@ -1031,13 +1052,18 @@ async function entitlementRefusal(db, accountId, spec, now) {
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
   }
   if (capabilities.includes('premium-exams')) return null;
+  const perWindow = freeExamsPerWindow();
+  if (perWindow <= 0) {
+    return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+      message: 'Mock papers are part of Pri Learning Premium. Practice stays unlimited on the free plan.' };
+  }
   const recent = await db.all("SELECT created_at FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
     [accountId, now - EXAM_WINDOW_MS]);
-  if (recent.length < FREE_EXAM_ALLOWANCE.examsPerWindow) return null;
+  if (recent.length < perWindow) return null;
   const nextAt = Number(recent[0].created_at) + EXAM_WINDOW_MS;
   return { status: 402, code: 'FREE_CAP_REACHED', capability: 'premium-exams', used: recent.length,
-    limit: FREE_EXAM_ALLOWANCE.examsPerWindow, windowDays: FREE_EXAM_ALLOWANCE.examWindowDays, nextAt,
-    message: `The free plan includes ${FREE_EXAM_ALLOWANCE.examsPerWindow === 1 ? 'one exam simulation' : `${FREE_EXAM_ALLOWANCE.examsPerWindow} exam simulations`} every ${FREE_EXAM_ALLOWANCE.examWindowDays} days. Premium includes unlimited simulations.` };
+    limit: perWindow, windowDays: FREE_EXAM_ALLOWANCE.examWindowDays, nextAt,
+    message: `The free plan includes ${perWindow === 1 ? 'one exam simulation' : `${perWindow} exam simulations`} every ${FREE_EXAM_ALLOWANCE.examWindowDays} days. Premium includes unlimited simulations.` };
 }
 
 /**

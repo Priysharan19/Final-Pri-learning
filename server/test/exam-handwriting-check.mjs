@@ -80,13 +80,16 @@ await new Promise(resolve => fake.listen(0, '127.0.0.1', resolve));
 
 const vars = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_AUTH_EMAIL_PROVIDER', 'PRI_HANDWRITING_API_KEY',
   'PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_MODEL', 'PRI_HANDWRITING_FALLBACK_MODEL', 'PRI_HANDWRITING_TIMEOUT_MS',
-  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM'];
+  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_FREE_EXAMS_PER_WINDOW'];
 const previous = Object.fromEntries(vars.map(name => [name, process.env[name]]));
 Object.assign(process.env, {
   NODE_ENV: 'test', PRI_PLATFORM_DB: join(scratch, 'unused.db'), PRI_AUTH_DELIVERY_KEY: '5d'.repeat(32),
   PRI_HANDWRITING_API_KEY: 'local-counting-fixture', PRI_HANDWRITING_ENDPOINT: `http://127.0.0.1:${fake.address().port}/v1/responses`,
   PRI_HANDWRITING_MODEL: 'fixture-primary', PRI_HANDWRITING_TIMEOUT_MS: '2000',
-  PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
+  PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000',
+  // Mock papers are Premium at the shipped default (exam-authority-check.mjs);
+  // this suite's free accounts sit one paper each, as before.
+  PRI_FREE_EXAMS_PER_WINDOW: '1'
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_HANDWRITING_FALLBACK_MODEL']) delete process.env[name];
 

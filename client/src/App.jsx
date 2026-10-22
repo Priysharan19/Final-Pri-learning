@@ -37,6 +37,8 @@ const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
+const NotebookPage = React.lazy(() => import('./notebook/NotebookPage.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
@@ -614,6 +616,8 @@ export default function App() {
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/premium" element={studentOnly(<Paywall />)} />
+                    <Route path="/notebook" element={studentOnly(<NotebookPage />)} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>

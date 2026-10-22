@@ -7,9 +7,15 @@ const STATUS = new Set(['free', 'trialing', 'active', 'grace', 'paused', 'past_d
 const PROVIDER = new Set(['none', 'apple', 'google', 'web', 'admin']);
 const MAX_OFFLINE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// The free/Premium split: practice is unlimited on every plan; Premium is
+// unlimited examiner marking, mock papers, the full mistake notebook, the
+// parent report and the target plan (plus the long-standing extras below).
+// `unlimited-practice` stays in the list so builds that still read it keep
+// treating a Premium account as uncapped.
 export const PREMIUM_CAPABILITIES = Object.freeze([
   'unlimited-practice', 'advanced-pri-explain', 'premium-exams',
-  'jee-advanced-content', 'advanced-analytics', 'additional-ai-usage'
+  'jee-advanced-content', 'advanced-analytics', 'additional-ai-usage',
+  'unlimited-marking', 'full-notebook', 'parent-report', 'target-plan'
 ]);
 
 /**

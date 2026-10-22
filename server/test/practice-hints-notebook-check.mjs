@@ -8,9 +8,13 @@
 //                 left. The solution rung resolves the question as REVEALED,
 //                 never correct. One-try modes offer no ladder. Another
 //                 account's question is 404.
-//   notebook      only a wrong resolution the deterministic engine diagnosed
-//                 (an authored trap its feedback matched) is filed; a wrong
-//                 answer with no diagnosis and a reveal are not. A twin is a
+//   notebook      every wrong resolution is filed (the notebook/paywall
+//                 split: "every marked step that was wrong is saved"); it is
+//                 grouped under the misconception the deterministic engine
+//                 diagnosed (an authored trap its feedback matched), and a
+//                 wrong answer with no diagnosis is filed under its topic
+//                 alone, never given an invented misconception. A reveal is
+//                 not a mistake. A correct twin marks the entry fixed. A twin is a
 //                 new server-issued question from the same generator, dot
 //                 point and difficulty, with no key in it, and only the
 //                 owning account can draw one.
@@ -24,6 +28,9 @@ import { join } from 'node:path';
 const scratch = mkdtempSync(join(tmpdir(), 'pri-hints-notebook-'));
 process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
+// The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs;
+// this suite marks many answers on one free account, so it raises it by configuration.
+process.env.PRI_FREE_MARKED_PER_DAY = '100000';
 process.env.PRI_AUTH_DELIVERY_KEY = '6b'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
@@ -122,7 +129,7 @@ try {
   const c = await registerAccount(h, { email: 'notebook.c@example.test', deviceId: 'ipad-notebook-c' });
   const d = await registerAccount(h, { email: 'notebook.d@example.test', deviceId: 'ipad-notebook-d' });
   eq([(await verifyEmail(h, c.account.id)).status, (await verifyEmail(h, d.account.id)).status], [200, 200], 'two more verified accounts');
-  eq((await get('/v1/practice/notebook', c.jar)).data.entries, [], 'an empty notebook to begin with');
+  eq((await get('/v1/practice/notebook', c.jar)).data.groups, [], 'an empty notebook to begin with');
 
   const t = await issue(c.jar, PERCENT, 4242);
   const tid = t.data.question.id;
@@ -135,7 +142,7 @@ try {
   eq([tev.misconception, tev.misconceptionSource], [misconceptionIdForTrap(tq.subtopic, trap.why), 'trap'], 'the attempt is filed under what the engine diagnosed');
   eq(tev.dotpoint, tq.dotpoint, 'with its dot point');
 
-  // Wrong with no diagnosis, and revealed: neither is filed.
+  // Wrong with no diagnosis: filed under its topic alone. Revealed: not filed.
   const w = await issue(c.jar, PERCENT, 5151);
   await grade(c.jar, w.data.question.id, '123456');
   const wrongPlain = await grade(c.jar, w.data.question.id, '123457');
@@ -146,17 +153,21 @@ try {
 
   const book = await get('/v1/practice/notebook', c.jar);
   eq(book.status, 200, 'the notebook is served');
-  eq(book.data.entries.length, 1, 'exactly one group: only the diagnosed slip is filed');
-  const g = book.data.entries[0];
-  eq([g.key, g.count, g.items.length, g.items[0].id, g.items[0].questionId, g.items[0].prompt, g.items[0].canTwin],
-    [tev.misconception, 1, 1, tev.eventId, tid, tq.prompt, true], 'the group names the slip and the question it came from');
-  eq((await get('/v1/practice/notebook', d.jar)).data.entries, [], 'another account sees none of it');
+  eq([book.data.total, book.data.groups.length], [2, 2], 'two mistakes in two groups: the reveal is not filed');
+  const g = book.data.groups.find(x => x.misconception?.id === tev.misconception);
+  ok(!!g, 'one group is the diagnosed slip');
+  eq([g.key, g.count, g.items.length, g.items[0].id, g.items[0].questionId, g.items[0].prompt, g.items[0].canTwin, g.items[0].fixed],
+    [`${tq.subtopic}::${tev.misconception}`, 1, 1, tev.eventId, tid, tq.prompt, true, false], 'the group names the topic, the slip and the question it came from');
+  const plainGroup = book.data.groups.find(x => x !== g);
+  eq([plainGroup.misconception, plainGroup.key, plainGroup.items[0].questionId], [null, `${tq.subtopic}::unclassified`, w.data.question.id],
+    'the undiagnosed wrong answer is filed under its topic with no invented misconception');
+  eq((await get('/v1/practice/notebook', d.jar)).data.groups, [], 'another account sees none of it');
 
   // ── The twin ─────────────────────────────────────────────────────────────
   const stolen = await post(`/v1/practice/notebook/${tev.eventId}/twin`, {}, d.jar);
   eq([stolen.status, stolen.data.error?.code], [404, 'NOTEBOOK_ENTRY_NOT_FOUND'], 'another account cannot draw a twin of this entry');
   const revealedEv = await eventOf(r.data.question.id);
-  eq((await post(`/v1/practice/notebook/${revealedEv.eventId}/twin`, {}, c.jar)).status, 404, 'an attempt that was never filed has no twin');
+  eq((await post(`/v1/practice/notebook/${revealedEv.eventId}/twin`, {}, c.jar)).status, 404, 'a revealed attempt was never filed and has no twin');
   eq((await post(`/v1/practice/notebook/${tev.eventId}/twin`, { seed: 1 }, c.jar)).status, 400, 'a twin takes no parameters (no seed from the device)');
   const twin = await post(`/v1/practice/notebook/${tev.eventId}/twin`, {}, c.jar);
   eq(twin.status, 201, 'the owner draws a twin');
@@ -169,6 +180,9 @@ try {
   const twGrade = await grade(c.jar, tw.id, twSealed.answer.value);
   eq([twGrade.data.authoritative, twGrade.data.correct], [true, true], 'and marked by the server like any question');
   eq((await grade(d.jar, tw.id, twSealed.answer.value)).status, 404, 'another account cannot answer it');
+  eq(twSealed._twinOf, tev.eventId, 'the twin is sealed with the mistake it retries');
+  const fixedEntry = (await get('/v1/practice/notebook', c.jar)).data.groups.flatMap(x => x.items).find(i => i.id === tev.eventId);
+  eq([fixedEntry.fixed, fixedEntry.retries, fixedEntry.review.due], [true, 1, false], 'answering the twin correctly marks the mistake fixed and ends its reviews');
 
   // ── The review queue ─────────────────────────────────────────────────────
   const queue = await get('/v1/practice/review-queue', c.jar);
@@ -180,7 +194,7 @@ try {
   eq((await get('/v1/practice/review-queue', {})).status, 401, 'signed out, there is no queue');
   eq((await get('/v1/practice/notebook', {})).status, 401, 'nor a notebook');
 
-  console.log(`HINTS AND NOTEBOOK: PASS — ${count}/${count} checks — the server serves and charges each rung in order and credits a correct answer with the weight left, the solution rung is a reveal, the notebook files only what the engine diagnosed, twins are server-issued per account, and the review queue is the account's own.`);
+  console.log(`HINTS AND NOTEBOOK: PASS — ${count}/${count} checks — the server serves and charges each rung in order and credits a correct answer with the weight left, the solution rung is a reveal, the notebook files every wrong resolution under what the engine diagnosed, twins are server-issued per account, and the review queue is the account's own.`);
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });

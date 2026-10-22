@@ -380,9 +380,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
     ok(new RegExp(`<button[^>]*data-check-next[^>]*>${en['practice.nextQuestion']}</button>`).test(unavailable) && /data-check-retry/.test(unavailable), 'question: Next question, or try again');
     ok(!/data-check-next/.test(reconnect), 'only that reason offers to leave the question');
     const freeCap = refusal('free-cap');
-    ok(freeCap.includes(en['check.freeCapTitle']) && freeCap.includes(en['check.notChecked']) && freeCap.includes(en['check.freeCapHint']),
+    // The hint names the free plan's daily marking allowance from FREE_MARKING_ALLOWANCE (5 marked answers a day).
+    ok(freeCap.includes(en['check.freeCapTitle']) && freeCap.includes(en['check.notChecked']) && freeCap.includes(en['check.freeCapHint'].replace('{n}', '5')) && /includes 5 a day/.test(freeCap),
       'free cap: today\'s free questions are used up, the answer was not checked, and when they come back');
-    ok(/<a[^>]*href="\/settings#cloud-account-title"[^>]*>See Premium<\/a>/.test(freeCap) && !/data-check-retry|data-check-sign-in|data-check-next/.test(freeCap),
+    ok(/<a[^>]*href="\/premium"[^>]*>See Premium<\/a>/.test(freeCap) && !/data-check-retry|data-check-sign-in|data-check-next/.test(freeCap),
       'free cap: See Premium is the one next step — no retry (the day does not change), no sign-in, no next question (capped the same way)');
     for (const kind of Object.values(CHECK_REFUSAL)) {
       const html = refusal(kind);
@@ -581,7 +582,8 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   ok(/\{helpUsed > 0 && !resolved && diagnostic && \(/.test(card), 'the card promises no hint-credit figure for a practice question');
 
   const exams = read('src/pages/Exams.jsx');
-  ok(/const kind = checkRefusal\(err\);\s*if \(checkRefusalCopy\(kind, 'exam'\)\) setRefusal\(kind\);/.test(exams), 'the exam page reads the same refusal codes');
+  ok(/const kind = checkRefusal\(err\);\s*if \(Number\(err\?\.status\) === 402 && \(err\?\.capability === 'premium-exams'[^\n]*\) setPremiumGate\(true\);\s*else if \(checkRefusalCopy\(kind, 'exam'\)\) setRefusal\(kind\);/.test(exams), 'the exam page reads the same refusal codes, after explaining a Premium mock-paper refusal');
+  ok(/to=\{PAYWALL_ROUTE\} state=\{\{ from: 'exams' \}\}/.test(exams), 'a refused mock paper links to the Premium screen');
   ok(/<CheckRefusal kind=\{refusal\} context="exam" user=\{user\} refreshUser=\{refreshUser\} onRetry=\{start\} busy=\{busy\} \/>/.test(exams), 'and mounts the same sign-in / retry in place');
   ok((exams.match(/^\s*\{startRefused\}$/gm) || []).length === 2, 'in both the India and the general exam layouts');
   ok(/setRefusal\(kind => \(kind === 'sign-in' \? null : kind\)\)/.test(exams) && !/onCloudSessionChange[\s\S]{0,300}start\(\)/.test(exams), 'signing in clears the reason; the paper never starts on its own');

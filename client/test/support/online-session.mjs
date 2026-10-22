@@ -59,7 +59,11 @@ const ENV = {
   // browser, by tour-free-cap.js — which boots this platform with the default
   // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
   // the cap raised by configuration so it is never read as a fault.
-  PRI_FREE_PRACTICE_PER_DAY: '100000'
+  PRI_FREE_PRACTICE_PER_DAY: '100000',
+  // The free plan's 5 marked scripts a day is proved at its shipped default by
+  // server/test/practice-daily-cap-check.mjs; flows that mark more answers on
+  // one free account raise it by configuration.
+  PRI_FREE_MARKED_PER_DAY: '100000'
 };
 // PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
 // page's own origin, which is this server's ephemeral loopback port.

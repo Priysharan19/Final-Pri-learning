@@ -55,10 +55,12 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
-  // The free plan's daily cap is decided per account where a question is
-  // issued: the count, its exactly-once under two racing devices and the
-  // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
+  // The free plan's daily marking allowance is decided per account where an
+  // answer is marked: the count, its exactly-once under two racing devices and
+  // the account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // The mistake notebook's free preview and Premium unlock, on Postgres.
+  'notebook-paywall-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.

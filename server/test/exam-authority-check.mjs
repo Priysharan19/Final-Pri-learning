@@ -967,7 +967,20 @@ try {
   const racer = await registerAccount(h, { email: 'exam.racer@example.test', deviceId: 'ipad-exam-racer' });
   for (const account of [free, advFree, racer]) eq((await verifyEmail(h, account.account.id)).status, 200, 'a free account is verified');
   await h.db.run('DELETE FROM rate_limits');
-  eq([FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays], [1, 30], 'the free plan is one simulation every 30 days, from the shared definition');
+  // Mock papers are Premium: the shipped free allowance is zero papers.
+  eq([FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays], [0, 30], 'the shipped free plan includes no mock papers, from the shared definition');
+  {
+    const premiumOnly = await create(free.jar, practice);
+    eq([premiumOnly.status, premiumOnly.data?.error?.code, premiumOnly.data?.error?.capability], [402, 'PREMIUM_REQUIRED', 'premium-exams'],
+      'at the shipped default a free account is refused a mock paper as Premium-only');
+    const premiumOnlyIndia = await create(free.jar, await india(free.jar, 'cbse', 10));
+    eq([premiumOnlyIndia.status, premiumOnlyIndia.data?.error?.code], [402, 'PREMIUM_REQUIRED'], 'a blueprint paper too');
+    eq(await rows(free.account.id, 'exam-paper'), 0, 'and the refusal seals nothing');
+  }
+  // The window-counting machinery stays for a deployment that raises the free
+  // allowance (PRI_FREE_EXAMS_PER_WINDOW); the rest of this block proves it at
+  // one paper per window, read per request from the server's env only.
+  process.env.PRI_FREE_EXAMS_PER_WINDOW = '1';
   const freeKey = idem();
   const firstFree = await create(free.jar, practice, freeKey);
   eq(firstFree.status, 201, 'a free account starts its one free simulation');

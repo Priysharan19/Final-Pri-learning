@@ -54,8 +54,11 @@ for (const [claim, why] of FALSE_NOW) {
 // #283: Premium is enforced now, so the README must state the free tier the
 // gate enforces rather than the old "Premium buys nothing" gap.
 const { FREE_TIER } = await import(join(ROOT, 'client/src/local/entitlementGate.js'));
-ok(new RegExp(`${FREE_TIER.practicePerDay} practice questions a day`).test(readme) && !/Premium buys nothing/i.test(readme),
-  'the README states the enforced free-tier cap and no longer says Premium buys nothing');
+// Free/Premium split: practice is unlimited and marking is the daily allowance.
+const { FREE_NOTEBOOK_PREVIEW } = await import(join(ROOT, 'client/src/engine/practiceAllowance.js'));
+ok(FREE_TIER.practicePerDay === null && /unlimited practice/.test(readme) && new RegExp(`${FREE_TIER.markedPerDay} marked answers a day`).test(readme) &&
+  new RegExp(`newest ${FREE_NOTEBOOK_PREVIEW} mistakes`).test(readme) && !/\d+ practice questions a day|one exam simulation every/.test(readme) && !/Premium buys nothing/i.test(readme),
+  'the README states the enforced free-tier allowance (unlimited practice, marked answers a day, notebook preview) and no longer says Premium buys nothing');
 
 // The gaps that must stay named while they are still real.
 const { plotSpecFor } = await import(join(ROOT, 'client/src/engine/plotSpec.js'));

@@ -110,7 +110,7 @@ function seedServerDice(seed) {
 
 const ENV_NAMES = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN',
   'PRI_HANDWRITING_API_KEY', 'PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_MODEL', 'PRI_HANDWRITING_FALLBACK_MODEL',
-  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_FREE_PRACTICE_PER_DAY'];
+  'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_FREE_MARKED_PER_DAY'];
 // A 1×1 white PNG. The reader stand-in does not look at it; the server only
 // checks that what the device sent is a bounded base64 image.
 const BLANK_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4//8/AwAI/AL+p5qgoAAAAABJRU5ErkJggg==';
@@ -147,6 +147,9 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   // client/test/server-daily-cap-client-check.mjs; here it is raised by
   // configuration unless a suite sets it itself (`env`).
   process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
+  // The free plan's 5 marked scripts a day is proven in practice-daily-cap-check.mjs;
+  // suites that mark many answers on one free account raise it by configuration.
+  process.env.PRI_FREE_MARKED_PER_DAY = '100000';
 
   // ── The handwriting reader the server calls (third party, stood in) ───────
   const reader = { calls: 0, server: null };

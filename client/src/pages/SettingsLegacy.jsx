@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { FREE_NOTEBOOK_PREVIEW } from '../engine/practiceAllowance.js';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import Icon from '../components/Icon.jsx';
@@ -512,7 +513,7 @@ export default function Settings() {
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, exams: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { marked: FREE_TIER.markedPerDay, notebook: FREE_NOTEBOOK_PREVIEW })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>

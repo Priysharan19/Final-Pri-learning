@@ -58,10 +58,10 @@ account), it is marked **OWNER**.
 > • Follow your progress chapter by chapter
 >
 > FREE AND PREMIUM
-> The free plan includes 20 practice questions a day and one exam simulation every 30 days, for
-> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily practice limit and the
-> exam-simulation limit, and includes the JEE Advanced track. Premium is ₹199 a month or ₹1,499
-> a year.
+> The free plan includes unlimited practice and 5 answers marked by the examiner each day,
+> for CBSE / NCERT and JEE Main. Pri Learning Premium adds unlimited marking, mock papers, the
+> full mistake notebook, the parent report, the target plan and the JEE Advanced track.
+> Premium is ₹199 a month or ₹1,499 a year.
 >
 > WHAT PRI NEEDS
 > Checking answers needs a Pri account and an internet connection. Your ink and drafts are kept
@@ -244,7 +244,7 @@ claims.
 | Server reads handwriting/photos; answer-blind; image not kept | `server/platform/handwriting.js`, `practice.js`, `handwritingProvider.js`; `data-retention.md` §4 |
 | Reading proposes, student can correct | `practice.js` `/:id/recognition/:receipt/confirm` |
 | Marks decided by the deterministic engine | `server/platform/markerOps.js`, `markerPool.js`; ADR-0001 |
-| Free: 20 questions/day, one exam simulation per 30 days | `client/src/local/backend.js` (free tier comment), `client/src/engine/examAllowance.js` |
+| Free: unlimited practice, 5 marked answers/day, no mock papers | `client/src/engine/practiceAllowance.js`, `client/src/engine/examAllowance.js`, `server/platform/practiceAllowance.js` |
 | Premium lifts the daily practice cap | `client/src/local/entitlementGate.js` (`UNLIMITED_PRACTICE`, device-local counter at `POST /practice/next` and `/history/:id/retry`) |
 | Premium lifts the exam-simulation limit | `server/platform/exams.js` `entitlementRefusal` (`premium-exams`); `client/src/local/indiaExamBackend.js` |
 | JEE Advanced is Premium | `client/src/local/backend.js` (`requireCapability(…, JEE_ADVANCED)`), `indiaExamBackend.js`, `exams.js` |

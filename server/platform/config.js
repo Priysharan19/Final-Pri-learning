@@ -2,6 +2,7 @@ import { isAbsolute } from 'node:path';
 import { compatibilityConfigProblems } from './clientCompatibility.js';
 import { aiAllowanceConfigProblems } from './aiAllowance.js';
 import { practiceAllowanceConfigProblems } from './practiceAllowance.js';
+import { examAllowanceConfigProblems } from './exams.js';
 import { errorSinkConfigProblems } from './errorSink.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
@@ -427,6 +428,7 @@ export function platformConfigStatus() {
   if (production) missing.push(...compatibilityConfigProblems());
   if (production) missing.push(...aiAllowanceConfigProblems());
   if (production) missing.push(...practiceAllowanceConfigProblems());
+  if (production) missing.push(...examAllowanceConfigProblems());
   if (production) missing.push(...errorSinkConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
