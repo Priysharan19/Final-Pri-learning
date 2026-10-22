@@ -573,6 +573,79 @@ try {
   budgetServer.close();
 }
 
+// ── 10 · What the route hands the reader, and what it hands back (#196) ──────
+// Reconciliation of the #192 cloud-handwriting authority on current main.
+// `questionId` is the one field the route accepts beside the picture: it binds
+// the read receipt to an issued question. It must never travel to the reader,
+// even when it names a question this account owns and a receipt is minted.
+// And the reader's reply is untrusted model output: whatever it adds — a
+// verdict, marks, an "answer" — the route returns only the closed
+// transcription shape, so nothing a model says can arrive looking like a mark.
+{
+  const QID = '5e1f0c2a-9b3d-4c7e-8a61-2f4d6b8c0e19';
+  db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
+    .run('acct-boundary', 'boundary@example.test', 'Boundary', 'student', now, now, now);
+  db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
+    VALUES (?,?,?,?,?,?,?,?)`).run('ses-acct-boundary', 'acct-boundary', sha256('raw-acct-boundary'), 'ipad', null, now, now, now + 86400000);
+  // The question was issued to this account, so the route mints a receipt for it.
+  db.prepare(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
+    VALUES (?,?,?,?,?,?,?)`).run('acct-boundary', 'practice-question', QID, '{}', null, now, now + 86400000);
+
+  const bodies = [];
+  const hostileReader = async (_url, init) => {
+    bodies.push(String(init?.body ?? ''));
+    return {
+      ok: true, status: 200,
+      json: async () => ({ output_text: JSON.stringify({
+        lines: [{ text: 'x = 4', latex: 'x = 4', confidence: 0.97, uncertain: false, doubt: '', gap_before: false,
+          correct: true, marks: 5, answer: 'x = 4', verdict: 'right' }],
+        confidence: 0.97, needs_confirmation: false,
+        correct: true, isCorrect: true, marks: 5, marksEarned: 5, answer: 'x = 4', solution: 'subtract 3, halve', verdict: 'correct'
+      }) })
+    };
+  };
+  const boundaryApp = express();
+  boundaryApp.use(express.json({ limit: '2mb' }));
+  boundaryApp.use(cookieParser());
+  boundaryApp.use('/handwriting', createHandwritingRouter(db, {
+    env,
+    transcribe: (image, options) => transcribeHandwriting(image, { ...options, env, fetchImpl: hostileReader })
+  }));
+  const boundaryServer = await new Promise(resolve => { const s = boundaryApp.listen(0, '127.0.0.1', () => resolve(s)); });
+  const boundaryBase = `http://127.0.0.1:${boundaryServer.address().port}`;
+  try {
+    const page = PNG + Buffer.from('boundary-page-0001').toString('base64');
+    const res = await fetch(`${boundaryBase}/handwriting/transcribe`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-boundary` },
+      body: JSON.stringify({ image: page, questionId: QID, requestId: 'req-boundary-0001' })
+    });
+    const json = await res.json().catch(() => null);
+    eq(res.status, 200, 'a verified account reading for an issued question is answered');
+    ok(typeof json?.receipt === 'string' && json.receipt.startsWith('v1.'), 'and, the question being this account\'s own, a read receipt is minted for it');
+    eq(bodies.length, 1, 'exactly one body reached the reader');
+    const sent = bodies[0] || '';
+    ok(!sent.includes(QID) && !sent.includes(QID.slice(0, 8)), 'the issued question id never travels to the reader, though the route bound a receipt to it');
+    ok(!sent.includes('req-boundary-0001'), 'nor does the client request id');
+    ok(!/"questionId"|"requestId"/.test(sent), 'the reader body has no slot for either');
+    ok(sent.includes(page), 'what the reader received is the picture');
+
+    eq(Object.keys(json?.transcription || {}).sort(),
+      ['confidence', 'confidenceFloor', 'engine', 'escalated', 'fallbackAttempted', 'fallbackFailureCode', 'latencyMs', 'lines', 'needsConfirmation', 'providerNeedsConfirmation', 'text'],
+      'the route answers with the closed transcription shape, whatever extra the model returned');
+    eq(Object.keys(json?.transcription?.lines?.[0] || {}).sort(), ['confidence', 'doubt', 'gapBefore', 'latex', 'text', 'uncertain'],
+      'and every line is the closed line shape');
+    eq(Object.keys(json || {}).sort(), ['receipt', 'reused', 'transcription'], 'nothing beside the transcription, the receipt and the reuse flag');
+    const wireReply = JSON.stringify(json);
+    for (const leak of ['"correct"', '"isCorrect"', '"marks"', '"marksEarned"', '"answer"', '"solution"', '"verdict"', 'subtract 3']) {
+      ok(!wireReply.includes(leak), `a model-supplied ${leak} never reaches the student's device`);
+    }
+    eq(json?.transcription?.text, 'x = 4', 'the transcription itself comes through unchanged');
+  } finally {
+    await new Promise(resolve => boundaryServer.close(resolve));
+  }
+}
+
 console.log(failures.length
   ? `HANDWRITING TRANSCRIPTION: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `HANDWRITING TRANSCRIPTION: PASS — ${pass}/${pass} checks — answer-blind, transcription-only, unretained, confidence-gated, signed-in and rate limited.`);
