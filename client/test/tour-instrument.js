@@ -466,7 +466,12 @@ export const writeFlow = {
       await page.keyboard.press('/');
       await check('“/” focuses the search', await page.evaluate(() => document.activeElement?.hasAttribute('data-history-search')));
       await page.keyboard.type('zzqx-no-such-question');
-      await page.waitForSelector('[data-history-search-count]', { timeout: 10000 }).catch(() => {});
+      // Wait for the settled search state, not merely the first render of the
+      // count: under CI load the count can mount a frame before the ledger's
+      // rows unmount, which made this check intermittently read 162/163. The
+      // assertion below is unchanged.
+      await page.waitForFunction(() => document.querySelectorAll('.hist-row').length === 0
+        && document.querySelectorAll('[data-history-search-count]').length === 1, null, { timeout: 10000 }).catch(() => {});
       await check('a search with no match lists nothing', await page.locator('.hist-row').count() === 0 && await page.locator('[data-history-search-count]').count() === 1);
       await page.locator('[data-history-search]').fill('');
       await page.waitForSelector('.hist-row', { timeout: 10000 }).catch(() => {});
