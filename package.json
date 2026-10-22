@@ -205,7 +205,7 @@
     "test:photo:practise": "node client/test/question-photo-client-check.mjs",
     "test:predictor": "node client/test/mark-predictor-check.mjs",
     "preflight": "node tools/production-preflight.mjs",
-    "test:pdf": "node client/test/pdf-working-check.mjs",
+    "test:pdf": "node client/test/pdf-working-check.mjs && node client/test/ink-pdf-resource-check.mjs",
     "test:mcq:distinct": "node client/test/mcq-distinctness-check.mjs",
     "test:budget": "node client/test/install-budget-check.mjs",
     "test:boot": "node client/test/boot-resilience-check.mjs",
