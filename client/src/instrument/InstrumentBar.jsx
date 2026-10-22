@@ -132,7 +132,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
     <>
       <header className="in-bar no-print" data-instrument-bar>
         <button type="button" className="in-mark" onClick={() => nav('/', { replace: isCurrentUrl('/') })} aria-label={t('inst.home')}>
-          <PMark size={28} />Pri
+          <PMark size={28} wordmark />
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')} ref={tabsRef}>
           {TABS.map(tab => (
