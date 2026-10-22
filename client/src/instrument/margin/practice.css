@@ -163,5 +163,6 @@ html.ui-instrument [data-c-surface] :lang(hi) :is(.btn, .chip, .tag, .mcq-mark, 
 @media (max-width: 560px) {
   html.ui-instrument [data-c-surface] .exam-head .btn:not(.qpage *) { letter-spacing: 0.04em; padding: 0 12px; white-space: nowrap; }
   html.ui-instrument [data-c-surface] .exam-head-title:not(.qpage *) { min-width: 0; }
+  html.ui-instrument [data-c-surface] .tag:not(.qpage *) { white-space: normal; max-width: 100%; overflow-wrap: anywhere; height: auto; }
   html.ui-instrument [data-c-surface] :is(.exam-body, .exam-paper, .exam-nav):not(.qpage *) { min-width: 0; max-width: 100%; }
 }
