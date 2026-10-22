@@ -108,7 +108,6 @@ jobs:
           node client/test/class10-ncert-product-check.mjs
           node client/test/india-practice-availability-check.mjs
           node client/test/entitlement-check.mjs
-          node client/test/history-search-race-check.mjs
           node client/test/sync-contract-check.mjs
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.

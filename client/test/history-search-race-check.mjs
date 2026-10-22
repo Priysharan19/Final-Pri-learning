@@ -6,6 +6,7 @@
 // it to the skeleton and refilled it — a count that vanished after it looked
 // settled. This replays that render sequence without a browser.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { historyListKey, historyListRequest, historyRowsFor } from '../src/pages/historyLoadLifecycle.js';
 
 let pass = 0;
@@ -32,5 +33,11 @@ ok('a late response for another request reads as loading', () => assert.equal(hi
 ok('a search ignores the page number', () => assert.equal(historyListKey(req({ searching: true, page: 3 })), search));
 ok('nothing loaded is loading', () => assert.equal(historyRowsFor(null, newest), null));
 ok('the classic build asks for filter and page only', () => assert.deepEqual(historyListRequest({ instrument: false, filter: 'wrong', page: 2, sort: 'marks', searching: true }), { filter: 'wrong', page: 2 }));
+
+// The component must use this contract, not drift back to unkeyed state.
+const src = readFileSync(new URL('../src/pages/History.jsx', import.meta.url), 'utf8');
+ok('History.jsx renders rows only via historyRowsFor(loaded, listKey)', () => assert.match(src, /const data = historyRowsFor\(loaded, listKey\);/));
+ok('History.jsx keeps no unkeyed list state', () => assert.doesNotMatch(src, /\[data, setData\] = useState/));
+ok('the list fetch effect depends on [listKey, refresh]', () => assert.match(src, /api\.post\('\/history\/list', listBody\)[\s\S]{0,400}?\}, \[listKey, refresh\]\);/));
 
 console.log(`HISTORY SEARCH RACE: PASS — ${pass}/${pass}`);

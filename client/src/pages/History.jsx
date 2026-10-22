@@ -150,11 +150,13 @@ function HistoryForProfile() {
     const gate = createHistoryLoadGate();
     detailGate.current?.cancel();
     setFailedKey(null); setOpen(null);
-    api.post('/history/list', JSON.parse(listKey)).then(
+    api.post('/history/list', listBody).then(
       rows => { if (gate.current()) setLoaded({ key: listKey, rows }); },
       () => { if (gate.current()) setFailedKey(listKey); }
     );
     return () => gate.cancel();
+    // listBody is fully described by listKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listKey, refresh]);
 
   async function toggleBookmark(id) {
