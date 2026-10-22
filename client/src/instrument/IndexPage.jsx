@@ -9,6 +9,7 @@ import { useT, tLater } from '../i18n/index.js';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { MathText } from '../lib/latex.jsx';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
 import IndexDial from './margin/IndexDial.jsx';
 import { registerOf } from './margin/register.js';
@@ -59,17 +60,20 @@ function Odometer({ value }) {
   );
 }
 
-// Resume → Write (design v3 05): a View Transition in which the old page is
-// gone at once, the Index block lingers briefly where it was, and Write fades
-// in with its prompt already in place (shell.css). The update waits briefly for
+// Resume → Write (design v3 05): a View Transition in which the old page and
+// the Index block are gone at once, the chapter's title travels into Write's
+// chapter crumb, and Write fades in with its prompt already in place (shell.css). The update waits briefly for
 // the prompt to mount. No API, or Reduce Motion: a cut.
 function morphTo(card, go) {
   if (typeof document.startViewTransition !== 'function' || reduced() || !card) { go(); return; }
   const root = document.documentElement;
+  const title = card.querySelector('.k-q');
   card.style.viewTransitionName = 'pri-question';
+  if (title) title.style.viewTransitionName = 'pri-chapter';
   try {
     const vt = document.startViewTransition(() => {
       card.style.viewTransitionName = '';
+      if (title) title.style.viewTransitionName = '';
       root.dataset.vt = 'question';
       flushSync(go);
     return new Promise(resolve => {
@@ -80,7 +84,7 @@ function morphTo(card, go) {
     });
     });
     vt.finished.finally(() => { delete root.dataset.vt; });
-  } catch { card.style.viewTransitionName = ''; delete root.dataset.vt; go(); }
+  } catch { card.style.viewTransitionName = ''; if (title) title.style.viewTransitionName = ''; delete root.dataset.vt; go(); }
 }
 
 export default function IndexPage() {
@@ -114,6 +118,34 @@ export default function IndexPage() {
       evidence: chapterEvidence(row, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy)
     }));
   }, [curriculum, user]);
+
+  // The key result under the next chapter: the first formula its shipped Notes
+  // give (curriculum, not a question), fetched lazily once the hero has
+  // settled. A chapter whose Notes have no formula shows nothing.
+  const [keyResult, setKeyResult] = useState(null);
+  const keyChapter = recent ? recent.subtopic : recent === null ? chapters[0]?.row.id : null;
+  useEffect(() => {
+    if (!keyChapter) return undefined;
+    let live = true;
+    const id = setTimeout(() => {
+      import('../notes/notesIndex.js').then(({ gradeOfChapter, loadNotesForGrade }) => {
+        const grade = gradeOfChapter(keyChapter);
+        return grade ? loadNotesForGrade(grade) : {};
+      }).then(notes => {
+        const f = notes?.[keyChapter]?.formulas?.[0];
+        if (live) setKeyResult(f?.tex ? { tex: f.tex, label: f.label, chapter: keyChapter } : null);
+      }).catch(() => { });
+    }, reduced() ? 0 : 1300);
+    return () => { live = false; clearTimeout(id); };
+  }, [keyChapter]);
+  const keyBlock = keyResult && keyResult.chapter === keyChapter && (
+    <div className="k-key">
+      <small lang="en">{keyResult.label}</small>
+      <p className="k-eq" lang="en"><MathText text={`$${keyResult.tex}$`} /></p>
+      <PageLink className="k-notes" to={`/notes/${keyResult.chapter}`}>{t('inst.openInNotes')}</PageLink>
+    </div>
+  );
+
 
   // Default to the chapter the student last worked in, else the first.
   const current = useMemo(() => {
@@ -207,6 +239,7 @@ export default function IndexPage() {
                   what the next page delivers. */}
               <small>{t('inst.resumePrefix')}</small>
               <p className="k-q" lang="en"><TermGloss text={recent.subtopicName || ''} /></p>
+              {keyBlock}
               {resumeMarks && <small>{t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible })}</small>}
               {resumeMarks && resumeMarks.possible <= 10 && (
                 <div className="in-seg10" aria-hidden="true">
@@ -227,6 +260,7 @@ export default function IndexPage() {
             <div className="k-next" data-instrument-begin>
               <small>{t('inst.chapterN', { n: 1 })} · <span lang="en">{chapters[0].row.name}</span></small>
               <p className="k-q">{t('inst.beginFirst')}</p>
+              {keyBlock}
               <PageLink className="in-btn is-primary c-btn-primary" to={practiceHref({ subtopic: chapters[0].row.id, track })}>{t('inst.begin')}</PageLink>
             </div>
           )}

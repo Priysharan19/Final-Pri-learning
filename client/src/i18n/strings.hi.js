@@ -3128,6 +3128,8 @@ export default {
   "inst.beginFirst": "आपका पहला प्रश्न तैयार है।",
   "inst.begin": "शुरू करें",
   "inst.cmdShort": "यहाँ जाएँ…",
+  "inst.openInNotes": "नोट्स में खोलें",
+  "inst.cmdFormulas": "सूत्र",
   "inst.dialLabel": "रजिस्टर",
   "inst.dialAria": "रजिस्टर: शुद्धता {accuracy}%, {total} में से {started} अध्याय शुरू किए।",
   "inst.dialAriaHeld": "रजिस्टर: शुद्धता अभी नहीं बताई गई, {total} में से {started} अध्याय शुरू किए।",

@@ -301,7 +301,13 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 @media (max-width: 900px) {
   .k-hero, .k-body { grid-template-columns: 1fr; }
   .k-hero { padding: 20px 16px; justify-items: center; }
-  .k-hero > div { justify-self: stretch; }
+  /* Greeting first, then a 300px dial, then "Continue" inside the first fold. */
+  .k-hero { gap: 16px; }
+  .k-hero > div { display: contents; }
+  .k-hero .in-greet { order: 1; justify-self: stretch; }
+  .k-hero .m-dial { order: 2; margin: 0; }
+  .k-hero .k-next { order: 3; justify-self: stretch; margin-top: 4px; }
+  .k-hero .k-ledger { order: 4; justify-self: stretch; }
   .in-spine { border-right: 0; padding: 8px 16px 0; }
   .in-plate { position: static; padding: 18px 16px 0; }
 }

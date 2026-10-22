@@ -3065,6 +3065,8 @@ export default {
   "inst.beginFirst": "Your first question is ready.",
   "inst.begin": "Begin",
   "inst.cmdShort": "Jump to…",
+  "inst.openInNotes": "Open in Notes",
+  "inst.cmdFormulas": "Formulas",
   "inst.dialLabel": "Register",
   "inst.dialAria": "Register: accuracy {accuracy}%, {started} of {total} chapters started.",
   "inst.dialAriaHeld": "Register: accuracy not yet stated, {started} of {total} chapters started.",

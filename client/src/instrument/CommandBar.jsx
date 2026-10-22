@@ -20,6 +20,7 @@ const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress
 // (noteCurriculum) or an idle prewarm, and refreshed only once they are older
 // than STALE_MS: opening the sheet does not refetch warm lists.
 const STALE_MS = 5 * 60 * 1000;
+const formulaMemo = new Map();
 const memo = { key: '', chapters: [], at: 0, scriptsKey: '', scripts: [], scriptsAt: 0 };
 const sameIds = (a, b) => a.length === b.length && a.every((x, i) => (x.row?.id ?? x.id) === (b[i].row?.id ?? b[i].id));
 const fresh = at => Date.now() - at < STALE_MS;
@@ -59,6 +60,20 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   const [chapters, setChapters] = useState(() => (warm ? memo.chapters : []));
   const [scripts, setScripts] = useState(() => (warmScripts ? memo.scripts : []));
   const [loaded, setLoaded] = useState(warm);
+  // Maths the sheet knows: the formulas of the student's shipped Notes, loaded
+  // on the first keystroke (never at open), searched by label and note.
+  const [formulas, setFormulas] = useState(() => formulaMemo.get(user?.year) || null);
+  useEffect(() => {
+    if (!q.trim() || formulas || !user?.year) return;
+    import('../notes/notesIndex.js').then(m => m.loadNotesForGrade(user.year)).then(notes => {
+      const list = [];
+      for (const [chapterId, n] of Object.entries(notes || {})) {
+        for (const f of n?.formulas || []) if (f?.tex && f?.label) list.push({ chapterId, label: f.label, tex: f.tex, find: `${f.label} ${f.note || ''}`.toLowerCase() });
+      }
+      formulaMemo.set(user.year, list);
+      setFormulas(list);
+    }).catch(() => setFormulas([]));
+  }, [q, formulas, user?.year]);
   const input = useRef(null);
 
   useEffect(() => {
@@ -89,6 +104,10 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     const match = s => !needle || String(s).toLowerCase().includes(needle);
     const track = practiceTrack(user);
     const groups = [
+      { key: 'formulas', label: t('inst.cmdFormulas'), rows: needle.length > 2 && !commands ? (formulas || []).filter(f => f.find.includes(needle)).slice(0, 3).map((f, i) => ({
+        id: `fx-${f.chapterId}-${i}`, label: `$${f.tex}$`, math: true, content: true, meta: f.label, glyph: 'doc', hint: t('inst.openInNotes'),
+        run: () => nav(`/notes/${f.chapterId}`)
+      })) : [] },
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
         id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, num: String(c.index + 1).padStart(2, '0'),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
@@ -104,7 +123,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     ];
     return groups.filter(g => g.rows.length && (!commands || g.key === 'actions'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, scripts, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
+  }, [q, chapters, scripts, formulas, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
