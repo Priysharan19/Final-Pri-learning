@@ -28,11 +28,17 @@
 // upstream fix is body-parser 1.20.9. Task item 3 asks exactly for a test that
 // sends a gzip frame with trailing bytes and proves the process survives.
 //
+// Because the survival checks alone cannot tell 1.20.6 from 1.20.9 on this
+// Node, the suite also asserts the installed body-parser version directly
+// (independent review of #693): a lockfile regression below 1.20.9 goes red
+// here even when the audit registry is unreachable and the floor cannot run.
+//
 // Synthetic evidence: an in-process server and crafted bytes, not production.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { gzipSync } from 'node:zlib';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { createRequire } from 'node:module';
 
 process.env.NODE_ENV = 'test';
 process.env.PRI_AUTH_DELIVERY_KEY = '53'.repeat(32);
@@ -42,6 +48,33 @@ const { startApp, checks } = await import('./support/app-harness.mjs');
 const { createPlatformDb } = await import('../platform/db.js');
 
 const c = checks();
+
+// ── 0 · The installed body-parser is the patched line ─────────────────────────
+// Resolved from the server package itself (server/node_modules), the copy the
+// production middleware chain below actually loads. GHSA-27r3-jxmh-p828 is
+// fixed in 1.20.9; anything below it is the vulnerable line.
+const FIXED_BODY_PARSER = '1.20.9';
+function versionAtLeast(installed, floor) {
+  const parse = v => String(v).trim().replace(/^v/, '').split('-')[0].split('.').map(n => Number.parseInt(n, 10));
+  const a = parse(installed); const b = parse(floor);
+  if (a.length < 3 || a.some(n => !Number.isInteger(n) || n < 0)) return false;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > (b[i] ?? 0)) return true;
+    if (a[i] < (b[i] ?? 0)) return false;
+  }
+  return true;
+}
+const serverRequire = createRequire(new URL('../package.json', import.meta.url));
+const installedBodyParser = serverRequire('body-parser/package.json').version;
+c.ok(versionAtLeast(installedBodyParser, FIXED_BODY_PARSER),
+  `server/node_modules/body-parser is ${installedBodyParser}, at least ${FIXED_BODY_PARSER} (GHSA-27r3-jxmh-p828 fixed line)`);
+// The comparison itself: a vulnerable version and a malformed one both fail it,
+// so the check above cannot pass by accident of string ordering.
+c.eq(versionAtLeast('1.20.6', FIXED_BODY_PARSER), false, 'the comparison rejects 1.20.6');
+c.eq(versionAtLeast('1.20.10', FIXED_BODY_PARSER), true, 'the comparison accepts 1.20.10 (numeric, not lexical)');
+c.eq(versionAtLeast('2.0.0', FIXED_BODY_PARSER), true, 'the comparison accepts a later major');
+c.eq(versionAtLeast('1.19.9', FIXED_BODY_PARSER), false, 'the comparison rejects an earlier minor');
+c.eq(versionAtLeast('garbage', FIXED_BODY_PARSER), false, 'the comparison rejects a malformed version');
 
 // With a listener on, Node no longer exits on an uncaught exception — so the
 // suite records every one and fails on it explicitly. Without the listener
