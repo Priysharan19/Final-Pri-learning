@@ -1068,7 +1068,7 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
 .in-led-search { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 10px; border-radius: 4px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); color: var(--in-tx-3); min-width: 230px; }
 .in-led-search:focus-within { box-shadow: 0 0 0 1px var(--in-edge-3); outline: 2px solid var(--in-signal); outline-offset: 1px; }
 .in-led-search svg { width: 15px; height: 15px; flex: none; }
-.in-led-search input { flex: 1; min-width: 0; border: 0; background: transparent; font: 400 13.5px var(--in-ui); color: var(--in-tx); outline: none; padding: 0; }
+.in-led-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: 400 13.5px var(--in-ui); color: var(--in-tx); outline: none; padding: 0; }
 .in-led-search input::placeholder { color: var(--in-tx-3); }
 @media (max-width: 760px) {
   .in-hsb, .in-hsb.is-right { margin-left: 0; width: 100%; }

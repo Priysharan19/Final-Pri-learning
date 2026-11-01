@@ -161,7 +161,8 @@ export const flow = {
       const probe = document.createElement('div'); probe.style.color = page; document.body.appendChild(probe);
       const pageRgb = getComputedStyle(probe).color; probe.remove();
       const htmlBg = getComputedStyle(document.documentElement).backgroundColor;
-      const bar = document.querySelector('.topbar');
+      // The v1.0 top bar, or the instrument build's one bar of tabs.
+      const bar = document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]');
       const strip = document.elementFromPoint(innerWidth / 2, 4);
       const brand = bar.querySelector('a, button, svg')?.getBoundingClientRect();
       const nav = document.querySelector('.mobilenav');
@@ -308,7 +309,7 @@ export const flow = {
     await page.waitForTimeout(900);
     const plan = await page.evaluate(() => {
       const card = document.querySelector('.settings-grid .grid > .card');
-      const top = document.querySelector('.topbar').getBoundingClientRect().bottom;
+      const top = (document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]')).getBoundingClientRect().bottom;
       const nav = document.querySelector('.mobilenav').getBoundingClientRect().top;
       const rows = [...card.querySelectorAll('.set-row')].map(r => r.getBoundingClientRect());
       return { cardTop: Math.round(card.getBoundingClientRect().top), topbar: Math.round(top), nav: Math.round(nav), lastRow: Math.round(rows.at(-1)?.bottom) };
@@ -405,13 +406,21 @@ export const flow = {
         JSON.stringify(s));
       await goto('/');
       await settle();
-      const shellSig = await page.evaluate(() => ({
-        side: getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
-        bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
-        topbar: Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
-        pad: getComputedStyle(document.querySelector('.content')).paddingBottom
-      }));
-      await check(`${vp.id}: the shell keeps its rail and top bar, no bottom bar`, shellSig.side && !shellSig.bar && shellSig.topbar === 64, JSON.stringify(shellSig));
+      // The v1.0 shell keeps its rail and 64px top bar; the instrument build
+      // keeps its one 54px bar of tabs and has no rail at any width.
+      const shellSig = await page.evaluate(() => {
+        const instrument = document.documentElement.classList.contains('ui-instrument');
+        const topbar = document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]');
+        return {
+          instrument,
+          side: !!document.querySelector('.sidebar') && getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
+          bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
+          topbar: topbar ? Math.round(topbar.getBoundingClientRect().height) : null,
+          pad: getComputedStyle(document.querySelector('.content')).paddingBottom
+        };
+      });
+      await check(`${vp.id}: ${shellSig.instrument ? 'the shell keeps its tab bar, no rail, no bottom bar' : 'the shell keeps its rail and top bar, no bottom bar'}`,
+        shellSig.instrument ? !shellSig.side && !shellSig.bar && shellSig.topbar === 54 : shellSig.side && !shellSig.bar && shellSig.topbar === 64, JSON.stringify(shellSig));
     }
     await page.setViewportSize(PHONE);
   }
