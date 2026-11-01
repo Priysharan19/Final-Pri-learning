@@ -10,9 +10,9 @@ import { PANEL_CROSSINGS } from '../data/timeline';
 /**
  * S4 — THE INSTRUMENT (20.00–26.50). The feature run: six lit panels of real
  * product surface fly through a depth corridor, each crossing the focal plane
- * on a beat (20.5 … 25.5), capped by the offline line. Every panel is a
+ * on a beat (20.5 … 25.5), capped by the sign-in line. Every panel is a
  * plausible extension of theme.css v4; every claim matches the shipped
- * marketing (3,44,798 measured; percentile/rivals illustrative, as in the
+ * marketing (chapter count measured; progress/rivals illustrative, as in the
  * launch reel). This is the flex — but it stays inside the argument: the
  * diagnosis panel, not the streak counter, gets the emphasis.
  */
@@ -44,10 +44,10 @@ const Shell: React.FC<{ kicker: string; children: React.ReactNode }> = ({ kicker
 );
 
 const BankCard: React.FC<{ p: number }> = ({ p }) => (
-  <Shell kicker="Question bank · generated on-device">
+  <Shell kicker="Question bank · generated fresh">
     <TextBox>
       <div style={{ fontFamily: FONT.serif, fontSize: 92, color: C.ink, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
-        {Math.round(344798 * ramp(p, [0, 0.85], [0, 1], easeDrift)).toLocaleString('en-IN')}
+        {Math.round(77 * ramp(p, [0, 0.85], [0, 1], easeDrift)).toLocaleString('en-IN')}
       </div>
     </TextBox>
     <TextBox>
@@ -82,7 +82,7 @@ const MapCard: React.FC<{ p: number }> = ({ p }) => {
   });
   const dp = ramp(p, [0, 0.9], [0, 1], easeDrift);
   return (
-    <Shell kicker="Knowledge map · every topic, one web">
+    <Shell kicker="Knowledge map · chapters, one web">
       <svg width={560} height={240} style={{ overflow: 'visible' }}>
         {edges.map(([a, b], k) => (
           <line
@@ -140,11 +140,11 @@ const DiagCard: React.FC<{ p: number }> = ({ p }) => (
 );
 
 const PercCard: React.FC<{ p: number }> = ({ p }) => (
-  <Shell kicker="Predicted percentile · from your practice">
+  <Shell kicker="Chapters practised · from your practice">
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 18 }}>
       <TextBox>
         <div style={{ fontFamily: FONT.serif, fontSize: 108, color: C.goldBright, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
-          {(96.4 * ramp(p, [0, 0.8], [0.86, 1], easeOvershoot)).toFixed(1)}
+          {Math.round(23 * ramp(p, [0, 0.8], [0.86, 1], easeOvershoot))}
         </div>
       </TextBox>
       <TextBox>
@@ -192,7 +192,7 @@ const MatchCard: React.FC<{ p: number }> = ({ p }) => {
         ))}
       </div>
       <TextBox>
-        <span style={{ fontFamily: FONT.serif, fontStyle: 'italic', fontSize: 16, color: C.ink3 }}>rivals illustrative · all on-device</span>
+        <span style={{ fontFamily: FONT.serif, fontStyle: 'italic', fontSize: 16, color: C.ink3 }}>rivals illustrative · needs an account</span>
       </TextBox>
     </Shell>
   );
@@ -205,7 +205,7 @@ const MockCard: React.FC<{ p: number }> = ({ p }) => {
     { c: 'Exact value stated', ok: false, m: '1' },
   ];
   return (
-    <Shell kicker="Full mocks · criteria marking">
+    <Shell kicker="Timed papers · automatic marking">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {rows.map((r, i) => {
           const rp = ramp(p, [0.08 + i * 0.14, 0.35 + i * 0.14], [0, 1]);
@@ -250,7 +250,7 @@ export const Instrument: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
     PANEL_CROSSINGS.slice(1).reduce((acc, tc) => acc + SPACING * ramp(t, [tc - 0.8, tc], [0, 1], easeDrift), 0) +
     120 * ramp(t, [25.5, 26.5], [0, 1], easeDrift);
 
-  const offlineO = t >= 25.55;
+  const signInO = t >= 25.55;
 
   return (
     <AbsoluteFill style={{ background: C.page, opacity: ramp(t, [t0, t0 + 0.3], [0, 1]) }}>
@@ -320,10 +320,10 @@ export const Instrument: React.FC<{ t0?: number }> = ({ t0 = 20 }) => {
       </Stage>
 
       {/* the run's punchline — set type, still frame, brand truth */}
-      {offlineO ? (
+      {signInO ? (
         <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
           <Display
-            words={w('All of it *offline.*')}
+            words={w('Sign in. Connect. *Practise.*')}
             size={spec.aspect === '916' ? TYPE.s4 : TYPE.s3}
             wordAt={[25.6 - t0, 25.6 - t0, 25.72 - t0]}
             landDur={0.22}
