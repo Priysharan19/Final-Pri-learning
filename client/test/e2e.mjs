@@ -30,7 +30,7 @@
 // of the screen at that moment was written.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
+import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, normalize, extname, sep } from 'node:path';
@@ -39,7 +39,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile } from './support/verified-onboarding.mjs';
-import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
+import { watchBoot, bootFailure, bootRecovery, recordFlight } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -338,13 +338,22 @@ async function runFlow(flow, { browser, opts }) {
   const base = platform.origin;
   const online = flow.online ? platform.session(ctx, page) : null;
   const api = helpers(page, base, flow.id);
+  const flight = recordFlight(browser, ctx);
   try {
     await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
+    const seen = await flight.report().catch(e => [`the flight record could not be read: ${String(e?.message || e).slice(0, 120)}`]);
+    const saved = [];
+    await mkdir(SHOTS, { recursive: true }).catch(() => {});
+    for (const { name, screen } of flight.closedScreens()) {
+      const file = join(SHOTS, `${flow.id}-FAIL-closed-${name}.png`);
+      await writeFile(file, screen).then(() => saved.push(file)).catch(() => {});
+    }
     ok('the flow ran to the end', false,
-      `threw: ${String(err?.stack || err).split('\n').slice(0, 4).join('\n      ')}${path ? `\n      screenshot: ${path}` : ''}`);
+      `threw: ${String(err?.stack || err).split('\n').slice(0, 4).join('\n      ')}${path ? `\n      screenshot: ${path}` : ''}${saved.map(file => `\n      screenshot: ${file}`).join('')}${seen.map(line => `\n      ${line}`).join('')}`);
   }
+  flight.stop();
   // An exception thrown out of a render is invisible to every assertion above
   // it — the boundary catches it and the page carries on looking plausible.
   ok('no uncaught errors reached the page', crashes.length === 0, crashes.slice(0, 3).join(' · '));
