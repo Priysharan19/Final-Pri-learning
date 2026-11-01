@@ -14,6 +14,8 @@ If the code changes what leaves the device, change this file, the Apple label do
 posture, the SDK dependency lists, the telemetry event allowlist, the answer-blind request fields
 or the deletion route drift from what is declared here. The check cannot see server environment
 variables (for example whether `PRI_SENTRY_DSN` is set) or contracts; those stay **OWNER** rows.
+`node tools/store-readiness-check.mjs` also holds the Crash logs and Phone number rows, Step 3 and
+Step 4 to the code, the Apple label and both privacy manifests.
 
 Android phones and tablets are in V1 since the owner's scope change of 2026-10-16
 (`docs/release/PRI_V1_RELEASE_SCOPE.md` §22, #504). The data flows are the same server flows the
