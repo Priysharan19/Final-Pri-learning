@@ -236,7 +236,7 @@
     "verify:deployment": "node tools/verify-deployment.mjs",
     "test:deploy": "node tools/deployment-contract.test.mjs",
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",
-    "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate",
+    "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate && node tools/governance-text.test.mjs",
     "engine:benchmark": "node scripts/engine-benchmark.mjs"
   }
 }

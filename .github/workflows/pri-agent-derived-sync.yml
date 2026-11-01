@@ -84,7 +84,7 @@ jobs:
           test "$declared_mission" = "$mission"
           [[ "$declared_risk" =~ ^R[1-4]$ ]]
           node trusted/scripts/pri-mission-control.mjs validate-ledger \
-            /tmp/pri-derived-issues.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
+            /tmp/pri-derived-issues.json "$agent" "$mission" "$HEAD_REF" "$declared_risk" "$HEAD_SHA"
 
           mapfile -t changed < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")
           if [[ "${#changed[@]}" -eq 0 ]]; then
