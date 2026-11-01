@@ -286,6 +286,21 @@ enum JourneySelfCheck {
       await sleep(1500);   // the gate's first check settles
       return assertHeld('launch') + ' at ' + location.pathname;
     });
+    await step('wordmarkClearsStatusBar', async () => {
+      // The shell states the real safe area as --pri-inset-top (WebShell.swift
+      // applySafeArea): at scroll top the welcome wordmark sits at or below it,
+      // never under the status bar or the Dynamic Island. Every iPhone has a
+      // status-bar inset, so on a phone-width page it is at least 20px.
+      window.scrollTo(0, 0); await sleep(300);
+      const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pri-inset-top')) || 0;
+      // A phone's status bar is at least 20pt; a smaller value is a mis-scaled inset.
+      if (innerWidth < 600 && !(inset >= 20)) throw new Error('--pri-inset-top is ' + inset + 'px on a phone');
+      const mark = q('.logo.logo-lg');
+      if (!mark) throw new Error('no welcome wordmark on ' + location.pathname);
+      const top = mark.getBoundingClientRect().top;
+      if (top + 0.5 < inset) throw new Error('wordmark top ' + top.toFixed(1) + 'px is under the ' + inset.toFixed(1) + 'px status-bar inset');
+      return 'wordmark top ' + top.toFixed(1) + 'px ≥ inset ' + inset.toFixed(1) + 'px';
+    });
     await step('noEntryWithoutAccount', async () => {
       // With no server the card cannot send a code (its field is disabled and
       // it says so) or the gate cannot reach the server ("retry"). Either way
