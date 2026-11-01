@@ -395,7 +395,7 @@ export const flow = {
         return {
           // The instrument's split workspace (≥ 900px, design s4/s5) sets the
           // action dock under the sheet rather than sticky at the foot.
-          split: document.documentElement.classList.contains('ui-instrument') && !!document.querySelector('.ws-split'),
+          split: document.documentElement.classList.contains('ui-instrument') && !!document.querySelector('.ws-split') && matchMedia('(min-width: 900px)').matches,
           tabsShare: tabs && tools ? +(tabs.width / tools.width).toFixed(2) : null,
           actionsPosition: actions.position, actionsMarginTop: actions.marginTop,
           exitLabel: !!exitLabel && getComputedStyle(exitLabel).display !== 'none',
