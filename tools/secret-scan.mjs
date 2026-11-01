@@ -8,9 +8,11 @@
 // High-signal patterns only — provider key formats that are never legitimate in
 // a repository: OpenAI keys, Razorpay live keys, Resend keys, PEM private keys,
 // JWTs, AWS access keys and secrets, GitHub/Slack/Google tokens, Stripe live
-// keys, and database URLs that embed a password. Every tracked file is read,
-// including the iOS bundles (ios/*.swiftpm/Resources holds a copy of the web
-// build) and, when present, client/dist — the bytes that actually ship.
+// keys, and database URLs that embed a password. Every tracked file is read
+// and, when present, client/dist — the bytes that actually ship. The iOS
+// bundles (ios/*.swiftpm/Resources/Web) are generated from client/dist and no
+// longer tracked (decision D28); `npm run check:ios` proves they are a
+// byte-exact copy, so scanning client/dist covers them.
 //
 // A tracked .env file is a failure by name, whatever it contains (only
 // templates ending .example / .sample / .template may be committed).

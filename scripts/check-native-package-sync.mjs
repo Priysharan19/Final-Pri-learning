@@ -5,8 +5,9 @@
 // package exists because some iPad / Swift Playgrounds installs may still open
 // that copy directly. Until it is retired, every Swift source, Package.swift,
 // Info.plist, the asset catalogue and the bundled models must be byte-identical
-// (CP-04 widened this from Swift + Package.swift). Resources/Web is gated
-// separately by sync-ios.mjs.
+// (CP-04 widened this from Swift + Package.swift). Resources/Web is generated
+// into both packages from one client/dist (decision D28, never tracked) and
+// is gated separately by `npm run check:ios` after `npm run sync:ios`.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
