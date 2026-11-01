@@ -86,7 +86,8 @@ check('mobile More supports Escape', has(app, "if (e.key === 'Escape')"));
 // nor serves its route, while the test builds that walk /classes keep it.
 check('student Classes follows the classroom-product flag', has(app, "const CLASSES_ON = featureEnabled('extendedTracks');"));
 check('the Classes entry is listed only with the flag', has(app, "...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])"));
-check('the Classes route lands on the role landing without the flag', has(app, "CLASSES_ON ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />"));
+check('the Classes route lands on the role landing without the flag', has(app, "CLASSES_ON && Classes ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />"));
+check('a production build with the flag off never emits the Classes chunk', has(app, "const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));"));
 // The instrument build's phone bar has the Map (the v1.0 bar has Tasks there);
 // its shell lists the Map and Scripts so every surface shares one list.
 check('the instrument phone bar carries the Map', has(app, "new Set(INSTRUMENT_ON ? ['/', '/practice', '/map', '/progress'] : ['/', '/practice', '/tasks', '/progress'])"));

@@ -35,7 +35,13 @@ const Match = React.lazy(() => import('./pages/Match.jsx'));
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
-const Classes = React.lazy(() => import('./pages/Classes.jsx'));
+// The student Classes page follows the classroom-product flag (CLASSES_ON
+// below). The build constant is read directly here, as for the instrument, so
+// a production build made with the flag off never emits or warms its 47 kB
+// chunk: nothing a student of that build can open is paid for by its install.
+/* global __PRI_FEATURE_EXTENDED_TRACKS__ */
+const CLASSES_BUILT_OUT = typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' && !__PRI_FEATURE_EXTENDED_TRACKS__ && import.meta.env?.PROD === true;
+const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
@@ -533,7 +539,9 @@ export default function App() {
   const navSections = user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
   const navItems = navSections.flatMap(section => section.items);
   const primarySet = user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
-  const mobilePrimary = navItems.filter(item => primarySet.has(item.to));
+  // In the bar's own order (Index, Practice, Map, Report in the instrument
+  // build), not the order the shell's list happens to hold them in.
+  const mobilePrimary = [...primarySet].map(to => navItems.find(item => item.to === to)).filter(Boolean);
   const mobileMore = navItems.filter(item => !primarySet.has(item.to));
   const roleLanding = user.role === 'teacher' ? '/teach' : '/';
 
@@ -640,7 +648,7 @@ export default function App() {
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
                     <Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />
-                    <Route path="/classes" element={CLASSES_ON ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />} />
+                    <Route path="/classes" element={CLASSES_ON && Classes ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />} />
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
