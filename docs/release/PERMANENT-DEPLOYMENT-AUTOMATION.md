@@ -53,8 +53,9 @@ Keep it draft until it is retired/closed under a separately reviewed plan.
    workflow; a maintainer may also dispatch it on `main` for an exact SHA.
 3. Proof workflow uses read-only permissions, does not use release secrets, and
    checks out that SHA. It requires the candidate to be on `origin/main`.
-   It retries for up to roughly six minutes because Railway staging may
-   be rolling out independently. `tools/verify-deployment.mjs` requires
+   It retries for at least 45 minutes (92 attempts, 30 seconds apart)
+   because Railway staging rolls out independently and on 22 October 2026
+   the build landed 34 minutes after the merge. `tools/verify-deployment.mjs` requires
    server and web release identities to agree, healthy/readiness endpoints,
    PostgreSQL schema and billing versions to match that checkout, and email
    provider readiness. It fails on old/new mismatched SHA.

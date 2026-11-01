@@ -31,7 +31,9 @@ jobs:
        github.event.workflow_run.head_repository.full_name == github.repository &&
        github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The wait below covers at least 45 minutes of Railway build time, so the
+    # job needs room for it plus checkout and the final verify.
+    timeout-minutes: 60
     env:
       CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}
       STAGING_ORIGIN: https://pri-learning-staging-staging.up.railway.app
@@ -71,7 +73,15 @@ jobs:
           # Main Integrity completes. Never mistake an older healthy SHA as proof.
           # The command is read-only and checks server, web, database and email
           # readiness using THIS checked-out SHA's schema constants.
-          for attempt in $(seq 1 12); do
+          #
+          # How long to wait: on 22 Oct 2026 the staging build of a5778a319
+          # landed 34 minutes after the merge (buildTimestamp 11:35:15Z against
+          # a merge at 11:01:14Z) and the earlier 12 × 30 s loop had given up at
+          # 11:09:52Z with 12/14, so the proof went red on a deployment that
+          # then passed (#646). 92 attempts 30 s apart wait at least 45 minutes
+          # before declaring the SHA unproven. Nothing the check asserts is
+          # relaxed; only the patience is.
+          for attempt in $(seq 1 92); do
             if node tools/verify-deployment.mjs \
                 --origin "$STAGING_ORIGIN" --sha "$CANDIDATE_SHA" \
                 --engine postgres --auth-email-proven \
@@ -81,7 +91,7 @@ jobs:
                 >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-            if [[ "$attempt" -lt 12 ]]; then sleep 30; fi
+            if [[ "$attempt" -lt 92 ]]; then sleep 30; fi
           done
           cat "$RUNNER_TEMP/release-audit/staging-check.txt"
           echo "::error::Staging did not prove exact SHA $CANDIDATE_SHA. No release authorization."
