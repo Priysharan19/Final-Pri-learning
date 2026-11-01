@@ -191,7 +191,6 @@ async function run() {
     // The rendered landing screen with the flag off, at its welcome stage.
     const hero = off({});
     ok(!/lympiad|ओलंपियाड/.test(hero), 'production: the rendered welcome names no Olympiad track');
-    ok(/Classes 7–12 · JEE/.test(on({ initialStage: 'pick' })) || true, 'the brand kicker renders (development render exercised)');
   }
 
   console.log(failures.length
