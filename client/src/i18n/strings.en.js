@@ -2974,6 +2974,8 @@ export default {
   // The Index's second half (audit-interface item 2): what the v1.0 Home
   // offered besides the chapters — the review queue, the study plan, photo
   // practice and the exact-topic generator — each with its own entry here.
+  "inst.reportUp": "up",
+  "inst.reportDown": "down",
   "inst.alsoTitle": "More ways to practise",
   "inst.reviewQueue": "Review queue",
   "inst.reviewQueueNone": "Nothing is due yet. Practice brings a topic back before it fades.",
