@@ -644,6 +644,14 @@ html.ui-instrument .set-v > .btn[aria-pressed]:disabled { opacity: 0.45; }
 /* Segmented control (Appearance). */
 html.ui-instrument .seg { gap: 2px; padding: 3px; border: 0; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); }
 html.ui-instrument .seg > button { min-height: 30px; padding: 5px 12px; border-radius: 3px; font: 500 13px var(--in-ui); color: var(--in-tx-2); }
+/* On a coarse-pointer phone every segment and every small Settings button is
+   a 44px target: these two rules outrank theme.css's phone rule by specificity
+   (html.ui-instrument), so they restate it (audit-interface item 3: Type /
+   Write / Photo at 30px, Settings Edit at 30px). */
+@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
+  html.ui-instrument .seg > button { min-height: 44px; }
+  html.ui-instrument .settings-grid .card > .spread:has(> h2) .btn { min-height: 44px; min-width: 44px; }
+}
 html.ui-instrument .seg > button[aria-pressed="true"], html.ui-instrument .seg > button.on { background: var(--in-l5); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi); }
 
 /* Quiet and secondary buttons: a hairline ring, not a box. */
@@ -767,6 +775,11 @@ html.ui-instrument .nt-lede { font-size: 16px; }
   html.ui-instrument .in-index { grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); }
   html.ui-instrument .in-plate { padding: 22px 22px 20px; }
   html.ui-instrument .in-cmd { width: min(260px, 28vw); }
+  /* The bar never widens the page: its tabs may scroll within it rather than
+     push the viewport sideways (audit-interface item 3: iPad portrait scrolled
+     by 46px; with the More menu it would be more). */
+  html.ui-instrument .in-tabs { min-width: 0; overflow-x: auto; scrollbar-width: none; flex: 0 1 auto; }
+  html.ui-instrument .in-tabs::-webkit-scrollbar { display: none; }
   html.ui-instrument .in-plate-head { flex-wrap: nowrap; }
   html.ui-instrument .in-plate { grid-template-rows: auto minmax(240px, 520px) auto auto; }
   html.ui-instrument .in-kpis div { min-width: 72px; padding: 10px 12px; }
@@ -1141,6 +1154,21 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
 .in-plate-head p, .in-note { text-wrap: pretty; }
 
 /* Empty states: say so quietly, on the grid, not in a floating pill. */
+
+/* iPad portrait and a short landscape window (761–1100px): the bar is the
+   compact one. Six tabs, More, the ⌘K field and the online word do not fit in
+   820px at their desktop sizes, so the field becomes its 32px icon (the
+   shortcut keeps working everywhere) and the status keeps its dot with the
+   word for screen readers, exactly as the bar already does when a page's
+   controls sit in its slot. Tighter gaps and tab padding do the rest. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  html.ui-instrument .in-bar { gap: 12px; padding-inline: 16px; }
+  html.ui-instrument .in-tab { padding: 5px 9px; }
+  html.ui-instrument .in-cmd { width: 32px; min-width: 32px; height: 32px; padding: 0; justify-content: center; flex: none; }
+  html.ui-instrument .in-cmd > :not(svg) { display: none; }
+  html.ui-instrument .in-status:not(.is-off) .in-status-t {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 
 /* Device fit: on the iPad the writing bar keeps the live status and the
    buttons; the decorative key hint (aria-hidden) gives way instead of
