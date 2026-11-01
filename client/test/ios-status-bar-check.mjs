@@ -36,6 +36,23 @@ check('ContentView sets the status bar from the page tone, only where the page i
   /\.preferredColorScheme\(Self\.statusBarScheme\(for: pageTone\)\)/.test(app)
     && /guard !edgeToEdge\.isEmpty, let tone else \{ return nil \}/.test(app)
     && /\.onReceive\(NotificationCenter\.default\.publisher\(for: \.priPageTone\)\)/.test(app));
+// Safe area (#615, salvaged): inside the shell env(safe-area-inset-*) is 0, so
+// WebShell states the real insets as --pri-inset-* on <html> at document
+// start and again on every layout and safe-area change; the welcome screen's
+// padding reads them, and the simulator journey's first leg checks the
+// wordmark clears the inset (wordmarkClearsStatusBar).
+check('the web shell injects --pri-inset-* at document start and re-applies them on layout and safe-area changes',
+  /static func safeAreaScript\(_ insets: UIEdgeInsets/.test(shell)
+    && /--pri-inset-top/.test(shell) && /--pri-inset-right/.test(shell) && /--pri-inset-bottom/.test(shell) && /--pri-inset-left/.test(shell)
+    && /Coordinator\.safeAreaScript\(launchInsets[\s\S]{0,300}injectionTime: \.atDocumentStart/.test(shell)
+    && /func applySafeArea\(_ insets: UIEdgeInsets\)/.test(shell)
+    && /override func safeAreaInsetsDidChange\(\)/.test(shell)
+    && /coordinator\?\.applySafeArea\(container\.safeAreaInsets\)/.test(shell));
+check('the welcome and sign-in screens pad by the injected insets',
+  /\.auth-wrap \{\s*padding-top: calc\(24px \+ var\(--pri-inset-top\)\)/.test(read('client/src/theme.css')));
+check('the simulator journey\'s first leg checks the wordmark clears the status-bar inset',
+  /await step\('wordmarkClearsStatusBar'/.test(read('ios/PriLearning.swiftpm/JourneySelfCheck.swift'))
+    && /'launch', 'wordmarkClearsStatusBar', 'noEntryWithoutAccount'/.test(read('scripts/iphone-journey.mjs')));
 check('the web shell observes the page\'s theme-color and reports its tone (iPhone only)',
   /webView\.observe\(\\\.themeColor, options: \[\.initial, \.new\]\)/.test(shell)
     && /StatusBarAppearance\.tone\(/.test(shell)
