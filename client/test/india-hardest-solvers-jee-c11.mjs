@@ -340,9 +340,10 @@ export const SOLVE_JEE_C11 = {
 
   'c11-complex-algebra-reasoning'(q) {
     const p = q.prompt;
-    let m = p.match(/^Find (\$\|z\|\$|the real part of \$z\$) for the complex number \$z\$ that satisfies \$\|z\| ([+-]) z = (\d+) ([+-]) (\d+)i\$\.$/);
+    // The imaginary coefficient 1 is typeset as a bare i ("6 - i"), never "1i".
+    let m = p.match(/^Find (\$\|z\|\$|the real part of \$z\$) for the complex number \$z\$ that satisfies \$\|z\| ([+-]) z = (\d+) ([+-]) (\d*)i\$\.$/);
     if (m) {
-      const a = Number(m[3]), b = (m[4] === '-' ? -1 : 1) * Number(m[5]), plus = m[2] === '+';
+      const a = Number(m[3]), b = (m[4] === '-' ? -1 : 1) * Number(m[5] === '' ? 1 : m[5]), plus = m[2] === '+';
       // Imaginary parts: ±y = b. Real part: |z| ± x = a, monotone in x — bisect.
       const y = plus ? b : -b;
       const g = x => Math.hypot(x, y) + (plus ? x : -x) - a;
