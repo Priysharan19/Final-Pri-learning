@@ -106,7 +106,7 @@ function recorder(via) {
       : parsed?.text?.format?.name ? 'working' : 'unknown';
     wire.push({ via, kind, url: String(url), headers: { ...(init?.headers || {}) }, body });
     const reply = kind === 'transcription'
-      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97 }], confidence: 0.97, needs_confirmation: false }
+      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }
       : {
           lines: WORKING_LINES.map((_, index) => ({ index, status: 'ok', carried: false, why: '' })),
           first_break: -1, hint: '', confidence: 0.9, misconception_id: null, needs_confirmation: false
