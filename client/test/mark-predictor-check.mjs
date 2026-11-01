@@ -168,8 +168,15 @@ ok(JSON.stringify(later.units.map(u => u.sd)) !== JSON.stringify(advice.units.ma
   const backend = readFileSync(join(ROOT, 'client/src/local/backend.js'), 'utf8');
   const calls = backend.split('\n').filter(line => /predictExamMark\(/.test(line) && !/^\s*import\b/.test(line));
   eq(calls.length, 1, 'the local backend calls the predictor in exactly one place');
-  ok(/examPrediction:\s*\(\(\) => \{[\s\S]{0,400}?predictExamMark\(blueprint, ratings/.test(backend),
-    'and that place is the read-only examPrediction field of the progress summary');
+  // Pinned by the field that encloses the call, not by a character count from
+  // its opening: the #300 fix put a comment and an evidence reader between the
+  // two, which no 400-character window survives, and the contract is only that
+  // the one call sits inside the read-only examPrediction IIFE.
+  const fieldStart = backend.indexOf('examPrediction: (() => {');
+  const fieldEnd = fieldStart >= 0 ? backend.indexOf('})(),', fieldStart) : -1;
+  const callAt = backend.indexOf('predictExamMark(blueprint, ratings');
+  ok(fieldStart >= 0 && fieldEnd > fieldStart && callAt > fieldStart && callAt < fieldEnd,
+    `and that place is the read-only examPrediction field of the progress summary (field ${fieldStart}..${fieldEnd}, call at ${callAt})`);
   const page = readFileSync(join(ROOT, 'client/src/pages/IndiaProgress.jsx'), 'utf8');
   ok(/import\s*\{\s*predictionSentence\s*\}\s*from\s*'\.\.\/engine\/markPredictor\.js'/.test(page),
     'the progress page takes only the sentence that describes a prediction');
