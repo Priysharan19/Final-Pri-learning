@@ -64,11 +64,13 @@ export const t = (lang) => STRINGS[lang];
  *   title       <title> without the site name
  *   description meta description
  *   alternate   the same page in the other language, or null
+ *   hreflang    false when `alternate` is only a navigation link, not a
+ *               translation of this page, so no hreflang pair is declared
  *   body        main content HTML
  *   headings    [{ text, id }] for the "on this page" rail (optional)
  *   wide        true for the home page (no reading column)
  */
-export function page({ lang, path, title, description, alternate, body, headings = [], wide = false, bodyClass = '', noindex = false }) {
+export function page({ lang, path, title, description, alternate, hreflang: declareHreflang = true, body, headings = [], wide = false, bodyClass = '', noindex = false }) {
   const s = t(lang);
   const routes = ROUTES[lang];
   const nav = s.nav.map(([key, label]) => {
@@ -84,7 +86,7 @@ export function page({ lang, path, title, description, alternate, body, headings
     ? `<nav class="rail" aria-label="${escapeHtml(s.onThisPage)}"><p class="rail-title">${s.onThisPage}</p><ol>${headings.map(h => `<li><a href="#${escapeHtml(h.id)}">${escapeHtml(h.text)}</a></li>`).join('')}</ol></nav>`
     : '';
   const fullTitle = path === '/' ? title : `${title} · Pri Learning`;
-  const hreflang = alternate
+  const hreflang = alternate && declareHreflang
     ? `\n  <link rel="alternate" hreflang="${lang}" href="${SITE_ORIGIN}${path}">\n  <link rel="alternate" hreflang="${lang === 'en' ? 'hi' : 'en'}" href="${SITE_ORIGIN}${alternate}">`
     : '';
   return `<!doctype html>

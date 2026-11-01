@@ -211,6 +211,8 @@ main.reading { padding-top: 40px; }
 .qa dd { margin: 0.35em 0 0; color: var(--ink-2); }
 .qa dt:first-child { margin-top: 0; }
 .index-list { list-style: none; padding: 0; border-top: 1px solid var(--line); }
+.page-head + .index-list { border-top: 0; } /* the page head already draws this hairline */
+.index-list + .fine { margin-top: 24px; }
 .index-list li { margin: 0; border-bottom: 1px solid var(--line); }
 .index-list a { display: flex; justify-content: space-between; gap: 16px; padding: 14px 2px; text-decoration: none; }
 .index-list a:hover { color: var(--accent); }
@@ -288,6 +290,7 @@ main.wide { padding-top: 0; }
 @media (min-width: 760px) { .plain { columns: 2; } }
 .plain p { break-inside: avoid; padding: 14px 0; border-top: 1px solid var(--line); color: var(--ink-2); font-size: 16px; }
 .plain p b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; font-family: var(--serif); font-size: 18px; }
+.coverage-notes { margin-top: 28px; }
 .honest { border-left: 2px solid var(--prime); padding: 4px 0 4px 18px; max-width: 64ch; color: var(--ink-2); font-size: 16px; }
 .honest + .honest { margin-top: 14px; }
 

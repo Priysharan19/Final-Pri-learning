@@ -43,8 +43,12 @@ function noticeArticle({ slug, lang, docs, demote = 0, dropTitle = false, only =
     throw new Error(`docs/legal/${docs[slug].file[lang]} still contains a placeholder; the site will not publish a template.`);
   }
   const file = `docs/legal/${docs[slug].file[lang]}`;
+  // data-source names the file the body came from; data-sections, when only
+  // some H2 sections are rendered, lists which. tools/site-check.mjs reads both
+  // and requires the body to be, word for word, those sections of that file.
+  const sections = only ? ` data-sections="${only.join(',')}"` : '';
   return {
-    html: `<article class="prose notice" lang="${lang}" data-source="${file}">\n${rendered.html}\n</article>`,
+    html: `<article class="prose notice" lang="${lang}" data-source="${file}"${sections}>\n${rendered.html}\n</article>`,
     title: rendered.title,
     headings: rendered.headings.filter(h => h.level === 2),
     file,
@@ -264,13 +268,17 @@ export function hindiIndexPage({ docs }) {
   <li><a href="${r['refund-policy']}"><span>${escapeHtml(title('refund-policy'))}</span><small>${escapeHtml(lastUpdated(docs['refund-policy'].hi))}</small></a></li>
   <li><a href="${r['delete-account']}"><span>अपना खाता मिटाएँ</span><small>ऐप में, ऐप के बिना, ईमेल से</small></a></li>
 </ul>
-<p class="fine" style="margin-top:24px">ऐप में प्रश्न, संकेत और हल अंग्रेज़ी में हैं; ऐप का इंटरफ़ेस अंग्रेज़ी और हिन्दी में है।</p>`;
+<p class="fine">ऐप में प्रश्न, संकेत और हल अंग्रेज़ी में हैं; ऐप का इंटरफ़ेस अंग्रेज़ी और हिन्दी में है।</p>`;
+  // The header links back to the English home, but /hi is an index of the
+  // Hindi notices, not a translation of the home page, so it declares no
+  // hreflang pair (search engines ignore a pair the other page does not return).
   return page({
     lang: 'hi',
     path: '/hi',
     title: 'हिन्दी में सूचनाएँ',
     description: 'Pri Learning की गोपनीयता सूचना, उपयोग की शर्तें, रिफ़ंड नीति, सहायता और खाता मिटाने का पन्ना, हिन्दी में।',
     alternate: '/',
+    hreflang: false,
     body
   });
 }
@@ -336,7 +344,7 @@ export function homePage({ docs }) {
         <li><span class="n">3</span><span class="expr">${M.line3}</span><span class="note"></span></li>
         <li class="final"><span class="n">4</span><span class="expr">${M.line4}</span><span class="note">final answer · checked by rule</span></li>
       </ol>
-      <figcaption class="sheet-foot"><span><b>Read</b> by the server, <b>confirmed</b> by the student, <b>marked</b> by rule.</span><span>Marks are for the final answer.</span></figcaption>
+      <figcaption class="sheet-foot"><span><b>Read</b> by the server, <b>confirmed</b> by the student, <b>marked</b> by rule.</span><span>Marking is automatic and can be wrong.</span></figcaption>
     </figure>
     </div>
   </div>
@@ -350,8 +358,8 @@ export function homePage({ docs }) {
     </div>
     <div class="ledger three">
       <div><span class="k">1</span><h3>You write</h3><div class="cell"><p>With an Apple Pencil, a finger or the keyboard, one line of working at a time. You can also photograph working done on paper, or a textbook question to practise questions like it.</p></div></div>
-      <div><span class="k">2</span><h3>Pri reads it</h3><div class="cell"><p>A picture of your writing goes to Pri's server, which passes it to OpenAI to read. Nothing is sent until you have agreed to this, once, and you can turn it off at any time and type instead. The picture never carries the question, the expected answer or your name.</p><p>You see the transcription and can correct it before it counts.</p></div></div>
-      <div><span class="k">3</span><h3>The rules decide</h3><div class="cell"><p>The mark is decided by Pri's marking engine, a fixed set of mathematical rules, never by an AI model. Marks are for the final answer. Marking is automatic and can be wrong: if a question is marked wrongly, report it from the question and we will look at it. A mark inside Pri Learning has no standing outside it.</p></div></div>
+      <div><span class="k">2</span><h3>Pri reads it</h3><div class="cell"><p>A picture of your writing goes to Pri's server, which passes it to OpenAI to read. This is on for a signed-in account, and you can turn it off at any time in Settings → Handwriting, after which you type your answers instead. When you write with a pencil or a finger, the picture is drawn from your own strokes and nothing else: not the question, not the expected answer, not your name. A photograph is your camera's picture, so whatever is in the frame is sent. Pri keeps no copy of either.</p><p>You see the transcription and can correct it before it counts.</p></div></div>
+      <div><span class="k">3</span><h3>The rules decide</h3><div class="cell"><p>The mark is decided by Pri's marking engine, a fixed set of mathematical rules, never by an AI model. Marking is automatic and can be wrong: if a question is marked wrongly, report it from the question and we will look at it. A mark inside Pri Learning has no standing outside it.</p></div></div>
     </div>
   </div>
 </section>
@@ -371,7 +379,7 @@ export function homePage({ docs }) {
       <div><h3>JEE Main</h3><p class="row-math"><span class="lead">Find</span> ${M.limit}</p></div>
       <div><h3>JEE Advanced <span class="tag">Premium</span></h3><p class="row-math"><span class="lead">Simplify</span> ${M.complex}</p></div>
     </div>
-    <div style="margin-top:28px">
+    <div class="coverage-notes">
       <p class="honest">Questions, hints and worked solutions are in English. The app's interface is in English and Hindi.</p>
       <p class="honest">The questions and the marking rules are checked by automated tests. They have not yet had an independent human review. Not endorsed by NCERT, CBSE or NTA.</p>
     </div>
@@ -410,7 +418,7 @@ export function homePage({ docs }) {
       <p><b>No ads. No tracking.</b> Not on this site, not in the app. We do not sell your data.</p>
       <p><b>An account, and a connection, to check answers.</b> Work done without a connection is kept on your device until it can be checked.</p>
       <p><b>Under 18? A parent or guardian confirms first.</b> They get a link or a code, and can withdraw at any time.</p>
-      <p><b>Your handwriting is read by OpenAI, after you agree.</b> Pri keeps no copy of the picture, and it never goes with the question, the expected answer or your name.</p>
+      <p><b>Your handwriting is read by OpenAI while you are signed in. You can turn it off.</b> Pri keeps no copy. Handwriting goes as a picture drawn from your strokes and nothing else: not the question, not the expected answer, not your name. A photograph sends whatever is in the frame, so keep out of shot what you would not want sent.</p>
       <p><b>Delete your account whenever you like.</b> In the app, or <a href="${r['delete-account']}">without it</a>. Deletion is immediate.</p>
       <p><b>Questions and grievances.</b> A named grievance officer, a reply within 3 working days, and the Data Protection Board of India if we do not resolve it. See <a href="${r.support}">Support</a>.</p>
     </div>
