@@ -12,8 +12,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import {
-  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
+  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, describeRuntimes, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
+  requiredRuntime, runtimeMatches,
 } from '../../scripts/simulator-fleet.mjs';
+import { EXPECTED_CASES, MAX_DEVIATION_PX, judge } from '../../scripts/ink-native-check.mjs';
 
 let pass = 0;
 const failures = [];
@@ -69,6 +71,68 @@ ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty outp
   ok(pickSimulator(multi, { family: 'iPhone' })?.name === 'iPhone 17', 'the family filter applies');
   ok(pickSimulator(multi, { named: 'iPad Air' }) === null && pickSimulator('') === null, 'no match is null, not a guess');
   ok(pickSimulator(LISTING)?.udid === IPAD, 'the fixture listing picks its booted iPad');
+}
+
+// ── the runtime is NAMED: a pin, never "the newest installed" ────────────────
+// #676: the iOS 27 regression went unseen because every harness took the
+// newest runtime on the image. A pinned lane cannot be moved to another iOS by
+// a runner-image change; it fails by name instead.
+{
+  const A = 'AAAAAAAA-1111-4111-8111-111111111111', B = 'BBBBBBBB-2222-4222-8222-222222222222', C = 'CCCCCCCC-3333-4333-8333-333333333333';
+  const image = `== Devices ==
+-- iOS 26.5 --
+    iPad (A16) (${A}) (Shutdown)
+    iPhone 17 (${'44444444-4444-4444-8444-444444444444'}) (Shutdown)
+-- iOS 27.0 --
+    iPad (A16) (${B}) (Shutdown)
+-- iOS 27.1 --
+    iPad (A16) (${C}) (Shutdown)
+`;
+  ok(runtimeMatches('iOS 27.0', '27') && runtimeMatches('iOS 27.0', '27.0') && !runtimeMatches('iOS 27.0', '27.1') && !runtimeMatches('iOS 26.5', '27') && runtimeMatches('iOS 26.5', null),
+    'a pin matches by the components it names (27 matches 27.0 and 27.1; 27.0 matches 27.0 only; no pin matches everything)');
+  ok(pickSimulator(image, { runtime: '27.0' })?.udid === B, 'pinned to 27.0 the lane runs on the 27.0 device, not the newer 27.1 one');
+  ok(pickSimulator(image, { runtime: '26.5' })?.udid === A, 'pinned to 26.5 the lane runs on 26.5 although 27.x is installed');
+  ok(pickSimulator(image, { runtime: '27' })?.udid === C, 'a major-only pin takes the newest runtime of that major');
+  ok(pickSimulator(image, { runtime: '28' }) === null && pickSimulator(image, { runtime: '27.2' }) === null, 'a pin the image does not carry is null, never a run on another iOS');
+  ok(pickSimulator(image, { family: 'iPhone', runtime: '27.0' }) === null, 'the pin applies per family (no iPhone on 27.0 here)');
+  // Mutation: without the pin, adding a newer runtime to the image silently moves the lane.
+  ok(pickSimulator(image)?.udid === C && pickSimulator(image.replace('-- iOS 27.1 --', '-- iOS 28.0 --'))?.udid === C,
+    'unpinned, a runner-image update moves the gate to whatever is newest');
+  ok(pickSimulator(image.replace('-- iOS 27.1 --', '-- iOS 28.0 --'), { runtime: '27.0' })?.udid === B, 'pinned, the same image update changes nothing');
+  ok(describeRuntimes(image) === 'iOS 26.5, iOS 27.0, iOS 27.1', 'the installed runtimes are named for the failure message');
+  ok(requiredRuntime({ argv: ['node', 'x', '--runtime', '27.0'], env: {} }) === '27.0', '--runtime names the pin');
+  ok(requiredRuntime({ argv: [], env: { PRI_SIM_RUNTIME: 'iOS 26.5' } }) === '26.5', 'PRI_SIM_RUNTIME names the pin (an iOS prefix is tolerated)');
+  ok(requiredRuntime({ argv: [], env: {} }) === null, 'off CI a pin is optional');
+  ok(throwsWith(() => requiredRuntime({ argv: [], env: { CI: 'true' } }), /CI must name the iOS simulator runtime/), 'on CI a lane with no pin refuses to run');
+  ok(throwsWith(() => requiredRuntime({ argv: ['node', 'x', '--runtime', 'latest'], env: {} }), /must look like 27 or 27\.0/), '"latest" is not a pin');
+}
+
+// ── Gate A judges capture fidelity, not a reader ─────────────────────────────
+{
+  const fidelity = (over = {}) => {
+    const f = { passed: 10, cases: 10, pct: '100.0', back: 231, sent: 231, dev: '0.74', floor: MAX_DEVIATION_PX.toFixed(1), fields: 'ok', ...over };
+    return `PRIINK ── capture fidelity: ${f.passed}/${f.cases} cases · strokes ${f.pct}% (${f.back}/${f.sent}) · max deviation ${f.dev} px (floor ${f.floor}) · fields ${f.fields} ──`;
+  };
+  const bridge = (over = {}) => {
+    const b = { mounted: 'yes', positioned: 'yes', sent: 4, back: 4, placement: 'ok', ...over };
+    return `PRIINK bridge mounted=${b.mounted} positioned=${b.positioned} strokesSent=${b.sent} strokesBack=${b.back} placement=${b.placement}`;
+  };
+  ok(EXPECTED_CASES === 10 && MAX_DEVIATION_PX === 2.0, 'the gate holds ten cases to a 2.0 px deviation floor');
+  ok(judge([fidelity(), bridge()]).problems.length === 0, 'a clean run passes');
+  ok(judge([fidelity({ passed: 9 })]).problems.some(p => /capture fidelity 9\/10/.test(p)), 'one failing case fails the gate');
+  ok(judge([fidelity({ back: 230, pct: '99.6' }), bridge()]).problems.some(p => /every stroke must come back/.test(p)), 'one dropped stroke in 231 fails the gate');
+  ok(judge([fidelity({ dev: '2.01' }), bridge()]).problems.some(p => /2\.01 px is above the 2 px floor/.test(p)), 'a point moved past the floor fails the gate');
+  ok(judge([fidelity({ dev: '2.00' }), bridge()]).problems.length === 0, 'exactly the floor passes');
+  ok(judge([fidelity({ dev: 'inf' }), bridge()]).problems.some(p => /above the 2 px floor/.test(p)), 'an unmeasurable deviation fails');
+  ok(judge([fidelity({ fields: 'BAD' }), bridge()]).problems.some(p => /Pencil field/.test(p)), 'a lost Pencil field fails the gate');
+  ok(judge([fidelity({ floor: '3.0' }), bridge()]).problems.some(p => /different deviation floor/.test(p)), 'the Swift floor and this gate must agree');
+  ok(judge([fidelity({ cases: 9, passed: 9 }), bridge()]).problems.some(p => /ran 9 cases; expected 10/.test(p)), 'fewer cases than the protocol fails');
+  ok(judge([fidelity(), bridge({ positioned: 'NO' })]).problems.some(p => /mispositioned/.test(p)), 'a mispositioned surface fails');
+  ok(judge([fidelity(), bridge({ back: 3 })]).problems.some(p => /did not survive the bridge round trip \(3\/4\)/.test(p)), 'a stroke lost on the live bridge fails');
+  ok(judge([fidelity(), bridge({ placement: 'BAD' })]).problems.some(p => /placement maths/.test(p)), 'wrong placement at page scale 1.5 fails');
+  ok(judge([fidelity()]).problems.some(p => /bridge smoke test did not report/.test(p)) && judge([bridge()]).problems.some(p => /did not report a capture-fidelity score/.test(p)), 'a missing half fails');
+  ok(judge(['PRIINK ── 10/10 exact · character accuracy 100.0% ──', 'PRIINK bridge mounted=yes positioned=yes strokesBack=4 readShape=ok']).problems.length >= 2,
+    'the retired reader benchmark lines no longer satisfy the gate');
 }
 
 // ── which simulators are in the way ──────────────────────────────────────────

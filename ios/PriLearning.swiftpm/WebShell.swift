@@ -51,7 +51,7 @@ struct WebShell: UIViewRepresentable {
         let cloudConfigured = NativeCloudBridge.isConfigured ? "true" : "false"
         let nativeReleaseIdentity = NativeReleaseIdentity.javaScriptLiteral
         let nativeFlag = WKUserScript(
-            source: NativeHostBridge.hostScript(cloudConfigured: NativeCloudBridge.isConfigured) + " window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
+            source: NativeHostBridge.hostScript(cloudConfigured: NativeCloudBridge.isConfigured) + " window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
@@ -70,7 +70,6 @@ struct WebShell: UIViewRepresentable {
         config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
-        config.userContentController.add(context.coordinator, name: "priPhoto")
         config.userContentController.add(context.coordinator, name: "priBilling")
         config.userContentController.add(context.coordinator, name: "priCloud")
 
@@ -132,7 +131,6 @@ struct WebShell: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKDownloadDelegate {
         private var downloadDestination: URL?
         private weak var shellWebView: WKWebView?
-        private let photoOCR = PhotoOCRBridge()
         private let billing = StoreKitBillingBridge()
         private let cloud = NativeCloudBridge()
         private let host = NativeHostBridge()
@@ -305,9 +303,17 @@ struct WebShell: UIViewRepresentable {
             webView.load(URLRequest(url: target))
         }
 
-        /// Dynamic Type: the page is laid out in CSS pixels, so the system text
-        /// size scales the whole page. It is capped so the CSS viewport never
-        /// drops below 360px wide (the narrowest layout the product is tested at).
+        /// Text size. The page is laid out in CSS pixels, so the system text
+        /// size SCALES THE WHOLE PAGE through the viewport; it is capped so the
+        /// CSS viewport never drops below 360 px wide (the narrowest layout the
+        /// product is tested at). This is not system Dynamic Type: text does
+        /// not reflow at the system's metrics, and on a 402 pt iPhone the
+        /// largest accessibility size reaches only about 1.12× (1.5× on iPad).
+        /// Do not declare Larger Text / Dynamic Type support for the app
+        /// (RELEASE.md §8); the device matrix records what the sizes really
+        /// do (docs/release/device-matrix.md, TEXTSIZE cases). Making it real
+        /// means the web app's type scale following a text-size token, which
+        /// is a product change recorded for the owner, not a shell setting.
         ///
         /// The scale is applied through the viewport (`width = view width ÷
         /// scale`), not `pageZoom`: WKWebView's page zoom magnifies without
@@ -373,10 +379,6 @@ struct WebShell: UIViewRepresentable {
             }
             if message.name == "priInk" {
                 ink.handle(message.body)
-                return
-            }
-            if message.name == "priPhoto" {
-                photoOCR.handle(message.body, webView: shellWebView)
                 return
             }
             if message.name == "priBilling" {

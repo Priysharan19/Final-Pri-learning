@@ -82,18 +82,18 @@ Review this list against the exact candidate before each submission rather than 
 
 ### Native capabilities currently declared
 
-- Camera: declared in `Package.swift` with a purpose string for photographing handwritten mathematics for on-device reading/attempt use.
+- Camera: declared in `Package.swift` with a purpose string for photographing handwritten mathematics; the photo is sent to the Pri server to be read.
 - App category: Education.
 - Non-exempt encryption declaration: `ITSAppUsesNonExemptEncryption = false` in Info.plist.
 
 ### Native/product data paths that must be represented accurately in privacy review
 
 - offline/local learning data and profiles stored on device;
-- Apple Pencil/PencilKit handwriting used by the local handwriting pipeline;
-- photo input when the student explicitly uses photo OCR;
+- Apple Pencil/PencilKit handwriting: captured on the device, and sent to the Pri server as a picture when the student presses "Read my answer" (no on-device reader);
+- photo input when the student attaches a photo of working: sent to the Pri server to be read (no on-device OCR);
 - optional authenticated `/v1` cloud account/sync/classroom/entitlement features through `NativeCloudBridge`;
 - native Apple purchase/restore flow with server-authoritative entitlement state;
-- optional cloud handwriting path only where the product/configuration enables it, subject to its answer-blind privacy boundary;
+- the server handwriting/photo reader is the only reader; it is answer-blind and on by default for an eligible signed-in account (minors need a confirmed guardian), and nothing is read offline;
 - user-initiated exports/shares of backups, progress/task files and related artifacts.
 
 This inventory is an engineering map, not legal advice and not an App Store privacy answer by itself. The person submitting the app must reconcile the exact shipping features, server configuration and current Apple disclosure requirements.
@@ -159,6 +159,7 @@ Before pressing Submit for Review:
 - icon, display name and launch presentation are correct;
 - permission purpose text matches actual behavior;
 - App Privacy answers have been reviewed against the exact shipping data paths;
+- Accessibility Nutrition Labels: do **not** declare Larger Text / Dynamic Type support. The shell scales the whole page through the viewport, capped so the CSS viewport never drops below 360 px (about 1.12× at the largest size on a 402 pt iPhone, up to 1.5× on iPad); that is not system Dynamic Type reflow. Declare VoiceOver only after the physical pass in `docs/release/device-matrix.md` records it;
 - screenshots/preview/media match the shipping UI and supported device sizes;
 - product description, support URL, privacy-policy URL and contact information are current;
 - subscriptions/in-app purchase products used by the build are correctly configured and reviewable;

@@ -1,6 +1,6 @@
 # Pri Learning — native iPad app
 
-`PriLearning.swiftpm` is the canonical native Apple package for Pri Learning. It wraps the bundled offline-first React application in a SwiftUI/WKWebView shell and adds native PencilKit/Vision handwriting, camera/photo OCR, StoreKit billing, sharing/downloads and bounded production cloud transport.
+`PriLearning.swiftpm` is the canonical native Apple package for Pri Learning. It wraps the bundled React application in a SwiftUI/WKWebView shell and adds the native PencilKit writing surface, camera access for photo attach, StoreKit billing, sharing/downloads and bounded production cloud transport. Nothing in the shell reads handwriting or photos: both are read on the server (owner decision 2026-10-02, default D16), and the deterministic marking engine in the web bundle decides every mark.
 
 `ios/PriLearning 2.swiftpm` is a tracked compatibility copy for existing Swift Playgrounds installs. Native source changes must remain synchronized; CI enforces the package contract.
 
@@ -52,11 +52,9 @@ Do not describe the shipping app as making “no network requests.” Describe i
 - `LocalSchemeHandler.swift` — serves bundled assets through `prilearning://` so local web storage remains in the app sandbox.
 - `NativeCloudBridge.swift` — bounded HTTPS `/v1` transport with native cookie/CSRF ownership.
 - `StoreKitBillingBridge.swift` — native Apple purchase/restore bridge; server entitlement state remains authoritative.
-- `PhotoOCRBridge.swift` — native photo OCR path.
-- `Ink/` — PencilKit surface, stroke bridge, recognition and native handwriting support.
+- `Ink/` — PencilKit surface (`InkSurface.swift`), the stroke model (`InkStroke.swift`), the page bridge (`InkBridge.swift`, capture only, no read op), the capture-fidelity self-check (`InkSelfCheck.swift`, Gate A) and the debug demo driver.
 - `Assets.xcassets/AppIcon.appiconset/` — production AppIcon asset, regression-gated by the native bridge suite.
 - `Resources/Web/` — generated offline-first web application bundle.
-- `Resources/Models/` — promoted native model assets when release evidence allows them.
 
 ## Production release
 

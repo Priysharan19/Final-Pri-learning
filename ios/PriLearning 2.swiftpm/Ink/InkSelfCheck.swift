@@ -1,22 +1,28 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Native ink self-check
+// Pri Learning · Native ink self-check (Gate A: capture fidelity)
 //
-// Scores the NATIVE reading pipeline end to end — segmentation, rasterising,
-// Vision, the maths decode, powers, fractions, assembly — against expressions
-// whose answer is known.
+// Nothing native reads ink any more: the page draws the picture and asks the
+// server (owner decision 2026-10-02, default D16). What the native layer must
+// get right is CAPTURE: every stroke a student makes on the PencilKit surface
+// reaches the page with every point and the Pencil signal attached to it —
+// timing, pressure, azimuth, altitude — in the page's own coordinate space,
+// and the surface sits exactly where the page said it should.
 //
-// A word on what this number is and is not. The ink is written from the same
-// glyph shapes the web engine kept as templates, so it is synthetic, and a
-// synthetic score is worth much less than a real one. It is worth something
-// here for a reason it was NOT worth anything for the old engine: Vision has
-// never seen these shapes. The web engine was scored against jittered copies
-// of the very templates it matched against, which measures the generator; this
-// measures a reader that has no relationship to the generator at all.
+// This check scores that, deterministically, in two parts:
 //
-// It still does not tell you how the app reads YOUR handwriting. Only writing
-// on the thing does that. What it does tell you is whether the pipeline holds
-// together: whether powers land as powers, whether a times sign is told from
-// an x, whether a stacked fraction comes back as one, whether a line survives.
+//   1. Codec fidelity. Synthetic strokes (the glyph shapes the project has
+//      always used as test ink) are written into a real PKDrawing through the
+//      production StrokeCodec and read back the way the bridge reads a
+//      student's drawing. Every stroke must survive; the returned path must
+//      stay within the codec's own sampling step of the path that was drawn;
+//      duration, force, azimuth and altitude must survive; and the JSON the
+//      page receives must round-trip without loss.
+//   2. Bridge smoke. InkBridge is driven with the exact message sequence the
+//      page sends — mount, tool, strokes in — and must mount, position the
+//      surface where the page said, and hand every stroke back.
+//
+// The ink is synthetic and placed programmatically. This is a regression gate
+// for capture; it is never Pencil, device or recognition evidence.
 //
 // Run:  xcrun simctl launch <device> com.prilearning.app --ink-selfcheck
 // Read: xcrun simctl spawn <device> log show --last 2m \
@@ -24,6 +30,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import CoreGraphics
 import Foundation
+import PencilKit
 
 enum InkSelfCheck {
 
@@ -87,6 +94,9 @@ enum InkSelfCheck {
         var slant: CGFloat = 0.10          // a consistent hand leans
         var jitter: CGFloat = 0.9          // nobody draws a clean polyline
         var seed: UInt64 = 0x5EED
+        /// Seconds between samples and a pressure profile, so the Pencil
+        /// fields the codec must preserve are present on every point.
+        var sampleSeconds: TimeInterval = 1.0 / 120.0
 
         mutating func noise() -> CGFloat {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
@@ -94,24 +104,34 @@ enum InkSelfCheck {
         }
     }
 
-    /// Lay a glyph down at the pen's position and advance it.
+    /// Lay a glyph down at the pen's position and advance it. Every point
+    /// carries time, force, azimuth and altitude, as a Pencil point would.
     private static func write(_ symbol: String, pen: inout Pen, scale: CGFloat, rise: CGFloat) -> [InkStroke] {
         guard let outline = font[symbol] else { return [] }
         let height = pen.emHeight * scale
         let width = height * 0.62
         let top = pen.baseline - rise - height
         var strokes: [InkStroke] = []
-        for polyline in outline {
+        for (strokeIndex, polyline) in outline.enumerated() {
             var points: [InkPoint] = []
             var i = 0
+            var sample = 0
             while i + 1 < polyline.count {
                 let ux = CGFloat(polyline[i]) / 100
                 let uy = CGFloat(polyline[i + 1]) / 100
                 let y = top + uy * height
                 // Slant is applied about the baseline, the way a hand leans.
                 let x = pen.x + ux * width + pen.slant * (pen.baseline - y)
-                points.append(InkPoint(x: x + pen.noise(), y: y + pen.noise(), w: 3))
+                let force = 0.35 + 0.4 * CGFloat(sample % 5) / 4
+                points.append(InkPoint(
+                    x: x + pen.noise(), y: y + pen.noise(), w: 3 + force,
+                    t: TimeInterval(sample) * pen.sampleSeconds,
+                    force: force,
+                    azimuth: 1.1 + 0.05 * CGFloat(strokeIndex),
+                    altitude: 0.9 + 0.02 * CGFloat(strokeIndex)
+                ))
                 i += 2
+                sample += 1
             }
             if points.count >= 2 { strokes.append(InkStroke(points: points)) }
         }
@@ -151,8 +171,7 @@ enum InkSelfCheck {
         return strokes
     }
 
-    /// Numerator over a bar over denominator — the shape a line reader cannot
-    /// handle and the fraction pass exists for.
+    /// Numerator over a bar over denominator.
     private static func stackedFraction(numerator: String, denominator: String, pen: inout Pen) -> [InkStroke] {
         let barY = pen.baseline - pen.emHeight * 0.35
         let startX = pen.x
@@ -170,7 +189,7 @@ enum InkSelfCheck {
         let endX = max(top.x, bottom.x)
         let bar = (0...14).map { i -> InkPoint in
             let t = CGFloat(i) / 14
-            return InkPoint(x: startX - 4 + t * (endX - startX + 8), y: barY, w: 3)
+            return InkPoint(x: startX - 4 + t * (endX - startX + 8), y: barY, w: 3, t: TimeInterval(i) / 120, force: 0.5, azimuth: 1.0, altitude: 1.0)
         }
         strokes.append(InkStroke(points: bar))
         pen.x = endX + pen.emHeight * 0.18
@@ -181,24 +200,27 @@ enum InkSelfCheck {
 
     private struct Case {
         let name: String
-        let expected: String
         let build: (inout Pen) -> [InkStroke]
     }
 
+    /// The same ten pages the old benchmark wrote, kept as capture cases: single
+    /// lines, powers, brackets, a function name, a decimal, two lines and a
+    /// stacked fraction, so the codec is exercised on short strokes, long
+    /// strokes, raised strokes and strokes far from the origin.
     private static var cases: [Case] {
-        func plain(_ name: String, _ source: String, _ expected: String) -> Case {
-            Case(name: name, expected: expected) { pen in ink(for: source, pen: &pen) }
+        func plain(_ name: String, _ source: String) -> Case {
+            Case(name: name) { pen in ink(for: source, pen: &pen) }
         }
         return [
-            plain("cubic",        "y = 2x^3 + 9x^2 - 108x", "y=2x^(3)+9x^(2)-108x"),
-            plain("simple",       "x = 3",                  "x=3"),
-            plain("quadratic",    "2x^2 - 5x + 3 = 0",      "2x^(2)-5x+3=0"),
-            plain("negative",     "x = -4",                 "x=-4"),
-            plain("brackets",     "(x + 3)(x - 2) = 0",     "(x+3)(x-2)=0"),
-            plain("derivative",   "6x^2 + 18x - 108",       "6x^(2)+18x-108"),
-            plain("function",     "sin(x) = 1",             "sin(x)=1"),
-            plain("decimal",      "x = 2.5",                "x=2.5"),
-            Case(name: "twoLines", expected: "x^(2)+2x\n=0") { pen in
+            plain("cubic",        "y = 2x^3 + 9x^2 - 108x"),
+            plain("simple",       "x = 3"),
+            plain("quadratic",    "2x^2 - 5x + 3 = 0"),
+            plain("negative",     "x = -4"),
+            plain("brackets",     "(x + 3)(x - 2) = 0"),
+            plain("derivative",   "6x^2 + 18x - 108"),
+            plain("function",     "sin(x) = 1"),
+            plain("decimal",      "x = 2.5"),
+            Case(name: "twoLines") { pen in
                 var strokes = ink(for: "x^2 + 2x", pen: &pen)
                 var second = pen
                 second.x = 40
@@ -206,14 +228,14 @@ enum InkSelfCheck {
                 strokes += ink(for: "= 0", pen: &second)
                 return strokes
             },
-            Case(name: "fraction", expected: "(1)/(2)") { pen in
+            Case(name: "fraction") { pen in
                 stackedFraction(numerator: "1", denominator: "2", pen: &pen)
             }
         ]
     }
 
-    /// The screenshot expression: what the app was reading wrongly before any
-    /// of this, laid out to fit the question page's writing area.
+    /// The screenshot expression, laid out to fit the question page's writing
+    /// area (used by the --ink-demo driver to show the surface in the app).
     static func demoStrokes() -> [InkStroke] {
         var pen = Pen()
         pen.x = 44
@@ -222,53 +244,112 @@ enum InkSelfCheck {
         return ink(for: "y = 2x^3 + 9x^2 - 108x", pen: &pen)
     }
 
+    // MARK: - Fidelity
+
+    /// The codec resamples a PencilKit path every `sampleStep` points, so a
+    /// returned path may differ from the drawn polyline by up to that step plus
+    /// the B-spline's own smoothing of a control polygon. The floor below is
+    /// what the gate holds the codec to; scripts/ink-native-check.mjs reads
+    /// the measured maximum and fails the lane when it exceeds this.
+    static let maxDeviationFloorPx: CGFloat = 2.0
+
+    struct Fidelity {
+        var strokesSent = 0
+        var strokesBack = 0
+        var pointsSent = 0
+        var pointsBack = 0
+        var maxDeviation: CGFloat = 0           // returned point → drawn polyline, and drawn point → returned polyline
+        var durationOK = true
+        var forceOK = true
+        var azimuthOK = true
+        var altitudeOK = true
+        var jsonOK = true
+        var ok: Bool { strokesSent == strokesBack && maxDeviation <= maxDeviationFloorPx && durationOK && forceOK && azimuthOK && altitudeOK && jsonOK && pointsBack > 0 }
+    }
+
+    private static func distance(_ p: CGPoint, toSegment a: CGPoint, _ b: CGPoint) -> CGFloat {
+        let dx = b.x - a.x, dy = b.y - a.y
+        let len2 = dx * dx + dy * dy
+        guard len2 > 0 else { return hypot(p.x - a.x, p.y - a.y) }
+        let t = max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2))
+        return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+    }
+
+    private static func distance(_ p: CGPoint, toPolyline points: [InkPoint]) -> CGFloat {
+        guard let first = points.first else { return .infinity }
+        if points.count == 1 { return hypot(p.x - first.x, p.y - first.y) }
+        var best = CGFloat.infinity
+        for i in 1..<points.count {
+            best = min(best, distance(p, toSegment: CGPoint(x: points[i - 1].x, y: points[i - 1].y), CGPoint(x: points[i].x, y: points[i].y)))
+        }
+        return best
+    }
+
+    /// Through the production codec into a real PKDrawing and back, exactly as
+    /// setStrokes → surface.strokes does on the live bridge.
+    static func fidelity(of strokes: [InkStroke]) -> Fidelity {
+        var f = Fidelity()
+        f.strokesSent = strokes.count
+        f.pointsSent = strokes.reduce(0) { $0 + $1.points.count }
+        let drawing = StrokeCodec.drawing(from: strokes, color: .black)
+        let back = StrokeCodec.strokes(from: drawing)
+        f.strokesBack = back.count
+        f.pointsBack = back.reduce(0) { $0 + $1.points.count }
+        for (sent, got) in zip(strokes, back) {
+            guard !got.points.isEmpty else { f.maxDeviation = .infinity; continue }
+            for p in got.points { f.maxDeviation = max(f.maxDeviation, distance(CGPoint(x: p.x, y: p.y), toPolyline: sent.points)) }
+            for p in sent.points { f.maxDeviation = max(f.maxDeviation, distance(CGPoint(x: p.x, y: p.y), toPolyline: got.points)) }
+            // Timing: monotonic, and the stroke lasts as long as it did.
+            let times = got.points.map(\.t)
+            if zip(times, times.dropFirst()).contains(where: { $0 > $1 + 1e-6 }) { f.durationOK = false }
+            if abs(got.duration - sent.duration) > max(0.02, sent.duration * 0.1) { f.durationOK = false }
+            // Pencil signal: interpolated between the control points, so it
+            // stays inside the range that was written.
+            func within(_ values: [CGFloat], of sentValues: [CGFloat], slack: CGFloat) -> Bool {
+                guard let lo = sentValues.min(), let hi = sentValues.max() else { return true }
+                return values.allSatisfy { $0 >= lo - slack && $0 <= hi + slack }
+            }
+            if !within(got.points.map(\.force), of: sent.points.map(\.force), slack: 0.01) { f.forceOK = false }
+            if !within(got.points.map(\.azimuth), of: sent.points.map(\.azimuth), slack: 0.01) { f.azimuthOK = false }
+            if !within(got.points.map(\.altitude), of: sent.points.map(\.altitude), slack: 0.01) { f.altitudeOK = false }
+        }
+        // The JSON the page receives must carry every field back unchanged.
+        for stroke in back {
+            guard let decoded = InkStroke(json: stroke.jsonObject), decoded.points.count == stroke.points.count else { f.jsonOK = false; continue }
+            for (a, b) in zip(stroke.points, decoded.points) {
+                if abs(a.x - b.x) > 1e-9 || abs(a.y - b.y) > 1e-9 || abs(a.w - b.w) > 1e-9 || abs(a.t - b.t) > 1e-9
+                    || abs(a.force - b.force) > 1e-9 || abs(a.azimuth - b.azimuth) > 1e-9 || abs(a.altitude - b.altitude) > 1e-9 { f.jsonOK = false }
+            }
+        }
+        return f
+    }
+
     // MARK: - Run
 
     static func run() {
-        let recognizer = MathInkRecognizer()
-        var exact = 0
-        var totalDistance = 0
-        var totalLength = 0
-
-        MathInkRecognizer.trace = ProcessInfo.processInfo.arguments.contains("--ink-trace")
-        NSLog("PRIINK ── native ink self-check ─────────────────────────────")
+        NSLog("PRIINK ── native capture self-check ─────────────────────────")
+        var passed = 0
+        var worst: CGFloat = 0
+        var strokesSent = 0, strokesBack = 0
+        var fieldsOK = true
         for testCase in cases {
             var pen = Pen()
             let strokes = testCase.build(&pen)
-            MathInkRecognizer.traceLabel = testCase.name
-            if MathInkRecognizer.trace { NSLog("PRIINK case %@", testCase.name as NSString) }
-            let reading = recognizer.read(strokes: strokes, overrides: [:])
-            let got = reading.text
-            let distance = editDistance(got, testCase.expected)
-            totalDistance += distance
-            totalLength += testCase.expected.count
-            if got == testCase.expected { exact += 1 }
-            NSLog("PRIINK %@ %-11@ strokes=%d  want=%@  got=%@",
-                  got == testCase.expected ? "PASS" : "FAIL",
-                  testCase.name as NSString, strokes.count,
-                  testCase.expected as NSString, got as NSString)
+            let f = fidelity(of: strokes)
+            passed += f.ok ? 1 : 0
+            worst = max(worst, f.maxDeviation)
+            strokesSent += f.strokesSent
+            strokesBack += f.strokesBack
+            fieldsOK = fieldsOK && f.durationOK && f.forceOK && f.azimuthOK && f.altitudeOK && f.jsonOK
+            NSLog("PRIINK %@ %-11@ strokes=%d back=%d points=%d back=%d maxDev=%.2f duration=%@ force=%@ azimuth=%@ altitude=%@ json=%@",
+                  f.ok ? "PASS" : "FAIL", testCase.name as NSString,
+                  f.strokesSent, f.strokesBack, f.pointsSent, f.pointsBack, Double(f.maxDeviation),
+                  f.durationOK ? "ok" : "BAD", f.forceOK ? "ok" : "BAD", f.azimuthOK ? "ok" : "BAD", f.altitudeOK ? "ok" : "BAD", f.jsonOK ? "ok" : "BAD")
         }
-        let accuracy = totalLength == 0 ? 0 : 1 - Double(totalDistance) / Double(totalLength)
-        NSLog("PRIINK ── %d/%d exact · character accuracy %.1f%% ──",
-              exact, cases.count, accuracy * 100)
+        let strokePct = strokesSent == 0 ? 0 : 100 * Double(strokesBack) / Double(strokesSent)
+        NSLog("PRIINK ── capture fidelity: %d/%d cases · strokes %.1f%% (%d/%d) · max deviation %.2f px (floor %.1f) · fields %@ ──",
+              passed, cases.count, strokePct, strokesBack, strokesSent, Double(worst), Double(maxDeviationFloorPx), fieldsOK ? "ok" : "BAD")
         DispatchQueue.main.async { checkBridge() }
-    }
-
-    private static func editDistance(_ a: String, _ b: String) -> Int {
-        let a = Array(a), b = Array(b)
-        if a.isEmpty { return b.count }
-        if b.isEmpty { return a.count }
-        var previous = Array(0...b.count)
-        var current = [Int](repeating: 0, count: b.count + 1)
-        for i in 1...a.count {
-            current[0] = i
-            for j in 1...b.count {
-                current[j] = min(previous[j] + 1, current[j - 1] + 1,
-                                 previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1))
-            }
-            swap(&previous, &current)
-        }
-        return previous[b.count]
     }
 }
 
@@ -276,18 +357,19 @@ enum InkSelfCheck {
 // Bridge smoke test
 //
 // Drives InkBridge with the exact message sequence the page sends — mount,
-// tool, strokes in, read — and checks what comes back out. It covers the half
-// of the contract the recognition score does not: that the surface mounts and
-// positions, that strokes survive the round trip through PencilKit, and that a
-// reading is emitted in the shape the reading panel expects.
+// tool, strokes in — and checks what comes back out: that the surface mounts
+// and positions where the page said, that every stroke survives the round trip
+// through PencilKit and is handed back as a strokes message, and that the
+// placement maths holds at a page scale other than 1 (Dynamic Type).
 // ─────────────────────────────────────────────────────────────────────────────
 import UIKit
 import WebKit
 
 extension InkSelfCheck {
 
-    /// Kept alive for the length of the check — the reading arrives later, on
-    /// the main queue, and a bridge that has been released cannot deliver it.
+    /// Kept alive for the length of the check — the strokes message arrives
+    /// later, on the main queue, and a bridge that has been released cannot
+    /// deliver it.
     private static var liveBridge: InkBridge?
     private static var liveContainer: UIView?
 
@@ -301,13 +383,14 @@ extension InkSelfCheck {
         liveBridge = bridge
         liveContainer = container
 
-        var strokeReports = 0
+        var pen = Pen()
+        let strokes = ink(for: "x = 3", pen: &pen)
+        var reported = false
         bridge.onEmit = { payload in
-            if payload["type"] as? String == "strokes" {
-                strokeReports = (payload["strokes"] as? [Any])?.count ?? 0
-            }
-            guard payload["type"] as? String == "reading" else { return }
-            report(payload, container: container, strokeReports: strokeReports)
+            guard payload["type"] as? String == "strokes", !reported else { return }
+            reported = true
+            let back = (payload["strokes"] as? [Any])?.count ?? 0
+            report(container: container, strokesSent: strokes.count, strokesBack: back)
             liveBridge = nil
             liveContainer = nil
         }
@@ -320,16 +403,28 @@ extension InkSelfCheck {
             "ink": "#efece1"
         ])
         bridge.handle(["op": "tool", "tool": "pen", "finger": true])
-
-        var pen = Pen()
-        let strokes = ink(for: "x = 3", pen: &pen)
         NSLog("PRIINK bridge sending %d strokes, %d points",
               strokes.count, strokes.reduce(0) { $0 + $1.points.count })
         bridge.handle(["op": "setStrokes", "strokes": strokes.map(\.jsonObject)])
-        bridge.handle(["op": "recognize", "reqId": 7, "overrides": [String: String]()])
     }
 
-    private static func report(_ reading: [String: Any], container: UIView, strokeReports: Int) {
+    /// The placement maths at a page scale of 1.5: CSS px → points, with the
+    /// scroll offset the page reported already applied by the web view.
+    private static func placementOK() -> Bool {
+        let p = InkBridge.placement(frame: CGRect(x: 60, y: 220, width: 880, height: 380),
+                                    clip: CGRect(x: 47, y: 54, width: 977, height: 714),
+                                    reportedOffset: CGPoint(x: 0, y: 130),
+                                    contentOffset: CGPoint(x: 0, y: 195),
+                                    zoom: 1.5,
+                                    viewBounds: CGRect(x: 0, y: 0, width: 1024, height: 768))
+        return p.scale == 1.5
+            && p.surfaceBounds == CGRect(x: 0, y: 0, width: 880, height: 380)
+            && abs(p.clipFrame.minX - 70.5) < 0.01 && abs(p.clipFrame.minY - 81) < 0.01
+            && abs(p.surfaceCenter.x - (90 - 70.5 + 660)) < 0.01
+            && abs(p.surfaceCenter.y - (330 - 81 + 285)) < 0.01
+    }
+
+    private static func report(container: UIView, strokesSent: Int, strokesBack: Int) {
         let mounted = container.subviews.count == 2 && !container.subviews[1].isHidden
         // The frame is reported in viewport space and the surface sits inside
         // the clip view, so its origin is the difference between the two.
@@ -337,24 +432,8 @@ extension InkSelfCheck {
             abs($0.frame.minX - (60 - 47)) < 1 && abs($0.frame.minY - (220 - 54)) < 1
                 && abs($0.frame.width - 880) < 1 && abs($0.frame.height - 380) < 1
         } ?? false
-
-        let lines = (reading["lines"] as? [[String: Any]]) ?? []
-        let symbols = (lines.first?["symbols"] as? [[String: Any]]) ?? []
-        let shapeOK = reading["reqId"] as? Int == 7
-            && reading["minConf"] is Double
-            && reading["margin"] is Double
-            && lines.first?["box"] is [String: Any]
-            && !symbols.isEmpty
-            && symbols.allSatisfy {
-                $0["id"] is String && $0["sym"] is String && $0["conf"] is Double
-                    && $0["alts"] is [[String: Any]] && $0["box"] is [String: Any]
-                    && $0["strokeIdxs"] is [Int]
-            }
-
-        NSLog("PRIINK bridge mounted=%@ positioned=%@ strokesBack=%d readShape=%@ read=%@",
-              mounted ? "yes" : "NO", positioned ? "yes" : "NO", strokeReports,
-              shapeOK ? "ok" : "BAD",
-              (reading["text"] as? String ?? "<none>") as NSString)
+        NSLog("PRIINK bridge mounted=%@ positioned=%@ strokesSent=%d strokesBack=%d placement=%@",
+              mounted ? "yes" : "NO", positioned ? "yes" : "NO", strokesSent, strokesBack,
+              placementOK() ? "ok" : "BAD")
     }
-
 }

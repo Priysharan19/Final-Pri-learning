@@ -1,33 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Native ink bridge (web side)
 //
-// PencilKit owns the low-latency writing surface. Recognition sources are
-// explicit rather than hidden behind one generic call:
-//   foundationRecognize() → Pri's bundled Core ML model, when validated/present
-//   recognize()           → mature native rescue recogniser
-// Browser/dev builds have neither and use the JS Pri engine directly.
-//
-// DEBUG/native readings are additionally fused with Pri's purpose-built
-// line/stroke recogniser. Native owns real-line geometry; Pri owns glyph
-// segmentation and identity inside that line. Safe, answer-blind question
-// context is retained on the web request and applied only during that Pri pass.
+// PencilKit owns the low-latency writing surface; this module keeps it told
+// where the writing area is and receives the strokes it captures. It does NOT
+// ask the shell to read anything: handwriting is read only by the server
+// (client/src/ink/cloudReader.js), from a picture the page draws of these very
+// strokes, when the student presses "Read my answer" (owner decision
+// 2026-10-02, default D16 2026-11-01). The on-device readers the shell once
+// exposed (foundationRecognize, recognize) are gone from both sides of the
+// bridge, and client/test/native-ink-check.mjs keeps the two sides equal.
 // ─────────────────────────────────────────────────────────────────────────────
-import { fuseNativeStrokeReading } from './hybrid.js';
-import { inferSetContextFromPrompt, mergeRecognitionContext } from './setNotation.js';
-import { inferTrigContextFromPrompt } from './trigNotation.js';
 import { priNative } from '../platform/native/index.js';
 
 // The writing surface is a platform capability (CP-02): priNative decides which
-// transport carries it. This module keeps the ink-specific semantics — geometry,
-// stroke snapshots, and readings that resolve (never reject) with a tagged
-// failure so the recognition consensus in InkAnswer.jsx can always continue.
+// transport carries it. This module keeps the ink-specific semantics: geometry
+// and immutable stroke snapshots.
 export const nativeInkAvailable = () => priNative.ink.available();
 
-let nextRequestId = 1;
-const pending = new Map();       // reqId → {resolve, context, overrides, strokes, surfaceEpoch}
 const strokeListeners = new Set();
 let latestStrokes = [];
-let surfaceEpoch = 0;
 
 export function snapshotInkStrokes(strokes) {
   return (Array.isArray(strokes) ? strokes : []).map(stroke => ({
@@ -36,129 +27,21 @@ export function snapshotInkStrokes(strokes) {
   }));
 }
 
-const BASE_MATH_ALPHABET = [
-  ...'0123456789'.split(''),
-  '+', '-', '*', '/', '=', '(', ')', '[', ']', '{', '}', '<', '>', '<=', '>=', '!=', '±', '.', ',', ':', '%', '°', '∪', '∩',
-  'pi', 'theta', 'sqrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'ln', 'log'
-];
-
-/**
- * Recover only ANSWER-BLIND notation from the visible question. This is a
- * fallback for callers that do not yet pass recognitionContext explicitly.
- * Single-letter variables must occur outside a normal word, so the x in
- * "differentiate" cannot enter the alphabet. u/v are included because they are
- * standard scratch variables in product/chain-rule working; no expected answer
- * or mark-scheme text is ever read here.
- */
-export function inferredNotationContext(explicit = null) {
-  if (typeof document === 'undefined') return explicit || null;
-  const prompt = document.querySelector('.q-prompt');
-  const raw = String(prompt?.textContent || '');
-  const vars = new Set(['u', 'v']);
-  const common = new Set('xyzuvnktmabcrfgh'.split(''));
-  const re = /(?:^|[^A-Za-z])([A-Za-z])(?=[^A-Za-z]|$)/g;
-  for (const match of raw.matchAll(re)) {
-    const ch = match[1].toLowerCase();
-    if (common.has(ch)) vars.add(ch);
-  }
-  const generic = { alphabet: [...new Set([...BASE_MATH_ALPHABET, ...vars])] };
-
-  // Topic context is public question language, never the hidden answer. Build
-  // it compositionally so a future topic can add a safe grammar without
-  // discarding the generic maths alphabet or a caller's explicit answer type.
-  let inferred = generic;
-  const trigContext = inferTrigContextFromPrompt(raw, inferred.alphabet);
-  if (trigContext) inferred = mergeRecognitionContext(inferred, trigContext);
-  const setContext = inferSetContextFromPrompt(raw, inferred.alphabet);
-  if (setContext) inferred = mergeRecognitionContext(inferred, setContext);
-  return mergeRecognitionContext(inferred, explicit);
-}
-
-function invalidatePending(reason) {
-  surfaceEpoch += 1;
-  for (const [reqId, entry] of pending) {
-    pending.delete(reqId);
-    entry.resolve(failedReading(entry.op, reason));
-  }
-}
-
 function receiveInk(payload) {
-    if (!payload || typeof payload !== 'object') return;
-    if (payload.type === 'strokes') {
-      // JSON messages are immutable snapshots from the native bridge. Replace
-      // the top-level array on every pen-up instead of mutating it in place, so
-      // recognition requests can safely retain this exact snapshot by reference.
-      // This avoids another O(total stroke points) deep clone on every request.
-      latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
-      for (const listener of strokeListeners) listener(latestStrokes);
-    } else if (payload.type === 'reading') {
-      const entry = pending.get(payload.reqId);
-      if (entry) {
-        pending.delete(payload.reqId);
-        if (entry.surfaceEpoch !== surfaceEpoch) {
-          entry.resolve(failedReading(entry.op, 'surface-stale'));
-          return;
-        }
-        let reading = payload;
-        if (entry.strokes.length &&
-            (payload.engine === 'native-primary-debug' || payload.engine === 'native-rescue')) {
-          try {
-            reading = fuseNativeStrokeReading(
-              payload,
-              entry.strokes,
-              entry.overrides || {},
-              entry.context || inferredNotationContext()
-            );
-            reading.engine = `${payload.engine}+line-stroke-fusion`;
-          } catch {
-            reading = payload;
-          }
-        }
-        entry.resolve(reading);
-      }
-    }
+  if (!payload || typeof payload !== 'object') return;
+  if (payload.type === 'strokes') {
+    // JSON messages are immutable snapshots from the native bridge. Replace
+    // the top-level array on every pen-up instead of mutating it in place, so
+    // a caller may retain this exact snapshot by reference (the picture the
+    // server reads is drawn from it) without another deep clone.
+    latestStrokes = Array.isArray(payload.strokes) ? payload.strokes : [];
+    for (const listener of strokeListeners) listener(latestStrokes);
+  }
 }
 
 if (typeof window !== 'undefined') priNative.ink.onMessage(receiveInk);
 
 const post = message => priNative.ink.post(message);
-
-// Readings never reject (the recognition consensus must always continue), but
-// the failure still carries a code from the closed priNative error set.
-const FAILURE_CODES = { 'bridge-unavailable': 'UNAVAILABLE', timeout: 'TIMEOUT' };
-function failedReading(op, failure) {
-  const base = op === 'foundationRecognize' ? 'pri-foundation' : 'native-rescue';
-  const code = FAILURE_CODES[failure] || (String(failure).startsWith('surface-') ? 'CANCELLED' : 'INTERNAL');
-  return {
-    type: 'reading', lines: [], text: '', symbols: [], minConf: 0, margin: 0,
-    weakest: null, engine: `${base}-${failure}`, failure, error: { code }
-  };
-}
-
-function requestReading(message, timeoutMs, context = null) {
-  return new Promise((resolve) => {
-    const reqId = nextRequestId++;
-    pending.set(reqId, {
-      resolve, context, overrides: message.overrides || {}, op: message.op,
-      // `latestStrokes` is replaced, never mutated, when native emits a new
-      // drawing snapshot. Holding the reference preserves the exact page that
-      // belongs to this request without cloning every point a second time.
-      strokes: latestStrokes, surfaceEpoch
-    });
-    if (!post({ ...message, reqId })) {
-      pending.delete(reqId);
-      resolve(failedReading(message.op, 'bridge-unavailable'));
-      return;
-    }
-    setTimeout(() => {
-      const entry = pending.get(reqId);
-      if (entry) {
-        pending.delete(reqId);
-        entry.resolve(failedReading(entry.op, 'timeout'));
-      }
-    }, timeoutMs);
-  });
-}
 
 /** Where the writing area is, and how much of it the shell may draw in. */
 function geometryOf(element) {
@@ -207,7 +90,6 @@ export const nativeInk = {
 
   mount(element) {
     if (!element) return false;
-    invalidatePending('surface-remounted');
     latestStrokes = [];
     return post({ op: 'mount', ...geometryOf(element), ink: inkColor() });
   },
@@ -217,34 +99,25 @@ export const nativeInk = {
     post({ op: 'layout', ...geometryOf(element) });
   },
 
-  unmount() { invalidatePending('surface-unmounted'); latestStrokes = []; post({ op: 'unmount' }); },
+  unmount() { latestStrokes = []; post({ op: 'unmount' }); },
   setAppearance() { post({ op: 'appearance', ink: inkColor() }); },
   setTool(tool, finger) { post({ op: 'tool', tool, finger: !!finger }); },
   setEnabled(enabled) { post({ op: 'enabled', enabled: !!enabled }); },
   undo() { post({ op: 'undo' }); },
   redo() { post({ op: 'redo' }); },
-  clear() { invalidatePending('surface-cleared'); latestStrokes = []; post({ op: 'clear' }); },
+  clear() { latestStrokes = []; post({ op: 'clear' }); },
   setStrokes(strokes) {
     // External callers may retain/mutate their array. Snapshot once at the API
-    // boundary; recognition can then reuse this bridge-owned immutable snapshot.
+    // boundary; the bridge-owned snapshot is what listeners receive.
     latestStrokes = snapshotInkStrokes(strokes);
     post({ op: 'setStrokes', strokes: latestStrokes });
   },
 
+  /** The strokes the shell last reported, by reference (immutable). */
+  strokes() { return latestStrokes; },
+
   onStrokes(listener) {
     strokeListeners.add(listener);
     return () => strokeListeners.delete(listener);
-  },
-
-  /** Pri-owned learned model. Empty result means no validated asset is bundled
-   * or the model declined the page; callers must continue through fallbacks. */
-  foundationRecognize(overrides = {}, context = null) {
-    return requestReading({ op: 'foundationRecognize', overrides }, 8000, context);
-  },
-
-  /** Mature native rescue recogniser. It remains on-device and is intentionally
-   * separate from the foundation call so production fallback order is auditable. */
-  recognize(overrides = {}, context = null) {
-    return requestReading({ op: 'recognize', overrides }, 14000, context);
   }
 };

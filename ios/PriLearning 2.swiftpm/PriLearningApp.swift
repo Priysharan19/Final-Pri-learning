@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Native iPad app entry
-// SwiftUI shell around the Pri Learning engine. The whole product — the maths
-// engine, marker, handwriting recogniser, adaptive model and IndexedDB store —
-// ships inside this app bundle and runs in an embedded, offline web runtime.
-// The shell adds the native layer: full-screen app, iOS share sheet for
-// exports, camera access for photo attach, and sandboxed persistent storage.
+// SwiftUI shell around the Pri Learning engine. The maths engine, the
+// deterministic marker, the adaptive model and the IndexedDB store ship inside
+// this app bundle and run in an embedded web runtime. Handwriting and photos
+// are READ on the server (owner decision 2026-10-02, default D16); the shell
+// adds the native layer: the PencilKit writing surface, full-screen app, iOS
+// share sheet for exports, camera access for photo attach, and sandboxed
+// persistent storage.
 // ─────────────────────────────────────────────────────────────────────────────
 import SwiftUI
 
@@ -12,13 +14,11 @@ import SwiftUI
 struct PriLearningApp: App {
     init() {
         if ProcessInfo.processInfo.arguments.contains("--ink-selfcheck") {
-            // Structural geometry must pass before any downstream recogniser is
-            // allowed to produce a score. If an exponent/limit becomes another
-            // line, or if real Pencil ink disappears from the visible reading,
-            // OCR accuracy is irrelevant because the maths was already damaged.
-            InkSegmentationRegression.assertProductionInvariants()
+            // Gate A: capture fidelity and the bridge. Every stroke placed on
+            // the PencilKit surface must come back with every point, its
+            // timing, pressure, azimuth and altitude, and the surface must sit
+            // where the page said. Nothing here reads ink.
             DispatchQueue.global(qos: .userInitiated).async {
-                InkCompletenessRecovery.assertNoDisappearedInkInvariant()
                 InkSelfCheck.run()
             }
         }

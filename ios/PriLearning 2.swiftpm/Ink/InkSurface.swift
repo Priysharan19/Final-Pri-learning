@@ -132,9 +132,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     // MARK: - History
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-        // A new mark makes any whole-page read immediately stale. Invalidate at
-        // Pencil-down rather than waiting for pen-up so Vision/Foundation work
-        // cannot continue burning CPU while the student is actively writing.
+        // A new mark makes any server reading the page holds a reading of
+        // earlier ink. The page learns of the change at pen-up (strokes); this
+        // pen-down hook stays so the bridge sees the mark begin.
         delegate?.inkSurfaceDidBeginStroke(self)
         pushHistory()
     }

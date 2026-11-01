@@ -195,10 +195,10 @@ const TESTS = [
     action: 'Use a runner/Xcode image with an available iPad simulator before trusting native results.'
   },
   {
-    id: 'native-ink-app', modes: ['native'], subsystem: 'Native PencilKit/Vision app', severity: 'P0', blocking: true,
+    id: 'native-ink-app', modes: ['native'], subsystem: 'Native PencilKit capture (iPhone + iPad shell)', severity: 'P0', blocking: true,
     command: ['npm', ['run', 'test:ink:native']], timeoutMs: 1200000,
-    fixArea: 'Swift PencilKit/Vision integration, mounted iPad app and native lifecycle',
-    action: 'Fix the first native self-check/benchmark failure and preserve stale-result cancellation and package parity.'
+    fixArea: 'Swift PencilKit surface, stroke codec, ink bridge placement and the pinned simulator runtime',
+    action: 'Fix the first capture-fidelity or bridge failure (a dropped stroke, a moved point, lost Pencil fields, a mispositioned surface) and keep both packages identical. Nothing native reads ink; reading is on the server.'
   }
 ];
 
@@ -369,7 +369,7 @@ function reportMarkdown(report) {
   lines.push('');
   lines.push('- Browser E2E drives the mounted production build through real student flows; it is not a screenshot-only tour.');
   lines.push('- `check:ios` verifies the packaged SwiftPM web bundle matches the current client build.');
-  lines.push('- Native mode builds/exercises the PencilKit/Vision iPad simulator path on macOS.');
+  lines.push('- Native mode builds/exercises the PencilKit capture path (surface, stroke codec, bridge) on an iOS simulator on macOS; nothing native reads ink.');
   lines.push('- A simulator is not a physical Apple Pencil. Real-writer/physical release evidence remains a separate empirical gate.');
   if (skips.length) {
     lines.push(`- Skipped checks: ${skips.map(s => `\`${s.id}\``).join(', ')}.`);

@@ -608,8 +608,9 @@ enum JourneySelfCheck {
     });
     await step('photoDraft', async () => {
       // The product reads photos only on the server (ADR-0001). Attach one and
-      // prove the device neither reads nor marks it: the native Vision bridge
-      // is never asked, and no transcript appears.
+      // prove the device neither reads nor marks it: there is no on-device
+      // photo reader any more (the legacy receiver is wrapped only to prove
+      // nothing answers on it), and no transcript appears.
       let nativeReads = 0;
       const original = window.__priPhotoReceive;
       window.__priPhotoReceive = p => { nativeReads += 1; if (original) original(p); };

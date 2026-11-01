@@ -2,10 +2,14 @@
 // Pri Learning · Ink bridge
 //
 // Joins the native writing surface to the page it sits on. The web app owns
-// layout, toolbar and downstream marking. Native exposes TWO recognisers:
-//   foundationRecognize — Pri's bundled Core ML foundation model, when present;
-//   recognize           — the mature native Vision/geometry emergency reader.
-// The web layer decides fallback order explicitly.
+// layout, toolbar, the picture of the ink and everything downstream: the page
+// draws the strokes this bridge hands it and asks the SERVER to read them
+// (client/src/ink/cloudReader.js). Nothing native reads the ink: the on-device
+// Vision and Core ML readers were removed from the shipping target (owner
+// decision 2026-10-02, default D16 2026-11-01). What this bridge must get
+// right is capture fidelity — every stroke, every point, with its timing,
+// pressure, azimuth and altitude — and placement: the surface sits exactly
+// over the page's writing area at any scroll offset and page scale.
 // ─────────────────────────────────────────────────────────────────────────────
 import UIKit
 import WebKit
@@ -27,12 +31,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     private let clipView = InkClipView()
     private let surface = InkSurfaceView()
-    private let foundationRecognizer = InkFoundationPageRecognizer()
-    private let recognizer = MathInkRecognizer()
-    private let recognitionQueue = DispatchQueue(label: "com.prilearning.ink.recognize", qos: .userInitiated)
     private let encodingQueue = DispatchQueue(label: "com.prilearning.ink.encode", qos: .userInitiated)
-    private let revisionLock = NSLock()
-    private var strokeRevision: UInt64 = 0
 
     private weak var webView: WKWebView?
 
@@ -58,6 +57,10 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     // MARK: - Messages from the page
 
+    /// The ops the page may send. The web side's answer-blind allowlist
+    /// (client/src/platform/native/index.js INK_OPS) names the same set, and
+    /// client/test/native-ink-check.mjs keeps the two equal. There is no
+    /// read op: reading happens on the server.
     func handle(_ body: Any) {
         guard let message = body as? [String: Any],
               let op = message["op"] as? String else { return }
@@ -74,7 +77,7 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             isMounted = true
             clipView.isHidden = false
             applyLayout()
-            emit(["type": "mounted", "foundationAvailable": foundationRecognizer.isAvailable])
+            emit(["type": "mounted"])
 
         case "layout":
             guard isMounted else { return }
@@ -107,16 +110,6 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
             let raw = message["strokes"] as? [Any] ?? []
             surface.setStrokes(raw.compactMap(InkStroke.init(json:)))
 
-        case "foundationRecognize":
-            let requestId = message["reqId"] as? Int ?? 0
-            let overrides = message["overrides"] as? [String: String] ?? [:]
-            foundationRecognize(requestId: requestId, overrides: overrides)
-
-        case "recognize":
-            let requestId = message["reqId"] as? Int ?? 0
-            let overrides = message["overrides"] as? [String: String] ?? [:]
-            recognize(requestId: requestId, overrides: overrides)
-
         default:
             break
         }
@@ -133,8 +126,8 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     /// Where the native surface goes. The page reports CSS pixels; UIKit works
     /// in points, and the two differ by the web view's page zoom (Dynamic Type,
     /// CP-04). The surface keeps CSS-pixel bounds and is scaled by the zoom, so
-    /// strokes, readings and restored strokes never change units, and touches
-    /// map through the transform. At zoom 1 this is exactly the old layout.
+    /// strokes and restored strokes never change units, and touches map through
+    /// the transform. At zoom 1 this is exactly the old layout.
     struct Placement: Equatable {
         let clipFrame: CGRect
         let surfaceBounds: CGRect
@@ -192,115 +185,15 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
 
     // MARK: - Strokes out
 
-    private func invalidateRecognitionForInkMutation() {
-        revisionLock.lock()
-        strokeRevision &+= 1
-        revisionLock.unlock()
-        recognizer.cancelActiveVision()
-    }
-
     func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView) {
-        // Invalidate immediately at Pencil-down. Foundation work is suppressed
-        // by the revision checks and active Vision work is cancelled outright.
-        // Waiting until pen-up lets obsolete whole-page reads compete with ink.
-        invalidateRecognitionForInkMutation()
+        // Nothing to cancel: no native read is ever in flight. The page learns
+        // of the new ink at pen-up, through the strokes message below, and
+        // marks any server reading it holds as of earlier writing.
     }
 
     func inkSurfaceDidChangeStrokes(_ surface: InkSurfaceView) {
-        invalidateRecognitionForInkMutation()
         let strokes = surface.strokes
         emit(["type": "strokes", "strokes": strokes.map(\.jsonObject)])
-    }
-
-    private func revisionSnapshot() -> UInt64 {
-        revisionLock.lock(); defer { revisionLock.unlock() }
-        return strokeRevision
-    }
-
-    private func revisionIsCurrent(_ revision: UInt64) -> Bool {
-        revisionLock.lock(); defer { revisionLock.unlock() }
-        return revision == strokeRevision
-    }
-
-    private func emptyReadingPayload(requestId: Int, engine: String) -> [String: Any] {
-        var payload = Reading(lines: [], text: "", minConfidence: 0, margin: 0, weakest: nil).jsonObject
-        payload["type"] = "reading"
-        payload["reqId"] = requestId
-        payload["engine"] = engine
-        return payload
-    }
-
-    // MARK: - Recognition
-
-    private func foundationRecognize(requestId: Int, overrides: [String: String]) {
-        let strokes = surface.strokes
-        let revision = revisionSnapshot()
-        recognitionQueue.async { [weak self] in
-            guard let self else { return }
-            guard self.revisionIsCurrent(revision) else {
-                let payload = self.emptyReadingPayload(requestId: requestId, engine: "pri-foundation-stale")
-                DispatchQueue.main.async { self.emit(payload) }
-                return
-            }
-            let foundation = self.foundationRecognizer.read(strokes: strokes, overrides: overrides)
-                ?? Reading(lines: [], text: "", minConfidence: 0, margin: 0, weakest: nil)
-            guard self.revisionIsCurrent(revision) else {
-                let payload = self.emptyReadingPayload(requestId: requestId, engine: "pri-foundation-stale")
-                DispatchQueue.main.async { self.emit(payload) }
-                return
-            }
-
-#if DEBUG
-            // Foundation is one opinion. Do not secretly run the expensive native
-            // rescue here as well: the web arbiter requests that reader exactly
-            // once when independent opinions disagree. This avoids duplicate
-            // whole-page Vision work on physical iPad.
-            var payload = foundation.jsonObject
-            payload["type"] = "reading"
-            payload["reqId"] = requestId
-            payload["foundationAvailable"] = self.foundationRecognizer.isAvailable
-            payload["debugModelTest"] = true
-            if self.foundationRecognizer.isAvailable && !foundation.text.isEmpty {
-                payload["engine"] = "pri-foundation-debug"
-            } else {
-                payload["engine"] = self.foundationRecognizer.isAvailable
-                    ? "pri-foundation-no-reading-debug"
-                    : "pri-foundation-unavailable-debug"
-            }
-            DispatchQueue.main.async { self.emit(payload) }
-#else
-            var payload = foundation.jsonObject
-            payload["type"] = "reading"
-            payload["reqId"] = requestId
-            payload["engine"] = "pri-foundation"
-            payload["available"] = self.foundationRecognizer.isAvailable
-            DispatchQueue.main.async { self.emit(payload) }
-#endif
-        }
-    }
-
-    private func recognize(requestId: Int, overrides: [String: String]) {
-        let strokes = surface.strokes
-        let revision = revisionSnapshot()
-        recognitionQueue.async { [weak self] in
-            guard let self else { return }
-            guard self.revisionIsCurrent(revision) else {
-                let payload = self.emptyReadingPayload(requestId: requestId, engine: "native-rescue-stale")
-                DispatchQueue.main.async { self.emit(payload) }
-                return
-            }
-            let reading = self.recognizer.readWithGlyphConsensus(strokes: strokes, overrides: overrides)
-            guard self.revisionIsCurrent(revision) else {
-                let payload = self.emptyReadingPayload(requestId: requestId, engine: "native-rescue-stale")
-                DispatchQueue.main.async { self.emit(payload) }
-                return
-            }
-            var payload = reading.jsonObject
-            payload["type"] = "reading"
-            payload["reqId"] = requestId
-            payload["engine"] = "native-rescue"
-            DispatchQueue.main.async { self.emit(payload) }
-        }
     }
 
     // MARK: - Messages to the page
