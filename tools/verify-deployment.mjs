@@ -2,9 +2,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · is the deployment at this origin exactly the release we meant?
 //
-// Read-only. It sends three unauthenticated GETs (/v1/health, /v1/ready,
-// /release.json), reads no credential and changes nothing. It exits non-zero
-// unless every one of these holds:
+// Read-only. It sends four unauthenticated GETs (/v1/health, /v1/ready,
+// /release.json, /v1/billing/config), reads no credential and changes nothing.
+// It exits non-zero unless every one of these holds:
 //
 //   · /v1/health answers as pri-learning-platform and identifies the running
 //     release/database engine;
@@ -13,6 +13,9 @@
 //   · the server's release SHA is the one nominated (--sha);
 //   · the web client the server ships carries the identical release identity;
 //   · /v1/ready says the replica can serve (ready or degraded, never not_ready);
+//   · web checkout is off: the terms and the refund policy say there is no
+//     purchase on the website, and the web client offers Razorpay checkout
+//     whenever this route reports it configured (CloudAccountPanel.jsx);
 //   · with --engine, the database driver is the one the cutover step expects.
 //
 //   node tools/verify-deployment.mjs --origin https://learn.example.com \
@@ -79,12 +82,13 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   if (!check(SHA.test(expectedSha), 'nominated SHA is a full 40-hex commit', sha)) return { ok: false, results };
   if (engine !== null && !['postgres', 'sqlite'].includes(engine)) throw new Error('--engine must be postgres or sqlite');
 
-  let health, ready, web;
+  let health, ready, web, billing;
   try {
-    [health, ready, web] = await Promise.all([
+    [health, ready, web, billing] = await Promise.all([
       getJson(fetchImpl, `${base}/v1/health`),
       getJson(fetchImpl, `${base}/v1/ready`),
-      getJson(fetchImpl, `${base}/release.json`)
+      getJson(fetchImpl, `${base}/release.json`),
+      getJson(fetchImpl, `${base}/v1/billing/config`)
     ]);
   } catch (error) {
     check(false, 'origin reachable', error?.message || String(error));
@@ -133,6 +137,12 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   const readyDetail = [r.state, ...(r.failing || []), ...(r.degraded || []).map(code => `degraded:${code}`)].filter(Boolean).join(' ');
   check(ready.status === 200 && r.ready === true, '/v1/ready says this replica can serve', readyDetail || `status ${ready.status}`);
   check(!r.releaseSha || r.releaseSha === expectedSha, '/v1/ready reports the same SHA', r.releaseSha);
+  // Sent as a browser, with no X-Pri-Client header: a native client is always
+  // told false, which would hide the server's real answer. Turning web checkout
+  // on is a change to the notices first (docs/legal/README.md), then to this.
+  check(billing.status === 200 && billing.body?.webCheckout?.configured === false,
+    'web checkout is off, as the terms and refund policy say',
+    billing.status === 200 ? `configured ${billing.body?.webCheckout?.configured}` : `status ${billing.status}`);
 
   return { ok: results.every(item => item.ok), results };
 }
