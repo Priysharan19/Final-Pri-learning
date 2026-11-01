@@ -305,7 +305,7 @@ export const flow = {
         await goto(route);
         await settle();
         const a = await page.evaluate(AUDIT);
-        await check(`${route}@ipad: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+        await check(`${route}@ipad: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 30)));
       }
     }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });

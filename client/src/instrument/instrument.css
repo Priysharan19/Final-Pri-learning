@@ -644,11 +644,12 @@ html.ui-instrument .set-v > .btn[aria-pressed]:disabled { opacity: 0.45; }
 /* Segmented control (Appearance). */
 html.ui-instrument .seg { gap: 2px; padding: 3px; border: 0; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); }
 html.ui-instrument .seg > button { min-height: 30px; padding: 5px 12px; border-radius: 3px; font: 500 13px var(--in-ui); color: var(--in-tx-2); }
-/* On a coarse-pointer phone every segment and every small Settings button is
-   a 44px target: these two rules outrank theme.css's phone rule by specificity
-   (html.ui-instrument), so they restate it (audit-interface item 3: Type /
-   Write / Photo at 30px, Settings Edit at 30px). */
-@media (pointer: coarse) and (max-width: 760px), (hover: none) and (max-width: 760px) {
+/* On touch every segment and every small Settings button is a 44px target:
+   these two rules outrank theme.css's phone rule by specificity
+   (html.ui-instrument), so they restate it, at every touch width because an
+   iPad is a touch screen too (audit-interface item 3: Type / Write / Photo at
+   30px, Settings Edit at 30px). */
+@media (pointer: coarse), (hover: none) {
   html.ui-instrument .seg > button { min-height: 44px; }
   html.ui-instrument .settings-grid .card > .spread:has(> h2) .btn { min-height: 44px; min-width: 44px; }
 }
@@ -1188,6 +1189,41 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
    The tab strip scrolls inside the bar, so the extra width never moves the page. */
 @media (min-width: 761px) and (max-width: 1100px) and (pointer: coarse), (min-width: 761px) and (max-width: 1100px) and (hover: none) {
   html.ui-instrument .in-cmd { width: 44px; min-width: 44px; height: 44px; }
+}
+
+/* Every touch width, not only a phone: theme.css stops its 44px rules at 760px
+   for the v1.0 rail, and this interface's own controls are drawn for a mouse.
+   tour-instrument measures these on an iPad. Where the drawn size matters the
+   finger lands in a 44px area laid under it, as on the phone. */
+@media (pointer: coarse), (hover: none) {
+  html.ui-instrument .btn-sm { min-width: 44px; min-height: 44px; }
+  html.ui-instrument :is(.pill-opt, .set-menu-item, .acct-menu-item, .editor-tool, .ws-filter, .genbar .icon-btn, .field input, .field select) { min-height: 44px; }
+  html.ui-instrument .genbar .icon-btn { min-width: 44px; }
+  html.ui-instrument .in-bar .user-chip { min-width: 44px; min-height: 44px; justify-content: center; }
+  html.ui-instrument .in-flt { height: 44px; }
+  html.ui-instrument .in-segc button, html.ui-instrument .in-bar-slot .in-segc button { min-height: 44px; }
+  html.ui-instrument .in-led-search, html.ui-instrument .in-bar-slot .in-led-search { height: 44px; }
+
+  html.ui-instrument .chip-x, html.ui-instrument .genbar-toggle { position: relative; z-index: 1; }
+  html.ui-instrument .chip-x::after, html.ui-instrument .genbar-toggle::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%);
+  }
+
+  /* The Notes map keeps the phone's spacing, scrolling inside its frame, so
+     neighbouring chapters' hit areas never overlap. */
+  html.ui-instrument .nt-map-frame { overflow-x: auto; overscroll-behavior-x: contain; }
+  html.ui-instrument .nt-map-canvas { min-width: calc(var(--n, 1) * 46px + 24px); }
+
+  /* "Bookmarked only": the whole 44px row is the checkbox; its 18px box is drawn. */
+  html.ui-instrument .nt-check { position: relative; }
+  html.ui-instrument .nt-check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  html.ui-instrument .nt-check span { display: inline-flex; align-items: center; gap: 8px; }
+  html.ui-instrument .nt-check span::before { content: ''; flex: none; width: 18px; height: 18px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--in-edge-3); }
+  html.ui-instrument .nt-check input:checked + span::before {
+    box-shadow: none; background: var(--in-action) center / 14px 14px no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 7.5 3 3 6-7'/%3E%3C/svg%3E");
+  }
+  html.ui-instrument .nt-check input:focus-visible + span::before { outline: 2px solid var(--in-signal); outline-offset: 1px; }
 }
 
 /* Device fit: on the iPad the writing bar keeps the live status and the
