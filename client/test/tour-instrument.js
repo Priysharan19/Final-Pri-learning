@@ -679,8 +679,49 @@ export const hindiFlow = {
   }
 };
 
+// Issue #658: a student opens the app online, sees the Index, loses the
+// connection and taps a tab they have never opened. This flow never visits the
+// Map, the Report or Scripts online, so what opens them offline can only be
+// the warm pass. install-budget-check.mjs --instrument holds the manifest; this
+// proves the tabs actually paint from it.
+export const offlineFlow = {
+  id: 'instrument-offline',
+  name: 'Instrument · Map, Report and Scripts open on a first visit offline',
+  online: true,
+  async run({ page, check, goto, settle, createProfile, online }) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goto('/');
+    await createProfile({ name: 'Diya Instrument', year: 10, course: 'in' });
+    await online.signIn({ name: 'Diya Instrument' });
+    await settle();
+    await goto('/');
+    await page.waitForSelector('.in-ch', { timeout: 30000 });
+    // The same question the page asks at boot (local/offlineWarm.js), awaited
+    // here so the check cannot race the worker.
+    const held = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.ready;
+      const worker = navigator.serviceWorker.controller || registration.active;
+      return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = e => resolve(e.data || null);
+        worker.postMessage({ type: 'pri-warm', optional: false }, [channel.port2]);
+        setTimeout(() => resolve(null), 180000);
+      });
+    });
+    await check('the service worker finished the offline build', !!held, JSON.stringify(held));
+    await page.context().setOffline(true);
+    await page.waitForFunction(() => !navigator.onLine, null, { timeout: 5000 }).catch(() => {});
+    for (const [name, href, ready] of [['the Map', '/map', '[data-map-chapter]'], ['the Report', '/progress', '[data-instrument-report]'], ['Scripts', '/review', '.in-led-bar, [data-state="empty"]']]) {
+      await page.locator(`.in-tab[href="${href}"]`).click();
+      const painted = await page.waitForSelector(ready, { timeout: 30000 }).then(() => true, () => false);
+      await check(`offline, ${name} opens on its first visit`, painted && new URL(page.url()).pathname === href, page.url());
+    }
+    await page.context().setOffline(false);
+  }
+};
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   process.env.PRI_FEATURE_INSTRUMENT = '1';
   const { runFlows } = await import('./e2e.mjs');
-  process.exit(await runFlows([flow, writeFlow, hindiFlow]) ? 1 : 0);
+  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow]) ? 1 : 0);
 }
