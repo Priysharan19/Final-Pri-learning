@@ -264,8 +264,12 @@ jobs:
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
-          grep -Eq 'INSTALL BUDGET: PASS — 68/68 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
-          grep -Fq 'nothing emitted left uncovered.' suites.log
+          # npm run test:budget measures two production builds: the flag-off one
+          # and the instrument one (PRI_FEATURE_INSTRUMENT=1), whose Map, Report
+          # and Scripts tabs are held in the warm pass (#658).
+          grep -Eq 'INSTALL BUDGET: PASS — 58/58 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Eq 'INSTALL BUDGET \(instrument build\): PASS — 61/61 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 2
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused

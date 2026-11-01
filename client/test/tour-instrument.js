@@ -139,13 +139,16 @@ export const flow = {
     await page.getByTestId('choose-topic').click();
     await page.waitForSelector('#gen-panel', { timeout: 10000 }).catch(() => {});
     await check('the generator opens on the Index and lists the class or track step', await page.locator('#gen-panel').count() === 1 && await page.locator('#gen-panel .gen-cat').count() === 5);
-    // A new profile has no course chosen: the pane offers the courses first,
-    // and choosing one moves on to the topics (as on the v1.0 Home).
-    if (await page.locator('.gen-cat[aria-selected="true"]', { hasText: 'Course' }).count()) {
+    // A new profile has no track chosen: the Topics step is disabled until
+    // one is, so the pane offers the tracks first and choosing one moves on
+    // to the topics (as on the v1.0 Home).
+    const topicsTab = page.locator('.gen-cat', { hasText: en['home.catTopics'] });
+    if (await topicsTab.isDisabled()) {
       await page.locator('#gen-pane .gen-opt').first().click();
-      await page.waitForSelector('.gen-cat[aria-selected="true"]', { timeout: 5000 }).catch(() => {});
+      await page.waitForFunction(() => !!document.querySelector('.gen-cat[aria-selected="true"]:not([disabled])'), null, { timeout: 5000 }).catch(() => {});
     }
-    await check('its topics pane lists the syllabus chapters', await page.locator('.gen-cat[aria-selected="true"]', { hasText: 'Topics' }).count() === 1 && await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
+    await topicsTab.click();
+    await check('its topics pane lists the syllabus chapters', await topicsTab.getAttribute('aria-selected') === 'true' && await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
     await page.locator('#gen-pane .gen-opt:not([disabled])').first().click();
     await page.locator('.genbar-head .btn-ghost', { hasText: 'Generate' }).click();
     await page.waitForURL(/\/practice/, { timeout: 15000 }).catch(() => {});

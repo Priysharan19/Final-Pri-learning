@@ -3029,6 +3029,8 @@ export default {
   "inst.strand.data": "आँकड़े",
   "inst.tabReport": "रिपोर्ट",
   "inst.tabScripts": "उत्तर-पुस्तिकाएँ",
+  "inst.reportUp": "बढ़ा",
+  "inst.reportDown": "घटा",
   "inst.alsoTitle": "अभ्यास के और तरीके",
   "inst.reviewQueue": "समीक्षा कतार",
   "inst.reviewQueueNone": "अभी कुछ बाकी नहीं है। कोई टॉपिक भूलने से पहले अभ्यास उसे फिर सामने लाता है।",
