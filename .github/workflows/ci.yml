@@ -86,6 +86,8 @@ jobs:
         run: node client/test/native-shell-csp-check.mjs
       - name: Store-facing privacy manifest matches the privacy labels; Android permissions and signing stay closed
         run: node tools/store-readiness-check.mjs
+      - name: Public site is generated from docs/legal, uses only approved wording, links resolve, nothing phones home
+        run: npm run test:site
       - name: Install client dependencies
         run: npm ci --prefix client
       # Grading is online-only and server-authoritative, so the suites that
