@@ -218,16 +218,15 @@ export const ON_DEMAND = [
   //     keeps it.
   //   · Instrument Sans's Latin Extended subset, by the Inter script-subset
   //     argument above: fetched only when a glyph in its range appears.
-  //   · The Map, the Report (ReportHead with the Progress page under it) and
-  //     Scripts (the History page, at /review).
-  //     Each is one tab a student opens deliberately, after the Index; the
-  //     first open online keeps it offline from then on, and a first open
-  //     offline shows the route's ordinary chunk-load failure — the same
-  //     promise the placement check and the archive already make.
+  // The Map, the Report (ReportHead with the Progress page under it) and
+  // Scripts (the History page, at /review) are NOT on demand: they are three
+  // of the interface's six tabs, and a student who opened the app online and
+  // then lost the connection expects a tab to open (issue #658). They ride in
+  // the warm pass like every other tab, and install-budget-check.mjs
+  // --instrument holds them there against the unchanged ceiling.
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
-    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset']
   ] : [
     [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
