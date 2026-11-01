@@ -222,7 +222,11 @@ check('Home consumes one central recommendation resolver and one primary action'
   assert.match(home, /api\.get\('\/practice\/resume'\)/);
   assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
   assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
-  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('className="genbar"'));
+  // The exact-topic generator is a shared component now (home/TopicGenerator.jsx,
+  // rendered by Home and by the instrument Index); it still sits below the
+  // primary action on Home.
+  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('<TopicGenerator'));
+  assert.match(readFileSync(join(ROOT, 'src/home/TopicGenerator.jsx'), 'utf8'), /className="genbar"/);
   assert.match(home, /assignments === false/);
   assert.doesNotMatch(home, /TAGLINES|Tagline|DiamondTrack|adaptiveOn/);
 });

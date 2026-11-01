@@ -118,6 +118,67 @@ export const flow = {
     await page.locator('[data-instrument-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
     await check('Practise this chapter opens Practice for that chapter', new URL(page.url()).searchParams.get('subtopic') === id, page.url());
+
+    // Home parity (audit-interface item 2): what the v1.0 Home offered besides
+    // the chapters is on the Index too, each as its own entry.
+    await goto('/');
+    await settle();
+    await page.waitForSelector('[data-instrument-also]', { timeout: 15000 });
+    await check('the Index offers the review queue', await page.locator('[data-instrument-review-queue]').count() === 1 && /\/practice$/.test(await page.locator('[data-instrument-review-queue]').getAttribute('href')));
+    await check('a new student is told nothing is due, in words, with the shell’s own figure', await page.locator('[data-instrument-review-due="0"]').count() === 1 && /Nothing is due/.test(await page.locator('[data-instrument-review-due]').textContent()));
+    await check('the Index offers the study plan', await page.locator('[data-instrument-plan][href="/plan"]').count() === 1);
+    await check('the Index offers photo practice (the one link to /practise-photo)', await page.locator('[data-home-photo-practise][href="/practise-photo"]').count() === 1);
+    await check('the Index offers the exact-topic generator', await page.locator('[data-instrument-generator] .genbar-toggle').count() === 1 && await page.getByTestId('choose-topic').count() === 1);
+    await page.getByTestId('choose-topic').click();
+    await page.waitForSelector('#gen-panel', { timeout: 10000 }).catch(() => {});
+    await check('the generator opens on the Index and lists the class or track step', await page.locator('#gen-panel').count() === 1 && await page.locator('#gen-panel .gen-cat').count() === 5);
+    await page.locator('.gen-cat', { hasText: 'Topics' }).click().catch(() => {});
+    await check('its topics pane lists the syllabus chapters', await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
+    await page.locator('#gen-pane .gen-opt').first().click();
+    await page.locator('.genbar-head .btn-ghost', { hasText: 'Generate' }).click();
+    await page.waitForURL(/\/practice/, { timeout: 15000 }).catch(() => {});
+    await check('Generate opens Practice for the chosen topic', /\/practice\?/.test(page.url()) && !!new URL(page.url()).searchParams.get('subtopic'), page.url());
+
+    // Navigation parity: on an iPad and the web every non-tab destination has
+    // a visible entry (the More menu beside the tabs); on a phone the Map has
+    // a slot in the bottom bar and the rest sit behind More.
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await goto('/');
+    await settle();
+    const moreBtn = page.locator('[data-instrument-more] .in-more');
+    await check('iPad: a More menu button sits beside the tabs', await moreBtn.isVisible() && await moreBtn.getAttribute('aria-haspopup') === 'menu' && await moreBtn.getAttribute('aria-expanded') === 'false');
+    await moreBtn.click();
+    await page.waitForSelector('#in-more-menu[role=menu]', { timeout: 5000 }).catch(() => {});
+    const moreItems = await page.locator('#in-more-menu [role=menuitem]').allTextContents();
+    await check('iPad: More lists Exams, Tasks, Plan and Settings as menu items', ['Exams', 'Tasks', 'Plan', 'Settings'].every(w => moreItems.some(x => x.trim() === w)), JSON.stringify(moreItems));
+    await check('iPad: opening More moves focus into the menu', await page.evaluate(() => document.activeElement?.getAttribute('role') === 'menuitem'));
+    await page.keyboard.press('Escape');
+    await check('iPad: Escape closes More and returns focus to its button', await page.locator('#in-more-menu').count() === 0 && await page.evaluate(() => document.activeElement?.classList.contains('in-more')));
+    await moreBtn.click();
+    await page.locator('#in-more-menu [role=menuitem]', { hasText: 'Exams' }).click();
+    await page.waitForURL(/\/exams$/, { timeout: 15000 }).catch(() => {});
+    await check('iPad: choosing Exams from More opens Exams', new URL(page.url()).pathname === '/exams', page.url());
+    await goto('/tasks'); await settle();
+    await check('iPad: Tasks renders under the instrument bar', await page.locator('[data-instrument-bar]').count() === 1 && new URL(page.url()).pathname === '/tasks');
+    await goto('/plan'); await settle();
+    await check('iPad: Plan renders under the instrument bar', await page.locator('[data-instrument-bar]').count() === 1 && new URL(page.url()).pathname === '/plan');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await goto('/');
+    await settle();
+    const barHrefs = await page.locator('.mobilenav .mnav-item[href]').evaluateAll(els => els.map(e => e.getAttribute('href')));
+    await check('phone: the bottom bar holds Index, Practice, Map and Report', JSON.stringify(barHrefs) === JSON.stringify(['/', '/practice', '/map', '/progress']), JSON.stringify(barHrefs));
+    await check('phone: the More menu beside the tabs is not drawn (the sheet has its list)', !(await page.locator('[data-instrument-more]').isVisible().catch(() => false)));
+    await page.locator('.mobilenav .mnav-item[href="/map"]').click();
+    await page.waitForSelector('[data-map-chapter]', { timeout: 15000 }).catch(() => {});
+    await check('phone: the Map tab opens the Map', new URL(page.url()).pathname === '/map' && await page.locator('[data-map-chapter]').count() === chapters, page.url());
+    await goto('/'); await settle();
+    await page.getByRole('button', { name: 'More' }).click();
+    await settle();
+    const sheetHrefs = await page.locator('.mnav-sheet-item[href]').evaluateAll(els => els.map(e => e.getAttribute('href')));
+    await check('phone: More holds Scripts, Notes, Plan, Tasks, Exams and Settings', ['/review', '/notes', '/plan', '/tasks', '/exams', '/settings'].every(h => sheetHrefs.includes(h)), JSON.stringify(sheetHrefs));
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1440, height: 900 });
     await goto('/');
     await settle();
 

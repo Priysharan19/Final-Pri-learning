@@ -165,6 +165,56 @@ html.ui-instrument :focus-visible { outline: 2px solid var(--in-signal); outline
 html.ui-instrument .content { max-width: 1320px; }
 html.ui-instrument .shell.is-focus .in-bar { display: none; }
 
+/* More: every destination that is not a tab (Plan, Tasks, Exams, the games,
+   Settings), as a menu button beside the tabs. On a phone the bottom bar's
+   More sheet holds the same list, so the button is not drawn there. */
+.in-more-wrap { position: relative; display: flex; align-items: center; }
+.in-more {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 0; border-radius: 4px;
+  background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); color: var(--in-tx-3); font: 500 13.5px var(--in-ui); cursor: pointer; white-space: nowrap;
+}
+.in-more:hover, .in-more[aria-expanded="true"] { color: var(--in-tx); background: var(--in-l3); }
+.in-more svg { width: 14px; height: 14px; }
+.in-more-menu {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 70; min-width: 200px; padding: 6px;
+  border-radius: 6px; background: var(--in-l1); box-shadow: var(--in-sh-2, 0 0 0 1px var(--in-edge-2));
+}
+.in-more-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 6px 10px; border: 0; border-radius: 4px;
+  background: none; color: var(--in-tx-2); font: 500 13.5px var(--in-ui); text-align: left; cursor: pointer;
+}
+.in-more-item:hover, .in-more-item:focus-visible { background: var(--in-l3); color: var(--in-tx); }
+.in-more-item.is-here { color: var(--in-tx); box-shadow: inset 2px 0 0 var(--in-signal); }
+.in-more-item .nav-ico { display: inline-flex; width: 18px; height: 18px; color: var(--in-tx-3); }
+.in-more-item .nav-ico svg { width: 18px; height: 18px; }
+@media (max-width: 760px) { .in-more-wrap { display: none; } }
+
+/* The Index's second half: the review queue, the plan, photo practice and the
+   exact-topic generator, under the chapters and the plate. */
+.in-also { grid-column: 1 / -1; padding: 22px 24px 26px; border-top: 1px solid var(--in-edge); }
+.in-also > h2 { margin: 0 0 14px; font: 500 11px var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-also-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.in-also-link {
+  display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px; border-radius: 6px;
+  background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); color: var(--in-tx); text-decoration: none;
+}
+.in-also-link:hover { box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3); }
+.in-also-glyph { flex: none; width: 28px; height: 28px; border-radius: 4px; display: grid; place-items: center; background: var(--in-l3); color: var(--in-tx-2); }
+.in-also-text { display: grid; gap: 2px; min-width: 0; }
+.in-also-text b { font: 500 14.5px var(--in-ui); letter-spacing: -0.01em; }
+.in-also-text small { font-size: 12.5px; line-height: 1.4; color: var(--in-tx-3); text-wrap: pretty; }
+.in-also .home-card { border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); margin-bottom: 12px; }
+.in-also-gen { display: grid; gap: 10px; justify-items: start; max-width: 720px; }
+.in-also-gen .genbar { max-width: none; }
+html.ui-instrument .genbar-head { border-radius: 6px; border-color: var(--in-edge-2); background: var(--in-l1); min-height: 44px; }
+html.ui-instrument .genbar-head.open { border-radius: 6px 6px 0 0; }
+html.ui-instrument .gen-panel { border-radius: 0 0 6px 6px; border-color: var(--in-edge-2); background: var(--in-l1); }
+html.ui-instrument .gen-opt { border-radius: 4px; }
+html.ui-instrument .gen-opt.on { border-color: var(--in-tx); box-shadow: 0 0 0 1px var(--in-tx); }
+html.ui-instrument .gen-cat.on { box-shadow: inset 2px 0 0 var(--in-signal); }
+@media (max-width: 980px) { .in-also { padding: 18px 0 0; margin-top: 18px; } }
+@media (max-width: 760px) { .in-also { order: 7; } .in-also-list { grid-template-columns: 1fr; } }
+
 @media (max-width: 760px) {
   .in-bar { height: 50px; padding-inline: 14px; gap: 10px; }
   .in-tabs, .in-status { display: none; }
@@ -184,8 +234,9 @@ html.ui-instrument .mnav-item.active .nav-ico { color: var(--in-tx); }
    shared nav markup is untouched; the tab set itself is not changed here. */
 html.ui-instrument .mobilenav .nav-ico { width: 22px; height: 22px; display: grid; place-items: center; }
 html.ui-instrument .mobilenav .nav-ico::before { content: none; width: 22px; height: 22px; background: currentColor; -webkit-mask: var(--in-g) center / 22px 22px no-repeat; mask: var(--in-g) center / 22px 22px no-repeat; }
-html.ui-instrument .mobilenav .mnav-item:is([href="/"], [href="/practice"], [href="/tasks"], [href="/progress"], :not([href])) .nav-ico > svg { display: none; }
-html.ui-instrument .mobilenav .mnav-item:is([href="/"], [href="/practice"], [href="/tasks"], [href="/progress"], :not([href])) .nav-ico::before { content: ""; }
+html.ui-instrument .mobilenav .mnav-item:is([href="/"], [href="/practice"], [href="/map"], [href="/tasks"], [href="/progress"], :not([href])) .nav-ico > svg { display: none; }
+html.ui-instrument .mobilenav .mnav-item:is([href="/"], [href="/practice"], [href="/map"], [href="/tasks"], [href="/progress"], :not([href])) .nav-ico::before { content: ""; }
+html.ui-instrument .mobilenav .mnav-item[href="/map"] { --in-g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round'%3E%3Ccircle cx='4' cy='4' r='1.6'/%3E%3Ccircle cx='12' cy='5' r='1.6'/%3E%3Ccircle cx='7' cy='12' r='1.6'/%3E%3Cpath d='M5.4 4.4 10.4 5M5 5.5l1.5 5M11 6.4 8.2 10.8'/%3E%3C/svg%3E"); }
 html.ui-instrument .mobilenav .mnav-item[href="/"] { --in-g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round'%3E%3Cpath d='M2.5 4h7M2.5 8h9M2.5 12h6M13 3v10'/%3E%3C/svg%3E"); }
 html.ui-instrument .mobilenav .mnav-item[href="/practice"] { --in-g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='m10.6 2.6 2.8 2.8-7.8 7.8-3.4.6.6-3.4Z'/%3E%3C/svg%3E"); }
 html.ui-instrument .mobilenav .mnav-item[href="/tasks"] { --in-g: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 1.5h6l3 3v10h-9ZM9.5 1.5v3h3M5.5 8h5M5.5 10.5h5'/%3E%3C/svg%3E"); }
@@ -352,11 +403,12 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 
 /* Touch screens: everything a finger presses is at least 44×44. */
 @media (pointer: coarse), (hover: none) {
-  .in-btn, .in-cmd { min-height: 44px; }
+  .in-btn, .in-cmd, .in-more, .in-more-item, .in-also-link { min-height: 44px; }
   .in-strip button { min-height: 0; }
   .in-tab { min-height: 44px; }
   .in-mark { min-height: 44px; min-width: 44px; }
   .in-ch { min-height: 48px; }
+  html.ui-instrument .genbar-toggle, html.ui-instrument .genbar-empty, html.ui-instrument .gen-cat, html.ui-instrument .gen-opt, html.ui-instrument .chip-x { min-height: 44px; }
 }
 
 /* ── Write & Check (step 2) ──────────────────────────────────────────────────
