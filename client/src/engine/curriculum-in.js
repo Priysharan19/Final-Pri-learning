@@ -27,7 +27,7 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
-import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS } from './curriculum-in-hardest-covers.js';
+import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS, INDIA_RETIRED_RUNGS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
   const group = IN_CURRICULUM.find(g => g.grade === 7);
@@ -208,5 +208,40 @@ function installHardestCovers(table) {
 installHardestCovers(INDIA_HARDEST_COVERS);
 // Tranche 2: one D4 form for each JEE Class 11 / Class 12 dot point that had none.
 installHardestCovers(INDIA_JEE_HARDEST_COVERS);
+
+// Issue #408: a routine form claimed at the hardest level is replaced, then its
+// rung retired (see INDIA_RETIRED_RUNGS). Only the named rung goes; the cover's
+// other rungs and dot points stay. Load-time errors, not silent no-ops, when a
+// retirement names a rung the chapter does not have, or would leave the dot
+// point with no form at that rung, or when the named replacement is not what
+// now serves it.
+function retireRungs(table) {
+  for (const [chapterId, retirements] of Object.entries(table)) {
+    const views = new Set([
+      IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
+      IN_CHAPTER_BY_ID[chapterId],
+      IN_CHAPTERS.find(chapter => chapter.id === chapterId)
+    ].filter(Boolean));
+    if (!views.size) throw new Error(`${chapterId} is not a chapter of this curriculum`);
+    for (const chapter of views) {
+      for (const { gen, dp, diff, replacedBy } of retirements) {
+        const at = chapter.covers.findIndex(c => c.gen === gen && c.dp.includes(dp) && (c.diff || []).includes(diff));
+        if (at < 0) throw new Error(`${chapterId}: no cover ${gen} at dot point ${dp}, D${diff} to retire`);
+        const cover = chapter.covers[at];
+        if (cover.dp.length !== 1) throw new Error(`${chapterId}: ${gen} covers several dot points; retire a rung of a single-dot-point cover`);
+        const kept = { ...cover, dp: [...cover.dp], diff: cover.diff.filter(d => d !== diff) };
+        chapter.covers = kept.diff.length
+          ? chapter.covers.map((c, i) => (i === at ? kept : c))
+          : chapter.covers.filter((_, i) => i !== at);
+        const still = chapter.covers.filter(c => c.dp.includes(dp) && (c.diff || []).includes(diff)).map(c => c.gen);
+        if (!still.length) throw new Error(`${chapterId}: retiring ${gen} D${diff} would leave dot point ${dp} with no form at D${diff}`);
+        if (!still.includes(replacedBy)) throw new Error(`${chapterId}: ${replacedBy} does not serve dot point ${dp} at D${diff}`);
+      }
+    }
+  }
+}
+
+installHardestCovers(INDIA_JEE_REPLACEMENT_COVERS);
+retireRungs(INDIA_RETIRED_RUNGS);
 
 export * from './curriculum-in-base.js';

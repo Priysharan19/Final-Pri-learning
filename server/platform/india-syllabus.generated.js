@@ -117,7 +117,7 @@ export const IN_CHAPTER_SKILLS = Object.freeze({
   "c10-trigonometry": Object.freeze([{"gen":"c10-trigonometry-current","dotpoint":0},{"gen":"c10-trig-boundary-relations","dotpoint":2},{"gen":"c10-trig-ratio-reasoning","dotpoint":0},{"gen":"c10-trig-standard-reasoning","dotpoint":1}].map(Object.freeze)),
   "c11-3d-introduction": Object.freeze([{"gen":"c11-3d-introduction","dotpoint":0}].map(Object.freeze)),
   "c11-binomial-theorem": Object.freeze([{"gen":"c11-binomial-theorem","dotpoint":0}].map(Object.freeze)),
-  "c11-complex-numbers": Object.freeze([{"gen":"c11-complex-numbers","dotpoint":0},{"gen":"c11-complex-modulus-reasoning","dotpoint":0},{"gen":"c11-complex-quadratic-reasoning","dotpoint":2},{"gen":"c11-complex-algebra-reasoning","dotpoint":0},{"gen":"c11-complex-polar-reasoning","dotpoint":1}].map(Object.freeze)),
+  "c11-complex-numbers": Object.freeze([{"gen":"c11-complex-numbers","dotpoint":0},{"gen":"c11-complex-modulus-reasoning","dotpoint":0},{"gen":"c11-complex-quadratic-reasoning","dotpoint":2},{"gen":"c11-complex-algebra-reasoning","dotpoint":0},{"gen":"c11-complex-polar-reasoning","dotpoint":1},{"gen":"c11-complex-quadratic-jee-reasoning","dotpoint":2}].map(Object.freeze)),
   "c11-conic-sections": Object.freeze([{"gen":"c11-conic-sections","dotpoint":0}].map(Object.freeze)),
   "c11-limits-derivatives": Object.freeze([{"gen":"c11-limits-derivatives","dotpoint":0},{"gen":"c11-limit-reasoning","dotpoint":0},{"gen":"c11-derivative-rules-reasoning","dotpoint":2},{"gen":"c11-limit-jee-reasoning","dotpoint":0},{"gen":"c11-first-principles-reasoning","dotpoint":1}].map(Object.freeze)),
   "c11-linear-inequalities": Object.freeze([{"gen":"c11-linear-inequalities","dotpoint":0}].map(Object.freeze)),

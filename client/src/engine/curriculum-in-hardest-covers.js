@@ -130,7 +130,46 @@ export const INDIA_JEE_HARDEST_COVERS = Object.freeze({
   'c12-vector-algebra': [d4('c12-vector-direction-reasoning', 0)]
 });
 
+// ── Replacements and retired rungs · issue #408 ─────────────────────────────
+// A dot point can have a form at the hardest level that is not a hardest-level
+// question. Issue #408 found one: Complex Numbers dot point 2 ("solve quadratic
+// equations with complex roots") reached D4 on both JEE tracks only through the
+// chapter's own generator at D4 — "solve x² + bx + c = 0 and give the imaginary
+// part of the roots", which is the quadratic formula and nothing more. A
+// chapter-level D4 request drew it too.
+//
+// The fix is a replacement, then a retirement, in that order. The replacement
+// table adds an original D4 form for the dot point (same provenance as tranche
+// 2). The retirement removes the routine rung from the chapter's covers; the
+// generator itself is untouched and still serves its other rungs. The
+// installer (curriculum-in.js) refuses a retirement that names a rung the
+// chapter does not have, or that would leave the dot point with no form at
+// that rung — so retiring can never turn a selectable level into a refusal.
+//
+// The routine rung sat above the CBSE window (D1–D3), so CBSE students see no
+// change: their dot point 2 is still served at D3 by c11-complex-quadratic-
+// reasoning. Only the JEE tracks' D4 pool changes.
+export const INDIA_JEE_REPLACEMENT_PROVENANCE = Object.freeze({
+  ...INDIA_HARDEST_PROVENANCE,
+  tranche: 'phase-4-issue-408-replacement',
+  scope: 'JEE dot points whose only D4 form was routine (issue #408)'
+});
+
+/** chapterId → original D4 forms that replace a retired routine rung. */
+export const INDIA_JEE_REPLACEMENT_COVERS = Object.freeze({
+  'c11-complex-numbers': [d4('c11-complex-quadratic-jee-reasoning', 2)]
+});
+
+/** chapterId → rungs removed from the chapter's covers, each with what replaced it and why. */
+export const INDIA_RETIRED_RUNGS = Object.freeze({
+  'c11-complex-numbers': [Object.freeze({
+    gen: 'c11-complex-numbers', dp: 2, diff: 4,
+    replacedBy: 'c11-complex-quadratic-jee-reasoning',
+    reason: 'routine: the D4 rung asks for the imaginary part of the roots of x² + bx + c = 0, a direct use of the quadratic formula (issue #408)'
+  })]
+});
+
 /** The generators this table introduces, in table order. */
 export const INDIA_HARDEST_GENERATORS = Object.freeze(
-  [INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS].flatMap(table => Object.values(table).flatMap(list => list.map(entry => entry.gen)))
+  [INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS].flatMap(table => Object.values(table).flatMap(list => list.map(entry => entry.gen)))
 );
