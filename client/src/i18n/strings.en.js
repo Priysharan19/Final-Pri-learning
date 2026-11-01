@@ -869,6 +869,12 @@ export default {
     other: 'This document still has {n} placeholders to complete, and it has not been checked by a lawyer. Do not rely on it, and do not publish the app to a store or a payment provider until it has been finished and reviewed.'
   },
   'legal.translationUnavailable': 'The Hindi translation has not arrived — it is fetched the first time it is asked for, so this is what an offline first read looks like. Below is the English, which is the version that governs in any case.',
+  'legal.unreviewedTitle': 'Not yet reviewed by a lawyer.',
+  'legal.unreviewedBody': 'This notice is published so you can read what the app does with your data. No lawyer qualified in Indian law has reviewed it yet. When that review has happened, this banner will go.',
+  'legal.thirdPartyTitle': 'Third-party notices',
+  'legal.thirdPartyLead': 'Pri Learning is built with open-source software. The licences below are reproduced in English exactly as their authors published them, which is why this page is not translated.',
+  'legal.thirdPartyLoading': 'Loading the licence texts…',
+  'legal.thirdPartyUnavailable': 'The licence texts have not arrived — they are fetched the first time this page is opened. Try again when you are connected.',
 
   // ── Placement check ────────────────────────────────────────────────────────
   'snap.entry': 'Practise from a photo',
@@ -2595,7 +2601,7 @@ export default {
   'signup.noticeWhat': "Pri stores your child’s name, class, contact, their answers and their progress on its servers. Today those run on Railway in the Netherlands (Amsterdam); a move to Supabase in Mumbai is planned.",
   'signup.noticeWhy': "Pri’s server marks their answers, and a picture of their handwriting or photo is sent to OpenAI to be read. Their progress also syncs between devices and is backed up. It is never sold or used for advertising.",
   'signup.noticeNot': "Until you confirm, Pri’s server holds only what it needs to set up the account and reach you: their name, class and contact details, and yours. Their answers are not checked, their handwriting and photos are not read, and nothing syncs.",
-  'signup.noticeWithdraw': "You can withdraw at any time from the parent screen in Pri with a code sent to your phone, or from the link in our email. Sync stops at once.",
+  'signup.noticeWithdraw': "You can withdraw at any time from the link in our email (or, where sign-in by SMS is offered, from the parent screen in Pri with a code sent to your phone). Withdrawing stops everything at once: marking, handwriting and photo reading, exams and sync.",
   'signup.noticeVersion': "Notice version {v}",
   'signup.consentAgree': "I am this learner’s parent or guardian, and I agree.",
   'signup.consentApprove': "Approve",
