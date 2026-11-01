@@ -40,18 +40,57 @@ node site/build.mjs        # rewrites site/public
 npm run test:site          # self-test, then the contract against site/public
 ```
 
-CI runs `npm run test:site` (job *Suites policy and contracts*, and in `npm test`).
-It fails when `site/public` differs from a fresh render, when any page carries a
-`{{PLACEHOLDER}}`, when the site's own copy uses a banned phrase or a price other
-than ₹199 / ₹1,499, when a required sentence is missing, when any internal link
-or fragment is broken, when anything loads from another origin, and when
-`vercel.json` stops being a plain static deployment. `tools/site-check.test.mjs`
-plants each of those regressions in memory and proves the check catches it.
+CI runs `npm run test:site` (job *Suites policy and contracts*, and in `npm test`):
+`tools/site-markdown.test.mjs` (the converter), then `tools/site-check.test.mjs`
+(the self-test), then `tools/site-check.mjs` (the contract against `site/public`).
+The contract fails when:
+
+- `site/public` differs from a fresh render, or any page carries a `{{PLACEHOLDER}}`;
+- a legal article is not, word for word and in order, the `docs/legal` file its
+  `data-source` names (or the H2 sections its `data-sections` lists) — the
+  source and the page are reduced to words independently of the converter, and
+  a numbered list's ordinals count as words, so a lost line, a swallowed
+  number, a changed word or an added sentence all fail at the first word where
+  the two part;
+- a home-page or support sentence that paraphrases a notice no longer has its
+  basis in the notice (`NOTICE_PREMISES` in `tools/site-check.mjs`): "on for a
+  signed-in account" needs `privacy.md` to say "on by default", "after you
+  agree" is refused while it does, the stroke-image guarantee may not be
+  stretched over photographs, "keeps no copy", "3 working days", the Data
+  Protection Board and "no standing outside it" each need their sentence;
+- the site's own copy uses a banned phrase, states final-answer-only marking
+  before the D12 server switch exists on `main`, or gives a price other than
+  `₹199` / `₹1,499` in any spelling (`₹`, `Rs`, `INR`, `rupees`);
+- a required sentence is missing, any internal link or fragment is broken, an
+  hreflang pair is not returned by the other page, anything loads from another
+  origin, or a page carries an inline `style` (the CSP would drop it);
+- `vercel.json` stops being a plain static deployment.
+
+`tools/site-check.test.mjs` plants each of those regressions in memory and proves
+the check catches it; `tools/site-markdown.test.mjs` pins the converter's subset
+and the CommonMark rule that only a bullet or `1.` may interrupt a paragraph, so a
+line beginning `2023. The Act applies.` keeps its number as text.
 
 The banned list applies to the site's own words. The bodies of the notices are
 owned by `docs/legal` and `client/test/legal-pages-check.mjs`; they are rendered
 inside `<article data-source="docs/legal/…">` and excluded from the word scan
-(they legitimately say "offline" and "percentile" in negations).
+(they legitimately say "offline" and "percentile" in negations) — but the
+fidelity rule above requires them to be exactly their source, so nothing else
+can be placed inside one.
+
+## Headers
+
+`vercel.json` sends a locked Content-Security-Policy (`default-src 'none'`,
+`style-src 'self'`, `script-src 'self'`, no `connect-src`), which is why no page
+may carry an inline style or script, plus `Referrer-Policy: no-referrer`,
+`X-Frame-Options: DENY` and `Strict-Transport-Security: max-age=31536000;
+includeSubDomains`. **`includeSubDomains` is a cross-host decision**: once a
+browser has seen it on `prilearning.com`, it will refuse plain HTTP to
+`app.prilearning.com` and every other subdomain for a year. That is intended —
+the app host serves HTTPS only (D5) and nothing under this domain should ever be
+plain HTTP — but if any subdomain must ever be reachable over HTTP, remove
+`includeSubDomains` before DNS points here. There is no `preload`, so the
+decision stays reversible within `max-age`.
 
 ## Previewing locally
 
