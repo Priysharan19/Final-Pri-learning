@@ -3,8 +3,6 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import Icon from '../components/Icon.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
-import Calibrate from '../ink/Calibrate.jsx';
-import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudReadingWanted } from '../ink/cloudReader.js';
 // The daily cap is read from the gate that enforces it, so the number a student
@@ -201,37 +199,23 @@ function GlossRow() {
   );
 }
 
+// Handwriting: how it is captured, and the server reading that reads it.
+// There is no "Teach it your handwriting" here any more. Calibration saved
+// personal templates that only the retired on-device recogniser read; the
+// server reader every student path uses (ink/InkAnswer.jsx → readWithCloud)
+// never saw them, so the screen told students their hand had been learned
+// when nothing in the shipped reading path had changed. The feature and its
+// copy are gone rather than hidden (client/test/handwriting-claims-check.mjs
+// pins the removal and the privacy notice's matching wording).
 function HandwritingSection({ toast }) {
   const { user, setUser } = useApp();
   const t = useT();
-  const [teaching, setTeaching] = useState(false);
-  const [, refresh] = useState(0);
-  useEffect(() => { ensurePersonalLoaded().then(() => refresh(x => x + 1)); }, []);
-  const stats = personalStats();
-
-  if (teaching) {
-    return <Calibrate toast={toast} onDone={() => { setTeaching(false); refresh(x => x + 1); }} />;
-  }
   return (
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>{t('settings.handwriting')}</h2>
       <p className="sub" style={{ marginBottom: 12 }}>
         {t(priNative.ink.available() ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
       </p>
-      <div className="set-row">
-        <span className="set-k">{t('settings.templatesLearned')}</span>
-        <span className="set-v" data-t="templates-learned">{stats.total === 0
-          ? t('settings.templatesNone')
-          : t('settings.templatesCount', { total: stats.total, symbols: Object.keys(stats.bySymbol).length })}</span>
-      </div>
-      <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-        <button className="btn btn-primary btn-sm" onClick={() => setTeaching(true)}>{t('settings.teachHandwriting')}</button>
-        {stats.total > 0 && (
-          <button className="btn btn-quiet btn-sm" onClick={async () => { await clearPersonal(); refresh(x => x + 1); toast(t('settings.handwritingCleared')); }}>
-            {t('settings.resetHandwriting')}
-          </button>
-        )}
-      </div>
       {/* The consent copy is in the catalogue like everything else, so a Hindi
           reader is told what leaves their device in the language they read. The
           emphasis these two carried in JSX is gone: a <b> around a fragment of

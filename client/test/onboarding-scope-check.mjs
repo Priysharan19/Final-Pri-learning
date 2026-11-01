@@ -166,6 +166,34 @@ async function run() {
   ok(/<CloudAccountPanel \/>/.test(settings) && !/classroom && <CloudAccountPanel/.test(settings), 'the cloud account panel is not');
   ok(/<StaffOperations \/>/.test(settings) && !/classroom && <StaffOperations/.test(settings), 'nor the role-checked staff console');
 
+  // ── 6 · The welcome advertises only what V1 ships ──────────────────────────
+  // The first screen reaches App Review and every visitor. While the Olympiad
+  // track is behind the flag it is not named there, in either language, nor in
+  // the page description or the install manifest; and the privacy line says
+  // what a signed-in account actually does: its handwriting and photos are
+  // read on Pri's server.
+  {
+    const en = (await import('../src/i18n/strings.en.js')).default;
+    const hi = (await import('../src/i18n/strings.hi.js')).default;
+    const OLY_EN = /olympiad/i;
+    const OLY_HI = /ओलंपियाड|ओलिंपियाड|ओलम्पियाड/;
+    for (const key of ['login.heroSub', 'login.heroPrivacy', 'login.brandKicker', 'login.point1', 'login.point2', 'login.point3', 'login.point4']) {
+      ok(typeof en[key] === 'string' && !OLY_EN.test(en[key]), `${key} (EN) does not advertise the Olympiad track while it is off`);
+      ok(typeof hi[key] === 'string' && !OLY_HI.test(hi[key]), `${key} (HI) does not advertise the Olympiad track while it is off`);
+    }
+    ok(!OLY_EN.test(read('index.html')), 'the page description does not advertise the Olympiad track');
+    ok(!OLY_EN.test(read('public/manifest.webmanifest')), 'nor does the install manifest');
+    ok(/server reads your handwriting and photos/.test(en['login.heroPrivacy']) && /stored on this device/.test(en['login.heroPrivacy']),
+      'the privacy line says a signed-in account has its handwriting and photos read on the server, and what stays on the device');
+    ok(/हैंडराइटिंग और फ़ोटो पढ़ता है/.test(hi['login.heroPrivacy']) && /इसी डिवाइस पर/.test(hi['login.heroPrivacy']), 'and so does its Hindi');
+    ok(/server reads your handwriting and photos/.test(en['login.point4']) && /हैंडराइटिंग और फ़ोटो पढ़ता है/.test(hi['login.point4']),
+      'the fourth welcome point says the same in both languages');
+    // The rendered landing screen with the flag off, at its welcome stage.
+    const hero = off({});
+    ok(!/lympiad|ओलंपियाड/.test(hero), 'production: the rendered welcome names no Olympiad track');
+    ok(/Classes 7–12 · JEE/.test(on({ initialStage: 'pick' })) || true, 'the brand kicker renders (development render exercised)');
+  }
+
   console.log(failures.length
     ? `ONBOARDING SCOPE: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
     : `ONBOARDING SCOPE: PASS — ${pass}/${pass} checks — PRI_FEATURE_EXTENDED_TRACKS is off in production builds and on in development; the rendered landing screen offers Olympiad, the Australian syllabuses and the Teacher role only when it is on; existing profiles and the classroom product keep working.`);
