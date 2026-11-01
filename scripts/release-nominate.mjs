@@ -17,7 +17,9 @@
 //   · staging (/v1/health, /v1/ready, /release.json) serves exactly that SHA on
 //     Postgres, ready, at the schema versions THAT commit's
 //     server/platform/schemaVersions.js states;
-//   · the promotion would be a fast-forward of deploy/production.
+//   · the promotion would be a fast-forward of deploy/production;
+//   · the notices at that commit promise nothing the code at that commit lacks
+//     (tools/legal-promises.mjs): the notice is public once the SHA is promoted.
 //
 // When everything holds it prints the promotion commands from
 // release-policy.md with the SHA filled in. It NEVER runs them: pushing
@@ -36,6 +38,7 @@ import { execFile } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { legalPromiseGaps } from '../tools/legal-promises.mjs';
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -210,6 +213,10 @@ export async function nominate({
     catch (error) { check(false, 'schema versions readable at that commit', error?.message || String(error)); }
   }
   if (versions) info('schema versions this commit expects', `schema ${versions.schemaVersion} / billing ${versions.billingSchemaVersion}`);
+  if (commitKnown) {
+    const gaps = await legalPromiseGaps(path => git(['show', `${expected}:${path}`]));
+    check(gaps.length === 0, 'the notices promise nothing this commit does not do', gaps.join('; ') || undefined);
+  }
 
   // ── GitHub Actions on exactly this SHA ─────────────────────────────────────
   try {

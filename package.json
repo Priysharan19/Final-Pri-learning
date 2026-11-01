@@ -183,7 +183,7 @@
     "test:sync:restore": "node client/test/cloud-restore-fidelity-check.mjs",
     "test:sync:auto": "node client/test/auto-sync-scheduler-check.mjs",
     "test:sync:conflict": "node client/test/sync-conflict-recovery-check.mjs",
-    "test:legal": "node client/test/legal-pages-check.mjs && node tools/third-party-notices.mjs --check",
+    "test:legal": "node client/test/legal-pages-check.mjs && node tools/third-party-notices.mjs --check && node tools/legal-promises.test.mjs",
     "test:i18n": "node client/test/i18n-check.mjs && node client/test/i18n-coverage-check.mjs && node client/test/i18n-voice-check.mjs",
     "legal:status": "node tools/legal-status.mjs",
     "legal:notices": "node tools/third-party-notices.mjs",
