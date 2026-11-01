@@ -385,6 +385,39 @@ wrong(percentage, '52.5%', 'percent: a wrong percentage is wrong');
 const proportion = { answerType: 'numeric', answer: { value: 0.475 } };
 correct(proportion, '47.5%', 'percent: a proportion answered as a percentage');
 correct(proportion, '0.475', 'percent: the proportion itself');
+// On a question that asks for a percentage, the sign is the answer's unit, written
+// once at the end. 100 times the answer with a sign is never the answer (P0, #670).
+for (const input of ['4750%', '(4750%)', '4750%%', '4750% + 0', '4750 percent']) wrong(percentage, input, `percent: "${input}" is a hundred times the percentage`);
+correct(percentage, '47.5 percent', 'percent: the word is the sign');
+correct(percentage, '(47.5%)', 'percent: one sign inside brackets');
+const bySuffix = { answerType: 'numeric', answer: { value: 66.3 }, answerSuffix: '%', prompt: 'Find the combined mean mark.' };
+correct(bySuffix, '66.3%', 'percent: a % beside the box asks for a percentage');
+wrong(bySuffix, '6630%', 'percent: and a hundred times it is wrong');
+const cvPct = { answerType: 'numeric', answer: { value: 20 / 3, simplestFraction: { n: 20, d: 3 }, requireFraction: false }, answerSuffix: '%', prompt: 'Find the coefficient of variation, as a percentage.' };
+correct(cvPct, '20/3%', 'percent: the whole expression before the sign is the percentage');
+const areaOnly = { answerType: 'numeric', answer: { value: 72 }, prompt: 'Find the area.' };
+wrong(areaOnly, '7200%', 'percent: a % on an area is a wrong unit');
+
+// ── 10b. A label names the asked quantity ────────────────────────────────────
+const bSquared = { answerType: 'numeric', answer: { value: 50 }, prompt: 'Find $b^2$.' };
+correct(bSquared, 'b^2 = 50', 'label: the asked quantity');
+correct(bSquared, 'b² = 50', 'label: the asked quantity with a superscript');
+wrong(bSquared, 'b = 50', 'label: b is not b²');
+wrong(bSquared, 'a^2 = 50', 'label: another quantity');
+const sumAB = { answerType: 'numeric', answer: { value: 7 }, prompt: 'Find $a + b$.' };
+correct(sumAB, 'a + b = 7', 'label: the asked sum');
+wrong(sumAB, 'a = 7', 'label: one of the summands is not the sum');
+const meanDev = { answerType: 'numeric', answer: { value: 2.4 }, prompt: 'Find the mean deviation about the mean.' };
+correct(meanDev, 'mean deviation = 2.4', 'label: the whole asked phrase');
+wrong(meanDev, 'Mean = 2.4', 'label: the mean is not the mean deviation');
+const prRed = { answerType: 'numeric', answer: { value: 0.4, simplestFraction: { n: 2, d: 5 } }, prompt: 'Find $P(\\text{red})$ as a fraction in simplest form.' };
+correct(prRed, 'P(red) = 2/5', 'label: P(red)');
+correct(prRed, 'P = 2/5', 'label: the bare P still reads as before');
+const expX = { answerType: 'numeric', answer: { value: 1.05 }, prompt: 'Find $E(X)$.' };
+correct(expX, 'E = 1.05', 'label: the bare E still reads as before');
+const fAt = { answerType: 'numeric', answer: { value: 7 }, prompt: 'If $f(x) = x^2 - 2$, evaluate $f(3)$.' };
+correct(fAt, 'f = 7', 'label: the bare f still reads as before');
+correct(fAt, 'f(3) = 7', 'label: f(3)');
 
 // ── 11. A variable is not a unit ─────────────────────────────────────────────
 // cleanInput strips a trailing unit. Applied to an expression answer it ate the
