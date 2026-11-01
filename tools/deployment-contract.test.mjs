@@ -5,7 +5,7 @@
 //    than its own shutdown deadline, so Railway never SIGKILLs a clean exit.
 // 2. tools/verify-deployment.mjs passes only an origin serving exactly the
 //    nominated SHA on both server and web, at this checkout's schema versions,
-//    and fails on each single drift.
+//    with web checkout off as the notices say, and fails on each single drift.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -90,7 +90,9 @@ function healthy() {
       }
     },
     readyStatus: 200,
-    web: { ...identity }
+    web: { ...identity },
+    billing: { webCheckout: { provider: 'razorpay', configured: false } },
+    billingStatus: 200
   };
 }
 let state = healthy();
@@ -99,6 +101,12 @@ const server = createServer((req, res) => {
   if (req.url === '/v1/health') return send(200, state.health);
   if (req.url === '/v1/ready') return send(state.readyStatus, state.ready);
   if (req.url === '/release.json') return send(200, state.web);
+  if (req.url === '/v1/billing/config') {
+    // The route tells a native client false whatever the server holds, so a
+    // verifier that declared itself native would prove nothing.
+    if (req.headers['x-pri-client']) return send(200, { webCheckout: { provider: 'razorpay', configured: false, refusedForNativeClient: true } });
+    return send(state.billingStatus, state.billing);
+  }
   send(404, {});
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -133,7 +141,10 @@ try {
       s.ready.ready = false;
       s.ready.state = 'not_ready';
       s.ready.failing = ['AUTH_EMAIL_NOT_CONFIGURED'];
-    }]
+    }],
+    ['web checkout configured while the notices say there is no purchase on the website', s => { s.billing.webCheckout.configured = true; }],
+    ['a billing config that does not say whether web checkout is off', s => { s.billing = {}; }],
+    ['no billing config route', s => { s.billingStatus = 404; s.billing = {}; }]
   ];
   for (const [name, mutate] of drifts) {
     state = healthy();
