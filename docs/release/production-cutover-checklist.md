@@ -87,12 +87,17 @@ explicit production-infrastructure actions and were not performed by this recove
 
 - [ ] Pick one `main` SHA. All four required CI contexts in `release-policy.md` are green on it,
       and `Production Container` (`deployment-image.yml`) is green on it:
-      `node scripts/release-nominate.mjs <sha>` checks all of that plus that staging serves exactly
-      this SHA on Postgres at that commit's schema versions and that `deploy/production → sha` is a
-      fast-forward, then prints the promotion commands. It pushes nothing. It counts *every* workflow
-      run on the SHA, scheduled and agent workflows included: an unrelated red run (for example a
-      failed `Pri App Health Agent` schedule on the tip) blocks nomination until it is green or
-      rerun; it does not pick which workflows are code gates. The order from here to the
+      `node scripts/release-nominate.mjs <sha> --candidate` checks all of that plus that staging
+      serves exactly this SHA on Postgres at that commit's schema versions and that
+      `deploy/production → sha` is a fast-forward. It pushes nothing. It counts *every* workflow
+      on the SHA, scheduled and agent workflows included, by the newest run of each workflow and
+      event: an unrelated red run (for example a failed `Pri App Health Agent` schedule on the tip)
+      blocks nomination until that workflow's newest run on the SHA is green; a later schedule that
+      passed supersedes a flaky one; it does not pick which workflows are code gates. The same
+      command without `--candidate` is the release-stage run of §4.6 step 7: it also requires the
+      physical-device matrix and the real-human reader evidence for this exact SHA (or a recorded
+      override by a named human), prints the promotion commands with the engine production serves,
+      and is followed by `node scripts/release-dossier.mjs <sha>`. The order from here to the
       promotion, with the 24 h soak gate, is `docs/operations/postgres-cutover.md` §4.6.
 - [ ] On a checkout of that SHA: `node tools/verify-release-identity.mjs` passes and
       `npm run test:deploy` passes.

@@ -7,16 +7,17 @@
 // "pictures" are byte strings. No network, no provider, no mailbox.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
-  CONTAINER_CONTEXT, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, evaluateRuns, ghAll, latestCheckRuns, nominate,
-  parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands
+  CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
+  loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey
 } from '../scripts/release-nominate.mjs';
+import { EXTERNAL_GATES, buildDossier, parseArgs as parseDossierArgs, recordProblems, recordTemplate } from '../scripts/release-dossier.mjs';
 import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
@@ -36,8 +37,9 @@ const PROD_POINTER = 'c'.repeat(40);
 const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 1 · release-nominate: the gate, with git, gh and the hosts stubbed
+// 1 · release-nominate: the gate, with git, gh, the hosts and the evidence ledgers stubbed
 // ═════════════════════════════════════════════════════════════════════════════
+const scratch = [];
 {
   const schemaSource = `export const SCHEMA_VERSION = ${SCHEMA_VERSION};\nexport const BILLING_SCHEMA_VERSION = ${BILLING_SCHEMA_VERSION};\n`;
   eq(parseSchemaVersions(schemaSource).schemaVersion, SCHEMA_VERSION, 'parseSchemaVersions reads SCHEMA_VERSION');
@@ -46,39 +48,125 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   assert.throws(() => parseNominateArgs([]), /40-hex/, 'a SHA is required'); count += 1;
   assert.throws(() => parseNominateArgs([SHA, '--bogus']), /Unknown argument/, 'unknown flags are refused'); count += 1;
+  assert.throws(() => parseNominateArgs([SHA, '--production-engine', 'mysql']), /postgres or sqlite/, '--production-engine takes postgres or sqlite only'); count += 1;
+  assert.throws(() => parseNominateArgs([SHA, '--override']), /needs a value/, '--override needs a path'); count += 1;
   const parsed = parseNominateArgs([SHA, '--no-fetch', '--staging', 'https://s.example', '--json']);
-  ok(parsed.sha === SHA && parsed.fetch === false && parsed.staging === 'https://s.example' && parsed.json === true, 'parseArgs reads the SHA and flags');
+  ok(parsed.sha === SHA && parsed.fetch === false && parsed.staging === 'https://s.example' && parsed.json === true && parsed.stage === 'release', 'parseArgs reads the SHA and flags; the default stage is release');
+  const cand = parseNominateArgs([SHA, '--candidate', '--override', 'x.json', '--production-engine', 'postgres']);
+  ok(cand.stage === 'candidate' && cand.override === 'x.json' && cand.productionEngine === 'postgres', 'parseArgs reads --candidate, --override and --production-engine');
 
   const runs = evaluateRuns([
-    { name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success' },
-    { name: 'Derived apply', path: '.github/workflows/x.yml', status: 'completed', conclusion: 'skipped' },
-    { name: 'dependabot', path: 'dynamic/dependabot/dependabot-updates', status: 'completed', conclusion: 'failure' }
+    { name: 'CI', path: '.github/workflows/ci.yml', event: 'push', status: 'completed', conclusion: 'success' },
+    { name: 'Derived apply', path: '.github/workflows/x.yml', event: 'workflow_run', status: 'completed', conclusion: 'skipped' },
+    { name: 'dependabot', path: 'dynamic/dependabot/dependabot-updates', event: 'dynamic', status: 'completed', conclusion: 'failure' }
   ]);
   ok(runs.ok && runs.ignored.length === 1 && runs.relevant.length === 2, 'Dependabot version-update runs are listed, not counted; skipped is green');
   ok(!evaluateRuns([{ name: 'CI', path: 'a.yml', status: 'in_progress', conclusion: null }]).ok, 'an in-progress run blocks');
   ok(!evaluateRuns([{ name: 'CI', path: 'a.yml', status: 'completed', conclusion: 'cancelled' }]).ok, 'a cancelled run blocks');
   ok(!evaluateRuns([]).ok, 'no run at all blocks');
+  // Dedupe by (workflow, event): the newest run of each decides.
+  const health = (conclusion, at, extra = {}) => ({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion, run_started_at: at, ...extra });
+  const flaky = evaluateRuns([health('failure', '2026-10-23T18:15:00Z', { run_number: 40 }), health('success', '2026-10-24T18:15:00Z', { run_number: 41 })]);
+  ok(flaky.ok && flaky.superseded.length === 1 && flaky.superseded[0].conclusion === 'failure' && flaky.latest.length === 1, 'a flaky scheduled run superseded by a later green schedule on the same SHA is listed, not counted');
+  const genuine = evaluateRuns([health('success', '2026-10-23T18:15:00Z', { run_number: 40 }), health('failure', '2026-10-24T18:15:00Z', { run_number: 41 })]);
+  ok(!genuine.ok && genuine.red.length === 1, 'a workflow whose newest run is red still disqualifies the SHA (a genuine failure reproduces)');
+  const otherEvent = evaluateRuns([
+    { name: 'CI', workflow_id: 2, event: 'push', status: 'completed', conclusion: 'success', run_started_at: '2026-10-23T18:20:00Z' },
+    { name: 'CI', workflow_id: 2, event: 'pull_request', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-23T18:15:00Z' }
+  ]);
+  ok(!otherEvent.ok && otherEvent.latest.length === 2, 'a later run of a different event never supersedes a red run (push does not stand in for pull_request)');
+  const stillRunning = evaluateRuns([health('failure', '2026-10-23T18:15:00Z'), { ...health(null, '2026-10-24T18:15:00Z'), status: 'in_progress' }]);
+  ok(!stillRunning.ok && stillRunning.pending.length === 1 && stillRunning.superseded.length === 1, 'a newer run still in progress supersedes the red one but blocks until it completes');
+  const sameStamp = evaluateRuns([health('failure', '2026-10-23T18:15:00Z', { run_number: 40, run_attempt: 1 }), health('success', '2026-10-23T18:15:00Z', { run_number: 40, run_attempt: 2 })]);
+  ok(sameStamp.ok, 'with equal start times the higher attempt wins');
+  eq(runGroupKey({ workflow_id: 7, event: 'schedule' }), 'id:7|schedule', 'runs group by workflow id and event');
+  eq(runGroupKey({ path: 'a.yml', event: 'push' }), 'path:a.yml|push', 'without a workflow id the path identifies the workflow');
   const latest = latestCheckRuns([
     { name: 'J', status: 'completed', conclusion: 'failure', completed_at: '2026-10-18T10:00:00Z' },
     { name: 'J', status: 'completed', conclusion: 'success', completed_at: '2026-10-18T11:00:00Z' }
   ]);
   eq(latest.get('J').conclusion, 'success', 'a rerun replaces the earlier attempt of the same check');
 
-  // The promotion commands are the ones release-policy.md prints.
+  // The promotion commands are the ones release-policy.md prints; the verify
+  // command takes the engine production serves.
   const policy = read('docs/release/release-policy.md');
-  const commands = promotionCommands(SHA);
+  const commands = promotionCommands(SHA, { engine: 'sqlite' });
   for (const generic of ['git merge-base --is-ancestor <approved-sha> origin/main', 'git merge-base --is-ancestor origin/deploy/production <approved-sha>', 'git push origin <approved-sha>:refs/heads/deploy/production']) {
     ok(policy.includes(generic), `release-policy.md still documents: ${generic}`);
     ok(commands.some(line => line.startsWith(generic.replace(/<approved-sha>/g, SHA))), `promotion prints: ${generic.replace(/<approved-sha>/g, '<sha>')}`);
   }
   ok(commands.some(line => line.includes(`${PRODUCTION_ORIGIN}/v1/health`)), 'promotion ends with the production health check');
+  ok(commands.some(line => /--engine sqlite --persistent-storage-proven --auth-email-proven$/.test(line)), 'on SQLite the verify command asks for the persistent-storage proof');
+  ok(promotionCommands(SHA, { engine: 'postgres' }).some(line => /--engine postgres --auth-email-proven$/.test(line)) && !promotionCommands(SHA, { engine: 'postgres' }).some(line => /persistent-storage/.test(line)), 'on Postgres the verify command names postgres and no storage proof');
+  assert.throws(() => promotionCommands(SHA), /production engine/, 'the promotion commands cannot be printed without the engine'); count += 1;
+
+  // ── evidence fixtures: a device ledger and a reader-evaluation directory ──
+  function evidence({ device = 'complete', reader = 'at-sha' } = {}) {
+    const dir = mkdtempSync(join(tmpdir(), 'pri-nominate-evidence-'));
+    scratch.push(dir);
+    const ledger = join(dir, 'results.jsonl');
+    const lines = [];
+    if (device !== 'none') {
+      for (const kase of CASES) {
+        const android = kase.family === 'AND' || kase.family === 'ANT';
+        const failing = device === 'one-fail' && kase.id === 'DM-IPH-02-OTP';
+        const sha = device === 'other-sha' ? OTHER : SHA;
+        lines.push(JSON.stringify(android
+          ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no Android device available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
+          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+      }
+      if (device === 'one-missing') lines.pop();
+    }
+    writeFileSync(ledger, lines.length ? lines.join('\n') + '\n' : '');
+    const readerDir = join(dir, 'cloud-reader-eval');
+    mkdirSync(readerDir);
+    if (reader !== 'none') {
+      writeFileSync(join(readerDir, '2026-10-30.json'), JSON.stringify({
+        format: 'pri-cloud-reader-eval', version: 1, evidenceClass: reader === 'dry-run' ? 'synthetic-dry-run' : 'real-human', measuredAt: '2026-10-30T10:00:00Z',
+        releaseSha: reader === 'other-sha' ? OTHER : reader === 'no-sha' ? undefined : SHA, corpus: { writers: 3, samples: 40, split: 'test' }, results: { exact: 31, lines: 40 }
+      }));
+    }
+    return { dir, ledger, readerDir };
+  }
+  {
+    const full = evidence();
+    eq(validateLedger(full.ledger).length, 0, 'the complete device fixture passes the recorder\'s own validation (it is what a real ledger would hold)');
+    const dev = deviceEvidence(SHA, { ledger: full.ledger });
+    ok(dev.ok && dev.counts.pass === 18 && dev.counts.blocked === 18 && dev.counts['not run'] === 0, 'deviceEvidence: 18 Apple passes and 18 Android blocked rows are complete (blocked is recorded, never omitted)');
+    ok(!deviceEvidence(OTHER, { ledger: full.ledger }).ok, 'deviceEvidence: another SHA has no evidence of its own');
+    ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-fail' }).ledger }).ok, 'deviceEvidence: one fail is incomplete');
+    ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-missing' }).ledger }).ok, 'deviceEvidence: one not-run case is incomplete');
+    const rd = readerEvidence(SHA, { dir: full.readerDir });
+    ok(rd.ok && rd.file === '2026-10-30.json' && /3 writer/.test(rd.detail), 'readerEvidence: a real-human report naming the SHA counts');
+    ok(!readerEvidence(SHA, { dir: evidence({ reader: 'dry-run' }).readerDir }).ok, 'readerEvidence: a dry run (synthetic) never counts');
+    ok(/none records releaseSha/.test(readerEvidence(SHA, { dir: evidence({ reader: 'other-sha' }).readerDir }).detail), 'readerEvidence: a report for another SHA is named, not accepted');
+    ok(/NOT MEASURED/.test(readerEvidence(SHA, { dir: join(full.dir, 'absent') }).detail), 'readerEvidence: no directory is NOT MEASURED');
+    ok(!readerEvidence(SHA, { dir: evidence({ reader: 'no-sha' }).readerDir }).ok, 'readerEvidence: a report without releaseSha cannot be tied to the SHA');
+  }
+  const overrideFile = (body, name = 'override.json') => { const dir = mkdtempSync(join(tmpdir(), 'pri-override-')); scratch.push(dir); const file = join(dir, name); writeFileSync(file, typeof body === 'string' ? body : JSON.stringify(body)); return file; };
+  const goodOverride = { sha: SHA, waives: ['device-matrix', 'reader-evidence'], by: 'Priya Example', at: '2026-11-01T09:00:00Z', reason: 'First internal TestFlight only; the device matrix runs on this build next week and the release is not public.' };
+  eq(loadOverride(overrideFile(goodOverride), SHA).problems.length, 0, 'a complete override by a named human for this SHA is accepted');
+  ok(loadOverride(overrideFile({ ...goodOverride, sha: OTHER }), SHA).problems.some(p => /not the nominated/.test(p)), 'an override for another SHA is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, by: 'CI' }), SHA).problems.some(p => /does not name a human/.test(p)), 'an override "by" CI is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, by: 'Claude agent' }), SHA).problems.some(p => /does not name a human/.test(p)), 'an override "by" an agent is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, waives: ['everything'] }), SHA).problems.some(p => /unknown evidence requirement/.test(p)), 'an override may only waive a known requirement by name');
+  ok(loadOverride(overrideFile({ ...goodOverride, waives: [] }), SHA).problems.some(p => /waives nothing/.test(p)), 'an override that waives nothing is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, reason: 'because' }), SHA).problems.some(p => /reason/.test(p)), 'an override needs a reason');
+  ok(loadOverride(overrideFile({ ...goodOverride, at: 'yesterday' }), SHA).problems.some(p => /ISO date-time/.test(p)), 'an override needs an ISO time');
+  ok(loadOverride(overrideFile('not json'), SHA).problems.some(p => /not JSON/.test(p)), 'a corrupt override is refused');
+  ok(loadOverride(join(tmpdir(), 'pri-no-such-override.json'), SHA).problems.some(p => /no such file/.test(p)), 'a missing override file is refused');
+  assert.deepEqual([...EVIDENCE_REQUIREMENTS], ['device-matrix', 'reader-evidence'], 'the two release-evidence requirements'); count += 1;
 
   // ── the stubbed world ─────────────────────────────────────────────────────
-  function world() {
+  function world(evidenceOptions = {}) {
+    const ev = evidence(evidenceOptions);
     const w = {
       mainAncestors: new Set([SHA, OTHER]), tip: OTHER, knownCommits: new Set([SHA, OTHER, PROD_POINTER]), prodPointer: PROD_POINTER, ffFromProd: true,
       schemaSource,
-      runs: [{ name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success' }],
+      runs: [
+        { name: 'CI', workflow_id: 1, path: '.github/workflows/ci.yml', event: 'push', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:10:00Z' },
+        { name: 'Release Staging Proof', workflow_id: 9, path: '.github/workflows/release-staging-proof.yml', event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:40:00Z', html_url: 'https://github.com/x/y/actions/runs/1' }
+      ],
       checks: [...REQUIRED_CONTEXTS, CONTAINER_CONTEXT].map(name => ({ name, status: 'completed', conclusion: 'success', completed_at: '2026-10-18T12:00:00Z' })),
       staging: {
         health: { ok: true, service: 'pri-learning-platform', releaseIdentity: { releaseSha: SHA, buildTimestamp: '2026-10-18T00:00:00.000Z' }, schemaVersion: String(SCHEMA_VERSION), billingSchemaVersion: String(BILLING_SCHEMA_VERSION), database: { engine: 'postgres', reachable: true } },
@@ -86,7 +174,8 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         readyStatus: 200,
         web: { releaseSha: SHA }
       },
-      production: { health: { ok: true, releaseIdentity: { releaseSha: PROD_POINTER } } },
+      production: { health: { ok: true, releaseIdentity: { releaseSha: PROD_POINTER }, database: { engine: 'sqlite', reachable: true } }, reachable: true },
+      ledger: ev.ledger, readerDir: ev.readerDir,
       gitCalls: [], ghCalls: []
     };
     w.git = async args => {
@@ -113,7 +202,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
     w.gh = async path => {
       w.ghCalls.push(path);
-      if (path.includes('/actions/runs')) return { workflow_runs: w.runs };
+      if (path.includes('/actions/runs')) return { workflow_runs: path.includes(`head_sha=${SHA}`) ? w.runs : (w.tipRuns || []) };
       if (path.includes('/check-runs')) return { check_runs: w.checks };
       throw new Error(`unexpected gh ${path}`);
     };
@@ -126,18 +215,20 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (path === '/v1/ready') return json(w.staging.readyStatus, w.staging.ready);
         if (path === '/release.json') return json(200, w.staging.web);
       }
-      if (origin === PRODUCTION_ORIGIN && path === '/v1/health') return json(200, w.production.health);
+      if (origin === PRODUCTION_ORIGIN && path === '/v1/health') { if (!w.production.reachable) throw new Error('ECONNREFUSED'); return json(200, w.production.health); }
       return json(404, null);
     };
     return w;
   }
-  const run = (w, extra = {}) => nominate({ sha: SHA, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: true, ...extra });
+  const run = (w, extra = {}) => nominate({ sha: SHA, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: true, deviceLedger: w.ledger, readerEvalDir: w.readerDir, ...extra });
   const failed = report => report.results.filter(r => r.ok === false).map(r => r.label);
 
   const good = world();
   const pass = await run(good);
-  ok(pass.ok, `a green, deployed, fast-forwardable SHA is nominated (failed: ${failed(pass).join('; ')})`);
-  ok(pass.promotion.length === promotionCommands(SHA).length, 'a nomination prints the promotion commands');
+  ok(pass.ok, `a green, deployed, fast-forwardable SHA with complete evidence is nominated (failed: ${failed(pass).join('; ')})`);
+  ok(pass.stage === 'release' && pass.engine === 'sqlite' && pass.overrides.length === 0, 'the default run is the release stage, on the evidence, with the engine production serves');
+  ok(pass.promotion.length === promotionCommands(SHA, { engine: 'sqlite' }).length && pass.promotion.some(line => /--engine sqlite --persistent-storage-proven/.test(line)), 'a nomination prints the promotion commands with the deployed engine (SQLite today)');
+  ok(pass.results.some(r => r.ok === true && /device matrix complete/.test(r.label)) && pass.results.some(r => r.ok === true && /reader evaluation recorded/.test(r.label)), 'the device matrix and the reader evidence are checks, not reminders');
   ok(good.gitCalls.every(call => !/\bpush\b/.test(call)), 'nominate never runs git push');
   ok(good.gitCalls.some(call => call.startsWith('fetch')), 'nominate fetches origin first');
   ok(good.ghCalls.some(p => p.includes(`head_sha=${SHA}`)), 'nominate asks GitHub for the runs on exactly this SHA');
@@ -153,13 +244,65 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
   ok(pass.results.some(r => r.label.startsWith('position on origin/main') && /behind/.test(r.detail)), 'a certified SHA need not be the tip; the position is informational');
 
+  // The deployed engine drives the verify command.
+  const pg = world(); pg.production.health.database.engine = 'postgres';
+  const pgReport = await run(pg);
+  ok(pgReport.ok && pgReport.engine === 'postgres' && pgReport.promotion.some(line => /--engine postgres --auth-email-proven$/.test(line)) && !pgReport.promotion.some(line => /persistent-storage/.test(line)), 'when production serves Postgres the verify command says postgres and drops the SQLite storage proof');
+  const cutover = await run(world(), { productionEngine: 'postgres' });
+  ok(cutover.ok && cutover.engine === 'postgres' && cutover.results.some(r => /given with --production-engine/.test(r.detail || '')), '--production-engine postgres prints the post-cutover verify command although production serves SQLite now');
+  const dark = world(); dark.production.reachable = false;
+  const darkReport = await run(dark);
+  ok(!darkReport.ok && failed(darkReport).some(l => /engine known/.test(l)), 'an unreachable production with no --production-engine refuses: the verify command would guess');
+  ok((await run(dark, { productionEngine: 'sqlite' })).ok, 'an unreachable production is nominated when the engine is given explicitly');
+  const noEngine = world(); delete noEngine.production.health.database;
+  ok(!(await run(noEngine)).ok, 'a production health without an engine refuses without --production-engine');
+
+  // The candidate stage: everything but the evidence, and no promotion.
+  const early = world({ device: 'none', reader: 'none' });
+  const earlyReport = await run(early, { stage: 'candidate' });
+  ok(earlyReport.ok && earlyReport.stage === 'candidate' && earlyReport.promotion.length === 0, 'the candidate stage passes without evidence and prints no promotion');
+  ok(earlyReport.results.some(r => r.ok === null && /release evidence/.test(r.label) && /not checked at the candidate stage/.test(r.detail)), 'the candidate stage says the evidence is not yet required');
+  ok(!(await run(early)).ok, 'the same world fails at the release stage');
+  await assert.rejects(run(world(), { stage: 'later' }), /stage must be/, 'an unknown stage is refused'); count += 1;
+
+  // The evidence gate at the release stage.
+  const evidenceDrifts = [
+    ['no device evidence at all', { device: 'none' }, /device matrix complete/],
+    ['one device case not run', { device: 'one-missing' }, /device matrix complete/],
+    ['one device case failed', { device: 'one-fail' }, /device matrix complete/],
+    ['device evidence for another build', { device: 'other-sha' }, /device matrix complete/],
+    ['no reader evaluation', { reader: 'none' }, /reader evaluation recorded/],
+    ['a dry-run reader evaluation', { reader: 'dry-run' }, /reader evaluation recorded/],
+    ['a reader evaluation of another SHA', { reader: 'other-sha' }, /reader evaluation recorded/]
+  ];
+  for (const [name, options, label] of evidenceDrifts) {
+    const report = await run(world(options));
+    ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} at the release stage (failed: ${failed(report).join('; ') || 'none'})`);
+  }
+  {
+    const waivedWorld = world({ device: 'none', reader: 'none' });
+    const waived = await run(waivedWorld, { overridePath: overrideFile(goodOverride) });
+    ok(waived.ok && waived.overrides.length === 2 && waived.overrides.every(o => o.by === 'Priya Example') && waived.promotion.length > 0, 'a recorded override by a named human waives both requirements by name and the nomination says so');
+    ok(waived.results.filter(r => r.ok === null && /WAIVED by recorded override/.test(r.label)).length === 2, 'each waived requirement is a visible WAIVED row, never silent');
+    const partial = await run(world({ device: 'none' }), { overridePath: overrideFile({ ...goodOverride, waives: ['reader-evidence'] }) });
+    ok(!partial.ok && failed(partial).some(l => /device matrix complete/.test(l)), 'an override that waives only the reader evidence does not waive the device matrix');
+    const evidenceWins = await run(world(), { overridePath: overrideFile(goodOverride) });
+    ok(evidenceWins.ok && evidenceWins.overrides.length === 0, 'when the evidence exists the override is not used: the nomination stands on the evidence');
+    const wrongSha = await run(world({ device: 'none', reader: 'none' }), { overridePath: overrideFile({ ...goodOverride, sha: OTHER }) });
+    ok(!wrongSha.ok && failed(wrongSha).some(l => /override is well-formed/.test(l)) && failed(wrongSha).some(l => /device matrix complete/.test(l)), 'an override for another SHA is refused and waives nothing');
+    const byCi = await run(world({ device: 'none', reader: 'none' }), { overridePath: overrideFile({ ...goodOverride, by: 'CI' }) });
+    ok(!byCi.ok && byCi.overrides.length === 0, 'an override signed by CI is refused and waives nothing');
+    const missing = await run(world({ device: 'none', reader: 'none' }), { overridePath: join(tmpdir(), 'pri-no-such-override.json') });
+    ok(!missing.ok && failed(missing).some(l => /override is well-formed/.test(l)), 'a missing override file is a failed check, not a silent pass');
+  }
+
   const drifts = [
     ['a SHA that is not on origin/main', w => { w.mainAncestors.delete(SHA); }, /SHA is on origin\/main/],
-    ['a workflow still running', w => { w.runs.push({ name: 'Native Ink', path: 'n.yml', status: 'in_progress', conclusion: null }); }, /has completed/],
-    ['a red workflow', w => { w.runs.push({ name: 'CodeQL', path: 'c.yml', status: 'completed', conclusion: 'failure' }); }, /failed or was cancelled/],
+    ['a workflow still running', w => { w.runs.push({ name: 'Native Ink', workflow_id: 3, path: 'n.yml', event: 'push', status: 'in_progress', conclusion: null }); }, /has completed/],
+    ['a red workflow', w => { w.runs.push({ name: 'CodeQL', workflow_id: 4, path: 'c.yml', event: 'push', status: 'completed', conclusion: 'failure' }); }, /failed or was cancelled/],
     ['a required context missing', w => { w.checks = w.checks.filter(c => c.name !== REQUIRED_CONTEXTS[0]); }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[0])}`)],
     ['a required context red', w => { w.checks.find(c => c.name === REQUIRED_CONTEXTS[2]).conclusion = 'failure'; }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[2])}`)],
-    ['an unrelated scheduled workflow red on the SHA', w => { w.runs.push({ name: 'Pri App Health Agent', path: '.github/workflows/app-health-agent.yml', status: 'completed', conclusion: 'failure' }); }, /no workflow run on this SHA failed or was cancelled/],
+    ['an unrelated scheduled workflow red on the SHA', w => { w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-19T18:15:00Z' }); }, /no workflow run on this SHA failed or was cancelled/],
     ['Production Container absent (path-filtered)', w => { w.checks = w.checks.filter(c => c.name !== CONTAINER_CONTEXT); }, /Production Container green/],
     ['staging running another SHA', w => { w.staging.health.releaseIdentity.releaseSha = OTHER; }, /staging runs the nominated SHA/],
     ['staging web bundle from another build', w => { w.staging.web.releaseSha = OTHER; }, /release\.json/],
@@ -177,6 +320,14 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} (failed: ${failed(report).join('; ') || 'none'})`);
     ok(w.gitCalls.every(call => !/\bpush\b/.test(call)), `no git push while refusing ${name}`);
   }
+  {
+    // A flaky scheduled run that a later schedule passed does not refuse the SHA.
+    const w = world();
+    w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-19T18:15:00Z' });
+    w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'success', run_started_at: '2026-10-20T18:15:00Z' });
+    const report = await run(w);
+    ok(report.ok && report.results.some(r => r.ok === null && /superseded/.test(r.label) && /Pri App Health Agent/.test(r.detail)), 'a superseded flaky scheduled run is listed, not counted');
+  }
   const unreachable = world();
   unreachable.fetchImpl = async () => { throw new Error('ECONNREFUSED'); };
   ok(!(await run(unreachable)).ok, 'an unreachable staging refuses the nomination');
@@ -187,6 +338,98 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(!badSha.ok && badSha.results.length === 1, 'a non-40-hex SHA is refused before anything runs');
   const source = read('scripts/release-nominate.mjs');
   ok(!/\[\s*'push'/.test(source) && !/execFile\w*\([^)]*push/.test(source), 'the source never passes "push" to git; the push is only printed');
+  ok(!/--engine (sqlite|postgres)\b/.test(source), 'the source never hard-codes the engine of the verify command');
+  ok(!/device-matrix\.md\),\n/.test(source) || !/Before promoting:.*device matrix/.test(source), 'the device matrix is no longer printed as a reminder');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 1b · release-dossier: one record for one SHA (#686 steps 25, 27, 28, 30)
+  // ═══════════════════════════════════════════════════════════════════════════
+  assert.throws(() => parseDossierArgs([]), /40-hex/, 'the dossier needs a SHA'); count += 1;
+  assert.throws(() => parseDossierArgs([SHA, '--record']), /needs a value/, '--record needs a path'); count += 1;
+  const dArgs = parseDossierArgs([SHA.toUpperCase(), '--json', '--no-fetch']);
+  ok(dArgs.command === 'build' && dArgs.sha === SHA && dArgs.json && !dArgs.fetch && dArgs.record.endsWith(join('go-no-go', `${SHA}.json`)) && dArgs.out.endsWith(join('go-no-go', `${SHA}.md`)), 'the dossier defaults its record and output to docs/release/evidence/go-no-go/<sha>');
+  eq(parseDossierArgs(['template', SHA]).command, 'template', 'template <sha> is the record skeleton command');
+  const tpl = recordTemplate(SHA);
+  ok(tpl.sha === SHA && tpl.go.decision === null && tpl.go.sha === SHA && EXTERNAL_GATES.every(g => tpl.gates[g.id].status === 'NOT_RECORDED'), 'the template records no GO and every gate NOT_RECORDED');
+  eq(recordProblems(tpl, SHA).length, 0, 'the template is well-formed');
+  ok(recordProblems({ ...tpl, sha: OTHER }, SHA).some(p => /not/.test(p)), 'a record for another SHA is a problem');
+  ok(recordProblems({ ...tpl, go: { ...tpl.go, decision: 'MAYBE' } }, SHA).some(p => /go\.decision/.test(p)), 'go.decision is GO, NO-GO or null');
+  ok(recordProblems({ ...tpl, gates: { ...tpl.gates, examiner: { status: 'DONE' } } }, SHA).some(p => /gates\.examiner\.status/.test(p)), 'a gate status outside PASS/BLOCKED/NOT_RECORDED is a problem');
+  assert.deepEqual(EXTERNAL_GATES.map(g => g.id), ['examiner', 'counsel', 'security', 'native', 'store', 'data'], 'the six gates only people can close'); count += 1;
+
+  const NOW = Date.parse('2026-11-05T12:00:00Z');
+  function fullRecord() {
+    const r = recordTemplate(SHA);
+    r.candidate = { frozenAt: '2026-11-03T09:00:00Z', by: 'Priya Example', note: 'merge freeze declared' };
+    r.stagingProof = { result: 'DEPLOYMENT VERIFIED: PASS — 14/14', runUrl: 'https://github.com/x/y/actions/runs/1', at: '2026-11-03T09:30:00Z' };
+    r.soak = { startedAt: '2026-11-03T10:00:00Z', endedAt: '2026-11-04T11:00:00Z', watchedBy: 'Priya Example', incidents: 'none', mergeFreezeDeclaredBy: 'Priya Example' };
+    r.acceptance = { result: 'PASS', report: 'tools/acceptance/out/2026-11-03/report.json', tester: 'Priya Example', at: '2026-11-03T12:00:00Z' };
+    for (const g of EXTERNAL_GATES) r.gates[g.id] = { status: 'PASS', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: `signed ${g.id} record` };
+    r.go = { decision: 'GO', by: 'Priya Example', at: '2026-11-04T15:00:00Z', sha: SHA, statement: 'GO for exactly this SHA.' };
+    return r;
+  }
+  const dossier = (w, record, extra = {}) => buildDossier({ sha: SHA, record, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: false, deviceLedger: w.ledger, readerEvalDir: w.readerDir, now: NOW, ...extra });
+  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; return w; };
+  const ready = await dossier(frozen(), fullRecord());
+  ok(ready.verdict === 'GO-READY' && ready.reasons.length === 0, `a frozen, soaked, evidenced, signed and GO-recorded SHA is GO-READY (reasons: ${ready.reasons.join('; ')})`);
+  ok(ready.rows.find(r => r.step === 28).ok === true && /GO by Priya Example/.test(ready.rows.find(r => r.step === 28).detail), 'the owner GO row names the person and quotes the statement');
+  ok(ready.rows.find(r => r.step === 30).ok === null && /not yet/.test(ready.rows.find(r => r.step === 30).detail), 'before the promotion step 30 is informational: not yet');
+  ok(/# GO\/NO-GO dossier — `a{40}`/.test(ready.markdown) && /## Verdict: \*\*GO-READY\*\*/.test(ready.markdown) && ready.markdown.includes('git push origin ' + SHA + ':refs/heads/deploy/production'), 'the markdown names the SHA, the verdict and prints step 29 only when GO-READY');
+  ok(/PHYSICAL-HUMAN/.test(ready.markdown) && /real-human/.test(ready.markdown) && /pushes nothing, deploys nothing and authorises nothing/.test(ready.markdown), 'the markdown states the evidence classes and that it authorises nothing');
+  ok(/\| PASS \| Independent examiner result/.test(ready.markdown) && /Kalp Example/.test(ready.markdown), 'the gate table names who signed each gate');
+  ok(frozen().gitCalls.every(call => !/\bpush\b/.test(call)), 'the dossier never runs git push');
+
+  const noGo = async (name, mutateRecord, label, mutateWorld = () => {}) => {
+    const w = frozen(); mutateWorld(w);
+    const record = fullRecord(); mutateRecord(record);
+    const result = await dossier(w, record);
+    ok(result.verdict === 'NO-GO' && result.reasons.some(r => label.test(r)) && !result.markdown.includes('git push origin'), `NO-GO when ${name} (reasons: ${result.reasons.join('; ')})`);
+  };
+  await noGo('the owner has not recorded GO', r => { r.go.decision = null; }, /owner GO recorded/);
+  await noGo('the owner recorded NO-GO', r => { r.go.decision = 'NO-GO'; r.go.statement = 'wait for counsel'; }, /owner GO recorded/);
+  await noGo('the GO names another SHA', r => { r.go.sha = OTHER; }, /owner GO recorded/);
+  await noGo('the GO is signed by an agent', r => { r.go.by = 'Claude agent'; }, /owner GO recorded/);
+  await noGo('the GO is dated in the future', r => { r.go.at = '2026-11-06T00:00:00Z'; }, /owner GO recorded/);
+  await noGo('the soak is shorter than 24 h', r => { r.soak.endedAt = '2026-11-04T09:59:00Z'; }, /soak window/);
+  await noGo('the soak has not ended', r => { r.soak.endedAt = '2026-11-06T10:00:00Z'; }, /soak window/);
+  await noGo('an incident is recorded during the soak', r => { r.soak.incidents = ['500 on /v1/sync/push at 03:12Z']; }, /no \/v1 500/);
+  await noGo('nobody watched the soak', r => { r.soak.watchedBy = 'automation'; }, /watched by a named person/);
+  await noGo('staging built the SHA after the soak began', () => {}, /before the soak began/, w => { w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T10:30:00.000Z'; });
+  await noGo('main moved past the SHA (soak void)', () => {}, /merge freeze held/, w => { w.tip = OTHER; });
+  await noGo('the Release Staging Proof never ran on the SHA', () => {}, /Release Staging Proof/, w => { w.runs = w.runs.filter(run => run.name !== 'Release Staging Proof'); });
+  await noGo('the Release Staging Proof is red on the SHA', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'failure'; });
+  await noGo('a gate is NOT_RECORDED', r => { r.gates.counsel = { status: 'NOT_RECORDED' }; }, /counsel/);
+  await noGo('a gate is BLOCKED', r => { r.gates.store = { status: 'BLOCKED', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: 'Paid Apps Agreement not signed' }; }, /Store readiness/);
+  await noGo('a gate PASS is unsigned', r => { r.gates.examiner.by = ''; }, /examiner/);
+  await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance A–D/);
+  await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance A–D/);
+  await noGo('the candidate was never frozen', r => { r.candidate = { frozenAt: '', by: '' }; }, /candidate SHA frozen/);
+  await noGo('the device evidence is missing (the nomination fails)', () => {}, /release-stage nomination/, w => { writeFileSync(w.ledger, ''); });
+  await noGo('the record is for another SHA', r => { r.sha = OTHER; }, /operator record/);
+  {
+    // Step 30 after the promotion: production serves the SHA, main moved on, staging serves the tip with a green proof.
+    const w = frozen(); w.tip = OTHER; w.mainAncestors.add(OTHER); w.production.health.releaseIdentity.releaseSha = SHA; w.staging.health.releaseIdentity.releaseSha = OTHER; w.staging.web.releaseSha = OTHER;
+    w.tipRuns = [{ name: 'Release Staging Proof', workflow_id: 9, event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-11-05T01:00:00Z' }];
+    const after = await dossier(w, fullRecord());
+    const thirty = after.rows.find(r => r.step === 30);
+    ok(/CERTIFIED/.test(thirty.label) && /staging serves b{40}/.test(thirty.detail), 'after the promotion a later merge that reached staging unaided with a green proof certifies step 30');
+    w.tipRuns[0].conclusion = 'failure';
+    const afterRed = await dossier(w, fullRecord());
+    ok(/not yet certified/.test(afterRed.rows.find(r => r.step === 30).label), 'a red proof on the later merge does not certify step 30');
+    ok(after.verdict === 'NO-GO' && after.reasons.some(r => /merge freeze held/.test(r)), 'that later state is no longer GO-READY for this SHA (the soak belongs to one SHA), which is correct after a promotion');
+  }
+  {
+    const withOverride = frozen();
+    writeFileSync(withOverride.ledger, '');
+    const overridePath = overrideFile({ ...goodOverride, waives: ['device-matrix'] });
+    const record = fullRecord(); record.overrides = overridePath;
+    const result = await dossier(withOverride, record);
+    ok(result.verdict === 'GO-READY' && result.rows.some(r => r.step === 'override' && /device-matrix waived/.test(r.label) && /Priya Example/.test(r.detail)) && /## Overrides/.test(result.markdown) && /device-matrix waived/.test(result.markdown), 'a recorded override is carried into the dossier by name, person and reason');
+  }
+  const dossierSource = read('scripts/release-dossier.mjs');
+  ok(!/\[\s*'push'/.test(dossierSource) && !/railway|update_ref|deploy\/production'\]/.test(dossierSource.replace(/\/\/.*$/gm, '')), 'the dossier source never pushes, deploys or moves the pointer');
+  ok(existsSync(join(ROOT, 'docs/release/evidence/go-no-go/README.md')) && /release-dossier\.mjs/.test(read('docs/release/evidence/go-no-go/README.md')) && /template/.test(read('docs/release/evidence/go-no-go/README.md')), 'the go-no-go directory is committed with a README naming the generator and the template');
+  for (const dir of scratch) rmSync(dir, { recursive: true, force: true });
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
