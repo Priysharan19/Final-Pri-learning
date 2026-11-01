@@ -84,6 +84,8 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 
 | # | Action | Link | Done when |
 |---|---|---|---|
+| F0 | Do not promote the 2 Nov 2026 notices to production ahead of the 30-day child-account erasure they promise (D18). The store privacy-policy field points at that page, so the code must be in the same SHA | `node scripts/release-nominate.mjs <sha>`; `node tools/legal-promises.mjs` shows the gap on its own | The row "the notices promise nothing this commit does not do" is green. It is red today: the accounts stream has not landed |
+| F0a | Leave every `PRI_RAZORPAY_*` and `PRI_WEB_*_PRICE_ID` variable unset on production. The terms and refund policy say there is no purchase on the website, and the web client shows Razorpay checkout whenever the server reports it configured | Railway → production → Variables (names only) | `npm run verify:deployment` passes its "web checkout is off" line |
 | F1 | Counsel-approved privacy notice and terms published at `<origin>/privacy` and `/terms`; placeholders filled | — | `node tools/legal-status.mjs` → 0 placeholders; banner gone |
 | F2 | Enter the App Privacy answers | App Store Connect → app → App Privacy | Matches `docs/release/app-store-privacy-labels.md` |
 | F3 | Enter name, subtitle, description, keywords, URLs, category, age rating | App Store Connect → app → the version page; App Information | Matches `docs/release/store/app-store-listing.md` |

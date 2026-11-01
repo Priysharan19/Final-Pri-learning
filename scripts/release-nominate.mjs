@@ -46,6 +46,8 @@
 //     copied into the GO/NO-GO dossier (scripts/release-dossier.mjs).
 //     `--candidate` runs everything except the evidence rows, for §4.6 step 1
 //     before the TestFlight/Play build exists; it never prints the promotion.
+//   · the notices at that commit promise nothing the code at that commit lacks
+//     (tools/legal-promises.mjs): the notice is public once the SHA is promoted.
 //
 // When everything holds it prints the promotion commands from
 // release-policy.md with the SHA filled in. It NEVER runs them: pushing
@@ -80,6 +82,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, readLedger, summarise } from './device-matrix-record.mjs';
+import { legalPromiseGaps } from '../tools/legal-promises.mjs';
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -514,6 +517,10 @@ export async function nominate({
     catch (error) { check(false, 'schema versions readable at that commit', error?.message || String(error)); }
   }
   if (versions) info('schema versions this commit expects', `schema ${versions.schemaVersion} / billing ${versions.billingSchemaVersion}`);
+  if (commitKnown) {
+    const gaps = await legalPromiseGaps(path => git(['show', `${expected}:${path}`]));
+    check(gaps.length === 0, 'the notices promise nothing this commit does not do', gaps.join('; ') || undefined);
+  }
 
   // ── GitHub Actions on exactly this SHA ─────────────────────────────────────
   let runsOnSha = [];
