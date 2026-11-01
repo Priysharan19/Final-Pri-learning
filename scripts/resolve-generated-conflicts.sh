@@ -16,6 +16,9 @@
 # It never touches a path outside the two generated roots and never commits:
 # finish with `git commit` (merge) or `git rebase --continue` yourself, then run
 # `npm run build && npm run sync:ios` to regenerate the bundles locally.
+# When the index already holds only the placeholders there is nothing to
+# resolve: it says so and exits 0 without touching the working tree, so a
+# locally generated (ignored) bundle survives an accidental run.
 #
 #   scripts/resolve-generated-conflicts.sh            # after the merge/rebase stopped
 #   scripts/resolve-generated-conflicts.sh --dry-run  # print what would change
@@ -26,7 +29,7 @@ ROOTS=('ios/PriLearning.swiftpm/Resources/Web' 'ios/PriLearning 2.swiftpm/Resour
 PLACEHOLDER='README.md'
 DRY_RUN=0
 
-usage() { sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -55,8 +58,24 @@ generated="$(git ls-files -z --cached -- "${ROOTS[@]}" | tr '\0' '\n' | awk -v p
 count=0
 [[ -n "$generated" ]] && count="$(printf '%s\n' "$generated" | wc -l | tr -d ' ')"
 unmerged_before="$(git diff --name-only --diff-filter=U | wc -l | tr -d ' ')"
+in_progress='no'
+for marker in MERGE_HEAD rebase-merge rebase-apply; do
+  [[ -e "$git_dir/$marker" ]] && in_progress='yes'
+done
 
-echo "generated bundle entries in the index: $count (unmerged paths before: $unmerged_before)"
+echo "generated bundle entries in the index: $count (unmerged paths before: $unmerged_before; merge or rebase in progress: $in_progress)"
+
+# Nothing to resolve: the index already holds only the placeholders. On a
+# branch that is not mid-merge this is the normal post-D28 state, and a
+# locally generated bundle (ignored by git) must be left exactly as it is.
+if [[ "$count" -eq 0 ]]; then
+  echo "nothing to do: the index holds no generated bundle entry under either root; the working tree was not touched."
+  if [[ "$in_progress" == 'yes' && "$unmerged_before" -gt 0 ]]; then
+    echo "the $unmerged_before unmerged path(s) are outside the generated roots; resolve them, then finish the merge or rebase."
+  fi
+  exit 0
+fi
+
 if [[ "$DRY_RUN" -eq 1 ]]; then
   if [[ -n "$generated" ]]; then
     printf '%s\n' "$generated" | head -12 | while IFS= read -r file; do echo "  would remove from index: $file"; done

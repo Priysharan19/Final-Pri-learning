@@ -24,7 +24,7 @@
 // client/test/ios-bundle-generation-check.mjs can prove, on a fixture tree,
 // that the check still fails on a missing, stale, altered or absent bundle.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readdirSync, readFileSync, rmSync, cpSync, existsSync, statSync, mkdirSync } from 'node:fs';
+import { readdirSync, readFileSync, rmSync, cpSync, existsSync, mkdirSync, openSync, fstatSync, closeSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -39,13 +39,28 @@ export function bundlesFor(root) {
   return PACKAGES.map(label => ({ label, web: join(root, 'ios', label, 'Resources', 'Web') }));
 }
 
-/** Relative path → short sha256 for every regular file under dir (.DS_Store skipped). */
+/**
+ * Relative path → short sha256 for every regular file under dir (.DS_Store
+ * skipped). Each file is opened once and both the type check and the read go
+ * through that one descriptor, so nothing can be swapped under the path
+ * between the two (CodeQL js/file-system-race); the directory walk uses the
+ * dirent types instead of a second stat.
+ */
 export function fingerprint(dir, base = dir, acc = {}) {
-  for (const name of readdirSync(dir)) {
-    if (name === '.DS_Store') continue;
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) fingerprint(full, base, acc);
-    else acc[full.slice(base.length + 1).split('\\').join('/')] = createHash('sha256').update(readFileSync(full)).digest('hex').slice(0, 16);
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === '.DS_Store') continue;
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) { fingerprint(full, base, acc); continue; }
+    let linkedDirectory = false;
+    const fd = openSync(full, 'r');
+    try {
+      const stat = fstatSync(fd);
+      if (stat.isFile()) acc[full.slice(base.length + 1).split('\\').join('/')] = createHash('sha256').update(readFileSync(fd)).digest('hex').slice(0, 16);
+      else linkedDirectory = stat.isDirectory();
+    } finally {
+      closeSync(fd);
+    }
+    if (linkedDirectory) fingerprint(full, base, acc);
   }
   return acc;
 }
@@ -54,6 +69,13 @@ function requireDist(dist) {
   if (!existsSync(dist)) throw new Error(`${dist} does not exist — run \`npm run build\` first.`);
   const missing = REQUIRED_FILES.filter(name => !existsSync(join(dist, name)));
   if (missing.length) throw new Error(`client/dist is not a complete production build: missing ${missing.join(', ')} — run \`npm run build\` again.`);
+  // The sync copies every top-level build entry over the bundle, keeping only
+  // the tracked placeholder; a build output of the same name would overwrite
+  // that tracked file and the check would then misreport it. Refuse it here,
+  // before anything is copied (nothing in client/public may be called README.md).
+  if (existsSync(join(dist, PLACEHOLDER))) {
+    throw new Error(`client/dist carries a top-level ${PLACEHOLDER}, the name of the tracked placeholder in ios/*/Resources/Web — the sync would overwrite a tracked file. Remove it from client/public; no build output may be called ${PLACEHOLDER}.`);
+  }
 }
 
 /**

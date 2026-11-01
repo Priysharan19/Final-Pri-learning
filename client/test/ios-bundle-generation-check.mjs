@@ -13,7 +13,13 @@
 //      is gone or ignored, and when an Android asset is tracked;
 //   3. scripts/resolve-generated-conflicts.sh clears the modify/delete
 //      conflicts a pre-D28 branch gets when main is merged into it, restores
-//      the placeholder and leaves every other conflict for the person.
+//      the placeholder and leaves every other conflict for the person; with
+//      nothing to resolve it leaves a locally generated bundle alone;
+//   4. tools/ci-workflow-policy-check.mjs fails any workflow job that runs
+//      `xcodebuild -scheme PriLearning` without `npm run sync:ios` and
+//      `npm run check:ios` earlier in the same job (mutations on a copy of
+//      the real workflows below), so no native lane can build from a
+//      checkout whose Resources/Web holds only the placeholder.
 // No build is needed; everything runs in temporary directories.
 //
 // Usage: node client/test/ios-bundle-generation-check.mjs
@@ -29,6 +35,9 @@ import { ANDROID_TRACKED_ASSETS, GENERATED_ROOTS, audit } from '../../tools/gene
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RESOLVER = join(ROOT, 'scripts', 'resolve-generated-conflicts.sh');
 const UNTRACKED_CLI = join(ROOT, 'tools', 'generated-bundles-untracked-check.mjs');
+const POLICY_CLI = join(ROOT, 'tools', 'ci-workflow-policy-check.mjs');
+const WORKFLOWS = join(ROOT, '.github', 'workflows');
+const SWIFT_BUILD = /\bxcodebuild\b[^#\n]*\s-scheme\s+PriLearning\b/;
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => (cond ? pass++ : failures.push(label));
@@ -120,6 +129,22 @@ try {
   }
   ok(throwsWith(() => checkBundles({ root: fx, dist: join(fx, 'nowhere') }), /does not exist — run `npm run build` first/), 'no client/dist at all is named as such');
   ok(checkBundles({ root: fx }).ok, 'the fixture is whole again');
+
+  // A build output named like the tracked placeholder (anything dropped into
+  // client/public would produce one) is refused before a byte is copied: the
+  // sync would otherwise overwrite the tracked README and the check would then
+  // misreport it as "missing: only in build".
+  writeFileSync(join(dist, PLACEHOLDER), '# a README that leaked into the build\n');
+  ok(throwsWith(() => syncBundles({ root: fx }), /client\/dist carries a top-level README\.md, the name of the tracked placeholder/), 'sync refuses a client/dist with a top-level README.md');
+  ok(throwsWith(() => checkBundles({ root: fx }), /client\/dist carries a top-level README\.md/), 'check refuses it too');
+  ok(webs.every(web => readFileSync(join(web, PLACEHOLDER), 'utf8') === '# placeholder\n'), 'the tracked placeholder in both packages is untouched by the refused sync');
+  rmSync(join(dist, PLACEHOLDER));
+  ok(checkBundles({ root: fx }).ok, 'without it the bundles still pass');
+  // The fingerprint walks nested folders and skips macOS metadata (a Finder
+  // visit must not change the result).
+  writeFileSync(join(dist, 'assets', '.DS_Store'), 'finder\n');
+  ok(JSON.stringify(fingerprint(dist)) === JSON.stringify(built) && checkBundles({ root: fx }).ok, 'a .DS_Store in the build is not counted and does not fail the check');
+  rmSync(join(dist, 'assets', '.DS_Store'));
 
   // ── 3 · the untracked guard on a fixture repository ────────────────────────
   const repo = join(tmp, 'guard');
@@ -242,6 +267,88 @@ try {
   ok(audit(merge).problems.filter(p => !/not ignored: android/.test(p)).length === 0, 'and the merged branch passes the untracked guard');
   ok(spawnSync('bash', [RESOLVER], { cwd: merge, encoding: 'utf8', env: GIT_ENV }).status === 0 && git(merge, 'status', '--short').trim() === '', 'running the resolver again on a clean tree is a no-op');
   ok(spawnSync('bash', [RESOLVER, '--nonsense'], { cwd: merge, encoding: 'utf8', env: GIT_ENV }).status === 2, 'an unknown argument is refused');
+
+  // Not mid-merge, index already clean, but a bundle was generated locally
+  // (ignored by git): the resolver must say there is nothing to do and leave
+  // the generated files exactly where they are.
+  const localBundle = [join(merge, GENERATED_ROOTS[0], 'index.html'), join(merge, GENERATED_ROOTS[1], 'assets', 'index-cccc2222.js')];
+  for (const file of localBundle) write(file, 'generated locally\n');
+  ok(git(merge, 'status', '--short').trim() === '', 'the locally generated bundle is ignored by git');
+  const idle = spawnSync('bash', [RESOLVER], { cwd: merge, encoding: 'utf8', env: GIT_ENV });
+  ok(idle.status === 0 && /^nothing to do: the index holds no generated bundle entry/m.test(idle.stdout), `with nothing to resolve the resolver says so (${idle.stdout.trim().split('\n').pop()})`);
+  ok(!/Finish with git commit/.test(idle.stdout) && /merge or rebase in progress: no/.test(idle.stdout), 'and does not tell the person to finish a merge that is not happening');
+  ok(localBundle.every(file => existsSync(file) && readFileSync(file, 'utf8') === 'generated locally\n'), 'the locally generated bundle survives');
+  const idleDry = spawnSync('bash', [RESOLVER, '--dry-run'], { cwd: merge, encoding: 'utf8', env: GIT_ENV });
+  ok(idleDry.status === 0 && /nothing to do/.test(idleDry.stdout) && !/would clear working tree/.test(idleDry.stdout), 'the dry run agrees');
+  ok(localBundle.every(file => existsSync(file)), 'and touches nothing either');
+  for (const file of localBundle) rmSync(file, { force: true });
+
+  // ── 5 · every Swift build lane generates the bundles first ────────────────
+  const wfCopy = join(tmp, 'workflows');
+  cpSync(WORKFLOWS, wfCopy, { recursive: true });
+  const policy = () => spawnSync(process.execPath, [POLICY_CLI, '--workflows', wfCopy], { encoding: 'utf8' });
+  const lanes = readdirSync(wfCopy).filter(f => /\.ya?ml$/.test(f) && SWIFT_BUILD.test(readFileSync(join(wfCopy, f), 'utf8')));
+  ok(lanes.includes('native-ink.yml') && lanes.includes('pri-mac-v1-acceptance.yml'), `the Native Ink lane and the trusted Mac acceptance lane both build the package (${lanes.join(', ')})`);
+  const real = policy();
+  ok(real.status === 0 && /every Swift build generates the iOS web bundles first/.test(real.stdout), `the real workflows pass the policy (${real.stderr.trim().split('\n').slice(-3).join(' | ')})`);
+  for (const lane of lanes) {
+    const original = readFileSync(join(wfCopy, lane), 'utf8');
+    const stripped = (re) => original.split('\n').filter(l => !re.test(l)).join('\n');
+    const withoutSync = stripped(/^\s*npm run sync:ios\s*$/);
+    ok(withoutSync !== original, `${lane}: the sync step is a line of its own`);
+    writeFileSync(join(wfCopy, lane), withoutSync);
+    let r = policy();
+    ok(r.status === 1 && new RegExp(`${lane.replace(/\./g, '\\.')}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run sync:ios' earlier in the same job`).test(r.stderr),
+      `${lane}: removing the sync step fails the policy (${r.stderr.trim().split('\n')[0]})`);
+    writeFileSync(join(wfCopy, lane), stripped(/^\s*npm run check:ios\s*$/));
+    r = policy();
+    ok(r.status === 1 && new RegExp(`${lane.replace(/\./g, '\\.')}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run check:ios' after the sync`).test(r.stderr),
+      `${lane}: removing the check step fails the policy`);
+    // The generation moved after the Swift build: too late for that runner.
+    const lines = original.split('\n');
+    const buildAt = lines.findIndex(l => SWIFT_BUILD.test(l) && !l.trim().startsWith('#'));
+    const moved = [...lines.filter(l => !/^\s*npm run (sync|check):ios\s*$/.test(l))];
+    const movedBuildAt = moved.findIndex(l => SWIFT_BUILD.test(l) && !l.trim().startsWith('#'));
+    const indent = lines[buildAt].match(/^\s*/)[0];
+    moved.splice(movedBuildAt + 1, 0, `${indent}npm run sync:ios`, `${indent}npm run check:ios`);
+    writeFileSync(join(wfCopy, lane), moved.join('\n'));
+    r = policy();
+    ok(r.status === 1 && /without 'npm run sync:ios' earlier in the same job/.test(r.stderr) && /without 'npm run check:ios' after the sync/.test(r.stderr),
+      `${lane}: generating the bundles after the Swift build fails the policy`);
+    // Prose about the sync never satisfies the rule.
+    writeFileSync(join(wfCopy, lane), withoutSync.replace(/^(\s*)npm run check:ios\s*$/m, '$1# npm run sync:ios is documented here but never run\n$1npm run check:ios'));
+    r = policy();
+    ok(r.status === 1 && /without 'npm run sync:ios' earlier in the same job/.test(r.stderr), `${lane}: a commented-out sync does not count`);
+    writeFileSync(join(wfCopy, lane), original);
+  }
+  // A sync in another job never reaches the runner that builds.
+  write(join(wfCopy, 'zz-fixture-split-jobs.yml'), [
+    'name: fixture', 'on:', '  workflow_dispatch:', 'permissions:', '  contents: read', 'jobs:',
+    '  web:', '    runs-on: ubuntu-latest', '    steps:', '      - run: |', '          npm run build', '          npm run sync:ios', '          npm run check:ios',
+    '  swift:', '    runs-on: macos-15', '    steps:', "      - run: xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' build", ''
+  ].join('\n'));
+  const split = policy();
+  ok(split.status === 1 && /zz-fixture-split-jobs\.yml: job 'swift' runs xcodebuild -scheme PriLearning at line 17 without 'npm run sync:ios' earlier in the same job/.test(split.stderr),
+    `a sync in a different job does not satisfy the rule (${split.stderr.trim().split('\n')[0]})`);
+  rmSync(join(wfCopy, 'zz-fixture-split-jobs.yml'));
+  // A build the line-oriented parser cannot place in a job is a failure, not a pass.
+  write(join(wfCopy, 'zz-fixture-odd-indent.yml'), [
+    'name: fixture', 'on:', '  workflow_dispatch:', 'permissions:', '  contents: read', 'jobs:',
+    '    swift:', '        runs-on: macos-15', '        steps:', "            - run: xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' build", ''
+  ].join('\n'));
+  const odd = policy();
+  ok(odd.status === 1 && /zz-fixture-odd-indent\.yml: xcodebuild -scheme PriLearning at line 10 is not inside a two-space-indented job/.test(odd.stderr),
+    `a Swift build outside a recognisable job fails rather than escaping the rule (${odd.stderr.trim().split('\n')[0]})`);
+  rmSync(join(wfCopy, 'zz-fixture-odd-indent.yml'));
+  ok(policy().status === 0, 'the copy passes again once the fixtures are gone');
+  // The trusted Mac lane checks out with clean: true (which wipes ignored files),
+  // so it must install client dependencies and generate before it builds.
+  const mac = readFileSync(join(WORKFLOWS, 'pri-mac-v1-acceptance.yml'), 'utf8');
+  const at = s => { const i = mac.indexOf(s); return i < 0 ? Infinity : i; };
+  ok(/clean:\s*true/.test(mac), 'the Mac lane still cleans its checkout');
+  ok(at('npm ci --prefix client') < at('npm run build') && at('npm run build') < at('npm run sync:ios') && at('npm run sync:ios') < at('npm run check:ios') && at('npm run check:ios') < at('xcodebuild -scheme PriLearning'),
+    'the Mac lane installs client dependencies, builds, syncs and checks the bundles before its one xcodebuild');
+  ok(at('xcodebuild -scheme PriLearning') < at('node scripts/native-bridge-selfcheck.mjs') && at('xcodebuild -scheme PriLearning') < at('node scripts/iphone-journey.mjs'), 'and the bridge and journey steps run the app built from that bundle');
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }
@@ -251,4 +358,4 @@ if (failures.length) {
   console.log(`IOS BUNDLE GENERATION: FAIL — ${pass}/${pass + failures.length} checks.`);
   process.exit(1);
 }
-console.log(`IOS BUNDLE GENERATION: PASS — ${pass}/${pass} checks — sync produces a complete copy of client/dist, the check catches a missing, altered, stale or absent bundle, the guard keeps generated files out of git, and the resolver clears pre-D28 merge conflicts.`);
+console.log(`IOS BUNDLE GENERATION: PASS — ${pass}/${pass} checks — sync produces a complete copy of client/dist, the check catches a missing, altered, stale or absent bundle, the guard keeps generated files out of git, the resolver clears pre-D28 merge conflicts and leaves a clean tree alone, and every Swift build lane must generate first.`);
