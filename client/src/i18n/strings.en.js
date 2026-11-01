@@ -486,22 +486,6 @@ export default {
   // ── Handwriting workspace (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──────
   'ink.writingSpace': 'Writing space',
 
-  // ── Handwriting calibration (ink/Calibrate) ─────────────────────────────────
-  'calibrate.title': 'Teach it your handwriting',
-  'calibrate.instruction': 'Write this symbol the way YOU write it, then save:',
-  'calibrate.symbolOf': '— symbol {n} of {total}',
-  'calibrate.writeAria': 'Write {symbol}',
-  'calibrate.decimalPoint': '· (decimal point)',
-  'calibrate.skip': 'Skip',
-  'calibrate.stop': 'Stop',
-  'calibrate.saveNext': 'Save & next →',
-  'calibrate.savedSoFar': { one: '{n} sample saved so far', other: '{n} samples saved so far' },
-  'calibrate.doneTitle': 'That\'s your hand learned.',
-  'calibrate.samplesSaved': { one: '{n} sample saved', other: '{n} samples saved' },
-  'calibrate.templatesTotal': { one: '{n} personal template in total', other: '{n} personal templates in total' },
-  'calibrate.doneSummary': '{saved} — {total}. They now outrank the built-in shapes, and every correction you make while practising adds more.',
-  'calibrate.done': 'Done',
-  'calibrate.anotherRound': 'Another round',
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.decodedOnDevice': 'Decoded on-device',
   'verdict.ocrConfidence': ' · {percent}% OCR confidence',
@@ -657,12 +641,6 @@ export default {
   'settings.handwriting': 'Handwriting',
   'settings.handwritingNative': 'This app captures your writing with the device’s own ink surface, using a stylus or your finger. Your handwriting is read by Pri’s server reader below, which needs a connection and a signed-in account; your ink itself stays on this device.',
   'settings.handwritingBrowser': 'Write with your finger, a stylus or a mouse. Your handwriting is read by Pri’s server reader below, which needs a connection and a signed-in account; your ink itself stays on this device.',
-  'settings.templatesLearned': 'Personal templates learned',
-  'settings.templatesNone': 'None yet',
-  'settings.templatesCount': '{total} across {symbols} symbols',
-  'settings.teachHandwriting': 'Teach it your handwriting (2 min)',
-  'settings.resetHandwriting': 'Reset learned handwriting',
-  'settings.handwritingCleared': 'Learned handwriting cleared',
   'settings.cloudOnFor': '{label} is on for this profile',
   'settings.cloudOffFor': '{label} is off — this stays on your device',
 
@@ -699,7 +677,7 @@ export default {
   'settings.backupRestored': 'Backup restored — {rows} records',
   'settings.backupRestoredUnprotected': 'Backup restored — {rows} records. This profile has no password; set one in Account to protect it again.',
   'settings.deleteProfile': 'Delete this profile…',
-  'settings.deleteWarning': 'Deleting “{name}” wipes its ratings, attempts, exams, favourites and learned handwriting from this device. Nothing is held anywhere else — export a full backup first if there is any chance you want it back.',
+  'settings.deleteWarning': 'Deleting “{name}” wipes its ratings, attempts, exams, favourites and handwriting from this device. Nothing is held anywhere else — export a full backup first if there is any chance you want it back.',
   'settings.typeNameToConfirm': 'Type “{name}” to confirm',
   'settings.typeNameLabel': 'Type {name} to confirm deletion',
   'settings.typeTheName': 'Type the profile name — “{name}” — to confirm.',
@@ -714,8 +692,12 @@ export default {
 
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
   // Public account entry and explicit offline entry are load-bearing browser contracts.
-  'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
-  'login.heroPrivacy': 'Private: profiles, drafts and handwriting are stored on this device. Checking answers needs a Pri account and a connection. No ads.',
+  // The welcome names only the tracks V1 ships (certification-report.md: cbse,
+  // jee-main, jee-advanced). The Olympiad track is behind
+  // PRI_FEATURE_EXTENDED_TRACKS and is not advertised while it is off
+  // (client/test/onboarding-scope-check.mjs holds this copy to that).
+  'login.heroSub': 'Maths for NCERT Classes 7–12 and JEE Main & Advanced — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',
+  'login.heroPrivacy': 'Private: profiles, drafts and handwriting are stored on this device. Once you sign in, Pri’s server reads your handwriting and photos and checks your answers, which needs a connection. No ads.',
   'login.cloudSignIn': 'Sign in to your Pri cloud account',
   'login.cloudIntent': 'Pri cloud account — first open or create the profile on this device that the account will sync. You’ll land in Account settings to sign in.',
   'login.privacy': 'Privacy',
@@ -725,11 +707,11 @@ export default {
   'login.chooseLanguage': 'Choose your language',
 
   'login.backToWelcome': 'Back to the Pri Learning welcome screen',
-  'login.brandKicker': 'Classes 7–12 · JEE · Olympiad',
-  'login.point1': 'Generated questions across NCERT Classes 7–12, JEE Main & Advanced and olympiad topics',
+  'login.brandKicker': 'Classes 7–12 · JEE',
+  'login.point1': 'Generated questions across NCERT Classes 7–12 and JEE Main & Advanced',
   'login.point2': 'Handwritten working marked line by line',
-  'login.point3': 'An engine that learns exactly how you write',
-  'login.point4': 'Your drafts and handwriting stay on this device; answers are checked by Pri’s server once you sign in',
+  'login.point3': 'Marks decided by Pri’s deterministic engine, with worked solutions',
+  'login.point4': 'Your drafts stay on this device; once you sign in, Pri’s server reads your handwriting and photos and checks your answers',
 
   'login.stepOf': 'Step {current} of {total}',
   'login.stepRoleTitle': 'Who are you?',
@@ -2989,6 +2971,15 @@ export default {
   "inst.strand.data": "Data",
   "inst.tabReport": "Report",
   "inst.tabScripts": "Scripts",
+  // The Index's second half (audit-interface item 2): what the v1.0 Home
+  // offered besides the chapters — the review queue, the study plan, photo
+  // practice and the exact-topic generator — each with its own entry here.
+  "inst.alsoTitle": "More ways to practise",
+  "inst.reviewQueue": "Review queue",
+  "inst.reviewQueueNone": "Nothing is due yet. Practice brings a topic back before it fades.",
+  "inst.reviewQueueDue": { "one": "{n} topic is due — open Practice and it comes first", "other": "{n} topics are due — open Practice and they come first" },
+  "inst.planSub": "This week’s sessions, and the weeks to your exam",
+  "inst.photoSub": "A photo of a question from your book, read on Pri’s server, then practised here",
   "inst.reportHeat": "Practice · last {n} weeks",
   "inst.reportHeatSpoken": "You practised on {days} days in the last {n} weeks.",
   "inst.reportLost": "Where marks were lost",

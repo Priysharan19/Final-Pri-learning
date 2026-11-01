@@ -1198,13 +1198,6 @@ async function run() {
       await click(page, 'button.btn-quiet', { text: 'Delete this profile' });
     });
 
-    await step('settings · handwriting calibration', '/settings', async () => {
-      await goTo(page, BASE, '/settings');
-      await click(page, 'button.btn-primary', { text: 'Teach it your handwriting' });
-      await page.waitForSelector('.ink-wrap', { timeout: 30000 });
-      await wait(page, 600);
-    });
-
     // ── the documents a store, a payment provider and the DPDP Act require ──
     // A parent reading a privacy notice on a phone with a screen reader is
     // exactly the reader these pages have to work for.
