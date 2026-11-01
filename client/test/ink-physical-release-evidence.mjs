@@ -1,9 +1,18 @@
 #!/usr/bin/env node
-// Pri Ink · physical Apple Pencil production evidence gate
+// Pri Ink · physical Apple Pencil production evidence gate (server reader)
 //
-// This file scores results captured from the ACTUAL production recognition and
-// authority path on physical iPads. It does not manufacture handwriting data.
-// With no result files, normal mode reports NOT MEASURED and strict mode fails.
+// This file scores results captured from the ACTUAL production reading and
+// authority path on physical iPads: PencilKit strokes on the device, the
+// picture read by the SERVER reader (client/src/ink/cloudReader.js →
+// /v1/handwriting/transcribe), the confirmation boundary the card applies, and
+// the round-trip time InkAnswer measured for that read. It does not
+// manufacture handwriting data. With no result files, normal mode reports NOT
+// MEASURED and strict mode fails.
+//
+// The on-device readers (Vision, Core ML foundation, the JS recogniser) are
+// retired from the shipped path (owner decision 2026-10-02, confirmed as
+// default D16 on 2026-11-01). A sample whose engine names one of them is not
+// production evidence and is refused here.
 //
 // Usage:
 //   node client/test/ink-physical-release-evidence.mjs
@@ -30,6 +39,17 @@ const SPLIT = argAfter('--split', 'test');
 const VALID_SPLITS = new Set(['train', 'validation', 'test', 'final-holdout']);
 if (!VALID_SPLITS.has(SPLIT)) throw new Error(`invalid --split ${SPLIT}`);
 
+/** The evidence schema this scorer accepts. Version 1 described the retired
+ * on-device consensus reader and its 500 ms on-device latency; no version-1
+ * file was ever collected, and none is accepted. */
+export const PHYSICAL_EVIDENCE_SCHEMA_VERSION = 2;
+/** Engine labels the server reader returns start with this
+ * (client/src/ink/cloudReader.js CLOUD_ENGINE_PREFIX, pinned by
+ * client/test/ink-production-evidence-capture-check.mjs). */
+export const SERVER_ENGINE_PREFIX = 'cloud';
+/** Labels of readers no student reaches. Evidence from them is refused. */
+export const RETIRED_READER = /vision|foundation|native-rescue|native-primary|pri-js|consensus|pri-ink-v|line-stroke-fusion/i;
+
 export const PHYSICAL_RELEASE_FLOORS = Object.freeze({
   writers: 20,
   expressions: 1000,
@@ -44,7 +64,16 @@ export const PHYSICAL_RELEASE_FLOORS = Object.freeze({
   autoMarkPrecision: 0.999,
   criticalExpressions: 200,
   deviceModels: 2,
-  recognitionP95Ms: 500
+  // Server read, device to device: the round trip InkAnswer measures from the
+  // press of "Read my answer" to the transcription landing, on the device's own
+  // network. This replaces the retired on-device target of 500 ms, which a
+  // network reader can never meet. 4 000 ms is the product's existing
+  // end-to-end latency budget (docs/operations/alerts.md §2a: ink submitted →
+  // mark shown under 4 s at p95; HANDWRITING_LATENCY_P95 warns at 4 s).
+  // Recorded as a default pending the owner's confirmation
+  // (V1_DECISIONS_2026-11-01.md D16 addendum); it may be tightened, never
+  // loosened, without a recorded decision.
+  serverReadP95Ms: 4000
 });
 
 const errors = [];
@@ -90,11 +119,23 @@ function looksCritical(target) {
   return /\^|\/|sqrt\(|[=<>]|!=|<=|>=|\n/.test(t);
 }
 
+/** Why a sample's engine is not the shipped server reader, or null. */
+export function engineProblem(engine) {
+  const label = String(engine || '').trim();
+  if (!label) return 'missing production engine label';
+  if (RETIRED_READER.test(label)) return `engine "${label}" is a retired on-device reader, not the shipped server reader`;
+  if (!label.toLowerCase().startsWith(SERVER_ENGINE_PREFIX)) return `engine "${label}" is not a server-reader label (expected "${SERVER_ENGINE_PREFIX}…")`;
+  return null;
+}
+
 function validateRun(raw, file) {
   const label = path.basename(file);
   if (!isObj(raw)) { fail(`${label}: root must be an object`); return null; }
-  if (raw.schemaVersion !== 1) fail(`${label}: schemaVersion must be 1`);
+  if (raw.schemaVersion !== PHYSICAL_EVIDENCE_SCHEMA_VERSION) {
+    fail(`${label}: schemaVersion must be ${PHYSICAL_EVIDENCE_SCHEMA_VERSION} (server-reader evidence); got ${JSON.stringify(raw.schemaVersion)}`);
+  }
   if (raw.physicalHardware !== true) fail(`${label}: physicalHardware must be true`);
+  if (raw.reader !== 'server') fail(`${label}: reader must be "server" (the only reader in the student path)`);
   if (typeof raw.runId !== 'string' || !raw.runId.trim()) fail(`${label}: missing runId`);
   if (typeof raw.recordedAt !== 'string' || Number.isNaN(Date.parse(raw.recordedAt))) fail(`${label}: recordedAt must be ISO-8601`);
 
@@ -131,8 +172,10 @@ function validateRun(raw, file) {
     if (!['auto', 'confirm', 'abstain'].includes(s.authority)) fail(`${prefix}: authority must be auto/confirm/abstain`);
     if (s.authority === 'auto' && !String(s.recognized || '').trim()) fail(`${prefix}: auto authority cannot have an empty reading`);
     if (s.pencil !== true) fail(`${prefix}: physical release evidence is Apple Pencil-only`);
-    if (!finite(s.recognitionMs) || Number(s.recognitionMs) < 0) fail(`${prefix}: recognitionMs must be a non-negative number`);
-    if (typeof s.engine !== 'string' || !s.engine.trim()) fail(`${prefix}: missing production engine label`);
+    if (s.reader !== 'server') fail(`${prefix}: reader must be "server"`);
+    if (!finite(s.recognitionMs) || Number(s.recognitionMs) < 0) fail(`${prefix}: recognitionMs (server read round trip) must be a non-negative number`);
+    const engine = engineProblem(s.engine);
+    if (engine) fail(`${prefix}: ${engine}`);
     if (s.researchOnly === true) fail(`${prefix}: researchOnly readings cannot count as production evidence`);
     if (s.productionReady === false) fail(`${prefix}: productionReady:false cannot count as production evidence`);
   }
@@ -151,7 +194,7 @@ if (fs.existsSync(RESULTS_DIR)) {
 if (!files.length) {
   console.log(`\nPRI INK PHYSICAL RELEASE EVIDENCE — NOT MEASURED`);
   console.log(`No physical result JSON files found in ${RESULTS_DIR}`);
-  console.log('Collect anonymised real Apple Pencil runs using handwriting/v12/REAL_PENCIL_RELEASE_EVIDENCE.md.\n');
+  console.log('Collect anonymised real Apple Pencil runs of the server reader using handwriting/v12/REAL_PENCIL_RELEASE_EVIDENCE.md.\n');
   process.exit(STRICT ? 1 : 0);
 }
 
@@ -224,7 +267,7 @@ const autoPrecision = ratio(autoCorrect, auto);
 const autoCoverage = ratio(auto, total);
 const latencyP95 = p95(latencies);
 
-console.log(`\nPri Ink physical Apple Pencil evidence · ${SPLIT}\n`);
+console.log(`\nPri Ink physical Apple Pencil evidence · server reader · ${SPLIT}\n`);
 console.log(`  runs: ${selected.length}`);
 console.log(`  writers: ${writers.size}`);
 console.log(`  device models: ${devices.size}`);
@@ -236,7 +279,7 @@ console.log(`  critical structure: ${(100 * criticalRate).toFixed(3)}% (${critic
 console.log(`  authority: auto ${auto}, confirm ${confirm}, abstain ${abstain}`);
 console.log(`  auto-mark precision: ${(100 * autoPrecision).toFixed(3)}% (${autoCorrect}/${auto})`);
 console.log(`  auto-mark coverage: ${(100 * autoCoverage).toFixed(2)}%`);
-console.log(`  recognition p95: ${Number.isFinite(latencyP95) ? latencyP95.toFixed(1) : 'n/a'} ms`);
+console.log(`  server read p95: ${Number.isFinite(latencyP95) ? latencyP95.toFixed(1) : 'n/a'} ms (device round trip)`);
 
 if (STRICT) {
   const f = PHYSICAL_RELEASE_FLOORS;
@@ -250,7 +293,7 @@ if (STRICT) {
   if (criticalRate < f.criticalExact) fail(`critical structure ${(100 * criticalRate).toFixed(3)}% < ${(100 * f.criticalExact).toFixed(1)}%`);
   if (auto < f.autoMarkDecisions) fail(`safe-auto precision requires >=${f.autoMarkDecisions} actual auto-mark decisions; measured ${auto}`);
   if (autoPrecision < f.autoMarkPrecision) fail(`auto-mark precision ${(100 * autoPrecision).toFixed(3)}% < ${(100 * f.autoMarkPrecision).toFixed(1)}%`);
-  if (!(latencyP95 <= f.recognitionP95Ms)) fail(`recognition p95 ${latencyP95.toFixed(1)} ms > ${f.recognitionP95Ms} ms`);
+  if (!(latencyP95 <= f.serverReadP95Ms)) fail(`server read p95 ${latencyP95.toFixed(1)} ms > ${f.serverReadP95Ms} ms`);
 }
 
 for (const w of warnings) console.warn(`WARN ${w}`);

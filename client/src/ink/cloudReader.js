@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · asking a server to read the ink
+// Pri Learning · asking the server to read the ink
 //
-// The on-device reader has 58 classes and no comma, so a line like
-// "−1, 0, 1, 2, 4" cannot come back right however well it is written. This is
-// the other route, and it runs only when the student has turned it on.
+// The server reader is the ONLY reader in a student's path (owner decision
+// 2026-10-02, default D16 2026-11-01): the on-device recogniser is retired from
+// the shipped product, and nothing is read or marked offline. The ink is the
+// student's and is kept whatever happens to reading.
 //
 // Four rules hold it in place:
 //
@@ -14,12 +15,12 @@
 //      stays off. An explicit "off" in Settings is always respected; a profile
 //      that never chose is the only one the default applies to.
 //   2. It never replaces a reading the student has corrected by hand. A tap to
-//      fix a glyph is the most reliable signal on the page.
-//   3. It only supersedes when the server says it is confident. An unconfident
-//      server read is offered for confirmation, never marked.
-//   4. The local reading is published first and always. The student writes and
-//      sees their working immediately; the server read arrives after, or not
-//      at all, and the app is usable either way.
+//      fix a line is the most reliable signal on the page.
+//   3. An unconfident server read is offered for confirmation, never marked.
+//      The deterministic engine marks what the student confirms.
+//   4. A read happens only when the student presses "Read my answer", and its
+//      round trip is measured by InkAnswer (readMs) so the physical evidence
+//      can record the latency the student actually waited.
 //
 // The picture is drawn from the student's own strokes by cloudRaster.js. This
 // module adds nothing to it, and sends nothing beside it.
