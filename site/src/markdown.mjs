@@ -49,14 +49,20 @@ export function renderInline(text, { mapLink = (u) => u } = {}) {
   return out;
 }
 
-const LIST_ITEM = /^([-*]|\d+\.)[ \t]+(.*)$/;
+const LIST_ITEM = /^([-*]|\d{1,9}\.)[ \t]+(.*)$/;
 const HEADING = /^(#{1,3})[ \t]+(.+?)[ \t]*#*$/;
+
+// CommonMark: a bullet or "1." may interrupt a paragraph; any other number may
+// not, so a paragraph line that happens to begin "2023. The Act applies." stays
+// text and the number is kept. Any number may start a list at the beginning of
+// a block, and the list then starts at that number.
+const INTERRUPTS_PARAGRAPH = /^([-*]|1\.)[ \t]+\S/;
 
 /**
  * Parse Markdown into blocks:
  *   { type: 'heading', level, text }
  *   { type: 'paragraph', text }
- *   { type: 'list', ordered, items: [ [paragraphText, ...], ... ] }
+ *   { type: 'list', ordered, start, items: [ [paragraphText, ...], ... ] }
  */
 export function parseBlocks(markdown) {
   const lines = String(markdown).replace(/\r\n?/g, '\n').split('\n');
@@ -75,7 +81,15 @@ export function parseBlocks(markdown) {
     const li = LIST_ITEM.exec(line);
     if (li) {
       const ordered = /\d/.test(li[1]);
+      const start = ordered ? parseInt(li[1], 10) : 1;
       const items = [];
+      // A later line starts a new item of this list when it carries a marker of
+      // the same kind; a marker of the other kind ends the list only if it may
+      // interrupt a paragraph (a bullet or "1."), otherwise it is lazy text.
+      const startsItem = (text) => {
+        const m = LIST_ITEM.exec(text);
+        return Boolean(m) && (/\d/.test(m[1]) === ordered || INTERRUPTS_PARAGRAPH.test(text));
+      };
       while (i < lines.length) {
         const m = LIST_ITEM.exec(lines[i]);
         if (!m || /\d/.test(m[1]) !== ordered) break;
@@ -98,7 +112,7 @@ export function parseBlocks(markdown) {
             }
             break;
           }
-          if (LIST_ITEM.test(next)) break;
+          if (startsItem(next)) break;
           if (/^[ \t]+\S/.test(next) || current.length) {
             // An indented line, or a lazy continuation of the current paragraph.
             if (!/^[ \t]+\S/.test(next) && paragraphs.length) break;
@@ -111,13 +125,13 @@ export function parseBlocks(markdown) {
         if (current.length) paragraphs.push(joinWrapped(current));
         items.push(paragraphs);
       }
-      blocks.push({ type: 'list', ordered, items });
+      blocks.push({ type: 'list', ordered, start, items });
       continue;
     }
 
     const para = [line];
     i++;
-    while (i < lines.length && lines[i].trim() && !HEADING.test(lines[i]) && !LIST_ITEM.test(lines[i])) {
+    while (i < lines.length && lines[i].trim() && !HEADING.test(lines[i]) && !INTERRUPTS_PARAGRAPH.test(lines[i])) {
       para.push(lines[i]);
       i++;
     }
@@ -165,12 +179,13 @@ export function renderMarkdown(markdown, options = {}) {
     }
     if (block.type === 'list') {
       const tag = block.ordered ? 'ol' : 'ul';
+      const open = block.ordered && block.start !== 1 ? `<ol start="${block.start}">` : `<${tag}>`;
       const items = block.items.map(paragraphs => (
         paragraphs.length === 1
           ? `<li>${renderInline(paragraphs[0], { mapLink })}</li>`
           : `<li>${paragraphs.map(p => `<p>${renderInline(p, { mapLink })}</p>`).join('')}</li>`
       ));
-      parts.push(`<${tag}>${items.join('')}</${tag}>`);
+      parts.push(`${open}${items.join('')}</${tag}>`);
     }
   }
   return { html: parts.join('\n'), title, headings };
