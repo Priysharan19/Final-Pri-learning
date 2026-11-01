@@ -228,9 +228,10 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          # 351 (m-finish-16): the review switch, store-purchase wording, retention and
+          # 364 (m-finish-16): the review switch, store-purchase wording, retention and
           # crash-report disclosures, and the generated third-party notices page.
-          grep -Fq 'LEGAL PAGES: PASS — 351/351 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 364/364 checks' suites.log
+          grep -Fq 'LEGAL PROMISES GATE: PASS — 10/10 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).

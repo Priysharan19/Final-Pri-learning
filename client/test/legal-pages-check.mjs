@@ -191,6 +191,12 @@ for (const [slug] of PAGES) {
 const pack = readFileSync(join(ROOT, 'docs/legal/counsel/COUNSEL-INFORMATION-PACK.md'), 'utf8');
 ok(/cross-border transfer/i.test(pack) && /review-status\.json/.test(pack),
   'the counsel pack carries the cross-border question that used to sit in the notice, and explains the review switch');
+// The pack says every factual statement cites its source. What OpenAI's pages say
+// changes, so each of those statements carries the page and the day it was read.
+ok(/developers\.openai\.com\/api\/docs\/guides\/your-data[^|\n]*retrieved 2026-11-02/i.test(pack),
+  'the pack cites the OpenAI page and retrieval date for the abuse-monitoring retention');
+ok(/developers\.openai\.com\/api\/docs\/guides\/safety-checks\/under-18-api-guidance[^\n]*retrieved 2026-11-02/i.test(pack.replace(/\n(?=\s)/g, ' ')),
+  'and for the under-18 guidance');
 
 // The notice describes real behaviour; these are the facts it rests on.
 const syncContract = readFileSync(join(ROOT, 'client/src/platform/syncContract.js'), 'utf8');
@@ -245,6 +251,17 @@ ok(!/website subscription|bought .* through the website|Settings → Account/i.t
   'the refund policy no longer describes website purchases or an in-app cancel control');
 ok(/no purchase on the website/i.test(refunds) && /no purchase on the website/i.test(terms),
   'and both the refund policy and the terms say there is no purchase on the website');
+// That sentence is true only while the server reports web checkout off: the web
+// client offers Razorpay whenever it reports it configured. So the deployment
+// verifier refuses a server that does, and the README names the dependency.
+const accountPanel = readFileSync(join(ROOT, 'client/src/components/CloudAccountPanel.jsx'), 'utf8');
+ok(/setWebCheckout\(result\?\.webCheckout\?\.configured === true\)/.test(accountPanel),
+  'the web client shows checkout only when the server reports it configured (the fact that sentence rests on)');
+const deployVerifier = readFileSync(join(ROOT, 'tools/verify-deployment.mjs'), 'utf8');
+ok(/\/v1\/billing\/config/.test(deployVerifier) && /billing\.body\?\.webCheckout\?\.configured === false/.test(deployVerifier),
+  'and the deployment verifier fails a server that reports it configured');
+ok(/no purchase on the website[\s\S]{0,240}verify-deployment\.mjs/i.test(readFileSync(join(ROOT, 'docs/legal/README.md'), 'utf8')),
+  'and the legal README lists that dependency among what the text rests on');
 for (const [doc, label] of [[refunds, 'refund policy'], [terms, 'terms']]) {
   ok(/App Store/.test(doc) && /Google Play/.test(doc), `the ${label} covers the App Store and Google Play`);
   ok(/iPhone/.test(doc) && /iPad/.test(doc) && /Android/.test(doc), `the ${label} names iPhone, iPad and Android`);
@@ -396,9 +413,26 @@ ok(/90 days/.test(privacy), 'the notice states the telemetry retention window');
 const practiceCode = readFileSync(join(ROOT, 'server/platform/practice.js'), 'utf8');
 const examsCode = readFileSync(join(ROOT, 'server/platform/exams.js'), 'utf8');
 ok(/const MAX_AGE = 90 \* 24 \* 60 \* 60 \* 1000/.test(practiceCode), 'practice receipts live 90 days in the code');
-ok(/RECORD_TTL[^\n]*5 \* 365/.test(examsCode) || /RECORD_TTL[^\n]*365[^\n]*5/.test(examsCode) || /RECORD_TTL/.test(examsCode),
-  'exam records carry a record TTL in the code');
+ok(/const RECORD_TTL = 5 \* 365 \* 24 \* 60 \* 60 \* 1000/.test(examsCode), 'exam records live five years in the code');
 ok(/record of each marked answer[^.]*kept for 90 days/i.test(privacy), 'the notice states the 90-day life of a marked answer’s record');
+// The mark outlives the 90 days in the graded-attempt event, so "the mark is kept
+// for 90 days" alone would read as the mark being gone. The notice says which
+// half goes and which half stays, and that split is pinned to both events the
+// server keeps: neither may start carrying what the student wrote.
+ok(/After that your answer, your working and the transcription are gone; which question it was, whether it was right, the marks and the chapter stay in your learning history while your account is open/.test(privacy),
+  'the notice says what leaves after 90 days and what stays in the learning history');
+ok(/उसके बाद आपका उत्तर, आपका हल और लिप्यंतरण हट जाते हैं; कौन-सा प्रश्न था, वह सही था या नहीं, अंक और अध्याय आपके पढ़ाई के इतिहास में तब तक रहते हैं जब तक आपका खाता खुला है/.test(privacyHi.replace(/\s+/g, ' ')),
+  'and the Hindi says the same');
+const gradedStart = practiceCode.indexOf('attemptId, submissionId, questionId: qid');
+const gradedEvent = practiceCode.slice(gradedStart, practiceCode.indexOf('serverAcknowledgedAt: now', gradedStart));
+ok(/correct: response\.correct/.test(gradedEvent) && /marksEarned: response\.marksEarned/.test(gradedEvent) && /subtopic: q\.subtopic/.test(gradedEvent),
+  'the graded-attempt event keeps the question, the result, the marks and the chapter, as the notice says');
+const syncWorkerCode = readFileSync(join(ROOT, 'client/src/platform/syncWorker.js'), 'utf8');
+const syncedAttempt = syncWorkerCode.slice(syncWorkerCode.indexOf('function attemptPayload'), syncWorkerCode.indexOf('async function loadState'));
+for (const [event, label] of [[gradedEvent, 'the graded-attempt event'], [syncedAttempt, 'the synced attempt event']]) {
+  ok(event.length > 200 && !/\b(answer|answers|working|workingLines|transcript\w*|transcription|typed|ink)\s*:/i.test(event),
+    `${label} carries none of what the student wrote, so it can outlive the 90 days`);
+}
 ok(/Exam papers[^.]*up to five years/i.test(privacy), 'and the five-year life of exam records');
 ok(/crash reports?/i.test(privacy) && /Never the error message/i.test(privacy),
   'and discloses coded crash reports, saying what they never contain');
@@ -660,6 +694,8 @@ ok(existsSync(join(ROOT, 'tools/third-party-notices.mjs')), 'the generator exist
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 ok(/third-party-notices\.mjs --check/.test(pkg.scripts['test:legal'] || ''),
   'and its --check runs inside npm run test:legal, which CI runs, so a stale page fails the build');
+ok(/legal-promises\.test\.mjs/.test(pkg.scripts['test:legal'] || ''),
+  'and so does the test of the gate that stops a notice being promoted ahead of its code');
 // Every production dependency in the lockfile is on the page, with a licence.
 const lock = JSON.parse(readFileSync(join(ROOT, 'client/package-lock.json'), 'utf8'));
 const shipped = Object.entries(lock.packages)
@@ -672,6 +708,12 @@ ok(/^### react 18\.3\.1$/m.test(notices) && /MIT License/.test(notices) && /Apac
 ok(/## The Android app/.test(notices) && /com\.android\.billingclient:billing/.test(notices) && /androidx\.webkit:webkit/.test(notices),
   'the Android libraries are listed with their publishers’ licences');
 ok(/## The iPhone and iPad app/.test(notices), 'and the iPhone and iPad app is accounted for');
+// The web list comes from the whole lockfile; the Android list does not, and the
+// page may not imply that it does.
+ok(!/lists what ships\s+inside the app/.test(notices) && /the libraries the Android app declares/.test(notices),
+  'the page says it lists the libraries the Android app declares, not everything that ships');
+ok(/bring in libraries of their own, which also ship in the app/.test(notices.replace(/\s+/g, ' ')) && /not listed here one by one/.test(notices.replace(/\s+/g, ' ')),
+  'and says their own dependencies ship too and are not listed one by one');
 // The page is routed and rendered like the notices, in English, on demand.
 const noticeRoutes = app.split(`path="/${NOTICES_PAGE}"`).length - 1;
 ok(noticeRoutes >= 2, `/${NOTICES_PAGE} is routed for signed-out and signed-in visitors (${noticeRoutes} routes)`);

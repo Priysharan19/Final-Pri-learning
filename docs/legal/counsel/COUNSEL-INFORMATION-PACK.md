@@ -72,7 +72,7 @@ banner on its own.
 | Application server | Railway | Observed in region `ams` (Amsterdam) on 2026-10-04; **owner to confirm the region before launch** (a move nearer Mumbai is the audit's default) | Railway is a US company. The service region is a deployment setting |
 | Database (today, production) | SQLite file on a Railway volume | Amsterdam, with the server | Until the Postgres cutover, production account data is stored outside India. The notice says so |
 | Database (target) | Supabase Postgres | Mumbai, India (`ap-south-1`) | Cutover prepared; **does not happen without the owner's own yes on the day** (D27) because the data step is irreversible (`docs/release/production-cutover-checklist.md`) |
-| Handwriting / photo reading, working check, tutor | OpenAI API (`api.openai.com`) | Outside India; region and contracting entity to be confirmed | Requests set `store: false`. OpenAI's API terms allow it to keep inputs for a limited period (it states up to 30 days) for abuse monitoring; Pri has **no zero-data-retention arrangement** on record (`docs/privacy/data-retention.md` §4). OpenAI's published under-18 API guidance is a reason the owner is asking for one (Q15) |
+| Handwriting / photo reading, working check, tutor | OpenAI API (`api.openai.com`) | Outside India; region and contracting entity to be confirmed | Requests set `store: false`, which governs application state, not abuse monitoring. OpenAI's page "Data controls in the OpenAI platform" (https://developers.openai.com/api/docs/guides/your-data, retrieved 2026-11-02) states that abuse-monitoring logs are kept for up to 30 days by default, longer where the law requires or to protect its services or others from harm, and that zero data retention is an approval-based control; it also states API data is not used to train models unless the customer opts in. Pri has **no zero-data-retention arrangement** on record (`docs/privacy/data-retention.md` §4). OpenAI's under-18 guidance is a reason the owner is asking for one (Q15). Provider pages change: counsel should read the current text and the contract, not this summary |
 | Email (sign-in links and codes, guardian emails, new-device notices) | Resend | US provider; sending domain `mail.prilearning.com` | Sees address and message. Named in the notice |
 | SMS (codes) | None at launch (D3) | — | `server/platform/smsProvider.js` supports MSG91 or Twilio Verify, but `PRI_SMS_PROVIDER` is unset on both environments, `GET /v1/account/otp/channels` reports `sms: false`, and the shipped client shows the SMS option only when the server reports it live. The notice, the Apple label, the privacy manifest and the Play form therefore declare no phone number |
 | Payments | Apple App Store (StoreKit) and Google Play Billing | Provider | Pri never sees card details (`server/platform/appleBilling.js`, `googleBilling.js`). Neither store is configured on production yet (the audit found billing `not_configured` on both environments) |
@@ -262,10 +262,10 @@ must be made to both languages in the same change.
 | 4 | Data is stored on Railway in Amsterdam today; a move to Supabase Mumbai is planned; OpenAI processes outside India; Resend and the stores in their own regions | `production-cutover-checklist.md`, ADR-0001 | Q19–Q21 (cross-border, processors) |
 | 5 | No sign-in by SMS is offered; the notice will describe it first if it is added | `otp.js` `channels`, `SignUpFlow.jsx`; D3 | — |
 | 6 | For an under-18 account: a guardian's name and email; confirmation by link or email code; what the confirmation does and does not prove; it is not verifiable parental consent; withdrawal stops marking, reading, exams and sync | `guardianConsent.js`, `otp.js` | Q5–Q12 |
-| 7 | An unconfirmed or withdrawn child account is erased 30 days after the window, and a guardian can ask for erasure without the child's login | **Owner default D18, being built in the accounts stream; not yet in the code at `a5778a319`** | Q10 (period); engineering will align the code and this row before release |
+| 7 | An unconfirmed or withdrawn child account is erased 30 days after the window, and a guardian can ask for erasure without the child's login | **Owner default D18, being built in the accounts stream; not yet in the code at `a5778a319`.** `scripts/release-nominate.mjs` refuses a production nomination while the notice promises this and the code lacks it (`tools/legal-promises.mjs`) | Q10 (period); engineering will align the code and this row before release |
 | 8 | The DPDP child-data obligations are expected in May 2027, eighteen months after the Rules were notified in November 2025 | Owner's reading; see §5 | Q6 (exact date) |
 | 9 | Crash reports (screen, code, fingerprint, build; never the message, URL or anything typed), per-device switch | `telemetry.js` `cleanErrorReport`, `reportCrash` | — |
-| 10 | Retention: answer records 90 days; exam records up to five years; telemetry 90 days; immediate deletion; the payment ledger, de-texted problem reports and one audit row survive unlinked; backups age out; deleting the account does not cancel a store subscription | `data-retention.md` §2 | Q23–Q24 (periods; "which tax and accounting law requires us to keep") |
+| 10 | Retention: answer text, working and transcription 90 days, while the question id, result, marks and chapter stay in the learning history until deletion; exam records up to five years; telemetry 90 days; immediate deletion; the payment ledger, de-texted problem reports and one audit row survive unlinked; backups age out; deleting the account does not cancel a store subscription | `data-retention.md` §2 | Q23–Q24 (periods; "which tax and accounting law requires us to keep") |
 | 11 | Processors named: Resend, Apple and Google, Railway, Supabase (planned), OpenAI | §2 above | Q21 |
 | 12 | The notice "is meant to give you what the DPDP Act asks a notice to give you" and "has not yet been reviewed by a lawyer" (it no longer claims to "follow" the Act) | `review-status.json` | Q27 (banner and status wording) |
 
@@ -398,8 +398,12 @@ Engineering can demonstrate any of these on a staging deployment with test accou
     (D17) say, and is it the "explicit permission" Apple Guideline 5.1.2(i) asks for?
 15. Is OpenAI's retention for abuse monitoring (with `store: false`, no zero-data-retention
     agreement) acceptable for children's data, or should we obtain zero data retention or choose a
-    different provider or region? OpenAI's published under-18 guidance says not to process personal
-    data of children below the digital-consent age without zero data retention.
+    different provider or region? OpenAI's page "Under-18 guidance"
+    (https://developers.openai.com/api/docs/guides/safety-checks/under-18-api-guidance, retrieved 2026-11-02)
+    says not to use its services to process personal data of children under 13, or under the
+    applicable age of digital consent, without first implementing zero data retention in its API.
+    What that age is for an Indian student, and whether it is 18, is for counsel; the owner has not
+    concluded either way.
 16. A photographed page may contain other people's data or the student's name. Is the current
     warning ("keep out of shot whatever you would not want sent") sufficient?
 17. Does the "check my working" feature, which sends the question text as well as the working,
@@ -455,8 +459,10 @@ Engineering can demonstrate any of these on a staging deployment with test accou
     label and Play Data safety, should that be declared as "Customer Support" data as well as user
     content?
 35. The third-party notices page (`/third-party-notices`) is generated from the dependency
-    licences and reproduces them in English only. Is anything more required for an app sold in
-    India?
+    licences and reproduces them in English only. Every web package is listed, but on Android it
+    lists only the libraries the app declares, and says that their own dependencies ship too and
+    are not listed one by one. Is that enough, or must every Android library be listed? Is anything
+    more required for an app sold in India?
 
 ---
 

@@ -198,7 +198,10 @@ We do not sell your data. We do not share it for advertising.
 - Learning events on our server are kept while your account is open.
 - The record of each marked answer — the question, your answer and working,
   the transcription of your handwriting or photo with any correction you typed,
-  and the mark — is kept for 90 days.
+  and the mark — is kept for 90 days. After that your answer, your working and
+  the transcription are gone; which question it was, whether it was right, the
+  marks and the chapter stay in your learning history while your account is
+  open.
 - Exam papers, the answers you gave in them and their results are kept for up
   to five years, or until you delete your account, whichever comes first.
 - Telemetry, including crash reports, is limited to an allow-list of fields and

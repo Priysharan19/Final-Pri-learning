@@ -91,9 +91,11 @@ their authors published them, and the page says so in both languages.
 `node tools/third-party-notices.mjs` (`npm run legal:notices`) from
 `client/package-lock.json` (every production package, with the licence text
 found in its installed copy) and `android/gradle/libs.versions.toml` (the
-Android app's runtime libraries, with their publishers' licences). The iPhone
-and iPad app uses Apple's own frameworks only. Server dependencies are not
-distributed and are not listed.
+libraries the Android app declares, with their publishers' licences). The page
+says that those libraries' own dependencies ship too and are not listed one by
+one; listing them needs a committed Gradle lockfile for the release classpath.
+The iPhone and iPad app uses Apple's own frameworks only. Server dependencies
+are not distributed and are not listed.
 
 `npm run test:legal` runs the generator's `--check`, so a dependency change
 without a regenerated page fails CI. The page is reached by `import()` from
@@ -119,6 +121,9 @@ on. If the code changes, the notice is wrong until it is changed too.
   (`server/platform/practice.js` `MAX_AGE`); exam records up to five years
   (`server/platform/exams.js` `RECORD_TTL`); telemetry and coded crash reports
   90 days (`server/platform/telemetry.js`). All are deleted with the account.
+  The `graded-attempt` learning event outlives the 90 days and is kept until
+  deletion: question id, whether it was right, marks, chapter and how it was
+  practised, never what the student wrote. The notice states both halves.
 - Account deletion is immediate; what survives it, unlinked, is listed in
   `docs/privacy/data-retention.md` §2 and enforced by
   `server/test/account-lifecycle-journey-check.mjs`. It is available in-app for
@@ -132,12 +137,21 @@ on. If the code changes, the notice is wrong until it is changed too.
 - The 30-day erasure of an unconfirmed or withdrawn child account, and a
   guardian's erasure request without the child's login, are owner default D18
   and are being built in the accounts stream; the notice promises them from
-  2 November 2026 and the counsel pack records the gap.
+  2 November 2026 and the counsel pack records the gap. **That code must reach
+  production no later than these pages.** `scripts/release-nominate.mjs` refuses
+  a SHA whose notice makes the promise while its code lacks the job or the
+  guardian route (`tools/legal-promises.mjs`).
 - Password-protected profiles are encrypted at rest on the device; profiles
   without a password are not (`client/src/local/idb.js`, `client/src/local/auth.js`).
 - Subscriptions are sold only through the App Store and Google Play
   (`PRI_V1_RELEASE_SCOPE.md` §12); Razorpay is dormant and refused to native
   clients. Deleting an account does not cancel a store subscription.
+- "There is no purchase on the website" (terms and refund policy) holds only
+  while the server reports `webCheckout.configured: false`, because the web
+  client offers Razorpay whenever it reports it configured
+  (`CloudAccountPanel.jsx`). `tools/verify-deployment.mjs` fails a deployment
+  that reports it configured. Leave the Razorpay variables unset; turning web
+  checkout on is a change to the notices first.
 
 ## Launch checklist (owner and counsel only)
 
