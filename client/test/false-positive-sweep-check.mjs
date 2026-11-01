@@ -132,12 +132,12 @@ function numericProbes(q, a) {
   // with the word and a unit, braces or a second sign is never the key (#670).
   // (Off a percentage question a key in −1…1 may be written as a percentage —
   // 100% is 1, 44% is 0.44 — so only the doubled sign is probed there.)
-  const asksPercent = a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '');
+  const asksPercent = asksPercentage(q, a);
   if (v !== 0) {
     const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`, `${fmt(v * 100)} percents`] : [`${fmt(v * 100)} percent %`];
     for (const input of spellings) out.push({ input, why: 'a hundred times the key, with the word percent' });
   }
-  if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  if (asksPercent && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
   // Two numbers written as a list — a trap (or 0) beside the key, in either
   // order — are not one answer. "0, -2" once read as 0 − 2 (issue #408 review).
   const beside = [0, ...(q.traps || []).map(t => t?.value)].filter(x => typeof x === 'number' && Number.isFinite(x) && differs(x, v));
@@ -149,12 +149,33 @@ function numericProbes(q, a) {
   if (v > 0) out.push({ input: `0, +(${fmt(v)})`, why: 'a list with a bracketed signed value' });
   // On a percentage question a typed % is the answer's unit: 100 times the key
   // with the sign is 100 times too big, never the key read as ÷100.
-  if ((a.percent || /%/.test(q.answerSuffix || '') || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) {
+  if (asksPercent && v !== 0) {
     out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' },
       { input: `(${fmt(v * 100)}%)`, why: 'a hundred times the percentage, bracketed with the sign' }, { input: `${fmt(v * 100)}%%`, why: 'a hundred times the percentage, two signs' },
       { input: `${fmt(v * 100)}% + 0`, why: 'a hundred times the percentage, the sign used as arithmetic' });
   }
+  // Off a percentage question the sign keeps its arithmetic meaning, so the key
+  // written with a % it never asked for is a hundredth of the key (0.2% for
+  // 0.2) or a wrong unit (72% for an area of 72): never the key. A percentage
+  // the prompt only gives ("20 percent of the marbles") does not change this.
+  if (!asksPercent && v !== 0 && Math.abs(v / 100 - v) > band * 1.0000001 && differs(v / 100, v)) out.push({ input: `${fmt(v)}%`, why: 'the key with a % sign the question did not ask for' });
   return out;
+}
+
+// Does the question ask for its answer as a percentage? Decided here in this
+// file's own words, apart from the checker, so a disagreement shows up as a
+// finding: a key declared percent, a % beside the box, or the word standing
+// for the asked quantity in the sentence that asks ("what percentage", "as a
+// percentage") — never a percentage the prompt gives ("20 percent of x", "95
+// per cent accurate"), wherever that given stands.
+function asksPercentage(q, a) {
+  if (a?.percent === true) return true;
+  if (a?.percent === false) return false;
+  if (/%/.test(String(q.answerSuffix || ''))) return true;
+  const sentences = String(q.prompt || '').split(/(?<=[.?!])\s+/).filter(Boolean);
+  const asks = sentences.filter(s => /\?\s*$/.test(s) || /\b(?:find|what|express|calculate|give|how|state|determine|work out|evaluate|compute|write)\b/i.test(s));
+  const text = (asks.length ? asks : sentences.slice(-1)).join(' ').replace(/(?:\$[^$]*\d[^$]*\$|\d[\d.,/]*)\s*per\s?cent(?:age)?s?\b/gi, ' ');
+  return /\bper\s?cent(?:age)?s?\b/i.test(text) || /\bas\s+an?\s+\\?%/i.test(text);
 }
 
 function setProbes(a) {
@@ -468,6 +489,21 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   expect('percent: and 0.44% is not', !verdict(accurate, '0.44%').correct);
   const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
   expect('percent: on a question not asking for a percentage, 44% is still 0.44', verdict(prob, '44%').correct);
+  // A given percentage INSIDE the asking sentence is still a given (repair of #670 on
+  // m-finish-10-marking): it once made "20%" a wrong 20 and "0.2%" a right 0.2.
+  const givenInAsk = { answerType: 'numeric', prompt: 'If 20 percent of the marbles are red, what is the probability of drawing a red marble?', answer: { value: 0.2 } };
+  expect('percent: "20%" is 0.2 when the only "percent" in the asking sentence is a given', verdict(givenInAsk, '20%').correct);
+  expect('percent: and "0.2%" is 0.002, refused', !verdict(givenInAsk, '0.2%').correct);
+  const findX = { answerType: 'numeric', prompt: 'If 20 percent of $x$ is 40, find $x$.', answer: { value: 200 } };
+  expect('percent: "200%" is not x = 200 — a given percent lends no unit', !verdict(findX, '200%').correct);
+  expect('percent: "200" is x', verdict(findX, '200').correct);
+  const whatPct = { answerType: 'numeric', prompt: 'What percentage of 50 is 10?', answer: { value: 20 } };
+  expect('percent: "what percentage" still asks for one: 20% accepted', verdict(whatPct, '20%').correct);
+  expect('percent: and 2000% refused', !verdict(whatPct, '2000%').correct);
+  // The sweep's own reading of "asks for a percentage" agrees on these shapes.
+  expect('sweep oracle: a given percent in the asking sentence is not an ask', !asksPercentage(givenInAsk, givenInAsk.answer));
+  expect('sweep oracle: "what percentage" is an ask', asksPercentage(whatPct, whatPct.answer));
+  expect('sweep oracle: a % beside the box is an ask', asksPercentage(own, own.answer));
   // (f) A label is read off only when it names the asked quantity.
   const b2 = { answerType: 'numeric', prompt: 'Find $b^2$.', answer: { value: 50 } };
   for (const input of ['b^2 = 50', 'b² = 50', 'B^2=50']) expect(`label: "${input}" names b², accepted`, verdict(b2, input).correct);

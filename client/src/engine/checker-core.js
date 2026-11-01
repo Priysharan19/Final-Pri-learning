@@ -116,12 +116,17 @@ function fractionFormDemanded(question, ans) {
   return ASKS_FRACTION.test(String(question?.prompt ?? ''));
 }
 
-// A "%" the student typed is worth a second reading at value × 100 only on a
-// question that asked for a percentage. On a question that asked for a
-// probability, "0.44%" is the wrong number written with the wrong sign, and
-// giving it a second chance would mark a wrong answer right. The word, not the
-// symbol: prompts quote percentages in their data all the time.
+// A "%" the student typed is the answer's unit only on a question that asked
+// for a percentage: "65%" is 65 there, and "6500%" is never 65. Anywhere else
+// the sign keeps its arithmetic meaning, so "44%" is 0.44 on a probability
+// question and "0.44%" is the wrong number. The word, not the symbol: prompts
+// quote percentages in their data all the time.
 const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
+// A percentage the prompt GIVES — "20 percent of x", "95 per cent accurate",
+// "$12\frac{1}{2}$ percent" — is data, not the answer's unit, even when it
+// stands in the sentence that asks. Only the word standing for the asked
+// quantity ("what percentage", "as a percentage", "the percentage profit") is.
+const GIVEN_PERCENT = /(?:\$[^$]*\d[^$]*\$|\\\([^)]*\d[^)]*\\\)|\d[\d.,/]*)\s*per\s?cent(?:age)?s?\b/gi;
 
 // "975 paise" is ₹9.75. Whether the word is a hundredth of the rupee or the
 // question's own unit depends on what the question asks in: a suffix in paise
@@ -322,7 +327,11 @@ function percentAnswerWanted(question, ans) {
   if (/%/.test(String(question?.answerSuffix ?? ''))) return true;
   // The word counts only where the question asks for its answer: "a test that
   // is 95 percent accurate … find the probability" asks for a probability.
-  const asking = askingSentences(String(question?.prompt ?? ''));
+  // A given percentage is struck out first, so "If 20 percent of the marbles
+  // are red, what is the probability?" asks for a probability too, and "If 20
+  // percent of x is 40, find x" asks for a number: a given "percent" never
+  // sets the answer's unit (it once made 20% a wrong 20 and 0.2% a right 0.2).
+  const asking = askingSentences(String(question?.prompt ?? '')).replace(GIVEN_PERCENT, ' ');
   return ASKS_PERCENT.test(asking) || /\bas\s+an?\s+\\?%/i.test(asking);
 }
 /** The sentences of a prompt that ask for the answer (the last one when none says so). */

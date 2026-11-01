@@ -428,7 +428,11 @@ function labelNamesTheAsk(text, answer, question) {
   const line = stripSentence(text).replace(/^\s*(?:final\s+answer|answer|ans|उत्तर)\s*[:=-]?\s*/iu, '');
   // The label before the value, however it is joined on: "=", "≈", an arrow,
   // "is" or a colon (a ratio's "2:3" has no letters before it, so is no label).
-  const m = line.match(/^\s*([^=≈<>⇒→:]{1,40}?)\s*(?:=>|⇒|→|->|=(?!=)|≈|:|\s+is\s+)/u);
+  // The typed arrows "=>" and "->" are read as the arrow they draw before the
+  // match, so no pattern here parses "->" (CodeQL js/bad-tag-filter read the
+  // earlier "->" alternative as an HTML comment end).
+  const drawn = line.split('=>').join('⇒').split('->').join('→');
+  const m = drawn.match(/^\s*([^=≈<>⇒→:]{1,40}?)\s*(?:⇒|→|=(?!=)|≈|:|\s+is\s+)/u);
   if (!m || !/\p{L}/u.test(m[1]) || STRONG_WORDS.test(m[1])) return true;
   const label = m[1].trim();
   const read = readAnswerLabel(question, `${label} = ${answer}`);

@@ -397,6 +397,31 @@ const cvPct = { answerType: 'numeric', answer: { value: 20 / 3, simplestFraction
 correct(cvPct, '20/3%', 'percent: the whole expression before the sign is the percentage');
 const areaOnly = { answerType: 'numeric', answer: { value: 72 }, prompt: 'Find the area.' };
 wrong(areaOnly, '7200%', 'percent: a % on an area is a wrong unit');
+// A percentage the prompt GIVES is data, not the answer's unit, even inside the
+// sentence that asks (repair of #670, m-finish-10-marking). The key is the
+// proportion 0.2, so "20%" is it and "0.2%" is a hundred times too small.
+const givenInAsk = { answerType: 'numeric', answer: { value: 0.2 }, prompt: 'If 20 percent of the marbles are red, what is the probability of drawing a red marble?' };
+correct(givenInAsk, '20%', 'percent: a given "20 percent" in the asking sentence does not make 20% a wrong 20');
+wrong(givenInAsk, '0.2%', 'percent: and 0.2% is 0.002, not 0.2');
+correct(givenInAsk, '0.2', 'percent: the proportion itself');
+const givenBefore = { answerType: 'numeric', answer: { value: 0.2 }, prompt: 'A test is 20 percent complete. Find the probability that a task picked at random is done.' };
+correct(givenBefore, '20%', 'percent: a given "20 percent" in an earlier sentence: 20% is 0.2');
+wrong(givenBefore, '0.2%', 'percent: and 0.2% is not');
+const givenMath = { answerType: 'numeric', answer: { value: 0.125 }, prompt: 'What decimal is $12\\frac{1}{2}$ percent of a whole?' };
+correct(givenMath, '12.5%', 'percent: a typeset given percentage is a given: 12.5% is 0.125');
+wrong(givenMath, '0.125%', 'percent: and 0.125% is not');
+const findX = { answerType: 'numeric', answer: { value: 200 }, prompt: 'If 20 percent of $x$ is 40, find $x$.' };
+correct(findX, '200', 'percent: x itself');
+wrong(findX, '200%', 'percent: a % on x = 200 is a wrong unit, not a unit the given "20 percent" lent it');
+wrong(findX, '2%', 'percent: 2% is 0.02, not 200');
+const whatPct = { answerType: 'numeric', answer: { value: 20 }, prompt: 'What percentage of 50 is 10?' };
+correct(whatPct, '20%', 'percent: "what percentage" asks for one: 20% is 20');
+correct(whatPct, '20', 'percent: the bare number is 20 too');
+wrong(whatPct, '2000%', 'percent: a hundred times it is wrong');
+wrong(whatPct, '0.2', 'percent: the proportion is not the percentage');
+const asPctOf = { answerType: 'numeric', answer: { value: 40 }, prompt: 'Express 20 as a percentage of 50.' };
+correct(asPctOf, '40%', 'percent: "20 as a percentage of 50" asks for a percentage, the 20 is not a given percentage');
+wrong(asPctOf, '4000%', 'percent: and a hundred times it is wrong');
 
 // ── 10b. A label names the asked quantity ────────────────────────────────────
 const bSquared = { answerType: 'numeric', answer: { value: 50 }, prompt: 'Find $b^2$.' };
