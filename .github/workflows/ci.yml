@@ -23,7 +23,7 @@ jobs:
   # against the concatenated shard logs.
   suites-shard:
     name: Suites shard ${{ matrix.shard }}/4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -61,7 +61,7 @@ jobs:
 
   suites-contracts:
     name: Suites policy and contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -136,7 +136,7 @@ jobs:
     name: Suites, coverage and accuracy gates
     needs: [suites-shard, suites-contracts]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Every shard finished green
@@ -309,7 +309,7 @@ jobs:
 
   platform:
     name: Production account, sync and commercial schema
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
     # only for this job, trusts loopback connections and holds no credential;
@@ -469,13 +469,15 @@ jobs:
           node server/test/content-review-contract-check.mjs
           node server/test/assignment-execution-contract-check.mjs
           node server/test/classroom-submission-contract-check.mjs
-      - name: Rate-limit identity, sync idempotency, grants, body size and catalogue exposure
+      - name: Rate-limit identity, sync idempotency, grants, body size, compressed-body survival and catalogue exposure
         run: |
           node server/test/proxy-identity-contract-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
           node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
+          # GHSA-27r3-jxmh-p828: a gzip body with trailing bytes must leave the process answering.
+          node server/test/compressed-body-survival-check.mjs
           node server/test/content-index-exposure-check.mjs
       - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
         run: |
@@ -641,7 +643,7 @@ jobs:
   # proves every command of npm run test:e2e is in exactly one group.
   browser-shard:
     name: Browser shard (${{ matrix.group }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The accessibility gate builds the client itself; give it the same flags
     # client/test/e2e.mjs uses for its build so both walk the same app (the
     # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
@@ -697,9 +699,26 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+      # A hung browser or APT download must not quietly eat the shard's
+      # 20-minute budget: on 22 Oct main run 39767442194 and #557 sat ~20 min
+      # in this step and were cancelled, and #671's a11y-boot did the same.
+      # Give the install its own bound and retry once — each attempt is capped
+      # by `timeout` so a single stalled download cannot consume the whole
+      # step, and a transient registry/APT stall self-heals on the second try.
       - name: Install ${{ matrix.browsers }}
         working-directory: client
-        run: npx playwright install --with-deps ${{ matrix.browsers }}
+        timeout-minutes: 12
+        run: |
+          set -o pipefail
+          for attempt in 1 2; do
+            if timeout 300 npx playwright install --with-deps ${{ matrix.browsers }}; then
+              exit 0
+            fi
+            echo "::warning title=Playwright install retry::attempt ${attempt} did not finish within 5 min; retrying" >&2
+            sleep 15
+          done
+          echo "::error title=Playwright install failed::browser install did not finish in two bounded attempts" >&2
+          exit 1
       # The single job's later tours ran --no-build against the build
       # tour-ai-tutor.js leaves behind: the job's feature flags, tutor off.
       # A group that starts with --no-build tours makes that same build first.
@@ -811,7 +830,7 @@ jobs:
     name: Browser suites (end-to-end and accessibility)
     needs: [browser-shard]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Every shard finished green
@@ -954,7 +973,7 @@ jobs:
 
   build:
     name: Client build and offline-first boundary
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1032,7 +1051,7 @@ jobs:
     # answer. The release gates for marking live in the suites job above.
     name: Engine benchmark report (main only)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
