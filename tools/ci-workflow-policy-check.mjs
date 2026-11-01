@@ -5,9 +5,10 @@
 //      version comment (Dependabot refreshes both together);
 //   3. no `pull_request_target` workflow that checks out the pull request's
 //      head (`github.event.pull_request.head.*` / `github.head_ref`) — that is
-//      the privileged-token-meets-untrusted-code pattern; untrusted builds run
-//      on `pull_request` and hand privileged consumers an artifact
-//      (.github/workflows/pri-agent-derived-sync.yml → pri-agent-derived-apply.yml);
+//      the privileged-token-meets-untrusted-code pattern; an untrusted build
+//      runs on `pull_request` and, if a privileged consumer is ever needed
+//      again, hands it an artifact over `workflow_run` (the derived-mirror pair
+//      that did this was retired when the iPad bundles left git, decision D28);
 //   4. a `pull_request_target` workflow may not install or run npm from the
 //      candidate at all.
 // Deliberately dependency-free: the checks are line-oriented so they run from a

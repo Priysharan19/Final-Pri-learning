@@ -63,8 +63,12 @@ jobs:
           tools/jee-question-department/extract_official.py
           tools/jee-question-department/review_official.py
           tools/jee-question-department/test_official_pipeline.py
-      - name: Build + iOS sync guarantee
+      # The iOS bundles are generated from the build, never tracked (decision
+      # D28): generate, then prove the copy is complete.
+      - name: Build + iOS bundle generation guarantee
         run: |
+          set -euo pipefail
           npm ci --prefix client
           npm run build
-          node scripts/sync-ios.mjs --check
+          npm run sync:ios
+          npm run check:ios
