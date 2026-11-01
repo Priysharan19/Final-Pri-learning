@@ -18,7 +18,7 @@ import {
   parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands
 } from '../scripts/release-nominate.mjs';
 import {
-  CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
+  BUILD_KINDS, CASES, DEFAULT_LEDGER, FAMILIES, GROUPS, JOURNEY, SEVERITIES, SOAK_MIN_MINUTES, casesMarkdown, problemsWith, readLedger, recordResult, recordSoak, reportMarkdown, soakLedgerFor, soakSummary, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
 import {
   EVIDENCE, EXPORT_FRESH_MS, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
@@ -722,16 +722,29 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 4 · device-matrix-record: stable ids, refusals, the ledger and the doc
+// 4 · device-matrix-record: stable ids, groups, refusals, the ledgers and the doc
 // ═════════════════════════════════════════════════════════════════════════════
 {
   eq(FAMILIES.length, 4, 'four device families: iPhone, iPad + Pencil, Android phone, Android tablet');
   eq(JOURNEY.length, 9, 'nine journey steps from install to History');
-  eq(CASES.length, 36, '36 stable case ids');
-  ok(CASES.every(c => /^DM-(IPH|IPD|AND|ANT)-0[1-9]-[A-Z]+$/.test(c.id)), 'case ids are DM-<family>-<seq>-<step>');
+  const groupSteps = GROUPS.flatMap(g => g.steps);
+  eq(GROUPS.map(g => g.id).join(','), 'ACCESSIBILITY,ORIENTATION,RESTORE,EXAM,LIFECYCLE,EXPORT', 'the six groups issue #10 and scope §18 #11 asked for');
+  ok(groupSteps.some(s => s.id === 'VOICEOVER' && s.families.join() === 'IPH,IPD') && groupSteps.some(s => s.id === 'TALKBACK' && s.families.join() === 'AND,ANT'), 'VoiceOver on Apple, TalkBack on Android');
+  ok(groupSteps.some(s => s.id === 'KEYBOARD' && s.families.includes('IPH') && s.families.includes('IPD')), 'Full Keyboard Access on iPhone and iPad');
+  ok(groupSteps.some(s => s.id === 'TEXTSIZE' && s.families.length === 4 && /1\.12/.test(s.expect) && /360 CSS px/.test(s.expect)), 'the text-size case says what the shell really does (viewport scale capped at 360 CSS px, about 1.12× on iPhone)');
+  ok(groupSteps.some(s => s.id === 'ROTATE' && !s.families.includes('IPH')) && groupSteps.some(s => s.id === 'SPLITVIEW' && s.families.join() === 'IPD') && groupSteps.some(s => s.id === 'STAGEMANAGER' && s.families.join() === 'IPD'), 'rotation skips the portrait-only iPhone; Split View and Stage Manager are iPad');
+  for (const id of ['REINSTALL', 'TIMED', 'BACKGROUND', 'STORAGE', 'MEMORY', 'EXPORT', 'SHARE']) ok(groupSteps.some(s => s.id === id && s.families.length === 4), `${id} applies to every family`);
+  const expectedCases = 36 + groupSteps.reduce((n, s) => n + s.families.length, 0);
+  eq(CASES.length, expectedCases, `${expectedCases} stable case ids (36 journey + ${expectedCases - 36} group cases)`);
+  eq(CASES.length, 80, '80 cases in all');
+  ok(CASES.every(c => /^DM-(IPH|IPD|AND|ANT)-\d{2}-[A-Z]+$/.test(c.id)), 'case ids are DM-<family>-<seq>-<step>');
   eq(new Set(CASES.map(c => c.id)).size, CASES.length, 'case ids are unique');
   ok(['INSTALL', 'OTP', 'GUARDIAN', 'ISSUE', 'WRITE', 'PHOTO', 'TRANSCRIPT', 'MARK', 'HISTORY'].every((step, i) => JOURNEY[i].id === step), 'the journey is §22.2 in order');
   ok(CASES.filter(c => c.pencil).length === 1 && CASES.find(c => c.pencil).id === 'DM-IPD-05-WRITE', 'exactly one case is the Apple Pencil case');
+  ok(CASES.filter(c => c.group === 'JOURNEY').length === 36 && CASES.every(c => c.group === 'JOURNEY' || GROUPS.some(g => g.id === c.group)), 'every case belongs to the journey or a named group');
+  eq(Object.keys(SEVERITIES).join(','), 'P0,P1,P2,P3', 'four severities');
+  eq(BUILD_KINDS.join(','), 'development,testflight,play-internal,play-closed', 'the build kinds a device can run');
+  eq(SOAK_MIN_MINUTES, 30, 'a soak is at least 30 minutes');
 
   const doc = read('docs/release/device-matrix.md');
   const block = doc.split('<!-- device-matrix-cases:start -->')[1]?.split('<!-- device-matrix-cases:end -->')[0]?.trim();
@@ -739,17 +752,20 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(CASES.every(c => doc.includes(`\`${c.id}\``)), 'every case id is in the doc');
   ok(/PHYSICAL-HUMAN/.test(doc) && /never written into this matrix/.test(doc), 'the doc states the evidence class and the simulator rule');
   ok(/PRI_V1_RELEASE_SCOPE\.md.*§22\.2/.test(doc), 'the doc cites the §22.2 journey');
-  ok(/results\.jsonl/.test(doc) && /device-matrix-record\.mjs/.test(doc), 'the doc names the ledger and the recorder');
-  ok(/## What this matrix does not cover \(issue #10 stays open\)/.test(doc) && /Backup restore/.test(doc) && /Exam flows/.test(doc) && /Stage Manager/.test(doc) && /severity/.test(doc) && /Soak-test duration/.test(doc) && /must not close #10/.test(doc), 'the doc states which #10 gates this matrix does not cover and that #10 stays open');
+  ok(/results\.jsonl/.test(doc) && /soak\.jsonl/.test(doc) && /device-matrix-record\.mjs/.test(doc), 'the doc names both ledgers and the recorder');
+  ok(/## Which server a device build talks to/.test(doc) && /Development build → staging, first/.test(doc) && /Store build → production, after promotion, release held/.test(doc) && /refuses a store build on staging and a\s+development build on production/.test(doc), 'the doc settles which server each build kind tests against and keeps the two kinds distinct');
+  ok(/## Defect severity \(required on every fail\)/.test(doc) && /`P0`/.test(doc) && /`P3`/.test(doc), 'the doc carries the severity taxonomy');
+  ok(/## Soak record/.test(doc) && /at least 30 minutes/.test(doc), 'the doc carries the soak record');
+  ok(/VoiceOver/.test(doc) && /Full Keyboard Access/.test(doc) && /Stage Manager/.test(doc) && /Split View/.test(doc) && /RESTORE/.test(doc) && /EXAM/.test(doc) && /LIFECYCLE/.test(doc) && /EXPORT/.test(doc), 'the doc names the accessibility, orientation, restore, exam, lifecycle and export groups');
   ok(/NOT_A_HUMAN/.test(doc) && /no\s+override/i.test(doc), 'the doc documents the fail-closed tester word list');
-  ok(existsSync(join(ROOT, 'docs/release/evidence/device-matrix/README.md')) && /results\.jsonl/.test(read('docs/release/evidence/device-matrix/README.md')), 'the ledger directory is committed with a README naming the ledger');
+  ok(existsSync(join(ROOT, 'docs/release/evidence/device-matrix/README.md')) && /results\.jsonl/.test(read('docs/release/evidence/device-matrix/README.md')) && /soak\.jsonl/.test(read('docs/release/evidence/device-matrix/README.md')), 'the ledger directory is committed with a README naming both ledgers');
 
   const dir = mkdtempSync(join(tmpdir(), 'pri-dm-'));
   const ledger = join(dir, 'results.jsonl');
-  const base = { case: 'DM-IPH-02-OTP', result: 'pass', device: 'iPhone 16 Pro Max', os: 'iOS 26.0.1', sha: SHA, tester: 'Priya Example' };
+  const base = { case: 'DM-IPH-02-OTP', result: 'pass', device: 'iPhone 16 Pro Max', os: 'iOS 26.0.1', sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging' };
   try {
-    const written = recordResult(base, { ledger, now: Date.parse('2026-10-19T01:00:00Z') });
-    ok(written.evidenceClass === 'PHYSICAL-HUMAN' && written.recorder === 'scripts/device-matrix-record.mjs', 'a pass by a named human on real hardware is recorded as PHYSICAL-HUMAN');
+    const written = recordResult(base, { ledger, now: Date.parse('2026-11-02T01:00:00Z') });
+    ok(written.evidenceClass === 'PHYSICAL-HUMAN' && written.recorder === 'scripts/device-matrix-record.mjs' && written.buildKind === 'development' && written.server === 'staging' && written.severity === null, 'a pass by a named human on real hardware is recorded as PHYSICAL-HUMAN with its build kind and server');
     eq(readLedger(ledger).length, 1, 'one line appended');
     const refusals = [
       ['a pass without a tester', { ...base, tester: undefined }, /named human/],
@@ -762,38 +778,85 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       ['a missing OS', { ...base, os: '' }, /needs --os/],
       ['a short SHA', { ...base, sha: 'e3f9cabe1' }, /40-hex/],
       ['an unknown case', { ...base, case: 'DM-IPH-99-NOPE' }, /unknown case id/],
+      ['a case that does not apply to the family (Split View on iPhone)', { ...base, case: 'DM-IPH-14-SPLITVIEW' }, /unknown case id/],
       ['an unknown result', { ...base, result: 'maybe' }, /result must be one of/],
       ['the Pencil case without a Pencil', { ...base, case: 'DM-IPD-05-WRITE', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.0.1' }, /needs --pencil/],
       ['a blocked row without a reason', { case: 'DM-AND-01-INSTALL', result: 'blocked', sha: SHA }, /needs --notes/],
-      ['a fail without a tester', { ...base, result: 'fail', tester: null }, /named human/]
+      ['a fail without a tester', { ...base, result: 'fail', tester: null, severity: 'P1', notes: 'the code never arrived' }, /named human/],
+      ['a pass without a build kind', { ...base, buildKind: undefined }, /needs --build-kind/],
+      ['a pass without a server', { ...base, server: undefined }, /needs --server/],
+      ['a store build on staging', { ...base, buildKind: 'testflight' }, /cannot have talked to staging/],
+      ['a development build on production', { ...base, server: 'production' }, /development build is not run against production/],
+      ['a fail without a severity', { ...base, result: 'fail', notes: 'the code arrived but the field did not autofill' }, /needs --severity P0\|P1\|P2\|P3/],
+      ['a fail with an unknown severity', { ...base, result: 'fail', severity: 'P9', notes: 'the code arrived but the field did not autofill' }, /needs --severity/],
+      ['a fail without notes', { ...base, result: 'fail', severity: 'P2' }, /a fail needs --notes/],
+      ['a pass carrying a severity', { ...base, severity: 'P2' }, /only a fail carries a severity/]
     ];
     for (const [name, input, pattern] of refusals) {
       assert.throws(() => recordResult(input, { ledger }), error => error.exitCode === 2 && error.problems.some(p => pattern.test(p)), `refuses ${name}`); count += 1;
     }
     eq(readLedger(ledger).length, 1, 'a refusal writes nothing');
-    const pencil = recordResult({ ...base, case: 'DM-IPD-05-WRITE', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.0.1', pencil: 'Apple Pencil Pro' }, { ledger, now: Date.parse('2026-10-19T01:01:00Z') });
+    const pencil = recordResult({ ...base, case: 'DM-IPD-05-WRITE', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.0.1', pencil: 'Apple Pencil Pro' }, { ledger, now: Date.parse('2026-11-02T01:01:00Z') });
     ok(pencil.pencil === 'Apple Pencil Pro', 'the Pencil case records the Pencil model');
-    const blocked = recordResult({ case: 'DM-AND-01-INSTALL', result: 'blocked', sha: SHA, notes: 'no Android device available' }, { ledger, now: Date.parse('2026-10-19T01:02:00Z') });
+    const blocked = recordResult({ case: 'DM-AND-01-INSTALL', result: 'blocked', sha: SHA, notes: 'no Android device available' }, { ledger, now: Date.parse('2026-11-02T01:02:00Z') });
     ok(blocked.evidenceClass === 'BLOCKED-EXTERNAL' && blocked.tester === null, 'a blocked row needs no tester and is BLOCKED-EXTERNAL, never physical evidence');
-    recordResult({ ...base, result: 'fail', notes: 'code arrived but the field did not autofill' }, { ledger, now: Date.parse('2026-10-19T02:00:00Z') });
+    const failed = recordResult({ ...base, result: 'fail', severity: 'p1', notes: 'code arrived but the field did not autofill' }, { ledger, now: Date.parse('2026-11-02T02:00:00Z') });
+    eq(failed.severity, 'P1', 'a fail records its severity (normalised to upper case)');
+    recordResult({ ...base, case: 'DM-IPH-12-TEXTSIZE', result: 'fail', severity: 'P2', notes: 'at AX5 the page scaled 1.12x and the mode switch clipped' }, { ledger, now: Date.parse('2026-11-02T02:01:00Z') });
+    const store = recordResult({ ...base, case: 'DM-IPH-01-INSTALL', buildKind: 'testflight', server: 'production', build: 'TestFlight 1.0 (3)' }, { ledger, now: Date.parse('2026-11-02T03:00:00Z') });
+    ok(store.buildKind === 'testflight' && store.server === 'production', 'a store-build row names production');
     const summary = summarise(readLedger(ledger), { sha: SHA });
     eq(summary.rows.find(r => r.id === 'DM-IPH-02-OTP').latest.result, 'fail', 'the latest record per case wins');
-    ok(summary.counts.pass === 1 && summary.counts.fail === 1 && summary.counts.blocked === 1 && summary.counts['not run'] === 33, 'the summary counts pass, fail, blocked and not run');
-    eq(summarise(readLedger(ledger), { sha: OTHER }).counts['not run'], 36, 'another build has no evidence of its own');
-    const md = reportMarkdown(summary);
-    ok(md.includes('`DM-IPH-02-OTP` | FAIL') && md.includes('Priya Example') && md.includes('not run') && /PHYSICAL-HUMAN/.test(md), 'the markdown report names the tester, the result and the evidence class');
+    ok(summary.counts.pass === 2 && summary.counts.fail === 2 && summary.counts.blocked === 1 && summary.counts['not run'] === 75, `the summary counts pass, fail, blocked and not run (${JSON.stringify(summary.counts)})`);
+    ok(summary.bySeverity.P1 === 1 && summary.bySeverity.P2 === 1 && summary.releaseBlocking === 1, 'open defects are counted by severity and P0/P1 are release-blocking');
+    ok(summary.byBuildKind.development.pass === 2 && summary.byBuildKind.development.fail === 2 && summary.byBuildKind.testflight.pass === 1, 'rows are counted per build kind');
+    const devOnly = summarise(readLedger(ledger), { sha: SHA, buildKind: 'development' });
+    const storeOnly = summarise(readLedger(ledger), { sha: SHA, buildKind: 'testflight' });
+    ok(devOnly.rows.find(r => r.id === 'DM-IPH-01-INSTALL').latest === null && storeOnly.counts.pass === 1 && storeOnly.counts.fail === 0 && storeOnly.counts['not run'] === 79, 'a report for one build kind never shows the other kind\'s rows');
+    eq(summarise(readLedger(ledger), { sha: OTHER }).counts['not run'], 80, 'another build has no evidence of its own');
+    const md = reportMarkdown(summary, soakSummary([], { sha: SHA }));
+    ok(md.includes('`DM-IPH-02-OTP` | JOURNEY | FAIL | P1') && md.includes('Priya Example') && md.includes('not run') && /PHYSICAL-HUMAN/.test(md) && /1 RELEASE-BLOCKING/.test(md) && /development pass 2 \/ fail 2/.test(md) && /testflight pass 1/.test(md), 'the markdown report names the tester, the result, the severity, the build kinds and the evidence class');
     eq(validateLedger(ledger).length, 0, 'the ledger the recorder wrote validates');
-    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-10-19T03:00:00Z', case: 'DM-IPD-08-MARK', result: 'pass', device: 'iPad Pro', os: 'iPadOS 26', sha: SHA, tester: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
+
+    // Soak records: a separate ledger with the same human/hardware/build rules.
+    const soakBase = { device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.0.1', pencil: 'Apple Pencil Pro', sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging', minutes: '45', failures: '0', notes: '30-min timed paper, 6 handwritten answers' };
+    const soak = recordSoak(soakBase, { ledger, now: Date.parse('2026-11-02T04:00:00Z') });
+    ok(soak.kind === 'soak' && soak.minutes === 45 && soak.failures === 0 && soak.evidenceClass === 'PHYSICAL-HUMAN' && existsSync(soakLedgerFor(ledger)), 'a soak is recorded beside the case ledger as PHYSICAL-HUMAN');
+    const soakRefusals = [
+      ['a soak under 30 minutes', { ...soakBase, minutes: '29' }, /integer >= 30/],
+      ['a soak with no failure count', { ...soakBase, failures: undefined }, /needs --failures/],
+      ['a soak with failures and no notes', { ...soakBase, failures: '2', notes: '' }, /with failures needs --notes/],
+      ['a soak by an agent', { ...soakBase, tester: 'QA bot' }, /does not name a human/],
+      ['a soak on a simulator', { ...soakBase, device: 'iPad Pro (M4) Simulator' }, /simulator\/emulator/],
+      ['a soak on a store build against staging', { ...soakBase, buildKind: 'play-internal' }, /cannot have talked to staging/],
+      ['a soak with no build kind', { ...soakBase, buildKind: undefined }, /needs --build-kind/]
+    ];
+    for (const [name, input, pattern] of soakRefusals) {
+      assert.throws(() => recordSoak(input, { ledger }), error => error.exitCode === 2 && error.problems.some(p => pattern.test(p)), `refuses ${name}`); count += 1;
+    }
+    eq(readLedger(soakLedgerFor(ledger)).length, 1, 'a refused soak writes nothing');
+    const soaks = soakSummary(readLedger(soakLedgerFor(ledger)), { sha: SHA });
+    ok(soaks.soaks.length === 1 && soaks.minutes === 45 && soaks.failures === 0, 'the soak summary totals minutes and failures');
+    ok(/Soak: 1 record\(s\), 45 min in total, 0 failure\(s\)/.test(reportMarkdown(summary, soaks)), 'the markdown report carries the soak');
+    eq(validateLedger(ledger).length, 0, 'both ledgers validate');
+
+    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-11-02T05:00:00Z', case: 'DM-IPD-08-MARK', result: 'pass', device: 'iPad Pro', os: 'iPadOS 26', sha: SHA, tester: null, buildKind: 'development', server: 'staging', evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
     ok(validateLedger(ledger).some(e => /named human/.test(e)), 'a hand-written pass without a tester is caught by validate');
+    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-11-02T05:01:00Z', case: 'DM-IPD-08-MARK', result: 'fail', device: 'iPad Pro', os: 'iPadOS 26', sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging', notes: 'the mark never came', evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
+    ok(validateLedger(ledger).some(e => /needs --severity/.test(e)), 'a hand-written fail without a severity is caught by validate');
+    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-11-02T05:02:00Z', case: 'DM-IPD-08-MARK', result: 'pass', device: 'iPad Pro', os: 'iPadOS 26', sha: SHA, tester: 'Priya Example', evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
+    ok(validateLedger(ledger).some(e => /needs --build-kind/.test(e)), 'a hand-written row with no build kind is caught by validate');
+    writeFileSync(soakLedgerFor(ledger), readFileSync(soakLedgerFor(ledger), 'utf8') + JSON.stringify({ ...soak, minutes: 10 }) + '\n');
+    ok(validateLedger(ledger).some(e => /soak line 2: .*integer >= 30/.test(e)), 'a hand-written short soak is caught by validate');
     writeFileSync(ledger, readFileSync(ledger, 'utf8') + 'not json\n');
     ok(validateLedger(ledger).some(e => /not JSON/.test(e)), 'a corrupt line is caught by validate');
     eq(recordResult({ ...base, evidenceClass: 'SIMULATOR' }, { ledger }).evidenceClass, 'PHYSICAL-HUMAN', 'the recorder derives the evidence class from the result; a caller cannot set it');
-    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-10-19T04:00:00Z', case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16', os: 'iOS 26', sha: SHA, tester: 'Priya Example', evidenceClass: 'SIMULATOR', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
+    writeFileSync(ledger, readFileSync(ledger, 'utf8') + JSON.stringify({ recordedAt: '2026-11-02T06:00:00Z', case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16', os: 'iOS 26', sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging', evidenceClass: 'SIMULATOR', recorder: 'scripts/device-matrix-record.mjs' }) + '\n');
     ok(validateLedger(ledger).some(e => /evidenceClass/.test(e)), 'a stored line with a smuggled evidence class is caught by validate');
   } finally { rmSync(dir, { recursive: true, force: true }); }
   if (existsSync(DEFAULT_LEDGER)) eq(validateLedger(DEFAULT_LEDGER).length, 0, 'the committed ledger validates');
   else ok(true, 'no committed ledger yet (no physical run has been recorded)');
-  eq(problemsWith({ case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16', os: 'iOS 26', sha: SHA, tester: 'Priya Example' }).length, 0, 'a complete pass has no problems');
+  eq(problemsWith({ case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16', os: 'iOS 26', sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging' }).length, 0, 'a complete pass has no problems');
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
