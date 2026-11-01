@@ -9,27 +9,36 @@
 //
 //   1. It cannot drift from the notices. site/public must equal a fresh render,
 //      so a change to docs/legal that is not re-generated fails CI, and no
-//      page may carry a {{PLACEHOLDER}}.
+//      page may carry a {{PLACEHOLDER}}. Every <article data-source="docs/legal/…">
+//      body must be, word for word and in order, the named file (or the
+//      sections data-sections lists), so the converter can neither lose nor
+//      add a word of a notice. And a home-page sentence that paraphrases a
+//      notice may stand only while the notice carries the sentence it rests on
+//      (NOTICE_PREMISES), so a change to a notice fails here until the
+//      paraphrase is rewritten with it.
 //   2. It says only what is approved. The site's own copy — everything outside
-//      the <article data-source="docs/legal/…"> bodies, which docs/legal and
+//      the legal article bodies, which docs/legal and
 //      client/test/legal-pages-check.mjs govern — may not use the words the
 //      V1 coverage decision bans (audit-content; V1_DECISIONS D24): nothing
 //      about a syllabus being whole, accuracy, question counts, percentiles,
 //      working without a connection, examiners, store badges, or any price
-//      except the two approved ones. Required sentences must be present.
+//      except the two approved ones, in any currency spelling. Required
+//      sentences must be present.
 //   3. Nothing is broken and nothing phones home. Every internal link and
-//      fragment resolves inside the output, every external link is on the
-//      allowlist and HTTPS, and no script, style, image, font, frame or form
-//      reaches another origin. No analytics.
+//      fragment resolves inside the output, hreflang pairs are reciprocal,
+//      every external link is on the allowlist and HTTPS, no script, style,
+//      image, font, frame or form reaches another origin, and no page carries
+//      an inline style (the CSP in vercel.json would block it). No analytics.
 //   4. The Vercel config stays a static deployment: clean URLs, no build, no
 //      functions, no environment, security headers, redirects that resolve.
 //
-// checkSite() is pure so the self-test can mutate a rendered copy in memory.
+// checkSite() is pure so the self-test can mutate a rendered copy, or the
+// notices, in memory.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { diffOutput, readOutput, renderSite } from '../site/build.mjs';
+import { diffOutput, readNotices, readOutput, renderSite } from '../site/build.mjs';
 import { APP_ORIGIN, PRICES, SITE_ORIGIN } from '../site/src/config.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,10 +65,14 @@ export const BANNED = [
   [/\brank predict|\bmark predict|\bpredicted (rank|mark|percentile)/i, 'predicts a rank or mark'],
   [/\bguarantee/i, 'guarantees something'],
   [/\b(method|step) marks?\b/i, 'promises method marks, which are off in V1'],
+  // D12 decides final-answer-only marking, but origin/main has no server-side
+  // switch yet and pays method marks (audit-marking item 6). Until that switch
+  // lands, the site may not describe the decision as present behaviour. Remove
+  // this line in the PR that lands the switch, and say so in that PR.
+  [/\bmarks are for the final answer\b|\bfinal[- ]answer (only|marks)\b|\bonly (the|your) final answer (is|counts|earns|scores)\b/i, 'states final-answer-only marking (D12) before the server switch exists on main'],
   [/\d+(\.\d+)?\s?%/, 'states a percentage'],
-  [/\b\d{1,3}(,\d{3})+\+?\s+(distinct\s+)?questions?\b/i, 'states a question count'],
-  [/\b\d{4,}\+?\s+(distinct\s+)?questions?\b/i, 'states a question count'],
-  [/\b(over|more than|thousands of|lakhs? of|crores? of)\s+(\d[\d,]*\s+)?questions\b/i, 'states a question count'],
+  [/\b\d[\d,]*\+?\s+(distinct\s+)?questions?\b/i, 'states a question count'],
+  [/\b(over|more than|hundreds of|dozens of|thousands of|lakhs? of|crores? of)\s+(\d[\d,]*\s+)?questions\b/i, 'states a question count'],
   // Superiority and hype (AGENTS.md)
   [/\b#1\b|\bnumber one\b|\bthe best\b|\bbetter than\b|\bbeats?\b|\boutperform/i, 'claims superiority'],
   [/\btrusted by\b|\bloved by\b|\bworld[- ]class\b|\bproduction[- ]ready\b/i, 'unsupported claim'],
@@ -77,8 +90,10 @@ export const BANNED = [
   [/सटीक|प्रमाणित|आधिकारिक|परीक्षक|असीमित|प्रतिशत|गारंटी|सबसे कठिन/u, 'banned claim (Hindi)']
 ];
 
-// Every ₹ amount on the site must be one of these, verbatim (D19).
+// Every price on the site must be one of these, verbatim (D19): "₹199", never
+// "Rs 199", "INR 199" or "199 rupees", and no third amount in any spelling.
 export const APPROVED_PRICES = new Set(Object.values(PRICES));
+export const PRICE = /(?:₹|\bRs\.?|\bINR)\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:rupees?|INR|Rs\.?)\b/gi;
 
 export const REQUIRED = {
   'index.html': [
@@ -87,6 +102,7 @@ export const REQUIRED = {
     /coming soon/i,
     'fixed set of mathematical rules',
     'never by an AI model',
+    'OpenAI',
     PRICES.monthly,
     PRICES.annual,
     'App Store',
@@ -102,6 +118,40 @@ export const ALLOWED_EXTERNAL_HOSTS = new Set([new URL(APP_ORIGIN).host]);
 
 const TRACKING = /googletagmanager|google-analytics|gtag\(|analytics\.js|fbq\(|facebook\.net|hotjar|mixpanel|segment\.(io|com)|posthog|plausible\.io|clarity\.ms|amplitude|sentry\.io|doubleclick|matomo/i;
 
+// Sentences of the site's own copy that paraphrase a notice. Each may appear on
+// its page only while the English notice (whitespace-normalised) matches
+// `requires` and does not match `forbids`. When a notice changes — D17 will
+// replace "on by default" with a prompt before the first read — the paraphrase
+// fails here until it is rewritten with the notice, so the two cannot diverge.
+export const NOTICE_PREMISES = [
+  { page: 'index.html', says: /on for a signed-in account/, notice: 'privacy', requires: /on by default for a signed-in account/,
+    why: 'says reading is on for a signed-in account, but privacy.md no longer says it is on by default' },
+  { page: 'index.html', says: /after you (have )?agree|until you (have )?agree|before you agree|once you (have )?agree|nothing is sent until|nothing leaves the device until/i, notice: 'privacy', forbids: /on by default for a signed-in account/,
+    why: 'says reading waits for your agreement, but privacy.md still says it is on by default for a signed-in account (D17 has not landed)' },
+  { page: 'index.html', says: /not the question, not the expected answer, not your name/, notice: 'privacy', requires: /not the question, not the expected answer, not your name/,
+    why: 'repeats the stroke-image guarantee, which privacy.md no longer states in those words' },
+  { page: 'index.html', says: /whatever is in the frame is sent|sends whatever is in the frame/, notice: 'privacy', requires: /whatever is in the frame is sent/,
+    why: 'describes the photo path, which privacy.md no longer describes in those words' },
+  { page: 'index.html', says: /never carries the question|never goes with the question/i, notice: 'privacy', forbids: /whatever is in the frame is sent/,
+    why: 'claims no picture carries the question, but privacy.md says a photograph sends whatever is in the frame' },
+  { page: 'index.html', says: /keeps no copy/, notice: 'privacy', requires: /keeps no copy/,
+    why: 'says Pri keeps no copy, which privacy.md no longer says' },
+  { page: 'index.html', says: /parent or guardian confirms first/i, notice: 'privacy', requires: /parent or guardian has confirmed/,
+    why: 'says a guardian confirms first, which privacy.md no longer says' },
+  { page: 'index.html', says: /Deletion is immediate/, notice: 'privacy', requires: /deletion is immediate/,
+    why: 'says deletion is immediate, which privacy.md no longer says' },
+  { page: 'index.html', says: /3 working days/, notice: 'grievance', requires: /3 working days/,
+    why: 'quotes a reply period grievance.md no longer gives' },
+  { page: 'support/index.html', says: /3 working days/, notice: 'grievance', requires: /3 working days/,
+    why: 'quotes a reply period grievance.md no longer gives' },
+  { page: 'index.html', says: /Data Protection Board of India/, notice: 'grievance', requires: /Data Protection Board of India/,
+    why: 'names an escalation grievance.md no longer names' },
+  { page: 'index.html', says: /no standing outside it/, notice: 'terms', requires: /no standing outside it/,
+    why: 'repeats a sentence terms.md no longer has' },
+  { page: 'support/index.html', says: /no standing outside it/, notice: 'terms', requires: /no standing outside it/,
+    why: 'repeats a sentence terms.md no longer has' }
+];
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
@@ -111,6 +161,10 @@ export const decode = (s) => String(s)
   .replace(/&([a-z]+);/gi, (m, n) => ENTITIES[n.toLowerCase()] ?? m);
 
 const LEGAL_ARTICLE = /<article[^>]*\bdata-source="docs\/legal\/[^"]+"[^>]*>[\s\S]*?<\/article>/g;
+// A block boundary becomes " ¶ " so a phrase cannot be read across two
+// elements (the "8" closing one row's maths and the "Questions" opening the
+// next paragraph are not "8 questions").
+const BLOCK_TAG = /<\/?(?:p|div|li|ul|ol|dl|dt|dd|h[1-6]|section|header|footer|nav|article|aside|main|figure|figcaption|math|blockquote|table|tr|td|th|title|br)\b[^>]*>/gi;
 
 /** The words the site itself says: tags stripped, legal bodies removed, plus the attributes a reader meets. */
 export function authoredText(html) {
@@ -119,8 +173,9 @@ export function authoredText(html) {
   const text = withoutLegal
     .replace(/<script[\s\S]*?<\/script>/g, ' ')
     .replace(/<style[\s\S]*?<\/style>/g, ' ')
+    .replace(BLOCK_TAG, ' ¶ ')
     .replace(/<[^>]+>/g, ' ');
-  return decode([text, ...attrs].join(' ')).replace(/\s+/g, ' ');
+  return decode([text, ...attrs].join(' ¶ ')).replace(/\s+/g, ' ');
 }
 
 /** href/src/srcset targets in an HTML document, with the tag they sit on. */
@@ -144,19 +199,78 @@ export function resolveRoute(route, files) {
 
 const idsIn = (html) => new Set([...String(html).matchAll(/\sid="([^"]+)"/g)].map(m => m[1]));
 
+// ── Fidelity: a legal article is its source, word for word ───────────────────
+//
+// Both sides are reduced to word sequences independently of site/src/markdown.mjs,
+// so a converter bug cannot hide itself. The source keeps every token except
+// the H1 (the page supplies the title), heading marks, bullet marks, bold and
+// code marks and link targets; a numbered list's "1." "2." stay as tokens. The
+// article keeps every word and synthesises the ordinal of each <li> in an <ol>
+// from its position (and the list's start), so a paragraph swallowed into a
+// one-item list, a dropped number, a lost line or an added sentence all show
+// up as the first word where the two sequences part.
+
+/** The words of a docs/legal file; `sections` limits it to those H2 sections (by index). */
+export function noticeWords(markdown, sections = null) {
+  const kept = [];
+  let section = -1;
+  for (const line of String(markdown).replace(/\r\n?/g, '\n').split('\n')) {
+    if (/^#[ \t]/.test(line)) continue;
+    if (/^##[ \t]/.test(line)) section++;
+    if (sections && !sections.includes(section)) continue;
+    kept.push(line);
+  }
+  return kept.join('\n')
+    .replace(/^#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*[-*][ \t]+/gm, '')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '$1')
+    .replace(/\*\*|`/g, '')
+    .split(/\s+/).filter(Boolean);
+}
+
+/** The words a reader meets inside a rendered article, ordinals included. */
+export function articleWords(html) {
+  let n = 1;
+  let inOrdered = false;
+  const text = String(html)
+    .replace(/<\/?(?:strong|em|b|i|a|code|span)\b[^>]*>/g, '')
+    .replace(/<ol\b([^>]*)>|<\/ol>|<li\b[^>]*>/g, (tag, attrs) => {
+      if (tag.startsWith('<ol')) { inOrdered = true; n = Number(/\bstart="(\d+)"/.exec(attrs || '')?.[1] ?? 1); return ' '; }
+      if (tag === '</ol>') { inOrdered = false; return ' '; }
+      return inOrdered ? ` ${n++}. ` : ' ';
+    })
+    .replace(/<[^>]+>/g, ' ');
+  return decode(text).split(/\s+/).filter(Boolean);
+}
+
+/** The legal articles in a page: { source, sections, body }. */
+export function legalArticles(html) {
+  return [...String(html).matchAll(/<article\b([^>]*)>([\s\S]*?)<\/article>/g)].map(m => ({
+    source: /\bdata-source="([^"]+)"/.exec(m[1])?.[1] || null,
+    sections: /\bdata-sections="([^"]*)"/.exec(m[1])?.[1].split(',').map(Number) || null,
+    body: m[2]
+  }));
+}
+
 // ── The check ────────────────────────────────────────────────────────────────
 
 /**
  * @param {Map<string,string>} rendered   fresh render from site/build.mjs
  * @param {Map<string,string>} committed  what is in site/public
  * @param {object|null}        vercel     parsed site/vercel.json
+ * @param {object}             docs       the notices, as site/build.mjs readNotices() returns them
  * @returns {{ failures: string[], checks: number }}
  */
-export function checkSite({ rendered, committed, vercel }) {
+export function checkSite({ rendered, committed, vercel, docs = readNotices() }) {
   const failures = [];
   let checks = 0;
   const fail = (msg) => failures.push(msg);
   const ok = (cond, msg) => { checks++; if (!cond) fail(msg); };
+  const sourceByFile = new Map();
+  for (const slug of Object.keys(docs)) {
+    for (const lang of ['en', 'hi']) sourceByFile.set(`docs/legal/${docs[slug].file[lang]}`, docs[slug][lang]);
+  }
+  const noticeText = (slug) => String(docs[slug]?.en || '').replace(/\s+/g, ' ');
 
   // 1. Freshness and placeholders
   for (const line of diffOutput(rendered, committed)) fail(`stale: ${line}`);
@@ -189,6 +303,7 @@ export function checkSite({ rendered, committed, vercel }) {
     ok(!/<script\b(?![^>]*\bsrc="\/theme\.js")[^>]*>/i.test(body), `${path}: contains a script other than /theme.js`);
     ok(!/@import|url\(\s*["']?https?:/i.test(body), `${path}: inline CSS loads a remote asset`);
     ok(!/<img\b/i.test(body), `${path}: contains an <img>; the site uses typeset maths and inline SVG only (no screenshots, no store badges)`);
+    ok(!/\sstyle="/i.test(body) && !/<style\b/i.test(body), `${path}: carries an inline style, which the CSP in vercel.json (style-src 'self') blocks; use a class in styles.css`);
 
     // 3b. Words
     const text = authoredText(body);
@@ -196,12 +311,39 @@ export function checkSite({ rendered, committed, vercel }) {
       const m = pattern.exec(text);
       ok(!m, `${path}: banned phrase — ${why}: "${m?.[0]}"`);
     }
-    for (const m of text.matchAll(/₹\s?[\d,]+(\.\d+)?/g)) {
+    for (const m of text.matchAll(PRICE)) {
       ok(APPROVED_PRICES.has(m[0]), `${path}: price "${m[0]}" is not one of the approved prices (${[...APPROVED_PRICES].join(', ')})`);
     }
     for (const needle of REQUIRED[path] || []) {
       const present = needle instanceof RegExp ? needle.test(body) : body.includes(needle);
       ok(present, `${path}: required text missing — ${needle}`);
+    }
+    for (const p of NOTICE_PREMISES) {
+      if (p.page !== path || !p.says.test(text)) continue;
+      const notice = noticeText(p.notice);
+      ok(!(p.requires && !p.requires.test(notice)) && !(p.forbids && p.forbids.test(notice)), `${path}: ${p.why} — rewrite the sentence with docs/legal/${p.notice}.md`);
+    }
+
+    // 1b. Fidelity: each legal article is its source, word for word
+    for (const article of legalArticles(body)) {
+      ok(article.source && sourceByFile.has(article.source), `${path}: <article data-source="${article.source}"> names a file that is not a notice`);
+      if (!article.source || !sourceByFile.has(article.source)) continue;
+      const expected = noticeWords(sourceByFile.get(article.source), article.sections);
+      const actual = articleWords(article.body);
+      let at = 0;
+      while (at < expected.length && at < actual.length && expected[at] === actual[at]) at++;
+      const same = at === expected.length && at === actual.length;
+      ok(same, `${path}: <article data-source="${article.source}"> parts from the source at word ${at}: source "${expected.slice(at, at + 6).join(' ') || '(end)'}", page "${actual.slice(at, at + 6).join(' ') || '(end)'}"`);
+    }
+
+    // 3d. hreflang pairs are reciprocal; search engines ignore a one-way pair
+    const canonical = body.match(/<link rel="canonical" href="([^"]+)">/)?.[1] || null;
+    for (const m of body.matchAll(/<link rel="alternate" hreflang="([a-z]{2})" href="([^"]+)">/g)) {
+      const [, hreflang, href] = m;
+      if (href === canonical) { ok(hreflang === lang, `${path}: self hreflang "${hreflang}" is not the page language`); continue; }
+      const file = resolveRoute(href.replace(SITE_ORIGIN, '') || '/', committed);
+      ok(file, `${path}: hreflang ${hreflang} points at ${href}, which does not resolve`);
+      if (file) ok(committed.get(file).includes(`<link rel="alternate" hreflang="${lang}" href="${canonical}">`), `${path}: hreflang ${hreflang} → ${href} is not returned by ${file}`);
     }
 
     // 3c. Links
@@ -274,11 +416,13 @@ export function loadVercel() {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const rendered = renderSite();
   const committed = readOutput();
-  const { failures, checks } = checkSite({ rendered, committed, vercel: loadVercel() });
+  const docs = readNotices();
+  const { failures, checks } = checkSite({ rendered, committed, vercel: loadVercel(), docs });
   if (failures.length) {
     console.error(`SITE: FAIL — ${failures.length} of ${checks} checks`);
     for (const f of failures) console.error(`  ✗ ${f}`);
     process.exit(1);
   }
-  console.log(`SITE: PASS — ${checks}/${checks} checks across ${committed.size} files (${[...committed.keys()].filter(p => p.endsWith('.html')).length} pages, ${BANNED.length} banned patterns, ${APPROVED_PRICES.size} approved prices)`);
+  const articles = [...committed.values()].reduce((n, body) => n + legalArticles(body).length, 0);
+  console.log(`SITE: PASS — ${checks}/${checks} checks across ${committed.size} files (${[...committed.keys()].filter(p => p.endsWith('.html')).length} pages, ${articles} legal articles word-for-word, ${BANNED.length} banned patterns, ${NOTICE_PREMISES.length} notice premises, ${APPROVED_PRICES.size} approved prices)`);
 }

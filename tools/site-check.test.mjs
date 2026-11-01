@@ -4,15 +4,24 @@
 //
 //   node tools/site-check.test.mjs && node tools/site-check.mjs
 import assert from 'node:assert/strict';
-import { renderSite } from '../site/build.mjs';
-import { authoredText, checkSite, loadVercel } from './site-check.mjs';
+import { readNotices, renderSite } from '../site/build.mjs';
+import { NOTICE_PREMISES, authoredText, checkSite, loadVercel } from './site-check.mjs';
 
 const rendered = renderSite();
 const vercel = loadVercel();
+const docs = readNotices();
 assert.ok(vercel, 'site/vercel.json loads');
 let checks = 1;
 
-const run = (files, cfg = vercel) => checkSite({ rendered, committed: files, vercel: cfg }).failures;
+const run = (files, cfg = vercel, notices = docs) => checkSite({ rendered, committed: files, vercel: cfg, docs: notices }).failures;
+/** The notices with one English file edited, so a rule about a notice can be tested without touching docs/legal. */
+const withNotice = (slug, edit) => {
+  const copy = structuredClone(docs);
+  const after = edit(copy[slug].en);
+  assert.notEqual(after, copy[slug].en, `the edit of ${slug}.md changed something`);
+  copy[slug].en = after;
+  return copy;
+};
 const clone = () => new Map(rendered);
 const mutate = (path, edit) => {
   const files = clone();
@@ -73,6 +82,11 @@ const PLANTS = [
   ['superiority', 'better than any other app', /superiority/],
   ['emoji', 'maths ✨', /sparkles or emoji/],
   ['method marks', 'with method marks', /method marks/],
+  ['final-answer-only marking before the D12 switch', 'Marks are for the final answer', /final-answer-only marking \(D12\)/],
+  ['final-answer marks', 'final-answer marks only', /final-answer-only marking \(D12\)/],
+  ['three-digit question count', '500 questions', /question count/],
+  ['two-digit question count', '50 distinct questions', /question count/],
+  ['hundreds of questions', 'hundreds of questions', /question count/],
   ['out of V1', 'Olympiad too', /outside V1/],
   ['hindi offline', 'ऑफ़लाइन जाँच', /Hindi/],
   ['hindi whole syllabus', 'पूरा पाठ्यक्रम', /Hindi/]
@@ -87,19 +101,80 @@ expectFailure('banned on a Hindi page', run(mutate('hi/support/index.html', s =>
 expectFailure('banned in a meta description', run(mutate('index.html', s => s.replace('<meta name="description" content="', '<meta name="description" content="Complete syllabus. '))), /completeness|whole syllabus/);
 
 // 3b. The legal bodies are governed by docs/legal, not by this list: the same
-// words inside <article data-source="docs/legal/…"> are not reported here.
+// words inside <article data-source="docs/legal/…"> are not reported as banned
+// phrases — but the article must then be its source word for word, so the
+// planted sentence fails the fidelity rule instead. Nothing can hide in an article.
 {
   const files = mutate('privacy/index.html', s => s.replace(/(<article[^>]*data-source="docs\/legal\/privacy\.md"[^>]*>)/, '$1<p>Marks offline with examiner accuracy, 100% of the time.</p>'));
-  const banned = nonStale(run(files)).filter(f => /banned phrase/.test(f));
+  const failures = run(files);
+  const banned = nonStale(failures).filter(f => /banned phrase/.test(f));
   assert.deepEqual(banned, [], 'words inside a legal article are left to legal-pages-check');
   checks++;
   assert.ok(!/examiner accuracy/.test(authoredText(files.get('privacy/index.html'))), 'authoredText() excludes the legal body');
   checks++;
+  expectFailure('a sentence added inside a legal article', failures, /privacy\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word 0: source "[^"]+", page "Marks offline with examiner accuracy,/);
 }
 
-// 4. Prices: only the approved two, verbatim.
+// 3c. Fidelity: a legal article is its source, word for word and in order.
+expectFailure('a word changed in a legal article', run(mutate('terms/index.html', s => s.replace('Marking is automatic and can be wrong.', 'Marking is automatic and can be right.'))), /terms\/index\.html: <article data-source="docs\/legal\/terms\.md"> parts from the source at word \d+: source "wrong\./);
+expectFailure('a word dropped from a legal article', run(mutate('privacy/index.html', s => s.replace('only as bcrypt hashes', 'only as hashes'))), /privacy\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "bcrypt hashes/);
+expectFailure('a word dropped from a Hindi legal article', run(mutate('hi/terms/index.html', s => s.replace(/(<article[^>]*>\n<p>(?:<strong>)?)([^\s<]+)\s/, '$1'))), /hi\/terms\/index\.html: <article data-source="docs\/legal\/terms\.hi\.md"> parts from the source at word 0/);
+expectFailure('a legal article cut short', run(mutate('refunds/index.html', s => s.replace(/<article([^>]*)>\n([\s\S]*?)\n<\/article>/, (m, attrs, inner) => `<article${attrs}>\n${inner.split('\n').slice(0, -1).join('\n')}\n</article>`))), /refunds\/index\.html: <article data-source="docs\/legal\/refund-policy\.md"> parts from the source at word \d+: source "[^"]+", page "\(end\)"/);
+// The number-dot class: a numbered list that lost its numbers, or was renumbered, parts at the ordinal.
+expectFailure('a numbered list rendered as bullets', run(mutate('support/index.html', s => s.replace('<ol><li>We acknowledge', '<ul><li>We acknowledge').replace('when we will answer.</li></ol>', 'when we will answer.</li></ul>'))), /support\/index\.html: <article data-source="docs\/legal\/grievance\.md"> parts from the source at word \d+: source "1\. We acknowledge/);
+expectFailure('a numbered list renumbered', run(mutate('support/index.html', s => s.replace('<ol><li>We acknowledge', '<ol start="2"><li>We acknowledge'))), /source "1\. We acknowledge[^"]*", page "2\. We acknowledge/);
+// A partial article must name its sections honestly, and every article a real notice.
+expectFailure('data-sections understating the body', run(mutate('delete-account/index.html', s => s.replace('data-sections="6,7"', 'data-sections="6"'))), /delete-account\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "\(end\)"/);
+expectFailure('an article from an unknown file', run(mutate('terms/index.html', s => s.replace('data-source="docs/legal/terms.md"', 'data-source="docs/legal/other.md"'))), /names a file that is not a notice/);
+// The notice changed and the page did not: caught by fidelity even when the render is not stale.
+expectFailure('notice edited, page unchanged', run(clone(), vercel, withNotice('privacy', s => s.replace('Passwords are stored only as bcrypt hashes.', 'Passwords are stored as bcrypt hashes.'))), /privacy\/index\.html: <article data-source="docs\/legal\/privacy\.md"> parts from the source at word \d+: source "as bcrypt/);
+
+// 3d. Notice premises: a home-page paraphrase stands only while the notice says it.
+for (const p of NOTICE_PREMISES) {
+  const text = authoredText(rendered.get(p.page));
+  if (p.requires) assert.ok(p.says.test(text), `premise is live — ${p.page} says ${p.says}`);
+  else assert.ok(!p.says.test(text), `forbidden paraphrase is absent — ${p.page} ${p.says}`);
+  checks++;
+}
+// D17 has not landed: "after you agree" fails while privacy.md says on by default…
+expectFailure('consent-first wording before D17 (marking cell)', run(mutate('index.html', s => s.replace('This is on for a signed-in account, and you can turn it off at any time', 'Nothing is sent until you have agreed to this, once, and you can turn it off at any time'))), /index\.html: says reading waits for your agreement, but privacy\.md still says it is on by default for a signed-in account \(D17 has not landed\)/);
+expectFailure('consent-first wording before D17 (plain section)', run(mutate('index.html', s => s.replace('read by OpenAI while you are signed in. You can turn it off.', 'read by OpenAI, after you agree.'))), /D17 has not landed/);
+// …and once privacy.md drops "on by default", today's wording fails until it is rewritten.
+expectFailure('on-by-default wording after the notice drops it', run(clone(), vercel, withNotice('privacy', s => s.replace(/on by default for a signed-in account/g, 'asked for once, before the first read,'))), /index\.html: says reading is on for a signed-in account, but privacy\.md no longer says it is on by default/);
+// The stroke-image guarantee may not be stretched over photographs.
+expectFailure('guarantee stretched over photographs', run(mutate('index.html', s => s.replace("A photograph is your camera's picture, so whatever is in the frame is sent.", 'The picture never carries the question, the expected answer or your name.'))), /index\.html: claims no picture carries the question, but privacy\.md says a photograph sends whatever is in the frame/);
+// Other paraphrases: keeps no copy, the reply period, the escalation, the standing of a mark.
+{
+  const failures = run(clone(), vercel, withNotice('privacy', s => s.replaceAll('keeps no copy', 'keeps a copy')));
+  expectFailure('keeps-no-copy outlives the notice', failures, /index\.html: says Pri keeps no copy, which privacy\.md no longer says/);
+}
+{
+  const failures = run(clone(), vercel, withNotice('grievance', s => s.replaceAll('3 working days', '5 working days')));
+  expectFailure('reply period on the home page', failures, /index\.html: quotes a reply period grievance\.md no longer gives/);
+  expectFailure('reply period on support', failures, /support\/index\.html: quotes a reply period grievance\.md no longer gives/);
+}
+expectFailure('escalation outlives the notice', run(clone(), vercel, withNotice('grievance', s => s.replaceAll('Data Protection Board of India', 'Data Protection Board'))), /index\.html: names an escalation grievance\.md no longer names/);
+expectFailure('standing sentence outlives the terms', run(clone(), vercel, withNotice('terms', s => s.replaceAll('no standing outside it', 'no effect outside it'))), /support\/index\.html: repeats a sentence terms\.md no longer has/);
+expectFailure('OpenAI disclosure removed from home', run(mutate('index.html', s => s.replaceAll('OpenAI', 'a reading service'))), /index\.html: required text missing — OpenAI/);
+
+// 3c. The free plan's "20 practice questions a day" is a limit, not a count,
+// and the maths row ending in an 8 before the "Questions, hints…" paragraph is
+// two blocks: neither trips the count rule on the clean render (baseline above).
+assert.ok(/20 practice questions a day/.test(authoredText(rendered.get('index.html'))), 'the free-plan limit is still stated');
+checks++;
+
+// 4. Prices: only the approved two, verbatim, in any spelling of the currency.
 expectFailure('unapproved price', run(mutate('index.html', s => s.replace('₹1,499', '₹1,299'))), /price "₹1,299" is not one of the approved/);
 expectFailure('a third price', run(mutate('index.html', s => s.replace('App Store prices', 'App Store prices (was ₹999)'))), /price "₹999"/);
+for (const [label, plant, pattern] of [
+  ['Rs price', 'or Rs 999 a year', /price "Rs 999" is not one of the approved/],
+  ['Rs. price', 'or Rs. 999 a year', /price "Rs\. 999"/],
+  ['INR price', 'INR 999 a year', /price "INR 999"/],
+  ['rupees price', '999 rupees a year', /price "999 rupees"/],
+  ['approved amount in an unapproved spelling', 'Rs 199 a month', /price "Rs 199"/]
+]) {
+  expectFailure(`price: ${label}`, run(mutate('index.html', s => s.replace('Both plans use the same marking engine.', `Both plans use the same marking engine, ${plant}.`))), pattern);
+}
 
 // 5. Required sentences.
 expectFailure('can-be-wrong removed from home', run(mutate('index.html', s => s.replaceAll('Marking is automatic and can be wrong', 'Marking is automatic'))), /required text missing — Marking is automatic and can be wrong/);
@@ -116,8 +191,20 @@ expectFailure('http link', run(mutate('index.html', s => s.replace('href="/terms
 expectFailure('unlisted external host', run(mutate('index.html', s => s.replace('href="/terms"', 'href="https://example.com/terms"'))), /not on the allowlist/);
 expectFailure('sitemap entry that does not resolve', run(mutate('sitemap.xml', s => s.replace('/refunds</loc>', '/refund-policy</loc>'))), /sitemap\.xml: .*does not resolve/);
 
+// 6b. hreflang pairs are reciprocal and resolve.
+expectFailure('one-way hreflang', run(mutate('privacy/index.html', s => s.replace('\n  <link rel="alternate" hreflang="hi" href="https://prilearning.com/hi/privacy">', ''))), /hi\/privacy\/index\.html: hreflang en → https:\/\/prilearning\.com\/privacy is not returned by privacy\/index\.html/);
+expectFailure('hreflang to a page that declares none', run(mutate('index.html', s => s.replace('<link rel="canonical" href="https://prilearning.com/">', '<link rel="canonical" href="https://prilearning.com/">\n  <link rel="alternate" hreflang="hi" href="https://prilearning.com/hi">'))), /index\.html: hreflang hi → https:\/\/prilearning\.com\/hi is not returned by hi\/index\.html/);
+expectFailure('hreflang that does not resolve', run(mutate('privacy/index.html', s => s.replace('href="https://prilearning.com/hi/privacy">', 'href="https://prilearning.com/hi/privacy-notice">'))), /hreflang hi points at .* which does not resolve/);
+assert.ok(!/<link rel="alternate"/.test(rendered.get('hi/index.html')) && !/<link rel="alternate"/.test(rendered.get('index.html')), '/ and /hi are not a translation pair and declare no hreflang');
+checks++;
+
 // 7. Nothing phones home, nothing collects.
 expectFailure('analytics script', run(mutate('index.html', s => s.replace('</head>', '<script src="https://www.googletagmanager.com/gtag/js"></script></head>'))), /tracking reference|script other than|another origin/);
+// 7b. No inline style: the CSP (style-src 'self') would drop it silently.
+expectFailure('inline style attribute', run(mutate('index.html', s => s.replace('<div class="coverage-notes">', '<div class="coverage-notes" style="margin-top:28px">'))), /index\.html: carries an inline style/);
+expectFailure('style element', run(mutate('hi/index.html', s => s.replace('</head>', '<style>.fine{margin-top:24px}</style></head>'))), /hi\/index\.html: carries an inline style/);
+assert.ok(/style-src 'self'/.test(vercel.headers[0].headers.find(h => h.key === 'Content-Security-Policy').value), 'the CSP still forbids inline styles, which is why the rule exists');
+checks++;
 expectFailure('remote stylesheet', run(mutate('index.html', s => s.replace('</head>', '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter"></head>'))), /another origin|not on the allowlist/);
 expectFailure('store badge image', run(mutate('index.html', s => s.replace('</main>', '<p><img src="/badges/app-store.svg" alt="Download on the App Store"></p></main>'))), /contains an <img>|implies the app is on sale/);
 expectFailure('form', run(mutate('support/index.html', s => s.replace('</main>', '<form action="https://forms.example.com"><input name="email"></form></main>'))), /frame or a form/);
