@@ -39,3 +39,21 @@ A schema-12 SQLite database created by `169bcdfe7` (production's build) opens on
 train-10 head at schema 13 with `integrity_check ok`. This used an **empty** database. A copy
 of production's real file could not be taken: Railway volume download and `railway ssh` both
 need a human SSH-key signup. Snapshot `4bc17786` is a restore point, not a readable copy.
+
+## 5. Re-checked at merge into the release-tooling branch, 2 November 2026
+
+PR #589 was merged onto `agent/mission/reliability/m-finish-14-ops-release-tooling` from `main`
+`a5778a319`. The records above are dated staging evidence and are not rewritten; what was
+re-checked:
+
+- `#590` merged on 2026-10-19 at 14:13 UTC as `f265a00d0` (`gh pr view 590`), so "finding A is
+  closed by #590" still holds.
+- `server/platform/schemaVersions.js` on `main` declares `SCHEMA_VERSION = 13`,
+  `BILLING_SCHEMA_VERSION = 6`, matching the schema 13 / billing 6 staging reached here.
+- The 1 November 2026 audit read staging at `a5778a319` on Postgres, schema 13, and production
+  still at `169bcdfe7` on SQLite, schema 12, so §4's premise (no production promotion since)
+  still holds.
+- Supabase backups / PITR for staging and production were **not** re-read here (they need the
+  owner's Supabase access); enabling them remains the owner action recorded in
+  `ops-staging-log-2026-10-19.md` §5 and `postgres-cutover.md` §6.
+- Drills 5 and 6 remain `BLOCKED_EXTERNAL` for the reasons in §3.

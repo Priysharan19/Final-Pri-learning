@@ -38,3 +38,30 @@ The original nine-file Task 04 package is copied byte-for-byte into this directo
 - Android target API: https://developer.android.com/google/play/requirements/target-sdk
 
 **Verdict:** documentation integrated in a candidate review PR, NOT independently accepted until approval and exact-head CI. Release publication remains blocked on evidence and explicit authorization.
+
+## Re-checked at merge into the release-tooling branch, 2 November 2026
+
+Checked against `main` `a5778a319` by `agent/mission/reliability/m-finish-14-ops-release-tooling`
+(PR #624 was 182 commits behind `main` at the time; the merge was clean). Nothing below is a
+store submission, a legal opinion or an acceptance.
+
+| Statement above | Still true on main? | Evidence |
+|---|---|---|
+| Apple marketing version **1.0 (build 2)** in both Swift packages | yes | `ios/PriLearning.swiftpm/Package.swift` `displayVersion: "1.0"`, `bundleVersion: "2"`; `ios/app-store-version.json` present |
+| Android `versionName "4.0"`, `minSdk 26`, `targetSdk 36`, operator-supplied `versionCode` | yes | `android/app/build.gradle.kts` lines 48–91 |
+| Twelve 19-October **emulator** screenshots, six phone and six tablet, with provenance | yes | `docs/release/store/play/screenshots/{phone,tablet}/` and its `README.md` (synthetic strokes, fixture server; not physical evidence) |
+| ₹199 / ₹1,499 are intended, not live, prices | yes | V1 decision D19 (1 November 2026) keeps the amounts; no storefront product has been priced |
+| Privacy notice revised 19 October, not legally approved | yes | `docs/legal/privacy.md` "Last updated: 19 October 2026"; counsel review still open (`V1_DECISIONS_2026-11-01.md`, "Only people can close these") |
+
+Decisions of 1 November 2026 that the pack must follow before any copy is entered in a console
+(`~/Developer/pri-finish/V1_DECISIONS_2026-11-01.md`, provisional until the owner confirms):
+
+- **D3** sign-in at launch is email code and password; Apple and Google sign-in arrive together in
+  an update and SMS stays off. Reviewer-access notes that promise an SMS code are stale.
+- **D12** method marks are off in production behind a server switch; store copy describes marks
+  for the final answer only.
+- **D23** past papers are off for students until a rights opinion exists.
+- **D1 / D2** India only on both stores; the public launch is iPhone and iPad first, with the
+  Android software finished but its closed test pending.
+- **D24** only the plain coverage wording; never "complete", "every chapter", "certified" or any
+  accuracy, question-count or percentile claim.
