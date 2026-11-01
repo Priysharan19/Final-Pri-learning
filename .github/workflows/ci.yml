@@ -228,6 +228,11 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
+          # Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad,
+          # promotion and store copy carry none of the retired claims; past papers are off by default (D23).
+          grep -Fq 'CONTENT HONESTY: PASS' suites.log
+          grep -Fq 'MARKETING CLAIMS: PASS' suites.log
+          grep -Fq 'PAST PAPERS SWITCH: PASS' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
@@ -290,6 +295,8 @@ jobs:
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
+          # The committed certification report describes the content in the tree (version, digest, scope, result).
+          grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
