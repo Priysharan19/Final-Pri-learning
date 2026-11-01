@@ -65,7 +65,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
-import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -117,24 +117,21 @@ function launchApp(device, bundleId, args = [], opts = {}) {
 }
 
 
+// The iOS runtime this run is pinned to (PRI_SIM_RUNTIME / --runtime). On CI
+// it is required: a lane that took "the newest runtime installed" could be
+// moved to another iOS by a runner-image change without anyone deciding to
+// (#676 went unseen that way). Off CI it is optional.
+const PINNED_RUNTIME = requiredRuntime();
+
 function pickDevice() {
   const named = argOf('device');
-  const family = (argOf('family') || 'iphone').toLowerCase();
-  const pattern = family === 'ipad' ? /iPad/ : /iPhone/;
-  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
-  // newest runtime: an older one can need a long first boot on a CI runner.
-  let runtime = [0];
-  const rows = [];
-  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
-    const header = l.match(/^-- iOS ([\d.]+) --/);
-    if (header) { runtime = header[1].split('.').map(Number); continue; }
-    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
-    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
-  }
-  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
-  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
-  const pick = matching.find(d => d.state === 'Booted') || matching[0];
-  if (!pick) throw new Error(`no ${named || family} simulator is available`);
+  const family = (argOf('family') || 'iphone').toLowerCase() === 'ipad' ? 'iPad' : 'iPhone';
+  const listing = run('xcrun', ['simctl', 'list', 'devices', 'available']);
+  // A booted match wins; otherwise the newest runtime that satisfies the pin
+  // (scripts/simulator-fleet.mjs). A pin nothing satisfies is a failure that
+  // names the runtime, never a run on another iOS.
+  const pick = pickSimulator(listing, { family, named, runtime: PINNED_RUNTIME });
+  if (!pick) throw new Error(`no ${named || family} simulator is available${PINNED_RUNTIME ? ` on the pinned iOS ${PINNED_RUNTIME} runtime` : ''} (installed: ${describeRuntimes(listing) || 'none'})`);
   return pick;
 }
 
@@ -588,10 +585,12 @@ const evidence = {
     'the Pri /v1 server (accounts, sessions, prepare / issue / recognise / confirm / grade) on a local SQLite file'],
   synthetic: ['an iOS simulator, not a device', 'strokes placed on the surface programmatically, not written with a Pencil or finger',
     'the handwriting reader: a scripted stand-in at the provider hop that never looks at the picture', 'a fixture account verified in the local database', 'email delivery: the server\'s TEST email adapter (the code is read from its outbox, nothing is sent)'],
-  notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment'],
+  notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment',
+    'system Dynamic Type: the shell scales the whole page through the viewport, capped so the CSS viewport never drops below 360 px (about 1.12× at the largest size on a 402 pt iPhone, up to 1.5× on iPad); the dynamicType steps prove that capped scale and no sideways overflow, not text reflow at system metrics',
+    'VoiceOver, Full Keyboard Access or any assistive technology: a11yAudit is a DOM smoke test'],
   sha,
   dirtyWorkingTree: dirty,
-  simulator: { name: sim.name, udid, runtime: os },
+  simulator: { name: sim.name, udid, runtime: os, pinnedRuntime: PINNED_RUNTIME, runtimePinned: PINNED_RUNTIME !== null },
   workflow: process.env.GITHUB_WORKFLOW || 'local',
   run: process.env.GITHUB_RUN_ID || null,
   timestamp: new Date().toISOString(),
