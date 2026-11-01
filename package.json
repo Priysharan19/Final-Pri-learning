@@ -208,7 +208,7 @@
     "preflight": "node tools/production-preflight.mjs",
     "test:pdf": "node client/test/pdf-working-check.mjs",
     "test:mcq:distinct": "node client/test/mcq-distinctness-check.mjs",
-    "test:budget": "node client/test/install-budget-check.mjs",
+    "test:budget": "node client/test/install-budget-check.mjs && node client/test/install-budget-check.mjs --instrument",
     "test:boot": "node client/test/boot-resilience-check.mjs",
     "test:india:surfaces": "node client/test/india-native-surfaces-check.mjs",
     "test:cbse:marking": "node client/test/cbse-marking-check.mjs",

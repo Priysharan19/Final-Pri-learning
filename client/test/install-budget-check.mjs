@@ -27,20 +27,29 @@
 // fake windows, because the decision that module makes (do we spend 0.9 MB on
 // the recogniser?) is the one place a mistake costs a student money.
 //
-// Usage:  node client/test/install-budget-check.mjs [--no-build]
+// Usage:  node client/test/install-budget-check.mjs [--no-build] [--instrument]
 // A fresh build is made first unless --no-build, so this can never be green
-// about a dist somebody left behind three commits ago.
+// about a dist somebody left behind three commits ago. With --instrument the
+// build is made with PRI_FEATURE_INSTRUMENT=1 (the interface's own warm set
+// and on-demand rules) and the Map, Report and Scripts tabs are held in the
+// warm pass (issue #658); npm run test:budget runs both.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { optionalWarmAllowed, warmOfflineBuild, prefetchInstrumentTabs, studentBusy } from '../src/local/offlineWarm.js';
-import { ON_DEMAND, PRECACHE_SKIP } from '../vite.config.js';
+import { optionalWarmAllowed, warmOfflineBuild, studentBusy } from '../src/local/offlineWarm.js';
+
+// The flag has to be in the environment before vite.config.js is evaluated:
+// its ON_DEMAND list and the warm set differ between the two builds.
+const INSTRUMENT = process.argv.includes('--instrument');
+if (INSTRUMENT) process.env.PRI_FEATURE_INSTRUMENT = '1';
+const { ON_DEMAND, PRECACHE_SKIP } = await import('../vite.config.js');
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
+const LABEL = INSTRUMENT ? 'INSTALL BUDGET (instrument build)' : 'INSTALL BUDGET';
 
 // ── The budget ───────────────────────────────────────────────────────────────
 // Measured on the build these numbers were first set against: 1,159 kB raw /
@@ -93,15 +102,22 @@ const kb = (n) => `${(n / 1024).toFixed(0)} kB`;
 // ── A build to measure ───────────────────────────────────────────────────────
 
 if (!process.argv.includes('--no-build')) {
-  const built = spawnSync('npx', ['vite', 'build'], { cwd: join(ROOT, 'client'), encoding: 'utf8' });
+  const built = spawnSync('npx', ['vite', 'build'], { cwd: join(ROOT, 'client'), encoding: 'utf8', env: { ...process.env } });
   if (built.status !== 0) {
-    console.log(`INSTALL BUDGET: FAIL — the client did not build\n${built.stderr || built.stdout}`);
+    console.log(`${LABEL}: FAIL — the client did not build\n${built.stderr || built.stdout}`);
     process.exit(1);
   }
 }
 if (!existsSync(join(DIST, 'sw.js'))) {
-  console.log('INSTALL BUDGET: FAIL — no client/dist/sw.js to measure. Run `npm run build` first, or drop --no-build.');
+  console.log(`${LABEL}: FAIL — no client/dist/sw.js to measure. Run \`npm run build\` first, or drop --no-build.`);
   process.exit(1);
+}
+// The dist being measured was made with the flag this run is about: the build
+// writes the flags it was made with beside itself (vite.config.js featureManifest).
+{
+  let flags = null;
+  try { flags = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')); } catch { flags = null; }
+  eq(flags?.instrument, INSTRUMENT, `the dist under measurement was built with the instrument flag ${INSTRUMENT ? 'on' : 'off'}`);
 }
 
 const sw = readFileSync(join(DIST, 'sw.js'), 'utf8');
@@ -117,7 +133,7 @@ ok(Array.isArray(PRECACHE) && PRECACHE.length > 1, 'the build wrote an install m
 ok(Array.isArray(WARM) && WARM.length > 0, 'and a warm manifest for what the install no longer carries');
 ok(Array.isArray(OPTIONAL) && OPTIONAL.length > 0, 'and an optional one for the recogniser');
 if (!PRECACHE || !WARM || !OPTIONAL) {
-  console.log(`INSTALL BUDGET: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
+  console.log(`${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
 
@@ -297,63 +313,38 @@ const silent = fakeWorker();
 const timedOut = await warmOfflineBuild({ scope: silent.scope, timeoutMs: 30 });
 eq(timedOut, null, 'a worker that never answers resolves rather than leaving the page waiting on it forever');
 
-// ── 8 · Prefetching the instrument's on-demand tabs (issue #658) ───────────
-// Runtime only, outside the manifests above, so it moves no budget number. The
-// decision is the recogniser's: cheap link, online, and never mid-task.
-
-const tabWindow = ({ connection = { effectiveType: '4g', saveData: false }, onLine = true, busySelectors = [] } = {}) => ({
-  navigator: { onLine, connection, serviceWorker: {} },
-  document: { querySelector: (sel) => (busySelectors.some(b => sel.includes(b)) ? {} : null) }
-});
-const countingLoaders = () => { const calls = []; return { calls, loaders: ['map', 'report', 'progress', 'scripts'].map(n => () => { calls.push(n); return Promise.resolve(); }) }; };
-const now = (run) => run();
-
-{
-  const l = countingLoaders();
-  eq(await prefetchInstrumentTabs({ scope: tabWindow(), loaders: l.loaders, idle: now }), 'fetched', 'on an unmetered 4G link, online and idle, the instrument tabs are prefetched');
-  eq(l.calls.join(','), 'map,report,progress,scripts', 'and every on-demand tab chunk is asked for');
+// ── 8 · The instrument's tabs are offline from the warm pass (issue #658) ──
+// Three of the interface's six tabs — the Map, the Report (ReportHead over the
+// Progress page) and Scripts (the History page) — used to be on demand in the
+// instrument build, with a runtime prefetch as the interim. A student who had
+// opened the app online and then lost the connection could still meet a tab
+// that would not open. They are warmed now, so a first open offline works,
+// and nothing in ON_DEMAND may name them again. With the flag off those chunks
+// are rightly on demand (that build never imports them), so the offline
+// promise is asserted on the instrument build and the rule's absence on both.
+const TAB_CHUNK = /(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/;
+for (const name of ['assets/MapPage-abc123.js', 'assets/ReportHead-abc123.js', 'assets/Progress-abc123.js', 'assets/History-abc123.js', 'assets/ledger-abc123.css']) {
+  const reason = onDemandReason(name);
+  ok(!reason || /flag off in this build/.test(reason),
+    `${name} is never on demand in the interface that paints it (${INSTRUMENT ? 'instrument build' : 'flag-off build'}: ${reason || 'no rule'})`);
 }
-for (const [connection, label] of [
-  [{ effectiveType: '4g', saveData: true }, 'Data Saver'],
-  [{ effectiveType: '3g', saveData: false }, 'a 3G link'],
-  [{ effectiveType: '2g', saveData: false }, 'a 2G link'],
-  [undefined, 'a browser that reports no connection']
-]) {
-  const l = countingLoaders();
-  const scope = tabWindow({ connection });
-  if (!connection) delete scope.navigator.connection;
-  eq(await prefetchInstrumentTabs({ scope, loaders: l.loaders, idle: now }), 'skipped', `${label} means the tabs are not prefetched`);
-  eq(l.calls.length, 0, `and with ${label} nothing is fetched`);
+if (INSTRUMENT) {
+  const tabChunks = emitted().filter(url => TAB_CHUNK.test(url.slice(1)));
+  ok(tabChunks.some(u => /MapPage-/.test(u)) && tabChunks.some(u => /ReportHead-/.test(u)) && tabChunks.some(u => /History-/.test(u)) && tabChunks.some(u => /Progress-/.test(u)),
+    `the instrument build emits the Map, Report, Progress and Scripts chunks (${tabChunks.length} tab files)`);
+  const warmed = tabChunks.filter(u => PRECACHE.includes(u) || WARM.includes(u));
+  eq(warmed.length, tabChunks.length,
+    `every Map, Report and Scripts chunk is installed or warmed, so a first open offline works — missing: ${JSON.stringify(tabChunks.filter(u => !warmed.includes(u)))}`);
+  ok(!/prefetchInstrumentTabs/.test(readFileSync(join(ROOT, 'client', 'src', 'App.jsx'), 'utf8')),
+    'and the shell no longer relies on an idle prefetch to get them');
 }
-{
-  const l = countingLoaders();
-  eq(await prefetchInstrumentTabs({ scope: tabWindow({ onLine: false }), loaders: l.loaders, idle: now }), 'skipped', 'offline, nothing is prefetched');
-  const noSw = tabWindow(); delete noSw.navigator.serviceWorker;
-  eq(await prefetchInstrumentTabs({ scope: noSw, loaders: l.loaders, idle: now }), 'skipped', 'with no service worker to keep them, nothing is prefetched');
-  eq(l.calls.length, 0, 'and neither case fetched anything');
-}
-ok(studentBusy(tabWindow({ busySelectors: ['.ink-stage'] })), 'an ink surface on screen counts as the student writing');
-ok(studentBusy(tabWindow({ busySelectors: ['aria-busy'] })), 'an aria-busy control counts as a Check in flight');
-{
-  const l = countingLoaders();
-  let idles = 0;
-  const result = await prefetchInstrumentTabs({ scope: tabWindow({ busySelectors: ['.ink-stage'] }), loaders: l.loaders, idle: (run) => { idles++; run(); }, attempts: 3 });
-  eq(result, 'busy', 'while the student keeps writing, the prefetch gives up rather than competing with the ink');
-  eq(idles, 3, 'after retrying at idle the stated number of times');
-  eq(l.calls.length, 0, 'and never fetches during inking');
-}
-{
-  const l = countingLoaders();
-  const scope = tabWindow({ busySelectors: ['aria-busy'] });
-  let idles2 = 0;
-  const result = await prefetchInstrumentTabs({ scope, loaders: l.loaders, idle: (run) => { if (++idles2 === 2) scope.document.querySelector = () => null; run(); }, attempts: 3 });
-  eq(result, 'fetched', 'a Check that finishes lets the next idle attempt prefetch');
-  eq(l.calls.length, 4, 'and that attempt asks for every tab');
-}
+ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('.ink-stage') ? {} : null) } }), 'an ink surface on screen counts as the student writing');
+ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('aria-busy') ? {} : null) } }), 'an aria-busy control counts as a Check in flight');
+ok(!studentBusy({ navigator: {}, document: { querySelector: () => null } }), 'and neither on screen means idle');
 
 // ── Report ───────────────────────────────────────────────────────────────────
 
 console.log(failures.length
-  ? `INSTALL BUDGET: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `INSTALL BUDGET: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered.`);
+  ? `${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
+  : `${LABEL}: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered.`);
 process.exit(failures.length ? 1 : 0);
