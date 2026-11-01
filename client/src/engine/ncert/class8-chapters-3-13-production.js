@@ -64,15 +64,15 @@ const generators = {
     if (diff === 3) {
       const x = ri(rng, 3, 15), k = ri(rng, 2, 7), c = ri(rng, 1, 12);
       const left = k*x + c, rightConst = left - (k+2)*x;
-      return q(`Opposite sides of a parallelogram are $${k}x+${c}$ and $${k+2}x${rightConst>=0?'+':''}${rightConst}$. Find $x$.`, x,
+      return q(`Opposite sides of a parallelogram are $${k}x+${c}$ and $${k+2}x${rightConst===0?'':rightConst>0?'+'+rightConst:rightConst}$. Find $x$.`, x,
         ['Opposite sides of a parallelogram are equal.', 'Set the two expressions equal.', 'Collect the $x$-terms on one side and constants on the other.'],
-        [['Opposite sides',`$${k}x+${c}=${k+2}x${rightConst>=0?'+':''}${rightConst}$`],['Solve',`$2x=${c-rightConst}$`],['Answer',`$x=${x}$`]]);
+        [['Opposite sides',`$${k}x+${c}=${k+2}x${rightConst===0?'':rightConst>0?'+'+rightConst:rightConst}$`],['Solve',`$2x=${c-rightConst}$`],['Answer',`$x=${x}$`]]);
     }
     const x = ri(rng, 20, 70), a = x + ri(rng, 5, 25), b = 180-a;
     const p = a - x, qv = b - 2*x;
-    return q(`Adjacent angles of a parallelogram are $(x+${p})^\\circ$ and $(2x${qv>=0?'+':''}${qv})^\\circ$. Find $x$.`, x,
+    return q(`Adjacent angles of a parallelogram are $(x+${p})^\\circ$ and $(2x${qv===0?'':qv>0?'+'+qv:qv})^\\circ$. Find $x$.`, x,
       ['Adjacent parallelogram angles sum to $180^\\circ$.', 'Add the two algebraic angle expressions.', 'Solve the resulting linear equation.'],
-      [['Supplementary relation',`$(x+${p})+(2x${qv>=0?'+':''}${qv})=180$`],['Collect',`$3x+${p+qv}=180$`],['Answer',`$x=${x}$`]]);
+      [['Supplementary relation',`$(x+${p})+(2x${qv===0?'':qv>0?'+'+qv:qv})=180$`],['Collect',`$3x+${p+qv}=180$`],['Answer',`$x=${x}$`]]);
   },
 
   'c8-data-handling-ncert-mastery': (rng, diff) => {
@@ -323,7 +323,7 @@ const generators = {
     if (diff === 3) {
       const g=ri(rng,2,7), a=ri(rng,2,6), b=ri(rng,1,5);
       return qMcq(rng, `Simplify $\\dfrac{${g*a}x^2+${g*b}x}{${g}x}$.`, `$${a}x+${b}$`, [
-        [`$${a}x^2+${b}x$`,'The denominator factor has not been cancelled.'],
+        [`$${a}x^2+${b===1?'':b}x$`,'The denominator factor has not been cancelled.'],
         [`$${a+b}x$`,'The quotient terms are unlike and cannot be combined.'],
         [`$${a}x+${g*b}$`,'Both numerator terms must be divided by gx.']
       ], ['Factor the numerator or divide each term by the monomial.','Cancel only common multiplicative factors.',`$${g*a}x^2/(${g}x)=${a}x$ and $${g*b}x/(${g}x)=${b}$.`],

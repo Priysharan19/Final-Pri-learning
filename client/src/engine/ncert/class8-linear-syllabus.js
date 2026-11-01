@@ -9,7 +9,7 @@
 export const NCERT_CLASS8_LINEAR_DOTPOINTS = Object.freeze([
   'Identify linear equations in one variable and solve equations with the variable on both sides using balanced operations and equivalent transposition',
   'Reduce and solve equations involving fractions, brackets and decimal coefficients by clearing denominators, expanding and combining like terms',
-  'Check solutions by substitution, diagnose common algebra errors and master the complete NCERT Exercise 2.1 and 2.2 equation styles'
+  'Check solutions by substitution, diagnose common algebra errors and solve mixed equations of every style in the chapter'
 ]);
 
 export const NCERT_CLASS8_LINEAR_SKILLS = Object.freeze([

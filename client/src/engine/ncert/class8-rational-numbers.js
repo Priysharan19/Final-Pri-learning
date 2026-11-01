@@ -9,6 +9,12 @@
 // No textbook prose is required at runtime. The notes below are rewritten for Pri
 // Learning while preserving every mathematical idea, worked example, Try These
 // check, Exercise 1.1 outcome, and the chapter summary.
+//
+// Served questions are original. Every generator below draws its own numbers
+// and solves them itself; none carries an NCERT exercise, example or Try These
+// number, and none reproduces a textbook item (NCERT's reuse terms; audit item
+// 6, Nov 2026). The textbook's own items appear only in the chapter shell's
+// source map and worked source checks, labelled as such.
 
 import { ri, rc, mcq, Frac } from '../qhelpers.js';
 
@@ -144,7 +150,7 @@ export const NCERT_CLASS8_RATIONAL_TOPPER_NOTES = Object.freeze([
 export const NCERT_CLASS8_RATIONAL_WORKED_EXAMPLES = Object.freeze([
   {
     id: 'ncert-example-1',
-    title: 'NCERT Example 1 · strategic addition',
+    title: 'Worked example 1 · strategic addition',
     prompt: '$\\frac{3}{7}-\\frac{6}{11}-\\frac{8}{21}+\\frac{5}{22}$',
     steps: [
       'Regroup using commutativity and associativity: $(\\frac{3}{7}-\\frac{8}{21})+(-\\frac{6}{11}+\\frac{5}{22})$.',
@@ -158,7 +164,7 @@ export const NCERT_CLASS8_RATIONAL_WORKED_EXAMPLES = Object.freeze([
   },
   {
     id: 'ncert-example-2',
-    title: 'NCERT Example 2 · cancel before multiplying',
+    title: 'Worked example 2 · cancel before multiplying',
     prompt: '$-\\frac45\\times\\frac37\\times\\frac{15}{16}\\times(-\\frac{14}{9})$',
     steps: [
       'There are two negative factors, so the final product is positive.',
@@ -172,7 +178,7 @@ export const NCERT_CLASS8_RATIONAL_WORKED_EXAMPLES = Object.freeze([
   },
   {
     id: 'ncert-example-3',
-    title: 'NCERT Example 3 · factor with distributivity',
+    title: 'Worked example 3 · factor with distributivity',
     prompt: '$\\frac25\\times(-\\frac37)-\\frac1{14}-\\frac37\\times\\frac35$',
     steps: [
       'Use commutativity on the last product: $\\frac25(-\\frac37)-\\frac35(\\frac37)-\\frac1{14}$.',
@@ -268,6 +274,33 @@ const signedFrac = rng => asFrac(rc(rng, FRACS), rng() < 0.45 ? -1 : 1);
 const fracAnswer = f => ({ value: f.value, simplestFraction: { n: f.n, d: f.d } });
 const fracInput = f => `e.g. ${f.str()}`;
 const paren = f => f.n < 0 ? `(${f.latex()})` : f.latex();
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; };
+const lcm = (a, b) => Math.abs(a * b) / gcd(a, b);
+/** Signed fractions with distinct values, so a comparison or a regrouping is a real one. */
+function distinctFracs(rng, count) {
+  const out = [];
+  for (let guard = 0; out.length < count && guard < 80; guard++) {
+    const f = signedFrac(rng);
+    if (!out.some(g => g.value === f.value)) out.push(f);
+  }
+  while (out.length < count) out.push(new Frac(out.length + 2, 11));
+  return out;
+}
+/** A fraction displayed exactly as written — unreduced when that is the point — with its sign in front. */
+const rawFrac = (n, d) => (n < 0 ? `-\\frac{${-n}}{${d}}` : `\\frac{${n}}{${d}}`);
+const rawParen = (n, d) => (n < 0 ? `(${rawFrac(n, d)})` : rawFrac(n, d));
+/** "a+b-c": fractions joined by the right sign, the first one bare. */
+const joinSum = fracs => fracs.map((f, i) => (i === 0 ? f.latex() : f.n < 0 ? `-${new Frac(-f.n, f.d).latex()}` : `+${f.latex()}`)).join('');
+/** "+b" / "-b" for a fraction appended to a sum. */
+const signedTerm = f => (f.n < 0 ? `-${new Frac(-f.n, f.d).latex()}` : `+${f.latex()}`);
+/** Keep drawing until the value is a genuine non-integer, non-zero fraction (so "as a fraction" is answerable as one). */
+function untilFraction(rng, make, fallback) {
+  for (let guard = 0; guard < 60; guard++) {
+    const out = make();
+    if (out && out.ans && out.ans.n !== 0 && out.ans.d !== 1) return out;
+  }
+  return fallback();
+}
 
 function propertyMcq(rng, prompt, correct, distractors, hints, steps) {
   const m = mcq(rng, correct, distractors);
@@ -340,90 +373,119 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
       );
     }
     if (diff === 2) {
-      return integerNumeric('Solve $x+18=5$. Which extension beyond whole numbers is needed to contain the solution?', -13, {
-        hints: ['Undo the addition of 18.', 'Subtract 18 from both sides.', '$x=5-18$.'],
+      // x + add = rhs with a negative solution: whole numbers cannot hold it.
+      const x = -ri(rng, 3, 19), add = ri(rng, 4, 25), rhs = x + add;
+      return integerNumeric(`Solve $x+${add}=${rhs}$. Which extension beyond whole numbers is needed to contain the solution?`, x, {
+        hints: [`Undo the addition of ${add}.`, `Subtract ${add} from both sides.`, `$x=${rhs}-${add}$.`],
         steps: [
-          { h: 'Start', d: '$x+18=5$' },
-          { h: 'Subtract 18', d: '$x=5-18$' },
-          { h: 'Answer', d: '$x=-13$, an integer but not a whole number' }
+          { h: 'Start', d: `$x+${add}=${rhs}$` },
+          { h: `Subtract ${add}`, d: `$x=${rhs}-${add}$` },
+          { h: 'Answer', d: `$x=${x}$, an integer but not a whole number` }
         ],
-        traps: [{ value: 13, why: 'Subtracting 18 from 5 gives −13, not +13.' }]
+        traps: [{ value: -x, why: `Subtracting ${add} from ${rhs} gives ${x}, not ${-x}.` }]
       });
     }
     if (diff === 3) {
-      const ans = new Frac(3, 2);
-      return fractionNumeric('Solve $2x=3$. Give the answer as a rational number in simplest form.', ans, {
+      // kx = m with k not dividing m: integers cannot hold the solution.
+      const k = rc(rng, [2, 3, 4, 5, 6, 7]);
+      let m = ri(rng, 1, 20);
+      while (m % k === 0) m += 1;
+      const ans = new Frac(m, k);
+      return fractionNumeric(`Solve $${k}x=${m}$. Give the answer as a rational number in simplest form.`, ans, {
         requireFraction: true,
-        hints: ['Divide both sides by 2.', '$x=3\\div2$.', 'Write the quotient as a fraction.'],
+        hints: [`Divide both sides by ${k}.`, `$x=${m}\\div${k}$.`, 'Write the quotient as a fraction in lowest terms.'],
         steps: [
-          { h: 'Start', d: '$2x=3$' },
-          { h: 'Divide by 2', d: '$x=\\frac32$' },
-          { h: 'Why rationals are needed', d: '$\\frac32$ is not an integer, but it is rational.' }
+          { h: 'Start', d: `$${k}x=${m}$` },
+          { h: `Divide by ${k}`, d: `$x=${rawFrac(m, k)}${ans.d === k && ans.n === m ? '' : `=${ans.latex()}`}$` },
+          { h: 'Why rationals are needed', d: `$${ans.latex()}$ is not an integer, but it is rational.` }
         ],
-        traps: [{ value: new Frac(2, 3).value, why: 'Dividing 3 by 2 gives $3/2$, not its reciprocal.' }]
+        traps: [{ value: new Frac(k, m).value, why: `Dividing ${m} by ${k} gives $${ans.latex()}$, not its reciprocal.` }]
       });
     }
-    const ans = new Frac(-7, 5);
-    return fractionNumeric('Solve $5x+7=0$ exactly.', ans, {
-      hints: ['First isolate $5x$.', 'Subtract 7 from both sides.', 'Then divide by 5.'],
+    // ax + b = 0 with a not dividing b: a negative, non-integer rational.
+    const a = ri(rng, 2, 9);
+    let b = ri(rng, 1, 20);
+    while (b % a === 0) b += 1;
+    const ans = new Frac(-b, a);
+    return fractionNumeric(`Solve $${a}x+${b}=0$ exactly.`, ans, {
+      hints: [`First isolate $${a}x$.`, `Subtract ${b} from both sides.`, `Then divide by ${a}.`],
       steps: [
-        { h: 'Start', d: '$5x+7=0$' },
-        { h: 'Subtract 7', d: '$5x=-7$' },
-        { h: 'Divide by 5', d: '$x=-\\frac75$' },
-        { h: 'Classification', d: '$-\\frac75$ is rational and is not an integer.' }
+        { h: 'Start', d: `$${a}x+${b}=0$` },
+        { h: `Subtract ${b}`, d: `$${a}x=${-b}$` },
+        { h: `Divide by ${a}`, d: `$x=${ans.latex()}$` },
+        { h: 'Classification', d: `$${ans.latex()}$ is rational and is not an integer.` }
       ],
       traps: [
-        { value: new Frac(7, 5).value, why: 'The 7 moves by subtracting, so the numerator is negative.' },
-        { value: new Frac(-5, 7).value, why: 'After $5x=-7$, divide −7 by 5; do not flip the quotient.' }
+        { value: new Frac(b, a).value, why: `The ${b} moves by subtracting, so the numerator is negative.` },
+        { value: new Frac(-a, b).value, why: `After $${a}x=${-b}$, divide ${-b} by ${a}; do not flip the quotient.` }
       ]
     });
   },
 
   'y8-ncert-rational-closure': (rng, diff) => {
     if (diff === 1) {
+      const [a, b] = distinctFracs(rng, 2);
+      const op = rc(rng, ['sum', 'difference', 'product']);
+      const opName = op === 'sum' ? 'addition' : op === 'difference' ? 'subtraction' : 'multiplication';
+      const sym = op === 'sum' ? '+' : op === 'difference' ? '-' : '\\times';
+      const result = op === 'sum' ? a.add(b) : op === 'difference' ? a.sub(b) : a.mul(b);
+      const general = op === 'sum' ? '$a+b=\\frac{ps+rq}{qs}$' : op === 'difference' ? '$a-b=\\frac{ps-rq}{qs}$' : '$ab=\\frac{pr}{qs}$';
       return propertyMcq(
         rng,
-        'NCERT Exercise 1.1: The product of two rational numbers is always a ______.',
+        `Take the rational numbers $${a.latex()}$ and $${b.latex()}$. Whichever two rational numbers are chosen, their ${op} is always a ______.`,
         'rational number',
         [
-          { text: 'whole number', why: '$\\frac12\\times\\frac12=\\frac14$, which is not whole.' },
-          { text: 'natural number', why: 'A product may be negative or fractional.' },
-          { text: 'non-zero number', why: 'A rational factor can be 0, so the product can be 0.' }
+          { text: 'whole number', why: `$${a.latex()}${sym}${paren(b)}=${result.latex()}$ — the ${op} need not be a whole number.` },
+          { text: 'natural number', why: `The ${op} can be negative or a fraction, so it need not be a natural number.` },
+          { text: 'non-zero number', why: op === 'difference' ? 'The difference of two equal rational numbers is 0.' : 'A rational number can be 0, and so can the result.' }
         ],
-        ['This is asking about closure under multiplication.', 'Write two rationals as $p/q$ and $r/s$.', 'Their product is $pr/(qs)$, again a rational number.'],
+        [`This is asking about closure under ${opName}.`, 'Write the two numbers as $\\frac pq$ and $\\frac rs$ with $q,s\\ne0$.', `Here $${a.latex()}${sym}${paren(b)}=${result.latex()}$; in general the result is an integer over a non-zero integer.`],
         [
           { h: 'Write two rationals', d: '$a=\\frac pq$ and $b=\\frac rs$ with $q,s\\ne0$' },
-          { h: 'Multiply', d: '$ab=\\frac{pr}{qs}$' },
-          { h: 'Conclusion', d: '$pr$ and $qs$ are integers and $qs\\ne0$, so the product is rational.' }
+          { h: `Form the ${op}`, d: general },
+          { h: 'Conclusion', d: `The numerator and $qs$ are integers and $qs\\ne0$, so the ${op} is rational: rational numbers are closed under ${opName}.` }
         ]
       );
     }
     if (diff === 2) {
-      const ans = new Frac(-7, 40);
-      return fractionNumeric('NCERT Try These: compute $\\frac58-\\frac45$ and give the answer as a fraction in simplest form.', ans, {
+      const { a, b, ans } = untilFraction(rng, () => {
+        const [a, b] = distinctFracs(rng, 2);
+        return { a, b, ans: a.sub(b) };
+      }, () => ({ a: new Frac(5, 8), b: new Frac(-4, 5), ans: new Frac(5, 8).sub(new Frac(-4, 5)) }));
+      const L = lcm(a.d, b.d);
+      const an = a.n * (L / a.d), bn = b.n * (L / b.d);
+      return fractionNumeric(`Work out the difference $${a.latex()}-${paren(b)}$. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Use a common denominator.', 'LCM$(8,5)=40$.', '$\\frac58=\\frac{25}{40}$ and $\\frac45=\\frac{32}{40}$.'],
+        hints: ['Use a common denominator.', `LCM$(${a.d},${b.d})=${L}$.`, `$${a.latex()}=${rawFrac(an, L)}$ and $${paren(b)}=${rawParen(bn, L)}$.`],
         steps: [
-          { h: 'Common denominator', d: '$\\operatorname{LCM}(8,5)=40$' },
-          { h: 'Convert', d: '$\\frac58=\\frac{25}{40},\\quad\\frac45=\\frac{32}{40}$' },
-          { h: 'Subtract numerators', d: '$\\frac{25-32}{40}=-\\frac7{40}$' },
+          { h: 'Common denominator', d: `$\\operatorname{LCM}(${a.d},${b.d})=${L}$` },
+          { h: 'Convert', d: `$${a.latex()}=${rawFrac(an, L)},\\quad ${paren(b)}=${rawParen(bn, L)}$` },
+          { h: 'Subtract numerators', d: `$\\frac{${an}${bn < 0 ? `+${-bn}` : `-${bn}`}}{${L}}=${rawFrac(an - bn, L)}${gcd(an - bn, L) === 1 ? '' : `=${ans.latex()}`}$` },
           { h: 'Closure check', d: 'The result is rational, illustrating closure under subtraction.' }
         ],
-        traps: [{ value: new Frac(7, 40).value, why: '$25-32=-7$; the sign matters.' }]
+        traps: [
+          { value: a.add(b).value, why: 'The second number is subtracted, not added.' },
+          { value: -ans.value, why: 'Keep the order: the first number minus the second.' }
+        ]
       });
     }
     if (diff === 3) {
-      const ans = new Frac(6, 35);
-      return fractionNumeric(`NCERT division check: compute $\\frac27\\div\\frac53$. ${AS_FRACTION}`, ans, {
+      const { a, b, ans } = untilFraction(rng, () => {
+        const [a, b] = distinctFracs(rng, 2);
+        return { a, b, ans: a.div(b) };
+      }, () => ({ a: new Frac(2, 7), b: new Frac(5, 3), ans: new Frac(6, 35) }));
+      const recip = new Frac(b.d, b.n);
+      const rawN = a.n * recip.n, rawD = a.d * recip.d;
+      return fractionNumeric(`Work out the quotient $${a.latex()}\\div${paren(b)}$. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Division by a non-zero fraction means multiply by its reciprocal.', 'The reciprocal of $5/3$ is $3/5$.', 'Now multiply and simplify.'],
+        hints: ['Division by a non-zero rational number means multiply by its reciprocal.', `The reciprocal of $${b.latex()}$ is $${recip.latex()}$.`, 'Now multiply and reduce to lowest terms.'],
         steps: [
-          { h: 'Reciprocal', d: '$\\frac53\\mapsto\\frac35$' },
-          { h: 'Replace division', d: '$\\frac27\\div\\frac53=\\frac27\\times\\frac35$' },
-          { h: 'Multiply', d: '$\\frac{2\\times3}{7\\times5}=\\frac6{35}$' },
+          { h: 'Reciprocal', d: `$${b.latex()}\\mapsto${recip.latex()}$` },
+          { h: 'Replace division', d: `$${a.latex()}\\div${paren(b)}=${a.latex()}\\times${paren(recip)}$` },
+          { h: 'Multiply', d: `$${rawFrac(rawN, rawD)}${gcd(rawN, rawD) === 1 ? '' : `=${ans.latex()}`}$` },
           { h: 'Closure caveat', d: 'The divisor was non-zero, so the quotient is a rational number.' }
         ],
-        traps: [{ value: new Frac(10, 21).value, why: 'You multiplied by $5/3$ instead of its reciprocal $3/5$.' }]
+        traps: [{ value: a.mul(b).value, why: `You multiplied by $${b.latex()}$ instead of its reciprocal $${recip.latex()}$.` }]
       });
     }
     return propertyMcq(
@@ -447,16 +509,25 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
 
   'y8-ncert-rational-commutativity': (rng, diff) => {
     if (diff === 1) {
+      const [a, b] = distinctFracs(rng, 2);
+      const mult = rng() < 0.6;
+      const sym = mult ? '\\times' : '+';
+      const opName = mult ? 'multiplication' : 'addition';
+      const otherName = mult ? 'addition' : 'multiplication';
       return propertyMcq(
         rng,
-        'NCERT Exercise 1.1: $(-\\frac{13}{17})(-\\frac27)=(-\\frac27)(-\\frac{13}{17})$. Which property is used?',
-        'Commutativity of multiplication',
-        [commonPropertyTraps.assoc, commonPropertyTraps.dist, commonPropertyTraps.closure],
-        ['Look at what changed from the left product to the right product.', 'The grouping did not change; only the order did.', '$ab=ba$ names the property.'],
+        `$${paren(a)}${sym}${paren(b)}=${paren(b)}${sym}${paren(a)}$. Which property of rational numbers does this equation illustrate?`,
+        `Commutativity of ${opName}`,
         [
-          { h: 'Compare the sides', d: 'The same two factors appear in reverse order.' },
-          { h: 'Rule', d: '$ab=ba$' },
-          { h: 'Property', d: 'Commutativity of multiplication' }
+          { text: `Commutativity of ${otherName}`, why: `The operation shown is ${opName}, not ${otherName}.` },
+          commonPropertyTraps.assoc,
+          commonPropertyTraps.dist
+        ],
+        ['Look at what changed from the left side to the right side.', 'The grouping did not change; only the order of the two numbers did.', `$${mult ? 'ab=ba' : 'a+b=b+a'}$ names the property.`],
+        [
+          { h: 'Compare the sides', d: `The same two numbers appear in reverse order under ${opName}.` },
+          { h: 'Rule', d: `$${mult ? 'ab=ba' : 'a+b=b+a'}$` },
+          { h: 'Property', d: `Commutativity of ${opName}` }
         ]
       );
     }
@@ -519,16 +590,20 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
 
   'y8-ncert-rational-associativity': (rng, diff) => {
     if (diff === 1) {
+      const [a, b, c] = distinctFracs(rng, 3);
+      const mult = rng() < 0.6;
+      const sym = mult ? '\\times' : '+';
+      const opName = mult ? 'multiplication' : 'addition';
       return propertyMcq(
         rng,
-        'NCERT Exercise 1.1: What allows $\\frac13(6\\times\\frac43)$ to be computed as $(\\frac13\\times6)\\times\\frac43$?',
-        'Associativity of multiplication',
+        `What allows $${paren(a)}${sym}\\left(${paren(b)}${sym}${paren(c)}\\right)$ to be computed as $\\left(${paren(a)}${sym}${paren(b)}\\right)${sym}${paren(c)}$?`,
+        `Associativity of ${opName}`,
         [commonPropertyTraps.comm, commonPropertyTraps.dist, commonPropertyTraps.closure],
-        ['The factor order is unchanged.', 'Only the brackets moved.', '$a(bc)=(ab)c$ is the relevant rule.'],
+        ['The order of the three numbers is unchanged.', 'Only the brackets moved.', `$${mult ? 'a(bc)=(ab)c' : 'a+(b+c)=(a+b)+c'}$ is the relevant rule.`],
         [
-          { h: 'Observe', d: 'Factor order: $\\frac13,6,\\frac43$ stays the same.' },
-          { h: 'Only grouping changes', d: '$a(bc)\\to(ab)c$' },
-          { h: 'Property', d: 'Associativity of multiplication' }
+          { h: 'Observe', d: `The order $${a.latex()},\\ ${b.latex()},\\ ${c.latex()}$ stays the same.` },
+          { h: 'Only grouping changes', d: `$${mult ? 'a(bc)\\to(ab)c' : 'a+(b+c)\\to(a+b)+c'}$` },
+          { h: 'Property', d: `Associativity of ${opName}` }
         ]
       );
     }
@@ -552,22 +627,29 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
       );
     }
     if (diff === 3) {
-      const lhs = new Frac(-15, 4), rhs = new Frac(-3, 5);
+      // [a ÷ b] ÷ c against a ÷ [b ÷ c]: they differ by a factor c², and no
+      // fraction in FRACS has c² = 1, so the comparison always separates them.
+      const [a, b, c] = distinctFracs(rng, 3);
+      const inner = a.div(b);
+      const lhs = inner.div(c);
+      const innerRight = b.div(c);
+      const rhs = a.div(innerRight);
       return propertyMcq(
         rng,
-        'NCERT associativity check: compare $[\\frac12\\div(-\\frac13)]\\div\\frac25$ with $\\frac12\\div[(-\\frac13)\\div\\frac25]$.',
+        `Compare $\\left[${paren(a)}\\div${paren(b)}\\right]\\div${paren(c)}$ with $${paren(a)}\\div\\left[${paren(b)}\\div${paren(c)}\\right]$. What does the comparison show?`,
         'They are unequal, so division is not associative',
         [
-          { text: 'They are equal, so division is associative', why: `The values are ${lhs.latex()} and ${rhs.latex()}, which are unequal.` },
+          { text: 'They are equal, so division is associative', why: `The values are $${lhs.latex()}$ and $${rhs.latex()}$, which are unequal.` },
           { text: 'They are unequal, so rational numbers are not closed under division by non-zero numbers', why: 'Both values are rational; the failure is associativity, not closure.' },
           { text: 'They are equal because division is commutative', why: 'Division is neither commutative nor associative.' }
         ],
         ['Work on each bracketed expression separately.', `The left grouping gives $${lhs.latex()}$.`, `The right grouping gives $${rhs.latex()}$.`],
         [
-          { h: 'Left grouping', d: '$[\\frac12\\div(-\\frac13)]\\div\\frac25=(-\\frac32)\\times\\frac52=-\\frac{15}{4}$' },
-          { h: 'Right inner bracket', d: '$(-\\frac13)\\div\\frac25=-\\frac56$' },
-          { h: 'Right grouping', d: '$\\frac12\\div(-\\frac56)=\\frac12\\times(-\\frac65)=-\\frac35$' },
-          { h: 'Conclusion', d: '$-\\frac{15}{4}\\ne-\\frac35$, so division is not associative.' }
+          { h: 'Left inner bracket', d: `$${paren(a)}\\div${paren(b)}=${a.latex()}\\times${paren(new Frac(b.d, b.n))}=${inner.latex()}$` },
+          { h: 'Left grouping', d: `$${paren(inner)}\\div${paren(c)}=${lhs.latex()}$` },
+          { h: 'Right inner bracket', d: `$${paren(b)}\\div${paren(c)}=${innerRight.latex()}$` },
+          { h: 'Right grouping', d: `$${paren(a)}\\div${paren(innerRight)}=${rhs.latex()}$` },
+          { h: 'Conclusion', d: `$${lhs.latex()}\\ne${rhs.latex()}$, so division is not associative.` }
         ]
       );
     }
@@ -591,38 +673,41 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
 
   'y8-ncert-rational-identities': (rng, diff) => {
     if (diff === 1) {
+      const a = signedFrac(rng);
       return propertyMcq(
         rng,
-        'NCERT Exercise 1.1: $(-\\frac45)\\times1=1\\times(-\\frac45)=-\\frac45$. Which property is displayed?',
+        `$${paren(a)}\\times1=1\\times${paren(a)}=${a.latex()}$. Which property is displayed?`,
         'Multiplicative identity',
         [
           { text: 'Additive identity', why: 'The additive identity is 0 and belongs to addition.' },
-          { text: 'Multiplicative inverse', why: 'An inverse would multiply with $-4/5$ to produce 1; here 1 leaves the number unchanged.' },
+          { text: 'Multiplicative inverse', why: `An inverse would multiply with $${a.latex()}$ to produce 1; here 1 leaves the number unchanged.` },
           commonPropertyTraps.comm
         ],
         ['Which operation appears?', 'Which special number leaves a factor unchanged?', 'For multiplication that special number is 1.'],
         [
           { h: 'Identity rule', d: '$a\\times1=1\\times a=a$' },
-          { h: 'Here', d: '$a=-\\frac45$' },
+          { h: 'Here', d: `$a=${a.latex()}$` },
           { h: 'Property', d: '1 is the multiplicative identity.' }
         ]
       );
     }
     if (diff === 2) {
+      const a = signedFrac(rng);
+      const inv = new Frac(a.d, a.n);
       return propertyMcq(
         rng,
-        'NCERT Exercise 1.1: $(-\\frac{19}{29})(\\frac{29}{-19})=1$. What relationship do the two factors have?',
+        `$${paren(a)}\\times${paren(inv)}=1$. How are the two factors related?`,
         'They are multiplicative inverses (reciprocals)',
         [
           { text: 'They are additive inverses', why: 'Additive inverses add to 0; these factors multiply to 1.' },
           { text: 'They are additive identities', why: 'The additive identity is the single number 0.' },
-          { text: 'They are equal rational numbers', why: '$-19/29$ and $-29/19$ are not equal.' }
+          { text: 'They are equal rational numbers', why: `$${a.latex()}$ and $${inv.latex()}$ are not equal.` }
         ],
-        ['Look at the product on the right.', 'Numbers whose product is 1 are multiplicative inverses.', 'For a non-zero fraction, swap numerator and denominator.'],
+        ['Look at the product on the right.', 'Numbers whose product is 1 are multiplicative inverses.', 'For a non-zero fraction, swap numerator and denominator and keep the sign.'],
         [
           { h: 'Definition', d: '$a\\cdot a^{-1}=1$ for $a\\ne0$' },
-          { h: 'Reciprocal', d: 'The reciprocal of $-\\frac{19}{29}$ is $-\\frac{29}{19}$.' },
-          { h: 'Check', d: '$(-\\frac{19}{29})(-\\frac{29}{19})=1$' }
+          { h: 'Reciprocal', d: `The reciprocal of $${a.latex()}$ is $${inv.latex()}$.` },
+          { h: 'Check', d: `$${paren(a)}\\times${paren(inv)}=1$` }
         ]
       );
     }
@@ -674,27 +759,41 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
       );
     }
     if (diff === 2) {
-      const ans = new Frac(7, 30);
-      return fractionNumeric(`NCERT Try These: find $\\frac75(-\\frac3{12})+\\frac75(\\frac5{12})$ **using distributivity**. ${AS_FRACTION}`, ans, {
+      const { a, b, c, ans } = untilFraction(rng, () => {
+        const a = signedFrac(rng);
+        const [b, c] = distinctFracs(rng, 2);
+        return { a, b, c, ans: a.mul(b.add(c)) };
+      }, () => ({ a: new Frac(7, 5), b: new Frac(-1, 4), c: new Frac(5, 12), ans: new Frac(7, 30) }));
+      const inside = b.add(c);
+      return fractionNumeric(`Find $${paren(a)}\\left(${b.latex()}\\right)+${paren(a)}\\left(${c.latex()}\\right)$ **using distributivity**. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Both terms have a common factor $7/5$.', 'Factor it out.', '$-3/12+5/12=2/12$.'],
+        hints: [`Both terms have the common factor $${a.latex()}$.`, 'Factor it out: $ab+ac=a(b+c)$.', `$${b.latex()}${signedTerm(c)}=${inside.latex()}$.`],
         steps: [
-          { h: 'Factor the common rational', d: '$\\frac75(-\\frac3{12}+\\frac5{12})$' },
-          { h: 'Combine inside', d: '$-\\frac3{12}+\\frac5{12}=\\frac2{12}=\\frac16$' },
-          { h: 'Multiply', d: '$\\frac75\\times\\frac16=\\frac7{30}$' },
-          { h: 'Answer', d: '$\\frac7{30}$' }
-        ]
+          { h: 'Factor the common rational', d: `$${paren(a)}\\left(${b.latex()}${signedTerm(c)}\\right)$` },
+          { h: 'Combine inside', d: `$${b.latex()}${signedTerm(c)}=${inside.latex()}$` },
+          { h: 'Multiply', d: `$${paren(a)}\\times${paren(inside)}=${ans.latex()}$` },
+          { h: 'Answer', d: `$${ans.latex()}$` }
+        ],
+        traps: [{ value: a.mul(b).add(c).value, why: `The factor $${a.latex()}$ multiplies both brackets, not only the first.` }]
       });
     }
     if (diff === 3) {
-      return integerNumeric('NCERT Try These: find $\\frac9{16}(\\frac4{12})+\\frac9{16}(-\\frac39)$ using distributivity.', 0, {
-        hints: ['Factor out $9/16$.', 'Simplify $4/12$ and $-3/9$.', 'The bracket becomes $1/3-1/3$.'],
+      // Two fractions written unreduced that are opposites of each other: the
+      // bracket collapses to 0 once each is reduced.
+      const a = signedFrac(rng);
+      const d = rc(rng, [2, 3, 4, 5, 6]);
+      const k1 = rc(rng, [2, 3, 4]);
+      let k2 = rc(rng, [2, 3, 4, 5]);
+      if (k2 === k1) k2 += 1;
+      return integerNumeric(`Find $${paren(a)}\\left(${rawFrac(k1, k1 * d)}\\right)+${paren(a)}\\left(${rawFrac(-k2, k2 * d)}\\right)$ using distributivity.`, 0, {
+        hints: [`Factor out $${a.latex()}$.`, `Reduce $${rawFrac(k1, k1 * d)}$ and $${rawFrac(-k2, k2 * d)}$ to lowest terms.`, `The bracket becomes $\\frac{1}{${d}}-\\frac{1}{${d}}$.`],
         steps: [
-          { h: 'Factor', d: '$\\frac9{16}(\\frac4{12}-\\frac39)$' },
-          { h: 'Simplify inside', d: '$\\frac4{12}=\\frac13$ and $\\frac39=\\frac13$' },
-          { h: 'Bracket', d: '$\\frac13-\\frac13=0$' },
-          { h: 'Answer', d: '$\\frac9{16}\\times0=0$' }
-        ]
+          { h: 'Factor', d: `$${paren(a)}\\left(${rawFrac(k1, k1 * d)}-${rawFrac(k2, k2 * d)}\\right)$` },
+          { h: 'Reduce inside', d: `$${rawFrac(k1, k1 * d)}=\\frac{1}{${d}}$ and $${rawFrac(k2, k2 * d)}=\\frac{1}{${d}}$` },
+          { h: 'Bracket', d: `$\\frac{1}{${d}}-\\frac{1}{${d}}=0$` },
+          { h: 'Answer', d: `$${paren(a)}\\times0=0$` }
+        ],
+        traps: [{ value: a.mul(new Frac(2, d)).value, why: 'The second fraction is negative, so the bracket is a difference, not a sum.' }]
       });
     }
     const a = signedFrac(rng);
@@ -702,13 +801,13 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
     const c = signedFrac(rng);
     const ans = a.mul(b.sub(c));
     return fractionNumeric(
-      `Evaluate $${paren(a)}${paren(b)}-${paren(a)}${paren(c)}$ by factoring the common rational number. ${AS_FRACTION}`,
+      `Evaluate $${paren(a)}\\left(${b.latex()}\\right)-${paren(a)}\\left(${c.latex()}\\right)$ by factoring the common rational number. ${AS_FRACTION}`,
       ans,
       {
         requireFraction: true,
         hints: [`Both products contain $${a.latex()}$.`, 'Use $ab-ac=a(b-c)$.', `First calculate $${paren(b)}-${paren(c)}$.`],
         steps: [
-          { h: 'Factor', d: `$${paren(a)}[${paren(b)}-${paren(c)}]$` },
+          { h: 'Factor', d: `$${paren(a)}\\left[${paren(b)}-${paren(c)}\\right]$` },
           { h: 'Bracket', d: `$${paren(b)}-${paren(c)}=${b.sub(c).latex()}$` },
           { h: 'Multiply', d: `$${a.latex()}\\times${paren(b.sub(c))}=${ans.latex()}$` },
           { h: 'Answer', d: `$${ans.latex()}$` }
@@ -719,49 +818,94 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
 
   'y8-ncert-rational-strategy': (rng, diff) => {
     if (diff === 1) {
-      const ans = new Frac(-125, 462);
-      return fractionNumeric(`NCERT Example 1: find $\\frac37-\\frac6{11}-\\frac8{21}+\\frac5{22}$. ${AS_FRACTION}`, ans, {
+      // Four terms whose denominators pair up (p with mp, q with nq), so
+      // regrouping before one big LCM is the efficient route.
+      const { A, B, C, D, ans } = untilFraction(rng, () => {
+        const [p, q] = (() => { const pool = [5, 7, 9, 11, 13]; const first = rc(rng, pool); return [first, rc(rng, pool.filter(x => x !== first))]; })();
+        const m = rc(rng, [2, 3]), n = rc(rng, [2, 3]);
+        const small = () => (rng() < 0.5 ? -1 : 1) * ri(rng, 1, 4);
+        const odd = k => { const pool = (k === 2 ? [1, 3, 5, 7, 9] : [1, 2, 4, 5, 7, 8]); return (rng() < 0.5 ? -1 : 1) * rc(rng, pool); };
+        let x3 = odd(m); if (Math.abs(x3) === p) x3 = x3 > 0 ? x3 + 1 : x3 - 1;
+        let x4 = odd(n); if (Math.abs(x4) === q) x4 = x4 > 0 ? x4 + 1 : x4 - 1;
+        const A = new Frac(small(), p), B = new Frac(small(), q), C = new Frac(x3, m * p), D = new Frac(x4, n * q);
+        if (C.d !== m * p || D.d !== n * q) return null;
+        return { A, B, C, D, ans: A.add(B).add(C).add(D) };
+      }, () => {
+        const A = new Frac(3, 7), B = new Frac(-5, 11), C = new Frac(-8, 21), D = new Frac(4, 22);
+        return { A, B, C, D, ans: A.add(B).add(C).add(D) };
+      });
+      const first = A.add(C), second = B.add(D);
+      return fractionNumeric(`Find the sum $${joinSum([A, B, C, D])}$ efficiently. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Do not rush to one four-denominator LCM.', 'Group $3/7$ with $-8/21$, and $-6/11$ with $5/22$.', 'Then combine the two simple results.'],
+        hints: ['Do not rush to one four-denominator LCM.', `Group $${A.latex()}$ with $${C.latex()}$, and $${B.latex()}$ with $${D.latex()}$: each pair shares a factor in its denominators.`, 'Then combine the two simple results.'],
         steps: [
-          { h: 'Regroup', d: '$(\\frac37-\\frac8{21})+(-\\frac6{11}+\\frac5{22})$' },
-          { h: 'First pair', d: '$\\frac9{21}-\\frac8{21}=\\frac1{21}$' },
-          { h: 'Second pair', d: '$-\\frac{12}{22}+\\frac5{22}=-\\frac7{22}$' },
-          { h: 'Final LCM', d: '$\\frac1{21}-\\frac7{22}=\\frac{22-147}{462}$' },
-          { h: 'Answer', d: '$-\\frac{125}{462}$' }
+          { h: 'Regroup', d: `$\\left(${A.latex()}${signedTerm(C)}\\right)+\\left(${B.latex()}${signedTerm(D)}\\right)$` },
+          { h: 'First pair', d: `$${A.latex()}${signedTerm(C)}=${first.latex()}$` },
+          { h: 'Second pair', d: `$${B.latex()}${signedTerm(D)}=${second.latex()}$` },
+          { h: 'Final LCM', d: `$${first.latex()}${signedTerm(second)}=${ans.latex()}$` },
+          { h: 'Answer', d: `$${ans.latex()}$` }
         ],
-        traps: [{ value: new Frac(125, 462).value, why: 'The net numerator is $22-147=-125$.' }],
+        traps: [{ value: -ans.value, why: 'Check the sign of each pair before the final addition.' }],
         solutionText: 'Commutativity and associativity make the arithmetic smaller before the final LCM.'
       });
     }
     if (diff === 2) {
-      const ans = new Frac(1, 2);
-      return fractionNumeric(`NCERT Example 2: find $-\\frac45\\times\\frac37\\times\\frac{15}{16}\\times(-\\frac{14}{9})$. ${AS_FRACTION}`, ans, {
+      // Four factors built so that numerators cancel against other
+      // denominators: the product collapses to ±k/(mn).
+      const { f1, f2, f3, f4, negatives, ans, p13, p24 } = untilFraction(rng, () => {
+        const Aa = ri(rng, 2, 9), Bb = ri(rng, 2, 9), Cc = ri(rng, 2, 9), Dd = ri(rng, 2, 9);
+        const k = rc(rng, [1, 3]), m = rc(rng, [2, 3, 4]), n = rc(rng, [2, 3, 4]);
+        // Each written factor is a genuine fraction in lowest terms except the
+        // two that are meant to cancel; nothing displayed is an integer in disguise.
+        if (gcd(Aa, Bb) !== 1 || gcd(Cc, Dd) !== 1 || Bb * k === Aa * m || Dd === Cc * n) return null;
+        const signs = [1, 1, 1, 1].map(() => (rng() < 0.5 ? -1 : 1));
+        const negatives = signs.filter(s => s < 0).length;
+        const sign = negatives % 2 === 0 ? 1 : -1;
+        const f1 = { n: signs[0] * Aa, d: Bb }, f2 = { n: signs[1] * Cc, d: Dd }, f3 = { n: signs[2] * Bb * k, d: Aa * m }, f4 = { n: signs[3] * Dd, d: Cc * n };
+        const p13 = new Frac(signs[0] * signs[2] * k, m), p24 = new Frac(signs[1] * signs[3], n);
+        return { f1, f2, f3, f4, negatives, ans: new Frac(sign * k, m * n), p13, p24 };
+      }, () => ({
+        f1: { n: -4, d: 5 }, f2: { n: 3, d: 7 }, f3: { n: 15, d: 16 }, f4: { n: -14, d: 9 }, negatives: 2,
+        ans: new Frac(1, 2), p13: new Frac(-3, 4), p24: new Frac(-2, 3)
+      }));
+      const show = f => rawFrac(f.n, f.d);
+      const showP = f => rawParen(f.n, f.d);
+      return fractionNumeric(`Find the product $${show(f1)}\\times${showP(f2)}\\times${showP(f3)}\\times${showP(f4)}$. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Two negative factors make the result positive.', 'Regroup so cancellation is visible.', 'Cancel before multiplying.'],
+        hints: [`${negatives === 0 ? 'No factor is negative' : `${negatives} of the factors ${negatives === 1 ? 'is' : 'are'} negative`}, so the result is ${negatives % 2 === 0 ? 'positive' : 'negative'}.`, 'Regroup so that a numerator sits over the denominator it cancels with.', 'Cancel before multiplying.'],
         steps: [
-          { h: 'Sign', d: 'Two negatives $\\Rightarrow$ positive product' },
-          { h: 'Regroup', d: '$(-\\frac45\\times\\frac{15}{16})(\\frac37\\times-\\frac{14}{9})$' },
-          { h: 'First product', d: '$-\\frac45\\times\\frac{15}{16}=-\\frac34$' },
-          { h: 'Second product', d: '$\\frac37\\times-\\frac{14}{9}=-\\frac23$' },
-          { h: 'Finish', d: '$(-\\frac34)(-\\frac23)=\\frac12$' }
+          { h: 'Sign', d: `${negatives} negative factor${negatives === 1 ? '' : 's'} $\\Rightarrow$ ${negatives % 2 === 0 ? 'positive' : 'negative'} product` },
+          { h: 'Regroup', d: `$\\left(${show(f1)}\\times${showP(f3)}\\right)\\left(${show(f2)}\\times${showP(f4)}\\right)$` },
+          { h: 'First product', d: `$${show(f1)}\\times${showP(f3)}=${p13.latex()}$` },
+          { h: 'Second product', d: `$${show(f2)}\\times${showP(f4)}=${p24.latex()}$` },
+          { h: 'Finish', d: `$${paren(p13)}\\times${paren(p24)}=${ans.latex()}$` }
         ],
+        traps: [{ value: -ans.value, why: 'Count the negative factors: an even number gives a positive product.' }],
         solutionText: 'The intended skill is strategic cancellation, not large-number multiplication.'
       });
     }
     if (diff === 3) {
-      const ans = new Frac(-1, 2);
-      return fractionNumeric(`NCERT Example 3: find $\\frac25\\times(-\\frac37)-\\frac1{14}-\\frac37\\times\\frac35$. ${AS_FRACTION}`, ans, {
+      // b·a − c − a·d with b + d = 1: factoring the shared a leaves a − c.
+      const { a, b, c, d, ans } = untilFraction(rng, () => {
+        const a = signedFrac(rng), c = signedFrac(rng);
+        const q = rc(rng, [5, 7, 9, 11]);
+        const p = ri(rng, 1, q - 1);
+        const b = new Frac(p, q), d = new Frac(q - p, q);
+        if (b.d !== q || d.d !== q) return null;
+        return { a, b, c, d, ans: a.sub(c) };
+      }, () => ({ a: new Frac(-3, 7), b: new Frac(2, 5), c: new Frac(1, 14), d: new Frac(3, 5), ans: new Frac(-1, 2) }));
+      const cTerm = c.n < 0 ? `+${new Frac(-c.n, c.d).latex()}` : `-${c.latex()}`;
+      return fractionNumeric(`Evaluate $${b.latex()}\\times${paren(a)}${cTerm}-${paren(a)}\\times${d.latex()}$ by factoring the shared rational number. ${AS_FRACTION}`, ans, {
         requireFraction: true,
-        hints: ['Rewrite the last product so the same negative factor appears twice.', 'Factor out $-3/7$.', '$2/5+3/5=1$.'],
+        hints: ['Rewrite the two products so the same factor appears in both.', `Factor out $${a.latex()}$.`, `$${b.latex()}+${d.latex()}=1$.`],
         steps: [
-          { h: 'Reveal the common factor', d: '$(-\\frac37)(\\frac25)+(-\\frac37)(\\frac35)-\\frac1{14}$' },
-          { h: 'Factor by distributivity', d: '$(-\\frac37)(\\frac25+\\frac35)-\\frac1{14}$' },
-          { h: 'Simplify bracket', d: '$\\frac25+\\frac35=1$' },
-          { h: 'Combine', d: '$-\\frac37-\\frac1{14}=-\\frac6{14}-\\frac1{14}$' },
-          { h: 'Answer', d: '$-\\frac7{14}=-\\frac12$' }
+          { h: 'Reveal the common factor', d: `$${paren(a)}\\left(${b.latex()}\\right)+${paren(a)}\\left(${d.latex()}\\right)${cTerm}$` },
+          { h: 'Factor by distributivity', d: `$${paren(a)}\\left(${b.latex()}+${d.latex()}\\right)${cTerm}$` },
+          { h: 'Simplify bracket', d: `$${b.latex()}+${d.latex()}=1$` },
+          { h: 'Combine', d: `$${a.latex()}${cTerm}=${ans.latex()}$` },
+          { h: 'Answer', d: `$${ans.latex()}$` }
         ],
-        traps: [{ value: new Frac(-11, 70).value, why: 'That value results from missing the negative sign on the last shared factor. Rewrite both products before factoring.' }],
+        traps: [{ value: a.mul(b).sub(c).sub(a.mul(d)).value === ans.value ? a.add(c).value : a.mul(b).sub(c).add(a.mul(d)).value, why: 'The last product is subtracted; keep its sign when you factor.' }],
         solutionText: 'Distributivity in reverse is the key observation.'
       });
     }

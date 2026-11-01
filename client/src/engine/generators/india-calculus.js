@@ -74,8 +74,9 @@ export const indiaCalculus = {
       const degree = ri(rng, 2, 4);
       const top = order === 1 ? dydx : d2;
       const k = ri(rng, 2, 7);
+      const ky = ri(rng, 1, 9);
       return {
-        prompt: `Find the degree of the differential equation $\\left(${top}\\right)^{${degree}} + ${k}\\left(${dydx}\\right)^{${degree + 2}} = ${ri(rng, 1, 9)}y$.`,
+        prompt: `Find the degree of the differential equation $\\left(${top}\\right)^{${degree}} + ${k}\\left(${dydx}\\right)^{${degree + 2}} = ${ky === 1 ? '' : ky}y$.`,
         answerType: 'numeric', answer: { value: order === 1 ? Math.max(degree, degree + 2) : degree },
         traps: [{ value: order, why: 'That is the order — the number of times y is differentiated. The degree is the power of the highest-order derivative once the equation is a polynomial in its derivatives.' }].filter(t => t.value !== (order === 1 ? degree + 2 : degree)),
         hints: [

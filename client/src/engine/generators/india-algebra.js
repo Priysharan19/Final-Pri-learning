@@ -389,18 +389,19 @@ export const indiaAlgebra = {
       const pos = ri(rng, 0, 3);
       const NAME = ['a_{11}', 'a_{12}', 'a_{21}', 'a_{22}'][pos];
       const value = A[pos] + k * B[pos];
+      const kB = `${k === 1 ? '' : k === -1 ? '-' : k}B`;
       return {
-        prompt: `Let $A = ${M2(A[0], A[1], A[2], A[3])}$ and $B = ${M2(B[0], B[1], B[2], B[3])}$. Find the entry $${NAME}$ of $A ${k >= 0 ? '+' : '-'} ${Math.abs(k)}B$.`,
+        prompt: `Let $A = ${M2(A[0], A[1], A[2], A[3])}$ and $B = ${M2(B[0], B[1], B[2], B[3])}$. Find the entry $${NAME}$ of $A ${k >= 0 ? '+' : '-'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}B$.`,
         answerType: 'numeric', answer: { value },
         traps: [{ value: A[pos] + B[pos], why: `Every entry of $B$ is multiplied by $${k}$ before it is added.` }].filter(t => t.value !== value),
         hints: [
           'Matrices of the same order are added entry by entry.',
-          `A scalar multiplies every entry, so $${k}B$ has entry $${k} \\times ${B[pos]}$ in that position.`,
+          `A scalar multiplies every entry, so $${kB}$ has entry $${k} \\times ${B[pos]}$ in that position.`,
           `$${A[pos]} + (${k})(${B[pos]})$.`
         ],
         steps: [
-          { h: 'Scalar first', d: `The entry of $${k}B$ in that position is $${k} \\times ${B[pos]} = ${k * B[pos]}$` },
-          { h: 'Then add entrywise', d: `$${A[pos]} + ${k * B[pos]}$` },
+          { h: 'Scalar first', d: `The entry of $${kB}$ in that position is $${k} \\times ${B[pos]} = ${k * B[pos]}$` },
+          { h: 'Then add entrywise', d: `$${A[pos]} ${k * B[pos] < 0 ? '-' : '+'} ${Math.abs(k * B[pos])}$` },
           { h: 'Answer', d: `$= ${value}$` }
         ]
       };
