@@ -55,6 +55,10 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
+  // Learning-state identity (v2) and monotonic expiry (#689, #690, #691): the
+  // canonical keys, the exact legacy lookups, the real housekeeping sweep and
+  // account isolation under RLS, on the Postgres store as pri_server.
+  'learning-state-identity-check.mjs',
   // The free plan's daily cap is decided per account where a question is
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
@@ -80,6 +84,10 @@ export const ENGINE_SUITES = [
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // Pending, given and withdrawn consent through the production /v1 chain:
+  // telemetry, classes, assignments and reports refuse a child and write
+  // nothing, never touch an adult, and leave staff routes open (#292).
+  'guardian-consent-coverage-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',

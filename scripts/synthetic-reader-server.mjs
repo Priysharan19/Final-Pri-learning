@@ -57,7 +57,7 @@ globalThis.fetch = async (input, init = {}) => {
       nonImageText: JSON.stringify({ instructions: body.instructions ?? null, parts: parts.filter(p => p?.type !== 'input_image') }),
       answered: { text, confidence }
     });
-    const lines = String(text).split('\n').filter(Boolean).map(line => ({ text: line, latex: line, confidence }));
+    const lines = String(text).split('\n').filter(Boolean).map(line => ({ text: line, latex: line, confidence, uncertain: false, doubt: '', gap_before: false }));
     return json(200, { output_text: JSON.stringify({ lines, confidence, needs_confirmation: confidence < 0.82 }) });
   }
   record({ kind: 'refused', at: Date.now(), target: url.origin + url.pathname });

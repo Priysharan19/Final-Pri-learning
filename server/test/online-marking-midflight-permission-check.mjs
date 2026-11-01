@@ -30,7 +30,7 @@ function waitingProvider(){
 }
 function finish(res){
  res.writeHead(200,{'content-type':'application/json'});
- res.end(JSON.stringify({output_text:JSON.stringify({lines:[{text:'x = 9',confidence:0.96}],confidence:0.96,needs_confirmation:false})}));
+ res.end(JSON.stringify({output_text:JSON.stringify({lines:[{text:'x = 9',latex:'',confidence:0.96,uncertain:false,doubt:'',gap_before:false}],confidence:0.96,needs_confirmation:false})}));
 }
 const vars=['NODE_ENV','PRI_PLATFORM_DB','PRI_AUTH_DELIVERY_KEY','PRI_PUBLIC_ORIGIN',
   'PRI_HANDWRITING_API_KEY','PRI_HANDWRITING_ENDPOINT','PRI_HANDWRITING_MODEL','PRI_HANDWRITING_FALLBACK_MODEL',

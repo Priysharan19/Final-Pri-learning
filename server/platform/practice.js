@@ -16,7 +16,7 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
@@ -486,18 +486,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Sealed with the question, so the receipt and the attempt carry it
     // whatever the device does or does not send.
     // (Seen and tried are records of one scope: one statement answers both.)
-    const seenKeys = seenKeysOf(q);
-    const triedKey = triedKeyOf(q);
-    const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
-    if (seenKeys.some(key => known.has(key))) { q._repeat = true; repeat = true; }
+    const triedKeys = triedKeysOf(q);
+    const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
+    const evidence = repeatEvidenceOf(q, known);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     // A try already spent on another copy of this content is spent on this one
     // (decided again, authoritatively, when it is marked). Content that has
     // resolved is a repeat and starts over with both tries: it earns nothing.
-    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && known.has(triedKey);
+    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && triedKeys.some(key => known.has(key));
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     // The free plan's daily cap counts the Practice surface's own modes; Rush,
     // Match and the placement check are "everything else", unlimited.
     const counted = practiceModeCounted(practiceMode);
@@ -724,7 +724,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const q = JSON.parse(escrow.response_json);
     // Decided now, not only at issue: copies issued before the first of them
     // was resolved are repeats the moment its solution has been shown.
-    if (await contentSeen(db, accountId, q, now)) q._repeat = true;
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     await markContentSeen(db, accountId, q, now);
     const ladder = ladderEvidence(viaHint ? HINT_RUNGS.length : await hintLevelOf(accountId, qid));
     const attemptId = randomUUID();
@@ -732,7 +733,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       marksEarned: 0, marksPossible: marksPossibleFor(q), creditedMarks: 0,
       hintLevel: ladder.hintLevel, markWeight: 0,
       questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
-      ...(q._repeat === true ? { repeat: true } : {}) };
+      ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}) };
     const hash = digest({ qid, operation: 'reveal' });
     for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
@@ -744,7 +745,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
       [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
         revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         contentId: opaqueContentId(q.contentId),
         subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
         dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
@@ -949,20 +950,20 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // Whether this content has been resolved before, and whether a try has
       // been spent on any copy of it: both are records of one scope, asked for
       // together (they were two statements).
-      const seenKeys = seenKeysOf(q);
-      const triedKey = triedKeyOf(q);
-      const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
+      const triedKeys = triedKeysOf(q);
+      const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
       // Decided now, not only at issue: several copies of one question can be
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
-      if (seenKeys.some(key => known.has(key))) q._repeat = true;
+      const evidence = repeatEvidenceOf(q, known);
+      if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
       const priorTry = held.get('practice-tries') || null;
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // A try spent on ANY copy of this content is spent on this one: the
       // first try is not renewed by asking for the question again. Content
       // already resolved is a repeat, which earns nothing and keeps its own
       // two tries.
-      const spent = tries >= 1 || (q._repeat !== true && known.has(triedKey));
+      const spent = tries >= 1 || (q._repeat !== true && triedKeys.some(key => known.has(key)));
       // The hint rungs served so far, as the server charged them.
       const hintLevel = await hintLevelOf(accountId, qid);
       return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel };
@@ -1190,7 +1191,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(notRead ? { workingNotRead: true } : {}),
         ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
@@ -1252,7 +1253,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           [cursor, attemptId, accountId, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct,
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
-            ...(q._repeat === true ? { repeat: true } : {}),
+            ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
             contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
@@ -1368,7 +1369,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     q._practiceMode = 'review';
     q._generator = generator;
     let repeat = chosen.repeat;
-    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     const trySpent = !repeat && await contentTried(db, accountId, q, now);
     const payload = JSON.stringify(q);
     const id = randomUUID();
@@ -1379,7 +1381,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
       twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
-      ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
+      ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
   });
 
   // ── The spaced review queue, per dot point ──────────────────────────────

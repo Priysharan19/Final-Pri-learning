@@ -264,7 +264,7 @@ export function fakeFetchFor(sample, index) {
     const want = String(sample.target);
     const misread = index % 4 === 1;
     const confidence = [0.97, 0.55, 0.86, 0.74, 0.91, 0.66][index % 6];
-    const lines = [{ text: misread ? `${want}9` : want, latex: null, confidence }];
+    const lines = [{ text: misread ? `${want}9` : want, latex: '', confidence, uncertain: false, doubt: '', gap_before: false }];
     return {
       ok: true, status: 200,
       json: async () => ({ output_text: JSON.stringify({ lines, confidence, needs_confirmation: confidence < 0.82 }) })

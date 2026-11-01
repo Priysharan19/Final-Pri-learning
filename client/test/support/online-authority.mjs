@@ -157,7 +157,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
         reader.calls += 1;
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ output_text: JSON.stringify({
-          lines: [{ text: READER_TEXT, latex: null, confidence: 0.99 }], confidence: 0.99, needs_confirmation: false
+          lines: [{ text: READER_TEXT, latex: '', confidence: 0.99, uncertain: false, doubt: '', gap_before: false }], confidence: 0.99, needs_confirmation: false
         }) }));
       });
     });
