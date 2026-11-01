@@ -338,6 +338,10 @@ if (INSTRUMENT) {
   ok(!/prefetchInstrumentTabs/.test(readFileSync(join(ROOT, 'client', 'src', 'App.jsx'), 'utf8')),
     'and the shell no longer relies on an idle prefetch to get them');
 }
+// V1 decision D10: the student Classes page follows the classroom-product
+// flag, and a production build made with it off (both builds this suite
+// measures) emits no chunk for a page no student of that build can open.
+ok(!emitted().some(url => /(^|\/)Classes-[^/]*\.js$/.test(url)), 'a production build with the classroom flag off emits no Classes chunk');
 ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('.ink-stage') ? {} : null) } }), 'an ink surface on screen counts as the student writing');
 ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('aria-busy') ? {} : null) } }), 'an aria-busy control counts as a Check in flight');
 ok(!studentBusy({ navigator: {}, document: { querySelector: () => null } }), 'and neither on screen means idle');

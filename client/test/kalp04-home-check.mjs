@@ -168,9 +168,10 @@ check('unfinished task question keeps resume priority', () => {
   assert.equal(row.destination, '/practice?task=task-resume');
 });
 
-const [backend, home, app, en, hi, theme] = await Promise.all([
+const [backend, home, generator, app, en, hi, theme] = await Promise.all([
   read('src/local/backend.js'),
   read('src/pages/Home.jsx'),
+  read('src/home/TopicGenerator.jsx'),
   read('src/App.jsx'),
   read('src/i18n/strings.en.js'),
   read('src/i18n/strings.hi.js'),
@@ -202,7 +203,10 @@ check('Home exposes exactly one semantic primary recommendation region and CTA',
 });
 
 check('primary recommendation appears before manual generator in source order', () => {
-  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('className="genbar"'));
+  // The generator is home/TopicGenerator.jsx (shared with the instrument
+  // Index); Home renders it below the primary action.
+  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('<TopicGenerator'));
+  assert.match(generator, /className="genbar"/);
 });
 
 check('cloud failure is bounded and local learning remains rendered', () => {

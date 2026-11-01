@@ -39,13 +39,20 @@ const AUDIT = () => {
   const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button]')]
     .filter(el => visible(el) && !el.closest('[aria-hidden="true"], [inert]'));
   const unnamed = controls.filter(el => !nameOf(el)).map(el => `${el.tagName}.${String(el.className).slice(0, 40)}`);
+  // The hit area, not the drawn box, probed 21px either side of the centre
+  // (the same measurement as tour-interface-quality.js). The control is
+  // scrolled into view first: elementFromPoint answers null for any point
+  // outside the viewport, so a control below the fold could never pass, and
+  // the Index is now taller than a phone screen.
   const small = controls.filter(el => {
+    el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
     if (r.width >= 43.5 && r.height >= 43.5) return false;
     const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
     const owns = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); };
     return ![[cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].every(([x, y]) => owns(x, y));
   }).map(el => `${nameOf(el).slice(0, 24) || el.tagName} ${Math.round(el.getBoundingClientRect().width)}×${Math.round(el.getBoundingClientRect().height)}`);
+  window.scrollTo(0, 0);
   return { count: controls.length, unnamed, small };
 };
 
@@ -132,9 +139,14 @@ export const flow = {
     await page.getByTestId('choose-topic').click();
     await page.waitForSelector('#gen-panel', { timeout: 10000 }).catch(() => {});
     await check('the generator opens on the Index and lists the class or track step', await page.locator('#gen-panel').count() === 1 && await page.locator('#gen-panel .gen-cat').count() === 5);
-    await page.locator('.gen-cat', { hasText: 'Topics' }).click().catch(() => {});
-    await check('its topics pane lists the syllabus chapters', await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
-    await page.locator('#gen-pane .gen-opt').first().click();
+    // A new profile has no course chosen: the pane offers the courses first,
+    // and choosing one moves on to the topics (as on the v1.0 Home).
+    if (await page.locator('.gen-cat[aria-selected="true"]', { hasText: 'Course' }).count()) {
+      await page.locator('#gen-pane .gen-opt').first().click();
+      await page.waitForSelector('.gen-cat[aria-selected="true"]', { timeout: 5000 }).catch(() => {});
+    }
+    await check('its topics pane lists the syllabus chapters', await page.locator('.gen-cat[aria-selected="true"]', { hasText: 'Topics' }).count() === 1 && await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
+    await page.locator('#gen-pane .gen-opt:not([disabled])').first().click();
     await page.locator('.genbar-head .btn-ghost', { hasText: 'Generate' }).click();
     await page.waitForURL(/\/practice/, { timeout: 15000 }).catch(() => {});
     await check('Generate opens Practice for the chosen topic', /\/practice\?/.test(page.url()) && !!new URL(page.url()).searchParams.get('subtopic'), page.url());
