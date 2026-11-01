@@ -96,7 +96,7 @@ needs a paragraph before release.
 |---|---|---|
 | `NSPrivacyTracking = false`; no tracking domains | `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` (+ mirror) | `tools/store-readiness-check.mjs` |
 | Required-reason API: `UserDefaults` → `CA92.1` | same | same |
-| Collected types after this reconciliation: EmailAddress, Name, UserID, DeviceID, PurchaseHistory, PhotosorVideos, OtherUserContent, ProductInteraction, OtherUsageData, CrashData, PerformanceData, OtherDiagnosticData, OtherDataTypes — all linked, none tracking | same | Held together by `tools/store-readiness-check.mjs` (CI: Suites policy and contracts): the manifest's collected types must equal the set on this line, and each needs a row in the table above. |
+| Collected types after this reconciliation: EmailAddress, Name, UserID, DeviceID, PurchaseHistory, PhotosorVideos, OtherUserContent, ProductInteraction, OtherUsageData, CrashData, PerformanceData, OtherDiagnosticData, OtherDataTypes — all linked, none tracking | same | Held together by `tools/store-readiness-check.mjs` (CI: Suites policy and contracts): the manifest's collected types must equal the set on this line, and each needs a row in the table above. The same check holds crash data and the phone number to one answer across the code (`reportCrash` and `POST /v1/telemetry/error`), this file, both manifests and the Play form, and proves on every run that it catches each way of breaking that. |
 
 Thirteen types. The handover's "14 published types" cannot be reconciled from here; if the live
 entry has a fourteenth, it is either Phone Number (remove it unless SMS is turned on) or an entry
