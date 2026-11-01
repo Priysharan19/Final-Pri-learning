@@ -699,25 +699,76 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
-      # A hung browser or APT download must not quietly eat the shard's
-      # 20-minute budget: on 22 Oct main run 39767442194 and #557 sat ~20 min
-      # in this step and were cancelled, and #671's a11y-boot did the same.
-      # Give the install its own bound and retry once — each attempt is capped
-      # by `timeout` so a single stalled download cannot consume the whole
-      # step, and a transient registry/APT stall self-heals on the second try.
+      # The browsers' system packages (apt). `playwright install --with-deps`
+      # ran apt on every shard, cached browsers or not, and apt is where the
+      # 20-minute mode lived. Measured from the jobs API over the 344 shard
+      # installs that ran between 22 Oct and 1 Nov: 283 took under a minute, the
+      # slowest in a green shard took 594 s, and nine took 1117 to 1200 s. All
+      # nine logs show apt and no browser download at all: the two that finished
+      # say "Fetched 119 MB in 19min 2s (104 kB/s)" and "in 18min 17s (108 kB/s)",
+      # and the other seven were cancelled with apt still fetching. A .deb that
+      # is already in apt's archive with the size and hash the package index
+      # names is not fetched again (a stale or altered file is), so the packages
+      # one run downloaded are kept for the next run on the same runner image.
+      - name: Runner image build (keys the package cache)
+        id: image
+        run: echo "build=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: Cache the browsers' system packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-debs
+          key: apt-debs-${{ steps.image.outputs.build }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+      # Two commands, bounded differently, because a kill is safe for one and
+      # not the other. System packages: once, never under `timeout` — GNU
+      # timeout signals the whole process group, and a SIGTERM while dpkg is
+      # unpacking leaves the package database interrupted so that a retry
+      # fails outright; only this step's own limit bounds it. Browser builds:
+      # Playwright downloads to a temporary file, so a stalled download is cut
+      # and started again; each attempt gets at most 600 s (above the 594 s
+      # slowest green install, apt included, and well under the 1117 s hung mode),
+      # and a second attempt gets whatever of the step's budget is left. The
+      # 12-minute step keeps about seven minutes of the 20-minute shard for the
+      # suites themselves (the slowest green group runs in about five).
       - name: Install ${{ matrix.browsers }}
         working-directory: client
         timeout-minutes: 12
+        env:
+          APT_DEBS: ${{ runner.temp }}/apt-debs
+          BROWSERS: ${{ matrix.browsers }}
         run: |
           set -o pipefail
+          budget=690
+          # 1 · system packages, from the cached .deb files where they match
+          if compgen -G "$APT_DEBS/*.deb" > /dev/null; then
+            sudo cp "$APT_DEBS"/*.deb /var/cache/apt/archives/
+            echo "apt: $(ls "$APT_DEBS"/*.deb | wc -l) cached package files offered"
+          fi
+          npx playwright install-deps $BROWSERS
+          mkdir -p "$APT_DEBS"
+          sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -f {} "$APT_DEBS"/ \;
+          sudo chown -R "$(id -u):$(id -g)" "$APT_DEBS"
+          echo "apt: $(ls "$APT_DEBS"/*.deb 2>/dev/null | wc -l) package files kept for the next run, ${SECONDS}s so far"
+          # 2 · browser builds, bounded and retried
           for attempt in 1 2; do
-            if timeout 300 npx playwright install --with-deps ${{ matrix.browsers }}; then
+            left=$(( budget - SECONDS ))
+            if (( left < 60 )); then break; fi
+            bound=$(( left < 600 ? left : 600 ))
+            set +e
+            timeout "$bound" npx playwright install $BROWSERS
+            status=$?
+            set -e
+            if (( status == 0 )); then
+              echo "browsers: installed on attempt ${attempt}, ${SECONDS}s in all"
               exit 0
             fi
-            echo "::warning title=Playwright install retry::attempt ${attempt} did not finish within 5 min; retrying" >&2
-            sleep 15
+            if (( status != 124 )); then
+              echo "::error title=Playwright install failed::browser install exited ${status} on attempt ${attempt}" >&2
+              exit "$status"
+            fi
+            echo "::warning title=Playwright install retry::attempt ${attempt} did not finish within ${bound}s; starting again" >&2
+            sleep 10
           done
-          echo "::error title=Playwright install failed::browser install did not finish in two bounded attempts" >&2
+          echo "::error title=Playwright install failed::browser download did not finish inside this step's ${budget}s budget" >&2
           exit 1
       # The single job's later tours ran --no-build against the build
       # tour-ai-tutor.js leaves behind: the job's feature flags, tutor off.
@@ -825,6 +876,18 @@ jobs:
           name: browser-shard-${{ matrix.group }}
           path: browser.log
           if-no-files-found: error
+      # What the screen showed when a flow failed. The log names these files, and
+      # until now they died with the runner, so a stall in a shard could only be
+      # guessed at from its timeout. Not named browser-shard-*: the job below
+      # downloads that pattern and requires exactly one log for each group.
+      - name: Failure screens
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: failure-screens-${{ matrix.group }}
+          path: /tmp/pri-e2e-shots/*FAIL*.png
+          if-no-files-found: ignore
+          retention-days: 14
 
   browser:
     name: Browser suites (end-to-end and accessibility)
