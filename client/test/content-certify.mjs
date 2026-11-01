@@ -61,6 +61,7 @@ const {
   indiaScope, indiaDifficultyWindow, resolveIndiaTarget, indiaRequestableDifficulties
 } = await import('../src/engine/indiaProduct.js');
 const { pyqCellsFor } = await import('../src/engine/pyq/pyqCoverage.js');
+const { pastPapersEnabled, PAST_PAPERS_OFF_REASON } = await import('../src/engine/pastPapers.js');
 const { generateQuestion, loadAllBanks, loadBanksFor, bankOf, GENERATORS } = await import('../src/engine/generators/index.js');
 const { makeRng } = await import('../src/engine/qhelpers.js');
 const { sanitizeFigure } = await import('../src/lib/sanitize.js');
@@ -162,6 +163,61 @@ export function figureProblems(q) {
   return out;
 }
 
+// ── Typesetting and provenance of what the student reads ───────────────────
+//
+// A machine-made prompt gives itself away: "(x - -5)", "1x + 2y", "6x+0=5x-2".
+// None of these is wrong mathematics, and every one tells a student the
+// question was not written by a person. These rules run over the $…$ maths of
+// every prompt, stem and option (the surfaces a student reads before
+// answering); a hit fails certification like a KaTeX error does.
+const TYPESET_RULES = [
+  // "- -5", "+-3", "x--2": two signs with nothing but space between them. A
+  // sign that follows an opening bracket, a brace, a relation, a comma or an
+  // operator-like control sequence is a legitimate leading sign.
+  ['double sign', /(?<![{(\[^_=,\\|])[-−+]\s*[-−](?=\s*(?:\d|\\frac|\\dfrac|\\sqrt|\\left|[a-zA-Z(]))/],
+  // "1x", "1y^2", "1i": a coefficient of one written out. Digits, a decimal
+  // point, a subscript/superscript brace or a preceding letter rule out the
+  // tail of a longer number or an index like a_1x.
+  ['unit coefficient', /(?<![\d._{^\\a-zA-Z}])1(?=[a-zA-Z](?![a-zA-Z]))/],
+  // "0x": a zero coefficient left in.
+  ['zero coefficient', /(?<![\d._{^\\a-zA-Z}])0(?=[a-zA-Z](?![a-zA-Z]))/],
+  // "+0=", "- 0)", "+0 -": a zero term left in an expression.
+  ['+0 term', /[-+]\s*0(?![\d.])(?=\s*(?:[=)\]},;|]|$|\\le|\\ge|\\ne|\\right|<|>|[-+]))/]
+];
+// A served question is Pri's own. A textbook exercise, example or Try These
+// number on a prompt reproduces the textbook (audit item 6, Nov 2026).
+const TEXTBOOK_NUMBERING = /\bNCERT\s+(?:Exercise|Example|Try These)\b|\bExercise\s+\d+\.\d+\s*Q\s*\d+/i;
+
+/** Typesetting defects in the $…$ maths of one student-read string. */
+export function typesettingProblems(text, where = 'text') {
+  if (text == null || text === '') return [];
+  const s = String(text);
+  const out = [];
+  let m;
+  MATH_SPLIT.lastIndex = 0;
+  while ((m = MATH_SPLIT.exec(s))) {
+    for (const [name, rule] of TYPESET_RULES) {
+      if (rule.test(m[1])) out.push(`${name} in ${where}: $${m[1].slice(0, 80)}$`);
+    }
+  }
+  if (TEXTBOOK_NUMBERING.test(s)) out.push(`textbook numbering in ${where}: ${s.slice(0, 100)}`);
+  return out;
+}
+
+/** The strings a student reads before answering: prompt, stem, part prompts and every option. */
+function readBeforeAnswering(q) {
+  const out = [];
+  const add = (where, v) => { if (typeof v === 'string' && v) out.push([where, v]); };
+  add('prompt', q.prompt);
+  add('stem', q.stem);
+  (q.mcqOptions || []).forEach((o, i) => add(`option ${i}`, o));
+  (q.parts || []).forEach((p, i) => {
+    add(`part ${i + 1} prompt`, p?.prompt);
+    (p?.mcqOptions || []).forEach((o, j) => add(`part ${i + 1} option ${j}`, o));
+  });
+  return out;
+}
+
 /** Problems with the identity stamp of a served item. */
 export function identityProblems(q, generatorId) {
   const out = [];
@@ -203,6 +259,7 @@ export function certifyQuestion(q, { generatorId = q?.subtopic, identity = true 
     problems.push(...inspect(q));
   }
   for (const [where, text] of renderedStrings(q)) problems.push(...latexProblems(text, where));
+  for (const [where, text] of readBeforeAnswering(q)) problems.push(...typesettingProblems(text, where));
   problems.push(...figureProblems(q));
   if (identity) problems.push(...identityProblems(q, generatorId));
   return problems;
@@ -221,11 +278,14 @@ function windowList(track, grade) {
  * Every V1 launch path: { id, track, grade, chapterId, dotpoint, pyqOnly,
  * difficulties, advertised }. A dot point is advertised when the curriculum
  * response marks it generated (an authored form at any difficulty) — the same
- * rule Home uses to enable it.
+ * rule Home uses to enable it. A past-papers path is advertised only while the
+ * past-papers switch is on (engine/pastPapers.js); off, it stays enumerated so
+ * the path count holds, and its declared state is the refusal.
  */
 export function enumeratePaths() {
   const paths = [];
   const push = (p) => paths.push(p);
+  const archives = pastPapersEnabled();
   for (const group of IN_CURRICULUM) {
     const grade = group.grade;
     for (const chapter of group.chapters) {
@@ -236,7 +296,7 @@ export function enumeratePaths() {
         push({ ...base, id: `cbse/${grade}/${chapter.id}#${i + 1}`, dotpoint: i, pyqOnly: false, difficulties: windowList('cbse', grade), advertised: generated });
       });
       if (pyqCellsFor('cbse', chapter.id).length) {
-        push({ ...base, id: `cbse/${grade}/${chapter.id}?pyq`, dotpoint: null, pyqOnly: true, difficulties: windowList('cbse', grade), advertised: true });
+        push({ ...base, id: `cbse/${grade}/${chapter.id}?pyq`, dotpoint: null, pyqOnly: true, difficulties: windowList('cbse', grade), advertised: archives });
       }
     }
   }
@@ -250,7 +310,7 @@ export function enumeratePaths() {
           push({ ...base, id: `${track}/${grade}/${chapter.id}#${i + 1}`, dotpoint: i, pyqOnly: false, difficulties: windowList(track, grade), advertised: generated });
         });
         if (pyqCellsFor(track, chapter.id).length) {
-          push({ ...base, id: `${track}/${grade}/${chapter.id}?pyq`, dotpoint: null, pyqOnly: true, difficulties: windowList(track, grade), advertised: true });
+          push({ ...base, id: `${track}/${grade}/${chapter.id}?pyq`, dotpoint: null, pyqOnly: true, difficulties: windowList(track, grade), advertised: archives });
         }
       }
     }
@@ -493,6 +553,18 @@ async function certifyIssuedExams(seeds, online) {
         }
       }
       if (stored.questionIds.length === 0) { row.failed++; row.failures['empty paper'] = { count: 1, example: 'paper composed with no questions', seed }; }
+      // Close the paper. The server allows MAX_OPEN_PAPERS (3) open papers per
+      // account; the full run issues six per selection on one account, so
+      // without this the fourth composition is refused with
+      // EXAM_OPEN_PAPER_LIMIT and the selection is recorded as a failure of
+      // the content rather than of the harness (audit item 12).
+      try {
+        await dispatchIndiaExam(user, 'POST', `/exams/${exam.id}/submit`, { answers: {}, ms: 1000 });
+      } catch (err) {
+        row.failed++;
+        const key = `paper could not be closed: ${err.code || ''} ${err.message}`.slice(0, 200);
+        row.failures[key] = { count: (row.failures[key]?.count || 0) + 1, example: key, seed };
+      }
     }
     row.pass = row.failed === 0 && row.papers === seeds;
     rows.push(row);
@@ -643,9 +715,10 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
       await send(`surface/india-progress/${key}/${chapter.id}`, indiaProgressPracticeHref(chapter, track), { chapterId: chapter.id });
     }
     // Smart practice with and without the past-papers filter. Under the
-    // filter, a class whose archive is empty must say so with
-    // INDIA_PYQ_UNAVAILABLE (rendered with its "turn the filter off" action).
-    const archived = paths.some(p => p.track === track && p.grade === grade && p.pyqOnly);
+    // filter, a class whose archive is empty — or every class while past
+    // papers are switched off — must say so with INDIA_PYQ_UNAVAILABLE
+    // (rendered with its "turn the filter off" action).
+    const archived = paths.some(p => p.track === track && p.grade === grade && p.pyqOnly && p.advertised);
     for (const pyq of [false, true]) {
       for (let i = 0; i < 3; i++) {
         await send(`${key}/smart${pyq ? '?pyq' : ''}#${i + 1}`, practiceHref({ track, pyq }), { pyq, refusal: pyq && !archived ? 'INDIA_PYQ_UNAVAILABLE' : null });
@@ -733,6 +806,14 @@ export async function certifyRepeatWindow(probes, { serve = null } = {}) {
 const DIGEST_FILE = path.join(ROOT, 'docs/content/content-digest.json');
 const DIGEST_DRAWS = 6;
 
+/** Every generator a V1 chapter declares in its covers, on any track. */
+export function coverGenerators() {
+  const out = new Set();
+  for (const group of IN_CURRICULUM) for (const ch of group.chapters) for (const c of ch.covers || []) if (GENERATORS[c.gen]) out.add(c.gen);
+  for (const track of ['jee-main', 'jee-advanced']) for (const grade of [11, 12]) for (const ch of indiaScope(track, grade)) for (const c of ch.covers || []) if (GENERATORS[c.gen]) out.add(c.gen);
+  return out;
+}
+
 /**
  * One digest per V1 generator: the content hashes of fixed seeds at every
  * difficulty. A changed digest means the same (generator, difficulty, seed)
@@ -781,6 +862,10 @@ function summarise(paths, exams, { mode, n, examSeeds }) {
   return {
     contentVersion: CONTENT_VERSION,
     mode, drawsPerDifficulty: n, examSeeds,
+    // Past papers are off for students by default until a rights opinion
+    // exists (engine/pastPapers.js, decision D23). The archive paths stay
+    // enumerated; off, their declared state is the refusal.
+    pastPapers: { enabled: pastPapersEnabled(), reason: pastPapersEnabled() ? null : PAST_PAPERS_OFF_REASON, paths: by(r => r.pyqOnly), advertised: by(r => r.pyqOnly && r.advertised) },
     paths: paths.length,
     advertisedPaths: by(r => r.advertised),
     passed: by(r => r.pass),
@@ -815,14 +900,17 @@ function markdown(report) {
   lines.push('');
   lines.push('Generated by `npm run content:certify` (`client/test/content-certify.mjs --full`). Do not edit by hand.');
   lines.push('');
-  lines.push('This report certifies what the **runtime serves** on every V1 launch path (CBSE/NCERT Classes 7–12, JEE Main, JEE Advanced) — schema, marker round-trip, LaTeX rendering, figures, identity/versioning, repeat prevention and difficulty. It is **not** a claim of syllabus completeness or of human source review: the human question-bank audit is separate and remains outstanding.');
+  lines.push('This report certifies what the **runtime serves** on every V1 launch path (CBSE/NCERT Classes 7–12, JEE Main, JEE Advanced) — schema, marker round-trip, LaTeX rendering, typesetting (no double signs, unit coefficients, zero terms or textbook numbering on a prompt), figures, identity/versioning, repeat prevention and difficulty. It is **not** a claim of syllabus completeness or of human source review: the human question-bank audit is separate and remains outstanding. A named difficulty is served exactly or refused with DIFFICULTY_UNAVAILABLE (issue #408); a dot point authored at fewer rungs is never snapped to a neighbouring rung on a named request.');
+  lines.push('');
+  lines.push('`client/test/content-report-fresh-check.mjs` fails CI when this report is older than the content it describes: a different CONTENT_VERSION, a changed generator digest, a different path or exam count, or a different past-papers default.');
   lines.push('');
   lines.push(`- Content version: \`${s.contentVersion}\``);
   lines.push(`- Mode: ${s.mode}, ${s.drawsPerDifficulty} seeded draws per (path, difficulty); ${s.examSeeds} paper(s) per exam selection`);
   lines.push(`- Paths: **${s.passed}/${s.paths} pass** (${s.advertisedPaths} advertised)`);
+  lines.push(`- Past papers: ${s.pastPapers.enabled ? 'ON (PRI_PAST_PAPERS=1)' : `OFF by default (${s.pastPapers.reason}; decision D23)`} — ${s.pastPapers.paths} archive paths enumerated, ${s.pastPapers.advertised} advertised${s.pastPapers.enabled ? '' : '; the declared state of each is the INDIA_PYQ_UNAVAILABLE refusal, and no timed paper holds a previous-year item'}`);
   lines.push(`- Questions served and validated: ${s.questionsServed} (${s.questionsFailed} failed)`);
   lines.push(`- Advertised paths that served nothing: ${s.emptyAdvertisedPaths}; unadvertised (shown "coming soon") paths with no form: ${s.unadvertisedEmptyPaths}`);
-  lines.push(`- Difficulty: ${s.difficultyMismatch} questions served at a rung other than the one the resolver chose. Every difficulty of the track window is requested on every path, so a dot point authored at fewer rungs is served at its nearest authored rung: ${s.difficultySnapped} such snapped requests, ${s.difficultyBelowWindow} of them outside the track window and disclosed to the student as such`);
+  lines.push(`- Difficulty: ${s.difficultyMismatch} questions served at a rung other than the one the resolver chose. The in-memory sample above asks every window rung on every path through the engine's resolver, which answers from the nearest authored rung and says so: ${s.difficultySnapped} such requests, ${s.difficultyBelowWindow} of them outside the track window. The product path is the end-to-end section below: through the backend a named level with no authored form is refused with DIFFICULTY_UNAVAILABLE, never snapped (issue #408)`);
   lines.push(`- Repeats in a ${REPEAT_WINDOW}-question window: ${s.repeatsAvoidable} avoidable (pool of ${2 * REPEAT_WINDOW}+ distinct items met and still repeated); ${s.repeatsExhausted} from smaller pools, each flagged to the student as a repeat`);
   lines.push(`- Low-variety paths (≤2 distinct items across the sample): ${s.lowVarietyPaths}`);
   lines.push(`- End to end through the local backend (POST /practice/next as the Practice page sends it): ${s.backend.passed}/${s.backend.paths} requests were answered as declared: a renderable, versioned question from the requested chapter at exactly the difficulty asked for, or — where that level has no authored form — a DIFFICULTY_UNAVAILABLE refusal listing the levels that exist — every advertised path with and without each window difficulty, the Class X NCERT library's D1–D4 buttons, India Progress's chapter buttons, and smart practice with and without the past-papers filter (where a class has no archive, the declared refusal)`);
@@ -883,8 +971,11 @@ export async function run(argv = process.argv.slice(2)) {
   const cells = certifyGeneratorCells(new Set(rows.flatMap(r => r.generators)), full ? 60 : 8);
 
   // Versioning gate: generator output under a fixed seed may not change while
-  // CONTENT_VERSION stays put.
-  const v1Generators = new Set(rows.flatMap(r => r.generators));
+  // CONTENT_VERSION stays put. The digest covers every generator a V1 chapter
+  // declares in its covers — whether or not this sample happened to draw it —
+  // plus whatever else was served (the archives, when past papers are on), so
+  // content-report-fresh-check.mjs can rebuild the same set without a run.
+  const v1Generators = new Set([...coverGenerators(), ...rows.flatMap(r => r.generators)]);
   const digests = generatorDigests(v1Generators);
   const committed = fs.existsSync(DIGEST_FILE) ? JSON.parse(fs.readFileSync(DIGEST_FILE, 'utf8')) : null;
   const cmp = compareDigests(committed, digests, CONTENT_VERSION);
