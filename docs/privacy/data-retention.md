@@ -184,7 +184,9 @@ What is true in the code today:
   **What `store: false` does and does not mean:** it tells the Responses API not to keep the
   response object for later retrieval. It is *not* a zero-data-retention agreement: under the
   provider's standard API terms, inputs may be retained for a limited period (OpenAI states up to
-  30 days) for abuse and misuse monitoring, and are not used for training by default. No
+  30 days) for abuse and misuse monitoring, and are not used for training by default (OpenAI,
+  "Data controls in the OpenAI platform",
+  https://developers.openai.com/api/docs/guides/your-data, retrieved 2026-11-02). No
   zero-data-retention arrangement is recorded for this deployment; if one is made, this section
   and the notice must say so. Earlier code comments said "nothing is retained by the provider";
   that overstated it and has been corrected.
@@ -256,6 +258,8 @@ more completely and adds no processing, so the version was not bumped and no re-
 - **Child accounts never confirmed or withdrawn** are not yet erased automatically. Owner default
   D18 (30 days, guardian may request erasure without the child's login) is promised in the notice
   from 2 Nov 2026 and is being built in the accounts stream; counsel sets the final period.
+  A production nomination is refused until that code is at the nominated SHA
+  (`tools/legal-promises.mjs`, called by `scripts/release-nominate.mjs`).
 - **Coded crash reports** (`POST /v1/telemetry/error`) are `client-error` rows under the 90-day
   telemetry retention; they are forwarded to Sentry only if `PRI_SENTRY_DSN` is set, which it is
   not at launch.
