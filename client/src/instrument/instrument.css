@@ -1184,6 +1184,11 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
   html.ui-instrument .in-status:not(.is-off) .in-status-t {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
+/* An iPad is a touch screen: there the icon is a 44px target, not a 32px one.
+   The tab strip scrolls inside the bar, so the extra width never moves the page. */
+@media (min-width: 761px) and (max-width: 1100px) and (pointer: coarse), (min-width: 761px) and (max-width: 1100px) and (hover: none) {
+  html.ui-instrument .in-cmd { width: 44px; min-width: 44px; height: 44px; }
+}
 
 /* Device fit: on the iPad the writing bar keeps the live status and the
    buttons; the decorative key hint (aria-hidden) gives way instead of

@@ -294,6 +294,20 @@ export const flow = {
         writeFileSync(join(outDir, `index-${size.id}-${scheme}.png`), await page.screenshot({ animations: 'disabled' }));
       }
     }
+    // An iPad is a touch screen too, and until this no suite measured one: the
+    // 44px rule above is phone-only, so the compact bar's 32px ⌘K button
+    // passed everywhere. Every kept route, portrait, with a coarse pointer.
+    if (cdp) {
+      await page.setViewportSize({ width: 820, height: 1180 });
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      for (const route of ['/', '/practice', '/map', '/progress', '/review', '/notes', '/plan', '/tasks', '/exams', '/settings']) {
+        await goto(route);
+        await settle();
+        const a = await page.evaluate(AUDIT);
+        await check(`${route}@ipad: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+      }
+    }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
   }
