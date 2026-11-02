@@ -14,14 +14,14 @@
     "@remotion/media-utils": "4.0.535",
     "katex": "0.19.0",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
+    "react-dom": "19.3.1",
     "remotion": "4.0.535",
     "zod": "3.23.8"
   },
   "devDependencies": {
     "@types/katex": "0.16.7",
     "@types/react": "18.3.12",
-    "@types/react-dom": "18.3.1",
+    "@types/react-dom": "19.3.0",
     "tsx": "4.19.2",
     "typescript": "5.6.3"
   }
