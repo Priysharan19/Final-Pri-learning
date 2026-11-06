@@ -212,6 +212,42 @@ await loadAllBanks();
   eq([keysOf(d0).includes(String(d0.seed) + ':'), keysOf(d0).includes(d0.contentHash), keysOf(d0).includes(d0.contentId), keysOf(d0).includes(d0.prompt.slice(0, 12))], [false, false, false, false], 'no seed, engine hash, content id or prompt text in any key');
   eq([contentIdentityOf(null), contentIdentityOf('x'), seenKeysOf(null), triedKeysOf(undefined), repeatEvidenceOf(d0, new Set())], [null, null, [], [], null], 'nothing is not an item, and nothing known is no repeat');
   eq(examItemsOf(parent).length, 4, 'a composed item discloses itself, its parts and their alternatives');
+
+  // Structured figures (Q2 on #695): an object-valued figure is identity by
+  // value, never String(object) === '[object Object]'. The shapes are the
+  // repository's own (class9-2026-27-gap-study-pack.js:108,116 and
+  // class9-2026-27-congruence-studies.js:57). No question the server issues
+  // carries one today; this pins the contract before one does.
+  const plot = (Y, extra = {}) => ({ type: 'coordinate-intercepts', points: { O: [0, 0], X: [6, 0], Y }, segments: [['O', 'X'], ['O', 'Y'], ['X', 'Y']], alt: 'Axes triangle', ...extra });
+  const area = { prompt: 'Find the area of the shaded triangle.', answerType: 'numeric', answer: { value: 12 } };
+  const fig = figure => contentIdentityOf({ ...area, figure });
+  ok(fig(plot([0, 4])) !== fig(plot([0, 9])), 'two structured diagrams that differ in one point are two identities (Q2 counterexample)');
+  ok(fig({ type: 'triangle', base: 6, height: 4 }) !== fig({ type: 'triangle', base: 8, height: 3 }), 'two triangles of the same area are two identities');
+  ok(fig({ type: 'ray-circle', A: [0, 0], B: [10, 0], angleDegrees: 30, radius: 7 }) !== fig({ type: 'ray-circle', A: [0, 0], B: [12, 0], angleDegrees: 30, radius: 8 }), 'the congruence-study ray-circle diagrams are two identities');
+  ok(seenKeyOf({ ...area, figure: plot([0, 4]) }) !== seenKeyOf({ ...area, figure: plot([0, 9]) }) && triedKeyOf({ ...area, figure: plot([0, 4]) }) !== triedKeyOf({ ...area, figure: plot([0, 9]) }), 'and their seen and tried keys differ');
+  const reordered = { alt: 'Axes triangle', segments: [['O', 'X'], ['O', 'Y'], ['X', 'Y']], points: { Y: [0, 4], X: [6, 0], O: [0, 0] }, type: 'coordinate-intercepts' };
+  eq(fig(reordered), fig(plot([0, 4])), 'the same diagram written with its keys in another order is one identity');
+  eq(fig(plot([0, 4], { note: undefined })), fig(plot([0, 4])), 'an undefined key is absent, as in JSON');
+  eq(fig(plot([0, 4], { alt: 'Axes   triangle ' })), fig(plot([0, 4])), 'whitespace inside a label is normalised, as it is for a string figure');
+  ok(fig({ ...plot([0, 4]), segments: [['O', 'Y'], ['O', 'X'], ['X', 'Y']] }) !== fig(plot([0, 4])), 'array order is meaning (segments, coordinates): a reordered list is another diagram');
+  ok(fig({ r: 5 }) !== fig({ r: '5' }), 'a number is not the string that prints like it');
+  ok(fig({ v: true }) !== fig({ v: 'true' }) && fig({ v: null }) !== fig({ v: 'null' }) && fig({ v: null }) !== fig({ v: '' }), 'nor is a boolean or null');
+  ok(fig(['a', 'b']) !== fig('a,b') && fig({ a: 1 }) !== fig('[object Object]') && fig([]) !== fig({}) && fig([]) !== fig(''), 'an array, an object, an empty list and the text that prints like them are four things');
+  ok(fig({ a: [1, 2] }) !== fig({ a: [[1, 2]] }) && fig({ a: { b: 1 } }) !== fig({ 'a.b': 1 }), 'nesting is preserved, not flattened');
+  eq(fig({ x: -0 }), fig({ x: 0 }), 'minus zero is zero');
+  eq(fig('<svg a/>'), contentIdentityOf({ ...area, figure: '  <svg   a/> ' }), 'a string figure keeps its normalised-text identity');
+  eq(contentIdentityOf({ ...area, figure: plot([0, 4]), identityIgnoresFigure: true }), contentIdentityOf({ ...area, figure: plot([0, 9]), identityIgnoresFigure: true }), 'identityIgnoresFigure still leaves a structured figure out');
+  ok(contentIdentityOf({ ...parent, parts: [{ ...partA, figure: plot([0, 4]) }, partB] }) !== contentIdentityOf({ ...parent, parts: [{ ...partA, figure: plot([0, 9]) }, partB] }), 'a part\'s structured figure is in the identity');
+  ok(contentIdentityOf({ ...area, alt: { ...altA, figure: plot([0, 4]) } }) !== contentIdentityOf({ ...area, alt: { ...altA, figure: plot([0, 9]) } }), 'an alternative\'s structured figure is in the identity');
+  const cyclic = { type: 'loop' }; cyclic.self = cyclic;
+  const deep = Array.from({ length: 40 }).reduce(inner => ({ inner }), { leaf: 1 });
+  for (const [name, figure] of [['a function', () => 1], ['a symbol', Symbol('s')], ['a bigint', 10n], ['a Date', new Date(0)], ['a Map', new Map([['a', 1]])], ['a class instance', new (class Shape {})()], ['NaN', { r: NaN }], ['Infinity', { r: Infinity }], ['a symbol key', { [Symbol('k')]: 1 }], ['a cycle', cyclic], ['nesting deeper than 32', deep]]) {
+    let refusal = null;
+    try { contentIdentityOf({ ...area, figure }); } catch (error) { refusal = error.code; }
+    eq(refusal, 'CONTENT_IDENTITY_UNSUPPORTED_FIGURE', `${name} as a figure is refused, never collapsed into a shared key`);
+  }
+  const shared = [0, 1];
+  eq(fig({ a: shared, b: shared }), fig({ a: [0, 1], b: [0, 1] }), 'the same array referenced twice is not a cycle');
   console.log(`  identity: ${count} checks`);
 }
 
@@ -311,6 +347,16 @@ try {
   const written = await rowsOf(A);
   eq(written.map(r => r.key), [seenKeyOf(base)], 'marking content seen writes one row, under the canonical key');
   eq([written[0].response_json, Number(written[0].created_at), Number(written[0].expires_at)], ['{}', T, T + SEEN_AGE], 'with no content in it, created now, expiring in five years');
+
+  // Structured figures on the store (Q2 on #695): seeing one diagram does not
+  // make a different diagram with the same text seen, on either engine.
+  {
+    const figured = Y => ({ prompt: 'Find the area of the shaded triangle.', answerType: 'numeric', answer: { value: 12 }, figure: { type: 'coordinate-intercepts', points: { O: [0, 0], X: [6, 0], Y }, alt: 'Axes triangle' } });
+    await inScope(C, () => markContentSeen(db, C, figured([0, 4]), T));
+    eq(await inScope(C, () => contentSeenEvidence(db, C, figured([0, 9]), T)), null, 'on the store: a different structured diagram with the same text is not seen');
+    eq(await inScope(C, () => contentSeenEvidence(db, C, figured([0, 4]), T)), { key: seenKeyOf(figured([0, 4])), legacy: false, ambiguous: false }, 'and the same diagram is, under its canonical key');
+    await inScope(C, () => db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='practice-content'", [C]));
+  }
   eq([await inScope(A, () => contentSeen(db, A, shuffled, T)), await inScope(A, () => contentSeen(db, A, otherSet, T)), await inScope(A, () => contentSeen(db, A, multi(OPTIONS, ['alpha is 4']), T))], [true, false, false],
     'a reshuffled copy is seen; the same options keyed to another text set, or to one option, is not');
   eq(await inScope(B, () => contentSeen(db, B, base, T)), false, 'another account has not seen it');
