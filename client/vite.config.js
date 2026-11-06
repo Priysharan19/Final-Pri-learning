@@ -278,7 +278,16 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+  // The instrument build is the exception for the prerequisite graph itself:
+  // its Map (MapPage.jsx) imports engine/prerequisites.js statically to draw
+  // each chapter's strand and "needs" line, so in that build the graph is part
+  // of a warmed tab, not of the placement check. Leaving it on demand there
+  // made the Map crash on a first visit offline ("Failed to fetch dynamically
+  // imported module"). install-budget-check.mjs --instrument now holds every
+  // file a tab chunk statically imports to the install or the warm pass.
+  [INSTRUMENT_BUILD
+    ? /(^|\/)(Placement|placement|prerequisiteSkillsHi)-[^/]*\.js$/
+    : /(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
 
   // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
   // Only a JEE student opening a chapter that has reviewed past papers ever
