@@ -194,12 +194,21 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href || process.arg
   const installed = verifyInstalled(device, bundleId);
   console.log(`Installed ${bundleId} at ${installed} (${(install.ms / 1000).toFixed(1)} s, attempt ${install.attempt})`);
   console.log('Running…');
-  run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
+  // Read the log from the launch onwards, not a sliding "--last 3m" window: on
+  // a cold hosted runner one `log show` can take long enough that lines the
+  // app wrote at launch slide out of a window measured from each query (the
+  // iOS 27 lane polled for 7.5 minutes and saw nothing).
+  const pad = n => String(n).padStart(2, '0');
+  const t0 = new Date(Date.now() - 5000);
+  const since = `${t0.getFullYear()}-${pad(t0.getMonth() + 1)}-${pad(t0.getDate())} ${pad(t0.getHours())}:${pad(t0.getMinutes())}:${pad(t0.getSeconds())}`;
+  const launchedAt = Date.now();
+  const launch = run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
+  console.log(`  launched: ${String(launch).trim()}`);
 
   let lines = [];
   for (let i = 0; i < 40; i++) {
     execSync('sleep 2');
-    const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--last', '3m',
+    const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', since,
       '--predicate', 'eventMessage CONTAINS "PRIINK"', '--style', 'compact'],
       { maxBuffer: 32 * 1024 * 1024 });
     lines = log.split('\n')
@@ -218,6 +227,15 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href || process.arg
   console.log('');
   if (problems.length) {
     for (const problem of problems) console.log(`FAIL — ${problem}`);
+    // Say why: is the app still running, and what did it log since launch?
+    console.log(`\n  ${((Date.now() - launchedAt) / 1000).toFixed(0)} s after launch. App log since ${since} (last 40 lines):`);
+    try {
+      const own = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', since,
+        '--predicate', `process == "${app.split('/').pop().replace(/\.app$/, '')}"`, '--style', 'compact'],
+        { maxBuffer: 32 * 1024 * 1024 });
+      for (const l of String(own).trim().split('\n').slice(-40)) console.log(`    ${l}`);
+    } catch (error) { console.log(`    (log show failed: ${error.message.split('\n')[0]})`); }
+    try { console.log(`  running apps: ${run('xcrun', ['simctl', 'spawn', device, 'launchctl', 'list']).split('\n').filter(l => /prilearning/i.test(l)).join(' | ') || 'none matching com.prilearning'}`); } catch { /* best effort */ }
     process.exit(1);
   }
   console.log(`PASS — capture fidelity ${figures.passed}/${figures.cases} cases, ${figures.strokesBack}/${figures.strokesSent} strokes back, max deviation ${figures.maxDeviation} px (floor ${MAX_DEVIATION_PX}), Pencil fields intact, bridge mounted and positioned on ${sim.name} (${sim.runtime}). Synthetic strokes on a simulator: capture evidence only.`);
