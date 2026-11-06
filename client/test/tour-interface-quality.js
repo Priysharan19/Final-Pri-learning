@@ -212,11 +212,21 @@ export const flow = {
                 // control that always has a shadow does not pass by having it.
                 const s = getComputedStyle(el);
                 const focused = { shadow: s.boxShadow, border: s.borderColor, outline: s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0 };
+                // The answer sheet is the field: an input inside .editor-shell
+                // draws no box of its own and focus is shown once, as a ring
+                // on the whole sheet (.editor-shell:focus-within, theme.css).
+                // That ring counts, measured the same way: it must appear
+                // with focus, so a sheet that always has a border still fails.
+                const sheet = el.closest('.editor-shell');
+                const sheetStyle = node => { const c = node && getComputedStyle(node); return c ? { shadow: c.boxShadow, border: c.borderColor } : null; };
+                const sheetFocused = sheetStyle(sheet);
                 el.blur();
                 const u = getComputedStyle(el);
                 const rest = { shadow: u.boxShadow, border: u.borderColor };
+                const sheetRest = sheetStyle(sheet);
                 el.focus({ preventScroll: true });
-                const ring = focused.outline || focused.shadow !== rest.shadow || focused.border !== rest.border;
+                const sheetRing = !!sheet && (sheetFocused.shadow !== sheetRest.shadow || sheetFocused.border !== sheetRest.border);
+                const ring = focused.outline || focused.shadow !== rest.shadow || focused.border !== rest.border || sheetRing;
                 const name = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || (el.labels?.[0]?.textContent) || '').trim();
                 return { ring, name: name.slice(0, 30), tag: el.tagName };
               }));
