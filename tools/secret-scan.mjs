@@ -26,7 +26,7 @@
 // gate must never itself copy a secret into a CI log.
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { closeSync, existsSync, fstatSync, openSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -95,10 +95,16 @@ export function scanFiles(paths, root = ROOT) {
   for (const absolute of paths) {
     const file = relative(root, absolute) || absolute;
     if (ENV_FILE.test(file) && !ENV_TEMPLATE.test(file)) findings.push({ file, line: 0, pattern: 'committed-env-file', masked: '(file)' });
-    let stat;
-    try { stat = statSync(absolute); } catch { continue; }
-    if (!stat.isFile() || stat.size > MAX_BYTES) continue;
-    const buffer = readFileSync(absolute);
+    // One open file descriptor is checked and read, so the bytes scanned are
+    // the bytes of the file that was size- and type-checked.
+    let fd;
+    try { fd = openSync(absolute, 'r'); } catch { continue; }
+    let buffer;
+    try {
+      const stat = fstatSync(fd);
+      if (!stat.isFile() || stat.size > MAX_BYTES) continue;
+      buffer = readFileSync(fd);
+    } catch { continue; } finally { closeSync(fd); }
     if (binary(buffer)) continue;
     scanned += 1;
     const result = scanText(buffer.toString('utf8'), file);

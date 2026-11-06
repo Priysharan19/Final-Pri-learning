@@ -32,6 +32,9 @@ import { fileURLToPath } from 'node:url';
 import { PACKAGES, PLACEHOLDER, REQUIRED_FILES, checkBundles, fingerprint, syncBundles } from '../../scripts/sync-ios.mjs';
 import { ANDROID_TRACKED_ASSETS, GENERATED_ROOTS, audit } from '../../tools/generated-bundles-untracked-check.mjs';
 
+// Every RegExp metacharacter, the backslash included, so a file name is matched literally.
+const escapeRegExp = (text) => text.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RESOLVER = join(ROOT, 'scripts', 'resolve-generated-conflicts.sh');
 const UNTRACKED_CLI = join(ROOT, 'tools', 'generated-bundles-untracked-check.mjs');
@@ -298,11 +301,11 @@ try {
     ok(withoutSync !== original, `${lane}: the sync step is a line of its own`);
     writeFileSync(join(wfCopy, lane), withoutSync);
     let r = policy();
-    ok(r.status === 1 && new RegExp(`${lane.replace(/\./g, '\\.')}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run sync:ios' earlier in the same job`).test(r.stderr),
+    ok(r.status === 1 && new RegExp(`${escapeRegExp(lane)}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run sync:ios' earlier in the same job`).test(r.stderr),
       `${lane}: removing the sync step fails the policy (${r.stderr.trim().split('\n')[0]})`);
     writeFileSync(join(wfCopy, lane), stripped(/^\s*npm run check:ios\s*$/));
     r = policy();
-    ok(r.status === 1 && new RegExp(`${lane.replace(/\./g, '\\.')}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run check:ios' after the sync`).test(r.stderr),
+    ok(r.status === 1 && new RegExp(`${escapeRegExp(lane)}: job '[A-Za-z0-9_-]+' runs xcodebuild -scheme PriLearning at line \\d+ without 'npm run check:ios' after the sync`).test(r.stderr),
       `${lane}: removing the check step fails the policy`);
     // The generation moved after the Swift build: too late for that runner.
     const lines = original.split('\n');

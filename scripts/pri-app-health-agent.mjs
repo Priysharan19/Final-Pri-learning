@@ -349,7 +349,7 @@ function reportMarkdown(report) {
       lines.push(`### ${failure.severity} · ${failure.subsystem}`);
       lines.push('');
       lines.push(`- **Check:** \`${failure.id}\``);
-      lines.push(`- **Command:** \`${failure.commandLine.replace(/`/g, '\\`')}\``);
+      lines.push(`- **Command:** \`${failure.commandLine.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``);
       lines.push(`- **Likely repair area:** ${failure.fixArea}`);
       lines.push(`- **Next fix:** ${failure.action}`);
       lines.push(`- **Duration:** ${formatDuration(failure.durationMs)}${failure.timedOut ? ' (timed out)' : ''}`);
