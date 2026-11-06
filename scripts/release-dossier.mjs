@@ -291,7 +291,9 @@ export async function buildDossier({
 }
 
 function mark(ok) { return ok === null ? '·' : ok ? 'PASS' : 'FAIL'; }
-function cell(text) { return String(text ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' '); }
+// Backslashes first, then pipes: evidence text such as `x\\| PASS |` must stay
+// inside its own cell and can never add a forged column to the GO/NO-GO table.
+function cell(text) { return String(text ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' '); }
 
 export function renderMarkdown(result, { device, reader } = {}) {
   const { sha, verdict, reasons, rows, nomination, generatedAt, recordPath } = result;

@@ -17,7 +17,7 @@ import {
   CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
   loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey
 } from '../scripts/release-nominate.mjs';
-import { EXTERNAL_GATES, buildDossier, parseArgs as parseDossierArgs, recordProblems, recordTemplate } from '../scripts/release-dossier.mjs';
+import { EXTERNAL_GATES, buildDossier, parseArgs as parseDossierArgs, recordProblems, recordTemplate, renderMarkdown } from '../scripts/release-dossier.mjs';
 import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
@@ -425,6 +425,14 @@ const scratch = [];
     const record = fullRecord(); record.overrides = overridePath;
     const result = await dossier(withOverride, record);
     ok(result.verdict === 'GO-READY' && result.rows.some(r => r.step === 'override' && /device-matrix waived/.test(r.label) && /Priya Example/.test(r.detail)) && /## Overrides/.test(result.markdown) && /device-matrix waived/.test(result.markdown), 'a recorded override is carried into the dossier by name, person and reason');
+  }
+  {
+    // Evidence text is untrusted: a detail ending in a backslash before a pipe
+    // must not close its cell and forge a PASS column (CodeQL incomplete-escaping).
+    const forged = renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['x'], rows: [{ step: 25, ok: false, label: 'Staging proof', detail: String.raw`evil\| PASS | forged`, who: 'bot' }], nomination: { results: [] }, generatedAt: 't', recordPath: null }, {});
+    const row = forged.split('\n').find(l => l.includes('evil')) || '';
+    const boundaries = [...row.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length;
+    ok(boundaries === 5, `dossier evidence cannot break out of its table cell (${boundaries} cell boundaries, want 5): ${row}`);
   }
   const dossierSource = read('scripts/release-dossier.mjs');
   ok(!/\[\s*'push'/.test(dossierSource) && !/railway|update_ref|deploy\/production'\]/.test(dossierSource.replace(/\/\/.*$/gm, '')), 'the dossier source never pushes, deploys or moves the pointer');
