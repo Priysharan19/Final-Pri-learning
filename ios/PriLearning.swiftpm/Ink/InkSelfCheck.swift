@@ -324,6 +324,62 @@ enum InkSelfCheck {
         return f
     }
 
+    // MARK: - Restore identity
+
+    struct RestoreIdentity {
+        var cycles = 0
+        var identical = true          // every unchanged restored stroke came back exactly as sent, every cycle
+        var newReencoded = false      // a stroke the student adds is read from PencilKit
+        var alteredReencoded = false  // a restored stroke that changed is not replaced by the stale original
+        var ok: Bool { cycles > 0 && identical && newReencoded && alteredReencoded }
+    }
+
+    private static func same(_ a: [InkStroke], _ b: [InkStroke]) -> Bool {
+        guard a.count == b.count else { return false }
+        for (x, y) in zip(a, b) {
+            guard x.points.count == y.points.count else { return false }
+            for (p, q) in zip(x.points, y.points) where p.x != q.x || p.y != q.y || p.w != q.w || p.t != q.t
+                || p.force != q.force || p.azimuth != q.azimuth || p.altitude != q.altitude { return false }
+        }
+        return true
+    }
+
+    /// A draft restored on every relaunch and saved again must not move:
+    /// five restore → read cycles return the page's own points each time; a
+    /// new stroke and a changed restored stroke are read from PencilKit.
+    static func restoreIdentity(of strokes: [InkStroke], cycles: Int = 5) -> RestoreIdentity {
+        var r = RestoreIdentity()
+        var current = strokes
+        for _ in 0..<cycles {
+            let (drawing, restored) = StrokeCodec.restore(current, color: .black)
+            let back = StrokeCodec.strokes(from: drawing, restored: restored)
+            if !same(back, strokes) { r.identical = false }
+            current = back
+            r.cycles += 1
+        }
+        let (drawing, restored) = StrokeCodec.restore(strokes, color: .black)
+        // A new mark: a live stroke, with a live creation date.
+        var pen = Pen(); pen.x = 600
+        let fresh = StrokeCodec.drawing(from: ink(for: "1", pen: &pen), color: .black).strokes
+        let withNew = PKDrawing(strokes: drawing.strokes + fresh.map {
+            PKStroke(ink: $0.ink, path: PKStrokePath(controlPoints: Array($0.path), creationDate: Date()))
+        })
+        let readNew = StrokeCodec.strokes(from: withNew, restored: restored)
+        r.newReencoded = readNew.count == strokes.count + fresh.count
+            && same(Array(readNew.prefix(strokes.count)), strokes)
+            && !readNew.suffix(fresh.count).contains { $0.points.isEmpty }
+        // A restored stroke that changed (same creation date, shorter path, as a cut would leave it).
+        if var first = drawing.strokes.first, first.path.count > 4 {
+            let cut = Array(first.path).prefix(first.path.count / 2)
+            first = PKStroke(ink: first.ink, path: PKStrokePath(controlPoints: Array(cut), creationDate: first.path.creationDate))
+            let altered = PKDrawing(strokes: [first] + drawing.strokes.dropFirst())
+            let readAltered = StrokeCodec.strokes(from: altered, restored: restored)
+            r.alteredReencoded = !same([readAltered[0]], [strokes[0]])
+                && same(Array(readAltered.dropFirst()), Array(strokes.dropFirst()))
+        }
+        return r
+    }
+
     // MARK: - Run
 
     static func run() {
@@ -347,6 +403,16 @@ enum InkSelfCheck {
                   f.durationOK ? "ok" : "BAD", f.forceOK ? "ok" : "BAD", f.azimuthOK ? "ok" : "BAD", f.altitudeOK ? "ok" : "BAD", f.jsonOK ? "ok" : "BAD")
         }
         let strokePct = strokesSent == 0 ? 0 : 100 * Double(strokesBack) / Double(strokesSent)
+        var restorePassed = 0
+        for testCase in cases {
+            var pen = Pen()
+            if restoreIdentity(of: testCase.build(&pen)).ok { restorePassed += 1 }
+        }
+        var probePen = Pen()
+        let probe = restoreIdentity(of: cases[0].build(&probePen))
+        NSLog("PRIINK restore identity: %d/%d cases · cycles=%d identical=%@ new=%@ altered=%@",
+              restorePassed, cases.count, probe.cycles, probe.identical ? "yes" : "NO",
+              probe.newReencoded ? "reencoded" : "BAD", probe.alteredReencoded ? "reencoded" : "BAD")
         NSLog("PRIINK ── capture fidelity: %d/%d cases · strokes %.1f%% (%d/%d) · max deviation %.2f px (floor %.1f) · fields %@ ──",
               passed, cases.count, strokePct, strokesBack, strokesSent, Double(worst), Double(maxDeviationFloorPx), fieldsOK ? "ok" : "BAD")
         DispatchQueue.main.async { checkBridge() }

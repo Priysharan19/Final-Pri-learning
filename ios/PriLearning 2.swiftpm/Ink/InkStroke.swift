@@ -117,15 +117,89 @@ enum StrokeCodec {
         return InkStroke(points: points)
     }
 
+    /// The largest gap left between two control points handed to PencilKit.
+    ///
+    /// `PKStrokePath(controlPoints:)` is a uniform cubic B-spline: the curve it
+    /// draws does not pass through its control points, it cuts every corner
+    /// by an amount that grows with the spacing between them. A stroke the
+    /// bridge receives from the page (a restored draft, ink written on the web
+    /// canvas) can have points several pixels apart, and the corners of a 2,
+    /// an 8 or an n then moved by up to 4 px on the way into the surface — the
+    /// Gate A self-check measured 4.11 px against its 2.0 px floor. Filling the
+    /// polygon in to this spacing first keeps the spline within a fraction of
+    /// a pixel of every point the student wrote. Strokes that came from
+    /// PencilKit are already `sampleStep` apart and are left as they are.
+    static let maxControlSpacing: CGFloat = 1.0
+
+    /// Linear fill between consecutive points; every field (time, width,
+    /// force, azimuth, altitude) is interpolated with the position, so the
+    /// stroke's duration and the range of its Pencil signal are unchanged.
+    static func densified(_ points: [InkPoint]) -> [InkPoint] {
+        guard points.count > 1 else { return points }
+        var out: [InkPoint] = [points[0]]
+        out.reserveCapacity(points.count)
+        for i in 1..<points.count {
+            let a = points[i - 1], b = points[i]
+            let gap = hypot(b.x - a.x, b.y - a.y)
+            let pieces = Int((gap / maxControlSpacing).rounded(.up))
+            if pieces > 1 {
+                for k in 1..<pieces {
+                    let u = CGFloat(k) / CGFloat(pieces)
+                    func mix(_ p: CGFloat, _ q: CGFloat) -> CGFloat { p + (q - p) * u }
+                    out.append(InkPoint(
+                        x: mix(a.x, b.x), y: mix(a.y, b.y), w: mix(a.w, b.w),
+                        t: a.t + (b.t - a.t) * Double(u),
+                        force: mix(a.force, b.force),
+                        azimuth: mix(a.azimuth, b.azimuth),
+                        altitude: mix(a.altitude, b.altitude)
+                    ))
+                }
+            }
+            out.append(b)
+        }
+        return out
+    }
+
     static func strokes(from drawing: PKDrawing) -> [InkStroke] {
         drawing.strokes.map { StrokeCodec.stroke(from: $0) }
     }
 
     static func drawing(from strokes: [InkStroke], color: UIColor) -> PKDrawing {
+        restore(strokes, color: color).drawing
+    }
+
+    // MARK: Restore identity
+    //
+    // A restored draft is written into PencilKit (above) and, until the
+    // student touches it, is the same ink they wrote. Reading it back through
+    // the spline would hand the page a slightly smoothed copy, and the page
+    // saves that copy as the draft: every relaunch or remount then restored the
+    // copy of a copy, and a "6" or an "8" crept by more each time (measured
+    // 4.1 px after one cycle and 5.7 px after five before the densified
+    // polygon; still 2.2 px after five with it). So a restore remembers what it
+    // wrote, keyed by a creation date no live stroke can have, and reading the
+    // canvas returns the student's own points for every restored stroke that
+    // is still exactly as it was written. Anything else — a new stroke, a
+    // stroke cut by the pixel eraser, a moved stroke — is read from PencilKit.
+
+    struct Restored {
+        fileprivate struct Entry { let stroke: InkStroke; let count: Int; let first: CGPoint; let last: CGPoint }
+        fileprivate var entries: [Date: Entry] = [:]
+        var count: Int { entries.count }
+    }
+
+    /// Dates far before any real stroke (2001 minus ~31 years), one per
+    /// restored stroke, so a restored path is recognisable when read back.
+    private static func restoreDate(_ index: Int) -> Date {
+        Date(timeIntervalSinceReferenceDate: -1_000_000_000 + Double(index))
+    }
+
+    static func restore(_ strokes: [InkStroke], color: UIColor) -> (drawing: PKDrawing, restored: Restored) {
         let ink = PKInk(.pen, color: color)
-        let built: [PKStroke] = strokes.compactMap { stroke in
-            guard !stroke.points.isEmpty else { return nil }
-            let controlPoints: [PKStrokePoint] = stroke.points.enumerated().map { index, p in
+        var restored = Restored()
+        var built: [PKStroke] = []
+        for stroke in strokes where !stroke.points.isEmpty {
+            let controlPoints: [PKStrokePoint] = densified(stroke.points).enumerated().map { index, p in
                 let fallbackTime = Double(index) / 120.0
                 let time = p.t > 0 || index == 0 ? p.t : fallbackTime
                 let width = max(1, p.w)
@@ -140,10 +214,30 @@ enum StrokeCodec {
                 )
             }
             let safePoints = controlPoints.count >= 2 ? controlPoints : controlPoints + controlPoints
-            let path = PKStrokePath(controlPoints: safePoints, creationDate: Date())
-            return PKStroke(ink: ink, path: path)
+            let date = restoreDate(built.count)
+            let path = PKStrokePath(controlPoints: safePoints, creationDate: date)
+            built.append(PKStroke(ink: ink, path: path))
+            restored.entries[date] = .init(stroke: stroke, count: path.count,
+                                           first: safePoints.first!.location, last: safePoints.last!.location)
         }
-        return PKDrawing(strokes: built)
+        return (PKDrawing(strokes: built), restored)
+    }
+
+    /// Read the canvas as the bridge does, returning the original points for
+    /// every restored stroke that has not been changed since it was restored.
+    static func strokes(from drawing: PKDrawing, restored: Restored) -> [InkStroke] {
+        drawing.strokes.map { pk in
+            if let entry = restored.entries[pk.path.creationDate],
+               pk.transform == .identity,
+               pk.mask == nil,                      // the pixel eraser masks a path without changing it
+               pk.maskedPathRanges.count == 1,
+               pk.path.count == entry.count,
+               let first = pk.path.first?.location, let last = pk.path.last?.location,
+               first == entry.first, last == entry.last {
+                return entry.stroke
+            }
+            return StrokeCodec.stroke(from: pk)
+        }
     }
 }
 

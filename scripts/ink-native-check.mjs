@@ -135,6 +135,21 @@ export function judge(lines) {
       if (figures.fields !== 'ok') problems.push('a Pencil field (time, force, azimuth, altitude) or the JSON round trip was lost');
     }
   }
+  // A draft restored on relaunch must come back exactly as the page sent it,
+  // or each restore → save cycle moves the student's ink a little further.
+  const restore = lines.find(l => l.includes('restore identity:'));
+  if (!restore) problems.push('the self-check did not report restore identity');
+  else {
+    const r = /restore identity: (\d+)\/(\d+) cases · cycles=(\d+) identical=(yes|NO) new=(reencoded|BAD) altered=(reencoded|BAD)/.exec(restore);
+    if (!r) problems.push(`the restore-identity line could not be read: ${restore}`);
+    else {
+      if (Number(r[2]) !== EXPECTED_CASES || r[1] !== r[2]) problems.push(`restore identity ${r[1]}/${r[2]} cases; every case must restore exactly`);
+      if (!(Number(r[3]) >= 5)) problems.push(`restore identity ran ${r[3]} cycles; expected at least 5`);
+      if (r[4] !== 'yes') problems.push('a restored stroke the student did not touch came back changed (draft drift)');
+      if (r[5] !== 'reencoded') problems.push('a new stroke after a restore was not read from the canvas');
+      if (r[6] !== 'reencoded') problems.push('a changed restored stroke was replaced by its stale original');
+    }
+  }
   if (!bridge) problems.push('the bridge smoke test did not report');
   else {
     const b = /mounted=(yes|NO) positioned=(yes|NO) strokesSent=(\d+) strokesBack=(\d+) placement=(ok|BAD)/.exec(bridge);

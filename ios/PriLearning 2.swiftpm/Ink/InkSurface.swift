@@ -178,6 +178,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     /// in Undo/Redo, and the reset is not emitted as a user stroke change.
     func resetForNewSheet() {
         clearHistory()
+        restored = StrokeCodec.Restored()
         replaceDrawing(PKDrawing(), notify: false)
     }
 
@@ -192,7 +193,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     // MARK: - Strokes
 
-    var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing) }
+    /// What the last restore wrote, so unchanged restored strokes are handed
+    /// back exactly as the page sent them (see StrokeCodec.Restored).
+    private var restored = StrokeCodec.Restored()
+
+    var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing, restored: restored) }
 
     /// Programmatic restoration establishes the baseline for the current
     /// question. It must not make the previous sheet reachable through Undo.
@@ -200,7 +205,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     /// new question's first undo point.
     func setStrokes(_ strokes: [InkStroke]) {
         clearHistory()
-        replaceDrawing(StrokeCodec.drawing(from: strokes, color: inkColor))
+        let (drawing, written) = StrokeCodec.restore(strokes, color: inkColor)
+        restored = written
+        replaceDrawing(drawing)
     }
 
     var isEmpty: Bool { canvas.drawing.strokes.isEmpty }

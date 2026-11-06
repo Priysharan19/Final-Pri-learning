@@ -117,20 +117,31 @@ ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty outp
     const b = { mounted: 'yes', positioned: 'yes', sent: 4, back: 4, placement: 'ok', ...over };
     return `PRIINK bridge mounted=${b.mounted} positioned=${b.positioned} strokesSent=${b.sent} strokesBack=${b.back} placement=${b.placement}`;
   };
+  const restore = (over = {}) => {
+    const r = { passed: 10, cases: 10, cycles: 5, identical: 'yes', fresh: 'reencoded', altered: 'reencoded', ...over };
+    return `PRIINK restore identity: ${r.passed}/${r.cases} cases · cycles=${r.cycles} identical=${r.identical} new=${r.fresh} altered=${r.altered}`;
+  };
+  // Restore identity: a draft restored on relaunch must not drift.
+  ok(judge([fidelity(), bridge()]).problems.some(p => /did not report restore identity/.test(p)), 'a run without the restore-identity line fails');
+  ok(judge([restore({ identical: 'NO' }), fidelity(), bridge()]).problems.some(p => /draft drift/.test(p)), 'a restored stroke that moved fails (draft drift)');
+  ok(judge([restore({ passed: 9 }), fidelity(), bridge()]).problems.some(p => /restore identity 9\/10/.test(p)), 'one case that does not restore exactly fails');
+  ok(judge([restore({ cycles: 1 }), fidelity(), bridge()]).problems.some(p => /ran 1 cycles/.test(p)), 'fewer than five restore cycles fails');
+  ok(judge([restore({ fresh: 'BAD' }), fidelity(), bridge()]).problems.some(p => /new stroke after a restore/.test(p)), 'a new stroke not read from the canvas fails');
+  ok(judge([restore({ altered: 'BAD' }), fidelity(), bridge()]).problems.some(p => /stale original/.test(p)), 'a changed stroke replaced by its stale original fails');
   ok(EXPECTED_CASES === 10 && MAX_DEVIATION_PX === 2.0, 'the gate holds ten cases to a 2.0 px deviation floor');
-  ok(judge([fidelity(), bridge()]).problems.length === 0, 'a clean run passes');
-  ok(judge([fidelity({ passed: 9 })]).problems.some(p => /capture fidelity 9\/10/.test(p)), 'one failing case fails the gate');
-  ok(judge([fidelity({ back: 230, pct: '99.6' }), bridge()]).problems.some(p => /every stroke must come back/.test(p)), 'one dropped stroke in 231 fails the gate');
-  ok(judge([fidelity({ dev: '2.01' }), bridge()]).problems.some(p => /2\.01 px is above the 2 px floor/.test(p)), 'a point moved past the floor fails the gate');
-  ok(judge([fidelity({ dev: '2.00' }), bridge()]).problems.length === 0, 'exactly the floor passes');
-  ok(judge([fidelity({ dev: 'inf' }), bridge()]).problems.some(p => /above the 2 px floor/.test(p)), 'an unmeasurable deviation fails');
-  ok(judge([fidelity({ fields: 'BAD' }), bridge()]).problems.some(p => /Pencil field/.test(p)), 'a lost Pencil field fails the gate');
-  ok(judge([fidelity({ floor: '3.0' }), bridge()]).problems.some(p => /different deviation floor/.test(p)), 'the Swift floor and this gate must agree');
-  ok(judge([fidelity({ cases: 9, passed: 9 }), bridge()]).problems.some(p => /ran 9 cases; expected 10/.test(p)), 'fewer cases than the protocol fails');
-  ok(judge([fidelity(), bridge({ positioned: 'NO' })]).problems.some(p => /mispositioned/.test(p)), 'a mispositioned surface fails');
-  ok(judge([fidelity(), bridge({ back: 3 })]).problems.some(p => /did not survive the bridge round trip \(3\/4\)/.test(p)), 'a stroke lost on the live bridge fails');
-  ok(judge([fidelity(), bridge({ placement: 'BAD' })]).problems.some(p => /placement maths/.test(p)), 'wrong placement at page scale 1.5 fails');
-  ok(judge([fidelity()]).problems.some(p => /bridge smoke test did not report/.test(p)) && judge([bridge()]).problems.some(p => /did not report a capture-fidelity score/.test(p)), 'a missing half fails');
+  ok(judge([restore(), fidelity(), bridge()]).problems.length === 0, 'a clean run passes');
+  ok(judge([restore(), fidelity({ passed: 9 })]).problems.some(p => /capture fidelity 9\/10/.test(p)), 'one failing case fails the gate');
+  ok(judge([restore(), fidelity({ back: 230, pct: '99.6' }), bridge()]).problems.some(p => /every stroke must come back/.test(p)), 'one dropped stroke in 231 fails the gate');
+  ok(judge([restore(), fidelity({ dev: '2.01' }), bridge()]).problems.some(p => /2\.01 px is above the 2 px floor/.test(p)), 'a point moved past the floor fails the gate');
+  ok(judge([restore(), fidelity({ dev: '2.00' }), bridge()]).problems.length === 0, 'exactly the floor passes');
+  ok(judge([restore(), fidelity({ dev: 'inf' }), bridge()]).problems.some(p => /above the 2 px floor/.test(p)), 'an unmeasurable deviation fails');
+  ok(judge([restore(), fidelity({ fields: 'BAD' }), bridge()]).problems.some(p => /Pencil field/.test(p)), 'a lost Pencil field fails the gate');
+  ok(judge([restore(), fidelity({ floor: '3.0' }), bridge()]).problems.some(p => /different deviation floor/.test(p)), 'the Swift floor and this gate must agree');
+  ok(judge([restore(), fidelity({ cases: 9, passed: 9 }), bridge()]).problems.some(p => /ran 9 cases; expected 10/.test(p)), 'fewer cases than the protocol fails');
+  ok(judge([restore(), fidelity(), bridge({ positioned: 'NO' })]).problems.some(p => /mispositioned/.test(p)), 'a mispositioned surface fails');
+  ok(judge([restore(), fidelity(), bridge({ back: 3 })]).problems.some(p => /did not survive the bridge round trip \(3\/4\)/.test(p)), 'a stroke lost on the live bridge fails');
+  ok(judge([restore(), fidelity(), bridge({ placement: 'BAD' })]).problems.some(p => /placement maths/.test(p)), 'wrong placement at page scale 1.5 fails');
+  ok(judge([restore(), fidelity()]).problems.some(p => /bridge smoke test did not report/.test(p)) && judge([bridge()]).problems.some(p => /did not report a capture-fidelity score/.test(p)), 'a missing half fails');
   ok(judge(['PRIINK ── 10/10 exact · character accuracy 100.0% ──', 'PRIINK bridge mounted=yes positioned=yes strokesBack=4 readShape=ok']).problems.length >= 2,
     'the retired reader benchmark lines no longer satisfy the gate');
 }
