@@ -254,7 +254,7 @@ function CrashReportsCard({ t }) {
   return (
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>{t('settings.crashReportsTitle')}</h2>
-      <label className="row" style={{ gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+      <label className="row in-check" style={{ gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
         <input type="checkbox" checked={on} onChange={e => setOn(setErrorReportsEnabled(e.target.checked))} />
         <span>{t('settings.crashReportsLabel')}</span>
       </label>
