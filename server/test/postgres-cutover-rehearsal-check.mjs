@@ -33,6 +33,8 @@ if (!String(process.env.PRI_TEST_PG_ADMIN_URL || '').trim()) {
   console.log('POSTGRES CUTOVER REHEARSAL: SKIPPED — needs a throwaway Postgres (run via node scripts/with-postgres.mjs).');
   process.exit(0);
 }
+// The Postgres runner counts a suite only when it says which engine it ran on.
+console.log('engine: postgres');
 const scratch = mkdtempSync(join(tmpdir(), 'pri-cutover-'));
 process.env.NODE_ENV = 'test';
 process.env.PRI_AUTH_DELIVERY_KEY = '6b'.repeat(32);
