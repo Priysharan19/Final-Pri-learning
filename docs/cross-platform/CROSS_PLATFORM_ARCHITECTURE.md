@@ -74,7 +74,7 @@ What this means in practice:
 | `priShare` | `postMessage({filename,content})` | none (fire and forget) | none | none | silent |
 | `WKDownload` (implicit) | `<a download>` / blob navigation | share sheet when the download finishes | none | none | silent on failure |
 
-None of the bridges carries a protocol version. Detection happens once at module load (`client/src/ink/InkAnswer.jsx`, `client/src/ink/Calibrate.jsx`). The Swift handlers check neither `frameInfo.isMainFrame` nor the security origin, and the flag script is injected with `forMainFrameOnly: false`. CP-02 closes both gaps.
+None of the bridges carries a protocol version. Detection happens once at module load (`client/src/ink/InkAnswer.jsx`, and the calibration screen `Calibrate.jsx`, since removed with the calibration feature in m-finish-12). The Swift handlers check neither `frameInfo.isMainFrame` nor the security origin, and the flag script is injected with `forMainFrameOnly: false`. CP-02 closes both gaps.
 
 ## 3. Apple/WebKit assumptions inside shared JavaScript (to be abstracted)
 
