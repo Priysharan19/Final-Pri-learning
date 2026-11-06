@@ -217,17 +217,19 @@ try {
   // between the identity existing and v2) still makes the content a repeat —
   // on every deal, because lv already keyed a multiple-choice question by its
   // option text — and the server writes no legacy key again. Where the lv key
-  // could not have told the question from another (here: a unit on the answer
-  // box, which lv left out), the repeat is reported as `repeatEvidence: 'legacy'`
-  // on the issue, the receipt and the attempt; a plain question carries no flag.
+  // cannot prove which question it was written for — and no lv key can, since
+  // lv left out alternatives and answer-box labels whatever the question —
+  // the repeat is reported as `repeatEvidence: 'legacy'` on the issue, the
+  // receipt and the attempt, until a canonical record replaces it.
   const lv = await account('lv');
   await h.db.run('DELETE FROM rate_limits');
   await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
     [lv.account.id, 'seen-c' + legacyContentIdentityOf(d0.q), '{}', 'legacy-v1-row', stamp, stamp + 86_400_000]);
   const lvIssue = await issueMcq(lv.jar, d4);
-  eq([lvIssue.status, lvIssue.data?.repeat, 'repeatEvidence' in (lvIssue.data || {})], [201, true, false], 'a question recorded under its version-1 identity alone is a repeat in another deal, with no evidence flag: v1 named a multiple-choice question exactly');
+  eq([lvIssue.status, lvIssue.data?.repeat, lvIssue.data?.repeatEvidence], [201, true, 'legacy'], 'a question recorded under its version-1 identity alone is a repeat in another deal, reported as resting on legacy evidence');
   const lvGrade = await grade(lv.jar, lvIssue.data.question.id, right(d4));
-  eq([lvGrade.data.correct, lvGrade.data.repeat, 'repeatEvidence' in lvGrade.data, (await eventOf(lvIssue.data.question.id)).repeat], [true, true, false, true], 'marked as a repeat, recorded as one');
+  const lvEvent = await eventOf(lvIssue.data.question.id);
+  eq([lvGrade.data.correct, lvGrade.data.repeat, lvGrade.data.repeatEvidence, lvEvent.repeat, lvEvent.repeatEvidence], [true, true, 'legacy', true, 'legacy'], 'marked as a repeat, recorded as one, the receipt and the attempt carrying the legacy flag; the mark itself is unchanged');
   const lvRows = await h.db.all("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-content'", [lv.account.id]);
   eq([lvRows.filter(r => r.key === seenKeysOf(d0.q)[0]).length, lvRows.filter(r => r.key.startsWith('seen-c') && !r.key.startsWith('seen-c2:')).length, lvRows.filter(r => /^seen-[0-9a-f]{16}$/.test(r.key)).length],
     [1, 1, 0], 'resolving it recorded the canonical key once; the only legacy-shaped row is the one inserted here; no engine-hash key was written');
