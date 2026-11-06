@@ -73,7 +73,29 @@ ok(/- आपकी हैंडराइटिंग के स्ट्रो�
   'and the Hindi notice says the same');
 ok(!/calibration\)/.test(read('docs/i18n.md')), 'docs/i18n.md no longer names a calibration surface');
 
+// ── 3b · No resident handwriting model, no iPad-only wording on every platform ─
+// The crash screen once said "your handwriting model" lives in this iPad's
+// database: there is no such model (handwriting is read on Pri's server) and
+// the same screen ships on web, iPhone and Android. Marks are checked and kept
+// by the server, not only on the device.
+const MODEL_EN = /handwriting model/i;
+const MODEL_HI = /हैंडराइटिंग मॉडल|लिखावट का मॉडल/;
+for (const [key, text] of flat(en)) ok(!MODEL_EN.test(text), `EN ${key} does not mention a handwriting model: ${JSON.stringify(text)}`);
+for (const [key, text] of flat(hi)) ok(!MODEL_HI.test(text), `HI ${key} does not mention a handwriting model: ${JSON.stringify(text)}`);
+// Every student surface ships on all four device classes; "iPad" is allowed
+// only in the staff classroom strings (teach.*), which are off in V1.
+for (const [lang, catalogue] of [['EN', en], ['HI', hi]]) {
+  for (const [key, text] of flat(catalogue)) {
+    if (key.startsWith('teach.')) continue;
+    ok(!/\biPad\b(?! (?:and|और) )/.test(text) || /iPhone (?:and|और) iPad/.test(text), `${lang} ${key} does not speak to an iPad on every platform: ${JSON.stringify(text)}`);
+  }
+}
+ok(/server/i.test(en['errorScreen.savedWorkSafe']) && /सर्वर/.test(hi['errorScreen.savedWorkSafe']),
+  'the crash screen says checked answers are kept on Pri\'s server, in both languages');
+
 // ── 4 · The suite can fail ──────────────────────────────────────────────────
+ok(MODEL_EN.test("bookmarks and your handwriting model all live in this device's database") && MODEL_HI.test('और आपका हैंडराइटिंग मॉडल — सब इस डिवाइस के डेटाबेस में'),
+  'the model pattern catches the removed crash-screen sentence in both languages');
 ok(CLAIM_EN.test("That's your hand learned.") && CLAIM_EN.test('An engine that learns exactly how you write') && CLAIM_EN.test('the model that adapts to your hand'),
   'the English claim pattern catches the three sentences this removes');
 ok(CLAIM_HI.test('एक इंजन जो सीखता है कि आप ठीक कैसे लिखते हैं') && CLAIM_HI.test('Pri ने आपकी लिखावट सीख ली।') && CLAIM_HI.test('वह मॉडल जो आपकी अपनी लिखावट के अनुसार ढलता है'),
