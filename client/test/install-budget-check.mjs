@@ -335,6 +335,32 @@ if (INSTRUMENT) {
   const warmed = tabChunks.filter(u => PRECACHE.includes(u) || WARM.includes(u));
   eq(warmed.length, tabChunks.length,
     `every Map, Report and Scripts chunk is installed or warmed, so a first open offline works — missing: ${JSON.stringify(tabChunks.filter(u => !warmed.includes(u)))}`);
+  // A warmed tab chunk is not enough: every module it imports statically is
+  // fetched before it runs, so the whole static-import closure has to be
+  // carried too. The Map once imported the prerequisite graph, which the
+  // placement rule left on demand: the Map chunk was warmed and the Map still
+  // crashed on its first visit offline ("Failed to fetch dynamically imported
+  // module"). Read from the emitted files themselves, so a chunking change
+  // moves the closure with it.
+  const staticImports = (url) => {
+    const file = join(DIST, url.slice(1));
+    if (!/\.js$/.test(url) || !existsSync(file)) return [];
+    const src = readFileSync(file, 'utf8');
+    const dir = url.slice(0, url.lastIndexOf('/') + 1);
+    const out = [];
+    for (const m of src.matchAll(/(?:^|[;}\s])(?:import|export)\s*(?:[^'"`()]*?\bfrom\s*)?["']\.\/([^"']+)["']/g)) out.push(dir + m[1]);
+    return out;
+  };
+  const closure = new Set();
+  const queue = tabChunks.filter(u => /\.js$/.test(u));
+  while (queue.length) {
+    const url = queue.pop();
+    for (const dep of staticImports(url)) if (!closure.has(dep)) { closure.add(dep); queue.push(dep); }
+  }
+  ok(closure.size > 0, `the tab chunks' static imports were read from the build (${closure.size} files)`);
+  const uncarried = [...closure].filter(u => !PRECACHE.includes(u) && !WARM.includes(u));
+  eq(uncarried.length, 0,
+    `every file a Map, Report or Scripts chunk imports statically is installed or warmed, so the tab does not crash on a first open offline — missing: ${JSON.stringify(uncarried)}`);
   ok(!/prefetchInstrumentTabs/.test(readFileSync(join(ROOT, 'client', 'src', 'App.jsx'), 'utf8')),
     'and the shell no longer relies on an idle prefetch to get them');
 }
