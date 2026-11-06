@@ -1214,6 +1214,19 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
   html.ui-instrument .nt-map-frame { overflow-x: auto; overscroll-behavior-x: contain; }
   html.ui-instrument .nt-map-canvas { min-width: calc(var(--n, 1) * 46px + 24px); }
 
+  /* Settings' error-report switch: the same treatment as "Bookmarked only" —
+     the whole 44px row is the checkbox, its 18px box is drawn, and a keyboard
+     focus ring is drawn on the row because the native box is transparent. */
+  html.ui-instrument .in-check { position: relative; min-height: 44px; align-items: center !important; }
+  html.ui-instrument .in-check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  html.ui-instrument .in-check span { display: inline-flex; align-items: center; gap: 8px; }
+  html.ui-instrument .in-check span::before { content: ''; flex: none; width: 18px; height: 18px; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--in-edge-3); }
+  html.ui-instrument .in-check input:checked + span::before {
+    box-shadow: none; background: var(--in-action) center / 14px 14px no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 7.5 3 3 6-7'/%3E%3C/svg%3E");
+  }
+  html.ui-instrument .in-check:has(input:focus-visible) { outline: 2px solid var(--in-action); outline-offset: 2px; border-radius: 4px; }
+
   /* "Bookmarked only": the whole 44px row is the checkbox; its 18px box is drawn. */
   html.ui-instrument .nt-check { position: relative; }
   html.ui-instrument .nt-check input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
