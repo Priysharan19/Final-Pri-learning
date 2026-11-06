@@ -263,22 +263,15 @@ export function legacyContentIdentityOf(item) {
  * have been that of a different question — that is, whether the item carries
  * something those projections left out: a multiple-correct key, a label on
  * the answer box, an alternative, or a part with its own figure, stem, lists,
- * labels or alternative. A match on such a key is honoured, and reported as
- * legacy evidence. (The prompt-only alias of an unstamped unit is ambiguous
- * whatever the unit; repeatEvidenceOf reports it by the key that matched.)
+ * labels or alternative. This looks at the current item only, so it is one
+ * direction of the question; repeatEvidenceOf reports every legacy-only match
+ * as ambiguous, because the historic item may have carried what this one lacks.
  */
 export function legacyIdentityAmbiguous(item) {
   if (!unit(item)) return false;
   const lossy = u => !!u && ((u.answerType === 'multi-mcq' && Array.isArray(u.mcqOptions)) || present(u.answerPrefix) || present(u.answerSuffix));
   const partLossy = part => !!unit(part) && (lossy(part) || !!unit(part.alt) || present(part.figure) || present(part.stem) || !!matchListOf(part));
   return lossy(item) || !!unit(item.alt) || partsOf(item).some(partLossy);
-}
-
-/** The legacy stamp key of an item that has no stamp: its prompt alone, which names no question exactly. Null when stamped. */
-function promptAliasOf(item) {
-  const stamp = item.contentHash ?? item.contentId;
-  if (stamp != null && stamp !== '') return null;
-  return item.prompt != null && item.prompt !== '' ? 'seen-' + opaqueContentHash(String(item.prompt)) : null;
 }
 
 /** Every legacy key this exact item was recorded under before v2 (read only; never written). */
@@ -307,10 +300,19 @@ export function triedKeysOf(item) {
 /**
  * Why `known` (the live keys of an account, from seenAmong) makes this item a
  * repeat: null when it does not. `legacy` says the match rests on a key written
- * before v2; `ambiguous` says that key could not have told this item from
- * another (the projection it was taken over dropped something this item has,
- * or it is the prompt-only alias of an unstamped unit), so the decision is
- * reported as legacy evidence.
+ * before v2. `ambiguous` says that key cannot prove the record was written for
+ * THIS item, so the decision is reported as legacy evidence.
+ *
+ * Every legacy-only match is ambiguous. Both legacy projections (the v1
+ * identity and the engine hash) leave out an alternative, the labels on the
+ * answer box, and a part's figure, stem, lists and alternative. Whatever the
+ * current item looks like, a different historic item — this one plus an
+ * alternative, say — wrote the same legacy key, and an opaque row cannot say
+ * which of the two it was written for. Judging by the current item alone
+ * (legacyIdentityAmbiguous) only covers one direction: it misses the record
+ * of an item that had an alternative when the current one has none (Q2 on
+ * #695). The repeat itself is still honoured: a repeat earns no progress and
+ * never changes a mark, so this widens what is disclosed, nothing else.
  */
 export function repeatEvidenceOf(item, known) {
   if (!known || known.size === 0) return null;
@@ -318,7 +320,7 @@ export function repeatEvidenceOf(item, known) {
   if (known.has(canonical)) return { key: canonical, legacy: false, ambiguous: false };
   const hit = legacy.find(key => known.has(key));
   if (!hit) return null;
-  return { key: hit, legacy: true, ambiguous: hit === promptAliasOf(item) || legacyIdentityAmbiguous(item) };
+  return { key: hit, legacy: true, ambiguous: true };
 }
 
 /** Every item of a sealed exam question whose solution a result discloses. */

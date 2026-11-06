@@ -313,15 +313,25 @@ await loadAllBanks();
     'plain parts, or no stamp, drop nothing from the version-1 projection (the prompt-only alias of an unstamped unit is judged by the key that matched, below)');
   const unstampedPlain = { prompt: plain.prompt, answerType: plain.answerType, answer: plain.answer };
   eq([repeatEvidenceOf(unstampedPlain, new Set(['seen-' + opaqueContentHash(unstampedPlain.prompt)])).ambiguous, repeatEvidenceOf(unstampedPlain, new Set(['seen-c' + legacyContentIdentityOf(unstampedPlain)])).ambiguous],
-    [true, false], 'an unstamped unit matched on its prompt alone is ambiguous; matched on its version-1 identity it is exact');
+    [true, true], 'an unstamped unit matched on its prompt alone, or on its version-1 identity, is ambiguous legacy evidence');
 
   // Evidence from a set of live keys.
   const known = new Set([seenKeyOf(d0)]);
   eq(repeatEvidenceOf(d0, known), { key: seenKeyOf(d0), legacy: false, ambiguous: false }, 'a canonical match is definite');
-  eq(repeatEvidenceOf(d0, new Set(['seen-c' + legacyContentIdentityOf(d0)])), { key: 'seen-c' + legacyContentIdentityOf(d0), legacy: true, ambiguous: false }, 'a version-1 match on a plain item is legacy and definite');
+  eq(repeatEvidenceOf(d0, new Set(['seen-c' + legacyContentIdentityOf(d0)])), { key: 'seen-c' + legacyContentIdentityOf(d0), legacy: true, ambiguous: true }, 'a version-1 match on a plain item is legacy and definite');
   const m = multi(OPTIONS, ['alpha is 4', 'gamma is 16']);
   eq(repeatEvidenceOf(m, new Set(['seen-c' + legacyContentIdentityOf(m)])), { key: 'seen-c' + legacyContentIdentityOf(m), legacy: true, ambiguous: true }, 'a version-1 match on a multiple-correct item is legacy and ambiguous');
   eq(repeatEvidenceOf(m, new Set([seenKeyOf(m), 'seen-c' + legacyContentIdentityOf(m)])).legacy, false, 'the canonical key wins when both are present');
+  // Q2 on #695, the reverse direction: the historic record was written for an
+  // item carrying something v1 dropped; the current item does not carry it.
+  const noAlt = { prompt: 'Find the area', answerType: 'numeric', answer: { value: 5 } };
+  const withAlt = { ...noAlt, alt: { prompt: 'OR find the perimeter', answerType: 'numeric', answer: { value: 6 } } };
+  eq([legacyContentIdentityOf(noAlt) === legacyContentIdentityOf(withAlt), contentIdentityOf(noAlt) !== contentIdentityOf(withAlt)], [true, true], '(v1 could not tell them apart; v2 can)');
+  eq(repeatEvidenceOf(noAlt, new Set(['seen-c' + legacyContentIdentityOf(withAlt)])), { key: 'seen-c' + legacyContentIdentityOf(noAlt), legacy: true, ambiguous: true }, 'a v1 record of the item WITH an alternative, read for the item without one: honoured, and reported as ambiguous');
+  eq(repeatEvidenceOf(withAlt, new Set(['seen-c' + legacyContentIdentityOf(noAlt)])).ambiguous, true, 'and in the other direction too');
+  const figA = { ...noAlt, figure: { type: 'triangle', base: 6, height: 4 } }, figB = { ...noAlt, figure: { type: 'triangle', base: 8, height: 3 } };
+  eq([legacyContentIdentityOf(figA) === legacyContentIdentityOf(figB), contentIdentityOf(figA) !== contentIdentityOf(figB), repeatEvidenceOf(figB, new Set(['seen-c' + legacyContentIdentityOf(figA)]))?.ambiguous], [true, true, true], 'two structured diagrams v1 saw as one ("[object Object]"): v2 tells them apart, and a v1-only match between them is reported as ambiguous');
+  eq(repeatEvidenceOf(noAlt, new Set(['seen-c' + legacyContentIdentityOf(withAlt), seenKeyOf(noAlt)])), { key: seenKeyOf(noAlt), legacy: false, ambiguous: false }, 'a canonical record is definite even beside a legacy one');
   eq(repeatEvidenceOf(m, new Set(['seen-c' + legacyContentIdentityOf(multi(OPTIONS, ['alpha is 4']))])), null, 'a legacy key of a different item is not evidence: lookups are exact, never a family');
   console.log(`  compatibility: ${count} checks so far`);
 }
@@ -387,7 +397,7 @@ try {
     'an item the version-1 key cannot tell from the recorded one reads as seen — the row cannot say which it was — and says so: ambiguous legacy evidence');
   const plainQ = generateQuestion('c8-linear-equations-both-sides', 2, 9);
   await insertLegacy(A, 'seen-c' + legacyContentIdentityOf(plainQ));
-  eq(await inScope(A, () => contentSeenEvidence(db, A, plainQ, T)), { key: 'seen-c' + legacyContentIdentityOf(plainQ), legacy: true, ambiguous: false }, 'a plain question under its version-1 key is seen, as legacy evidence that is not ambiguous');
+  eq(await inScope(A, () => contentSeenEvidence(db, A, plainQ, T)), { key: 'seen-c' + legacyContentIdentityOf(plainQ), legacy: true, ambiguous: true }, 'a plain question under its version-1 key is seen, as ambiguous legacy evidence (the historic item may have carried an alternative or a label v1 dropped)');
   const hashQ = generateQuestion('c8-linear-equations-both-sides', 2, 10);
   await insertLegacy(A, 'seen-' + opaqueContentHash(hashQ.contentHash));
   eq((await inScope(A, () => contentSeenEvidence(db, A, hashQ, T)))?.legacy, true, 'a question recorded under its stamped engine hash alone (before any identity existed) is still seen');
@@ -509,17 +519,17 @@ try {
   const p5 = paperOf('exam-5', [legacyCase, legacySingle, multi(OPTIONS, ['beta is 9', 'delta is 25'])]);
   const r5 = await finalise(B, p5, answersFor(p5), T + 34 * DAY);
   eq([r5.detail[0].repeat, r5.detail[0].repeatEvidence, r5.detail[0].parts.map(part => part.repeat ?? false)], [true, 'legacy', [false, false]], 'a case study recorded under its version-1 key alone: the whole question is a repeat on legacy evidence (its parts carry figures and alternatives the key did not see); the parts, never recorded, are not');
-  eq([r5.detail[1].repeat, r5.detail[1].repeatEvidence ?? null], [true, null], 'a plain multiple-choice question under its version-1 key: a repeat, not ambiguous, so no evidence flag');
+  eq([r5.detail[1].repeat, r5.detail[1].repeatEvidence ?? null], [true, 'legacy'], 'a plain multiple-choice question under its version-1 key: a repeat, on legacy evidence (v1 could not have told it from the same question with an alternative)');
   eq([r5.detail[2].repeat ?? false, r5.score], [false, r1.score], 'a multiple-correct item never recorded is new work; marks unchanged throughout');
   const attemptFlags = r5.attempts.map(a => [a.repeat ?? false, a.repeatEvidence ?? null]);
-  eq(attemptFlags.filter(([, e]) => e === 'legacy').length, 0, 'per-part attempts of that case study rest on their own keys, so none is flagged legacy');
-  eq(attemptFlags.some(([r, e]) => r && e === null), true, '(the plain question\'s attempt is a repeat without the flag)');
+  eq(attemptFlags.filter(([r]) => !r).every(([, e]) => e === null), true, 'per-part attempts of that case study are new work on their own keys, never flagged legacy');
+  eq(attemptFlags.some(([r, e]) => r && e === 'legacy'), true, '(the plain question\'s attempt is a repeat, and carries the legacy flag)');
   // A third account, whose only records of the parts are version-1 keys (B's finalise above recorded them canonically).
   const p6 = paperOf('exam-6', [legacyCase]);
   await inScope(C, () => markSeen(db, C, caseStudy.parts.map(part => 'seen-c' + legacyContentIdentityOf(part)), T));
   const r6 = await finalise(C, p6, answersFor(p6), T + 35 * DAY);
-  eq([r6.detail[0].parts.map(part => [part.repeat ?? false, part.repeatEvidence ?? null])], [[[true, 'legacy'], [true, null]]], 'parts under version-1 keys: the part with a figure is a repeat on ambiguous legacy evidence, the plain part on legacy evidence that is exact');
-  eq(r6.attempts.map(a => [a.part, a.repeat ?? false, a.repeatEvidence ?? null]), [['a', true, 'legacy'], ['b', true, null]], 'and their attempts say the same');
+  eq([r6.detail[0].parts.map(part => [part.repeat ?? false, part.repeatEvidence ?? null])], [[[true, 'legacy'], [true, 'legacy']]], 'parts under version-1 keys: each part is a repeat on legacy evidence, the plain one included');
+  eq(r6.attempts.map(a => [a.part, a.repeat ?? false, a.repeatEvidence ?? null]), [['a', true, 'legacy'], ['b', true, 'legacy']], 'and their attempts say the same');
 
   console.log(`LEARNING STATE IDENTITY: PASS — ${count}/${count} checks — the canonical identity keys multiple-correct items by their option texts and covers every alternative, part figure, list and answer-box label; legacy keys are read exactly, never widened, honoured and reported; expiry never shrinks and housekeeping keeps what a later exposure kept, on ${engine}.`);
 } finally {
