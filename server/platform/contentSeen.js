@@ -151,6 +151,43 @@ function canonicalMatchList(item) {
   return lists.map(side);
 }
 
+/**
+ * The figure of a unit, as identity substance. A drawing is a string (SVG or a
+ * description) on every question the server issues today; that string is
+ * whitespace-normalised exactly as before. A structured figure (a plain object
+ * or array of points, segments, labels and numbers) is encoded by value, never
+ * through `String()`, which would turn every object into "[object Object]" and
+ * make two different diagrams one question: object keys in sorted order, arrays
+ * in their own order, and every value tagged with its JSON type, so 5 is not
+ * "5" and a list is not the string that prints like it. Anything that is not
+ * plain data (a function, a symbol, a bigint, a Date or Map, a class instance,
+ * a non-finite number, a cycle) has no stable identity: it is refused rather
+ * than collapsed into a key another question could share.
+ */
+const FIGURE_DEPTH = 32;
+function figureSubstance(figure, depth = 0, path = new Set()) {
+  if (figure == null) return depth === 0 ? '' : ['null'];
+  if (typeof figure === 'string') return depth === 0 ? norm(figure) : ['s', norm(figure)];
+  if (typeof figure === 'boolean') return ['b', figure];
+  if (typeof figure === 'number' && Number.isFinite(figure)) return ['n', Object.is(figure, -0) ? 0 : figure];
+  const refuse = why => { throw Object.assign(new TypeError(`content identity: unsupported figure (${why})`), { code: 'CONTENT_IDENTITY_UNSUPPORTED_FIGURE' }); };
+  if (typeof figure !== 'object') refuse(typeof figure);
+  if (depth >= FIGURE_DEPTH) refuse('nested too deeply');
+  if (path.has(figure)) refuse('cycle');
+  path.add(figure);
+  try {
+    if (Array.isArray(figure)) return ['a', Array.from(figure, value => figureSubstance(value, depth + 1, path))];
+    const proto = Object.getPrototypeOf(figure);
+    if (proto !== Object.prototype && proto !== null) refuse('not a plain object');
+    if (Object.getOwnPropertySymbols(figure).length) refuse('symbol key');
+    return ['o', Object.keys(figure).sort()
+      .filter(key => figure[key] !== undefined)
+      .map(key => [key, figureSubstance(figure[key], depth + 1, path)])];
+  } finally {
+    path.delete(figure);
+  }
+}
+
 /** The substance of one unit — an item, its alternative, a part — and of what it contains. */
 function unitSubstance(item) {
   if (!unit(item)) return null;
@@ -163,7 +200,7 @@ function unitSubstance(item) {
     // A generator marks a question whose figure does not bear on its answer
     // (`identityIgnoresFigure`, a private field no student is sent): every
     // drawing of it is then one question, so a new picture is not new content.
-    item.identityIgnoresFigure === true ? '' : norm(item.figure),
+    item.identityIgnoresFigure === true ? '' : figureSubstance(item.figure),
     canonicalMatchList(item),
     unitSubstance(unit(item.alt)),
     Array.isArray(item.parts) ? item.parts.map(part => unitSubstance(unit(part))) : null
