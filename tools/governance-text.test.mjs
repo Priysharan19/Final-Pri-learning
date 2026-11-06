@@ -8,7 +8,7 @@
 // Hermetic: reads files and runs the repository's own scripts; no network.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,7 +49,14 @@ const validate = execFileSync(process.execPath, [join(ROOT, 'scripts/pri-mission
 ok(/^PASS: mission control has/.test(validate) && validate.includes(`writer cap ${control.lease.max_writers}`), 'node scripts/pri-mission-control.mjs validate passes with the declared sets');
 
 // ── validate-ledger is called with the exact head SHA everywhere ───────────────
-for (const file of ['.github/workflows/pri-agent-governance.yml', '.github/workflows/pri-agent-derived-sync.yml', '.github/workflows/pri-agent-derived-apply.yml']) {
+// The callers are discovered, not listed: #697 retires the derived-mirror pair
+// (generated bundles are no longer tracked), and a listed file that no longer
+// exists would crash this suite instead of checking anything. Any new caller is
+// held to the same contract; the governance workflow must remain one.
+const ledgerCallers = readdirSync(join(ROOT, '.github/workflows')).filter(name => /\.ya?ml$/.test(name)).sort()
+  .map(name => `.github/workflows/${name}`).filter(file => /validate-ledger/.test(read(file)));
+ok(ledgerCallers.includes('.github/workflows/pri-agent-governance.yml'), 'pri-agent-governance.yml still calls validate-ledger');
+for (const file of ledgerCallers) {
   const source = read(file);
   const calls = [...source.matchAll(/validate-ledger\s*(?:\\\n\s*)?([^\n]+)/g)].map(m => m[1].trim());
   ok(calls.length > 0, `${file} calls validate-ledger`);
