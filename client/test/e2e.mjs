@@ -30,8 +30,8 @@
 // of the screen at that moment was written.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -62,9 +62,13 @@ function parseArgs(argv) {
 }
 
 // A red line that cannot be looked at is half a report, so every failed check
-// leaves a picture of the screen behind. It goes to the system temp directory,
-// named in the failure — a test run never leaves anything in the repo.
-const SHOTS = join(tmpdir(), 'pri-e2e-shots');
+// leaves a picture of the screen behind. It goes to a private directory this
+// run creates under the system temp directory (mkdtemp: unpredictable name,
+// owner-only), named in the failure — a test run never leaves anything in the
+// repo, and no other local user can pre-create or swap the file it writes.
+// CI uploads /tmp/pri-e2e-shots-*/*FAIL*.png when a shard fails.
+let shotsDir = null;
+const shots = () => (shotsDir ??= mkdtempSync(join(tmpdir(), 'pri-e2e-shots-')));
 
 // ── Assertions ───────────────────────────────────────────────────────────────
 // Same shape as the security suite: groups collect counts, failures collect the
@@ -208,9 +212,9 @@ function helpers(page, base, flowId) {
   const shot = async (label) => {
     const name = `${flowId}-${String(++shotN).padStart(2, '0')}-${label}.png`;
     try {
-      await mkdir(SHOTS, { recursive: true });
-      await page.screenshot({ path: join(SHOTS, name), fullPage: false });
-      return join(SHOTS, name);
+      const file = join(shots(), name);
+      await page.screenshot({ path: file, fullPage: false });
+      return file;
     } catch { return null; }
   };
 
@@ -345,10 +349,12 @@ async function runFlow(flow, { browser, opts }) {
     const path = await api.shot('FAIL-crash');
     const seen = await flight.report().catch(e => [`the flight record could not be read: ${String(e?.message || e).slice(0, 120)}`]);
     const saved = [];
-    await mkdir(SHOTS, { recursive: true }).catch(() => {});
     for (const { name, screen } of flight.closedScreens()) {
-      const file = join(SHOTS, `${flow.id}-FAIL-closed-${name}.png`);
-      await writeFile(file, screen).then(() => saved.push(file)).catch(() => {});
+      try {
+        const file = join(shots(), `${flow.id}-FAIL-closed-${name}.png`);
+        await writeFile(file, screen, { flag: 'wx' });
+        saved.push(file);
+      } catch { /* a missing picture never hides the failure it belongs to */ }
     }
     ok('the flow ran to the end', false,
       `threw: ${String(err?.stack || err).split('\n').slice(0, 4).join('\n      ')}${path ? `\n      screenshot: ${path}` : ''}${saved.map(file => `\n      screenshot: ${file}`).join('')}${seen.map(line => `\n      ${line}`).join('')}`);
