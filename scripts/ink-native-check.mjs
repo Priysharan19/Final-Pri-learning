@@ -32,7 +32,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
@@ -201,21 +201,45 @@ if (import.meta.url === new URL(`file://${process.argv[1]}`).href || process.arg
   const pad = n => String(n).padStart(2, '0');
   const t0 = new Date(Date.now() - 5000);
   const since = `${t0.getFullYear()}-${pad(t0.getMonth() + 1)}-${pad(t0.getDate())} ${pad(t0.getHours())}:${pad(t0.getMinutes())}:${pad(t0.getSeconds())}`;
+  // The self-check also writes every PRIINK line to Documents/PRIINK.log in
+  // its own container (InkSelfCheck.say). A hosted iOS 27 image ran the app
+  // for 733 s and `log show` returned nothing for the process at all, so the
+  // file is read first and the unified log is the fallback. A stale file from
+  // an earlier run is removed before launch.
+  let reportFile = null;
+  try {
+    const container = String(run('xcrun', ['simctl', 'get_app_container', device, bundleId, 'data'])).trim();
+    if (container) {
+      reportFile = join(container, 'Documents', 'PRIINK.log');
+      rmSync(reportFile, { force: true });
+    }
+  } catch { /* no data container yet: the log is the only channel */ }
+  const fromFile = () => {
+    try { return reportFile && existsSync(reportFile) ? readFileSync(reportFile, 'utf8').split('\n').filter(l => l.startsWith('PRIINK')) : []; }
+    catch { return []; }
+  };
+  const done = ls => ls.some(l => l.startsWith('PRIINK bridge mounted'));
+
   const launchedAt = Date.now();
   const launch = run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
   console.log(`  launched: ${String(launch).trim()}`);
 
   let lines = [];
+  let source = 'none';
   for (let i = 0; i < 40; i++) {
     execSync('sleep 2');
+    const filed = fromFile();
+    if (filed.length) { lines = filed; source = 'container file'; if (done(lines)) break; continue; }
     const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', since,
       '--predicate', 'eventMessage CONTAINS "PRIINK"', '--style', 'compact'],
       { maxBuffer: 32 * 1024 * 1024 });
     lines = log.split('\n')
       .filter(l => l.includes('PRIINK') && !l.includes("'log'"))
       .map(l => l.slice(l.indexOf('PRIINK')));
-    if (lines.some(l => l.startsWith('PRIINK bridge mounted'))) break;
+    if (lines.length) source = 'unified log';
+    if (done(lines)) break;
   }
+  console.log(`  read from: ${source}${reportFile ? ` (${reportFile})` : ''}`);
 
   // The log window can still hold an earlier run; only the latest one is this
   // run's result.

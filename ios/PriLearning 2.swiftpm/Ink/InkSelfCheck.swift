@@ -34,6 +34,34 @@ import PencilKit
 
 enum InkSelfCheck {
 
+    // MARK: - Reporting
+    //
+    // Every PRIINK line goes to the unified log AND to Documents/PRIINK.log in
+    // the app's own container. A hosted iOS 27 image launched the app, kept it
+    // running for 733 s and showed nothing in `log show` for the process at
+    // all; scripts/ink-native-check.mjs now reads this file first (via
+    // `simctl get_app_container`) and falls back to the log.
+    static let reportURL: URL? = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("PRIINK.log")
+
+    static func resetReport() {
+        guard let url = reportURL else { return }
+        try? Data().write(to: url, options: .atomic)
+    }
+
+    static func say(_ line: String) {
+        NSLog("%@", line)
+        guard let url = reportURL, let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+
     /// One variant per symbol, lifted from client/src/ink/templates.js — the
     /// shapes this project already decided were representative handwriting.
     /// Each stroke is a polyline in a 0–100 box.
@@ -383,7 +411,8 @@ enum InkSelfCheck {
     // MARK: - Run
 
     static func run() {
-        NSLog("PRIINK ── native capture self-check ─────────────────────────")
+        resetReport()
+        say("PRIINK ── native capture self-check ─────────────────────────")
         var passed = 0
         var worst: CGFloat = 0
         var strokesSent = 0, strokesBack = 0
@@ -397,10 +426,10 @@ enum InkSelfCheck {
             strokesSent += f.strokesSent
             strokesBack += f.strokesBack
             fieldsOK = fieldsOK && f.durationOK && f.forceOK && f.azimuthOK && f.altitudeOK && f.jsonOK
-            NSLog("PRIINK %@ %-11@ strokes=%d back=%d points=%d back=%d maxDev=%.2f duration=%@ force=%@ azimuth=%@ altitude=%@ json=%@",
+            say(String(format: "PRIINK %@ %-11@ strokes=%d back=%d points=%d back=%d maxDev=%.2f duration=%@ force=%@ azimuth=%@ altitude=%@ json=%@",
                   f.ok ? "PASS" : "FAIL", testCase.name as NSString,
                   f.strokesSent, f.strokesBack, f.pointsSent, f.pointsBack, Double(f.maxDeviation),
-                  f.durationOK ? "ok" : "BAD", f.forceOK ? "ok" : "BAD", f.azimuthOK ? "ok" : "BAD", f.altitudeOK ? "ok" : "BAD", f.jsonOK ? "ok" : "BAD")
+                  f.durationOK ? "ok" : "BAD", f.forceOK ? "ok" : "BAD", f.azimuthOK ? "ok" : "BAD", f.altitudeOK ? "ok" : "BAD", f.jsonOK ? "ok" : "BAD"))
         }
         let strokePct = strokesSent == 0 ? 0 : 100 * Double(strokesBack) / Double(strokesSent)
         var restorePassed = 0
@@ -410,11 +439,11 @@ enum InkSelfCheck {
         }
         var probePen = Pen()
         let probe = restoreIdentity(of: cases[0].build(&probePen))
-        NSLog("PRIINK restore identity: %d/%d cases · cycles=%d identical=%@ new=%@ altered=%@",
+        say(String(format: "PRIINK restore identity: %d/%d cases · cycles=%d identical=%@ new=%@ altered=%@",
               restorePassed, cases.count, probe.cycles, probe.identical ? "yes" : "NO",
-              probe.newReencoded ? "reencoded" : "BAD", probe.alteredReencoded ? "reencoded" : "BAD")
-        NSLog("PRIINK ── capture fidelity: %d/%d cases · strokes %.1f%% (%d/%d) · max deviation %.2f px (floor %.1f) · fields %@ ──",
-              passed, cases.count, strokePct, strokesBack, strokesSent, Double(worst), Double(maxDeviationFloorPx), fieldsOK ? "ok" : "BAD")
+              probe.newReencoded ? "reencoded" : "BAD", probe.alteredReencoded ? "reencoded" : "BAD"))
+        say(String(format: "PRIINK ── capture fidelity: %d/%d cases · strokes %.1f%% (%d/%d) · max deviation %.2f px (floor %.1f) · fields %@ ──",
+              passed, cases.count, strokePct, strokesBack, strokesSent, Double(worst), Double(maxDeviationFloorPx), fieldsOK ? "ok" : "BAD"))
         DispatchQueue.main.async { checkBridge() }
     }
 }
@@ -469,8 +498,8 @@ extension InkSelfCheck {
             "ink": "#efece1"
         ])
         bridge.handle(["op": "tool", "tool": "pen", "finger": true])
-        NSLog("PRIINK bridge sending %d strokes, %d points",
-              strokes.count, strokes.reduce(0) { $0 + $1.points.count })
+        say(String(format: "PRIINK bridge sending %d strokes, %d points",
+              strokes.count, strokes.reduce(0) { $0 + $1.points.count }))
         bridge.handle(["op": "setStrokes", "strokes": strokes.map(\.jsonObject)])
     }
 
@@ -498,8 +527,8 @@ extension InkSelfCheck {
             abs($0.frame.minX - (60 - 47)) < 1 && abs($0.frame.minY - (220 - 54)) < 1
                 && abs($0.frame.width - 880) < 1 && abs($0.frame.height - 380) < 1
         } ?? false
-        NSLog("PRIINK bridge mounted=%@ positioned=%@ strokesSent=%d strokesBack=%d placement=%@",
+        say(String(format: "PRIINK bridge mounted=%@ positioned=%@ strokesSent=%d strokesBack=%d placement=%@",
               mounted ? "yes" : "NO", positioned ? "yes" : "NO", strokesSent, strokesBack,
-              placementOK() ? "ok" : "BAD")
+              placementOK() ? "ok" : "BAD"))
     }
 }
