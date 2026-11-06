@@ -431,6 +431,11 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   ok(!/no network needed|answer by typing right now/.test(en['verdict.inkNeedsDownloadBody']) && /need a connection/.test(en['verdict.inkNeedsDownloadBody']), 'the ink download note promises nothing without a network');
   ok(!/offline/.test(en['ncert.c10ChapterCount']) && !/ऑफ़लाइन/.test(hi['ncert.c10ChapterCount']), 'the Class 10 library count carries no "offline" badge');
   ok(/repeat/.test(en['verdict.repeatNote']) && /does not count/.test(en['verdict.repeatNote']) && hi['verdict.repeatNote'] !== en['verdict.repeatNote'], 'a repeat says it does not count, in both languages');
+// Said before the answer is sent, too, and for either cause the server marks a
+// repeat (an exhausted pool, or a solution already seen — practice.js), so the
+// note names neither cause as the only one.
+ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count towards your progress/.test(en['practice.repeatNote']) && !/in this session/.test(en['practice.repeatNote'])
+  && /नहीं गिना जाएगा/.test(hi['practice.repeatNote']), 'before submitting, a repeat says it will not count, in both languages');
 
   const { createServer } = await import('vite');
   const react = (await import('@vitejs/plugin-react')).default;

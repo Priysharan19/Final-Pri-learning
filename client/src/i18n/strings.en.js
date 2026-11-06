@@ -331,7 +331,7 @@ export default {
   'practice.emptyBody': 'Pri has no question it can serve for this choice right now. Your progress is safe — pick another topic, or let smart practice choose one for you.',
   'practice.emptyChooseTopic': 'Choose another topic',
   'practice.emptySmart': 'Switch to smart practice',
-  'practice.repeatNote': 'You have already met every question this choice can offer in this session, so this one is a repeat.',
+  'practice.repeatNote': 'You have met this question before, so this one is a repeat. It will be marked, but it will not count towards your progress or XP.',
   'practice.clearFilters': 'Clear filters — back to smart practice',
   'practice.clearShort': 'Clear filter',
   'practice.sessionScore': ' · session {correct}/{answered}',
