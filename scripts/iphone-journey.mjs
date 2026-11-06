@@ -169,6 +169,19 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // origin override and the journey's fixture account from it).
   const env = { ...process.env };
   for (const [k, v] of Object.entries(childEnv)) env[`SIMCTL_CHILD_${k}`] = v;
+  // JourneySelfCheck.say appends every PRIJOURNEY line to Documents/PRIJOURNEY.log
+  // in the app's container (the hosted iOS 27 image shows the app nothing in
+  // `log show`). Only what THIS launch appends is read: the size is taken first,
+  // so a summary left by an earlier run can never pass this one.
+  let reportFile = null, offset = 0;
+  try {
+    const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
+    if (container) { reportFile = join(container, 'Documents', 'PRIJOURNEY.log'); offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0; }
+  } catch { /* no data container yet: the log is the only channel */ }
+  const fromFile = () => {
+    try { return reportFile && existsSync(reportFile) ? readFileSync(reportFile).subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY')) : []; }
+    catch { return []; }
+  };
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
@@ -191,8 +204,10 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // journey with nothing reported. A read that does not come back is not a
     // result — the next pass reads again, and a phase whose summary is never
     // read is reported "not reported" and fails the journey.
+    const filed = fromFile();
     let log;
-    try {
+    if (filed.length) log = filed.join('\n');
+    else try {
       log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
         '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
     } catch (e) {

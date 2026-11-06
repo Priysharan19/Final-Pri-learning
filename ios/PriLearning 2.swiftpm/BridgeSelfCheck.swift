@@ -20,6 +20,26 @@
 import WebKit
 
 enum BridgeSelfCheck {
+
+    // Every PRIBRIDGE line goes to the unified log AND to Documents/PRIBRIDGE.log
+    // in the app's own container: on the hosted iOS 27 image `log show` returns
+    // nothing for the app, and scripts/native-bridge-selfcheck.mjs reads this
+    // file first (via `simctl get_app_container`), falling back to the log.
+    static let reportURL: URL? = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("PRIBRIDGE.log")
+
+    static func say(_ line: String, reset: Bool = false) {
+        NSLog("%@", line)
+        guard let url = reportURL, let data = (line + "\n").data(using: .utf8) else { return }
+        if !reset, let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
     static var requested: Bool { ProcessInfo.processInfo.arguments.contains("--bridge-selfcheck") }
 
     private static let script = """
@@ -81,21 +101,21 @@ enum BridgeSelfCheck {
 
     @MainActor
     static func run(in webView: WKWebView) {
-        NSLog("PRIBRIDGE bridge self-check started")
+        say("PRIBRIDGE bridge self-check started", reset: true)
         webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
             switch result {
             case .success(let value):
                 guard let text = value as? String,
                       let data = text.data(using: .utf8),
                       let out = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    NSLog("PRIBRIDGE FAIL unreadable self-check result")
+                    say("PRIBRIDGE FAIL unreadable self-check result")
                     return
                 }
                 var failures = 0
                 for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused", "subframeReachThroughRefused"] {
                     let ok = out[key] as? Bool == true
                     if !ok { failures += 1 }
-                    NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
+                    say(String(format: "PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key))
                 }
                 // Native ink placement math under a page scale (Dynamic Type through the
                 // viewport, or pinch; zoom = pageZoom × scrollView.zoomScale): zoom 1 must
@@ -113,17 +133,17 @@ enum BridgeSelfCheck {
                     zoomed.surfaceCenter == CGPoint(x: 375, y: 337.5) && zoomed.scale == 1.5 &&
                     zoomed.surfaceBounds.size == frame.size
                 if !placementOK { failures += 1 }
-                NSLog("PRIBRIDGE %@ inkPlacementZoom", placementOK ? "ok" : "FAIL")
+                say(String(format: "PRIBRIDGE %@ inkPlacementZoom", placementOK ? "ok" : "FAIL"))
                 let subframeHost = out["subframeHasHost"] as? Bool == true
                 if subframeHost { failures += 1 }
-                NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
+                say(String(format: "PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok"))
                 // Informational: whether the shell CSP stopped the child frame from
                 // loading (expected: subframe navigations are cancelled); the gate above is the pass/fail.
-                NSLog("PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false")
-                NSLog("PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? "")
-                NSLog("PRIBRIDGE summary %d failure(s)", failures)
+                say(String(format: "PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false"))
+                say(String(format: "PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? ""))
+                say(String(format: "PRIBRIDGE summary %d failure(s)", failures))
             case .failure(let error):
-                NSLog("PRIBRIDGE FAIL script error %@", String(describing: error))
+                say(String(format: "PRIBRIDGE FAIL script error %@", String(describing: error)))
             }
         }
     }

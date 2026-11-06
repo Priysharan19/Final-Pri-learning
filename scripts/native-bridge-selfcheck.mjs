@@ -17,7 +17,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
 
@@ -112,21 +112,45 @@ if (!app) {
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
 installApp(device, app);
+// BridgeSelfCheck.say also writes every PRIBRIDGE line to
+// Documents/PRIBRIDGE.log in the app's container. On the hosted iOS 27 image
+// `log show` returned nothing for the app and this step ran 47 minutes into the
+// job timeout, so the file is read first, a stale one is removed before
+// launch, and every `log show` has a hard timeout.
+let reportFile = null;
+try {
+  const container = run('xcrun', ['simctl', 'get_app_container', device, bundleId, 'data'], { timeout: 60_000 }).trim();
+  if (container) { reportFile = join(container, 'Documents', 'PRIBRIDGE.log'); rmSync(reportFile, { force: true }); }
+} catch { /* no data container yet: the log is the only channel */ }
+const fromFile = () => {
+  try { return reportFile && existsSync(reportFile) ? readFileSync(reportFile, 'utf8').split('\n').filter(l => l.startsWith('PRIBRIDGE')) : []; }
+  catch { return []; }
+};
+const fromLog = () => {
+  try {
+    return run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', started,
+      '--predicate', 'eventMessage CONTAINS "PRIBRIDGE"', '--style', 'compact'], { timeout: 90_000 })
+      .split('\n').filter(l => l.includes('PRIBRIDGE') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIBRIDGE')));
+  } catch { return []; }
+};
 const started = localStamp(new Date(Date.now() - 2000));
 launchApp(device, bundleId, ['--bridge-selfcheck']);
 
 let lines = [];
+let source = 'none';
 // A cold CI simulator can take minutes to start WebKit's processes on first launch.
 const polls = process.env.CI ? 120 : 45;
-for (let i = 0; i < polls; i++) {
+const deadline = Date.now() + polls * 2_000 + 120_000;
+for (let i = 0; i < polls && Date.now() < deadline; i++) {
   execSync('sleep 2');
-  const log = run('xcrun', ['simctl', 'spawn', device, 'log', 'show', '--start', started,
-    '--predicate', 'eventMessage CONTAINS "PRIBRIDGE"', '--style', 'compact']);
-  lines = log.split('\n').filter(l => l.includes('PRIBRIDGE') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIBRIDGE')));
+  const filed = fromFile();
+  if (filed.length) { lines = filed; source = 'container file'; }
+  else { lines = fromLog(); if (lines.length) source = 'unified log'; }
   const startAt = lines.lastIndexOf('PRIBRIDGE bridge self-check started');
   lines = startAt >= 0 ? lines.slice(startAt) : [];
   if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) break;
 }
+console.log(`  read from: ${source}${reportFile ? ` (${reportFile})` : ''}`);
 // Without a summary, say why before tearing down: is the app alive, what did it
 // log, did it crash. Diagnostics only — they never change the verdict.
 if (!lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
