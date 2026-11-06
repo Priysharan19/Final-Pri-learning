@@ -368,10 +368,10 @@ enum InkSelfCheck {
         r.newReencoded = readNew.count == strokes.count + fresh.count
             && same(Array(readNew.prefix(strokes.count)), strokes)
             && !readNew.suffix(fresh.count).contains { $0.points.isEmpty }
-        // A restored stroke that changed (same creation date, shorter path, as a cut would leave it).
+        // A restored stroke that changed (a shorter path, as a cut would leave it).
         if var first = drawing.strokes.first, first.path.count > 4 {
             let cut = Array(first.path).prefix(first.path.count / 2)
-            first = PKStroke(ink: first.ink, path: PKStrokePath(controlPoints: Array(cut), creationDate: first.path.creationDate))
+            first = PKStroke(ink: first.ink, path: PKStrokePath(controlPoints: Array(cut), creationDate: Date()))
             let altered = PKDrawing(strokes: [first] + drawing.strokes.dropFirst())
             let readAltered = StrokeCodec.strokes(from: altered, restored: restored)
             r.alteredReencoded = !same([readAltered[0]], [strokes[0]])

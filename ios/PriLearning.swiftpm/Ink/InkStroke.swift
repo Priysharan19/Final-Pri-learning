@@ -176,22 +176,30 @@ enum StrokeCodec {
     // saves that copy as the draft: every relaunch or remount then restored the
     // copy of a copy, and a "6" or an "8" crept by more each time (measured
     // 4.1 px after one cycle and 5.7 px after five before the densified
-    // polygon; still 2.2 px after five with it). So a restore remembers what it
-    // wrote, keyed by a creation date no live stroke can have, and reading the
-    // canvas returns the student's own points for every restored stroke that
-    // is still exactly as it was written. Anything else — a new stroke, a
-    // stroke cut by the pixel eraser, a moved stroke — is read from PencilKit.
+    // polygon; still 2.2 px after five with it). So a restore remembers the
+    // exact control points it wrote, and reading the canvas returns the
+    // student's own points for every stroke whose path is still exactly those
+    // control points (no transform, no mask). Anything else — a new stroke, a
+    // stroke cut by an eraser, a moved stroke — is read from PencilKit.
+    //
+    // The match is on the path's own points, not on PKStrokePath's creation
+    // date: that needs no sentinel date to survive PencilKit, and it keeps the
+    // shell clear of anything a store scanner reads as a file-timestamp API.
 
     struct Restored {
-        fileprivate struct Entry { let stroke: InkStroke; let count: Int; let first: CGPoint; let last: CGPoint }
-        fileprivate var entries: [Date: Entry] = [:]
-        var count: Int { entries.count }
+        fileprivate struct Entry { let stroke: InkStroke; let controlPoints: [ControlPoint] }
+        fileprivate var entries: [Int: [Entry]] = [:]
+        var count: Int { entries.values.reduce(0) { $0 + $1.count } }
     }
 
-    /// Dates far before any real stroke (2001 minus ~31 years), one per
-    /// restored stroke, so a restored path is recognisable when read back.
-    private static func restoreDate(_ index: Int) -> Date {
-        Date(timeIntervalSinceReferenceDate: -1_000_000_000 + Double(index))
+    /// The part of a control point PencilKit stores and hands back unchanged.
+    fileprivate struct ControlPoint: Equatable, Hashable {
+        let x: CGFloat, y: CGFloat, t: TimeInterval
+        init(_ p: PKStrokePoint) { x = p.location.x; y = p.location.y; t = p.timeOffset }
+    }
+
+    private static func controlPoints(of path: PKStrokePath) -> [ControlPoint] {
+        path.map(ControlPoint.init)
     }
 
     static func restore(_ strokes: [InkStroke], color: UIColor) -> (drawing: PKDrawing, restored: Restored) {
@@ -199,7 +207,7 @@ enum StrokeCodec {
         var restored = Restored()
         var built: [PKStroke] = []
         for stroke in strokes where !stroke.points.isEmpty {
-            let controlPoints: [PKStrokePoint] = densified(stroke.points).enumerated().map { index, p in
+            let points: [PKStrokePoint] = densified(stroke.points).enumerated().map { index, p in
                 let fallbackTime = Double(index) / 120.0
                 let time = p.t > 0 || index == 0 ? p.t : fallbackTime
                 let width = max(1, p.w)
@@ -213,12 +221,11 @@ enum StrokeCodec {
                     altitude: p.altitude > 0 ? p.altitude : .pi / 2
                 )
             }
-            let safePoints = controlPoints.count >= 2 ? controlPoints : controlPoints + controlPoints
-            let date = restoreDate(built.count)
-            let path = PKStrokePath(controlPoints: safePoints, creationDate: date)
+            let safePoints = points.count >= 2 ? points : points + points
+            let path = PKStrokePath(controlPoints: safePoints, creationDate: Date())
             built.append(PKStroke(ink: ink, path: path))
-            restored.entries[date] = .init(stroke: stroke, count: path.count,
-                                           first: safePoints.first!.location, last: safePoints.last!.location)
+            let written = controlPoints(of: path)
+            restored.entries[written.hashValue, default: []].append(.init(stroke: stroke, controlPoints: written))
         }
         return (PKDrawing(strokes: built), restored)
     }
@@ -227,14 +234,13 @@ enum StrokeCodec {
     /// every restored stroke that has not been changed since it was restored.
     static func strokes(from drawing: PKDrawing, restored: Restored) -> [InkStroke] {
         drawing.strokes.map { pk in
-            if let entry = restored.entries[pk.path.creationDate],
-               pk.transform == .identity,
-               pk.mask == nil,                      // the pixel eraser masks a path without changing it
-               pk.maskedPathRanges.count == 1,
-               pk.path.count == entry.count,
-               let first = pk.path.first?.location, let last = pk.path.last?.location,
-               first == entry.first, last == entry.last {
-                return entry.stroke
+            if pk.transform == .identity,
+               pk.mask == nil,                      // a pixel eraser masks a path without changing it
+               pk.maskedPathRanges.count == 1 {
+                let points = controlPoints(of: pk.path)
+                if let entry = restored.entries[points.hashValue]?.first(where: { $0.controlPoints == points }) {
+                    return entry.stroke
+                }
             }
             return StrokeCodec.stroke(from: pk)
         }
