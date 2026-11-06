@@ -57,6 +57,7 @@ export const ENGINE_SUITES = [
   'practice-repeat-credit-check.mjs',
   'practice-reveal-submit-race-check.mjs',
   'account-deletion-midflight-check.mjs',
+  'billing-out-of-order-concurrency-check.mjs',
   // The free plan's daily cap is decided per account where a question is
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
