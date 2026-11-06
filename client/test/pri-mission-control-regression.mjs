@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';
-import { writeFileSync, mkdtempSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,12 +156,17 @@ verify('Forged-looking heartbeat is snapshot-eligible but blocked by serialized-
 // PR's exact head. validate-ledger refuses five arguments (e803a3473 made the
 // head SHA mandatory); the derived-mirror workflows kept calling it with five,
 // so every agent/mission PR failed "Build derived iPad mirrors" on argument
-// count alone from 21 October. Pin the call shape where it is written.
-for (const workflow of ['pri-agent-governance.yml','pri-agent-derived-sync.yml','pri-agent-derived-apply.yml']) {
-  const text=readFileSync(join(root,'.github/workflows',workflow),'utf8').replace(/\\\n\s*/g,' ');
+// count alone from 21 October. The callers are discovered, not listed: a
+// workflow that is retired (#697 removes the derived-mirror pair) drops out,
+// and any new caller is held to the same shape.
+const workflowDir=join(root,'.github/workflows');
+const callers=readdirSync(workflowDir).filter(name=>/\.ya?ml$/.test(name)).sort()
+  .map(name=>({name,text:readFileSync(join(workflowDir,name),'utf8').replace(/\\\n\s*/g,' ')}))
+  .filter(({text})=>/pri-mission-control\.mjs validate-ledger /.test(text));
+verify('pri-agent-governance.yml still asks the ledger about every autonomous PR',callers.some(({name})=>name==='pri-agent-governance.yml'));
+for (const {name,text} of callers) {
   const calls=[...text.matchAll(/pri-mission-control\.mjs validate-ledger ([^\n]*)/g)].map(m=>m[1].trim().split(/\s+/));
-  verify(`${workflow} asks the ledger at least once`,calls.length>0);
-  for (const argv of calls) verify(`${workflow} passes issues, agent, mission, branch, risk and an exact head to validate-ledger: ${argv.join(' ')}`,argv.length===6&&/(HEAD_SHA|EXPECTED_HEAD|[0-9a-f]{40})/.test(argv[5]));
+  for (const argv of calls) verify(`${name} passes issues, agent, mission, branch, risk and an exact head to validate-ledger: ${argv.join(' ')}`,argv.length===6&&/(HEAD_SHA|EXPECTED_HEAD|[0-9a-f]{40})/.test(argv[5]));
 }
 console.log(`PASS: ${checks} deterministic governance regression assertions (isolated proposal; no GitHub write)`);
 
