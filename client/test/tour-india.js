@@ -47,7 +47,11 @@ export const flow = {
     // where a student's work lives and that there are no ads — and now, that
     // checking needs an account and a connection.
     await check('the privacy copy says work stays on this device, checking needs an account and a connection, no ads',
-      /stored on this device/i.test(privacy) && /checking answers needs a Pri account and a connection/i.test(privacy) && /no ads/i.test(privacy) &&
+      // Checking still needs an account and a connection; the sentence now
+      // says so as "once you sign in, Pri's server ... checks your answers,
+      // which needs a connection" (the copy names the server reader too).
+      /stored on this device/i.test(privacy) && /once you sign in/i.test(privacy) && /server .*checks your answers/i.test(privacy) &&
+        /needs a connection/i.test(privacy) && /no ads/i.test(privacy) &&
         !/account is optional|offline-first|works offline/i.test(privacy),
       `privacy copy reads ${JSON.stringify(privacy)}`);
     for (const [label, href] of [['Privacy', '/privacy'], ['Terms', '/terms'], ['Refunds', '/refund-policy'], ['Grievances', '/grievance']]) {
