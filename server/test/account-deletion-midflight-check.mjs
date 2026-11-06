@@ -117,8 +117,20 @@ try {
   eq(durable(await rowsLeft(tables, bystander.account.id)), durable(bystanderBefore), 'the bystander account is untouched');
 
   console.log(`ACCOUNT DELETION MID-FLIGHT: PASS — ${count}/${count} checks — an account deleted while its answer is being marked leaves nothing in ${tables.length} account tables, whichever commits first; retries are refused; another account is untouched, on ${engine}.`);
+} catch (error) {
+  // Reported here, not rethrown: the bounded teardown below then exits with 1.
+  console.error(error);
+  process.exitCode = 1;
 } finally {
-  await h.close?.();
-  await closeMarkerPool?.();
+  // Teardown is bounded: the marker's worker threads and the Postgres pool are
+  // closed, but a teardown that stalls on a loaded machine must not turn a
+  // finished run into a timeout. Whatever the assertions decided stands.
+  const bounded = (label, work) => Promise.race([
+    Promise.resolve().then(work).catch(error => console.error(`teardown: ${label}: ${error?.message || error}`)),
+    new Promise(resolve => setTimeout(() => { console.error(`teardown: ${label} still pending after 15 s`); resolve(); }, 15_000).unref())
+  ]);
+  await bounded('server', () => h.close?.());
+  await bounded('marker pool', () => closeMarkerPool());
   rmSync(scratch, { recursive: true, force: true });
+  process.exit(process.exitCode || 0);
 }
