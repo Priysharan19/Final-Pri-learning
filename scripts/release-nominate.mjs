@@ -27,14 +27,16 @@
 //     --production-engine for a promotion that follows the Postgres cutover in
 //     the same window, docs/operations/postgres-cutover.md §4.6 step 6);
 //   · at the RELEASE stage (the default), the release evidence exists for this
-//     exact SHA: the physical-device matrix has no `fail` and no `not run`
-//     case (docs/release/device-matrix.md; `blocked` rows are allowed, never
-//     omitted), and a real-human evaluation of the server reader names this
-//     SHA (tools/ink-cloud-reader-eval.mjs). Neither is a reminder any more:
-//     a missing one refuses the nomination unless an explicit override record
-//     (--override, format below) waives it by name, signed by a named human
-//     with a reason. The override is printed with the result and copied into
-//     the GO/NO-GO dossier (scripts/release-dossier.mjs).
+//     exact SHA: every case of the physical-device matrix is `pass` on real
+//     hardware (docs/release/device-matrix.md "device-complete"; `blocked` rows
+//     are recorded, never omitted and never acceptance), and a real-human
+//     evaluation of the server reader names this SHA
+//     (tools/ink-cloud-reader-eval.mjs). Neither is a reminder any more: a
+//     missing one refuses the nomination unless a public-release override
+//     record (--override, format below) waives it by name AND links an
+//     approving GitHub comment by a repository admin that names this SHA and
+//     the waived requirements. The override is printed with the result and
+//     copied into the GO/NO-GO dossier (scripts/release-dossier.mjs).
 //     `--candidate` runs everything except the evidence rows, for §4.6 step 1
 //     before the TestFlight/Play build exists; it never prints the promotion.
 //
@@ -51,8 +53,17 @@
 //     [--production https://final-pri-learning-production.up.railway.app]
 //     [--repo Priysharan19/Final-Pri-learning]
 //
-// Override record (JSON): { "sha": "<40-hex>", "waives": ["device-matrix" | "reader-evidence", …],
-//   "by": "<named human>", "at": "<ISO date-time>", "reason": "<why this release goes without it>" }
+// Override record (JSON): { "sha": "<40-hex>", "scope": "public-release" | "internal-test-track",
+//   "waives": ["device-matrix" | "reader-evidence", …], "by": "<named human>", "githubLogin": "<login>",
+//   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>", "at": "<ISO date-time>",
+//   "reason": "<why this release goes without it>" }
+// The JSON file is not the authority; the approval comment is. It must be written by `githubLogin`,
+// an admin of the repository, after the commit, never edited, and contain the exact line
+//   Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted,comma list>
+// An `internal-test-track` exception (TestFlight / Play internal) never waives release-stage evidence.
+// Evidence class of such an approval: GITHUB-ACCOUNT-AUTHENTICATED. GitHub proves the account, not
+// the person: anything holding that account's token can post as it, so the owner posts it in the
+// GitHub web UI themself, and the dossier never calls it more than that.
 //
 // Exit 0 nominated · 1 a check failed · 2 usage or a dependency (git, gh).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,6 +86,64 @@ export const PRODUCTION_ORIGIN = 'https://final-pri-learning-production.up.railw
 export const DEFAULT_READER_EVAL_DIR = join(ROOT, 'handwriting', 'v17', 'cloud-reader-eval');
 /** The evidence a release-stage nomination requires; each may be waived only by a recorded override naming it. */
 export const EVIDENCE_REQUIREMENTS = Object.freeze(['device-matrix', 'reader-evidence']);
+export const OVERRIDE_SCOPES = Object.freeze(['public-release', 'internal-test-track']);
+export const RELEASE_TARGET = 'deploy/production';
+export const APPROVAL_EVIDENCE_CLASS = 'GITHUB-ACCOUNT-AUTHENTICATED';
+const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+const APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/(\d+)#issuecomment-(\d+)$/;
+
+/** The exact line an evidence waiver's approval comment must contain. */
+export function waiverMarker(sha, waives) {
+  return `Pri-Evidence-Waiver: ${sha} scope=public-release target=${RELEASE_TARGET} waives=${[...new Set(waives.map(String))].sort().join(',')}`;
+}
+/** The exact line the owner's GO comment must contain (scripts/release-dossier.mjs). */
+export function goMarker(sha) {
+  return `Pri-Release-GO: ${sha} target=${RELEASE_TARGET}`;
+}
+
+/**
+ * Authenticates a release approval through GitHub instead of trusting a name typed into a file:
+ * the comment link is in this repository, its author is `githubLogin`, a User (not a bot) with
+ * admin permission, it was posted after the commit it approves and never edited, and it contains
+ * `marker` as a line of its own. Returns { ok, problems, login, createdAt, url }.
+ */
+export async function verifyApproval({ approval, githubLogin, sha, marker, repo = DEFAULT_REPO, gh = defaultGh, git = defaultGit, now = Date.now() }) {
+  const problems = [];
+  const url = String(approval || '').trim();
+  const parsed = APPROVAL_URL.exec(url);
+  const login = String(githubLogin || '').trim();
+  if (!parsed) problems.push(`approval must link the approving comment: https://github.com/${repo}/issues/<n>#issuecomment-<id>`);
+  else if (parsed[1].toLowerCase() !== String(repo).toLowerCase()) problems.push(`approval comment is in ${parsed[1]}, not ${repo}`);
+  if (!GITHUB_LOGIN.test(login)) problems.push('githubLogin must be the approver\'s GitHub login');
+  if (problems.length) return { ok: false, problems, login: null, createdAt: null, url };
+  const [, , number, id] = parsed;
+  let comment = null;
+  try { comment = await gh(`repos/${repo}/issues/comments/${id}`); }
+  catch (error) { return { ok: false, problems: [`approval comment ${id} could not be read from GitHub: ${error?.message || error}`], login: null, createdAt: null, url }; }
+  const author = String(comment?.user?.login || '');
+  if (author.toLowerCase() !== login.toLowerCase()) problems.push(`approval comment was written by ${author || '(unknown)'}, not ${login}`);
+  if (comment?.user?.type !== 'User') problems.push(`approval comment author is a ${comment?.user?.type || 'unknown'} account, not a person's User account`);
+  if (!String(comment?.issue_url || '').endsWith(`/issues/${number}`)) problems.push(`approval comment ${id} does not belong to #${number}`);
+  const created = Date.parse(comment?.created_at || '');
+  const updated = Date.parse(comment?.updated_at || comment?.created_at || '');
+  if (!Number.isFinite(created)) problems.push('approval comment has no creation time');
+  else {
+    if (Number.isFinite(updated) && updated !== created) problems.push('approval comment was edited after it was posted; post a new comment rather than editing one');
+    if (created > now) problems.push('approval comment is dated in the future');
+  }
+  const lines = String(comment?.body || '').split(/\r?\n/).map(line => line.trim());
+  if (!lines.includes(marker)) problems.push(`approval comment does not contain the exact line: ${marker}`);
+  try {
+    const permission = await gh(`repos/${repo}/collaborators/${encodeURIComponent(author || login)}/permission`);
+    if (permission?.permission !== 'admin') problems.push(`${author || login} has ${permission?.permission || 'no'} permission on ${repo}; a release approval needs a repository admin`);
+  } catch (error) { problems.push(`${author || login}'s permission on ${repo} could not be read: ${error?.message || error}`); }
+  try {
+    const committed = Date.parse(String(await git(['show', '-s', '--format=%cI', sha])).trim());
+    if (!Number.isFinite(committed)) problems.push(`the commit time of ${sha} could not be read`);
+    else if (Number.isFinite(created) && created < committed) problems.push(`approval comment (${comment.created_at}) predates the commit it approves; a stale approval cannot carry to a newer SHA`);
+  } catch (error) { problems.push(`the commit time of ${sha} could not be read: ${error?.message || error}`); }
+  return { ok: problems.length === 0, problems, login: author || null, createdAt: Number.isFinite(created) ? created : null, url };
+}
 export const ENGINES = Object.freeze(['postgres', 'sqlite']);
 export const STAGES = Object.freeze(['candidate', 'release']);
 
@@ -194,12 +263,28 @@ export function promotionCommands(sha, { productionOrigin = PRODUCTION_ORIGIN, e
   ];
 }
 
-/** The device matrix at this SHA: complete when no case is `fail` or `not run` (`blocked` rows are recorded, never omitted). */
+/**
+ * The device matrix at this SHA. Device-complete means every case of every family is `pass`
+ * (docs/release/device-matrix.md "Reading the report"; V1 scope §22.1/§22.4: real-device
+ * certification for each device class). A `blocked` row is recorded and reported, never omitted,
+ * but it is not acceptance: a family blocked for lack of hardware leaves the matrix incomplete,
+ * and only an authenticated public-release waiver (a founder-approved platform scope change) can
+ * release without it, visibly.
+ */
 export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER } = {}) {
   const summary = summarise(readLedger(ledger), { sha });
   const { counts, rows } = summary;
-  const ok = counts.fail === 0 && counts['not run'] === 0 && rows.length > 0;
-  return { ok, counts, total: rows.length, summary, detail: `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}` };
+  const families = new Map();
+  for (const row of rows) {
+    const family = families.get(row.family) || { family: row.family, label: row.familyLabel, pass: 0, other: 0 };
+    if (row.latest?.result === 'pass') family.pass += 1; else family.other += 1;
+    families.set(row.family, family);
+  }
+  const incompleteFamilies = [...families.values()].filter(f => f.other > 0).map(f => f.family);
+  const ok = rows.length > 0 && counts.pass === rows.length;
+  const detail = `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}`
+    + (ok ? ' · device-complete' : ` · not device-complete: ${incompleteFamilies.join(', ')} not all pass${counts.blocked ? ' (blocked is recorded, never acceptance)' : ''}`);
+  return { ok, counts, total: rows.length, summary, incompleteFamilies, detail };
 }
 
 /**
@@ -241,7 +326,13 @@ export function loadOverride(path, sha) {
   const by = String(record?.by || '').trim();
   const reason = String(record?.reason || '').trim();
   const at = String(record?.at || '').trim();
+  const scope = String(record?.scope || '').trim();
+  const githubLogin = String(record?.githubLogin || '').trim();
+  const approval = String(record?.approval || '').trim();
   if (record) {
+    if (!OVERRIDE_SCOPES.includes(scope)) problems.push(`override needs "scope": ${OVERRIDE_SCOPES.join(' or ')}`);
+    if (!GITHUB_LOGIN.test(githubLogin)) problems.push('override needs "githubLogin": the approver\'s GitHub login');
+    if (!APPROVAL_URL.test(approval)) problems.push('override needs "approval": the link to the approving GitHub comment (…/issues/<n>#issuecomment-<id>)');
     if (String(record.sha || '').toLowerCase() !== sha) problems.push(`override names sha ${record.sha || '(none)'}, not the nominated ${sha}`);
     if (!waives.length) problems.push('override waives nothing (waives: [])');
     for (const item of waives) if (!EVIDENCE_REQUIREMENTS.includes(item)) problems.push(`unknown evidence requirement ${JSON.stringify(item)}; known: ${EVIDENCE_REQUIREMENTS.join(', ')}`);
@@ -250,7 +341,7 @@ export function loadOverride(path, sha) {
     if (!Number.isFinite(Date.parse(at))) problems.push('override needs "at": an ISO date-time');
     if (reason.length < 20) problems.push('override needs "reason" of at least 20 characters');
   }
-  return { path, problems, sha, waives: problems.length ? [] : waives, by, at, reason };
+  return { path, problems, sha, waives: problems.length ? [] : waives, by, at, reason, scope, githubLogin, approval };
 }
 
 async function defaultGit(args) {
@@ -446,22 +537,33 @@ export async function nominate({
     info('release evidence', 'not checked at the candidate stage (--candidate); the release-stage run requires the device matrix and the reader evidence for this SHA, or a recorded override, and only it prints the promotion');
   } else {
     let override = null;
+    let overrideUsable = false;
     if (overridePath) {
       override = loadOverride(resolve(overridePath), expected);
-      check(override.problems.length === 0, 'evidence override is well-formed and names this SHA',
-        override.problems.length ? override.problems.join('; ') : `${override.path}: waives ${override.waives.join(', ')}; by ${override.by} at ${override.at}`);
+      const wellFormed = check(override.problems.length === 0, 'evidence override is well-formed and names this SHA',
+        override.problems.length ? override.problems.join('; ') : `${override.path}: ${override.scope}; waives ${override.waives.join(', ')}; by ${override.by} (${override.githubLogin}) at ${override.at}`);
+      if (wellFormed) {
+        const publicScope = check(override.scope === 'public-release', 'evidence override is a public-release waiver',
+          override.scope === 'public-release' ? 'scope public-release' : `scope ${override.scope}: an internal test-track exception is never approval for a public production release; it waives nothing here`);
+        if (publicScope) {
+          const auth = await verifyApproval({ approval: override.approval, githubLogin: override.githubLogin, sha: expected, marker: waiverMarker(expected, override.waives), repo, gh, git, now });
+          override.verified = auth;
+          overrideUsable = check(auth.ok, `evidence override approved on GitHub by a repository admin (${APPROVAL_EVIDENCE_CLASS})`,
+            auth.ok ? `${auth.url} by ${auth.login} at ${new Date(auth.createdAt).toISOString()}` : auth.problems.join('; '));
+        }
+      }
     }
-    const waived = requirement => override?.waives.includes(requirement) === true;
+    const waived = requirement => overrideUsable && override?.waives.includes(requirement) === true;
     const requirementRow = (requirement, label, evidence) => {
       if (evidence.ok) { check(true, label, evidence.detail); return; }
       if (waived(requirement)) {
-        overrides.push({ requirement, by: override.by, at: override.at, reason: override.reason, path: override.path, state: evidence.detail });
-        info(`${label} — WAIVED by recorded override`, `${evidence.detail}; by ${override.by} at ${override.at}: ${override.reason}`);
+        overrides.push({ requirement, by: override.by, githubLogin: override.verified.login, approval: override.verified.url, approvedAt: new Date(override.verified.createdAt).toISOString(), evidenceClass: APPROVAL_EVIDENCE_CLASS, at: override.at, reason: override.reason, path: override.path, state: evidence.detail });
+        info(`${label} — WAIVED by recorded override`, `${evidence.detail}; by ${override.by} (${override.verified.login}, ${override.verified.url}) at ${override.at}: ${override.reason}`);
         return;
       }
-      check(false, label, `${evidence.detail}; ${requirement === 'device-matrix' ? 'record the cases with scripts/device-matrix-record.mjs (blocked rows allowed, never omitted)' : 'run tools/ink-cloud-reader-eval.mjs at this SHA'}, or waive it by name in an --override record`);
+      check(false, label, `${evidence.detail}; ${requirement === 'device-matrix' ? 'record every case as pass with scripts/device-matrix-record.mjs (blocked rows are recorded, never acceptance)' : 'run tools/ink-cloud-reader-eval.mjs at this SHA'}, or waive it by name in an --override record`);
     };
-    requirementRow('device-matrix', 'device matrix complete for this SHA (no fail, no not-run)', deviceEvidence(expected, { ledger: deviceLedger }));
+    requirementRow('device-matrix', 'device matrix complete for this SHA (every case pass on real hardware)', deviceEvidence(expected, { ledger: deviceLedger }));
     requirementRow('reader-evidence', 'real-human reader evaluation recorded for this SHA', readerEvidence(expected, { dir: readerEvalDir }));
   }
 

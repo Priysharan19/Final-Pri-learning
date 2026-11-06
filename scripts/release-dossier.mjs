@@ -20,7 +20,14 @@
 //     native build, store, production data), each PASS with a named person or
 //     else NO-GO;
 //   · step 28 — the owner's GO, recorded in the record for exactly this SHA by
-//     a named human. The generator never writes a GO; it verifies one;
+//     a named human AND posted as a GitHub comment by a repository admin that
+//     contains the line `Pri-Release-GO: <sha> target=deploy/production`
+//     (go.approval links it, go.githubLogin names the account). The comment is
+//     the authority, not the file: it must be unedited and posted after the
+//     soak ended and after the candidate was frozen (a GO given before the
+//     evidence existed is stale). The generator never writes a GO; it verifies
+//     one. Evidence class: GITHUB-ACCOUNT-AUTHENTICATED (the account, not the
+//     person — the owner posts it themself in the GitHub web UI);
 //   · step 29 — the promotion commands the nomination printed, by hand;
 //   · step 30 — after the promotion, whether a later merge to `main` reached
 //     staging unaided with a green Release Staging Proof (the no-repeat
@@ -47,8 +54,8 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
-  DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, GREEN, PRODUCTION_ORIGIN, STAGING_ORIGIN,
-  deviceEvidence, evaluateRuns, getJson, ghAll, nominate, readerEvidence
+  APPROVAL_EVIDENCE_CLASS, DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, GREEN, PRODUCTION_ORIGIN, STAGING_ORIGIN,
+  deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
 } from './release-nominate.mjs';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, reportMarkdown } from './device-matrix-record.mjs';
 
@@ -82,7 +89,7 @@ export function recordTemplate(sha) {
     gates: Object.fromEntries(EXTERNAL_GATES.map(g => [g.id, { ...gate }])),
     overrides: null,
     reviews: [],
-    go: { decision: null, by: '', at: '', sha, statement: '' }
+    go: { decision: null, by: '', githubLogin: '', approval: '', at: '', sha, statement: '' }
   };
 }
 
@@ -237,7 +244,7 @@ export async function buildDossier({
   row('device', null, 'physical-device matrix for this SHA', device.detail, { evidenceClass: 'PHYSICAL-HUMAN (pass/fail) · BLOCKED-EXTERNAL (blocked)' });
   const reader = readerEvidence(expected, { dir: readerEvalDir });
   row('reader', null, 'real-human evaluation of the server reader for this SHA', reader.detail, { evidenceClass: reader.ok ? 'real-human' : 'NOT MEASURED' });
-  for (const item of nomination.overrides) row('override', null, `OVERRIDE: ${item.requirement} waived`, `${item.state}; by ${item.by} at ${item.at}: ${item.reason} (${relative(ROOT, item.path)})`, { who: item.by });
+  for (const item of nomination.overrides) row('override', null, `OVERRIDE: ${item.requirement} waived`, `${item.state}; by ${item.by} (${item.githubLogin}, ${item.approval}, approved ${item.approvedAt}) at ${item.at}: ${item.reason} (${relative(ROOT, item.path)})`, { who: item.by, evidenceClass: item.evidenceClass });
 
   // ── step 23: gates only people can close ───────────────────────────────────
   for (const gate of EXTERNAL_GATES) {
@@ -253,12 +260,20 @@ export async function buildDossier({
   // ── step 28: the owner's GO for exactly this SHA ───────────────────────────
   const go = rec.go || {};
   const goBy = human(go.by), goAt = iso(go.at);
-  const goOk = go.decision === 'GO' && String(go.sha || '').toLowerCase() === expected && goBy !== null && goAt !== null && goAt <= now && String(go.statement || '').trim().length > 0;
-  row(28, goOk, 'owner GO recorded for exactly this SHA by a named person',
+  const goRecorded = go.decision === 'GO' && String(go.sha || '').toLowerCase() === expected && goBy !== null && goAt !== null && goAt <= now && String(go.statement || '').trim().length > 0;
+  let goAuth = null;
+  if (go.decision === 'GO') goAuth = await verifyApproval({ approval: go.approval, githubLogin: go.githubLogin, sha: expected, marker: goMarker(expected), repo, gh, git, now });
+  // A GO is an answer to the evidence: given before the soak ended or before the SHA was frozen,
+  // it approved something that did not exist yet.
+  const approvedAt = goAuth?.ok ? goAuth.createdAt : null;
+  const goPremature = approvedAt !== null && ((soakEnd !== null && approvedAt < soakEnd) || (frozenAt !== null && approvedAt < frozenAt));
+  const goOk = goRecorded && goAuth?.ok === true && !goPremature;
+  row(28, goOk, 'owner GO for exactly this SHA, approved on GitHub by a repository admin after the soak',
     go.decision === 'GO'
-      ? (goOk ? `GO by ${goBy} at ${go.at}: ${String(go.statement).trim()}` : `GO recorded but ${[String(go.sha || '').toLowerCase() !== expected ? `for sha ${go.sha || '(none)'}, not this one` : null, !goBy ? 'go.by does not name a human' : null, goAt === null ? 'go.at is not an ISO date-time' : null, goAt !== null && goAt > now ? 'go.at is in the future' : null, !String(go.statement || '').trim() ? 'go.statement is empty' : null].filter(Boolean).join('; ')}`)
-      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file, for this exact SHA',
-    { who: goBy || '' });
+      ? (goOk ? `GO by ${goBy} (${goAuth.login}, ${goAuth.url} at ${new Date(approvedAt).toISOString()}): ${String(go.statement).trim()}`
+        : `GO recorded but ${[String(go.sha || '').toLowerCase() !== expected ? `for sha ${go.sha || '(none)'}, not this one` : null, !goBy ? 'go.by does not name a human' : null, goAt === null ? 'go.at is not an ISO date-time' : null, goAt !== null && goAt > now ? 'go.at is in the future' : null, !String(go.statement || '').trim() ? 'go.statement is empty' : null, goAuth && !goAuth.ok ? `the GitHub approval does not hold: ${goAuth.problems.join('; ')}` : null, goPremature ? `the GitHub approval (${new Date(approvedAt).toISOString()}) predates ${soakEnd !== null && approvedAt < soakEnd ? 'the end of the soak' : 'the candidate freeze'}: a GO given before the evidence existed is stale` : null].filter(Boolean).join('; ')}`)
+      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file and as a GitHub comment, for this exact SHA',
+    { who: goBy || '', evidenceClass: go.decision === 'GO' ? APPROVAL_EVIDENCE_CLASS : '' });
 
   // ── step 30: after the promotion, the pipeline works unaided ───────────────
   let prodSha = null;

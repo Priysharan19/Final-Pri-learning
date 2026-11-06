@@ -95,8 +95,8 @@ explicit production-infrastructure actions and were not performed by this recove
       blocks nomination until that workflow's newest run on the SHA is green; a later schedule that
       passed supersedes a flaky one; it does not pick which workflows are code gates. The same
       command without `--candidate` is the release-stage run of §4.6 step 7: it also requires the
-      physical-device matrix and the real-human reader evidence for this exact SHA (or a recorded
-      override by a named human), prints the promotion commands with the engine production serves,
+      physical-device matrix (every case `pass`) and the real-human reader evidence for this exact
+      SHA (or a public-release override approved by a repository admin in a GitHub comment), prints the promotion commands with the engine production serves,
       and is followed by `node scripts/release-dossier.mjs <sha>`. The order from here to the
       promotion, with the 24 h soak gate, is `docs/operations/postgres-cutover.md` §4.6.
 - [ ] On a checkout of that SHA: `node tools/verify-release-identity.mjs` passes and

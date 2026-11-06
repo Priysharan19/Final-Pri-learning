@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
   CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
-  loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey
+  goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker
 } from '../scripts/release-nominate.mjs';
 import { EXTERNAL_GATES, buildDossier, parseArgs as parseDossierArgs, recordProblems, recordTemplate, renderMarkdown } from '../scripts/release-dossier.mjs';
 import {
@@ -31,6 +31,7 @@ let count = 0;
 const ok = (value, message) => { assert.ok(value, message); count += 1; };
 const eq = (actual, expected, message) => { assert.equal(actual, expected, message); count += 1; };
 const read = path => readFileSync(join(ROOT, path), 'utf8');
+const DEFAULT_REPO_FOR_TESTS = 'Priysharan19/Final-Pri-learning';
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
 const PROD_POINTER = 'c'.repeat(40);
@@ -111,8 +112,13 @@ const scratch = [];
         const android = kase.family === 'AND' || kase.family === 'ANT';
         const failing = device === 'one-fail' && kase.id === 'DM-IPH-02-OTP';
         const sha = device === 'other-sha' ? OTHER : SHA;
-        lines.push(JSON.stringify(android
-          ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no Android device available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
+        const blocked = device === 'all-blocked' || (device === 'android-blocked' && android);
+        if (!blocked && android) {
+          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          continue;
+        }
+        lines.push(JSON.stringify(blocked
+          ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no device of this family available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
           : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
       }
       if (device === 'one-missing') lines.pop();
@@ -132,7 +138,12 @@ const scratch = [];
     const full = evidence();
     eq(validateLedger(full.ledger).length, 0, 'the complete device fixture passes the recorder\'s own validation (it is what a real ledger would hold)');
     const dev = deviceEvidence(SHA, { ledger: full.ledger });
-    ok(dev.ok && dev.counts.pass === 18 && dev.counts.blocked === 18 && dev.counts['not run'] === 0, 'deviceEvidence: 18 Apple passes and 18 Android blocked rows are complete (blocked is recorded, never omitted)');
+    ok(dev.ok && dev.counts.pass === 36 && dev.counts.blocked === 0 && /device-complete/.test(dev.detail), 'deviceEvidence: every case of all four families passed on real hardware is device-complete');
+    const androidBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'android-blocked' }).ledger });
+    ok(!androidBlocked.ok && androidBlocked.counts.pass === 18 && androidBlocked.counts.blocked === 18 && androidBlocked.incompleteFamilies.join(',') === 'AND,ANT' && /never acceptance/.test(androidBlocked.detail),
+      'deviceEvidence: Android families blocked for lack of hardware are reported by name and are NOT device-complete (V1 scope §22.1: each device class)');
+    const allBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'all-blocked' }).ledger });
+    ok(!allBlocked.ok && allBlocked.counts.pass === 0 && allBlocked.counts.blocked === 36, 'deviceEvidence: a matrix of 36 blocked rows and no physical pass is not acceptance (Q4 #696 counterexample)');
     ok(!deviceEvidence(OTHER, { ledger: full.ledger }).ok, 'deviceEvidence: another SHA has no evidence of its own');
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-fail' }).ledger }).ok, 'deviceEvidence: one fail is incomplete');
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-missing' }).ledger }).ok, 'deviceEvidence: one not-run case is incomplete');
@@ -144,7 +155,9 @@ const scratch = [];
     ok(!readerEvidence(SHA, { dir: evidence({ reader: 'no-sha' }).readerDir }).ok, 'readerEvidence: a report without releaseSha cannot be tied to the SHA');
   }
   const overrideFile = (body, name = 'override.json') => { const dir = mkdtempSync(join(tmpdir(), 'pri-override-')); scratch.push(dir); const file = join(dir, name); writeFileSync(file, typeof body === 'string' ? body : JSON.stringify(body)); return file; };
-  const goodOverride = { sha: SHA, waives: ['device-matrix', 'reader-evidence'], by: 'Priya Example', at: '2026-11-01T09:00:00Z', reason: 'First internal TestFlight only; the device matrix runs on this build next week and the release is not public.' };
+  const APPROVER = 'Priysharan19';
+  const approvalUrl = id => `https://github.com/${DEFAULT_REPO_FOR_TESTS}/issues/686#issuecomment-${id}`;
+  const goodOverride = { sha: SHA, scope: 'public-release', waives: ['device-matrix', 'reader-evidence'], by: 'Priya Example', githubLogin: APPROVER, approval: approvalUrl(1001), at: '2026-11-01T09:00:00Z', reason: 'Owner-approved staggered launch: Apple first, Android families follow on a later build (scope change recorded).' };
   eq(loadOverride(overrideFile(goodOverride), SHA).problems.length, 0, 'a complete override by a named human for this SHA is accepted');
   ok(loadOverride(overrideFile({ ...goodOverride, sha: OTHER }), SHA).problems.some(p => /not the nominated/.test(p)), 'an override for another SHA is refused');
   ok(loadOverride(overrideFile({ ...goodOverride, by: 'CI' }), SHA).problems.some(p => /does not name a human/.test(p)), 'an override "by" CI is refused');
@@ -153,6 +166,10 @@ const scratch = [];
   ok(loadOverride(overrideFile({ ...goodOverride, waives: [] }), SHA).problems.some(p => /waives nothing/.test(p)), 'an override that waives nothing is refused');
   ok(loadOverride(overrideFile({ ...goodOverride, reason: 'because' }), SHA).problems.some(p => /reason/.test(p)), 'an override needs a reason');
   ok(loadOverride(overrideFile({ ...goodOverride, at: 'yesterday' }), SHA).problems.some(p => /ISO date-time/.test(p)), 'an override needs an ISO time');
+  ok(loadOverride(overrideFile({ ...goodOverride, scope: undefined }), SHA).problems.some(p => /"scope"/.test(p)), 'an override must say whether it is a public-release waiver or an internal test-track exception');
+  ok(loadOverride(overrideFile({ ...goodOverride, githubLogin: '' }), SHA).problems.some(p => /githubLogin/.test(p)), 'an override must name the approver\'s GitHub account');
+  ok(loadOverride(overrideFile({ ...goodOverride, approval: undefined }), SHA).problems.some(p => /approval/.test(p)), 'an unsigned override (no approving comment) is refused (Q4 #696 counterexample)');
+  ok(loadOverride(overrideFile({ ...goodOverride, approval: 'https://example.com/ok' }), SHA).problems.some(p => /approval/.test(p)), 'an approval that is not a GitHub comment link is refused');
   ok(loadOverride(overrideFile('not json'), SHA).problems.some(p => /not JSON/.test(p)), 'a corrupt override is refused');
   ok(loadOverride(join(tmpdir(), 'pri-no-such-override.json'), SHA).problems.some(p => /no such file/.test(p)), 'a missing override file is refused');
   assert.deepEqual([...EVIDENCE_REQUIREMENTS], ['device-matrix', 'reader-evidence'], 'the two release-evidence requirements'); count += 1;
@@ -176,7 +193,14 @@ const scratch = [];
       },
       production: { health: { ok: true, releaseIdentity: { releaseSha: PROD_POINTER }, database: { engine: 'sqlite', reachable: true } }, reachable: true },
       ledger: ev.ledger, readerDir: ev.readerDir,
+      commitTime: '2026-10-17T00:00:00Z',
+      comments: new Map(), permissions: new Map([[APPROVER.toLowerCase(), 'admin'], ['someone-else', 'write']]),
       gitCalls: [], ghCalls: []
+    };
+    // An approving comment on the fake GitHub: { id, body, login, type, created, updated, issue }.
+    w.approve = (id, body, { login = APPROVER, type = 'User', created = '2026-11-01T09:00:00Z', updated = created, issue = 686 } = {}) => {
+      w.comments.set(String(id), { id, body, user: { login, type }, created_at: created, updated_at: updated, issue_url: `https://api.github.com/repos/${DEFAULT_REPO_FOR_TESTS}/issues/${issue}` });
+      return approvalUrl(id);
     };
     w.git = async args => {
       w.gitCalls.push(args.join(' '));
@@ -197,6 +221,7 @@ const scratch = [];
         throw new Error('not an ancestor');
       }
       if (cmd === 'rev-list') return '1\n';
+      if (cmd === 'show' && args[1] === '-s' && args[2] === '--format=%cI') return w.commitTime + '\n';
       if (cmd === 'show') return w.schemaSource;
       throw new Error(`unexpected git ${args.join(' ')}`);
     };
@@ -204,6 +229,10 @@ const scratch = [];
       w.ghCalls.push(path);
       if (path.includes('/actions/runs')) return { workflow_runs: path.includes(`head_sha=${SHA}`) ? w.runs : (w.tipRuns || []) };
       if (path.includes('/check-runs')) return { check_runs: w.checks };
+      let m = /\/issues\/comments\/(\d+)$/.exec(path);
+      if (m) { if (!w.comments.has(m[1])) throw new Error('HTTP 404: Not Found'); return w.comments.get(m[1]); }
+      m = /\/collaborators\/([^/]+)\/permission$/.exec(path);
+      if (m) return { permission: w.permissions.get(decodeURIComponent(m[1]).toLowerCase()) || 'none' };
       throw new Error(`unexpected gh ${path}`);
     };
     w.fetchImpl = async url => {
@@ -280,13 +309,41 @@ const scratch = [];
     ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} at the release stage (failed: ${failed(report).join('; ') || 'none'})`);
   }
   {
-    const waivedWorld = world({ device: 'none', reader: 'none' });
+    const approved = (w, override = goodOverride, id = 1001, options = {}) => { w.approve(id, `Approved.\n${waiverMarker(SHA, override.waives)}\n`, options); return w; };
+    const waivedWorld = approved(world({ device: 'none', reader: 'none' }));
     const waived = await run(waivedWorld, { overridePath: overrideFile(goodOverride) });
-    ok(waived.ok && waived.overrides.length === 2 && waived.overrides.every(o => o.by === 'Priya Example') && waived.promotion.length > 0, 'a recorded override by a named human waives both requirements by name and the nomination says so');
+    ok(waived.ok && waived.overrides.length === 2 && waived.overrides.every(o => o.by === 'Priya Example' && o.githubLogin === APPROVER && o.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED') && waived.promotion.length > 0, 'a public-release override approved on GitHub by a repository admin waives both requirements by name and the nomination says so');
     ok(waived.results.filter(r => r.ok === null && /WAIVED by recorded override/.test(r.label)).length === 2, 'each waived requirement is a visible WAIVED row, never silent');
-    const partial = await run(world({ device: 'none' }), { overridePath: overrideFile({ ...goodOverride, waives: ['reader-evidence'] }) });
+    ok(waived.results.some(r => r.ok === true && /approved on GitHub by a repository admin/.test(r.label)), 'the GitHub approval is its own visible check');
+    const staggered = await run(approved(world({ device: 'android-blocked' }), { ...goodOverride, waives: ['device-matrix'] }), { overridePath: overrideFile({ ...goodOverride, waives: ['device-matrix'] }) });
+    ok(staggered.ok && staggered.overrides.length === 1 && /AND, ANT not all pass/.test(staggered.overrides[0].state), 'blocked Android families release only through an approved, visible device-matrix waiver that names them');
+    ok(!(await run(world({ device: 'android-blocked' }))).ok, 'blocked Android families without a waiver refuse the release stage');
+    ok(!(await run(world({ device: 'all-blocked' }))).ok, 'an all-blocked device matrix refuses the release stage (Q4 #696 counterexample)');
+
+    // Authentication negative controls: each leaves the evidence unwaived.
+    const refusedWith = async (name, w, override, pattern) => {
+      const report = await run(w, { overridePath: overrideFile(override) });
+      ok(!report.ok && report.overrides.length === 0 && report.promotion.length === 0 && failed(report).some(l => /device matrix complete/.test(l)) && report.results.some(r => r.ok === false && pattern.test(`${r.label} ${r.detail || ''}`)),
+        `${name} waives nothing (failed: ${failed(report).join('; ')})`);
+    };
+    await refusedWith('a forged override whose approving comment does not exist (Q4 #696 counterexample)', world({ device: 'none', reader: 'none' }), goodOverride, /could not be read from GitHub/);
+    await refusedWith('an override whose comment was written by another account', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { login: 'someone-else' }), goodOverride, /written by someone-else, not/);
+    {
+      const w = approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { login: 'someone-else' });
+      await refusedWith('an override approved by a collaborator without admin permission', w, { ...goodOverride, githubLogin: 'someone-else' }, /write permission .*needs a repository admin/);
+    }
+    await refusedWith('an override approved by a bot account', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { type: 'Bot' }), goodOverride, /Bot account/);
+    await refusedWith('an override whose approving comment was edited', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { updated: '2026-11-02T09:00:00Z' }), goodOverride, /edited after it was posted/);
+    await refusedWith('an override approved before the commit existed (stale approval)', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { created: '2026-10-16T00:00:00Z' }), goodOverride, /predates the commit/);
+    await refusedWith('an override whose comment approves another SHA', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(OTHER, goodOverride.waives)); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose comment approves fewer waivers than the file claims', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, ['reader-evidence'])); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose comment approves a different target', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, goodOverride.waives).replace('deploy/production', 'deploy/staging')); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose approval link points at another repository', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, approval: 'https://github.com/evil/fork/issues/1#issuecomment-1001' }, /is in evil\/fork, not/);
+    await refusedWith('an override whose comment id belongs to another issue', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { issue: 999 }), goodOverride, /does not belong to #686/);
+    await refusedWith('an internal test-track exception at the release stage', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, scope: 'internal-test-track' }, /never approval for a public production release/);
+    const partial = await run(approved(world({ device: 'none' }), { ...goodOverride, waives: ['reader-evidence'] }), { overridePath: overrideFile({ ...goodOverride, waives: ['reader-evidence'] }) });
     ok(!partial.ok && failed(partial).some(l => /device matrix complete/.test(l)), 'an override that waives only the reader evidence does not waive the device matrix');
-    const evidenceWins = await run(world(), { overridePath: overrideFile(goodOverride) });
+    const evidenceWins = await run(approved(world()), { overridePath: overrideFile(goodOverride) });
     ok(evidenceWins.ok && evidenceWins.overrides.length === 0, 'when the evidence exists the override is not used: the nomination stands on the evidence');
     const wrongSha = await run(world({ device: 'none', reader: 'none' }), { overridePath: overrideFile({ ...goodOverride, sha: OTHER }) });
     ok(!wrongSha.ok && failed(wrongSha).some(l => /override is well-formed/.test(l)) && failed(wrongSha).some(l => /device matrix complete/.test(l)), 'an override for another SHA is refused and waives nothing');
@@ -365,14 +422,14 @@ const scratch = [];
     r.soak = { startedAt: '2026-11-03T10:00:00Z', endedAt: '2026-11-04T11:00:00Z', watchedBy: 'Priya Example', incidents: 'none', mergeFreezeDeclaredBy: 'Priya Example' };
     r.acceptance = { result: 'PASS', report: 'tools/acceptance/out/2026-11-03/report.json', tester: 'Priya Example', at: '2026-11-03T12:00:00Z' };
     for (const g of EXTERNAL_GATES) r.gates[g.id] = { status: 'PASS', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: `signed ${g.id} record` };
-    r.go = { decision: 'GO', by: 'Priya Example', at: '2026-11-04T15:00:00Z', sha: SHA, statement: 'GO for exactly this SHA.' };
+    r.go = { decision: 'GO', by: 'Priya Example', githubLogin: APPROVER, approval: approvalUrl(2001), at: '2026-11-04T15:00:00Z', sha: SHA, statement: 'GO for exactly this SHA.' };
     return r;
   }
   const dossier = (w, record, extra = {}) => buildDossier({ sha: SHA, record, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: false, deviceLedger: w.ledger, readerEvalDir: w.readerDir, now: NOW, ...extra });
-  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; return w; };
+  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; w.approve(2001, `GO.\n${goMarker(SHA)}`, { created: '2026-11-04T15:00:00Z' }); return w; };
   const ready = await dossier(frozen(), fullRecord());
   ok(ready.verdict === 'GO-READY' && ready.reasons.length === 0, `a frozen, soaked, evidenced, signed and GO-recorded SHA is GO-READY (reasons: ${ready.reasons.join('; ')})`);
-  ok(ready.rows.find(r => r.step === 28).ok === true && /GO by Priya Example/.test(ready.rows.find(r => r.step === 28).detail), 'the owner GO row names the person and quotes the statement');
+  ok(ready.rows.find(r => r.step === 28).ok === true && /GO by Priya Example \(Priysharan19, https:\/\/github\.com\/.*issuecomment-2001/.test(ready.rows.find(r => r.step === 28).detail) && ready.rows.find(r => r.step === 28).evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED', 'the owner GO row names the person, the approving GitHub comment and its evidence class, and quotes the statement');
   ok(ready.rows.find(r => r.step === 30).ok === null && /not yet/.test(ready.rows.find(r => r.step === 30).detail), 'before the promotion step 30 is informational: not yet');
   ok(/# GO\/NO-GO dossier — `a{40}`/.test(ready.markdown) && /## Verdict: \*\*GO-READY\*\*/.test(ready.markdown) && ready.markdown.includes('git push origin ' + SHA + ':refs/heads/deploy/production'), 'the markdown names the SHA, the verdict and prints step 29 only when GO-READY');
   ok(/PHYSICAL-HUMAN/.test(ready.markdown) && /real-human/.test(ready.markdown) && /pushes nothing, deploys nothing and authorises nothing/.test(ready.markdown), 'the markdown states the evidence classes and that it authorises nothing');
@@ -385,11 +442,19 @@ const scratch = [];
     const result = await dossier(w, record);
     ok(result.verdict === 'NO-GO' && result.reasons.some(r => label.test(r)) && !result.markdown.includes('git push origin'), `NO-GO when ${name} (reasons: ${result.reasons.join('; ')})`);
   };
-  await noGo('the owner has not recorded GO', r => { r.go.decision = null; }, /owner GO recorded/);
-  await noGo('the owner recorded NO-GO', r => { r.go.decision = 'NO-GO'; r.go.statement = 'wait for counsel'; }, /owner GO recorded/);
-  await noGo('the GO names another SHA', r => { r.go.sha = OTHER; }, /owner GO recorded/);
-  await noGo('the GO is signed by an agent', r => { r.go.by = 'Claude agent'; }, /owner GO recorded/);
-  await noGo('the GO is dated in the future', r => { r.go.at = '2026-11-06T00:00:00Z'; }, /owner GO recorded/);
+  await noGo('the owner has not recorded GO', r => { r.go.decision = null; }, /owner GO for exactly this SHA/);
+  await noGo('the owner recorded NO-GO', r => { r.go.decision = 'NO-GO'; r.go.statement = 'wait for counsel'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO names another SHA', r => { r.go.sha = OTHER; }, /owner GO for exactly this SHA/);
+  await noGo('the GO is signed by an agent', r => { r.go.by = 'Claude agent'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO is dated in the future', r => { r.go.at = '2026-11-06T00:00:00Z'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO has no GitHub approval link (an unsigned GO)', r => { r.go.approval = ''; }, /owner GO for exactly this SHA/);
+  await noGo('the GO approval comment does not exist', r => { r.go.approval = approvalUrl(2999); }, /owner GO for exactly this SHA/);
+  await noGo('the GO comment approves another SHA', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(OTHER), { created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment says NO-GO-style text without the exact marker', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, `NO-GO ${SHA}`, { created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment was posted by a non-admin', r => { r.go.githubLogin = 'someone-else'; }, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { login: 'someone-else', created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment was edited after posting', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-04T15:00:00Z', updated: '2026-11-04T16:00:00Z' }); });
+  await noGo('the GO comment was posted before the soak ended (stale GO)', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-04T10:00:00Z' }); });
+  await noGo('the GO comment was posted before the candidate was frozen', r => { r.soak.startedAt = '2026-11-02T00:00:00Z'; r.soak.endedAt = '2026-11-03T01:00:00Z'; }, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-03T08:00:00Z' }); w.staging.health.releaseIdentity.buildTimestamp = '2026-11-01T09:40:00.000Z'; });
   await noGo('the soak is shorter than 24 h', r => { r.soak.endedAt = '2026-11-04T09:59:00Z'; }, /soak window/);
   await noGo('the soak has not ended', r => { r.soak.endedAt = '2026-11-06T10:00:00Z'; }, /soak window/);
   await noGo('an incident is recorded during the soak', r => { r.soak.incidents = ['500 on /v1/sync/push at 03:12Z']; }, /no \/v1 500/);
@@ -421,10 +486,11 @@ const scratch = [];
   {
     const withOverride = frozen();
     writeFileSync(withOverride.ledger, '');
-    const overridePath = overrideFile({ ...goodOverride, waives: ['device-matrix'] });
+    withOverride.approve(1002, waiverMarker(SHA, ['device-matrix']));
+    const overridePath = overrideFile({ ...goodOverride, waives: ['device-matrix'], approval: approvalUrl(1002) });
     const record = fullRecord(); record.overrides = overridePath;
     const result = await dossier(withOverride, record);
-    ok(result.verdict === 'GO-READY' && result.rows.some(r => r.step === 'override' && /device-matrix waived/.test(r.label) && /Priya Example/.test(r.detail)) && /## Overrides/.test(result.markdown) && /device-matrix waived/.test(result.markdown), 'a recorded override is carried into the dossier by name, person and reason');
+    ok(result.verdict === 'GO-READY' && result.rows.some(r => r.step === 'override' && /device-matrix waived/.test(r.label) && /Priya Example \(Priysharan19, https:/.test(r.detail) && r.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED') && /## Overrides/.test(result.markdown) && /device-matrix waived/.test(result.markdown), 'a recorded override is carried into the dossier by name, person, GitHub approval and reason');
   }
   {
     // Evidence text is untrusted: a detail ending in a backslash before a pipe
