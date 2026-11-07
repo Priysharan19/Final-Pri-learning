@@ -14,6 +14,19 @@ updates:
     groups:
       client-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Post-launch majors (#512; V1 decisions of 1 November 2026): React 19
+      # waits until the browser, accessibility and native journeys have been
+      # re-run on the new runtime. Minor and patch updates still arrive, and a
+      # security advisory on an ignored major still raises a Dependabot alert.
+      - dependency-name: react
+        update-types: ['version-update:semver-major']
+      - dependency-name: react-dom
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/react-dom'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: npm
     directory: /server
     schedule:
@@ -23,12 +36,26 @@ updates:
     groups:
       server-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Express 5 is post-launch (#512): its router and body-parser semantics
+      # change the request path every server test pins. better-sqlite3 majors
+      # change the native ABI the Railway image builds against; they land with
+      # a container rebuild, not a weekly bump.
+      - dependency-name: express
+        update-types: ['version-update:semver-major']
+      - dependency-name: better-sqlite3
+        update-types: ['version-update:semver-major']
   - package-ecosystem: npm
     directory: /ad
     schedule:
       interval: weekly
       day: monday
     open-pull-requests-limit: 3
+    ignore:
+      # /ad is the unshipped video folder; majors there (React 19 #554,
+      # TypeScript 7 #555) have no launch value and only add CI load.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:

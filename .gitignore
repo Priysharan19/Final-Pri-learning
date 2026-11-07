@@ -18,10 +18,20 @@ scripts/.lan-cert/
 client/test/ink-corpus/*.json
 
 # Local real-writer calibration derived from that corpus. Vite copies the
-# client/public file into the iPad web bundle; every copy stays gitignored.
+# client/public file into client/dist, which stays gitignored.
 client/public/ink-bootstrap-profile.js
-ios/PriLearning.swiftpm/Resources/Web/ink-bootstrap-profile.js
-ios/PriLearning\ 2.swiftpm/Resources/Web/ink-bootstrap-profile.js
+
+# Generated iOS web bundles (decision D28, 1 November 2026). `npm run build &&
+# npm run sync:ios` copies client/dist into both native packages; Vite gives
+# every asset a content hash, so tracking the copies made every client merge
+# conflict every open client PR on ~300 generated files. Only the placeholder
+# README that keeps the folder in git (Package.swift declares
+# .copy("Resources/Web")) is tracked; tools/generated-bundles-untracked-check.mjs
+# fails CI if anything else under these folders is ever committed again.
+ios/PriLearning.swiftpm/Resources/Web/*
+!ios/PriLearning.swiftpm/Resources/Web/README.md
+ios/PriLearning 2.swiftpm/Resources/Web/*
+!ios/PriLearning 2.swiftpm/Resources/Web/README.md
 
 # Local neural-training outputs are large/private development artifacts.
 tools/ink-foundation/runs/
@@ -48,10 +58,6 @@ marketing/reel/export/
 # git cannot re-include a file under an excluded directory, so the directory
 # itself has to be let back in.
 !*[ ][2-9].swiftpm/
-
-# Exact build identity is generated into native bundles by sync:ios.
-ios/PriLearning.swiftpm/Resources/Web/release.json
-ios/PriLearning 2.swiftpm/Resources/Web/release.json
 
 # Python interpreter caches are generated artifacts, never release source.
 __pycache__/

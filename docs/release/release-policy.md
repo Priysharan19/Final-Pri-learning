@@ -98,7 +98,7 @@ An emergency bypass is for recovery when the normal PR path is unavailable, not 
 
 Stable metadata lives in `release/metadata.json`. Production build tooling must provide or be able to derive an exact 40-hex Git SHA and deterministic timestamp. `node tools/verify-release-identity.mjs` rejects missing, placeholder, malformed or drifting identity.
 
-Container builds receive `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` as build arguments because `.git` is intentionally excluded from the Docker context. Native archives must run build + `sync:ios` so `release.json` is present in the app bundle before archive validation.
+Container builds receive `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` as build arguments because `.git` is intentionally excluded from the Docker context. The native packages' web bundle (`ios/*/Resources/Web`) is generated, never tracked (decision D28, 1 November 2026): native archives and every CI lane that builds the package must run `npm run build && npm run sync:ios && npm run check:ios` before any Swift step, so the bundle and its `release.json` exist and are proven a complete copy of the build before archive validation. `tools/generated-bundles-untracked-check.mjs` (in `npm test`) fails if a generated file is committed again.
 
 ## Version changes
 

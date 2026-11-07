@@ -38,6 +38,7 @@ on:
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
+      - 'scripts/sync-ios.mjs'
       - '.github/workflows/native-ink.yml'
   pull_request:
     paths:
@@ -56,6 +57,7 @@ on:
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
+      - 'scripts/sync-ios.mjs'
       - '.github/workflows/native-ink.yml'
 
 permissions:
@@ -77,10 +79,26 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
 
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
+
+      # The web bundle inside the package is generated, never tracked (decision
+      # D28): Package.swift copies Resources/Web, so the client is built and
+      # synced into both packages before the one xcodebuild below, and the
+      # sync is proven complete. Without this the simulator app would carry an
+      # empty Web folder and every journey below would fail at the first page.
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Build the web client and generate the iOS web bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
 
       # V1 needs both families (#504). Hosted images do not always ship an
       # iPad device, so create any missing one from the installed iOS runtime.

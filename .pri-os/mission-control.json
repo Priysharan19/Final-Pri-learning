@@ -32,7 +32,19 @@
     "heartbeat_field": "Pri-Lease-Heartbeat-At",
     "progress_ref_field": "Pri-Lease-Heartbeat-Ref",
     "heartbeat_agent_field": "Pri-Lease-Heartbeat-By",
-    "admission_mode": "serialized_only"
+    "admission_mode": "serialized_only",
+    "writer_holding_states": [
+      "ACTIVE",
+      "IMPLEMENTING",
+      "TESTING",
+      "REPAIR"
+    ],
+    "review_states": [
+      "REVIEW",
+      "CI",
+      "MERGE_READY",
+      "REPAIR_PENDING"
+    ]
   },
   "retry_policy": {
     "max_identical_failure_attempts": 3,

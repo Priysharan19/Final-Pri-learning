@@ -1,9 +1,18 @@
-name: Staging uptime (SERVER_DOWN)
+name: Uptime backstop (SERVER_DOWN)
 
-# External SERVER_DOWN check for the staging /v1 server (docs/operations/alerts.md).
-# Every 5 minutes it asks /v1/health (liveness) and /v1/ready (readiness), each
-# twice with retries; the job fails when either is down. GitHub emails the repo
-# owner when a scheduled run fails. No checkout, no secrets, read-only token.
+# External SERVER_DOWN backstop for the staging and production /v1 servers
+# (docs/operations/alerts.md). Each target is asked /v1/health (liveness) and
+# /v1/ready (readiness), each twice with retries; a target's job fails when
+# either does not answer 200. GitHub emails the repository owner when a
+# scheduled run fails. No checkout, no secrets, read-only token, GET only.
+#
+# This is a BACKSTOP, not paging. The cron asks for every 5 minutes, but GitHub
+# delivers scheduled runs best-effort: between 19 Oct and 6 Nov 2026 this
+# workflow ran 92 times in 423 hours (1.8% of the requested cadence; median gap
+# 4.7 h, worst 9.9 h). An outage can therefore go unnoticed for hours. The
+# SERVER_DOWN rule in alerts.md §2 (1-minute interval, alert after 2 failures)
+# needs an external uptime monitor the owner configures; this file does not
+# pretend to be one.
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -18,10 +27,25 @@ concurrency:
 
 jobs:
   probe:
+    name: SERVER_DOWN probe (${{ matrix.target }})
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # A hanging host is the outage this exists for. Worst case per target:
+    # 4 probes x (4 tries x 15 s + 3 retry delays x 5 s) + 4 pauses x 5 s
+    # = 320 s. GitHub CANCELS a job that outlives timeout-minutes, and a
+    # cancelled scheduled run emails nobody, so the bound must exceed that
+    # (tools/deployment-contract.test.mjs recomputes it from the curl flags).
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: staging
+            base_url: https://pri-learning-staging-staging.up.railway.app
+          - target: production
+            base_url: https://final-pri-learning-production.up.railway.app
     env:
-      BASE_URL: https://pri-learning-staging-staging.up.railway.app
+      TARGET: ${{ matrix.target }}
+      BASE_URL: ${{ matrix.base_url }}
     steps:
       - name: Probe /v1/health and /v1/ready
         run: |
@@ -31,14 +55,15 @@ jobs:
             for attempt in 1 2; do
               code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
                 --retry 3 --retry-delay 5 --retry-all-errors \
-                "${BASE_URL}${path}" || echo 000)"
-              echo "SERVER_DOWN probe ${path} attempt ${attempt}: HTTP ${code}"
+                "${BASE_URL}${path}" || true)"
+              code="${code:-000}"
+              echo "SERVER_DOWN probe ${TARGET} ${path} attempt ${attempt}: HTTP ${code}"
               if [ "${code}" != "200" ]; then failed=1; fi
               sleep 5
             done
           done
           if [ "${failed}" -ne 0 ]; then
-            echo "::error::SERVER_DOWN — staging /v1/health or /v1/ready did not answer 200"
+            echo "::error::SERVER_DOWN — ${TARGET} /v1/health or /v1/ready did not answer 200"
             exit 1
           fi
-          echo "staging up"
+          echo "${TARGET} up"

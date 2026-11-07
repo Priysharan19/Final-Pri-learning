@@ -56,6 +56,23 @@ jobs:
           node scripts/apple-shipping-target.mjs --check-v1
           node client/test/apple-shipping-target-check.mjs
 
+      # The web bundle inside the package is generated, never tracked (decision
+      # D28), and `clean: true` above wipes any copy a previous run left on
+      # this Mac. The client is therefore built and synced into both packages
+      # before the one xcodebuild below, and the sync is proven complete;
+      # otherwise the app would carry an empty Web folder and every bridge and
+      # journey step below would fail at the first page.
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build the web client and generate the iOS web bundles
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
       - name: Provision available iPad and iPhone simulators
         run: node scripts/ci-provision-simulators.mjs --boot ipad
 
