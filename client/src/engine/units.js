@@ -168,6 +168,30 @@ export function unitContradicts(expectedSuffix, answerText) {
   return true;
 }
 
+/**
+ * Every unit a question's wording names, in any spelling: "8 cm by 4 cm",
+ * "in cm²", "\\text{ km/h}", "square centimetres", "3 s per lap". Read word by
+ * word (windows of one to three words), so a unit counts with or without a
+ * number before it. Returns a Set of canonical units.
+ */
+export function unitsNamed(text) {
+  const words = String(text ?? '')
+    .replace(/\$/g, ' ')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, ' $1 ')
+    .replace(/\^\{?([23])\}?/g, '^$1')
+    .replace(/\\[,;! ]/g, ' ')
+    .replace(/[(),.;:?!]/g, ' ')
+    .split(/\s+/).filter(Boolean);
+  const named = new Set();
+  for (let i = 0; i < words.length; i++) {
+    for (let k = 1; k <= 3 && i + k <= words.length; k++) {
+      const c = canonicalUnit(words.slice(i, i + k).join(' '));
+      if (c) named.add(c);
+    }
+  }
+  return named;
+}
+
 /** Is the question's unit written, as a whole unit, anywhere in the text? */
 export function unitWritten(expectedSuffix, texts) {
   const want = canonicalUnit(expectedSuffix);

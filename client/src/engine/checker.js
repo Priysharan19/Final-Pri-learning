@@ -532,8 +532,14 @@ function namesAValue(text, meta) {
 // A line that is not read is returned as a note saying so. It is neither a
 // mistake nor credit, and nothing after the budget is spent is credited. The
 // bound is on the text, not the clock, so the same working is always marked
-// the same way; the clock is only a backstop that these bounds keep idle.
-export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
+// the same way. There is no clock here: a wall-clock backstop turned correct
+// lines into "Not checked" whenever the machine was slow, so a student's marks
+// depended on server load (C3's report on #692: c10-arithmetic-progressions
+// D2 seed 1009 lost two verified lines under CPU load). On the server every
+// marking job runs in a worker that is TERMINATED at its deadline and answers
+// MARKING_TOO_COMPLEX or MARKING_BUSY (server/platform/markerPool.js) — an
+// explicit, retryable outcome, never a silently smaller mark.
+export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const UNREAD = {
   long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
   many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
@@ -542,15 +548,14 @@ const UNREAD = {
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
   let spent = 0, closed = false;
-  const started = Date.now();
   return rawLines.map((line, index) => {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return () => (Date.now() - started > WORKING_LIMITS.backstopMs ? UNREAD.many : null);
+    return null;
   });
 }
-const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
+const unreadNote = entry => entry;
 
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -1866,6 +1871,14 @@ const claimSides = c => c?.kind === 'equation' ? [c.ast.l, c.ast.r]
  * A line that is the same once identities are removed but is written SHORTER
  * than the reference has evaluated or collected something, and is a step.
  */
+/** One spelling for a written line: TeX relations, minus signs, braces and spacing set aside. */
+function lineTextKey(text) {
+  return normalize(cleanLine(String(text ?? '')))
+    .replace(/\\le(?:q|slant)?\b|⩽/g, '≤').replace(/\\ge(?:q|slant)?\b|⩾/g, '≥')
+    .replace(/<=/g, '≤').replace(/>=/g, '≥')
+    .replace(/[−–—]/g, '-').replace(/[\s{}]/g, '');
+}
+
 function methodProgressDuplicate(line, reference) {
   if (sameWrittenClaim(line, reference)) return true;
   const ls = claimSides(line), rs = claimSides(reference);
@@ -2799,7 +2812,7 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
     if (contradicted.has(index)) { row.reason = 'contradicted'; return row; }
     const claim = readClaim(l.text);
     const credit = () => {
-      counted.push(claim || { kind: 'text', text: String(l.text).trim() });
+      counted.push(claim || { kind: 'text', text: String(l.text).trim(), key: lineTextKey(l.text) });
       if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';
       return row;
     };
@@ -2809,6 +2822,14 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       row.reason = 'restated'; return row;
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // A line the claim reader cannot hold as one relation (a chained
+    // inequality, `-16 ≤ 4x ≤ 0`) is credited by its text, so its copy is
+    // caught by its text: written twice it is shown once, and earns once (#680
+    // reconciliation sweep: the same chain written three times earned 2 of 3).
+    if (!claim) {
+      const key = lineTextKey(l.text);
+      if (counted.some(c => c.kind === 'text' && c.key === key)) { row.reason = 'repeat'; return row; }
+    }
     // A line whose two sides are written the same (`x = x`, `0 = 0`) is true
     // of everything and moves nothing on, on any kind of question.
     if (claim?.kind === 'equation' && tautology(l.text)) { row.reason = 'unrelated'; return row; }
