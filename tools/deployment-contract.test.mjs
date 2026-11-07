@@ -40,6 +40,20 @@ ok(/^  PRI_PLATFORM_DB$/m.test(preflight({})), 'preflight asks for PRI_PLATFORM_
 ok(!/^  PRI_PLATFORM_DB$/m.test(preflight({ PRI_DATABASE_URL: 'postgresql://role@db.example/postgres?sslmode=verify-full' })),
   'preflight does not ask for PRI_PLATFORM_DB once PRI_DATABASE_URL selects Postgres');
 const envExample = readFileSync(join(ROOT, '.env.production.example'), 'utf8');
+// #218: production refuses to start with no mail transport, so preflight must
+// list the three auth-email variables as required, not optional.
+const bare = preflight({});
+for (const name of ['PRI_AUTH_EMAIL_PROVIDER', 'PRI_RESEND_API_KEY', 'PRI_AUTH_EMAIL_FROM']) {
+  ok(new RegExp(`^  ${name}$`, 'm').test(bare), `preflight asks for ${name} as a required variable`);
+}
+ok(!/'re_[A-Za-z0-9]/.test(bare), 'preflight never prints anything shaped like a Resend key');
+const email = from => preflight({ PRI_AUTH_EMAIL_PROVIDER: 'resend', PRI_RESEND_API_KEY: 'set', PRI_AUTH_EMAIL_FROM: from });
+ok(!/^  PRI_AUTH_EMAIL_FROM$/m.test(email('Pri Learning <verify@mail.prilearning.com>')) && !/Auth email will not reach/.test(email('Pri Learning <verify@mail.prilearning.com>')),
+  'a readable sender on a real domain is accepted without a warning');
+ok(/Resend's test sender/.test(email('Pri <onboarding@resend.dev>')), 'preflight warns that the resend.dev test sender reaches nobody but the account owner');
+ok(/example domain/.test(email('Pri Learning <noreply@example.com>')), 'preflight warns when the template\'s example sender was pasted unchanged');
+ok(/not an address the server can read/.test(email('Pri Learning')), 'preflight warns about a sender with no address');
+ok(/only provider the server supports/.test(preflight({ PRI_AUTH_EMAIL_PROVIDER: 'smtp' })), 'preflight warns about an unsupported provider');
 ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(envExample), '.env.production.example documents the Postgres variables');
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
