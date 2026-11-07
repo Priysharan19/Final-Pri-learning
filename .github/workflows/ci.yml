@@ -436,6 +436,8 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
+          # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
+          node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
@@ -450,6 +452,7 @@ jobs:
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+          grep -Fq 'PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
           set -o pipefail
@@ -574,12 +577,14 @@ jobs:
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 66/66 suites' platform-postgres.log
+          # 66 → 67: the question picker passes over content the account has resolved, on Postgres too.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 67/67 suites' platform-postgres.log
           grep -Fq '✓ practice-reveal-submit-race-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-midflight-check.mjs' platform-postgres.log
           grep -Fq '✓ billing-out-of-order-concurrency-check.mjs' platform-postgres.log
           grep -Fq '✓ postgres-cutover-rehearsal-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-consent-coverage-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-seen-aware-pick-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
