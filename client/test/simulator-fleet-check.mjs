@@ -16,6 +16,7 @@ import {
   requiredRuntime, runtimeMatches,
 } from '../../scripts/simulator-fleet.mjs';
 import { EXPECTED_CASES, MAX_DEVIATION_PX, judge } from '../../scripts/ink-native-check.mjs';
+import { judgeContentEnd } from '../../scripts/native-bridge-selfcheck.mjs';
 
 let pass = 0;
 const failures = [];
@@ -247,6 +248,31 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
     'both bridge self-checks reuse the built app');
   ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, 'the workflow contains exactly one xcodebuild of the package');
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
+}
+
+// ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
+// The leg kills the app's real WebContent process with ink on the native
+// surface; the verdict is judged here on recorded lines, both ways.
+{
+  const L = s => `PRIBRIDGE ${s}`;
+  const clean = [L('ok inkMountedBeforeContentEnd'), L('contentProcessEnded n=1 action=reload inkMounted=false'),
+    L('ok pageAliveAfterContentEnd (load 1)'), L('ok bridgeAfterContentEnd (load 1)'), L('ok inkDroppedAfterContentEnd (load 1)'),
+    L('ok recoveryPolicy (load 1)'), L('recovery 1 summary 0 failure(s)'),
+    L('contentProcessEnded n=2 action=reload inkMounted=false'), L('contentProcessEnded n=3 action=stopped inkMounted=false'), L('contentStopped shown')];
+  const without = (re) => clean.filter(l => !re.test(l));
+  const swap = (a, b) => clean.map(l => l.replace(a, b));
+  ok(judgeContentEnd(clean).ok, 'content end: a reload that drops the ink and stops at the third end passes');
+  // Recorded on an iOS 27 simulator with the handler removed: WebKit reloaded
+  // on its own, the ink surface stayed up, and the shell heard nothing.
+  ok(!judgeContentEnd([L('ok inkMountedBeforeContentEnd'), L('ok pageAliveAfterContentEnd (load 1)'), L('ok bridgeAfterContentEnd (load 1)'),
+    L('FAIL inkDroppedAfterContentEnd (load 1)'), L('ok recoveryPolicy (load 1)'), L('recovery 1 summary 1 failure(s)')]).ok,
+    'content end: the pre-fix run (WebKit reload, ink left mounted) fails');
+  ok(!judgeContentEnd(swap('n=1 action=reload inkMounted=false', 'n=1 action=reload inkMounted=true')).ok, 'content end: ink still mounted when the process ended fails');
+  ok(!judgeContentEnd(without(/stopped|shown/).concat([L('contentProcessEnded n=3 action=reload inkMounted=false')])).ok, 'content end: a reload loop that never stops fails');
+  ok(!judgeContentEnd(swap('n=2 action=reload', 'n=2 action=stopped').filter(l => !/n=3/.test(l))).ok, 'content end: stopping at the second end fails');
+  ok(!judgeContentEnd(without(/shown/)).ok, 'content end: no native stopped screen fails');
+  ok(!judgeContentEnd(swap('ok bridgeAfterContentEnd', 'FAIL bridgeAfterContentEnd')).ok, 'content end: a bridge that does not answer after the reload fails');
+  ok(!judgeContentEnd([]).ok, 'content end: a run that never reached the leg fails');
 }
 
 console.log(failures.length

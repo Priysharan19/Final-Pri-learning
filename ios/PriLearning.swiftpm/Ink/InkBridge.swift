@@ -55,6 +55,21 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
     func webViewDidScroll() { applyLayout() }
     func webViewDidResize() { applyLayout() }
 
+    /// The page's WebContent process ended (WebShell reloads it). The surface
+    /// belonged to that page: hide it, drop its ink and its Undo history, and
+    /// wait for the reloaded page to mount again; it restores its own saved
+    /// draft through setStrokes. Nothing is emitted: no page is there to hear it.
+    func pageDidTerminate() {
+        isMounted = false
+        clipView.isHidden = true
+        surface.resetForNewSheet()
+    }
+
+    /// What a self-check can see without touching the surface.
+    var surfaceState: (mounted: Bool, visible: Bool, strokes: Int) {
+        (isMounted, !clipView.isHidden, surface.strokes.count)
+    }
+
     // MARK: - Messages from the page
 
     /// The ops the page may send. The web side's answer-blind allowlist

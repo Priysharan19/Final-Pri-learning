@@ -100,7 +100,7 @@ enum BridgeSelfCheck {
     """
 
     @MainActor
-    static func run(in webView: WKWebView) {
+    static func run(in webView: WKWebView, ink: InkBridge) {
         say("PRIBRIDGE bridge self-check started", reset: true)
         webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
             switch result {
@@ -142,9 +142,99 @@ enum BridgeSelfCheck {
                 say(String(format: "PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false"))
                 say(String(format: "PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? ""))
                 say(String(format: "PRIBRIDGE summary %d failure(s)", failures))
+                if contentEndRequested { armContentEnd(ink: ink) }
             case .failure(let error):
                 say(String(format: "PRIBRIDGE FAIL script error %@", String(describing: error)))
             }
+        }
+    }
+
+    // ── The page's WebContent process ends (`--bridge-content-end`) ──
+    // scripts/native-bridge-selfcheck.mjs ends the real WebContent process from
+    // the host (SIGKILL, as iOS's memory pressure does) once the native ink
+    // surface is mounted with a stroke on it. Every load after that runs
+    // runRecovery: the page is the app again, the bridge answers, and the ink
+    // surface of the page that ended is gone. Before WebShell handled
+    // webViewWebContentProcessDidTerminate, WebKit reloaded the page on its own
+    // and the surface stayed mounted, with the old ink, above the new page.
+
+    static var contentEndRequested: Bool { ProcessInfo.processInfo.arguments.contains("--bridge-content-end") }
+    static var awaitingContentEnd = false
+    private static var recoveries = 0
+
+    @MainActor
+    static func armContentEnd(ink: InkBridge) {
+        ink.handle(["op": "mount",
+                    "frame": ["x": 40, "y": 160, "width": 600, "height": 300],
+                    "clip": ["x": 0, "y": 0, "width": 800, "height": 800],
+                    "scrollX": 0, "scrollY": 0])
+        ink.handle(["op": "setStrokes",
+                    "strokes": [["points": [["x": 10, "y": 10], ["x": 200, "y": 120], ["x": 320, "y": 40]]]]])
+        let s = ink.surfaceState
+        let ok = s.mounted && s.visible && s.strokes == 1
+        say("PRIBRIDGE \(ok ? "ok" : "FAIL") inkMountedBeforeContentEnd")
+        awaitingContentEnd = true
+        say("PRIBRIDGE ready for content process end")
+    }
+
+    static func contentProcessEnded(count: Int, reloading: Bool, inkMounted: Bool) {
+        guard requested else { return }
+        say("PRIBRIDGE contentProcessEnded n=\(count) action=\(reloading ? "reload" : "stopped") inkMounted=\(inkMounted)")
+    }
+
+    static func contentStoppedShown() {
+        guard requested else { return }
+        say("PRIBRIDGE contentStopped shown")
+    }
+
+    private static let recoveryScript = """
+    const out = {};
+    const h = window.__PRI_HOST__;
+    const root = document.getElementById('root');
+    out.pageAlive = document.readyState === 'complete' && !!h && h.protocol === 1 && !!root && root.childElementCount > 0;
+    let reply = null;
+    const original = window.__priNativeReceive;
+    window.__priNativeReceive = msg => { if (msg && msg.id === 'recovery-main') reply = msg; if (original) original(msg); };
+    window.webkit.messageHandlers.priBridge.postMessage({ v: 1, id: 'recovery-main', cap: 'storage', op: 'status', payload: {} });
+    for (let i = 0; i < 30 && !reply; i++) await new Promise(r => setTimeout(r, 100));
+    window.__priNativeReceive = original;
+    out.bridge = reply?.ok === true;
+    return JSON.stringify(out);
+    """
+
+    @MainActor
+    static func runRecovery(in webView: WKWebView, ink: InkBridge) {
+        recoveries += 1
+        let n = recoveries
+        webView.callAsyncJavaScript(recoveryScript, arguments: [:], in: nil, in: .page) { result in
+            var out: [String: Any] = [:]
+            if case .success(let value) = result, let text = value as? String, let data = text.data(using: .utf8) {
+                out = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            }
+            let s = ink.surfaceState
+            // The reload policy, as a table: more than 2 ends inside 30 s stop reloading.
+            let now = Date()
+            let policy = WebShell.Coordinator.self
+            let policyOK =
+                policy.recovery(after: [], at: now) == ([now], true) &&
+                policy.recovery(after: [now - 10], at: now).reload &&
+                !policy.recovery(after: [now - 10, now - 5], at: now).reload &&
+                policy.recovery(after: [now - 40, now - 5], at: now) == ([now - 5, now], true)
+            let checks: [(String, Bool)] = [
+                ("pageAliveAfterContentEnd", out["pageAlive"] as? Bool == true),
+                ("bridgeAfterContentEnd", out["bridge"] as? Bool == true),
+                ("inkDroppedAfterContentEnd", !s.mounted && !s.visible && s.strokes == 0),
+                ("recoveryPolicy", policyOK),
+            ]
+            var failures = 0
+            for (key, ok) in checks {
+                if !ok { failures += 1 }
+                say("PRIBRIDGE \(ok ? "ok" : "FAIL") \(key) (load \(n))")
+            }
+            if !s.mounted && !s.visible && s.strokes == 0 {} else {
+                say("PRIBRIDGE info ink after load \(n): mounted=\(s.mounted) visible=\(s.visible) strokes=\(s.strokes)")
+            }
+            say("PRIBRIDGE recovery \(n) summary \(failures) failure(s)")
         }
     }
 }

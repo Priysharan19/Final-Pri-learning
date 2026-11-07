@@ -143,6 +143,7 @@ struct WebShell: UIViewRepresentable {
 
         func attachInk(to webView: WKWebView, in container: UIView) {
             shellWebView = webView
+            shellContainer = container
             ink.attach(to: webView, in: container)
             // Scrolling is followed from the web view's own offset rather than
             // from messages: the page tells us where the writing area IS, and
@@ -416,14 +417,110 @@ struct WebShell: UIViewRepresentable {
             // Simulator/CI only: prove the bridge contract inside real WebKit.
             applyTextSize()
             #if DEBUG
+            if BridgeSelfCheck.awaitingContentEnd {
+                // A load after the page's WebContent process ended (whoever reloaded it).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.runRecovery(in: webView, ink: self.ink) }
+                return
+            }
             guard !bridgeSelfCheckRan else { return }
             if BridgeSelfCheck.requested {
                 bridgeSelfCheckRan = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView, ink: self.ink) }
             } else if JourneySelfCheck.phase != nil {
                 bridgeSelfCheckRan = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { JourneySelfCheck.run(in: webView) }
             }
+            #endif
+        }
+
+        // ── The page's WebContent process ended ──
+        // iOS ends the page's WebContent process under memory pressure, and
+        // WebKit ends it when it crashes. Without this method WebKit reloaded
+        // the page on its own and told the shell nothing: the native PencilKit
+        // surface stayed mounted, with the ended page's ink, above the new
+        // page, and a second end a few seconds later left a blank screen with
+        // no way back but force-quitting (both measured on an iOS 27 simulator
+        // by killing the real WebContent process; scripts/native-bridge-
+        // selfcheck.mjs now does this on every run). The page is reloaded here:
+        // drafts live in its own storage and checked work on Pri's server. The
+        // ink surface and any cloud request belonged to the page that ended,
+        // so they are dropped first. A page that keeps dying gets a native
+        // screen instead of a reload loop: the same policy as Android's
+        // onRenderProcessGone (MainActivity.kt, more than 2 within 30 s).
+        static let maxContentTerminations = 2
+        static let contentTerminationWindow: TimeInterval = 30
+        private var contentTerminations: [Date] = []
+        private weak var shellContainer: UIView?
+        private var stoppedView: UIView?
+
+        /// The terminations still inside the window (this one included), and
+        /// whether the page may be reloaded once more.
+        static func recovery(after earlier: [Date], at now: Date) -> (recent: [Date], reload: Bool) {
+            let recent = earlier.filter { now.timeIntervalSince($0) <= contentTerminationWindow } + [now]
+            return (recent, recent.count <= maxContentTerminations)
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            ink.pageDidTerminate()
+            cloud.cancelAll()
+            let (recent, reload) = Self.recovery(after: contentTerminations, at: Date())
+            contentTerminations = recent
+            #if DEBUG
+            BridgeSelfCheck.contentProcessEnded(count: recent.count, reloading: reload, inkMounted: ink.isMounted)
+            #endif
+            if reload { reloadPage(webView) } else { showStopped(over: webView) }
+        }
+
+        private func reloadPage(_ webView: WKWebView) {
+            if webView.url != nil {
+                webView.reload()
+            } else {
+                webView.load(URLRequest(url: URL(string: "prilearning://app/")!))
+            }
+        }
+
+        private func showStopped(over webView: WKWebView) {
+            guard stoppedView == nil, let container = shellContainer else { return }
+            let label = UILabel()
+            // The same words as Android's renderer_crash_body / renderer_crash_retry.
+            label.text = "Pri Learning stopped unexpectedly a few times. Your saved work is kept on this device."
+            label.numberOfLines = 0
+            label.textAlignment = .center
+            label.textColor = UIColor(white: 0.88, alpha: 1)
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            let retry = UIButton(configuration: .bordered(), primaryAction: UIAction(title: "Try again") { [weak self, weak webView] _ in
+                guard let self, let webView else { return }
+                self.contentTerminations.removeAll()
+                self.stoppedView?.removeFromSuperview()
+                self.stoppedView = nil
+                self.reloadPage(webView)
+            })
+            retry.accessibilityIdentifier = "pri.contentStopped.retry"
+            // The shell is dark whatever the system appearance; a light-mode
+            // tint drew the button's title black on a dark fill.
+            retry.tintColor = UIColor(white: 0.92, alpha: 1)
+            let stack = UIStackView(arrangedSubviews: [label, retry])
+            stack.axis = .vertical
+            stack.alignment = .center
+            stack.spacing = 24
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            let overlay = UIView(frame: container.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.backgroundColor = webView.backgroundColor
+            overlay.overrideUserInterfaceStyle = .dark
+            overlay.accessibilityIdentifier = "pri.contentStopped"
+            overlay.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.centerYAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.centerYAnchor),
+                stack.leadingAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+                stack.trailingAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.trailingAnchor, constant: -32),
+                retry.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            ])
+            container.addSubview(overlay)
+            stoppedView = overlay
+            #if DEBUG
+            BridgeSelfCheck.contentStoppedShown()
             #endif
         }
 
