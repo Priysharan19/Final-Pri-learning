@@ -1,0 +1,87 @@
+{
+  "created_utc": "2026-10-20",
+  "baseline": "98a30194caf349885a24b11d75edf01ac50df428",
+  "policy_verified_date": "2026-10-20",
+  "checks": {
+    "apple.title": {
+      "characters": 28,
+      "limit": 30,
+      "pass": true
+    },
+    "apple.subtitle": {
+      "characters": 29,
+      "limit": 30,
+      "pass": true
+    },
+    "apple.promotional": {
+      "characters": 128,
+      "limit": 170,
+      "pass": true
+    },
+    "apple.keywords": {
+      "characters": 76,
+      "limit": 100,
+      "pass": true
+    },
+    "google.title": {
+      "characters": 28,
+      "limit": 30,
+      "pass": true
+    },
+    "google.short": {
+      "characters": 63,
+      "limit": 80,
+      "pass": true
+    },
+    "apple.description_estimate": {
+      "characters": 1966,
+      "limit": 4000,
+      "pass": true,
+      "note": "Includes operator-facing qualification; not final pasted description"
+    },
+    "google.description": {
+      "characters": 1637,
+      "limit": 4000,
+      "pass": true
+    }
+  },
+  "claim_rows": 36,
+  "files": [
+    {
+      "name": "01-Apple-Listing-and-Review.md",
+      "size_bytes": 11198,
+      "sha256": "6dcc92e88bc8b296bbe454feb11e97f7d8aff65f99e50110cc744b704048bca1"
+    },
+    {
+      "name": "02-Google-Play-Listing-and-Assets.md",
+      "size_bytes": 9801,
+      "sha256": "2831eaee8702e2c063ba77b4549a21e71c98151dbda6ac1682876373aba73cb2"
+    },
+    {
+      "name": "03-Privacy-Children-and-Data-Safety.md",
+      "size_bytes": 15803,
+      "sha256": "06ad3e046bc54b6aef928c8e2c92e526d3d9713940e9f439f67c4bfbd496c84c"
+    },
+    {
+      "name": "04-Claim-Register.csv",
+      "size_bytes": 8291,
+      "sha256": "4b13ddfe8dcbfc36c3aef1bfe12c49f38df0ed8181de93d16e767a2b5a581f02"
+    },
+    {
+      "name": "05-Release-Governance.md",
+      "size_bytes": 13213,
+      "sha256": "fd4cf623c052d7beca729be27a9a8ad57f4d9b6077dc4cc95dde674d4a1cdc8d"
+    },
+    {
+      "name": "06-Submission-Worksheets.md",
+      "size_bytes": 7974,
+      "sha256": "06701cae41d52c4ee61145f25c5505bc172b146c9f0c8d39b7cb1ad741451cec"
+    },
+    {
+      "name": "README.md",
+      "size_bytes": 4639,
+      "sha256": "d57925e0b5c99efdb42a23c74e78c1f32b8a4589393f9a4754f3fe21e49761a7"
+    }
+  ],
+  "status": "Source-based documentation deliverables; no native/portal/physical/provider/legal certification performed."
+}

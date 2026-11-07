@@ -155,6 +155,11 @@ export function casesMarkdown() {
   return lines.join('\n');
 }
 
+// Ledger fields are free text typed by a tester (or edited by hand): flatten
+// every line ending and escape backslashes before pipes so a note can never add
+// a forged row or column to the matrix table the GO/NO-GO dossier embeds.
+function mdCell(text) { return String(text ?? '').replace(/\r\n|[\r\n\u000b\u000c\u0085\u2028\u2029]/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|'); }
+
 export function reportMarkdown(summary) {
   const lines = [
     `Physical-device matrix — ${summary.sha ? `build ${summary.sha}` : 'all builds'} — pass ${summary.counts.pass} · fail ${summary.counts.fail} · blocked ${summary.counts.blocked} · not run ${summary.counts['not run']} of ${summary.rows.length}`,
@@ -165,7 +170,7 @@ export function reportMarkdown(summary) {
   for (const row of summary.rows) {
     const r = row.latest;
     lines.push(r
-      ? `| \`${row.id}\` | ${r.result.toUpperCase()} | ${r.device || '—'} | ${r.os || '—'} | ${r.pencil || '—'} | \`${r.sha.slice(0, 12)}\` | ${r.tester || '—'} | ${r.recordedAt.slice(0, 10)} | ${r.notes || ''} |`
+      ? `| \`${mdCell(row.id)}\` | ${mdCell(String(r.result).toUpperCase())} | ${mdCell(r.device || '—')} | ${mdCell(r.os || '—')} | ${mdCell(r.pencil || '—')} | \`${mdCell(String(r.sha).slice(0, 12))}\` | ${mdCell(r.tester || '—')} | ${mdCell(String(r.recordedAt).slice(0, 10))} | ${mdCell(r.notes || '')} |`
       : `| \`${row.id}\` | not run | — | — | — | — | — | — | |`);
   }
   lines.push('', 'Every PASS/FAIL row is PHYSICAL-HUMAN evidence recorded by the named tester on real hardware. Simulator/emulator results are never written here (CI holds them). "not run" rows are open until a human records them.');

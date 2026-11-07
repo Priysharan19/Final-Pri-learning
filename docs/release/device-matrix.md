@@ -42,7 +42,8 @@ cases" gate and nothing else.
 
 ## Before a session
 
-1. The build is a nominated `main` SHA (`node scripts/release-nominate.mjs <sha>`) installed from its
+1. The build is a nominated `main` SHA (`node scripts/release-nominate.mjs <sha> --candidate`; the
+   release-stage run without `--candidate` later requires this matrix to be complete for the SHA) installed from its
    test track (TestFlight; Play internal testing). Write down the SHA the app's diagnostics show — it is
    recorded with every case and must equal the nominated one.
 2. The server side of the same journey already passed on staging without a device:
