@@ -32,4 +32,20 @@ run('sensitive approval from Kalp',{...basic,files:[{filename:'.github/workflows
 run('missing changed-file snapshot',{...basic,files:[]},false);n++;
 run('sensitive original renamed into non-sensitive location', {...basic,files:[{filename:'client/src/pages/Home.jsx',previous_filename:'.github/workflows/ci.yml',status:'renamed'}],reviews:[{...validReview,user:{login:'OtherReviewer',type:'User'}}],permissions:{...basic.permissions,OtherReviewer:'write'}},false);n++;
 run('malformed changed-file metadata', {...basic,files:[{filename:'client/src/pages/../../unsafe.js',status:'added'}]},false);n++;
+// The verifier, the canonical policy and the solo-maintainer decision must not
+// drift apart again: the header may not claim to gate the lane, and the policy
+// must say plainly that this mode merges without independent human review.
+{
+  const {readFileSync}=await import('node:fs');
+  const read=path=>readFileSync(new URL('../../'+path,import.meta.url),'utf8');
+  const header=read('scripts/pri-manual-authorization.mjs').split('\nimport ')[0];
+  const policy=read('docs/release/release-policy.md');
+  assert.ok(/It is NOT the merge gate\. No workflow runs live\(\)/.test(header) && /docs\/release\/release-policy\.md/.test(header) && /WITHOUT independent human review/.test(header) && !/before their manual lane can pass/.test(header),
+    'the verifier header says it is not the merge gate and points at the canonical policy');n++;
+  assert.ok(/### Solo-maintainer mode/.test(policy) && /issuecomment-6700751719/.test(policy) && /\*\*Not provided:\*\* independent human review/.test(policy) && /deliberately requires no approval count/.test(policy) && /at least 1, with approval after the latest push/.test(policy),
+    'release-policy.md records the solo-maintainer decision, what it does not provide and how to leave it');n++;
+  const workflows=(await import('node:fs')).readdirSync(new URL('../../.github/workflows/',import.meta.url)).map(name=>read('.github/workflows/'+name)).join('\n');
+  assert.ok(!/scripts\/pri-manual-authorization\.mjs/.test(workflows.replace(/node --check scripts\/pri-manual-authorization\.mjs/g,'')),
+    'if a workflow ever runs the live verifier, this header and the policy must be revisited (it is not wired today)');n++;
+}
 console.log('PASS: '+n+' manual-lane authorization regressions');
