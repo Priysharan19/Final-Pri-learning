@@ -74,12 +74,23 @@ export const ENGINE_SUITES = [
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'account-deletion-session-binding-check.mjs',
+  // Races the request thread cannot serialise on its own, and the cutover end
+  // to end: a reveal against a correct answer, a deletion against a mark in
+  // flight, two billing events of one subscription, SQLite -> Postgres served.
+  'practice-reveal-submit-race-check.mjs',
+  'account-deletion-midflight-check.mjs',
+  'billing-out-of-order-concurrency-check.mjs',
+  'postgres-cutover-rehearsal-check.mjs',
   // The data export behind fresh proof of the credential, and the new-device
   // sign-in notice: session rows, audit rows and the step-up on Postgres too.
   'export-reauth-check.mjs',
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // Pending, given and withdrawn consent through the production /v1 chain:
+  // telemetry, classes, assignments and reports refuse a child and write
+  // nothing, never touch an adult, and leave staff routes open (#292).
+  'guardian-consent-coverage-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',

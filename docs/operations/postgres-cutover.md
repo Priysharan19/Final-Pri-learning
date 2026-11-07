@@ -63,8 +63,9 @@ back-to-back operation (§2.6).
 | schema 12 | `20261016000000_rls_fail_closed.sql` (#522) | RLS deny-by-default: every `pri` table requires a declared `pri.scope` (`system` or `account`); the 19 account-owned tables admit only system scope or their own account; the store declares the scope on every statement | `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql` |
 | **schema 13** | `20261019000000_rls_account_coverage.sql` (train 10, security P2) | **account RLS on every account-bearing table**: `accounts`, the class/teacher tables, issue reports, the nullable-account billing ledgers, OTP challenges, the audit trail, content authorship, teacher invites and feature-flag provenance get a RESTRICTIVE `pri_account_scope` (system scope, or account scope on the row's own owner column); no row changes | `docs/release/rollback/20261019000000_rls_account_coverage.rollback.sql` |
 
-Applied on staging: all ten up to schema 12, in this order (schema 12 on 2026-10-18 by §2.5); schema 13 is applied right after train 10 merges. Applied on
-production: none.
+Applied on staging: all eleven up to schema 13, in this order (schema 12 on 2026-10-18 by §2.5; schema 13 after train 10). Observed
+live on 2026-11-07, read-only: staging `GET /v1/health` reports `schemaVersion "13"`, `billingSchemaVersion "6"`, Postgres, release
+`a5778a3`. Applied on production: none (production still serves SQLite at schema 12, release `169bcdf`).
 
 ### Connection: session mode only (mandatory, enforced at boot)
 
@@ -352,7 +353,7 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "12"`, `billingSchemaVersion = "6"`;
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "13"` (the version the current build requires; it was "12" before train 10), `billingSchemaVersion = "6"`;
    `GET /v1/ready` → 200 with `database` reported ready (503 + `Retry-After` means the replica
    cannot serve: read its coded state, not the logs' guesses).
 3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
