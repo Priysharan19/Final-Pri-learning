@@ -23,6 +23,7 @@ import { createHandwritingRouter } from '../platform/handwriting.js';
 import { createWorkingRouter } from '../platform/working.js';
 import { PAID_BUDGET, spendCeiling, spendCeilingMissing } from '../platform/spendCeiling.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 let pass = 0;
 const failures = [];
@@ -72,11 +73,11 @@ app.use('/working', createWorkingRouter(db, {
 }));
 const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
 const base = `http://127.0.0.1:${server.address().port}`;
-const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
+const PNG = pngDataUrl('a'.repeat(600));
 // A different picture each time: this account's SAME picture is read once and
 // then served from memory (recognitionOps.js), which is not what is counted here.
 let pictures = 0;
-const freshPicture = () => 'data:image/png;base64,' + Buffer.from('a'.repeat(600) + `-${pictures += 1}`).toString('base64');
+const freshPicture = () => pngDataUrl('a'.repeat(600) + `-${pictures += 1}`);
 const call = async (who, path, body) => {
   const res = await fetch(`${base}${path}`, {
     method: 'POST',

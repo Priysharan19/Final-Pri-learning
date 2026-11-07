@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 let checks=0;
 const eq=(actual,expected,reason)=>{assert.equal(actual,expected,reason);checks++;};
@@ -47,7 +48,7 @@ const {startApp,registerAccount,verifyEmail} = await import('./support/app-harne
 const {requestedEngine} = await import('./support/engine.mjs');
 const {decryptDeliveryToken}=await import('../platform/deliveryCrypto.js');
 const h=await startApp({engine:requestedEngine()});
-const image='data:image/png;base64,'+Buffer.from('a'.repeat(600)).toString('base64');
+const image=pngDataUrl('a'.repeat(600));
 const issue=jar=>h.request('/v1/practice/issue',{method:'POST',jar,body:{generator:'c8-linear-equations-both-sides',difficulty:2,seed:104729,curriculum:'in'}});
 const recognize=(jar,qid)=>h.request('/v1/practice/'+qid+'/recognize',{method:'POST',jar,body:{mode:'photo',image}});
 // Submit never starts a provider read (review 17, F3): it binds the read the
