@@ -69,6 +69,19 @@ function safeEndpointParts(endpoint) {
   }
 }
 
+/**
+ * The most lines one transcription may hold. The response schema states it and
+ * normalizeResult enforces it: the provider's strict mode is not the only
+ * thing standing between a non-conforming reply and the student.
+ */
+export const MAX_TRANSCRIPTION_LINES = 40;
+/** The longest `text` one line may hold (schema maxLength; enforced, never cut). */
+export const MAX_LINE_TEXT_CHARS = 400;
+/** The longest display-only `latex` one line may hold (schema maxLength). */
+export const MAX_LINE_LATEX_CHARS = 600;
+/** The longest `doubt` label one line may hold (schema maxLength). */
+export const MAX_LINE_DOUBT_CHARS = 120;
+
 /** Deliberately small: a schema the model cannot wander outside. */
 export const TRANSCRIPTION_SCHEMA = Object.freeze({
   type: 'object',
@@ -77,20 +90,20 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
   properties: {
     lines: {
       type: 'array',
-      maxItems: 40,
+      maxItems: MAX_TRANSCRIPTION_LINES,
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['text', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before'],
         properties: {
-          text: { type: 'string', maxLength: 400 },
-          latex: { type: 'string', maxLength: 600 },
+          text: { type: 'string', maxLength: MAX_LINE_TEXT_CHARS },
+          latex: { type: 'string', maxLength: MAX_LINE_LATEX_CHARS },
           confidence: { type: 'number', minimum: 0, maximum: 1 },
           // A symbol on this line could be one of two things. The reader says
           // so here instead of quietly picking one; the student is shown the
           // line as one to check. `doubt` names the two readings.
           uncertain: { type: 'boolean' },
-          doubt: { type: 'string', maxLength: 120 },
+          doubt: { type: 'string', maxLength: MAX_LINE_DOUBT_CHARS },
           // A clearly larger vertical gap above this line than between the
           // other lines: layout only, so a page holding more than one piece
           // of work can be shown to the student in its pieces.
@@ -322,38 +335,91 @@ export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   return { mime: `image/${match[1]}`, bytes };
 }
 
+// The reply is untrusted model output, checked here against the same contract
+// the schema states rather than trusted to the provider's strict mode (a custom
+// PRI_HANDWRITING_ENDPOINT, or a provider that drifts, may not enforce it).
+// Every check fails closed:
+//   · more lines than the schema allows, or a line whose `text` is longer than
+//     the schema allows, is not a transcription this reader can produce — the
+//     reply is refused as malformed (HANDWRITING_MALFORMED), so nothing of it is
+//     shown, kept or marked. A line is never cut short: truncated text would be
+//     marked as if the student had written it. These refusals are 422 and not
+//     retryable — the same page would be read the same way again, so the device
+//     must not keep paying to resend it (the student may still press Try again);
+//   · a line whose `text` is not a string is refused as malformed too (502,
+//     retryable: a garbled reply may not recur), rather than coerced or
+//     silently dropped from what the student wrote;
+//   · `latex` is display-only: one longer than the schema allows is dropped
+//     (the line shows its text), never cut into broken mathematics;
+//   · a doubt flag (`needs_confirmation`, a line's `uncertain`) that is not
+//     exactly `false` is a doubt: a string "true", a 1, null or a missing flag
+//     never reads as "no doubt";
+//   · a confidence that is not a finite number in [0, 1] — a string, NaN,
+//     Infinity, 1.5, -0.1, missing — counts as 0, which is below every floor,
+//     so the reading is offered for confirmation and never used as it stands.
+function malformedReply(reason, { overLimit = false } = {}) {
+  return new HandwritingProviderError(`The transcription did not match its response format (${reason}).`, {
+    code: 'HANDWRITING_MALFORMED', status: overLimit ? 422 : 502, retryable: !overLimit
+  });
+}
+
+/** Only an explicit `false` is "no doubt". */
+const doubtFlag = value => value !== false;
+
+/** A stated confidence, or 0 when it is not a finite number in [0, 1]. */
+const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
+
+// JSON Schema maxLength counts code points, not UTF-16 code units: a line of
+// mathematical italic 𝑥 (U+1D465) is one character per letter to the schema
+// and two to String#length. Both helpers walk at most max + 1 code points, so
+// a hostile multi-megabyte string costs no more than a conforming one.
+export function exceedsCodePoints(value, max) {
+  let count = 0;
+  for (const _ of value) { count += 1; if (count > max) return true; }
+  return false;
+}
+export function firstCodePoints(value, max) {
+  if (!exceedsCodePoints(value, max)) return value;
+  let out = '';
+  let count = 0;
+  for (const char of value) { if (count === max) break; out += char; count += 1; }
+  return out;
+}
+
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
+  if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`, { overLimit: true });
   return raw
-    .map(line => ({
-      text: String(line?.text ?? '').slice(0, 400).trim(),
-      latex: line?.latex ? String(line.latex).slice(0, 600).trim() : null,
-      confidence: Number.isFinite(Number(line?.confidence))
-        ? Math.min(1, Math.max(0, Number(line.confidence)))
-        : 0,
-      // The reader's own per-line doubt, passed on exactly as it was given.
-      // Nothing here re-reads or repairs the line: the text is never changed.
-      uncertain: line?.uncertain === true,
-      doubt: line?.uncertain === true && typeof line?.doubt === 'string' && line.doubt.trim()
-        ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
-        : null,
-      gapBefore: line?.gap_before === true
-    }))
+    .map(line => {
+      if (!line || typeof line !== 'object' || typeof line.text !== 'string') throw malformedReply('a line without text');
+      if (exceedsCodePoints(line.text, MAX_LINE_TEXT_CHARS)) throw malformedReply(`a line of more than ${MAX_LINE_TEXT_CHARS} characters`, { overLimit: true });
+      const uncertain = doubtFlag(line.uncertain);
+      return {
+        text: line.text.trim(),
+        latex: typeof line.latex === 'string' && line.latex && !exceedsCodePoints(line.latex, MAX_LINE_LATEX_CHARS) ? line.latex.trim() : null,
+        confidence: unitConfidence(line.confidence),
+        // The reader's own per-line doubt, passed on exactly as it was given.
+        // Nothing here re-reads or repairs the line: the text is never changed.
+        uncertain,
+        doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
+          ? firstCodePoints(line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim(), MAX_LINE_DOUBT_CHARS)
+          : null,
+        gapBefore: line.gap_before === true
+      };
+    })
     .filter(line => line.text.length > 0);
 }
 
 export function normalizeResult(parsed, { model, confidenceFloor }) {
   const lines = normalizeLines(parsed?.lines);
-  const stated = Number.isFinite(Number(parsed?.confidence))
-    ? Math.min(1, Math.max(0, Number(parsed.confidence)))
-    : 0;
+  const stated = unitConfidence(parsed?.confidence);
   // The overall confidence is never allowed to exceed the least confident line:
   // a page is only as readable as its worst line, and the marker reads them all.
   const worstLine = lines.length ? Math.min(...lines.map(l => l.confidence)) : 0;
   const confidence = lines.length ? Math.min(stated, worstLine) : 0;
   // A line the reader marked as uncertain is a doubt about the page, whether
   // or not the reader also raised the page-level flag.
-  const providerNeedsConfirmation = parsed?.needs_confirmation === true || lines.some(line => line.uncertain);
+  const providerNeedsConfirmation = doubtFlag(parsed?.needs_confirmation) || lines.some(line => line.uncertain);
   const needsConfirmation = providerNeedsConfirmation
     || !lines.length
     || confidence < confidenceFloor;
