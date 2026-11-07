@@ -225,7 +225,6 @@ jobs:
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 147/147 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
@@ -1053,15 +1052,28 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
-      - name: iOS bundle matches the client build
-        run: npm run check:ios
-      - name: Materialize exact native release identity
+      # The iOS web bundles are generated here, never read from git (decision
+      # D28): sync copies client/dist into both packages, check proves each
+      # copy is complete and byte-exact, then the shipped bytes are inspected.
+      - name: Generate the iOS web bundles from this build
         run: npm run sync:ios
+      - name: iOS bundles are a complete copy of the client build
+        run: npm run check:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
-      # After the build and the iOS bundle sync, so the scan reads the bytes
-      # that ship: every tracked file (iOS bundles included) and client/dist.
-      - name: Secret scan (tracked files, iOS bundles, built client)
+      - name: Generated iOS bundles are flag-off production builds
+        # The exact count moved here with the suite (it no longer runs in the
+        # sharded npm test): a check that silently ran fewer cases fails.
+        run: |
+          set -euo pipefail
+          node client/test/ios-bundle-features-check.mjs | tee ios-bundle-features.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' ios-bundle-features.log
+      - name: Generated iOS bundle pages need no inline script under the shell CSP
+        run: node client/test/native-shell-csp-check.mjs --require-generated
+      # After the build, so the scan reads the bytes that ship: every tracked
+      # file and client/dist (the generated iOS bundles are a byte-exact copy
+      # of client/dist, proven by check:ios above).
+      - name: Secret scan (tracked files, built client and therefore the iOS bundles)
         run: |
           node tools/secret-scan.test.mjs
           node tools/secret-scan.mjs

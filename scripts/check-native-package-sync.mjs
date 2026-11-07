@@ -5,10 +5,11 @@
 // package exists because some iPad / Swift Playgrounds installs may still open
 // that copy directly. Until it is retired, every Swift source, Package.swift,
 // Info.plist, the asset catalogue and the bundled models must be byte-identical
-// (CP-04 widened this from Swift + Package.swift). Resources/Web is gated
-// separately by sync-ios.mjs.
+// (CP-04 widened this from Swift + Package.swift). Resources/Web is generated
+// into both packages from one client/dist (decision D28, never tracked) and
+// is gated separately by `npm run check:ios` after `npm run sync:ios`.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,12 +23,14 @@ if (!existsSync(CANON) || !existsSync(COPY)) {
 }
 
 function sourceFiles(base, dir = base, out = new Map()) {
-  for (const name of readdirSync(dir)) {
+  // Directory entries carry their type, so nothing is stat-ed and then read
+  // as a separate step (no check-then-use window on the path).
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const name = entry.name;
     const full = join(dir, name);
     const rel = relative(base, full);
     if (name === '.DS_Store' || rel === 'Resources/Web' || rel.startsWith('Resources/Web/')) continue;
-    const stat = statSync(full);
-    if (stat.isDirectory()) sourceFiles(base, full, out);
+    if (entry.isDirectory()) sourceFiles(base, full, out);
     else if (name.endsWith('.swift') || rel === 'Package.swift' || rel === 'Info.plist' || rel === 'Resources/PrivacyInfo.xcprivacy' ||
       rel.startsWith('Resources/Models/') || rel.startsWith('Assets.xcassets/')) out.set(rel, readFileSync(full));
   }

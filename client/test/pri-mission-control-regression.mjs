@@ -109,6 +109,7 @@ verify('Dependency edges remain non-concurrent',dependentPair.code!==0&&dependen
 const changedBase={...dep,dependencies:[],base_sha:'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'};
 const otherBase=run(['can-run-concurrently',file('base-left.json',left),file('base-right.json',changedBase)]);
 verify('Different baselines remain non-concurrent',otherBase.code!==0&&otherBase.data.reason==='BASE_SHA_MISMATCH');
+// Hypothetical paths: the iPad web mirrors are generated and gitignored since decision D28, so no mission lists them; the shared-root rule stays as a backstop.
 const derivedA={...left,paths:['client/src/notes/data/notes-class8.js','ios/PriLearning.swiftpm/Resources/Web/a.js']};
 const derivedB={...dep,dependencies:[],paths:[student,'ios/PriLearning 2.swiftpm/Resources/Web/b.js']};
 const derivedPair=run(['can-run-concurrently',file('derived-left.json',derivedA),file('derived-right.json',derivedB)]);
