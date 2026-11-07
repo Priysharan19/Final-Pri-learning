@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync, execFile } from 'node:child_process';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -152,6 +152,22 @@ verify('PR validator rejects short head SHA',shortHead.code!==0);
 const spoofed={...e1,body:e1.body.replace(/^Pri-Lease-Heartbeat-Ref:.*$/m,'Pri-Lease-Heartbeat-Ref: '+'b'.repeat(40))};
 const spoofResult=run(['admit',file('spoof-candidate.json',{id:'student-new',agent:'student-experience',status:'ACTIVE',branch:'agent/mission/student-experience/student-new',base_sha:sha,risk:'R2',paths:[student],dependencies:[]}),file('spoof-ledger.json',[spoofed])]);
 verify('Forged-looking heartbeat is snapshot-eligible but blocked by serialized-admission requirement',spoofResult.code!==0&&spoofResult.data.decision==='DENY'&&spoofResult.data.reason==='SERIALIZED_ADMISSION_REQUIRED'&&spoofResult.data.eligible_on_snapshot===true);
+// Every workflow that asks the ledger about a PR must bind the answer to that
+// PR's exact head. validate-ledger refuses five arguments (e803a3473 made the
+// head SHA mandatory); the derived-mirror workflows kept calling it with five,
+// so every agent/mission PR failed "Build derived iPad mirrors" on argument
+// count alone from 21 October. The callers are discovered, not listed: a
+// workflow that is retired (#697 removes the derived-mirror pair) drops out,
+// and any new caller is held to the same shape.
+const workflowDir=join(root,'.github/workflows');
+const callers=readdirSync(workflowDir).filter(name=>/\.ya?ml$/.test(name)).sort()
+  .map(name=>({name,text:readFileSync(join(workflowDir,name),'utf8').replace(/\\\n\s*/g,' ')}))
+  .filter(({text})=>/pri-mission-control\.mjs validate-ledger /.test(text));
+verify('pri-agent-governance.yml still asks the ledger about every autonomous PR',callers.some(({name})=>name==='pri-agent-governance.yml'));
+for (const {name,text} of callers) {
+  const calls=[...text.matchAll(/pri-mission-control\.mjs validate-ledger ([^\n]*)/g)].map(m=>m[1].trim().split(/\s+/));
+  for (const argv of calls) verify(`${name} passes issues, agent, mission, branch, risk and an exact head to validate-ledger: ${argv.join(' ')}`,argv.length===6&&/(HEAD_SHA|EXPECTED_HEAD|[0-9a-f]{40})/.test(argv[5]));
+}
 console.log(`PASS: ${checks} deterministic governance regression assertions (isolated proposal; no GitHub write)`);
 
 const editableHeartbeat={...baseRecord,status:'ACTIVE',lease_heartbeat_at:at(),lease_heartbeat_ref:ref,lease_heartbeat_by:'india-curriculum'};
