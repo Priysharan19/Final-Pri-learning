@@ -44,6 +44,31 @@ const REQUIRED = [
     generate: () => secret(32),
     note: 'Rotating this makes pending unsent emails undeliverable. Set it once, before real users exist.'
   },
+  // Auth email (#218). startAuthDeliveryWorker() refuses to start a production
+  // server with no mail transport (AUTH_EMAIL_NOT_CONFIGURED): without one no
+  // account can verify, reset a password or reach a parent for consent.
+  {
+    name: 'PRI_AUTH_EMAIL_PROVIDER',
+    what: 'Which service sends verification, password-reset and parent-consent email. Production will not start without a mail transport.',
+    example: 'resend',
+    generate: null,
+    note: 'The only supported value is resend. It needs PRI_RESEND_API_KEY and PRI_AUTH_EMAIL_FROM as well.'
+  },
+  {
+    name: 'PRI_RESEND_API_KEY',
+    what: 'The Resend API key the server sends that email with.',
+    example: 'create one in Resend → API Keys; paste it into Railway only, never into chat or the repo',
+    generate: null,
+    placeholder: 'PASTE_YOUR_RESEND_API_KEY',
+    note: 'Sending access is enough to send. Full access also lets /v1/ready confirm the sender domain is verified.'
+  },
+  {
+    name: 'PRI_AUTH_EMAIL_FROM',
+    what: 'The From address on that email. Its domain must be added AND verified in the same Resend account (DKIM/SPF records published).',
+    example: 'Pri Learning <verify@mail.prilearning.com>',
+    generate: null,
+    note: 'Not an @resend.dev address: Resend\'s test sender only delivers to the Resend account owner, so every student and parent would get nothing.'
+  },
   {
     name: 'PRI_PAID_CALLS_PER_HOUR',
     what: 'A ceiling on paid handwriting/marking calls across the whole deployment, per hour. Required once PRI_HANDWRITING_API_KEY is set. Per-account limits bound one student; only this bounds the bill.',
@@ -82,7 +107,6 @@ const REQUIRED = [
 const OPTIONAL = [
   { name: 'PRI_DATABASE_URL', what: 'Runs /v1 on Supabase Postgres instead of the SQLite volume (ADR-0001). Session-mode pooler or direct host only, never port 6543, with sslmode=verify-full or sslmode=require plus PRI_DATABASE_SSL_ROOT_CERT. Mark it sealed on Railway. See docs/operations/postgres-cutover.md before setting it.' },
   { name: 'PRI_HANDWRITING_API_KEY', what: 'Turns on server-side handwriting reading and step checking. Without it both routes report themselves unavailable and the settings hide themselves.' },
-  { name: 'PRI_AUTH_EMAIL_PROVIDER', what: 'Set to "resend" with PRI_RESEND_API_KEY and PRI_AUTH_EMAIL_FROM to actually send verification email. Without it accounts cannot verify, and verified email gates the reading and marking routes.' },
   { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' },
   { name: 'PRI_DISPLAY_MONTHLY_PRICE', what: 'What the account panel shows, with PRI_DISPLAY_ANNUAL_PRICE. Until both are set the panel tells visitors that pricing has not been configured for this deployment, which is true and is not what a paying visitor should read.' }
 ];
@@ -120,12 +144,38 @@ if (!missing.length) {
   console.log('\nSet them on the service, not in this shell. With the Railway CLI:\n');
   console.log('  railway variables \\');
   for (const item of missing) {
-    const value = item.generate ? item.generate() : (item.example || 'CHANGE_ME');
+    const value = item.generate ? item.generate() : (item.placeholder || item.example || 'CHANGE_ME');
     console.log(`    --set ${item.name}='${value}' \\`);
   }
   console.log("    --set NODE_ENV='production'\n");
   console.log('The two generated values above are freshly random each run — take them');
   console.log('from the command block, not from the list, so you paste one pair.\n');
+}
+
+// The sender is checked by shape only: whether its domain is verified is a
+// question for Resend, which /v1/ready asks once the server is running.
+const senderDomain = (() => {
+  const text = String(env.PRI_AUTH_EMAIL_FROM || '').trim();
+  const bracket = text.match(/<([^<>\s]+)>\s*$/);
+  const address = (bracket ? bracket[1] : text).trim();
+  const match = address.match(/^[^@\s<>]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)$/i);
+  return match ? match[1].toLowerCase() : null;
+})();
+const emailWarnings = [];
+if (has('PRI_AUTH_EMAIL_PROVIDER') && String(env.PRI_AUTH_EMAIL_PROVIDER).trim().toLowerCase() !== 'resend') {
+  emailWarnings.push('PRI_AUTH_EMAIL_PROVIDER is not "resend", the only provider the server supports: it will refuse to start.');
+}
+if (has('PRI_AUTH_EMAIL_FROM') && !senderDomain) {
+  emailWarnings.push('PRI_AUTH_EMAIL_FROM is not an address the server can read: use "Name <user@domain>" or "user@domain".');
+} else if (senderDomain === 'resend.dev') {
+  emailWarnings.push('PRI_AUTH_EMAIL_FROM is Resend\'s test sender (resend.dev): it delivers only to the Resend account owner. Use a verified domain of your own.');
+} else if (/(^|\.)example\.(com|org|net)$/.test(senderDomain || '')) {
+  emailWarnings.push('PRI_AUTH_EMAIL_FROM is still the template\'s example domain. Use the domain you verified in Resend.');
+}
+if (emailWarnings.length) {
+  console.log('Auth email will not reach students as configured here:\n');
+  for (const warning of emailWarnings) console.log(`  ! ${warning}`);
+  console.log('');
 }
 
 if (present.length) {
