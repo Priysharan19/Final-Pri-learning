@@ -429,6 +429,9 @@ jobs:
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
+          # Learning-state identity (v2), exact legacy lookups and monotonic expiry (#689, #690, #691) on SQLite; Postgres below.
+          node server/test/learning-state-identity-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'LEARNING STATE IDENTITY: PASS — 172/172 checks' practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
@@ -449,7 +452,8 @@ jobs:
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+          # 295 → 306: legacy-only repeats over HTTP, flagged repeatEvidence: 'legacy' on issue, receipt and event.
+          grep -Fq 'REPEAT CREDIT: PASS — 306/306 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
           set -o pipefail
@@ -555,7 +559,9 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 62 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq '✓ learning-state-identity-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
