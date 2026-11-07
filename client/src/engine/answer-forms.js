@@ -11,6 +11,7 @@
 // is the same vector as "(1, −2, 3)". Everything here is deterministic.
 // ─────────────────────────────────────────────────────────────────────────────
 import { evalNumeric, numsClose, parse, evaluate, variablesOf } from './expr.js';
+import { exactValue, literalFraction, fraction, sameFraction, exactRadical, sameRadical, rationalAsRadical } from './exact.js';
 
 const INF = Infinity;
 
@@ -20,6 +21,66 @@ function num(text) {
   const t = s.replace(/[−–—]/g, '-').replace(/\s+/g, '');
   if (/^[+-]?(inf|infinity|∞|oo)$/i.test(t)) return t.startsWith('-') ? -INF : INF;
   return evalNumeric(s);
+}
+
+// ── Exact endpoints ──────────────────────────────────────────────────────────
+// An inequality's solution set has no rounding band: x > 999999999.9375 is
+// not x > 1000000000, and x > 2000000000000001 is not x > 2000000000000000
+// although the two differ by less than four units of the last binary place
+// (#680; Q1 round 2 found that a relative-ULP band credited 17 such bounds).
+// So each finite endpoint carries, beside its binary64 value, its exact
+// rational value when it is written only in numbers (exact.js), and two
+// endpoints are the same only when:
+//   · both are exact and equal as fractions;
+//   · one is exact and it IS the other's binary64 value (sqrt(1/4) is 1/2,
+//     but the decimal 1.4142135623730951 is not √2);
+//   · neither is exact (√8 and 2√2, each evaluated in binary64) and they agree
+//     to four units of the last place — the noise of the evaluation;
+//   · or the question authors a tolerance, the only approximate bound.
+
+/** The exact rational value of a finite binary64. */
+function floatFraction(v) {
+  if (!Number.isFinite(v)) return null;
+  if (Number.isInteger(v)) return fraction(BigInt(v));
+  let m = v, e = 0n;
+  while (!Number.isInteger(m)) { m *= 2; e += 1n; }
+  return fraction(BigInt(m), 2n ** e);
+}
+
+/** A written bound: its value and, when it has one, its exact value. */
+function bound(text) {
+  const v = num(text);
+  if (!Number.isFinite(v)) return { v, q: null, alg: null };
+  const q = exactValue(String(text).replace(/[−–—]/g, '-'));
+  return { v, q, alg: q ? null : exactRadical(String(text).replace(/[−–—]/g, '-')) };
+}
+
+/** An authored numeric endpoint means the decimal it is written as: 0.1 is 1/10. */
+function authoredFraction(v) {
+  if (!Number.isFinite(v)) return null;
+  const q = literalFraction(String(Math.abs(v)));
+  return q && (v < 0 ? fraction(-q.n, q.d) : q);
+}
+
+/** −1, 0 or 1 as the endpoint (x, xq) is below, at or above (y, yq). */
+function cmpEnd(x, xq, y, yq) {
+  if (xq && yq) {
+    const d = xq.n * yq.d - yq.n * xq.d;
+    return d < 0n ? -1 : d > 0n ? 1 : 0;
+  }
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+function sameEndpoint(x, xq, xAlg, y, yq, yAlg, tol) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return x === y;
+  if (tol != null) return Math.abs(x - y) <= tol;
+  if (xq && yq) return sameFraction(xq, yq);
+  // Radical forms that this small exact grammar can prove have identical
+  // coefficients. A perturbation of 10^-15 is a different exact boundary,
+  // even where binary64 evaluates the two expressions to the same float.
+  if ((xAlg || xq) && (yAlg || yq)) return sameRadical(xAlg || rationalAsRadical(xq), yAlg || rationalAsRadical(yq));
+  if (xq || yq) return sameFraction(xq || floatFraction(x), yq || floatFraction(y));
+  return x === y || Math.abs(x - y) <= 4 * Number.EPSILON * Math.max(Math.abs(x), Math.abs(y));
 }
 
 // ── Intervals / inequality solutions ─────────────────────────────────────────
@@ -52,58 +113,73 @@ function stripSetBuilder(s, variable) {
   const m = s.match(/^\{\s*([a-zA-Z])\s*(?:in\s*R)?\s*[:|]\s*(.+)\}$/);
   if (m) return { text: m[2].trim(), variable: m[1] };
   // x in (2, 5]  /  x in R
+  // x in (2, 5]: membership names the variable itself, so it must be the asked one
   const n = s.match(/^([a-zA-Z])\s*in\s*(.+)$/);
-  if (n) return { text: n[2].trim(), variable: n[1] };
+  if (n) {
+    if (variable && n[1] !== variable) throw new Error('Wrong variable');
+    return { text: n[2].trim(), variable: n[1] };
+  }
   return { text: s, variable };
 }
 
 function halfLine(variable, op, boundText, variableOnLeft) {
-  const b = num(boundText);
+  const { v: b, q, alg } = bound(boundText);
   if (!Number.isFinite(b)) throw new Error('A bound must be a finite number');
   // put the variable on the left: "3 < x" is "x > 3"
   const flipped = variableOnLeft ? op : ({ '<': '>', '<=': '>=', '>': '<', '>=': '<=' })[op];
-  if (flipped === '<') return { lo: -INF, hi: b, loOpen: true, hiOpen: true };
-  if (flipped === '<=') return { lo: -INF, hi: b, loOpen: true, hiOpen: false };
-  if (flipped === '>') return { lo: b, hi: INF, loOpen: true, hiOpen: true };
-  return { lo: b, hi: INF, loOpen: false, hiOpen: true };
+  if (flipped === '<') return { lo: -INF, hi: b, loOpen: true, hiOpen: true, hiQ: q, hiAlg: alg };
+  if (flipped === '<=') return { lo: -INF, hi: b, loOpen: true, hiOpen: false, hiQ: q, hiAlg: alg };
+  if (flipped === '>') return { lo: b, hi: INF, loOpen: true, hiOpen: true, loQ: q, loAlg: alg };
+  return { lo: b, hi: INF, loOpen: false, hiOpen: true, loQ: q, loAlg: alg };
 }
 
 function intersect(a, b) {
-  const lo = Math.max(a.lo, b.lo);
-  const hi = Math.min(a.hi, b.hi);
-  const loOpen = a.lo === b.lo ? (a.loOpen || b.loOpen) : (a.lo > b.lo ? a.loOpen : b.loOpen);
-  const hiOpen = a.hi === b.hi ? (a.hiOpen || b.hiOpen) : (a.hi < b.hi ? a.hiOpen : b.hiOpen);
-  return { lo, hi, loOpen, hiOpen };
+  const cl = cmpEnd(a.lo, a.loQ, b.lo, b.loQ), ch = cmpEnd(a.hi, a.hiQ, b.hi, b.hiQ);
+  const L = cl >= 0 ? a : b, H = ch <= 0 ? a : b;
+  return {
+    lo: L.lo, loQ: L.loQ ?? null, loAlg: L.loAlg ?? null, hi: H.hi, hiQ: H.hiQ ?? null, hiAlg: H.hiAlg ?? null,
+    loOpen: cl === 0 ? (a.loOpen || b.loOpen) : L.loOpen,
+    hiOpen: ch === 0 ? (a.hiOpen || b.hiOpen) : H.hiOpen
+  };
 }
 
 function isEmptyInterval(iv) {
-  if (iv.lo > iv.hi) return true;
-  if (numsClose(iv.lo, iv.hi, 1e-12) && Number.isFinite(iv.lo)) return iv.loOpen || iv.hiOpen;
+  const c = cmpEnd(iv.lo, iv.loQ, iv.hi, iv.hiQ);
+  if (c > 0) return true;
+  // Only equal endpoints make a degenerate interval: (0, 1e-13) holds 5e-14
+  // and is not empty, so nearly equal endpoints never erase it (#680, Q1).
+  if (c === 0 && Number.isFinite(iv.lo)) return iv.loOpen || iv.hiOpen;
   return false;
 }
 
 /** Sort, drop empties and merge overlapping or touching pieces. */
 export function normalizeRegion(intervals) {
   const list = (intervals || [])
-    .map(iv => ({
-      lo: iv.lo == null ? -INF : Number(iv.lo),
-      hi: iv.hi == null ? INF : Number(iv.hi),
-      loOpen: iv.lo == null ? true : !!iv.loOpen,
-      hiOpen: iv.hi == null ? true : !!iv.hiOpen
-    }))
+    .map(iv => {
+      const lo = iv.lo == null ? -INF : Number(iv.lo), hi = iv.hi == null ? INF : Number(iv.hi);
+      return {
+        lo, hi,
+        // An endpoint parsed from text carries its exact value; an authored
+        // number means the decimal it is written as.
+        loQ: iv.loQ !== undefined ? iv.loQ : authoredFraction(lo),
+        hiQ: iv.hiQ !== undefined ? iv.hiQ : authoredFraction(hi),
+        loAlg: iv.loAlg ?? null, hiAlg: iv.hiAlg ?? null,
+        loOpen: iv.lo == null ? true : !!iv.loOpen,
+        hiOpen: iv.hi == null ? true : !!iv.hiOpen
+      };
+    })
     .filter(iv => !isEmptyInterval(iv))
-    .sort((a, b) => a.lo - b.lo || (a.loOpen === b.loOpen ? 0 : a.loOpen ? 1 : -1));
+    .sort((a, b) => cmpEnd(a.lo, a.loQ, b.lo, b.loQ) || (a.loOpen === b.loOpen ? 0 : a.loOpen ? 1 : -1));
   const out = [];
   for (const iv of list) {
     const last = out[out.length - 1];
     if (!last) { out.push({ ...iv }); continue; }
-    const touches = iv.lo < last.hi || (numsClose(iv.lo, last.hi, 1e-12) && !(iv.loOpen && last.hiOpen));
+    const at = cmpEnd(iv.lo, iv.loQ, last.hi, last.hiQ);
+    const touches = at < 0 || (at === 0 && !(iv.loOpen && last.hiOpen));
     if (!touches) { out.push({ ...iv }); continue; }
-    if (iv.hi > last.hi || (numsClose(iv.hi, last.hi, 1e-12) && !iv.hiOpen)) {
-      last.hi = Math.max(last.hi, iv.hi);
-      last.hiOpen = numsClose(iv.hi, last.hi, 1e-12) ? (iv.hi > last.hi ? iv.hiOpen : (last.hiOpen && iv.hiOpen)) : last.hiOpen;
-      if (iv.hi >= last.hi) last.hiOpen = iv.hiOpen;
-    }
+    const beyond = cmpEnd(iv.hi, iv.hiQ, last.hi, last.hiQ);
+    if (beyond > 0) { last.hi = iv.hi; last.hiQ = iv.hiQ; last.hiAlg = iv.hiAlg; last.hiOpen = iv.hiOpen; }
+    else if (beyond === 0) last.hiOpen = last.hiOpen && iv.hiOpen;
   }
   return out;
 }
@@ -116,11 +192,12 @@ function parseAtom(text, variable) {
   // interval notation: (a, b], [a, b), ]a, b] (French open bracket)
   const iv = s.match(/^([\[\(\]])\s*([^,]+?)\s*,\s*([^\]\)\[]+?)\s*([\]\)\[])$/);
   if (iv) {
-    const lo = num(iv[2]), hi = num(iv[3]);
+    const L = bound(iv[2]), H = bound(iv[3]);
+    const lo = L.v, hi = H.v;
     const loOpen = iv[1] !== '[';
     const hiOpen = iv[4] !== ']';
     if (Number.isNaN(lo) || Number.isNaN(hi)) throw new Error('Bad interval bound');
-    return [{ lo, hi, loOpen: loOpen || lo === -INF, hiOpen: hiOpen || hi === INF }];
+    return [{ lo, hi, loQ: L.q, hiQ: H.q, loAlg: L.alg, hiAlg: H.alg, loOpen: loOpen || lo === -INF, hiOpen: hiOpen || hi === INF }];
   }
   // relation chain: a < x <= b, x > 3, 3 < x
   const ops = [...s.matchAll(/<=|>=|<|>/g)];
@@ -130,7 +207,12 @@ function parseAtom(text, variable) {
   for (const m of ops) { parts.push(s.slice(cursor, m.index).trim()); cursor = m.index + m[0].length; }
   parts.push(s.slice(cursor).trim());
   if (parts.some(p => !p)) throw new Error('Malformed inequality');
-  const isVar = p => /^[a-zA-Z]$/.test(p) && (!variable || p === variable || !/^[0-9]/.test(p));
+  // The one letter a comparison may name is the bound variable: "y > 3" is
+  // not a solution set in x, and "2 < x <= y" is not an interval (#680).
+  // With no variable bound yet, every comparison must name the same letter.
+  const letters = new Set(parts.filter(p => /^[a-zA-Z]$/.test(p)));
+  if (variable ? [...letters].some(l => l !== variable) : letters.size > 1) throw new Error('Wrong variable');
+  const isVar = p => /^[a-zA-Z]$/.test(p);
   let region = [...ALL];
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i][0];
@@ -157,11 +239,14 @@ export function parseIntervalInput(raw, variable = null) {
   const sb = stripSetBuilder(s, variable);
   s = sb.text;
   const usedVariable = sb.variable || variable;
-  const unions = s.split('|').map(p => p.trim()).filter(Boolean);
-  if (!unions.length) throw new Error('Empty answer');
+  const unions = s.split('|').map(p => p.trim());
+  // Dropping an empty segment converts malformed syntax into an apparently
+  // valid set: 'x>3 or' must never receive credit for 'x>3'.
+  if (unions.some(p => !p)) throw new Error('Empty union term');
   let intervals = [];
   for (const u of unions) {
-    const ands = u.split('&').map(p => p.trim()).filter(Boolean);
+    const ands = u.split('&').map(p => p.trim());
+    if (ands.some(p => !p)) throw new Error('Empty intersection term');
     let region = [...ALL];
     for (const atom of ands) {
       const piece = parseAtom(atom, usedVariable);
@@ -185,16 +270,15 @@ export function authoredRegion(ans) {
 export function sameRegion(a, b, tol) {
   const A = normalizeRegion(a), B = normalizeRegion(b);
   if (A.length !== B.length) return false;
-  const close = (x, y) => (Number.isFinite(x) || Number.isFinite(y)) ? numsClose(x, y, tol) : x === y;
-  return A.every((iv, i) => close(iv.lo, B[i].lo) && close(iv.hi, B[i].hi) && iv.loOpen === B[i].loOpen && iv.hiOpen === B[i].hiOpen);
+  return A.every((iv, i) => sameEndpoint(iv.lo, iv.loQ, iv.loAlg, B[i].lo, B[i].loQ, B[i].loAlg, tol) && sameEndpoint(iv.hi, iv.hiQ, iv.hiAlg, B[i].hi, B[i].hiQ, B[i].hiAlg, tol)
+    && iv.loOpen === B[i].loOpen && iv.hiOpen === B[i].hiOpen);
 }
 
 /** Same endpoints, different inclusion — the commonest near miss. */
 export function sameRegionIgnoringEndpoints(a, b, tol) {
   const A = normalizeRegion(a), B = normalizeRegion(b);
   if (A.length !== B.length) return false;
-  const close = (x, y) => (Number.isFinite(x) || Number.isFinite(y)) ? numsClose(x, y, tol) : x === y;
-  return A.every((iv, i) => close(iv.lo, B[i].lo) && close(iv.hi, B[i].hi));
+  return A.every((iv, i) => sameEndpoint(iv.lo, iv.loQ, iv.loAlg, B[i].lo, B[i].loQ, B[i].loAlg, tol) && sameEndpoint(iv.hi, iv.hiQ, iv.hiAlg, B[i].hi, B[i].hiQ, B[i].hiAlg, tol));
 }
 
 const fmtNum = v => (Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(10))));
@@ -219,11 +303,20 @@ export function formatRegion(intervals, variable = 'x', style = 'inequality') {
 
 // ── Matrices ─────────────────────────────────────────────────────────────────
 
+// A written separator stands between two entries: "1,,2" or "1, 2," leaves an
+// entry blank, and a blank entry is refused, never dropped — dropping it read
+// [[1,,2],[3,4]] as [[1,2],[3,4]] (#680, Q1).
+function separated(s, sep) {
+  const parts = s.split(sep).map(p => p.trim());
+  if (parts.some(p => !p)) throw new Error('Blank entry');
+  return parts;
+}
+
 function splitEntries(text) {
   const s = text.trim().replace(/[−–—]/g, '-');
   if (!s) return [];
-  if (s.includes(',')) return s.split(',').map(p => p.trim()).filter(Boolean);
-  if (s.includes('&')) return s.split('&').map(p => p.trim()).filter(Boolean);
+  if (s.includes(',')) return separated(s, ',');
+  if (s.includes('&')) return separated(s, '&');
   // whitespace separated, keeping "1/2" and "-3" whole
   return s.split(/\s+/).map(p => p.trim()).filter(Boolean);
 }
@@ -262,8 +355,9 @@ export function parseMatrixInput(raw) {
     rows = groups.map(splitEntries);
   } else {
     let inner = s.replace(/^\s*[\[\(\{\|]\s*/, '').replace(/\s*[\]\)\}\|]\s*$/, '');
-    const rowTexts = inner.includes(';') ? inner.split(';') : inner.split(/\n/);
-    rows = rowTexts.map(r => r.trim()).filter(Boolean).map(splitEntries);
+    // Rows on separate lines may have blank lines between them; a written ";" may not be doubled.
+    const rowTexts = inner.includes(';') ? separated(inner, ';') : inner.split(/\n/).map(r => r.trim()).filter(Boolean);
+    rows = rowTexts.map(splitEntries);
   }
   if (!rows.length || rows.some(r => !r.length)) throw new Error('Empty row');
   const width = rows[0].length;
@@ -324,15 +418,20 @@ export function parseVectorInput(raw) {
   let comps;
   if (ijk) {
     const compact = s.replace(/\s+/g, '').replace(/\*/g, '');
-    const terms = compact.match(/[+-]?[^+-]+/g) || [];
+    // Every character belongs to a term, and a run of signs is read by its
+    // parity: i − −2j is i + 2j. Before, the regex skipped the first sign of a
+    // run, so i − −2j read as i − 2j (#680).
+    const terms = compact.match(/[+-]*[^+-]+/g) || [];
+    if (terms.join('') !== compact) throw new Error('Not a component');
     // Components are indexed by position (i=0, j=1, k=2), never by a name
     // taken from the input, so no student text ever becomes a property key.
     const out = [0, 0, 0];
     const seen = [false, false, false];
     for (const term of terms) {
-      const m = term.match(/^([+-]?)(.*?)([ijk])$/);
+      const m = term.match(/^([+-]*)(.*?)([ijk])$/);
       if (!m) throw new Error('Not a component');
-      const [, sign, coef, axis] = m;
+      const [, signs, coef, axis] = m;
+      const sign = (signs.match(/-/g) || []).length % 2 ? '-' : '+';
       const slot = VECTOR_AXES.indexOf(axis);
       if (slot < 0) throw new Error('Not a component');
       if (seen[slot]) throw new Error('Repeated component');
@@ -344,8 +443,9 @@ export function parseVectorInput(raw) {
     comps = out;
   } else {
     const inner = s.replace(/^[\(\[<⟨\{]\s*/, '').replace(/\s*[\)\]>⟩\}]$/, '');
-    const parts = inner.includes(',') ? inner.split(',') : inner.split(/\n|\s{2,}|\s+/);
-    comps = parts.map(p => p.trim()).filter(Boolean).map(p => {
+    // A comma stands between two components: "(1,,2,3)" and "(1,2,3,)" leave one blank and are refused.
+    const parts = inner.includes(',') ? separated(inner, ',') : inner.split(/\n|\s{2,}|\s+/).map(p => p.trim()).filter(Boolean);
+    comps = parts.map(p => {
       const v = num(p);
       if (!Number.isFinite(v)) throw new Error('Bad component');
       return v;
