@@ -59,6 +59,9 @@ export const ENGINE_SUITES = [
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // An account's questions pass over content it has resolved, read from its
+  // own records on whichever engine holds them (not the device's avoid list).
+  'practice-seen-aware-pick-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.
