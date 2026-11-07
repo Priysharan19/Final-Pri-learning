@@ -80,6 +80,19 @@ for (const [label, source] of [['English', en], ['Hindi', hi]]) {
 }
 
 check('mobile More supports Escape', has(app, "if (e.key === 'Escape')"));
+
+// V1 decision D10 (1 Nov 2026): the student Classes tab follows the
+// classroom-product flag, so a production build (flag off) neither lists it
+// nor serves its route, while the test builds that walk /classes keep it.
+check('student Classes follows the classroom-product flag', has(app, "const CLASSES_ON = featureEnabled('extendedTracks');"));
+check('the Classes entry is listed only with the flag', has(app, "...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])"));
+check('the Classes route lands on the role landing without the flag', has(app, "CLASSES_ON && Classes ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />"));
+check('a production build with the flag off never emits the Classes chunk', has(app, "const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));"));
+// The instrument build's phone bar has the Map (the v1.0 bar has Tasks there);
+// its shell lists the Map and Scripts so every surface shares one list.
+check('the instrument phone bar carries the Map', has(app, "new Set(INSTRUMENT_ON ? ['/', '/practice', '/map', '/progress'] : ['/', '/practice', '/tasks', '/progress'])"));
+check('the instrument shell lists the Map and Scripts', has(app, "{ to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review }"));
+check('the instrument bar offers every non-tab destination as a visible More menu', /navItems\.filter\(item => !inTabs\(item\.to\)\)/.test(read('client/src/instrument/InstrumentBar.jsx')) && /role="menu"/.test(read('client/src/instrument/InstrumentBar.jsx')));
 check('mobile More restores trigger focus', has(app, 'moreButtonRef.current?.focus()'));
 check('teacher account menu points to workspace', has(app, "label: t('nav.teacherWorkspace'), run: () => nav('/teach')"));
 check('teacher sidebar hides student recent history', has(app, "user.role !== 'teacher' && <SidebarHistory"));

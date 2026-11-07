@@ -52,7 +52,7 @@ contracting entities and the regions confirmed by each provider.
 - Your profile: the name you typed, your class or track, and your settings.
 - A copy of every question you have answered, your answers, your marks and your
   history. The marks themselves are decided by our server.
-- Your handwriting strokes, and the model that adapts to your hand.
+- Your handwriting strokes.
 - Your streaks, badges and progress.
 
 If you set a password on a profile, this data is encrypted at rest on the

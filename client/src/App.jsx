@@ -6,7 +6,6 @@ import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
 import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
-import { prefetchInstrumentTabs } from './local/offlineWarm.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
@@ -36,7 +35,13 @@ const Match = React.lazy(() => import('./pages/Match.jsx'));
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
-const Classes = React.lazy(() => import('./pages/Classes.jsx'));
+// The student Classes page follows the classroom-product flag (CLASSES_ON
+// below). The build constant is read directly here, as for the instrument, so
+// a production build made with the flag off never emits or warms its 47 kB
+// chunk: nothing a student of that build can open is paid for by its install.
+/* global __PRI_FEATURE_EXTENDED_TRACKS__ */
+const CLASSES_BUILT_OUT = typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' && !__PRI_FEATURE_EXTENDED_TRACKS__ && import.meta.env?.PROD === true;
+const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
@@ -51,6 +56,14 @@ const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
+// V1 decision D10 (1 Nov 2026): a student tab the V1 evidence does not cover
+// is hidden from students, starting with Classes. The classroom product is the
+// PRI_FEATURE_EXTENDED_TRACKS surface (platform/features.js: "the classroom/
+// assignment panels for students", as Settings already gates them), so the
+// student Classes tab and route follow that flag: off in a production build,
+// on in the test builds that walk them. The route itself lands on the Index
+// rather than a blank page, and the teacher's own Classes section is untouched.
+const CLASSES_ON = featureEnabled('extendedTracks');
 // The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
 // the owner flips it. Its code and stylesheet load only when the flag is on.
 // The build constant is read directly here (not through featureEnabled) so the
@@ -70,14 +83,9 @@ const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><P
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
   import('./instrument/instrument.css');
-  // The Map, Report and Scripts tabs are on demand in this build; after an
-  // online launch, at idle and only on a cheap link, fetch them so the service
-  // worker keeps them for offline (local/offlineWarm.js, issue #658).
-  void prefetchInstrumentTabs({
-    scope: window,
-    loaders: [() => import('./instrument/MapPage.jsx'), () => import('./instrument/ReportHead.jsx'),
-      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx')]
-  });
+  // The Map, Report and Scripts tabs are part of the warm pass in this build
+  // (vite.config.js: no on-demand rule names them), so the service worker
+  // keeps them for a first open offline without a runtime prefetch (#658).
 }
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.
@@ -97,12 +105,21 @@ const I = {
   progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
   settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
   rush: <Icon name="rush" />, notes: <Icon name="notes" />, teacher: <Icon name="teacher" />,
+  map: <Icon name="map" />,
 };
 
+// The instrument build names the same places as its tabs do: the Index, the
+// Report and Scripts (every script, not only the wrong ones), and it has the
+// Map, which the v1.0 shell folds into Progress. The phone bar, the More sheet
+// and the command bar's page list all read this one list, so a destination is
+// never reachable on one of them and missing from another.
 const STUDENT_NAV = [
   { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
-  { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
-  { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
+  { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, ...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])] },
+  { label: 'nav.groupUnderstand', items: [
+    { to: '/progress', key: 'nav.progress', ico: I.progress },
+    ...(INSTRUMENT_ON ? [{ to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review }] : [{ to: '/review?filter=wrong', key: 'nav.review', ico: I.review }])
+  ] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
@@ -118,8 +135,15 @@ const TEACHER_NAV = [
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
-const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/tasks', '/progress']);
+// The phone bar's four destinations (More holds the rest). The instrument
+// build puts the Map where v1.0 put Tasks: it is a tab of that interface and
+// had no phone entry at all before (audit-interface item 2).
+const STUDENT_MOBILE_PRIMARY = new Set(INSTRUMENT_ON ? ['/', '/practice', '/map', '/progress'] : ['/', '/practice', '/tasks', '/progress']);
 const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
+
+// In the instrument build the phone bar and the More sheet call these places
+// what the tab bar calls them.
+const INSTRUMENT_TAB_KEYS = { '/': 'inst.tabIndex', '/progress': 'inst.tabReport' };
 
 function targetParts(to) {
   const u = new URL(to, 'https://pri.local');
@@ -135,7 +159,7 @@ function isDestinationActive(location, to) {
 }
 
 const TITLE_KEYS = {
-  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
+  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks', '/map': 'inst.tabMap',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
   '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
@@ -515,7 +539,9 @@ export default function App() {
   const navSections = user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
   const navItems = navSections.flatMap(section => section.items);
   const primarySet = user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
-  const mobilePrimary = navItems.filter(item => primarySet.has(item.to));
+  // In the bar's own order (Index, Practice, Map, Report in the instrument
+  // build), not the order the shell's list happens to hold them in.
+  const mobilePrimary = [...primarySet].map(to => navItems.find(item => item.to === to)).filter(Boolean);
   const mobileMore = navItems.filter(item => !primarySet.has(item.to));
   const roleLanding = user.role === 'teacher' ? '/teach' : '/';
 
@@ -622,7 +648,7 @@ export default function App() {
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
                     <Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />
-                    <Route path="/classes" element={studentOnly(<Classes />, '/teach#teacher-classes')} />
+                    <Route path="/classes" element={CLASSES_ON && Classes ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />} />
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
@@ -646,7 +672,7 @@ export default function App() {
           return (
             <PageLink key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
-              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{INSTRUMENT_ON && item.to === '/' ? t('inst.tabIndex') : t(item.key)}</span>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_ON ? INSTRUMENT_TAB_KEYS[item.to] || item.key : item.key)}</span>
             </PageLink>
           );
         })}
@@ -672,7 +698,7 @@ export default function App() {
               return (
                 <PageLink key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
                   aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
-                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
+                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_ON ? INSTRUMENT_TAB_KEYS[item.to] || item.key : item.key)}</span>
                 </PageLink>
               );
             })}

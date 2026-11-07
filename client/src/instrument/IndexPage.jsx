@@ -7,6 +7,8 @@ import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import ChapterScope from './ChapterScope.jsx';
 import TermGloss from '../components/TermGloss.jsx';
+import Glyph from './Glyph.jsx';
+import TopicGenerator from '../home/TopicGenerator.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
@@ -27,6 +29,24 @@ const isPhone = () => !!window.matchMedia?.(PHONE).matches;
 
 const greetingKey = hour => (hour < 12 ? 'inst.greetMorning' : hour < 17 ? 'inst.greetAfternoon' : 'inst.greetEvening');
 
+// The review-queue and plan cards arrive after the Index has painted, as they
+// do on the v1.0 Home: neither is needed for the first paint, and a chunk that
+// cannot be fetched (a first run offline) leaves the Index without the card
+// rather than without the Index.
+function Lazy(load) {
+  return function LazyCard(props) {
+    const [Card, setCard] = useState(null);
+    useEffect(() => {
+      let live = true;
+      load().then(m => { if (live) setCard(() => m.default); }).catch(() => { });
+      return () => { live = false; };
+    }, []);
+    return Card ? <Card {...props} /> : null;
+  };
+}
+const LazyReviewQueueCard = Lazy(() => import('../home/ReviewQueueCard.jsx'));
+const LazyPlanCard = Lazy(() => import('../home/PlanCard.jsx'));
+
 function Ring({ value, colourVar }) {
   const r = 10; const length = 2 * Math.PI * r;
   return (
@@ -39,13 +59,15 @@ function Ring({ value, colourVar }) {
 }
 
 export default function IndexPage() {
-  const { user } = useApp();
+  const { user, dueCount } = useApp();
   const t = useT();
   const [curriculum, setCurriculum] = useState(null);
   const [recent, setRecent] = useState(undefined);
   const [error, setError] = useState('');
   const [pick, setPick] = useState(null);
   const [marks, setMarks] = useState({});
+  // The plan card reads the week through the same stats the Plan page uses.
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
     let live = true;
@@ -54,6 +76,7 @@ export default function IndexPage() {
     api.get('/marks/by-chapter').then(r => { if (live) setMarks(r?.chapters || {}); }).catch(() => { });
     api.post('/history/list', { limit: 1 }).then(r => { if (live) setRecent(r?.items?.[0] || null); })
       .catch(() => { if (live) setRecent(null); });
+    api.get('/stats').then(r => { if (live) setStats(r || null); }).catch(() => { });
     return () => { live = false; };
   }, []);
 
@@ -227,6 +250,43 @@ export default function IndexPage() {
         </section>
       )}
       {curriculum && !chapters.length && <p className="in-empty">{t('inst.noChapters')}</p>}
+
+      {/* What the v1.0 Home offered besides the chapters, so nothing a student
+          could reach there is lost when the Index is the home: the review
+          queue (dot points due, from the server's own evidence), the study
+          plan, photo practice and the exact-topic generator. The due figure is
+          the shell's, from GET /reviews. */}
+      <section className="in-also" aria-labelledby="in-also-title" data-instrument-also>
+        <h2 id="in-also-title">{t('inst.alsoTitle')}</h2>
+        <ul className="in-also-list">
+          <li>
+            <PageLink className="in-also-link" to="/practice" data-instrument-review-queue>
+              <span className="in-also-glyph" aria-hidden="true"><Glyph name="doc" size={18} /></span>
+              <span className="in-also-text">
+                <b>{t('inst.reviewQueue')}</b>
+                <small data-instrument-review-due={dueCount}>{dueCount > 0 ? t('inst.reviewQueueDue', { n: dueCount, count: dueCount }) : t('inst.reviewQueueNone')}</small>
+              </span>
+            </PageLink>
+          </li>
+          <li>
+            <PageLink className="in-also-link" to="/plan" data-instrument-plan>
+              <span className="in-also-glyph" aria-hidden="true"><Glyph name="plan" size={18} /></span>
+              <span className="in-also-text"><b>{t('nav.plan')}</b><small>{t('inst.planSub')}</small></span>
+            </PageLink>
+          </li>
+          <li>
+            <PageLink className="in-also-link" to="/practise-photo" data-home-photo-practise data-instrument-photo>
+              <span className="in-also-glyph" aria-hidden="true"><Glyph name="box" size={18} /></span>
+              <span className="in-also-text"><b>{t('snap.entry')}</b><small>{t('inst.photoSub')}</small></span>
+            </PageLink>
+          </li>
+        </ul>
+        <LazyReviewQueueCard user={user} />
+        <LazyPlanCard user={user} stats={stats} />
+        <div className="in-also-gen" data-instrument-generator>
+          <TopicGenerator user={user} curriculum={curriculum} />
+        </div>
+      </section>
     </div>
   );
 }
