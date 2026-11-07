@@ -429,6 +429,9 @@ jobs:
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
+          # Learning-state identity (v2), exact legacy lookups and monotonic expiry (#689, #690, #691) on SQLite; Postgres below.
+          node server/test/learning-state-identity-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'LEARNING STATE IDENTITY: PASS — 172/172 checks' practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
@@ -451,7 +454,8 @@ jobs:
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+          # 295 → 306: legacy-only repeats over HTTP, flagged repeatEvidence: 'legacy' on issue, receipt and event.
+          grep -Fq 'REPEAT CREDIT: PASS — 306/306 checks' practice-http.log
           grep -Fq 'PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
@@ -578,13 +582,15 @@ jobs:
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
           # 66 → 67: the question picker passes over content the account has resolved, on Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 67/67 suites' platform-postgres.log
+          # 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 68/68 suites' platform-postgres.log
           grep -Fq '✓ practice-reveal-submit-race-check.mjs' platform-postgres.log
           grep -Fq '✓ account-deletion-midflight-check.mjs' platform-postgres.log
           grep -Fq '✓ billing-out-of-order-concurrency-check.mjs' platform-postgres.log
           grep -Fq '✓ postgres-cutover-rehearsal-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-consent-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seen-aware-pick-check.mjs' platform-postgres.log
+          grep -Fq '✓ learning-state-identity-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
