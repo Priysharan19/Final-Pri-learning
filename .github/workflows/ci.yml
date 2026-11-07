@@ -165,9 +165,9 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '2712000/2712000 self-checks passed across 339 subtopics' suites.log
+          grep -Fq '2840000/2840000 self-checks passed across 355 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2678/2678 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
           grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
@@ -180,12 +180,16 @@ jobs:
           grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
           grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
+          # #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic
+          # form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks.
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 478/478 checks' suites.log
+          # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
+          # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -213,7 +217,7 @@ jobs:
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 478/478 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
