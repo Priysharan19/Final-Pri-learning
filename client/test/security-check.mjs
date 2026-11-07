@@ -506,6 +506,38 @@ async function run() {
     eq('a payload with no figure in it at all comes back empty', sanitizeFigure('<script>alert(1)</script>'), '');
   } catch (err) { crashed(err); }
 
+  // ── The scanning fallback is linear (CodeQL js/redos) ─────────────────────
+  // Without DOMParser (Node, a Web Worker) figures go through the TAG scanner.
+  // An unterminated tag full of quote pairs once backtracked exponentially:
+  // 22 pairs held it for 25 s. The small case runs first so a regression fails
+  // in seconds instead of hanging the suite on the large one.
+  section('scanning fallback stays linear');
+  try {
+    const savedParser = globalThis.DOMParser;
+    delete globalThis.DOMParser;
+    try {
+      const timed = pairs => {
+        const input = '<svg><A' + '""'.repeat(pairs);
+        const started = performance.now();
+        const out = sanitizeFigure(input);
+        return { ms: performance.now() - started, out };
+      };
+      const small = timed(22);
+      ok('an unterminated tag with 22 quote pairs is scanned at once (it took 25 s before)', small.ms < 250, `${small.ms.toFixed(0)} ms`);
+      if (small.ms < 250) {
+        const big = timed(9000);
+        ok('18,000 quote characters in an unterminated tag are still scanned in linear time', big.ms < 250, `${big.ms.toFixed(0)} ms`);
+        ok('and the unterminated tag comes back as inert, escaped text', violations(big.out).length === 0 && !/<a\b/i.test(big.out) && big.out.includes('&lt;A'), show(big.out));
+      }
+      eq('a tag with an unbalanced quote is escaped as text, never emitted as a tag',
+        sanitizeFigure(`<svg><text x='1>hi</text></svg>`), `<svg>&lt;text x='1&gt;hi</text></svg>`);
+      eq('a quoted attribute containing ">" still parses as one tag (same output as before the fix)',
+        sanitizeFigure('<svg><text x="1" font-family="a > b">t</text></svg>'), '<svg><text x="1">t</text></svg>');
+    } finally {
+      if (savedParser) globalThis.DOMParser = savedParser;
+    }
+  } catch (err) { crashed(err); }
+
   // ── The edges of the sanitiser ─────────────────────────────────────────────
   section('sanitiser edges');
   try {

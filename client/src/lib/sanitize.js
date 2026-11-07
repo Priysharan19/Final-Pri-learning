@@ -87,7 +87,16 @@ function cleanNodes(parent, depth, budget) {
 
 // ── Node path: no DOM, so the same allowlist is applied by scanning ──────────
 
-const TAG = /<\/?([a-zA-Z][^\s/>]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
+// The three alternatives inside a tag are disjoint: a quoted run, or one
+// character that is neither '>' nor a quote. With `[^>]` (as before) a quote
+// could be read either as the start of a quoted run or as a plain character,
+// so an unterminated `<A` followed by quote pairs and no closing '>' backtracked
+// exponentially: 47 characters held the scan for 25 s (CodeQL js/redos). A tag
+// with an unbalanced quote no longer matches at all and is escaped as text,
+// which is the safe reading.
+// The tag name stops at a quote or '=' for the same reason: a name that could
+// swallow the quotes made the name/attribute split ambiguous (quadratic).
+const TAG = /<\/?([a-zA-Z][^\s/>"'=]*)((?:"[^"]*"|'[^']*'|[^>"'])*)>/g;
 const ATTR = /([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 
 function cleanTag(whole, name, rawAttrs) {
