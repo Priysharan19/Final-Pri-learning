@@ -23,9 +23,9 @@ deletion is a hard `DELETE` in one transaction, effective immediately.
 
 | State | How an account enters it | API behaviour | UI behaviour |
 | --- | --- | --- | --- |
-| **Unverified** | `POST /v1/account/register` (201, `verificationRequired: true`) | Signed in. `/me` reports `emailVerified: false`. `POST /sync/push`, `POST /classes`, `POST /classes/join`, `POST /billing/checkout/web`, `POST /handwriting/transcribe`, `POST /working/check` answer **403 `EMAIL_UNVERIFIED`**. Export, devices, logout, logout-all, password change, deletion and resend all work. | Cloud panel shows the verification prompt; practice, marking and on-device handwriting are unaffected. |
+| **Unverified** | `POST /v1/account/register` (201, `verificationRequired: true`) | Signed in. `/me` reports `emailVerified: false`. `POST /sync/push`, `POST /classes`, `POST /classes/join`, `POST /billing/checkout/web`, `POST /handwriting/transcribe`, `POST /working/check` answer **403 `EMAIL_UNVERIFIED`**. Export, devices, logout, logout-all, password change, deletion and resend all work. | Cloud panel shows the verification prompt. Grading is online-only, so nothing is marked and no handwriting is read until the address is verified; typed and written work waits on the device. |
 | **Active** | The one-time link from the `verify-email` outbox row is spent (`POST /email/verify`) | Every route the role allows. | Normal. |
-| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older"); a registration that sends neither a boolean `isAdult` nor a school class is refused with 400 `AGE_DECLARATION_REQUIRED` — and the same holds for a new account made by Google/Apple sign-in. Every account records its age decision (`accounts.age_basis`: adult / child, or legacy for accounts that predate it); an account with none recorded is refused by the gate with 403 `AGE_DECLARATION_REQUIRED` | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address; the app is fully usable offline. |
+| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older"); a registration that sends neither a boolean `isAdult` nor a school class is refused with 400 `AGE_DECLARATION_REQUIRED` — and the same holds for a new account made by Google/Apple sign-in. Every account records its age decision (`accounts.age_basis`: adult / child, or legacy for accounts that predate it); an account with none recorded is refused by the gate with 403 `AGE_DECLARATION_REQUIRED` | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address. Nothing is marked and no handwriting or photo is read until the guardian confirms; the work waits on the device. **Owner default D18 (2026-11-01), being built in the accounts stream:** an account whose guardian has not confirmed within 30 days, or has withdrawn, is erased 30 days after that, and a guardian can request erasure without the child's login. The privacy notice promises this from 2 Nov 2026; until the code lands this row records the gap. |
 | **Deleted** | `DELETE /v1/account` with fresh proof (current password; a fresh Apple/Google identity token + server nonce; or, for an account with no password, a fresh one-time code sent to its own email/phone via `POST /v1/account/otp/reauth-request`) — or, with no session at all, the public page `/account/delete-request` (`POST /v1/account/otp/delete-request` → `/delete-confirm`, proof by a code to the account's email; the same `deleteAccountRows()` transaction and billing hook; `server/test/account-deletion-public-check.mjs`) | Every session token is dead (401 `AUTH_REQUIRED`); login answers 401 `BAD_CREDENTIALS` exactly as for a wrong password; every outstanding verification/reset/guardian link answers 400 `TOKEN_INVALID`. The address is free: registering it again creates a new, empty, unverified account with a new id. | Signed out; local profiles on the device are untouched (they were never the server's). |
 
 A web subscription is cancelled at the provider (immediately, not at cycle end) **before** the rows
@@ -184,7 +184,9 @@ What is true in the code today:
   **What `store: false` does and does not mean:** it tells the Responses API not to keep the
   response object for later retrieval. It is *not* a zero-data-retention agreement: under the
   provider's standard API terms, inputs may be retained for a limited period (OpenAI states up to
-  30 days) for abuse and misuse monitoring, and are not used for training by default. No
+  30 days) for abuse and misuse monitoring, and are not used for training by default (OpenAI,
+  "Data controls in the OpenAI platform",
+  https://developers.openai.com/api/docs/guides/your-data, retrieved 2026-11-02). No
   zero-data-retention arrangement is recorded for this deployment; if one is made, this section
   and the notice must say so. Earlier code comments said "nothing is retained by the provider";
   that overstated it and has been corrected.
@@ -225,12 +227,14 @@ version was bumped to `2026-10-02` with this change, so consents given against t
 are distinguishable.
 
 **Notice-version policy.** `guardian_consents.notice_version` records which notice a guardian
-confirmed against; it is evidence, not a gate. A consent given under an earlier version **stays
-valid** and no re-consent is requested — the server never compares versions (`requireGuardianConsent`
-checks only confirmed/withdrawn). That is acceptable for `2026-10-02` because the change describes
-the existing flow more accurately and adds no new processing. A future notice change that adds a
-purpose or a recipient must instead ship a re-consent flow (a new request and token; confirmation
-can never clear a withdrawal) before the new processing starts; that is not built.
+confirmed against, and since #622 it **is** a gate: `requireGuardianConsent` accepts a confirmation
+only when its `notice_version` is in `ACCEPTED_CONSENT_NOTICE_VERSIONS` (`guardianConsent.js`;
+today `2026-10-19` and the current `2026-10-22`). A confirmation given under an older version reads
+as pending, and the learner asks again through the ordinary request flow; confirmation can never
+clear a withdrawal. A version is added to the accepted list only when the change since it does not
+alter what a guardian agreed to. The 2 November 2026 change to `signup.noticeWithdraw` (it now says
+withdrawal stops marking, reading, exams and sync, not only sync) describes the existing behaviour
+more completely and adds no processing, so the version was not bumped and no re-consent is asked.
 
 ---
 
@@ -249,6 +253,15 @@ can never clear a withdrawal) before the new processing starts; that is not buil
   (`cloudSecurity.appleSubscriptionNote`, `deleteRequest.device`).
 - **Phone-only accounts** (synthetic `@phone.invalid` address) cannot use the public email page;
   they delete in-app with a code to their phone. There is no signed-out path for them yet
-  (an SMS variant of `/delete-request` is a candidate follow-up).
+  (an SMS variant of `/delete-request` is a candidate follow-up). SMS is off at launch (owner
+  decision D3), so no such account can be created in the first release.
+- **Child accounts never confirmed or withdrawn** are not yet erased automatically. Owner default
+  D18 (30 days, guardian may request erasure without the child's login) is promised in the notice
+  from 2 Nov 2026 and is being built in the accounts stream; counsel sets the final period.
+  A production nomination is refused until that code is at the nominated SHA
+  (`tools/legal-promises.mjs`, called by `scripts/release-nominate.mjs`).
+- **Coded crash reports** (`POST /v1/telemetry/error`) are `client-error` rows under the 90-day
+  telemetry retention; they are forwarded to Sentry only if `PRI_SENTRY_DSN` is set, which it is
+  not at launch.
 - **Provider-side retention** of cloud-handwriting inputs is governed by the provider, not Pri.
 - **Backups** retain deleted data until they age out; the period is per deployment.
