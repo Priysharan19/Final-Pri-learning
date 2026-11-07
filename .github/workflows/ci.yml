@@ -23,7 +23,7 @@ jobs:
   # against the concatenated shard logs.
   suites-shard:
     name: Suites shard ${{ matrix.shard }}/4
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -61,7 +61,7 @@ jobs:
 
   suites-contracts:
     name: Suites policy and contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -108,6 +108,7 @@ jobs:
           node client/test/class10-ncert-product-check.mjs
           node client/test/india-practice-availability-check.mjs
           node client/test/entitlement-check.mjs
+          node client/test/question-clock-check.mjs
           node client/test/sync-contract-check.mjs
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.
@@ -135,7 +136,7 @@ jobs:
     name: Suites, coverage and accuracy gates
     needs: [suites-shard, suites-contracts]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Every shard finished green
@@ -307,7 +308,7 @@ jobs:
 
   platform:
     name: Production account, sync and commercial schema
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
     # only for this job, trusts loopback connections and holds no credential;
@@ -467,13 +468,15 @@ jobs:
           node server/test/content-review-contract-check.mjs
           node server/test/assignment-execution-contract-check.mjs
           node server/test/classroom-submission-contract-check.mjs
-      - name: Rate-limit identity, sync idempotency, grants, body size and catalogue exposure
+      - name: Rate-limit identity, sync idempotency, grants, body size, compressed-body survival and catalogue exposure
         run: |
           node server/test/proxy-identity-contract-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
           node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
+          # GHSA-27r3-jxmh-p828: a gzip body with trailing bytes must leave the process answering.
+          node server/test/compressed-body-survival-check.mjs
           node server/test/content-index-exposure-check.mjs
       - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
         run: |
@@ -639,7 +642,7 @@ jobs:
   # proves every command of npm run test:e2e is in exactly one group.
   browser-shard:
     name: Browser shard (${{ matrix.group }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The accessibility gate builds the client itself; give it the same flags
     # client/test/e2e.mjs uses for its build so both walk the same app (the
     # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
@@ -695,9 +698,77 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+      # The browsers' system packages (apt). `playwright install --with-deps`
+      # ran apt on every shard, cached browsers or not, and apt is where the
+      # 20-minute mode lived. Measured from the jobs API over the 344 shard
+      # installs that ran between 22 Oct and 1 Nov: 283 took under a minute, the
+      # slowest in a green shard took 594 s, and nine took 1117 to 1200 s. All
+      # nine logs show apt and no browser download at all: the two that finished
+      # say "Fetched 119 MB in 19min 2s (104 kB/s)" and "in 18min 17s (108 kB/s)",
+      # and the other seven were cancelled with apt still fetching. A .deb that
+      # is already in apt's archive with the size and hash the package index
+      # names is not fetched again (a stale or altered file is), so the packages
+      # one run downloaded are kept for the next run on the same runner image.
+      - name: Runner image build (keys the package cache)
+        id: image
+        run: echo "build=${ImageOS:-unknown}-${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: Cache the browsers' system packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/apt-debs
+          key: apt-debs-${{ steps.image.outputs.build }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+      # Two commands, bounded differently, because a kill is safe for one and
+      # not the other. System packages: once, never under `timeout` — GNU
+      # timeout signals the whole process group, and a SIGTERM while dpkg is
+      # unpacking leaves the package database interrupted so that a retry
+      # fails outright; only this step's own limit bounds it. Browser builds:
+      # Playwright downloads to a temporary file, so a stalled download is cut
+      # and started again; each attempt gets at most 600 s (above the 594 s
+      # slowest green install, apt included, and well under the 1117 s hung mode),
+      # and a second attempt gets whatever of the step's budget is left. The
+      # 12-minute step keeps about seven minutes of the 20-minute shard for the
+      # suites themselves (the slowest green group runs in about five).
       - name: Install ${{ matrix.browsers }}
         working-directory: client
-        run: npx playwright install --with-deps ${{ matrix.browsers }}
+        timeout-minutes: 12
+        env:
+          APT_DEBS: ${{ runner.temp }}/apt-debs
+          BROWSERS: ${{ matrix.browsers }}
+        run: |
+          set -o pipefail
+          budget=690
+          # 1 · system packages, from the cached .deb files where they match
+          if compgen -G "$APT_DEBS/*.deb" > /dev/null; then
+            sudo cp "$APT_DEBS"/*.deb /var/cache/apt/archives/
+            echo "apt: $(ls "$APT_DEBS"/*.deb | wc -l) cached package files offered"
+          fi
+          npx playwright install-deps $BROWSERS
+          mkdir -p "$APT_DEBS"
+          sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -f {} "$APT_DEBS"/ \;
+          sudo chown -R "$(id -u):$(id -g)" "$APT_DEBS"
+          echo "apt: $(ls "$APT_DEBS"/*.deb 2>/dev/null | wc -l) package files kept for the next run, ${SECONDS}s so far"
+          # 2 · browser builds, bounded and retried
+          for attempt in 1 2; do
+            left=$(( budget - SECONDS ))
+            if (( left < 60 )); then break; fi
+            bound=$(( left < 600 ? left : 600 ))
+            set +e
+            timeout "$bound" npx playwright install $BROWSERS
+            status=$?
+            set -e
+            if (( status == 0 )); then
+              echo "browsers: installed on attempt ${attempt}, ${SECONDS}s in all"
+              exit 0
+            fi
+            if (( status != 124 )); then
+              echo "::error title=Playwright install failed::browser install exited ${status} on attempt ${attempt}" >&2
+              exit "$status"
+            fi
+            echo "::warning title=Playwright install retry::attempt ${attempt} did not finish within ${bound}s; starting again" >&2
+            sleep 10
+          done
+          echo "::error title=Playwright install failed::browser download did not finish inside this step's ${budget}s budget" >&2
+          exit 1
       # The single job's later tours ran --no-build against the build
       # tour-ai-tutor.js leaves behind: the job's feature flags, tutor off.
       # A group that starts with --no-build tours makes that same build first.
@@ -804,12 +875,24 @@ jobs:
           name: browser-shard-${{ matrix.group }}
           path: browser.log
           if-no-files-found: error
+      # What the screen showed when a flow failed. The log names these files, and
+      # until now they died with the runner, so a stall in a shard could only be
+      # guessed at from its timeout. Not named browser-shard-*: the job below
+      # downloads that pattern and requires exactly one log for each group.
+      - name: Failure screens
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: failure-screens-${{ matrix.group }}
+          path: /tmp/pri-e2e-shots-*/*FAIL*.png
+          if-no-files-found: ignore
+          retention-days: 14
 
   browser:
     name: Browser suites (end-to-end and accessibility)
     needs: [browser-shard]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Every shard finished green
@@ -952,7 +1035,7 @@ jobs:
 
   build:
     name: Client build and offline-first boundary
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1043,7 +1126,7 @@ jobs:
     # answer. The release gates for marking live in the suites job above.
     name: Engine benchmark report (main only)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
