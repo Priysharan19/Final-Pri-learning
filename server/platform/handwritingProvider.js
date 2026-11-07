@@ -313,13 +313,48 @@ export async function probeHandwritingProvider({
 export const MAX_IMAGE_BYTES = 750_000;
 
 /** A data URL is the only shape accepted, and only for a raster image. */
+// ── What an uploaded picture really is, read from its first bytes ──────────
+// The handwriting reader, the working checker and the question-photo reader
+// accept a base64 data URL whose header says PNG, JPEG or WebP. A header is
+// whatever the caller wrote; the bytes are what the provider is paid to read.
+// Each format opens with a fixed signature, so the first twelve bytes decide
+// whether the payload is a picture at all: text, a PDF, an archive or random
+// bytes behind an image header are refused before any provider is called.
+// The declared type need not match the signature (a browser types a picked
+// file from its extension, so a PNG saved as .jpg arrives as image/jpeg and
+// is still a picture); it must be one of the three formats the readers accept.
+// Kept in this module: provider-answer-blind-check pins its imports to none.
+const SIGNATURES = Object.freeze([
+  // 89 50 4E 47 0D 0A 1A 0A
+  ['png', head => head.length >= 8 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
+    && head[4] === 0x0d && head[5] === 0x0a && head[6] === 0x1a && head[7] === 0x0a],
+  // FF D8 FF
+  ['jpeg', head => head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff],
+  // "RIFF" <size> "WEBP"
+  ['webp', head => head.length >= 12 && head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP']
+]);
+
+/**
+ * The format the base64 payload's own bytes declare ('png' | 'jpeg' | 'webp'),
+ * or null when they are none of them. Only the first 16 base64 characters
+ * (12 bytes) are decoded.
+ */
+export function imageFormatOf(base64) {
+  const head = Buffer.from(String(base64 || '').slice(0, 16), 'base64');
+  const found = SIGNATURES.find(([, matches]) => matches(head));
+  return found ? found[0] : null;
+}
+
 export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   const value = String(dataUrl || '');
   const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) throw new HandwritingProviderError('The image must be a base64 PNG, JPEG or WebP data URL.', { code: 'HANDWRITING_IMAGE_INVALID', status: 400 });
   const bytes = Math.floor((match[2].length * 3) / 4);
   if (bytes > maxBytes) throw new HandwritingProviderError(`The image is larger than the ${Math.round(maxBytes / 1000)} kB limit.`, { code: 'HANDWRITING_IMAGE_TOO_LARGE', status: 413 });
-  return { mime: `image/${match[1]}`, bytes };
+  // The header is the caller's word; the first bytes are the picture's (imageFormatOf, above).
+  const format = imageFormatOf(match[2]);
+  if (!format) throw new HandwritingProviderError('The image is not a PNG, JPEG or WebP picture.', { code: 'HANDWRITING_IMAGE_INVALID', status: 400 });
+  return { mime: `image/${match[1]}`, bytes, format };
 }
 
 function normalizeLines(raw) {

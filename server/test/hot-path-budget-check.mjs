@@ -39,6 +39,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'pri-hot-path-'));
 // --report: print the counts without pinning them (used to measure a build
@@ -50,7 +51,7 @@ const LEGACY_ONLY = process.argv.includes('--legacy');
 // ── The synthetic reader ─────────────────────────────────────────────────────
 // A picture is a tagged byte string; the reader answers with the text it holds.
 const picture = (text, salt = '') =>
-  'data:image/png;base64,' + Buffer.from(`SYNTHETIC|${JSON.stringify(text)}|${salt}|` + 'a'.repeat(300)).toString('base64');
+  pngDataUrl(`SYNTHETIC|${JSON.stringify(text)}|${salt}|` + 'a'.repeat(300));
 const provider = { calls: 0, sent: [] };
 const fake = createServer((req, res) => {
   let raw = '';

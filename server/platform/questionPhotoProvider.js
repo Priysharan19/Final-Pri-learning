@@ -28,7 +28,7 @@
 // configuration the handwriting reader uses, read through its exported
 // `providerConfig`/`providerStaticStatus`; this module does not change it.
 // ─────────────────────────────────────────────────────────────────────────────
-import { providerConfig, providerStaticStatus } from './handwritingProvider.js';
+import { imageFormatOf, providerConfig, providerStaticStatus } from './handwritingProvider.js';
 import { IN_CHAPTER_BY_ID, IN_CHAPTER_SKILLS } from './india-syllabus.generated.js';
 
 /** Same transport-derived ceiling as the handwriting route (1 MiB JSON body). */
@@ -105,7 +105,10 @@ export function validateQuestionImage(dataUrl, { maxBytes = MAX_QUESTION_IMAGE_B
   if (!match) throw new QuestionPhotoError('The photo must be a base64 PNG, JPEG or WebP data URL.', { code: 'QUESTION_PHOTO_IMAGE_INVALID', status: 400 });
   const bytes = Math.floor((match[2].length * 3) / 4);
   if (bytes > maxBytes) throw new QuestionPhotoError(`The photo is larger than the ${Math.round(maxBytes / 1000)} kB limit.`, { code: 'QUESTION_PHOTO_IMAGE_TOO_LARGE', status: 413 });
-  return { mime: `image/${match[1]}`, bytes };
+  // The header is the caller's word; the first bytes are the picture's (handwritingProvider.js imageFormatOf).
+  const format = imageFormatOf(match[2]);
+  if (!format) throw new QuestionPhotoError('The photo is not a PNG, JPEG or WebP picture.', { code: 'QUESTION_PHOTO_IMAGE_INVALID', status: 400 });
+  return { mime: `image/${match[1]}`, bytes, format };
 }
 
 /** A chapter/skill pair is accepted only when the syllabus really has it. */

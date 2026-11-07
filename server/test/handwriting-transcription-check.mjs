@@ -17,6 +17,7 @@
 // no API key and no spend.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
+import { pngDataUrl } from './support/test-image.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
@@ -34,7 +35,7 @@ const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
-const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
+const PNG = pngDataUrl('a'.repeat(600));
 
 // ── 1 · The prompt is a transcription contract ────────────────────────────────
 ok(/never solve/i.test(SYSTEM_INSTRUCTIONS), 'the model is told never to solve');

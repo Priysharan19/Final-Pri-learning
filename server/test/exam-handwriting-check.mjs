@@ -27,13 +27,14 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const scratch = mkdtempSync(join(tmpdir(), 'pri-exam-handwriting-'));
 
 // ── The counting stand-in reader ─────────────────────────────────────────────
 const picture = (label, behaviour = 'ok', filler = 'a') =>
-  'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
+  pngDataUrl(`PICTURE|${behaviour}|${label}|` + filler.repeat(300));
 const digestOf = image => createHash('sha256').update(Buffer.from(image.split(',')[1], 'base64')).digest('hex');
 
 const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set(), doubting: new Set() };
