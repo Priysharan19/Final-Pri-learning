@@ -140,7 +140,7 @@ export function judge(lines) {
   const restore = lines.find(l => l.includes('restore identity:'));
   if (!restore) problems.push('the self-check did not report restore identity');
   else {
-    const r = /restore identity: (\d+)\/(\d+) cases · cycles=(\d+) identical=(yes|NO) new=(reencoded|BAD) altered=(reencoded|BAD)/.exec(restore);
+    const r = /restore identity: (\d+)\/(\d+) cases · cycles=(\d+) identical=(yes|NO) new=(reencoded|BAD) altered=(reencoded|BAD) erased=(exact|BAD) undo=(exact|BAD)/.exec(restore);
     if (!r) problems.push(`the restore-identity line could not be read: ${restore}`);
     else {
       if (Number(r[2]) !== EXPECTED_CASES || r[1] !== r[2]) problems.push(`restore identity ${r[1]}/${r[2]} cases; every case must restore exactly`);
@@ -148,6 +148,8 @@ export function judge(lines) {
       if (r[4] !== 'yes') problems.push('a restored stroke the student did not touch came back changed (draft drift)');
       if (r[5] !== 'reencoded') problems.push('a new stroke after a restore was not read from the canvas');
       if (r[6] !== 'reencoded') problems.push('a changed restored stroke was replaced by its stale original');
+      if (r[7] !== 'exact') problems.push('erasing one restored stroke changed or lost another');
+      if (r[8] !== 'exact') problems.push('Undo after a restore did not bring back the page\'s own strokes');
     }
   }
   if (!bridge) problems.push('the bridge smoke test did not report');

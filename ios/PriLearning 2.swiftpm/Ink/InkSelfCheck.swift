@@ -359,7 +359,9 @@ enum InkSelfCheck {
         var identical = true          // every unchanged restored stroke came back exactly as sent, every cycle
         var newReencoded = false      // a stroke the student adds is read from PencilKit
         var alteredReencoded = false  // a restored stroke that changed is not replaced by the stale original
-        var ok: Bool { cycles > 0 && identical && newReencoded && alteredReencoded }
+        var erasedExact = false       // the eraser takes one whole stroke; every other comes back as the page sent it
+        var undoExact = false         // Undo puts back the drawing it held; every stroke is the page's own again
+        var ok: Bool { cycles > 0 && identical && newReencoded && alteredReencoded && erasedExact && undoExact }
     }
 
     private static func same(_ a: [InkStroke], _ b: [InkStroke]) -> Bool {
@@ -405,6 +407,18 @@ enum InkSelfCheck {
             r.alteredReencoded = !same([readAltered[0]], [strokes[0]])
                 && same(Array(readAltered.dropFirst()), Array(strokes.dropFirst()))
         }
+        // Erase and Undo. The surface's eraser is PKEraserTool(.vector): it
+        // removes whole strokes and never masks or cuts one, and the surface's
+        // Undo stack holds the PKDrawing as it was before the tool touched it.
+        // Model both on the restored drawing itself: drop one stroke, read; put
+        // the earlier drawing back, read.
+        let gone = drawing.strokes.count > 1 ? 1 : 0
+        var kept = drawing.strokes
+        kept.remove(at: gone)
+        var expected = strokes
+        expected.remove(at: gone)
+        r.erasedExact = same(StrokeCodec.strokes(from: PKDrawing(strokes: kept), restored: restored), expected)
+        r.undoExact = same(StrokeCodec.strokes(from: drawing, restored: restored), strokes)
         return r
     }
 
@@ -439,9 +453,10 @@ enum InkSelfCheck {
         }
         var probePen = Pen()
         let probe = restoreIdentity(of: cases[0].build(&probePen))
-        say(String(format: "PRIINK restore identity: %d/%d cases · cycles=%d identical=%@ new=%@ altered=%@",
+        say(String(format: "PRIINK restore identity: %d/%d cases · cycles=%d identical=%@ new=%@ altered=%@ erased=%@ undo=%@",
               restorePassed, cases.count, probe.cycles, probe.identical ? "yes" : "NO",
-              probe.newReencoded ? "reencoded" : "BAD", probe.alteredReencoded ? "reencoded" : "BAD"))
+              probe.newReencoded ? "reencoded" : "BAD", probe.alteredReencoded ? "reencoded" : "BAD",
+              probe.erasedExact ? "exact" : "BAD", probe.undoExact ? "exact" : "BAD"))
         say(String(format: "PRIINK ── capture fidelity: %d/%d cases · strokes %.1f%% (%d/%d) · max deviation %.2f px (floor %.1f) · fields %@ ──",
               passed, cases.count, strokePct, strokesBack, strokesSent, Double(worst), Double(maxDeviationFloorPx), fieldsOK ? "ok" : "BAD"))
         DispatchQueue.main.async { checkBridge() }

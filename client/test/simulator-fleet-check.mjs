@@ -119,9 +119,13 @@ ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty outp
     return `PRIINK bridge mounted=${b.mounted} positioned=${b.positioned} strokesSent=${b.sent} strokesBack=${b.back} placement=${b.placement}`;
   };
   const restore = (over = {}) => {
-    const r = { passed: 10, cases: 10, cycles: 5, identical: 'yes', fresh: 'reencoded', altered: 'reencoded', ...over };
-    return `PRIINK restore identity: ${r.passed}/${r.cases} cases · cycles=${r.cycles} identical=${r.identical} new=${r.fresh} altered=${r.altered}`;
+    const r = { passed: 10, cases: 10, cycles: 5, identical: 'yes', fresh: 'reencoded', altered: 'reencoded', erased: 'exact', undo: 'exact', ...over };
+    return `PRIINK restore identity: ${r.passed}/${r.cases} cases · cycles=${r.cycles} identical=${r.identical} new=${r.fresh} altered=${r.altered} erased=${r.erased} undo=${r.undo}`;
   };
+  ok(judge([restore({ erased: 'BAD' }), fidelity(), bridge()]).problems.some(p => /erasing one restored stroke/.test(p)), 'an erase that disturbs another restored stroke fails');
+  ok(judge([restore({ undo: 'BAD' }), fidelity(), bridge()]).problems.some(p => /Undo after a restore/.test(p)), 'an Undo that does not bring back the page\'s own strokes fails');
+  ok(judge([fidelity(), bridge(), 'PRIINK restore identity: 10/10 cases · cycles=5 identical=yes new=reencoded altered=reencoded']).problems.some(p => /could not be read/.test(p)),
+    'a self-check that does not report erase and Undo fails');
   // Restore identity: a draft restored on relaunch must not drift.
   ok(judge([fidelity(), bridge()]).problems.some(p => /did not report restore identity/.test(p)), 'a run without the restore-identity line fails');
   ok(judge([restore({ identical: 'NO' }), fidelity(), bridge()]).problems.some(p => /draft drift/.test(p)), 'a restored stroke that moved fails (draft drift)');
