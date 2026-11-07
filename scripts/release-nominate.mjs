@@ -27,11 +27,18 @@
 //     --production-engine for a promotion that follows the Postgres cutover in
 //     the same window, docs/operations/postgres-cutover.md §4.6 step 6);
 //   · at the RELEASE stage (the default), the release evidence exists for this
-//     exact SHA: every case of the physical-device matrix is `pass` on real
-//     hardware (docs/release/device-matrix.md "device-complete"; `blocked` rows
-//     are recorded, never omitted and never acceptance), and a real-human
-//     evaluation of the server reader names this SHA
-//     (tools/ink-cloud-reader-eval.mjs). Neither is a reminder any more: a
+//     exact SHA: the strict Release Candidate gates (release-candidate.yml) ran
+//     and passed on exactly this commit — a run counts only when GitHub
+//     attributes it to the SHA, its run name names the same SHA (the workflow
+//     checks out that exact commit and fails if it got another), and both
+//     blocking jobs concluded `success`, never `skipped`; every case of the
+//     physical-device matrix is `pass` on real hardware
+//     (docs/release/device-matrix.md "device-complete"; `blocked` rows are
+//     recorded, never omitted and never acceptance); and a real-human
+//     evaluation of the server reader names this SHA, clears Gate C's floors
+//     (READER_FLOORS) and is backed by the cloud-reader artifact of that
+//     Release Candidate run (tools/ink-cloud-reader-eval.mjs). Neither evidence
+//     row is a reminder any more: a
 //     missing one refuses the nomination unless a public-release override
 //     record (--override, format below) waives it by name AND links an
 //     approving GitHub comment by a repository admin that names this SHA and
@@ -288,10 +295,47 @@ export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER } = {}) {
 }
 
 /**
+ * Gate C's measurable floors (handwriting/v12/PRODUCTION_STANDARD.md), the numbers
+ * client/test/ink-release-evidence-gate.mjs enforces on the committed corpus. A
+ * reader report clears them or it is not release evidence; release-candidate.yml
+ * only uploads the measurement, so the floors are applied here. Never lower them
+ * to pass a release: collect the evidence.
+ */
+export const READER_FLOORS = Object.freeze({ split: 'test', minWriters: 20, minLines: 1000, minExactPct: 98.0, minCharPct: 99.5, minWorstWriterExactPct: 90.0 });
+
+/**
+ * Why a real-human reader report does not clear READER_FLOORS (empty when it does).
+ * The exact rate is recomputed from the counts, with every provider error counted
+ * as a misread: an expression the reader never answered was not read correctly.
+ */
+export function readerFloorProblems(report) {
+  const problems = [];
+  const corpus = report?.corpus || {};
+  const results = report?.results || {};
+  const writers = Number(corpus.writers);
+  const lines = Number(results.lines);
+  const exact = Number(results.exact);
+  const errors = results.providerErrors === undefined ? 0 : Number(results.providerErrors);
+  if (corpus.split !== READER_FLOORS.split) problems.push(`split ${corpus.split ?? '(none)'}, not the writer-disjoint ${READER_FLOORS.split} split`);
+  if (!(Number.isInteger(writers) && writers >= READER_FLOORS.minWriters)) problems.push(`${Number.isFinite(writers) ? writers : '?'} writer(s), floor ${READER_FLOORS.minWriters}`);
+  if (!(Number.isInteger(lines) && lines >= READER_FLOORS.minLines)) problems.push(`${Number.isFinite(lines) ? lines : '?'} expression(s) read, floor ${READER_FLOORS.minLines}`);
+  if (!(Number.isInteger(errors) && errors >= 0)) problems.push('providerErrors is not a count');
+  const counted = Number.isInteger(lines) && Number.isInteger(exact) && Number.isInteger(errors) && exact >= 0 && exact <= lines && errors >= 0 && lines + errors > 0;
+  const exactPct = counted ? 100 * exact / (lines + errors) : NaN;
+  if (!(exactPct >= READER_FLOORS.minExactPct)) problems.push(`exact ${Number.isFinite(exactPct) ? exactPct.toFixed(2) : '?'}% (provider errors count as misreads), floor ${READER_FLOORS.minExactPct}%`);
+  const charPct = results.charPct === null || results.charPct === undefined ? NaN : Number(results.charPct);
+  if (!(charPct >= READER_FLOORS.minCharPct)) problems.push(`characters ${Number.isFinite(charPct) ? charPct : '?'}%, floor ${READER_FLOORS.minCharPct}%`);
+  const worst = results.worstWriterExactPct === null || results.worstWriterExactPct === undefined ? NaN : Number(results.worstWriterExactPct);
+  if (!(worst >= READER_FLOORS.minWorstWriterExactPct)) problems.push(`worst writer ${Number.isFinite(worst) ? worst : '?'}%, floor ${READER_FLOORS.minWorstWriterExactPct}%`);
+  return problems;
+}
+
+/**
  * A real-human evaluation of the server reader that names this exact SHA
- * (tools/ink-cloud-reader-eval.mjs records `releaseSha`). Dry runs are labelled
- * synthetic and never count. The accuracy floors themselves are enforced by
- * release-candidate.yml; this requires that the measurement exists.
+ * (tools/ink-cloud-reader-eval.mjs records `releaseSha`) and clears READER_FLOORS.
+ * Dry runs are labelled synthetic and never count; a report under the floors is
+ * named with every shortfall, never accepted. nominate() additionally binds the
+ * report to the exact-SHA Release Candidate run that measured it.
  */
 export function readerEvidence(sha, { dir = DEFAULT_READER_EVAL_DIR } = {}) {
   const files = existsSync(dir) ? readdirSync(dir).filter(name => name.endsWith('.json')).sort() : [];
@@ -310,10 +354,40 @@ export function readerEvidence(sha, { dir = DEFAULT_READER_EVAL_DIR } = {}) {
   const writers = Number(best.report?.corpus?.writers) || 0;
   const results = best.report?.results || {};
   const lines = Number(results.lines) || 0;
+  const problems = readerFloorProblems(best.report);
   return {
-    ok: writers > 0 && lines > 0, file: best.file, report: best.report,
-    detail: `${best.file}: ${writers} writer(s), exact lines ${results.exact ?? '?'}/${lines}, measured ${best.report.measuredAt || '?'} (floors: release-candidate.yml)`
+    ok: problems.length === 0, file: best.file, report: best.report, problems,
+    detail: `${best.file}: ${writers} writer(s), exact lines ${results.exact ?? '?'}/${lines}, measured ${best.report.measuredAt || '?'}`
+      + (problems.length ? ` · below Gate C floors: ${problems.join('; ')}` : ' · clears Gate C floors')
   };
+}
+
+/** The workflow whose strict gates a release must pass on its exact SHA, and its blocking jobs. */
+export const RELEASE_CANDIDATE_WORKFLOW = '.github/workflows/release-candidate.yml';
+export const RELEASE_CANDIDATE_JOBS = Object.freeze([
+  'Handwriting release gates (strict, blocking)',
+  'Build, exact release identity and cross-platform matrix'
+]);
+/** The run name release-candidate.yml gives a run: the exact commit it checked out (and verified). */
+export function releaseCandidateTitle(sha) { return `Release Candidate · ${sha}`; }
+/** The artifact release-candidate.yml uploads when it measured the cloud reader on that commit. */
+export function readerArtifactName(sha) { return `cloud-reader-eval-${sha}`; }
+
+/**
+ * The newest Release Candidate run that tested exactly `sha`, or null. A run is
+ * about `sha` only when GitHub attributes it to `sha` (head_sha: the event's
+ * commit, whose copy of the workflow ran) AND its run name names `sha` (the
+ * commit the run checked out). A run dispatched with another `release_sha`, or
+ * by a version of the workflow without that binding, is never about `sha`.
+ */
+export function releaseCandidateRun(runs, sha) {
+  let newest = null;
+  for (const run of Array.isArray(runs) ? runs : []) {
+    if (String(run?.path || '').split('@')[0] !== RELEASE_CANDIDATE_WORKFLOW) continue;
+    if (run?.head_sha !== sha || run?.display_title !== releaseCandidateTitle(sha)) continue;
+    if (!newest || newerRun(run, newest)) newest = run;
+  }
+  return newest;
 }
 
 /** Reads and validates an override record. `problems` is empty when it may waive evidence for `sha`. */
@@ -442,8 +516,10 @@ export async function nominate({
   if (versions) info('schema versions this commit expects', `schema ${versions.schemaVersion} / billing ${versions.billingSchemaVersion}`);
 
   // ── GitHub Actions on exactly this SHA ─────────────────────────────────────
+  let runsOnSha = [];
   try {
     const runs = await ghAll(gh, `repos/${repo}/actions/runs?head_sha=${expected}&per_page=${GH_PAGE}`, 'workflow_runs');
+    runsOnSha = runs;
     const verdict = evaluateRuns(runs);
     const describe = list => list.map(run => `${run.name}${run.event ? ` [${run.event}]` : ''}: ${run.status}${run.conclusion ? '/' + run.conclusion : ''}`).join('; ');
     check(verdict.latest.length > 0, 'GitHub Actions ran on this SHA', verdict.latest.length ? `${verdict.latest.length} workflow(s) by event, ${verdict.relevant.length} run(s)` : 'no workflow run has this head SHA');
@@ -536,6 +612,49 @@ export async function nominate({
   if (stage === 'candidate') {
     info('release evidence', 'not checked at the candidate stage (--candidate); the release-stage run requires the device matrix and the reader evidence for this SHA, or a recorded override, and only it prints the promotion');
   } else {
+    // ── the strict Release Candidate gates ran on exactly this SHA ───────────
+    // PR CI runs the physical-evidence and real-ink gates advisory; only
+    // release-candidate.yml makes them blocking, so a release needs its run on
+    // this commit — attributed, named and checked out as this SHA, both
+    // blocking jobs `success` (a skipped or cancelled job proves nothing).
+    const rc = releaseCandidateRun(runsOnSha, expected);
+    let rcGreen = check(rc?.status === 'completed' && rc?.conclusion === 'success',
+      'strict Release Candidate gates passed on exactly this SHA (release-candidate.yml)',
+      rc ? `run ${rc.id}${rc.html_url ? ` ${rc.html_url}` : ''}: ${rc.status}${rc.conclusion ? '/' + rc.conclusion : ''}`
+        : `no run named "${releaseCandidateTitle(expected)}" is attributed to this SHA: dispatch release-candidate.yml on main while main is at this SHA (release_sha empty or equal to it), or push a v* tag at it. A run that checked out another commit, or a workflow version without the exact-SHA binding, never counts`);
+    let rcArtifacts = null;
+    if (rcGreen) {
+      try {
+        const jobs = await ghAll(gh, `repos/${repo}/actions/runs/${rc.id}/jobs?per_page=${GH_PAGE}`, 'jobs');
+        for (const name of RELEASE_CANDIDATE_JOBS) {
+          const job = jobs.find(item => item?.name === name);
+          rcGreen = check(job?.status === 'completed' && job?.conclusion === 'success', `Release Candidate job passed (not skipped): ${name}`,
+            job ? `${job.status}${job.conclusion ? '/' + job.conclusion : ''}` : 'no job with this name in the run') && rcGreen;
+        }
+      } catch (error) { rcGreen = check(false, 'Release Candidate jobs readable (gh api)', error?.message || String(error)); }
+      try { rcArtifacts = await ghAll(gh, `repos/${repo}/actions/runs/${rc.id}/artifacts?per_page=${GH_PAGE}`, 'artifacts'); }
+      catch (error) { rcArtifacts = null; info('Release Candidate artifacts unreadable', error?.message || String(error)); }
+    }
+    // A reader report is release evidence only when the exact-SHA Release
+    // Candidate run measured it: that run uploaded cloud-reader-eval-<sha>, and
+    // the report was measured inside that run's window. The local file is the
+    // artifact's JSON (gh run download <run> -n cloud-reader-eval-<sha>).
+    const boundReader = evidence => {
+      if (!evidence.ok) return evidence;
+      const unbound = why => ({ ...evidence, ok: false, detail: `${evidence.detail} · not bound to an exact-SHA Release Candidate measurement: ${why}` });
+      if (!rcGreen) return unbound('no passing Release Candidate run on this SHA');
+      const name = readerArtifactName(expected);
+      const artifact = (rcArtifacts || []).find(item => item?.name === name && item?.expired !== true);
+      if (!artifact) return unbound(`run ${rc.id} has no unexpired artifact ${name} (dispatch it with measure_cloud_reader)`);
+      const measured = Date.parse(evidence.report?.measuredAt || '');
+      const from = Date.parse(rc.run_started_at || rc.created_at || '');
+      const to = Date.parse(rc.updated_at || '');
+      if (!(Number.isFinite(measured) && Number.isFinite(from) && Number.isFinite(to) && measured >= from && measured <= to)) {
+        return unbound(`report measuredAt ${evidence.report?.measuredAt || '?'} is outside run ${rc.id} (${rc.run_started_at || '?'} – ${rc.updated_at || '?'}): use the JSON of artifact ${name}`);
+      }
+      return { ...evidence, detail: `${evidence.detail} · measured by Release Candidate run ${rc.id} (artifact ${name}, id ${artifact.id ?? '?'})` };
+    };
+
     let override = null;
     let overrideUsable = false;
     if (overridePath) {
@@ -561,10 +680,10 @@ export async function nominate({
         info(`${label} — WAIVED by recorded override`, `${evidence.detail}; by ${override.by} (${override.verified.login}, ${override.verified.url}) at ${override.at}: ${override.reason}`);
         return;
       }
-      check(false, label, `${evidence.detail}; ${requirement === 'device-matrix' ? 'record every case as pass with scripts/device-matrix-record.mjs (blocked rows are recorded, never acceptance)' : 'run tools/ink-cloud-reader-eval.mjs at this SHA'}, or waive it by name in an --override record`);
+      check(false, label, `${evidence.detail}; ${requirement === 'device-matrix' ? 'record every case as pass with scripts/device-matrix-record.mjs (blocked rows are recorded, never acceptance)' : 'measure the cloud reader in the Release Candidate run of this SHA (measure_cloud_reader) and use its artifact'}, or waive it by name in an --override record`);
     };
     requirementRow('device-matrix', 'device matrix complete for this SHA (every case pass on real hardware)', deviceEvidence(expected, { ledger: deviceLedger }));
-    requirementRow('reader-evidence', 'real-human reader evaluation recorded for this SHA', readerEvidence(expected, { dir: readerEvalDir }));
+    requirementRow('reader-evidence', 'real-human reader evaluation recorded for this SHA', boundReader(readerEvidence(expected, { dir: readerEvalDir })));
   }
 
   const ok = results.every(item => item.ok !== false);

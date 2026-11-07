@@ -15,9 +15,10 @@ import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
   CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
-  goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker
+  goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker,
+  READER_FLOORS, RELEASE_CANDIDATE_JOBS, RELEASE_CANDIDATE_WORKFLOW, readerArtifactName, readerFloorProblems, releaseCandidateRun, releaseCandidateTitle
 } from '../scripts/release-nominate.mjs';
-import { EXTERNAL_GATES, buildDossier, parseArgs as parseDossierArgs, recordProblems, recordTemplate, renderMarkdown } from '../scripts/release-dossier.mjs';
+import { EXTERNAL_GATES, LINE_BREAKS, buildDossier, cell, inline, para, parseArgs as parseDossierArgs, recordProblems, recordTemplate, renderMarkdown } from '../scripts/release-dossier.mjs';
 import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
@@ -102,7 +103,11 @@ const scratch = [];
   assert.throws(() => promotionCommands(SHA), /production engine/, 'the promotion commands cannot be printed without the engine'); count += 1;
 
   // ── evidence fixtures: a device ledger and a reader-evaluation directory ──
-  function evidence({ device = 'complete', reader = 'at-sha' } = {}) {
+  // A reader report that clears Gate C's floors (READER_FLOORS), measured inside
+  // the fixture Release Candidate run's window (09:00–11:00 on 30 Oct).
+  const READER_CORPUS = { writers: 24, samples: 1200, split: 'test' };
+  const READER_RESULTS = { exact: 1190, lines: 1200, charPct: 99.8, worstWriterExactPct: 95.0, providerErrors: 0 };
+  function evidence({ device = 'complete', reader = 'at-sha', readerFields = {} } = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'pri-nominate-evidence-'));
     scratch.push(dir);
     const ledger = join(dir, 'results.jsonl');
@@ -129,7 +134,7 @@ const scratch = [];
     if (reader !== 'none') {
       writeFileSync(join(readerDir, '2026-10-30.json'), JSON.stringify({
         format: 'pri-cloud-reader-eval', version: 1, evidenceClass: reader === 'dry-run' ? 'synthetic-dry-run' : 'real-human', measuredAt: '2026-10-30T10:00:00Z',
-        releaseSha: reader === 'other-sha' ? OTHER : reader === 'no-sha' ? undefined : SHA, corpus: { writers: 3, samples: 40, split: 'test' }, results: { exact: 31, lines: 40 }
+        releaseSha: reader === 'other-sha' ? OTHER : reader === 'no-sha' ? undefined : SHA, corpus: READER_CORPUS, results: READER_RESULTS, ...readerFields
       }));
     }
     return { dir, ledger, readerDir };
@@ -148,7 +153,41 @@ const scratch = [];
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-fail' }).ledger }).ok, 'deviceEvidence: one fail is incomplete');
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-missing' }).ledger }).ok, 'deviceEvidence: one not-run case is incomplete');
     const rd = readerEvidence(SHA, { dir: full.readerDir });
-    ok(rd.ok && rd.file === '2026-10-30.json' && /3 writer/.test(rd.detail), 'readerEvidence: a real-human report naming the SHA counts');
+    ok(rd.ok && rd.file === '2026-10-30.json' && /24 writer/.test(rd.detail) && /clears Gate C floors/.test(rd.detail), 'readerEvidence: a real-human report naming the SHA and clearing Gate C\'s floors counts');
+    // Gate C's floors (Q4 #696 holdout 13: 0/1 exact from 1 writer is not a measurement).
+    const C = fields => ({ ...READER_CORPUS, ...fields });
+    const R = fields => ({ ...READER_RESULTS, ...fields });
+    const floorDrifts = [
+      ['the Q4 holdout: 0/1 exact from one writer', { corpus: { writers: 1, samples: 1, split: 'test' }, results: { exact: 0, lines: 1 } }, /1 writer\(s\), floor 20/],
+      ['the old fixture: 31/40 from 3 writers', { corpus: C({ writers: 3, samples: 40 }), results: R({ exact: 31, lines: 40 }) }, /3 writer\(s\), floor 20/],
+      ['19 writers', { corpus: C({ writers: 19 }) }, /19 writer\(s\), floor 20/],
+      ['999 expressions', { results: R({ exact: 999, lines: 999 }) }, /999 expression\(s\) read, floor 1000/],
+      ['the train split', { corpus: C({ split: 'train' }) }, /split train, not the writer-disjoint test split/],
+      ['no split', { corpus: { writers: 24, samples: 1200 } }, /split \(none\)/],
+      ['97.83% exact', { results: R({ exact: 1174 }) }, /exact 97\.83%/],
+      ['98% read but 30 provider errors (96.75% of expressions)', { results: R({ exact: 1190, providerErrors: 30 }) }, /exact 96\.75% \(provider errors count as misreads\)/],
+      ['characters 99.4%', { results: R({ charPct: 99.4 }) }, /characters 99\.4%, floor 99\.5%/],
+      ['no character rate', { results: R({ charPct: null }) }, /characters \?%/],
+      ['worst writer 89.9%', { results: R({ worstWriterExactPct: 89.9 }) }, /worst writer 89\.9%, floor 90%/],
+      ['no worst-writer rate', { results: R({ worstWriterExactPct: undefined }) }, /worst writer \?%/],
+      ['more exact lines than lines (impossible counts)', { results: R({ exact: 1300 }) }, /exact \?%/],
+      ['a negative error count', { results: R({ providerErrors: -5 }) }, /providerErrors is not a count/],
+      ['writers as text', { corpus: C({ writers: 'many' }) }, /\? writer\(s\)/]
+    ];
+    for (const [name, fields, pattern] of floorDrifts) {
+      const below = readerEvidence(SHA, { dir: evidence({ readerFields: fields }).readerDir });
+      ok(!below.ok && pattern.test(below.detail) && /below Gate C floors/.test(below.detail), `readerEvidence: ${name} is named and refused (${below.detail})`);
+    }
+    ok(readerEvidence(SHA, { dir: evidence({ readerFields: { results: R({ exact: 1176 }) } }).readerDir }).ok, 'readerEvidence: exactly 98.00% exact, 99.5% characters and 90% worst writer at 20 writers and 1,000 expressions is the floor, not below it');
+    ok(readerEvidence(SHA, { dir: evidence({ readerFields: { corpus: C({ writers: 20 }), results: R({ exact: 980, lines: 1000, charPct: 99.5, worstWriterExactPct: 90 }) } }).readerDir }).ok, 'readerEvidence: a report exactly at every floor clears it');
+    eq(readerFloorProblems({ corpus: READER_CORPUS, results: READER_RESULTS }).length, 0, 'readerFloorProblems: the fixture clears every floor');
+    {
+      const gate = read('client/test/ink-release-evidence-gate.mjs');
+      const num = key => Number(new RegExp(`${key}:\\s*([0-9.]+)`).exec(gate)?.[1]);
+      ok(num('minTestWriters') === READER_FLOORS.minWriters && num('minTestExpressions') === READER_FLOORS.minLines && num('minExactPct') === READER_FLOORS.minExactPct
+        && num('minCharPct') === READER_FLOORS.minCharPct && num('minWorstWriterExactPct') === READER_FLOORS.minWorstWriterExactPct && READER_FLOORS.split === 'test',
+        'the reader floors are Gate C\'s numbers in client/test/ink-release-evidence-gate.mjs: neither copy can drift lower alone');
+    }
     ok(!readerEvidence(SHA, { dir: evidence({ reader: 'dry-run' }).readerDir }).ok, 'readerEvidence: a dry run (synthetic) never counts');
     ok(/none records releaseSha/.test(readerEvidence(SHA, { dir: evidence({ reader: 'other-sha' }).readerDir }).detail), 'readerEvidence: a report for another SHA is named, not accepted');
     ok(/NOT MEASURED/.test(readerEvidence(SHA, { dir: join(full.dir, 'absent') }).detail), 'readerEvidence: no directory is NOT MEASURED');
@@ -182,8 +221,11 @@ const scratch = [];
       schemaSource,
       runs: [
         { name: 'CI', workflow_id: 1, path: '.github/workflows/ci.yml', event: 'push', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:10:00Z' },
-        { name: 'Release Staging Proof', workflow_id: 9, path: '.github/workflows/release-staging-proof.yml', event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:40:00Z', html_url: 'https://github.com/x/y/actions/runs/1' }
+        { name: 'Release Staging Proof', workflow_id: 9, path: '.github/workflows/release-staging-proof.yml', event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:40:00Z', html_url: 'https://github.com/x/y/actions/runs/1' },
+        { id: 77, name: 'Release Candidate', display_title: releaseCandidateTitle(SHA), workflow_id: 12, path: RELEASE_CANDIDATE_WORKFLOW, head_sha: SHA, event: 'workflow_dispatch', status: 'completed', conclusion: 'success', run_started_at: '2026-10-30T09:00:00Z', updated_at: '2026-10-30T11:00:00Z', html_url: 'https://github.com/x/y/actions/runs/77' }
       ],
+      rcJobs: RELEASE_CANDIDATE_JOBS.map((name, id) => ({ id, name, status: 'completed', conclusion: 'success' })),
+      rcArtifacts: [{ id: 501, name: readerArtifactName(SHA), expired: false }],
       checks: [...REQUIRED_CONTEXTS, CONTAINER_CONTEXT].map(name => ({ name, status: 'completed', conclusion: 'success', completed_at: '2026-10-18T12:00:00Z' })),
       staging: {
         health: { ok: true, service: 'pri-learning-platform', releaseIdentity: { releaseSha: SHA, buildTimestamp: '2026-10-18T00:00:00.000Z' }, schemaVersion: String(SCHEMA_VERSION), billingSchemaVersion: String(BILLING_SCHEMA_VERSION), database: { engine: 'postgres', reachable: true } },
@@ -227,6 +269,8 @@ const scratch = [];
     };
     w.gh = async path => {
       w.ghCalls.push(path);
+      let rm = /\/actions\/runs\/(\d+)\/(jobs|artifacts)\?/.exec(path);
+      if (rm) return rm[2] === 'jobs' ? { jobs: rm[1] === '77' ? w.rcJobs : [] } : { artifacts: rm[1] === '77' ? w.rcArtifacts : [] };
       if (path.includes('/actions/runs')) return { workflow_runs: path.includes(`head_sha=${SHA}`) ? w.runs : (w.tipRuns || []) };
       if (path.includes('/check-runs')) return { check_runs: w.checks };
       let m = /\/issues\/comments\/(\d+)$/.exec(path);
@@ -307,6 +351,71 @@ const scratch = [];
   for (const [name, options, label] of evidenceDrifts) {
     const report = await run(world(options));
     ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} at the release stage (failed: ${failed(report).join('; ') || 'none'})`);
+  }
+  {
+    // The strict Release Candidate gates on exactly this SHA (Q4 #696 holdout 17
+    // and the exact-SHA binding hazard): attributed to the SHA, named after the
+    // commit it checked out, completed `success`, both blocking jobs `success`.
+    const rcRun = w => w.runs.find(r => r.path === RELEASE_CANDIDATE_WORKFLOW);
+    const rcDrifts = [
+      ['no Release Candidate run on the SHA (Q4 holdout 17)', w => { w.runs = w.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW); }],
+      ['a run dispatched with another release_sha (it tested another commit)', w => { rcRun(w).display_title = releaseCandidateTitle(OTHER); }],
+      ['a run of a workflow version without the exact-SHA binding (plain run name)', w => { rcRun(w).display_title = 'Release Candidate'; }],
+      ['a run attributed to another commit', w => { rcRun(w).head_sha = OTHER; }],
+      ['a run of another workflow file that borrows the title', w => { rcRun(w).path = '.github/workflows/ci.yml'; }],
+      ['a red Release Candidate run', w => { rcRun(w).conclusion = 'failure'; }],
+      ['a cancelled Release Candidate run', w => { rcRun(w).conclusion = 'cancelled'; }],
+      ['a skipped Release Candidate run (green to the workflow summary, proof of nothing)', w => { rcRun(w).conclusion = 'skipped'; }],
+      ['a Release Candidate run still in progress', w => { Object.assign(rcRun(w), { status: 'in_progress', conclusion: null }); }],
+      ['a skipped handwriting-gates job', w => { w.rcJobs[0].conclusion = 'skipped'; }],
+      ['a failed release-identity job', w => { w.rcJobs[1].conclusion = 'failure'; }],
+      ['a run without the release-identity job', w => { w.rcJobs = w.rcJobs.slice(0, 1); }],
+      ['a newer red Release Candidate run after an older green one', w => { w.runs.push({ ...rcRun(w), id: 78, conclusion: 'failure', run_started_at: '2026-10-31T09:00:00Z', updated_at: '2026-10-31T11:00:00Z' }); }]
+    ];
+    for (const [name, drift] of rcDrifts) {
+      const w = world(); drift(w);
+      const report = await run(w);
+      ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => /Release Candidate/.test(l)), `refuses ${name} (failed: ${failed(report).join('; ')})`);
+    }
+    const only = world(); only.runs = only.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW);
+    const onlyReport = await run(only);
+    const onlyFailed = failed(onlyReport);
+    ok(!onlyReport.ok && onlyFailed.length === 2 && /strict Release Candidate gates passed on exactly this SHA/.test(onlyFailed[0]) && /reader evaluation recorded/.test(onlyFailed[1])
+      && onlyReport.results.some(r => r.ok === false && /no passing Release Candidate run on this SHA/.test(r.detail || '')),
+      `with every CI context green and the device matrix complete, a missing exact-SHA Release Candidate run alone refuses the release, and the reader report cannot be bound without it (failed: ${onlyFailed.join('; ')})`);
+    const onlyCandidate = await run(only, { stage: 'candidate' });
+    ok(onlyCandidate.ok && onlyCandidate.promotion.length === 0, 'the candidate stage does not need the Release Candidate run, and prints no promotion');
+    const waiveAll = world({ device: 'none', reader: 'none' }); waiveAll.runs = waiveAll.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW);
+    waiveAll.approve(1009, `Approved.\n${waiverMarker(SHA, ['device-matrix', 'reader-evidence'])}\n`);
+    const waiveAllReport = await run(waiveAll, { overridePath: overrideFile({ ...goodOverride, approval: approvalUrl(1009) }) });
+    ok(!waiveAllReport.ok && failed(waiveAllReport).some(l => /strict Release Candidate gates/.test(l)), 'an approved waiver of both evidence rows never waives the strict Release Candidate gates');
+    const bound = await run(world());
+    ok(bound.ok && bound.results.some(r => r.ok === true && /reader evaluation recorded/.test(r.label) && /measured by Release Candidate run 77 \(artifact cloud-reader-eval-a{40}, id 501\)/.test(r.detail)), 'the accepted reader row names the Release Candidate run and artifact that measured it');
+    eq(bound.results.filter(r => r.ok === true && /^Release Candidate job passed \(not skipped\): /.test(r.label)).length, RELEASE_CANDIDATE_JOBS.length, 'each blocking Release Candidate job is its own check');
+    const unbound = async (name, mutate, pattern, options) => {
+      const w = world(options); mutate(w);
+      const report = await run(w);
+      ok(!report.ok && failed(report).length === 1 && /reader evaluation recorded/.test(failed(report)[0]) && report.results.some(r => r.ok === false && pattern.test(r.detail || '')), `${name} is not release evidence (failed: ${failed(report).join('; ')})`);
+    };
+    await unbound('a reader report the Release Candidate run did not measure (no artifact)', w => { w.rcArtifacts = []; }, /run 77 has no unexpired artifact cloud-reader-eval-a{40}/);
+    await unbound('a reader report whose artifact expired', w => { w.rcArtifacts[0].expired = true; }, /no unexpired artifact/);
+    await unbound('a reader report backed only by another commit\'s artifact', w => { w.rcArtifacts[0].name = readerArtifactName(OTHER); }, /no unexpired artifact cloud-reader-eval-a{40}/);
+    await unbound('a reader report measured before the Release Candidate run', () => {}, /measuredAt 2026-10-29T10:00:00Z is outside run 77/, { readerFields: { measuredAt: '2026-10-29T10:00:00Z' } });
+    await unbound('a reader report measured after the Release Candidate run', () => {}, /is outside run 77/, { readerFields: { measuredAt: '2026-10-30T12:00:00Z' } });
+    await unbound('a reader report with no measuredAt', () => {}, /measuredAt \? is outside run 77/, { readerFields: { measuredAt: undefined } });
+    eq(releaseCandidateRun([], SHA), null, 'releaseCandidateRun: no runs, no run');
+    eq(releaseCandidateRun([{ path: `${RELEASE_CANDIDATE_WORKFLOW}@refs/heads/main`, head_sha: SHA, display_title: releaseCandidateTitle(SHA), id: 5 }], SHA)?.id, 5, 'releaseCandidateRun: a path with a @ref suffix is the same workflow file');
+    eq(releaseCandidateRun([{ path: RELEASE_CANDIDATE_WORKFLOW, head_sha: SHA.toUpperCase(), display_title: releaseCandidateTitle(SHA) }], SHA), null, 'releaseCandidateRun: the SHA comparison is exact');
+    // The workflow side of the binding: the run name is the checked-out commit, and both jobs prove it.
+    const wf = read('.github/workflows/release-candidate.yml');
+    ok(/^run-name: Release Candidate · \$\{\{ inputs\.release_sha \|\| github\.sha \}\}$/m.test(wf) && releaseCandidateTitle(SHA) === `Release Candidate · ${SHA}`, 'release-candidate.yml names every run after the commit it checks out, the exact title nominate() accepts');
+    eq((wf.match(/^ {10}ref: \$\{\{ inputs\.release_sha \|\| github\.sha \}\}$/gm) || []).length, 2, 'both Release Candidate jobs check out that exact commit, never a moving branch');
+    ok(!/ref: \$\{\{[^}]*github\.ref[^}]*\}\}/.test(wf), 'no Release Candidate checkout follows github.ref (a branch can move between dispatch and checkout)');
+    eq((wf.match(/EXPECTED: \$\{\{ inputs\.release_sha \|\| github\.sha \}\}/g) || []).length, 2, 'both jobs receive the named commit through the environment, not interpolated into the script');
+    eq((wf.match(/\[\[ "\$EXPECTED" =~ \^\[0-9a-f\]\{40\}\$ \]\]/g) || []).length, 2, 'both jobs refuse a release_sha that is not a full 40-hex lowercase SHA');
+    eq((wf.match(/\[ "\$sha" = "\$EXPECTED" \] \|\| \{ echo "::error::checked out/g) || []).length, 2, 'both jobs fail when HEAD is not the named commit');
+    for (const name of RELEASE_CANDIDATE_JOBS) ok(wf.includes(`    name: ${name}\n`), `the blocking job nominate() requires exists in release-candidate.yml: ${name}`);
+    ok(wf.includes('name: cloud-reader-eval-${{ steps.candidate.outputs.sha }}') && readerArtifactName(SHA) === `cloud-reader-eval-${SHA}`, 'the artifact nominate() binds a reader report to is the one release-candidate.yml uploads');
   }
   {
     const approved = (w, override = goodOverride, id = 1001, options = {}) => { w.approve(id, `Approved.\n${waiverMarker(SHA, override.waives)}\n`, options); return w; };
@@ -499,6 +608,39 @@ const scratch = [];
     const row = forged.split('\n').find(l => l.includes('evil')) || '';
     const boundaries = [...row.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length;
     ok(boundaries === 5, `dossier evidence cannot break out of its table cell (${boundaries} cell boundaries, want 5): ${row}`);
+  }
+  {
+    // Q4 #696 holdout: a bare carriage return survived the old cell(); after
+    // CommonMark line-ending normalisation it opened a forged GO heading.
+    const render = (detail, extra = {}) => renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['x'], rows: [{ step: 25, ok: false, label: 'Staging proof', detail, who: 'fixture' }], nomination: { results: [] }, generatedAt: 't', recordPath: null, ...extra }, {});
+    const normalise = text => text.replace(/\r\n?/g, '\n');
+    const forgedHeading = text => /^ {0,3}#{1,6}[ \t]+GO CERTIFIED/m.test(normalise(text));
+    const q4 = render('not approved\r\r# GO CERTIFIED (FORGED)\r\r');
+    ok(!/\r/.test(q4) && !forgedHeading(q4), 'a bare carriage return in evidence cannot open a forged GO heading (Q4 #696 holdout: 4 CRs survived before)');
+    for (const [name, sep] of [['\\r', '\r'], ['\\n', '\n'], ['\\r\\n', '\r\n'], ['U+2028', '\u2028'], ['U+2029', '\u2029'], ['U+0085', '\u0085'], ['vertical tab', '\u000b'], ['form feed', '\u000c']]) {
+      const md = render(`ok${sep}| PASS | forged | bot |${sep}# GO CERTIFIED`);
+      const rows = normalise(md).split('\n').filter(l => l.includes('forged'));
+      ok(rows.length === 1 && [...rows[0].matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 5 && !forgedHeading(md) && !LINE_BREAKS.test(md.replace(/\n/g, '')),
+        `a ${name} line break in evidence stays inside its one table row and opens no heading`);
+      LINE_BREAKS.lastIndex = 0;
+    }
+    // Text that starts a Markdown line outside a table: reasons, device, reader, controller.
+    const lead = renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['# GO CERTIFIED (reason)'],
+      rows: [
+        { step: 'device', ok: false, label: 'device', detail: '# GO CERTIFIED (device)\r> quoted', evidenceClass: 'PHYSICAL-HUMAN\r# GO CERTIFIED (class)' },
+        { step: 'reader', ok: false, label: 'reader', detail: '1. GO CERTIFIED (reader)', evidenceClass: 'real-human' },
+        { step: 26, ok: null, label: 'controller', detail: '## GO CERTIFIED (controller)' }
+      ], nomination: { results: [] }, generatedAt: 't', recordPath: null }, {});
+    ok(!forgedHeading(lead) && !/^ {0,3}>/m.test(normalise(lead)) && !/^ {0,3}1\. GO/m.test(normalise(lead)) && /^- \\# GO CERTIFIED \(reason\)$/m.test(lead) && /^\\# GO CERTIFIED \(device\)/m.test(lead) && /^1\\\. GO CERTIFIED \(reader\)/m.test(lead),
+      'untrusted text that starts a line (NO-GO reasons, device, reader and controller details) cannot become a heading, quote or list');
+    eq(inline('a\r\nb\rc\nd\u2028e'), 'a b c d e', 'inline() flattens every line ending to one space');
+    eq(cell('x\\|y\rz'), 'x\\\\\\|y z', 'cell() flattens line endings, then escapes the backslash before the pipe');
+    eq(para('  # h'), '  \\# h', 'para() escapes an indented heading marker');
+    eq(para('fine text'), 'fine text', 'para() leaves ordinary text alone');
+    // The device-matrix table the dossier embeds holds tester-typed text too.
+    const matrix = reportMarkdown({ sha: 'a'.repeat(40), counts: { pass: 1, fail: 0, blocked: 0, 'not run': 0 }, rows: [{ id: 'DM-IPH-01-INSTALL', latest: { result: 'pass', device: 'iPhone | forged', os: 'iOS 26', pencil: null, sha: 'a'.repeat(40), tester: 'Priya\rExample', recordedAt: '2026-10-19T01:00:00Z', notes: String.raw`ok\| PASS |` + '\r\r# GO CERTIFIED (matrix)' } }] });
+    const matrixRow = normalise(matrix).split('\n').find(l => l.includes('DM-IPH-01-INSTALL')) || '';
+    ok(!/\r/.test(matrix) && !forgedHeading(matrix) && [...matrixRow.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 10, `a device-matrix note cannot add a row, a column or a heading to the matrix table (${matrixRow})`);
   }
   const dossierSource = read('scripts/release-dossier.mjs');
   ok(!/\[\s*'push'/.test(dossierSource) && !/railway|update_ref|deploy\/production'\]/.test(dossierSource.replace(/\/\/.*$/gm, '')), 'the dossier source never pushes, deploys or moves the pointer');
@@ -1157,6 +1299,8 @@ const scratch = [];
   ok(/takeover|pre-registration/i.test(readme), 'the README warns about the unverified-password-account takeover on step A');
   const pkg = JSON.parse(read('package.json'));
   ok(pkg.scripts['test:release:prep']?.includes('tools/release-prep.test.mjs') && pkg.scripts['test:release:prep'].includes('device-matrix-record.mjs validate'), 'test:release:prep runs this file and the ledger validation');
+  ok(pkg.scripts['test:release:prep'].includes('node client/test/q4-release-negative-controls.mjs') && pkg.scripts['test:release:prep'].includes('node client/test/release-source-policy-consistency-check.mjs'),
+    'test:release:prep also runs Q4\'s independent release holdout (17 negative controls) and the production-source policy check, so CI keeps both');
   ok(pkg.scripts.test.includes('npm run test:release:prep'), 'npm test (the CI deterministic suite) runs test:release:prep');
 }
 

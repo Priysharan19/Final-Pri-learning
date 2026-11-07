@@ -306,9 +306,18 @@ export async function buildDossier({
 }
 
 function mark(ok) { return ok === null ? '·' : ok ? 'PASS' : 'FAIL'; }
-// Backslashes first, then pipes: evidence text such as `x\\| PASS |` must stay
-// inside its own cell and can never add a forged column to the GO/NO-GO table.
-function cell(text) { return String(text ?? '').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' '); }
+// Untrusted text (ledger notes, report fields, record entries, API details)
+// reaches the Markdown only through these. CommonMark ends a line at \r\n, a
+// bare \r or \n, so every line ending (and the other vertical separators) is
+// flattened first: a detail such as `ok\r\r# GO CERTIFIED` can never open a
+// forged heading or table row. A line that starts with untrusted text has its
+// leading block marker escaped so it cannot become a heading, quote or list.
+// In a table cell, backslashes go before pipes: `x\\| PASS |` stays inside its
+// own cell and can never add a forged column to the GO/NO-GO table.
+export const LINE_BREAKS = /\r\n|[\r\n\u000b\u000c\u0085\u2028\u2029]/g;
+export function inline(text) { return String(text ?? '').replace(LINE_BREAKS, ' '); }
+export function cell(text) { return inline(text).replace(/\\/g, '\\\\').replace(/\|/g, '\\|'); }
+export function para(text) { return inline(text).replace(/^(\s*)([#>*+=|`~<_-])/, '$1\\$2').replace(/^(\s*\d+)([.)])/, '$1\\$2'); }
 
 export function renderMarkdown(result, { device, reader } = {}) {
   const { sha, verdict, reasons, rows, nomination, generatedAt, recordPath } = result;
@@ -318,20 +327,20 @@ export function renderMarkdown(result, { device, reader } = {}) {
   lines.push(`# GO/NO-GO dossier — \`${sha}\``, '');
   lines.push(`Generated ${generatedAt} by \`node scripts/release-dossier.mjs ${sha}\`${recordPath ? ` from \`${recordPath}\`` : ''}. One record for one exact commit (issue #686 steps 25, 27, 28 and 30; \`docs/operations/postgres-cutover.md\` §4.6). It pushes nothing, deploys nothing and authorises nothing: GO is the owner's recorded decision (step 28), and the promotion is step 29, by hand.`, '');
   lines.push(`## Verdict: **${verdict}**`, '');
-  if (verdict === 'NO-GO') { lines.push('Not ready because:', '', ...reasons.map(r => `- ${r}`), ''); }
+  if (verdict === 'NO-GO') { lines.push('Not ready because:', '', ...reasons.map(r => `- ${para(r)}`), ''); }
   else lines.push('Every gating row holds for this exact SHA, including the owner\'s recorded GO. The promotion commands in step 29 are run by hand by the approver the release record names.', '');
   lines.push('## Record and candidate (step 21)', '', table([...by('record'), ...by(21)]), '');
   lines.push('## Release-stage nomination (`scripts/release-nominate.mjs`)', '', table(by('nominate')), '');
   lines.push('| | Nomination row | Detail |', '|---|---|---|', ...nomination.results.map(r => `| ${r.ok === null ? '·' : r.ok ? '✓' : '✗'} | ${cell(r.label)} | ${cell(r.detail || '')} |`), '');
   lines.push('## Step 25 — staging proof and the 24 h soak under a merge freeze', '', table(by(25)), '');
   lines.push('## Staging acceptance A–D (§4.6 step 3)', '', table(by('acceptance')), '');
-  lines.push('## Physical-device matrix for this SHA', '', ...by('device').map(r => `${r.detail} — evidence class: ${r.evidenceClass}`), '');
+  lines.push('## Physical-device matrix for this SHA', '', ...by('device').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');
   if (device?.summary) lines.push(reportMarkdown(device.summary), '');
-  lines.push('## Server reader evidence for this SHA', '', ...by('reader').map(r => `${r.detail} — evidence class: ${r.evidenceClass}`), '');
+  lines.push('## Server reader evidence for this SHA', '', ...by('reader').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');
   const overrides = by('override');
   lines.push('## Overrides', '', overrides.length ? table(overrides) : 'None: the nomination stands on the evidence, not on a waiver.', '');
   lines.push('## Step 23 — gates only people can close', '', table(by(23)), '');
-  lines.push('## Step 26 — release controller', '', ...by(26).map(r => r.detail), '');
+  lines.push('## Step 26 — release controller', '', ...by(26).map(r => para(r.detail)), '');
   lines.push('## Step 28 — owner GO for exactly this SHA', '', table(by(28)), '');
   lines.push('## Step 29 — promotion, by hand, after GO', '');
   if (verdict === 'GO-READY' && nomination.promotion.length) lines.push('```bash', ...nomination.promotion, '```', '');
