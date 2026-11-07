@@ -1,8 +1,9 @@
 name: Pri Learning CodeQL scope
-# Scan source, not generated copies of it. The two iPad packages carry a tracked,
-# minified mirror of client/dist (refreshed by `npm run sync:ios`), so every
-# client finding would otherwise be reported three times on hashed file names
-# that change on every build. The source under client/src is what is scanned.
+# Scan source, not generated copies of it. The two iPad packages' Resources/Web
+# is a minified mirror of client/dist written by `npm run sync:ios`; since
+# decision D28 it is generated and ignored by git, so a CodeQL checkout never
+# contains it. The entries stay so a scan run after a local sync still reports
+# each client finding once, on client/src, not three times on hashed file names.
 paths-ignore:
   - ios/PriLearning.swiftpm/Resources/Web
   - "ios/PriLearning 2.swiftpm/Resources/Web"

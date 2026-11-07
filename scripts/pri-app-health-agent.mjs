@@ -31,16 +31,24 @@ const opts = parseArgs(process.argv.slice(2));
 
 const TESTS = [
   {
-    id: 'build', modes: ['fast', 'deep'], subsystem: 'App build', severity: 'P0', blocking: true,
+    // Native mode builds too: the package's web bundle is generated from this
+    // build (decision D28), so the simulator app below cannot exist without it.
+    id: 'build', modes: ['fast', 'deep', 'native'], subsystem: 'App build', severity: 'P0', blocking: true,
     command: ['npm', ['run', 'build']], timeoutMs: 180000,
     fixArea: 'client build / Vite imports / production asset graph',
     action: 'Fix the first build error. Do not inspect downstream UI failures until the production bundle builds cleanly.'
   },
   {
-    id: 'ios-bundle-sync', modes: ['fast', 'deep'], subsystem: 'iPad packaged app', severity: 'P0', blocking: true,
-    command: ['npm', ['run', 'check:ios']], timeoutMs: 120000,
-    fixArea: 'ios/PriLearning*.swiftpm/Resources/Web and scripts/sync-ios.mjs',
-    action: 'Rebuild the client, run npm run sync:ios, then verify npm run check:ios. Commit both mirrored bundles together.'
+    id: 'ios-bundle-sync', modes: ['fast', 'deep', 'native'], subsystem: 'iPad packaged app', severity: 'P0', blocking: true,
+    command: ['bash', ['-lc', 'set -euo pipefail; npm run sync:ios; npm run check:ios']], timeoutMs: 120000,
+    fixArea: 'scripts/sync-ios.mjs and the client build it copies (ios/*/Resources/Web is generated, never committed)',
+    action: 'Rebuild the client, run npm run sync:ios, then npm run check:ios must prove both packages carry a complete copy of client/dist. Never commit the generated bundles.'
+  },
+  {
+    id: 'ios-bundle-features', modes: ['fast', 'deep', 'native'], subsystem: 'iPad packaged app', severity: 'P0', blocking: true,
+    command: ['node', ['client/test/ios-bundle-features-check.mjs']], timeoutMs: 60000,
+    fixArea: 'PRI_FEATURE_* environment of the build that produced client/dist',
+    action: 'Rebuild without PRI_FEATURE_* set and sync again; a generated bundle with a flag on would ship a surface outside the V1 scope.'
   },
   {
     id: 'backend', modes: ['fast', 'deep'], subsystem: 'Local backend / Practice API', severity: 'P0', blocking: true,
@@ -341,7 +349,7 @@ function reportMarkdown(report) {
       lines.push(`### ${failure.severity} · ${failure.subsystem}`);
       lines.push('');
       lines.push(`- **Check:** \`${failure.id}\``);
-      lines.push(`- **Command:** \`${failure.commandLine.replace(/`/g, '\\`')}\``);
+      lines.push(`- **Command:** \`${failure.commandLine.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``);
       lines.push(`- **Likely repair area:** ${failure.fixArea}`);
       lines.push(`- **Next fix:** ${failure.action}`);
       lines.push(`- **Duration:** ${formatDuration(failure.durationMs)}${failure.timedOut ? ' (timed out)' : ''}`);
@@ -368,7 +376,7 @@ function reportMarkdown(report) {
   lines.push('## Evidence boundary');
   lines.push('');
   lines.push('- Browser E2E drives the mounted production build through real student flows; it is not a screenshot-only tour.');
-  lines.push('- `check:ios` verifies the packaged SwiftPM web bundle matches the current client build.');
+  lines.push('- `sync:ios` generates the SwiftPM web bundles from the current client build (they are never committed) and `check:ios` verifies each is a complete copy of it.');
   lines.push('- Native mode builds/exercises the PencilKit/Vision iPad simulator path on macOS.');
   lines.push('- A simulator is not a physical Apple Pencil. Real-writer/physical release evidence remains a separate empirical gate.');
   if (skips.length) {
