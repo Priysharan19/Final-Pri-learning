@@ -123,6 +123,8 @@ jobs:
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-exam-duplicate-check.mjs
           node client/test/india-progress-product-check.mjs
+          # #300: legacy generator-keyed rows count on dot points and the predicted paper.
+          node client/test/india-legacy-rows-check.mjs
           node tools/india-production-census.mjs
       - name: Real ink diagnostic (advisory in PR CI)
         if: always()
@@ -838,7 +840,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*434/434.*13 flows' browser.log
+          # tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40).
+          grep -Eq 'E2E SUITE.*438/438.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log

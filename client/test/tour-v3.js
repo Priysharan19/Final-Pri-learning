@@ -36,7 +36,7 @@ export const flow = {
   name: 'Practice · a question, marked both ways',
   online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
+  async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle, online, browserName = 'chromium' }) {
     await goto('/');
     await createProfile({ name: 'Blaise Pascal', year: 7 });
     await online.signIn({ name: 'Blaise Pascal' });
@@ -142,11 +142,15 @@ export const flow = {
     // The right answer comes from the oracle (support/online-session.mjs): the
     // device no longer holds one to read, and the server never hands one out
     // before the question is resolved.
+    // The resolved card's id is read BEFORE the click: read after it, a fast
+    // render had already put the next question's id there, and the wait for
+    // "a different id" could never end (about one run in ten).
+    const resolvedId = (await online.shownRow()).id;
     await page.locator('.ws-actions .btn-primary').click();
     await page.waitForFunction(id => {
       const el = document.querySelector('.qpage[data-question-id]');
       return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
-    }, (await online.shownRow()).id, { timeout: 30000 });
+    }, resolvedId, { timeout: 30000 });
     let right = null;
     for (let i = 0; i <= MAX_SKIPS; i++) {
       if (await typeTab.count()) await typeTab.click();
@@ -263,6 +267,55 @@ export const flow = {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await settle(); await settle();
     await check('the connection back, the same lesson is still open', await page.evaluate(() => document.querySelector('.qpage') === window.__lesson));
+
+    // ── 8b · a full reload with the network gone, mid-lesson ─────────────────
+    // A visibilitychange on a mounted lesson is not a reload. Here the page is
+    // reloaded offline through the installed service worker: it must boot a
+    // safe screen for this account (the shell inside the grace, or the gate),
+    // never a blank or crashed page. With the connection back, the reloaded
+    // lesson is the same question for the same learner, with no second code.
+    const lessonBefore = await page.locator('.qpage').getAttribute('data-question-id');
+    const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
+      .then(() => true).catch(() => false);
+    if (await check('the service worker is in charge of the open lesson, so an offline reload can paint at all', claimed,
+      'no worker claimed the client')) {
+      let offlineState = '';
+      await ctx.setOffline(true);
+      // Marks this document, so a reload that never happened cannot pass as one.
+      await page.evaluate(() => { window.__beforeOfflineReload = true; });
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(e => { offlineState = String(e).slice(0, 180); });
+      const reloaded = !(await page.evaluate(() => window.__beforeOfflineReload === true).catch(() => false));
+      if (!reloaded && browserName === 'webkit') {
+        // Playwright's offline emulation in WebKit fails the service worker's
+        // navigation, so no offline document loads (see tour-activation-gate.js).
+        // Said, not passed; Chromium runs it.
+        note('offline lesson reload: NOT exercised in WebKit — Playwright\'s offline emulation fails the service-worker navigation');
+        await ctx.setOffline(false);
+      } else {
+        const booted = await page.locator('.shell, [data-testid="account-activation-gate"]').first()
+          .waitFor({ state: 'attached', timeout: 15000 }).then(() => true).catch(() => false);
+        await page.locator('.qpage[data-question-id] .q-prompt').waitFor({ timeout: 15000 }).catch(() => {});
+        offlineState ||= (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 180);
+        await check('reloaded offline mid-lesson, the app boots a safe account-aware screen, not a blank or crashed page',
+          reloaded && booted && await page.locator('.crash-card').count() === 0,
+          `reloaded ${reloaded}, page ${page.url()}, state ${JSON.stringify(offlineState)}`);
+        // Inside the 72-hour grace (tour-activation-gate.js §5) that screen is
+        // the lesson itself: the same question, told nothing is checked offline.
+        const lessonOffline = await page.locator('.qpage').getAttribute('data-question-id').catch(() => null);
+        await check('inside the grace, the offline reload resumes the same question in the shell, with the offline line and no gate',
+          lessonOffline === lessonBefore && await page.locator('.shell').count() === 1 &&
+            await page.locator('[data-testid="account-activation-gate"]').count() === 0 &&
+            /nothing is checked/.test(await page.locator('[data-testid="offline-entry"]').innerText().catch(() => '')),
+          `before ${lessonBefore}, offline ${lessonOffline}, state ${JSON.stringify(offlineState)}`);
+        await ctx.setOffline(false);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+        const lessonAfter = await page.locator('.qpage').getAttribute('data-question-id');
+        await check('the connection back, the reloaded lesson resumes the same question for the same learner, with no second code',
+          !!lessonBefore && lessonAfter === lessonBefore && await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+          `before ${lessonBefore}, after ${lessonAfter}`);
+      }
+    }
   }
 };
 
