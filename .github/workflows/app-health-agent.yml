@@ -109,6 +109,15 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      # The package's web bundle is generated, never tracked (decision D28):
+      # the agent's native mode builds the client and syncs it into both
+      # packages before it builds the simulator app, so the dependencies must
+      # be present here.
+      - name: Install client dependencies
+        run: npm ci --prefix client
 
       - name: Audit installed iPad simulator app
         id: health

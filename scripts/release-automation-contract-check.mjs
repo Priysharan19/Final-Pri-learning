@@ -24,6 +24,20 @@ assert.match(staging, /head_branch == 'main'/,
   'only main branch may trigger staging proof');
 assert.match(staging, /head_repository\.full_name == github\.repository/,
   'workflow_run must reject fork origins');
+// The staging wait is bounded by elapsed time and ends inside the job's limit:
+// a count of attempts outlives the job when staging is unreachable (each
+// attempt then costs its 15-second request limit too), and the job is killed
+// before the loop's failure line and the artifact can run.
+const stagingWait = Number(staging.match(/WAIT_SECONDS=\$\(\((\d+) \* 60\)\)/)?.[1]);
+const stagingJobLimit = Number(staging.match(/timeout-minutes: (\d+)/)?.[1]);
+assert.ok(stagingWait >= 45,
+  'the staging wait must cover the 45 minutes a Railway build has taken');
+assert.ok(stagingJobLimit >= stagingWait + 5,
+  'the staging wait must end inside the job limit, with room for its failure line and artifact');
+assert.match(staging, /if \(\( SECONDS - started >= WAIT_SECONDS \)\); then break; fi/,
+  'the staging wait must stop on elapsed time');
+assert.doesNotMatch(staging, /seq 1 \d+/,
+  'the staging wait must not be a count of attempts');
 assert.match(staging, /persist-credentials: false/,
   'staging proof cannot preserve any git write credentials');
 assert.match(staging, /contents: read/,
@@ -52,4 +66,4 @@ assert.match(nomination, /real-human reader evaluation recorded for this SHA/, '
 assert.match(nomination, /WAIVED by recorded override/, 'an override must be printed, never silent');
 assert.doesNotMatch(nomination, /device-evidence reminder|and the device matrix \(docs\/release\/device-matrix\.md\),\n/,
   'the device matrix is no longer a printed reminder');
-console.log('RELEASE AUTOMATION BOUNDARY: PASS (20 assertions)');
+console.log('RELEASE AUTOMATION BOUNDARY: PASS (24 assertions)');

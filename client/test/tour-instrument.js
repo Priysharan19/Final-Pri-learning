@@ -283,10 +283,19 @@ export const writeFlow = {
     const head = page.locator('[data-question-head]');
     await check('the header numbers the question within this session', await head.count() === 1 && /^\d+$/.test(await head.getAttribute('data-question-head')), await head.getAttribute('data-question-head').catch(() => 'none'));
     await check('open practice has no defined length, so no progress segments are drawn', await page.locator('.in-prog10').count() === 0);
-    const t0 = (await page.locator('[data-question-timer]').textContent()).trim();
+    // Each read also records the question and whether it is resolved, so a
+    // failure says whether the clock stalled, reset, or stopped.
+    const clockRead = () => page.evaluate(() => {
+      const q = document.querySelector('.qpage');
+      return { text: (document.querySelector('[data-question-timer]')?.textContent || '').trim(), at: performance.now(),
+        id: q?.getAttribute('data-question-id') || 'none', resolved: document.querySelector('[data-question-timer]')?.getAttribute('data-clock-stopped') || 'none' };
+    });
+    const c0 = await clockRead();
     await page.waitForTimeout(2100);
-    const t1 = (await page.locator('[data-question-timer]').textContent()).trim();
-    await check('the question clock runs (mm:ss) and is a labelled timer', /^\d{2}:\d{2}$/.test(t1) && t1 !== t0 && await page.locator('[data-question-timer][role=timer][aria-label]').count() === 1, `${t0} → ${t1}`);
+    const c1 = await clockRead();
+    const t0 = c0.text; const t1 = c1.text;
+    await check('the question clock runs (mm:ss) and is a labelled timer', /^\d{2}:\d{2}$/.test(t1) && t1 !== t0 && await page.locator('[data-question-timer][role=timer][aria-label]').count() === 1,
+      `${t0} → ${t1} over ${Math.round(c1.at - c0.at)} ms · question ${c0.id} → ${c1.id} · resolved ${c0.resolved} → ${c1.resolved}`);
     // The ladder: every rung, locked ones closed, the charge stated.
     const ladder = page.locator('[data-hint-ladder]');
     await check('the hint ladder shows every rung before any is opened', await ladder.count() === 1 && await ladder.locator('.in-rung').count() === 4, await ladder.getAttribute('data-hint-ladder').catch(() => 'none'));

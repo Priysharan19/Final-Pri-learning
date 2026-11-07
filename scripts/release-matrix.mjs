@@ -13,7 +13,7 @@
 //   · the compatibility floor (minimum shell builds) is documented in code.
 //
 //   node scripts/release-matrix.mjs                 # what exists locally
-//   node scripts/release-matrix.mjs --require-native-apple    # after sync:ios
+//   node scripts/release-matrix.mjs --require-native-apple    # after build + sync:ios (bundles are generated, not tracked)
 //   node scripts/release-matrix.mjs --require-native-android  # after the Gradle build
 //   node scripts/release-matrix.mjs --json
 // Exit 1 on any mismatch. Physical evidence is not part of this matrix and is

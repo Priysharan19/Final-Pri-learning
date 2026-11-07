@@ -260,11 +260,17 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
-      - name: iOS bundle matches the client build
-        run: npm run check:ios
-      - name: Materialize exact native release identity
+      # Generated, never tracked (decision D28): sync writes client/dist into
+      # both packages, check proves each copy is complete and byte-exact.
+      - name: Generate the iOS web bundles from this build
         run: npm run sync:ios
+      - name: iOS bundles are a complete copy of the client build
+        run: npm run check:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
+      - name: Generated iOS bundles are flag-off production builds
+        run: node client/test/ios-bundle-features-check.mjs
+      - name: Generated iOS bundle pages need no inline script under the shell CSP
+        run: node client/test/native-shell-csp-check.mjs --require-generated
       - name: Cross-platform release matrix (CP-11)
         run: node scripts/release-matrix.mjs --require-native-apple
