@@ -63,6 +63,8 @@ import {
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 /** A signed constant for appending to a term: "+ 5" / "- 5". */
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3i", "- i", "+ x"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** A set written the way NCERT writes it. */
 const setTex = xs => `\\{${xs.join(',\\ ')}\\}`;
 /** Brackets a value only when it needs them — 6 stays 6, −4 becomes (−4). */
@@ -385,7 +387,7 @@ export const indiaClass11 = {
       const re = a * c - b * d, im = a * d + b * c;
       const want = askReal ? re : im;
       return {
-        prompt: `Let $z_1 = ${a} ${sg(b)}i$ and $z_2 = ${c} ${sg(d)}i$. Find the ${askReal ? 'real' : 'imaginary'} part of $z_1 z_2$.`,
+        prompt: `Let $z_1 = ${a} ${sgt(b, 'i')}$ and $z_2 = ${c} ${sgt(d, 'i')}$. Find the ${askReal ? 'real' : 'imaginary'} part of $z_1 z_2$.`,
         answerType: 'numeric', answer: { value: want },
         traps: traps(want, [
           { value: askReal ? a * c + b * d : a * d - b * c, why: askReal ? `$i^2 = -1$, so the $bd\\,i^2$ term *subtracts*: the real part is $ac - bd$.` : 'The two cross terms both carry a single $i$, so they add: the imaginary part is $ad + bc$.' },
@@ -394,13 +396,13 @@ export const indiaClass11 = {
         ]),
         hints: [
           'Multiply as you would two binomials, then use $i^2 = -1$.',
-          `$(${a} ${sg(b)}i)(${c} ${sg(d)}i) = ${a * c} ${sg(a * d)}i ${sg(b * c)}i ${sg(b * d)}i^2$.`,
+          `$(${a} ${sgt(b, 'i')})(${c} ${sgt(d, 'i')}) = ${a * c} ${sgt(a * d, 'i')} ${sgt(b * c, 'i')} ${sgt(b * d, 'i^2')}$.`,
           'Replace $i^2$ by $-1$ and collect the real and imaginary parts.'
         ],
         steps: [
-          { h: 'Expand', d: `$(${a} ${sg(b)}i)(${c} ${sg(d)}i) = ${a * c} ${sg(a * d)}i ${sg(b * c)}i ${sg(b * d)}i^2$` },
-          { h: 'Use i² = −1', d: `$${b * d}i^2 = ${-b * d}$` },
-          { h: 'Collect', d: `$z_1z_2 = ${re} ${sg(im)}i$` },
+          { h: 'Expand', d: `$(${a} ${sgt(b, 'i')})(${c} ${sgt(d, 'i')}) = ${a * c} ${sgt(a * d, 'i')} ${sgt(b * c, 'i')} ${sgt(b * d, 'i^2')}$` },
+          { h: 'Use i² = −1', d: `$${b * d === 1 ? '' : b * d === -1 ? '-' : b * d}i^2 = ${-b * d}$` },
+          { h: 'Collect', d: `$z_1z_2 = ${re} ${sgt(im, 'i')}$` },
           { h: 'Read off the part asked for', d: `${askReal ? 'Real' : 'Imaginary'} part $= ${want}$` }
         ]
       };
@@ -410,7 +412,7 @@ export const indiaClass11 = {
       const a = rng() < 0.5 ? p : -p;
       const b = rng() < 0.5 ? q : -q;
       return {
-        prompt: `Find $|z|$ for $z = ${a} ${sg(b)}i$.`,
+        prompt: `Find $|z|$ for $z = ${a} ${sgt(b, 'i')}$.`,
         answerType: 'numeric', answer: { value: r },
         traps: traps(r, [
           { value: Math.abs(a) + Math.abs(b), why: 'The modulus is the distance from the origin in the Argand plane, so it comes from Pythagoras — the parts are squared before they are added, not added directly.' },
@@ -442,7 +444,7 @@ export const indiaClass11 = {
       const c = rc(rng, cases);
       const k = ri(rng, 1, 9);
       const re = c.a * k, im = c.b * k;
-      const zTex = im === 0 ? `${re}` : re === 0 ? `${im === 1 ? '' : im === -1 ? '-' : im}i` : `${re} ${sg(im)}i`;
+      const zTex = im === 0 ? `${re}` : re === 0 ? `${im === 1 ? '' : im === -1 ? '-' : im}i` : `${re} ${sgt(im, 'i')}`;
       return {
         prompt: `Find the principal argument of $z = ${zTex}$, in degrees. The principal argument lies in $(-180°,\\ 180°]$.`,
         answerType: 'numeric', answer: { value: c.arg }, answerSuffix: 'degrees',
@@ -482,7 +484,7 @@ export const indiaClass11 = {
       steps: [
         { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${4 * c} = ${b * b - 4 * c} < 0$` },
         { h: 'Take the square root in ℂ', d: `$\\sqrt{${b * b - 4 * c}} = \\sqrt{${4 * q * q}}\\,i = ${2 * q}i$` },
-        { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm ${2 * q}i}{2} = ${m} \\pm ${q}i$` },
+        { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm ${2 * q}i}{2} = ${m} \\pm ${q === 1 ? '' : q}i$` },
         { h: 'Read off q', d: `$q = ${q}$` }
       ]
     };
@@ -913,22 +915,22 @@ export const indiaClass11 = {
       const p = nz(rng, -5, 5);
       const want = 2 * a * p + b;
       return {
-        prompt: `Let $f(x) = ${cx(a)}^2 ${sg(b)}x ${sg(c)}$. Using the definition $f'(x) = \\displaystyle\\lim_{h\\to 0}\\dfrac{f(x+h) - f(x)}{h}$, find $f'(${p})$.`,
+        prompt: `Let $f(x) = ${cx(a)}^2 ${sgt(b, 'x')} ${sg(c)}$. Using the definition $f'(x) = \\displaystyle\\lim_{h\\to 0}\\dfrac{f(x+h) - f(x)}{h}$, find $f'(${p})$.`,
         answerType: 'numeric', answer: { value: want },
         traps: traps(want, [
           { value: a * p * p + b * p + c, why: `That is $f(${p})$, the value of the function. The derivative is the limit of the difference quotient, not the function itself.` },
-          { value: a * p + b, why: `Differentiating $${cx(a)}^2$ brings the power down as a factor: it gives $${2 * a}x$, not $${a}x$.` },
+          { value: a * p + b, why: `Differentiating $${cx(a)}^2$ brings the power down as a factor: it gives $${2 * a}x$, not $${cx(a)}$.` },
           { value: 2 * a * p + b + c, why: 'The constant term disappears when the difference $f(x+h) - f(x)$ is taken, so it cannot survive into $f\'$.' }
         ]),
         hints: [
-          `Write out $f(x+h) = ${a}(x+h)^2 ${sg(b)}(x+h) ${sg(c)}$ and subtract $f(x)$.`,
-          `The constant cancels and every surviving term has a factor of $h$: $f(x+h) - f(x) = h\\left(${2 * a}x ${sg(b)} ${a === 1 ? '' : a === -1 ? '-' : a}h\\right)$.`,
+          `Write out $f(x+h) = ${cx(a, '(x+h)')}^2 ${sgt(b, '(x+h)')} ${sg(c)}$ and subtract $f(x)$.`,
+          `The constant cancels and every surviving term has a factor of $h$: $f(x+h) - f(x) = h\\left(${2 * a}x ${sg(b)} ${a === 1 ? '+' : a === -1 ? '-' : a > 0 ? `+ ${a}` : `- ${Math.abs(a)}`}h\\right)$.`,
           `Divide by $h$, let $h \\to 0$, then substitute $x = ${p}$.`
         ],
         steps: [
-          { h: 'Form f(x+h)', d: `$f(x+h) = ${a}(x+h)^2 ${sg(b)}(x+h) ${sg(c)}$` },
-          { h: 'Subtract f(x)', d: `$f(x+h) - f(x) = ${2 * a}xh ${a === 1 ? '+' : a === -1 ? '-' : `+ ${a}`}h^2 ${sg(b)}h$` },
-          { h: 'Divide by h', d: `$\\dfrac{f(x+h)-f(x)}{h} = ${2 * a}x ${a === 1 ? '+' : a === -1 ? '-' : `+ ${a}`}h ${sg(b)}$` },
+          { h: 'Form f(x+h)', d: `$f(x+h) = ${cx(a, '(x+h)')}^2 ${sgt(b, '(x+h)')} ${sg(c)}$` },
+          { h: 'Subtract f(x)', d: `$f(x+h) - f(x) = ${2 * a}xh ${sgt(a, 'h^2')} ${sgt(b, 'h')}$` },
+          { h: 'Divide by h', d: `$\\dfrac{f(x+h)-f(x)}{h} = ${2 * a}x ${sgt(a, 'h')} ${sg(b)}$` },
           { h: 'Let h → 0', d: `$f'(x) = ${2 * a}x ${sg(b)}$` },
           { h: 'Substitute', d: `$f'(${p}) = ${2 * a} \\times (${p}) ${sg(b)} = ${want}$` }
         ]

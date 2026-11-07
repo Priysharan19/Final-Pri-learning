@@ -53,6 +53,8 @@ import { exact, frac, fracTex, traps, twoNames, IN_CITIES } from './india-native
 
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3x", "- x^2"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** A power, written the way it is read: x rather than x^{1}. */
 const pw = (base, e) => (e === 1 ? base : `${base}^{${e}}`);
 
@@ -508,7 +510,7 @@ export const indiaClass12 = {
       const c = nz(rng, -9, 9);
       const want = frac(-b, 2 * a);
       return {
-        prompt: `The function $f(x) = ${cx(a)}^2 ${sg(b)}x ${sg(c)}$ is decreasing for $x < k$ and increasing for $x > k$. Find $k$.`,
+        prompt: `The function $f(x) = ${cx(a)}^2 ${sgt(b, 'x')} ${sg(c)}$ is decreasing for $x < k$ and increasing for $x > k$. Find $k$.`,
         answerType: 'numeric', ...exact(want),
         traps: traps(want.value, [
           { value: frac(b, 2 * a).value, why: `$f'(x) = ${2 * a}x ${sg(b)}$, and setting it to zero gives $${2 * a}x = ${-b}$ — the sign changes when the term crosses over.` },
@@ -536,7 +538,7 @@ export const indiaClass12 = {
       const askNormal = rng() < 0.5;
       const want = askNormal ? frac(-1, slope) : frac(slope, 1);
       return {
-        prompt: `Find the slope of the ${askNormal ? 'normal' : 'tangent'} to the curve $y = ${cx(a)}^3 ${sg(b)}x^2 ${sg(c)}$ at the point where $x = ${p}$.`,
+        prompt: `Find the slope of the ${askNormal ? 'normal' : 'tangent'} to the curve $y = ${cx(a)}^3 ${sgt(b, 'x^2')} ${sg(c)}$ at the point where $x = ${p}$.`,
         answerType: 'numeric', ...exact(want),
         traps: traps(want.value, [
           {

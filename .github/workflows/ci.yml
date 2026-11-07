@@ -180,11 +180,13 @@ jobs:
           grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          # 1713 → 2762 stated solutions (Nov 2026): the Class 8 Linear Equations mixed-review generator states its solution on every form.
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
+          # 133426 → 133367 wrong answers (Nov 2026): Class 8 and typesetting forms changed under CONTENT_VERSION 2026.11.0; the question count is unchanged.
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133367 wrong answers marked correct across 17304 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -228,6 +230,11 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
+          # Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad,
+          # promotion and store copy carry none of the retired claims; past papers are off by default (D23).
+          grep -Fq 'CONTENT HONESTY: PASS' suites.log
+          grep -Fq 'MARKETING CLAIMS: PASS' suites.log
+          grep -Fq 'PAST PAPERS SWITCH: PASS' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
@@ -290,6 +297,8 @@ jobs:
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
+          # The committed certification report describes the content in the tree (version, digest, scope, result).
+          grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')

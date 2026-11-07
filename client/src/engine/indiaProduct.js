@@ -15,6 +15,7 @@ import {
 import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
 import { hasJeePyqGenerator, hasJeePyqDifficulty } from './generators/jee-pyq-runtime.js';
 import { hasPyqGenerator, pyqCoverageOf, pyqGeneratorId } from './pyq/pyqCoverage.js';
+import { pastPapersEnabled } from './pastPapers.js';
 
 export const INDIA_COURSE = 'in';
 export const INDIA_TRACK_IDS = Object.freeze(Object.keys(IN_TRACKS));
@@ -244,7 +245,12 @@ export function resolveIndiaTarget(chapter, {
   const { floor, ceiling } = indiaDifficultyWindow(track.id, grade);
   const want = difficulty == null ? Math.max(floor, Math.min(2, ceiling)) : Math.max(floor, Math.min(ceiling, Number(difficulty) || 2));
 
-  if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
+  // Both previous-year archives sit behind one default-off switch until a
+  // rights opinion exists (engine/pastPapers.js, decision D23). Off, neither
+  // archive is a candidate anywhere, and "past papers only" is refused.
+  const archives = pastPapersEnabled();
+
+  if (archives && ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
     const pyqGenerator = `${track.id}-${chapter.id}`;
     if (hasJeePyqGenerator(pyqGenerator) && hasJeePyqDifficulty(pyqGenerator, want)) {
       return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: true };
@@ -252,7 +258,7 @@ export function resolveIndiaTarget(chapter, {
   }
 
   const archiveId = pyqGeneratorId(track.id, chapter.id);
-  const archiveCells = ordinal == null && hasPyqGenerator(archiveId)
+  const archiveCells = archives && ordinal == null && hasPyqGenerator(archiveId)
     ? pyqCoverageOf(archiveId).difficulties.map(d => ({
       generator: archiveId, difficulty: d, dotpointIndex: null,
       pyq: true, pyqArchive: 'source-cited-archive', windowed: d >= floor && d <= ceiling
@@ -345,21 +351,36 @@ export function indiaPyqAlternatives(chapter, { track: rawTrack = 'cbse', grade 
 }
 
 function productionSummary(chapters, grade) {
-  const reviewedChapters = chapters.filter(ch => indiaProductionStatus(ch, grade).sourceReviewed).length;
+  const statuses = chapters.map(ch => indiaProductionStatus(ch, grade));
+  const auditedChapters = statuses.filter(s => s.agentAudited).length;
+  const humanReviewedChapters = statuses.filter(s => s.humanReviewed && s.humanReviewer).length;
   const totalChapters = chapters.length;
   return Object.freeze({
-    reviewedChapters,
+    auditedChapters,
+    humanReviewedChapters,
     totalChapters,
-    reviewState: totalChapters > 0 && reviewedChapters === totalChapters
-      ? 'source-reviewed'
-      : reviewedChapters > 0 ? 'mixed-review' : 'source-review-pending'
+    // What the class as a whole can say about itself. 'agent-audited' is a
+    // software and fleet audit of the mapping, never a human review; a class
+    // reads 'human-reviewed' only when a named reviewer has signed every
+    // chapter, which none has (audit item 10).
+    reviewState: totalChapters > 0 && humanReviewedChapters === totalChapters
+      ? 'human-reviewed'
+      : totalChapters > 0 && auditedChapters === totalChapters
+        ? 'agent-audited'
+        : auditedChapters > 0 ? 'mixed' : 'agent-audit-pending'
   });
 }
 
-function cbseProductLabel(production) {
-  return production.reviewState === 'source-reviewed'
-    ? 'CBSE / NCERT · source-reviewed'
-    : 'CBSE / NCERT · source review in progress';
+/**
+ * The provenance label a CBSE class carries in the track picker. It may claim
+ * a review only when a named human signed every chapter; otherwise it says
+ * what actually happened — a software check of the mapping — or that even
+ * that is still pending. Exported so the honesty suite can prove the gate.
+ */
+export function cbseProductLabel(production) {
+  if (production.reviewState === 'human-reviewed') return 'CBSE / NCERT · examiner-reviewed';
+  if (production.reviewState === 'agent-audited') return 'CBSE / NCERT · software-checked, no examiner review yet';
+  return 'CBSE / NCERT · source mapping not yet checked';
 }
 
 /** Product sections with explicit provenance/review state on every chapter. */
@@ -373,7 +394,8 @@ export function indiaProductSections() {
       title: group.title,
       // A class with C/D mappings must not look identical to an audited A/B class
       // in the track picker. The chapter bank remains usable, but the product
-      // surface discloses that source review is still underway.
+      // surface discloses that only software has checked the mapping, or that
+      // not even that has happened yet.
       label: cbseProductLabel(production),
       caption: group.caption,
       difficultyFloor: IN_TRACKS.cbse.difficultyFloor || 1,
@@ -398,7 +420,8 @@ export function indiaProductSections() {
         difficultyCeiling: t.difficultyCeiling,
         chapters: chapters.map(ch => attachIndiaProductionStatus(ch, year)),
         production: Object.freeze({
-          reviewedChapters: chapters.filter(ch => indiaProductionStatus(ch, year).sourceReviewed).length,
+          auditedChapters: chapters.filter(ch => indiaProductionStatus(ch, year).agentAudited).length,
+          humanReviewedChapters: chapters.filter(ch => indiaProductionStatus(ch, year).humanReviewed).length,
           totalChapters: chapters.length
         })
       });

@@ -66,6 +66,8 @@ const rTex = f => fracTex(f.n, f.d);
 // ── Formatting ───────────────────────────────────────────────────────────────
 /** "+ 3" / "- 3" — a signed constant written after another term. */
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3i", "- i"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** cx written the way it is read: x, -x, 3x. */
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 /** "ax + b", with a zero term left out. */
@@ -569,10 +571,10 @@ function complexAlgebraReasoning(rng) {
       const value = askModulus ? modulus : x;
       if (value.n === 0) continue;
       return {
-        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sg(b)}i$.`,
+        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sgt(b, 'i')}$.`,
         answerType: 'numeric', ...exact(value),
         traps: traps(value.value, [
-          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sg(b)}i|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
+          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sgt(b, 'i')}|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
           { value: -value.value, why: 'Check the sign when the square root is isolated: the real part satisfies a linear equation once both sides are squared.' },
           { value: askModulus ? R(a * a + b * b, a).value : R(Math.abs(a * a - b * b), a).value, why: 'Expanding $(a \\mp x)^2$ gives a cross term $2ax$, so the division at the end is by $2a$.' }
         ]),

@@ -108,7 +108,8 @@ function replaceClass9() {
   if (first < 0 || !count) throw new Error('Class 9 flat curriculum is missing');
 
   for (const id of oldIds) delete IN_CHAPTER_BY_ID[id];
-  group.caption = 'Ganita Manjari Grade 9 Part I — coordinates, linear polynomials, real numbers, identities, circles, mensuration, probability and progressions';
+  // The honest label Class 9 carries until the rebuild is reviewed (D24).
+  group.caption = 'Ganita Manjari Grade 9 Part I — 8 of the 15 chapters in the CBSE 2026–27 list: coordinates, linear polynomials, real numbers, identities, circles, mensuration, probability and progressions';
   group.chapters = chapters;
 
   const flat = chapters.map(ch => ({ ...ch, dotpoints:[...ch.dotpoints], covers:ch.covers.map(c=>({gen:c.gen,dp:[...c.dp],diff:[...c.diff]})), grade:9 }));
@@ -135,7 +136,7 @@ function overlayClass10() {
   for (const chapter of CBSE_CLASS10_2026_27_CHAPTERS) {
     applyChapterOverlay(chapter.id, chapter.dotpoints, chapter.covers, { native: false });
   }
-  group.caption = 'CBSE/NCERT Class X Mathematics 2026–27 — current rationalised outcomes with source-reviewed production coverage';
+  group.caption = 'CBSE/NCERT Class X Mathematics 2026–27 — current rationalised outcomes, mapping checked by software, not yet by an examiner';
 }
 
 overlayClass10();
