@@ -39,6 +39,7 @@ import { createWorkingRouter } from '../platform/working.js';
 import { transcribeHandwriting } from '../platform/handwritingProvider.js';
 import { checkWorkingWithModel } from '../platform/workingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLATFORM = join(HERE, '../platform');
@@ -83,7 +84,7 @@ ok(HIDDEN_CANARIES.length === 11 && new Set(HIDDEN_CANARIES).size === 11, 'eleve
 ok(JSON.stringify(QUESTION).split('CANARY_').length - 1 === HIDDEN_CANARIES.length + 1, 'every canary in the fixture is in the search list (plus the prompt)');
 
 // Student ink and working, as a client would send them: nothing from the fixture.
-const PNG = 'data:image/png;base64,' + Buffer.from('ink-bytes-'.repeat(60)).toString('base64');
+const PNG = pngDataUrl('ink-bytes-'.repeat(60));
 const WORKING_LINES = ['2x + 3 = 11', '2x = 8', 'x = 4'];
 
 const env = {

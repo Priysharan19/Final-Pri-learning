@@ -20,6 +20,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'pri-recognition-dedupe-'));
 
@@ -27,7 +28,7 @@ const dir = mkdtempSync(join(tmpdir(), 'pri-recognition-dedupe-'));
 // A picture is a tagged byte string, so the provider can be told how to behave
 // by the picture alone — exactly the only thing the adapter sends it.
 const picture = (label, behaviour = 'ok', filler = 'a') =>
-  'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
+  pngDataUrl(`PICTURE|${behaviour}|${label}|` + filler.repeat(300));
 
 const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), failedOnce: new Set(), models: [] };
 const callsFor = label => provider.calls.get(label) || 0;

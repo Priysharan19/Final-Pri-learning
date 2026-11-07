@@ -389,6 +389,8 @@ jobs:
           node server/test/working-check-check.mjs
           node server/test/area-working-rubric-check.mjs
           node server/test/question-photo-check.mjs
+          # An upload behind an image header must be a PNG, JPEG or WebP by its own bytes; a non-picture never reaches a reader.
+          node server/test/image-signature-check.mjs
           node server/test/tutor-help-check.mjs
           node server/test/tutor-device-journey-check.mjs
           node server/test/tutor-issued-grounding-check.mjs
