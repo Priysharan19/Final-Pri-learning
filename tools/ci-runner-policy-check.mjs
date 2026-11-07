@@ -10,6 +10,7 @@ const person1 = read('person1-intelligence.yml');
 const jee = read('jee-question-department.yml');
 const hybrid = read('ink-hybrid.yml');
 const nativeInk = read('native-ink.yml');
+const nativeJourney27 = read('native-journey-ios27.yml');
 const buildInk = read('build-ink-v3-test-model.yml');
 const appHealth = read('app-health-agent.yml');
 
@@ -27,21 +28,48 @@ bounded('Person 1', person1, 'person1-intelligence');
 bounded('JEE Question Department', jee, 'jee-question-department');
 bounded('Ink Hybrid', hybrid, 'ink-hybrid');
 bounded('Native Ink', nativeInk, 'native-ink');
+bounded('Native Journey iOS 27', nativeJourney27, 'native-journey-ios27');
 // One repository-wide group let two Dependabot PRs rebased in the same minute
 // cancel each other's run (#462 was cancelled ten times); the key carries the ref.
 bounded('Build Ink V3 Test Model', buildInk, 'ink-v3-test-model');
 
-for (const [name, source] of [['CI', ci], ['Person 2', person2], ['Ink Hybrid', hybrid], ['Native Ink', nativeInk]]) {
+for (const [name, source] of [['CI', ci], ['Person 2', person2], ['Ink Hybrid', hybrid], ['Native Ink', nativeInk], ['Native Journey iOS 27', nativeJourney27]]) {
   assert.match(source, /workflow_dispatch:/, `${name} must retain an explicit manual validation path`);
   assert.match(source, /push:\s*\n\s+branches:\s*\[main\]/,
     `${name} feature branches must validate through pull_request instead of a duplicate push run`);
 }
 
-// Native Ink is the one macOS lane (3-core hosted runners, 60-minute jobs). A
-// push + pull_request pair cost two macOS jobs per PR commit and saturated the
-// queue on 2026-10-17, starving Pri App Health's macOS job on main.
+// Native Ink (iOS 26) and Native Journey iOS 27 are the two macOS lanes
+// (3-core hosted runners, 60-minute jobs). A push + pull_request pair cost two
+// macOS jobs per PR commit and saturated the queue on 2026-10-17, starving Pri
+// App Health's macOS job on main.
 assert.doesNotMatch(nativeInk, /push:\s*\n\s+paths:/,
   'Native Ink must never return to an unfiltered feature-branch push run');
+assert.doesNotMatch(nativeJourney27, /push:\s*\n\s+paths:/,
+  'Native Journey iOS 27 must never return to an unfiltered feature-branch push run');
+
+// Every macOS lane NAMES its Xcode and its iOS simulator runtime and asserts
+// them before building, on a hosted image, never on the trusted Mac runner.
+// #676 went unseen because the lane took "the newest runtime installed": a
+// runner-image change could move a gate to another iOS without anyone
+// deciding to. scripts/simulator-fleet.mjs refuses an unpinned run on CI.
+for (const [name, source, image, xcode, runtime] of [
+  ['Native Ink', nativeInk, 'macos-26', '26.6', '26.5'],
+  ['Native Journey iOS 27', nativeJourney27, 'xcode-27', '27.1', '27.0']
+]) {
+  assert.match(source, new RegExp(`runs-on: ${image}\\n`), `${name} runs on the hosted ${image} image`);
+  assert.doesNotMatch(source, /pri-learning-mac-trusted-manual/, `${name} never allocates the trusted Mac runner`);
+  assert.match(source, new RegExp(`PRI_SIM_RUNTIME: '${xcode.split('.')[0] === '27' ? '27\\.0' : runtime.replace('.', '\\.')}'`), `${name} names its iOS simulator runtime (${runtime})`);
+  assert.match(source, new RegExp(`DEVELOPER_DIR: /Applications/Xcode_${xcode.replace('.', '\\.')}\\.app/Contents/Developer`), `${name} names its Xcode (${xcode})`);
+  assert.match(source, /xcodebuild -version \| tee xcode-version\.txt/, `${name} asserts the Xcode version before building`);
+  assert.match(source, /xcrun simctl list runtimes \| tee runtimes\.txt/, `${name} asserts the simulator runtime before building`);
+  assert.match(source, /node scripts\/ci-provision-simulators\.mjs --boot ipad/, `${name} provisions simulators through the pinned provisioner`);
+  assert.match(source, /e\.simulator\.runtimePinned !== true/, `${name} refuses evidence that did not run on the pinned runtime`);
+  assert.doesNotMatch(source, /newest runtime/i, `${name} does not describe itself as running on the newest runtime`);
+}
+const appHealthNative = appHealth.match(/\n  native:\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:\n|$)/)?.[1] || '';
+assert.match(appHealthNative, /runs-on: macos-26\n/, 'Pri App Health native job runs on the hosted macos-26 image');
+assert.match(appHealthNative, /PRI_SIM_RUNTIME: '26\.5'/, 'Pri App Health native job names its iOS simulator runtime');
 
 // Main's own health evidence is never dropped: seven consecutive main runs were
 // cancelled by the next merge while the macOS job waited for a runner, and the
@@ -147,4 +175,4 @@ for (const g of groups) {
 assert.match(job('browser'), new RegExp(`for group in ${groups.join(' ')}; do[\\s\\S]*?-eq ${groups.length}\\n`),
   'the browser gate combines exactly one log from every group');
 
-console.log('PASS — release workflows keep only authoritative heads, avoid duplicate feature-branch push runs (the macOS lane included), never cancel main\'s health evidence, key Build Ink V3 by ref, and scope Ink Hybrid to handwriting changes; the sharded suites and browser gates keep their required check names, fail on any unsuccessful shard and run every npm test and test:e2e suite.');
+console.log('PASS — release workflows keep only authoritative heads, avoid duplicate feature-branch push runs (both pinned macOS lanes included), never cancel main\'s health evidence, key Build Ink V3 by ref, and scope Ink Hybrid to handwriting changes; the sharded suites and browser gates keep their required check names, fail on any unsuccessful shard and run every npm test and test:e2e suite.');

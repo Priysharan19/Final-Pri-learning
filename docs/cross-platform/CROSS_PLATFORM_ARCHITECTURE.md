@@ -28,7 +28,7 @@ Pri Learning ships as **one shared product core** (the React/Vite client in `cli
           │ ios/PriLearning  │  │ android/ (CP-06)│  │ (no shell)      │
           │ .swiftpm         │  │ Kotlin+WebView  │  │ fallbacks only  │
           │ WKWebView +      │  │ AssetLoader +   │  │ fetch+cookies,  │
-          │ PencilKit, Vision│  │ Play Billing,   │  │ canvas ink,     │
+          │ PencilKit canvas │  │ Play Billing,   │  │ canvas ink,     │
           │ StoreKit 2, URL- │  │ OkHttp cloud,   │  │ <input file>,   │
           │ Session cloud,   │  │ PhotoPicker,    │  │ <a download>    │
           │ share sheet      │  │ Share Intent    │  │                 │
@@ -40,7 +40,7 @@ What this means in practice:
 
 - **No second product.** Swift and Kotlin hold no curriculum, marking, adaptive, progress or entitlement logic. "AI proposes, the deterministic engine decides" stays inside the shared JavaScript engine on every platform.
 - **No React Native or Flutter rewrite.** The same `client/dist` build is bundled into every shell, as `scripts/sync-ios.mjs` already does for Apple.
-- **The Apple shell is kept and extended.** It is not replaced. PencilKit ink, the Vision photo reader, StoreKit 2 and the native cloud cookie jar are regression-protected iPad behaviour.
+- **The Apple shell is kept and extended.** It is not replaced. PencilKit ink capture, StoreKit 2 and the native cloud cookie jar are regression-protected iPad behaviour. (The on-device Vision/Core ML ink readers and the Vision photo reader were removed from the shipping target on 2 November 2026 under owner default D16: handwriting and photos are read on the server.)
 - **One platform-neutral contract** replaces direct `window.webkit.messageHandlers.*` access across the app (CP-02). Product code asks "can this host draw stylus ink?" and never asks "is this iOS?".
 
 ## 2. Exact current architecture (verified, not assumed)
@@ -51,13 +51,13 @@ What this means in practice:
 | The native Apple package lives under `ios/` | Yes | `ios/PriLearning.swiftpm` is canonical. `ios/PriLearning 2.swiftpm` is a compatibility copy whose Swift, `Package.swift` and `Resources/Web` are identical (only `RELEASE.md` differs). the former `PriLearning.swiftpm.zip` archive was a **stale** 2026-08-23 snapshot (removed in CP-04) without the cloud, billing or photo bridges. |
 | The Apple shell hosts the bundled client in WKWebView | Yes | `ios/PriLearning.swiftpm/WebShell.swift` loads `prilearning://app/` through `LocalSchemeHandler.swift`, using the persistent `WKWebsiteDataStore.default()` |
 | `Package.swift` declares `.pad` and `.phone` | Yes | `ios/PriLearning.swiftpm/Package.swift`, `supportedDeviceFamilies: [.pad, .phone]`, iOS 16.0 minimum. The CP-01 audit's one-off simulator build produced an `Info.plist` with `UIDeviceFamily = [1, 2]`; that is synthetic evidence, not in CI, and the source `Info.plist` does not set the key. |
-| Native bridges | Yes, five | `priInk` (PencilKit and the on-device recogniser), `priPhoto` (Vision OCR), `priBilling` (StoreKit 2), `priCloud` (URLSession `/v1` with a native cookie jar), `priShare` (UIActivityViewController). In addition, `<a download>`/blob navigations become a `WKDownload`, are written to a temp file and are opened in the share sheet (`WebShell.swift` download delegate). There are **no** lifecycle, storage, haptics or deep-link bridges. |
+| Native bridges | Yes, four | `priInk` (PencilKit capture only; no read op), `priBilling` (StoreKit 2), `priCloud` (URLSession `/v1` with a native cookie jar), `priShare` (UIActivityViewController). In addition, `<a download>`/blob navigations become a `WKDownload`, are written to a temp file and are opened in the share sheet (`WebShell.swift` download delegate). There are **no** lifecycle, storage, haptics or deep-link bridges. |
 | React holds Apple/WebKit assumptions | Yes | Detection is scattered across 10+ modules (section 3) |
 | The cloud backend is reusable by every client | **Partly** | The `/v1` auth, sync, AI and entitlements are client-agnostic. The **origin guard only exempts `X-Pri-Client: ios-native-v1`** (`server/platform/security.js`). There is **no Google Play verifier** (`server/platform/billing.js` returns `BILLING_PROVIDER_NOT_CONFIGURED`), and `/v1/health` hard-codes `google: false` (`server/platform/router.js`). |
 
 ### 2.1 Runtime layers today
 
-1. **The shell** (Swift, 6,995 lines across 26 tracked files). Most of it is the on-device ink recogniser stack under `ios/PriLearning.swiftpm/Ink/`. The shell itself is `WebShell.swift`, `LocalSchemeHandler.swift`, `NativeCloudBridge.swift`, `StoreKitBillingBridge.swift`, `PhotoOCR.swift` and `ReleaseIdentity.swift`.
+1. **The shell** (Swift). `ios/PriLearning.swiftpm/Ink/` is the PencilKit surface, the stroke model, the bridge and the capture self-check; the on-device recogniser stack that used to sit there was removed (D16). The shell itself is `WebShell.swift`, `LocalSchemeHandler.swift`, `NativeCloudBridge.swift`, `StoreKitBillingBridge.swift` and `ReleaseIdentity.swift`.
 2. **The web runtime** is `client/dist`, served from the custom origin `prilearning://app`. React Router uses `BrowserRouter`. It works only because the scheme handler returns `index.html` for extensionless paths.
 3. **The local learning backend** (`client/src/api.js` → `client/src/local/gateway.js` → `client/src/local/backend.js`) runs in process against IndexedDB `pri-learning` v4 (18 object stores, AES-sealed per-profile stores; `client/src/local/idb.js`) plus a second database, `pri-ink-personal` v1 (`client/src/ink/personal.js`). **Both are keyed to the bundled origin.** It never touches the network.
 4. **The cloud client** (`client/src/platform/cloudTransport.js`) is the only module allowed to perform network I/O. That rule is enforced by `tools/check-client-network-boundary.mjs`. Browsers use `fetch` with cookies and a CSRF header. The Apple shell uses the `priCloud` bridge, so cookies never reach JavaScript.
@@ -82,7 +82,7 @@ None of the bridges carries a protocol version. Detection happens once at module
 |---|---|
 | `client/src/ink/native.js` | `window.webkit.messageHandlers.priInk` and `__PRI_NATIVE_INK__` |
 | `client/src/ink/personal.js`, `client/dev/devStructural.js` | `__PRI_NATIVE_INK__` flag only |
-| `client/src/native/photo.js` | `messageHandlers.priPhoto` and `__PRI_NATIVE_PHOTO__` |
+| client/src/native/photo.js (removed 2 November 2026 with the on-device photo reader, D16) | was `messageHandlers.priPhoto` and `__PRI_NATIVE_PHOTO__`; no replacement, photos are read on the server |
 | `client/src/platform/nativeBilling.js` | `messageHandlers.priBilling`. StoreKit-shaped: `appAccountToken`, "App Store" copy |
 | `client/src/platform/cloudTransport.js` | `messageHandlers.priCloud`, `__PRI_NATIVE_CLOUD__` and `__PRI_NATIVE_CLOUD_CONFIGURED__` |
 | `client/src/lib/files.js`, `client/src/components/InkPhysicalEvidenceSession.jsx` | `messageHandlers.priShare` |
@@ -130,8 +130,8 @@ Object.defineProperty(window, '__PRI_HOST__', { writable: false, configurable: f
   shell: { version: '4.0', build: '2', id: 'com.prilearning.app' },
   release: { /* the bundled release.json (schemaVersion 1), same object as __PRI_NATIVE_RELEASE_IDENTITY__ */ },
   capabilities: {                    // absent key ⇒ unsupported
-    ink:       { versions: [1], stylus: true, finger: true, recognizer: 'pri-foundation' },
-    photo:     { versions: [1], capture: true, library: true, ocr: true },
+    ink:       { versions: [1], stylus: true, finger: true },            // capture only: reading is on the server
+    photo:     { versions: [1], capture: true, library: true, ocr: false }, // no shell reads a photo on the device
     billing:   { versions: [1], store: 'app-store' | 'play' }, // selects store copy/SDK flow only, never layout or logic
     cloud:     { versions: [1], configured: true },
     share:     { versions: [1], binary: true, print: true },
@@ -239,7 +239,7 @@ One transport and one dispatcher per host:
 
 ### 4.5 Testability
 
-- `client/src/platform/native/` ships a `createFakeHost({capabilities, handlers})` test double. It installs `__PRI_HOST__` and a scripted `priBridge`, so every capability is unit-testable in Node, the same way `client/test/native-ink-check.mjs` and `client/test/photo-ocr-bridge-check.mjs` already fake the WebKit handlers.
+- `client/src/platform/native/` ships a `createFakeHost({capabilities, handlers})` test double. It installs `__PRI_HOST__` and a scripted `priBridge`, so every capability is unit-testable in Node, the same way `client/test/native-ink-check.mjs` already fakes the WebKit handlers.
 - Contract tests run the **same** envelope fixtures against the JavaScript adapter, the Swift shell (an XCTest target or the `--bridge-selfcheck` launch argument) and the Kotlin shell (a JVM unit test plus an instrumented WebView test).
 - The CP-01 architecture check ratchets direct `messageHandlers` access down to an allowlist. CP-02 must shrink that allowlist to the contract module alone.
 

@@ -47,6 +47,27 @@
 import WebKit
 
 enum JourneySelfCheck {
+
+    // Every PRIJOURNEY line goes to the unified log AND is appended to
+    // Documents/PRIJOURNEY.log in the app's own container: on the hosted iOS 27
+    // image `log show` returns nothing for the app. scripts/iphone-journey.mjs
+    // reads only what each launch appends (it records the file's size first),
+    // falling back to the log.
+    static let reportURL: URL? = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("PRIJOURNEY.log")
+
+    static func say(_ line: String) {
+        NSLog("%@", line)
+        guard let url = reportURL, let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
     static var phase: String? {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--journey-marking-relaunch") { return "markingRelaunch" }
@@ -608,8 +629,9 @@ enum JourneySelfCheck {
     });
     await step('photoDraft', async () => {
       // The product reads photos only on the server (ADR-0001). Attach one and
-      // prove the device neither reads nor marks it: the native Vision bridge
-      // is never asked, and no transcript appears.
+      // prove the device neither reads nor marks it: there is no on-device
+      // photo reader any more (the legacy receiver is wrapped only to prove
+      // nothing answers on it), and no transcript appears.
       let nativeReads = 0;
       const original = window.__priPhotoReceive;
       window.__priPhotoReceive = p => { nativeReads += 1; if (original) original(p); };
@@ -1018,7 +1040,7 @@ enum JourneySelfCheck {
     @MainActor
     static func run(in webView: WKWebView) {
         guard let phase else { return }
-        NSLog("PRIJOURNEY started %@", phase)
+        say(String(format: "PRIJOURNEY started %@", phase))
         let script: String
         switch phase {
         case "relaunch": script = relaunch
@@ -1049,18 +1071,18 @@ enum JourneySelfCheck {
             case .success(let value):
                 guard let text = value as? String, let data = text.data(using: .utf8),
                       let steps = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]] else {
-                    NSLog("PRIJOURNEY FAIL unreadable result")
+                    say("PRIJOURNEY FAIL unreadable result")
                     return
                 }
                 var failures = 0
                 for (name, info) in steps.sorted(by: { $0.key < $1.key }) {
                     let ok = info["ok"] as? Bool == true
                     if !ok { failures += 1 }
-                    NSLog("PRIJOURNEY %@ %@ %@", ok ? "ok" : "FAIL", name, info["detail"] as? String ?? "")
+                    say(String(format: "PRIJOURNEY %@ %@ %@", ok ? "ok" : "FAIL", name, info["detail"] as? String ?? ""))
                 }
-                NSLog("PRIJOURNEY summary %@ %d failure(s)", phase, failures)
+                say(String(format: "PRIJOURNEY summary %@ %d failure(s)", phase, failures))
             case .failure(let error):
-                NSLog("PRIJOURNEY FAIL script error %@", String(describing: error))
+                say(String(format: "PRIJOURNEY FAIL script error %@", String(describing: error)))
             }
         }
     }

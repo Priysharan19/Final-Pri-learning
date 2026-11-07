@@ -10,7 +10,9 @@ The hidden production study route is:
 
 `/practice?inkEvidence=1`
 
-It mounts the same `InkAnswer` + PencilKit production recognition path used by Practice.
+It mounts the same `InkAnswer` + PencilKit surface + **server reader** path used by Practice. The device must be signed in to an account the server allows to read handwriting (a verified adult, or a minor with a confirmed guardian), because the server reader is the only reader: a session that is signed out cannot collect a single sample.
+
+Which server the build talks to is a release decision (`docs/release/device-matrix.md`, "Which server a device build talks to"): the first full collection runs on a **development build** of the frozen SHA pointed at **staging**; a TestFlight build talks to production only. Record the kind in the session setup.
 
 ## 2. Use only the assigned anonymous writer codes
 
@@ -49,7 +51,7 @@ For each assigned participant:
 7. do not tell the participant whether the model was correct during the pre-correction capture;
 8. export both JSON files at the end of the session.
 
-The release-evidence JSON contains the production reading, authority decision and latency. The corpus JSON contains the raw PencilKit strokes plus prompt transcription for the deterministic writer split.
+The release-evidence JSON contains the server reading, the confirmation decision and the server-read round trip the app measured. The corpus JSON contains the raw PencilKit strokes plus prompt transcription for the deterministic writer split. Each prompt costs one paid server read; a 61-prompt session is 61 reads against the account's allowance.
 
 ## 5. File placement
 
@@ -99,4 +101,4 @@ If the final holdout fails, the release claim fails. Do not redefine the holdout
 
 Person 1 software is implemented. Arbitrary-real-handwriting production proof becomes complete only when the real physical evidence satisfies the release floors already enforced by `ink-physical-release-evidence.mjs`.
 
-Synthetic writers, duplicated strokes, simulator sessions, research-only recognizers, browser fallbacks and hand-edited authority labels never count toward this proof.
+Synthetic writers, duplicated strokes, simulator sessions, retired on-device readers, browser fallbacks and hand-edited authority labels never count toward this proof.

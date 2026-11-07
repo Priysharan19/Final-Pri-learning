@@ -178,7 +178,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, []);
 
-  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false } = {}) => {
+  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false, readMs = null } = {}) => {
     setRec(r);
     setStale(isStale && r.lines.length > 0);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
@@ -205,6 +205,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       attested: r.attested || null,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
+      // How long the read the student waited for took, device to device: from
+      // the press of "Read my answer" to this transcription landing, measured
+      // here around the one readWithCloud call. Null when this publish is not
+      // a fresh read (a correction, a kept reading, a page that changed).
+      readMs: Number.isFinite(readMs) ? Math.max(0, readMs) : null,
       // The reading is of EARLIER writing: shown, labelled, never submitted.
       stale: isStale && r.lines.length > 0,
       // What the card keeps with the ink so a reload restores the transcript
@@ -254,6 +259,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
     focusAfterRead.current = typeof document !== 'undefined' && !!document.activeElement?.closest?.('.ink-read-action, .ink-status-action');
     setStatus({ kind: 'reading' });
+    const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+    const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
     readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
@@ -294,7 +301,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           before.lines.forEach((line, i) => { if (line.corrected === true) landed = applyLineCorrection(landed, i, line.text); });
         }
         expiredSigRef.current = null;
-        publish(landed, now, { stale: nowSignature !== signature });
+        publish(landed, now, { stale: nowSignature !== signature, readMs: sincePress() });
         setStatus(null);
         return;
       }
