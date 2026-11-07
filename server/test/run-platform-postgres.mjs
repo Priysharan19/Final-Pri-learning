@@ -55,10 +55,6 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
-  'practice-reveal-submit-race-check.mjs',
-  'account-deletion-midflight-check.mjs',
-  'billing-out-of-order-concurrency-check.mjs',
-  'postgres-cutover-rehearsal-check.mjs',
   // The free plan's daily cap is decided per account where a question is
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
@@ -78,6 +74,13 @@ export const ENGINE_SUITES = [
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'account-deletion-session-binding-check.mjs',
+  // Races the request thread cannot serialise on its own, and the cutover end
+  // to end: a reveal against a correct answer, a deletion against a mark in
+  // flight, two billing events of one subscription, SQLite -> Postgres served.
+  'practice-reveal-submit-race-check.mjs',
+  'account-deletion-midflight-check.mjs',
+  'billing-out-of-order-concurrency-check.mjs',
+  'postgres-cutover-rehearsal-check.mjs',
   // The data export behind fresh proof of the credential, and the new-device
   // sign-in notice: session rows, audit rows and the step-up on Postgres too.
   'export-reauth-check.mjs',
