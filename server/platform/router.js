@@ -26,6 +26,7 @@ import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
 import { readinessReport } from './readiness.js';
+import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
 import { metrics, metricsAccess, recordDatabaseError, recordServerError } from './metrics.js';
 import { captureError } from './errorSink.js';
@@ -216,6 +217,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
   router.use('/telemetry', requireGuardianConsent(db), createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
+  // STAGING ONLY: reserved-domain test mail (testMailbox.js). Off — and then
+  // indistinguishable from an unknown path — in production and by default.
+  router.use('/test-mailbox', createTestMailboxRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
   router.use((err, req, res, next) => {

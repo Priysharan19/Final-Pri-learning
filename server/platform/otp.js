@@ -23,7 +23,9 @@ import {
   normalizeDestination, normalizeEmail, normalizePhone, retireChallenge, verifyChallenge
 } from './otpCore.js';
 import { createSmsProviderFromEnv } from './smsProvider.js';
-import { createOtpEmailSenderFromEnv } from './otpEmail.js';
+import { createOtpEmailSenderFromEnv, otpEmailMessage } from './otpEmail.js';
+import { testMailboxAccepts } from './testMailboxPolicy.js';
+import { depositTestMail } from './testMailbox.js';
 import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
 import { deleteAccountRows, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -86,12 +88,21 @@ export function createOtpRouter(db, {
 
   async function deliver({ channel, destination, purpose, accountId = null, intent = null, now = Date.now() }) {
     if (channel === 'sms' && !sms) throw Object.assign(new Error('Phone codes are not available yet.'), { code: 'OTP_SMS_NOT_CONFIGURED', status: 503 });
-    if (channel === 'email' && !sendEmail) throw Object.assign(new Error('Email codes are not available yet.'), { code: 'OTP_EMAIL_NOT_CONFIGURED', status: 503 });
+    // STAGING ONLY: a reserved test address (testMailboxPolicy.js) gets its
+    // code in the test mailbox instead of an email. The challenge is the same
+    // one — same expiry, single use, attempt ceiling and send limits.
+    const keptForTest = channel === 'email' && testMailboxAccepts(env, destination);
+    if (channel === 'email' && !sendEmail && !keptForTest) throw Object.assign(new Error('Email codes are not available yet.'), { code: 'OTP_EMAIL_NOT_CONFIGURED', status: 503 });
     const providerName = channel === 'sms' ? sms.name : 'email';
     const delegated = channel === 'sms' && sms.generatesCode;
     const challenge = await createChallenge(db, { channel, purpose, destination, accountId, providerName, providerGeneratesCode: delegated, now });
     try {
-      if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
+      if (keptForTest) {
+        await depositTestMail(db, {
+          to: destination, kind: 'code', purpose, code: challenge.code,
+          subject: otpEmailMessage(challenge.code, purpose, undefined, { intent }).subject, now
+        });
+      } else if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
       else if (delegated) await sms.start({ to: destination, purpose });
       else await sms.send({ to: destination, code: challenge.code, purpose, publicOrigin });
     } catch (error) {

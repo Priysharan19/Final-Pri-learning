@@ -61,6 +61,28 @@ ok(containerWorkflow.includes("'railway.json'"), 'the container workflow runs wh
 // ── 2 · preflight agrees with the server about which database is required ──
 const preflight = env => execFileSync(process.execPath, [join(ROOT, 'tools', 'production-preflight.mjs')], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' });
 ok(/^  PRI_PLATFORM_DB$/m.test(preflight({})), 'preflight asks for PRI_PLATFORM_DB on SQLite');
+// The staging test mailbox (server/platform/testMailboxPolicy.js) must be off
+// under any configuration the production preflight is run for: it refuses
+// (exit 1) whenever the mailbox would be on, and says "off" otherwise.
+const preflightStatus = env => {
+  try { return { status: 0, out: preflight(env) }; } catch (error) { return { status: error.status, out: String(error.stdout || '') }; }
+};
+const PROD = { NODE_ENV: 'production', PRI_PUBLIC_ORIGIN: 'https://app.prilearning.com' };
+for (const [label, env] of [
+  ['a shell in test mode', { NODE_ENV: 'test' }],
+  ['a Railway staging environment', { NODE_ENV: 'production', RAILWAY_ENVIRONMENT_NAME: 'staging', PRI_PUBLIC_ORIGIN: 'https://pri-learning-staging-staging.up.railway.app' }]
+]) {
+  const run = preflightStatus(env);
+  ok(run.status === 1 && /test mailbox would be ON/.test(run.out), `preflight refuses ${label}: the test mailbox would be on`);
+}
+for (const [label, env] of [
+  ['Railway production', { ...PROD, RAILWAY_ENVIRONMENT_NAME: 'production' }],
+  ['a prilearning.com origin even in an environment named staging', { ...PROD, RAILWAY_ENVIRONMENT_NAME: 'staging' }],
+  ['a production shell with no Railway variable', PROD]
+]) {
+  const run = preflightStatus(env);
+  ok(run.status === 0 && /Staging test mailbox: off/.test(run.out), `preflight passes the mailbox check for ${label}`);
+}
 ok(!/^  PRI_PLATFORM_DB$/m.test(preflight({ PRI_DATABASE_URL: 'postgresql://role@db.example/postgres?sslmode=verify-full' })),
   'preflight does not ask for PRI_PLATFORM_DB once PRI_DATABASE_URL selects Postgres');
 const envExample = readFileSync(join(ROOT, '.env.production.example'), 'utf8');

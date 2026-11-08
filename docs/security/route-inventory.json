@@ -33,6 +33,27 @@
     },
     {
       "method": "GET",
+      "path": "/v1/test-mailbox/latest",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "STAGING AND TEST HARNESS ONLY (server/platform/testMailboxPolicy.js): on only when RAILWAY_ENVIRONMENT_NAME is 'staging' or NODE_ENV=test with no Railway variable; hard-off in Railway production, for a prilearning.com PRI_PUBLIC_ORIGIN and with PRI_TEST_MAILBOX=off (tools/production-preflight.mjs refuses a production configuration under which it would be on; /v1/ready reports testMailbox on|off). Answers only for an address at the reserved, undeliverable domain e2e.prilearning.test (RFC 2606/6761), whose accounts are synthetic by definition; returns the newest kept code, link or notice for that address. When off, or for any other address, the request falls through to /v1's ordinary 404 before the rate limit or any read, so it is indistinguishable from a path that does not exist. Codes and links keep their own expiry, single use and send limits.",
+      "rateLimits": [
+        {
+          "key": "test-mailbox",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/metrics",
       "auth": "operator-token",
       "roles": null,

@@ -20,6 +20,8 @@
 import { asStore } from './store.js';
 import { logEvent, safeCode } from './observability.js';
 import { createSecurityEmailSenderFromEnv } from './securityEmail.js';
+import { testMailboxAccepts } from './testMailboxPolicy.js';
+import { depositTestMail } from './testMailbox.js';
 
 const PHONE_ACCOUNT_EMAIL_DOMAIN = 'phone.invalid';
 export const NEW_DEVICE_ACTION = 'session.new-device';
@@ -64,6 +66,11 @@ export async function noteSessionCreated(db, { accountId, sessionId, deviceId, n
 
   const account = await db.get('SELECT email FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
   const to = String(account?.email || '').trim().toLowerCase();
+  // STAGING ONLY: a reserved test address keeps the notice in the test mailbox.
+  if (testMailboxAccepts(process.env, to)) {
+    await depositTestMail(db, { to, kind: 'notice', purpose: 'new-device', subject: 'New sign-in to your Pri Learning account', now });
+    return { newDevice: true, emailed: false, keptForTest: true };
+  }
   const send = sender();
   if (!send || !to || to.endsWith(`@${PHONE_ACCOUNT_EMAIL_DOMAIN}`)) return { newDevice: true, emailed: false };
 

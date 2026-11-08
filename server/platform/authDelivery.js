@@ -2,6 +2,8 @@ import { decryptDeliveryToken } from './deliveryCrypto.js';
 import { asStore, assertNoOpenTransaction, sqliteHandle } from './store.js';
 import { recordAuthEmail } from './metrics.js';
 import { logEvent, safeCode as logCode } from './observability.js';
+import { testMailboxAccepts } from './testMailboxPolicy.js';
+import { depositTestMail } from './testMailbox.js';
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_BATCH = 20;
@@ -338,7 +340,8 @@ export async function drainAuthDeliveryOutbox(db, {
   send,
   publicOrigin = process.env.PRI_PUBLIC_ORIGIN,
   now = Date.now(),
-  batchSize = DEFAULT_BATCH
+  batchSize = DEFAULT_BATCH,
+  env = process.env
 } = {}) {
   db = asStore(db);
   ensureAuthDeliverySchema(db);
@@ -388,14 +391,20 @@ export async function drainAuthDeliveryOutbox(db, {
 
     try {
       const actionUrl = buildAuthActionUrl(publicOrigin, row.kind, rawToken);
-      const result = await send({
-        outboxId: row.id,
-        accountId: row.account_id,
-        tokenId: row.token_id,
-        to: row.destination,
-        kind: row.kind,
-        actionUrl
-      });
+      // STAGING ONLY: a reserved test address (testMailboxPolicy.js) gets the
+      // link in the test mailbox instead of an email — the same single-use,
+      // one-hour bearer, recorded as delivered like any other.
+      const result = testMailboxAccepts(env, row.destination)
+        ? (await depositTestMail(db, { to: row.destination, kind: 'link', purpose: row.kind, link: actionUrl, subject: authEmailMessage(row.kind, actionUrl).subject, now }),
+          { providerMessageId: 'test-mailbox' })
+        : await send({
+          outboxId: row.id,
+          accountId: row.account_id,
+          tokenId: row.token_id,
+          to: row.destination,
+          kind: row.kind,
+          actionUrl
+        });
       await db.run(`UPDATE auth_delivery_outbox
         SET delivered_at=?, token_ciphertext='', provider_message_id=?, next_attempt_at=NULL, last_error_code=NULL
         WHERE id=? AND delivered_at IS NULL`, [now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id]);

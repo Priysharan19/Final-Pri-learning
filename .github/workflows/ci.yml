@@ -372,6 +372,10 @@ jobs:
           set -o pipefail
           node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
           grep -Fq 'RLS FAIL-CLOSED: PASS — 141/141 checks' rls-fail-closed.log
+          # The staging test mailbox: on only on staging and in the harness, only for
+          # @e2e.prilearning.test; every other address is sent; off, the route is a 404.
+          node server/test/test-mailbox-check.mjs | tee test-mailbox.log
+          grep -Fq 'TEST MAILBOX: PASS — 82/82 checks' test-mailbox.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -557,7 +561,9 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 62: the staging test mailbox, kept and read back as pri_server.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq '✓ test-mailbox-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

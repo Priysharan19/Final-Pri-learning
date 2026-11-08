@@ -80,6 +80,9 @@ export const ENGINE_SUITES = [
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // The staging test mailbox: reserved-domain codes and links kept in
+  // platform_meta and read back, every other address sent — as pri_server.
+  'test-mailbox-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
