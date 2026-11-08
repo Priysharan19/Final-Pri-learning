@@ -185,6 +185,15 @@ jobs:
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
+          # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
+          grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
+          grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 36783/36783 checks' suites.log
+          grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
+          grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
+          grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
@@ -557,7 +566,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 66/66 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
