@@ -13,12 +13,18 @@
 // the entry chunk is the one that publishes the resolved flags. A bundle that
 // was not generated fails here too; absence is never a pass.
 //
+// The student interface is not a flag: client/interface.config.mjs sets it for
+// every build (V1 decision D7). Each bundle must record exactly that interface
+// and skin, so the iPhone and iPad apps ship what the web and Android builds
+// ship.
+//
 // Usage: npm run build && npm run sync:ios && node client/test/ios-bundle-features-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FEATURE_FLAGS } from '../vite.config.js';
+import { FEATURE_FLAGS, INSTRUMENT_BUILD } from '../vite.config.js';
+import { STUDENT_INTERFACE, INTERFACE_SKIN } from '../interface.config.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const BUNDLES = ['PriLearning.swiftpm', 'PriLearning 2.swiftpm'].map(b => [b, join(ROOT, 'ios', b, 'Resources', 'Web')]);
@@ -38,6 +44,8 @@ for (const [label, web] of BUNDLES) {
     ok(`${label}: records the ${name} flag`, typeof flags[name] === 'boolean', JSON.stringify(flags));
     ok(`${label}: ${name} is off in the shipped bundle`, flags[name] === false, JSON.stringify(flags));
   }
+  ok(`${label}: ships the one student interface (${STUDENT_INTERFACE})`, flags.instrument === INSTRUMENT_BUILD, JSON.stringify(flags));
+  ok(`${label}: wears the skin the setting names (${INTERFACE_SKIN})`, flags.skin === INTERFACE_SKIN, JSON.stringify(flags));
   const entry = readdirSync(join(web, 'assets')).filter(f => /^index-[^/]*\.js$/.test(f));
   ok(`${label}: has one entry chunk`, entry.length === 1, entry.join(','));
   if (entry.length === 1) {
@@ -51,4 +59,4 @@ if (failures.length) {
   console.log(`IOS BUNDLE FEATURES: FAIL — ${pass}/${pass + failures.length} checks. Rebuild without PRI_FEATURE_* set (npm run build), then npm run sync:ios; the bundles are generated, never committed.`);
   process.exit(1);
 }
-console.log(`IOS BUNDLE FEATURES: PASS — ${pass}/${pass} checks — both generated iPad bundles are flag-off production builds.`);
+console.log(`IOS BUNDLE FEATURES: PASS — ${pass}/${pass} checks — both generated iPad bundles are flag-off production builds of the ${STUDENT_INTERFACE} interface.`);

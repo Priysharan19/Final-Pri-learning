@@ -267,14 +267,14 @@ jobs:
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
-          # npm run test:budget measures two production builds: the flag-off one
-          # and the instrument one (PRI_FEATURE_INSTRUMENT=1), whose Map, Report
-          # and Scripts tabs are held in the warm pass (#658). 61 → 63: the
-          # instrument build also holds every file those tabs import statically
-          # (the Map's prerequisite graph crashed a first offline visit).
-          grep -Eq 'INSTALL BUDGET: PASS — 58/58 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
-          grep -Eq 'INSTALL BUDGET \(instrument build\): PASS — 63/63 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
-          test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 2
+          # npm run test:budget measures the one production build: every build
+          # ships the Instrument from client/interface.config.mjs (D7), whose
+          # Map, Report and Scripts tabs are held in the warm pass (#658),
+          # together with every file those tabs import statically.
+          grep -Eq 'INSTALL BUDGET: PASS — 63/63 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
+          # One interface from one setting on web, iOS and Android (D7).
+          grep -Fq 'INTERFACE SETTING: PASS — 25/25 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
@@ -848,9 +848,10 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
-            # v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): builds with the
-            # flag on, so it runs last in this group.
-            node client/test/tour-instrument.js 2>&1 | tee -a browser.log
+            # The Instrument's own shell, Index, command bar and first-offline
+            # tabs (#658). Every build ships it (client/interface.config.mjs),
+            # so it runs on this group's build like the tours above.
+            node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -1070,13 +1071,15 @@ jobs:
         run: npm run check:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
-      - name: Generated iOS bundles are flag-off production builds
+      - name: Generated iOS bundles are flag-off production builds of the one interface
         # The exact count moved here with the suite (it no longer runs in the
         # sharded npm test): a check that silently ran fewer cases fails.
         run: |
           set -euo pipefail
           node client/test/ios-bundle-features-check.mjs | tee ios-bundle-features.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' ios-bundle-features.log
+          # 20 → 24: each bundle also records the one student interface and its
+          # skin from client/interface.config.mjs (V1 decision D7).
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 24/24 checks' ios-bundle-features.log
       - name: Generated iOS bundle pages need no inline script under the shell CSP
         run: node client/test/native-shell-csp-check.mjs --require-generated
       # After the build, so the scan reads the bytes that ship: every tracked

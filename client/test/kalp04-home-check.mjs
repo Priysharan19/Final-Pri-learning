@@ -168,9 +168,10 @@ check('unfinished task question keeps resume priority', () => {
   assert.equal(row.destination, '/practice?task=task-resume');
 });
 
-const [backend, home, generator, app, en, hi, theme] = await Promise.all([
+const [backend, home, index, generator, app, en, hi, theme] = await Promise.all([
   read('src/local/backend.js'),
   read('src/pages/Home.jsx'),
+  read('src/instrument/IndexPage.jsx'),
   read('src/home/TopicGenerator.jsx'),
   read('src/App.jsx'),
   read('src/i18n/strings.en.js'),
@@ -200,6 +201,34 @@ check('Home exposes exactly one semantic primary recommendation region and CTA',
   assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
   assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
   assert.match(home, /aria-describedby=\{reasonId\}/);
+});
+
+// Every build ships the Instrument (client/interface.config.mjs), whose Index is
+// the home: it must take its next action from the same resolver, show exactly
+// one primary action, and keep the cloud-failure note.
+check('the Index takes its next action from the shared resolver', () => {
+  assert.match(home, /export function useHomeDecision\(/);
+  assert.match(index, /useHomeDecision\(user, dueCount\)/);
+  assert.match(index, /actionCopy\(primary, user, t, topicName/);
+  assert.match(index, /primary\.priority >= URGENT/);
+});
+
+check('the Index renders one primary action at a time, each with one CTA', () => {
+  // Two places can be the primary action (the resolver's NextAction, or the
+  // resume card for the last chapter), and the render conditions exclude each
+  // other: urgent work wins, else the resume card when there is a last chapter.
+  assert.equal((index.match(/data-home-primary(?!-)/g) || []).length, 2);
+  assert.equal((index.match(/data-home-primary-cta/g) || []).length, 2);
+  assert.match(index, /primary && \(primary\.priority >= URGENT \|\| recent === null\)/);
+  assert.match(index, /recent && !\(homeDecision\.primary && homeDecision\.primary\.priority >= URGENT\)/);
+  assert.ok(index.indexOf('data-home-primary') < index.indexOf('<TopicGenerator'));
+});
+
+check('the Index keeps the cloud-failure note, the placement offer and the week', () => {
+  assert.match(index, /assignments === false/);
+  assert.match(index, /home\.cloudUnavailable/);
+  assert.match(index, /<PlacementCard /);
+  assert.match(index, /<GoalCard /);
 });
 
 check('primary recommendation appears before manual generator in source order', () => {

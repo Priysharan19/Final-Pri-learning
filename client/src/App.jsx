@@ -64,11 +64,11 @@ const PLACEMENT_ON = featureEnabled('placement');
 // on in the test builds that walk them. The route itself lands on the Index
 // rather than a blank page, and the teacher's own Classes section is untouched.
 const CLASSES_ON = featureEnabled('extendedTracks');
-// The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
-// the owner flips it. Its code and stylesheet load only when the flag is on.
-// The build constant is read directly here (not through featureEnabled) so the
-// bundler can see which branch survives: an instrument build then drops the
-// v1.0 Home page, the v1.0 sidebar and everything only they import.
+// The Instrument interface: the one student interface on every build (V1
+// decision D7), set in client/interface.config.mjs. The build constant is read
+// directly here (not through featureEnabled) so the bundler can see which
+// branch survives: the build drops the v1.0 Home page, the v1.0 sidebar and
+// everything only they import.
 /* global __PRI_FEATURE_INSTRUMENT__ */
 const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__ && import.meta.env?.PROD === true;
 const INSTRUMENT_ON = INSTRUMENT_BUILD || featureEnabled('instrument');

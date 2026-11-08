@@ -27,12 +27,14 @@
 // fake windows, because the decision that module makes (do we spend 0.9 MB on
 // the recogniser?) is the one place a mistake costs a student money.
 //
-// Usage:  node client/test/install-budget-check.mjs [--no-build] [--instrument]
+// Usage:  node client/test/install-budget-check.mjs [--no-build]
 // A fresh build is made first unless --no-build, so this can never be green
-// about a dist somebody left behind three commits ago. With --instrument the
-// build is made with PRI_FEATURE_INSTRUMENT=1 (the interface's own warm set
-// and on-demand rules) and the Map, Report and Scripts tabs are held in the
-// warm pass (issue #658); npm run test:budget runs both.
+// about a dist somebody left behind three commits ago. Every build ships the
+// one interface client/interface.config.mjs names (V1 decision D7), so there
+// is one build to measure: the Instrument's own warm set and on-demand rules,
+// with the Map, Report and Scripts tabs held in the warm pass (issue #658).
+// (--instrument, which used to select that build, is accepted and changes
+// nothing.)
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -41,15 +43,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { optionalWarmAllowed, warmOfflineBuild, studentBusy } from '../src/local/offlineWarm.js';
 
-// The flag has to be in the environment before vite.config.js is evaluated:
-// its ON_DEMAND list and the warm set differ between the two builds.
-const INSTRUMENT = process.argv.includes('--instrument');
-if (INSTRUMENT) process.env.PRI_FEATURE_INSTRUMENT = '1';
-const { ON_DEMAND, PRECACHE_SKIP } = await import('../vite.config.js');
+const { ON_DEMAND, PRECACHE_SKIP, INSTRUMENT_BUILD } = await import('../vite.config.js');
+const { STUDENT_INTERFACE } = await import('../interface.config.mjs');
+const INSTRUMENT = INSTRUMENT_BUILD;
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
-const LABEL = INSTRUMENT ? 'INSTALL BUDGET (instrument build)' : 'INSTALL BUDGET';
+const LABEL = 'INSTALL BUDGET';
 
 // ── The budget ───────────────────────────────────────────────────────────────
 // Measured on the build these numbers were first set against: 1,159 kB raw /
@@ -117,7 +117,7 @@ if (!existsSync(join(DIST, 'sw.js'))) {
 {
   let flags = null;
   try { flags = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')); } catch { flags = null; }
-  eq(flags?.instrument, INSTRUMENT, `the dist under measurement was built with the instrument flag ${INSTRUMENT ? 'on' : 'off'}`);
+  eq(flags?.instrument, INSTRUMENT, `the dist under measurement ships the interface client/interface.config.mjs names (${STUDENT_INTERFACE})`);
 }
 
 const sw = readFileSync(join(DIST, 'sw.js'), 'utf8');

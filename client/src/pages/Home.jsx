@@ -40,11 +40,12 @@ function LazyReviewQueueCard(props) {
   return Card ? <Card {...props} /> : null;
 }
 
-export default function Home() {
-  const { user, dueCount } = useApp();
-  const nav = useNavigate();
-  const t = useT();
-  const tx = useTx();
+// ── The home decision, shared by both homes ──────────────────────────────────
+// The Instrument's Index (the home every build ships, client/interface.config.mjs)
+// and this page read the same recommendation, the same placement offer and the
+// same week from here, so the Index carries everything the v1.0 Home offered
+// and one resolver decides the student's next action for both.
+export function useHomeDecision(user, dueCount) {
   const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
   const [assignments, setAssignments] = useState(null);
@@ -95,18 +96,6 @@ export default function Home() {
     })();
     return () => { live = false; };
   }, [online, user.id]);
-  // The placement check (flagged, off in production builds) is offered to
-  // Indian students after onboarding until they take it or say not now.
-  const [placement, setPlacement] = useState(null);
-  useEffect(() => {
-    if (!featureEnabled('placement') || user.course !== 'in' || user.role === 'teacher') return;
-    api.get('/placement').then(setPlacement).catch(() => { });
-  }, [user.course, user.role]);
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? t('home.goodMorning') : hour < 18 ? t('home.goodAfternoon') : t('home.goodEvening');
-  const firstName = user.name.split(' ')[0];
-
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
     user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
     assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
@@ -126,6 +115,33 @@ export default function Home() {
     return id => (id ? names.get(id) || null : null);
   }, [curriculum]);
 
+  return { local, stats, curriculum, assignments, online, homeDecision, alternatives, topicName };
+}
+
+// The placement check (flagged, off in production builds) is offered to
+// Indian students after onboarding until they take it or say not now.
+export function usePlacement(user) {
+  const [placement, setPlacement] = useState(null);
+  useEffect(() => {
+    if (!featureEnabled('placement') || user.course !== 'in' || user.role === 'teacher') return;
+    api.get('/placement').then(setPlacement).catch(() => { });
+  }, [user.course, user.role]);
+  const skip = () => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); };
+  return [placement, skip];
+}
+
+export default function Home() {
+  const { user, dueCount } = useApp();
+  const nav = useNavigate();
+  const t = useT();
+  const tx = useTx();
+  const { local, stats, curriculum, assignments, online, homeDecision, alternatives, topicName } = useHomeDecision(user, dueCount);
+  const [placement, skipPlacement] = usePlacement(user);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? t('home.goodMorning') : hour < 18 ? t('home.goodAfternoon') : t('home.goodEvening');
+  const firstName = user.name.split(' ')[0];
+
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
@@ -139,8 +155,7 @@ export default function Home() {
 
       <section className="home-section" aria-labelledby="home-manual-title">
         <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
-        <PlacementCard placement={placement} onGo={path => nav(path)}
-          onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
+        <PlacementCard placement={placement} onGo={path => nav(path)} onSkip={skipPlacement} />
         <LazyReviewQueueCard user={user} />
         <LazyPlanCard user={user} stats={stats} />
         {alternatives.length > 0 && (
@@ -172,7 +187,7 @@ const WORK_REASONS = {
 };
 
 /** The words for one recommendation. Every claim comes from the action's own data. */
-function actionCopy(action, user, t, topicName, resume) {
+export function actionCopy(action, user, t, topicName, resume) {
   const d = action.data || {};
   const india = user.course === 'in';
   const resumeTopic = action.kind === 'practice-resume' ? topicName(resume?.subtopic) : null;
@@ -262,7 +277,7 @@ function HomeAction({ action, nav, primary, topicName, resume, online = true }) 
   );
 }
 
-function GoalCard({ user, activity }) {
+export function GoalCard({ user, activity }) {
   const t = useT();
   const done = user.today?.questions || 0;
   const goal = user.dailyGoal || 10;
@@ -301,7 +316,7 @@ function GoalCard({ user, activity }) {
   );
 }
 
-function PlacementCard({ placement, onGo, onSkip }) {
+export function PlacementCard({ placement, onGo, onSkip }) {
   const t = useT();
   if (!placement?.available || placement.status === 'skipped' || placement.status === 'unavailable') return null;
   const root = placement.result?.rootGaps?.[0] || null;

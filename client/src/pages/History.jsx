@@ -295,18 +295,26 @@ function HistoryForProfile() {
                   <i className="in-led-cc" aria-hidden="true" />
                   <span className="in-led-id">{`D${item.difficulty}`}</span>
                   <span className="in-led-q"><MathText text={item.prompt} /></span>
-                  <span className="in-led-ch" lang="en"><TermGloss text={item.subtopicName} /></span>
+                  <span className="hist-name in-led-ch" lang="en"><TermGloss text={item.subtopicName} /></span>
                   <span className="in-led-res">
-                    {!item.repeat && Number.isInteger(item.marksPossible) ? <MarkStrip earned={item.marksEarned} possible={item.marksPossible} /> : (
-                      <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
-                        {item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·'}
-                      </span>
-                    )}
-                    <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
+                    {/* The certified marks when the server gave them; the
+                        verdict itself is always there, as a word, so a row
+                        reads the same to a screen reader with or without
+                        marks (and the glyph only where there is no strip). */}
+                    {!item.repeat && Number.isInteger(item.marksPossible) && <MarkStrip earned={item.marksEarned} possible={item.marksPossible} />}
+                    <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}${!item.repeat && Number.isInteger(item.marksPossible) ? ' is-word' : ''}`} data-verdict={item.correct ? 'correct' : item.correct === false ? 'incorrect' : 'unmarked'}>
+                      {!(!item.repeat && Number.isInteger(item.marksPossible)) && (item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·')}
+                      <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
+                    </span>
                     {item.viaInk && <span className="in-led-ic" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
                     {item.hasPhoto && <span className="in-led-ic" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
                   </span>
-                  <span className="in-led-tm">{formatDate(item.answeredAt, user, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}</span>
+                  {/* The day heading is outside the row's button, so a screen
+                      reader moving row by row would hear only a time: the
+                      row says its own date (day then month, en-IN) too. */}
+                  <time className="in-led-tm" dateTime={item.answeredAt} data-history-date={formatDate(item.answeredAt, user)}>
+                    <span className="sr-only">{formatDate(item.answeredAt, user)}, </span>{formatDate(item.answeredAt, user, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}
+                  </time>
                 </button>
                 <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}
                   aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}

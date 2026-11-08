@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
+import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -124,9 +125,19 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-// The instrument build (PRI_FEATURE_INSTRUMENT=1) changes what is warmed: see
-// the instrument rules in ON_DEMAND and BOOT_FONTS.
-const INSTRUMENT_BUILD = process.env.PRI_FEATURE_INSTRUMENT === '1';
+// The student interface comes from the one setting, client/interface.config.mjs
+// (V1 decision D7), never from a build variable: web, iOS and Android all run
+// this build and so all ship the same interface. It changes what is warmed:
+// see the instrument rules in ON_DEMAND and BOOT_FONTS.
+if (!STUDENT_INTERFACES.includes(STUDENT_INTERFACE)) throw new Error(`client/interface.config.mjs: unknown STUDENT_INTERFACE ${JSON.stringify(STUDENT_INTERFACE)}`);
+if (!INTERFACE_SKINS.includes(INTERFACE_SKIN)) throw new Error(`client/interface.config.mjs: unknown INTERFACE_SKIN ${JSON.stringify(INTERFACE_SKIN)}`);
+export const INSTRUMENT_BUILD = STUDENT_INTERFACE === 'instrument';
+// PRI_FEATURE_INSTRUMENT used to choose the interface per build. It is retired:
+// a build variable left set on Railway or a laptop changes nothing, and the
+// build says so rather than silently disagreeing with what it was asked for.
+if (process.env.PRI_FEATURE_INSTRUMENT !== undefined && process.env.PRI_FEATURE_INSTRUMENT !== (INSTRUMENT_BUILD ? '1' : '0')) {
+  console.warn(`[pri] PRI_FEATURE_INSTRUMENT=${process.env.PRI_FEATURE_INSTRUMENT} is ignored: the student interface is set in client/interface.config.mjs (${STUDENT_INTERFACE}).`);
+}
 
 export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
@@ -196,17 +207,10 @@ export const ON_DEMAND = [
   // nothing, never a crash, if one cannot be fetched.
   [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
 
-  // The v1.1 instrument interface is behind the opt-in PRI_FEATURE_INSTRUMENT
-  // build flag (OPT_IN_FLAGS below). A build made with it off never imports
-  // these chunks: App.jsx and Login.jsx reach them only through import() calls
-  // guarded by featureEnabled('instrument'), which is false for the whole
-  // build. Warming them would spend the install on code no student of that
-  // build can run. A build made with the flag on warms them as usual, so the
-  // instrument stays offline-ready where it is the interface.
-  //
-  // A build made with the flag on is the opposite case, and it pays for its
-  // own interface by not warming what that interface leaves unpainted or
-  // reaches only by an explicit visit:
+  // The Instrument interface (client/interface.config.mjs) pays for itself by
+  // not warming what it leaves unpainted or reaches only by an explicit visit.
+  // (The branch below for a build without it is kept only so the rules stay
+  // correct if the setting ever names another interface; no build makes one.)
   //   · Inter. Once instrument.css has loaded, every interface token (--font,
   //     --font-display) is remapped to Instrument Sans. Before that, the boot
   //     theme.css still names 'Inter Variable', so the moment between first
@@ -431,14 +435,15 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 //   "Write by hand"). Off: a paper offers Type only, so no path can leave
 //   unread handwriting on a paper. On: the frozen-page / pending / Retry
 //   checking flow of server/platform/exams.js applies.
-// INSTRUMENT (v1.1 interface) is opt-in everywhere, the dev server included,
-// so the interface production ships stays the one developers see by default.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT']);
-const OPT_IN_FLAGS = new Set(['INSTRUMENT']);
+// The interface is not a flag any more: `instrument` is recorded beside the
+// flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
+// to it, but its value comes from client/interface.config.mjs in every build and
+// on the development server alike.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
-  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
+  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);

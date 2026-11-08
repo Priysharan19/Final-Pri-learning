@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
@@ -9,6 +10,8 @@ import ChapterScope from './ChapterScope.jsx';
 import TermGloss from '../components/TermGloss.jsx';
 import Glyph from './Glyph.jsx';
 import TopicGenerator from '../home/TopicGenerator.jsx';
+import { actionOpenable } from '../home/recommendation.js';
+import { useHomeDecision, usePlacement, actionCopy, PlacementCard, GoalCard } from '../pages/Home.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
@@ -58,9 +61,38 @@ function Ring({ value, colourVar }) {
   );
 }
 
+// The student's next action, from the one resolver both homes share
+// (home/recommendation.js through useHomeDecision). Time-bound work outranks
+// the chapter the student last opened: an exam in progress, assigned or
+// overdue work, an unfinished question, an expired paper to read, reviews due
+// (priority 80 and above). Below that the Index's own resume card — the last
+// chapter, with its marks — is the primary action when there is one; a
+// student with no history gets the resolver's first-practice action.
+const URGENT = 80;
+
+function NextAction({ action, copy, online, nav }) {
+  const t = useT();
+  const openable = actionOpenable(action, { online });
+  const reasonId = 'home-primary-reason';
+  return (
+    <div className="in-resume in-nextact" data-home-primary data-kind={action.kind}>
+      <div>
+        <small className="in-nextact-k">{copy.kicker}</small>
+        <b>{copy.title}</b>
+        <small id={reasonId}>{openable ? copy.reason : t('home.needsConnection')}</small>
+      </div>
+      <button type="button" className="in-btn is-primary" data-home-primary-cta aria-describedby={reasonId}
+        disabled={!openable} onClick={() => nav(action.destination)}>{copy.cta} <span className="in-kbd" aria-hidden="true">↵</span></button>
+    </div>
+  );
+}
+
 export default function IndexPage() {
   const { user, dueCount } = useApp();
   const t = useT();
+  const nav = useNavigate();
+  const { stats: homeStats, local, assignments, online, homeDecision, alternatives, topicName } = useHomeDecision(user, dueCount);
+  const [placement, skipPlacement] = usePlacement(user);
   const [curriculum, setCurriculum] = useState(null);
   const [recent, setRecent] = useState(undefined);
   const [error, setError] = useState('');
@@ -135,16 +167,26 @@ export default function IndexPage() {
       <div className="in-spine">
         <div className="in-greet">
           <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
-          <h1>{t(greetingKey(hour), { name })}</h1>
+          <h1 className="home-greet">{t(greetingKey(hour), { name })}</h1>
         </div>
 
-        {recent && (
-          <div className="in-resume" data-instrument-resume>
+        {(() => {
+          const primary = homeDecision.primary;
+          if (primary && (primary.priority >= URGENT || recent === null)) {
+            return <NextAction action={primary} copy={actionCopy(primary, user, t, topicName, local?.resume)} online={online} nav={nav} />;
+          }
+          return null;
+        })()}
+        {assignments === false && (
+          <p className="in-note in-cloud-note" role="status">{t('home.cloudUnavailable')}</p>
+        )}
+        {recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT) && (
+          <div className="in-resume" data-instrument-resume data-home-primary data-kind="last-chapter">
             <div>
               <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
             </div>
-            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })}>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
+            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
             {resumeMarks && resumeMarks.possible <= 10 && (
               <div className="in-seg10" aria-hidden="true">
                 {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
@@ -281,8 +323,29 @@ export default function IndexPage() {
             </PageLink>
           </li>
         </ul>
+        {alternatives.length > 0 && (
+          <ul className="in-also-list in-alts" aria-label={t('home.chooseElse')}>
+            {alternatives.map(item => {
+              const copy = actionCopy(item, user, t, topicName, local?.resume);
+              const openable = actionOpenable(item, { online });
+              const key = String(item.kind + '-' + item.id).replace(/[^A-Za-z0-9_-]/g, '-');
+              return (
+                <li key={item.kind + ':' + item.id} data-home-alt>
+                  <button type="button" className="in-also-link" disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
+                    onClick={() => { if (openable) nav(item.destination); }} aria-describedby={`in-alt-${key}`}>
+                    <span className="in-also-text"><b>{copy.title}</b><small id={`in-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</small></span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <PlacementCard placement={placement} onGo={path => nav(path)} onSkip={skipPlacement} />
         <LazyReviewQueueCard user={user} />
         <LazyPlanCard user={user} stats={stats} />
+        <div className="in-week" data-instrument-week>
+          <GoalCard user={user} activity={(homeStats || stats)?.activity || []} />
+        </div>
         <div className="in-also-gen" data-instrument-generator>
           <TopicGenerator user={user} curriculum={curriculum} />
         </div>

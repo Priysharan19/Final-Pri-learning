@@ -348,16 +348,22 @@ const [indexHtml, themeBoot, themeCssMain, workspaceCss, inkCss, syncWorker] = a
 // Route-only styles load with their routes; the system is the three files in load order.
 const themeCss = themeCssMain + '\n' + workspaceCss + '\n' + inkCss;
 
-check('a preference resolves to exactly light or dark; unknown values are paper', () => {
+// The shipped interface (client/interface.config.mjs) follows the device by
+// default (owner decision 2026-10-20): an unknown preference is 'system', which
+// resolves by the device's own setting and to paper when it has none.
+check('a preference resolves to exactly light or dark; unknown values follow the device', () => {
   const dark = { matches: true }, light = { matches: false };
+  assert.equal(themeLib.DEFAULT_THEME_PREF, 'system');
   assert.equal(themeLib.resolveTheme('light', dark), 'light');
   assert.equal(themeLib.resolveTheme('dark', light), 'dark');
   assert.equal(themeLib.resolveTheme('system', dark), 'dark');
   assert.equal(themeLib.resolveTheme('system', light), 'light');
   assert.equal(themeLib.resolveTheme('system', null), 'light');
   for (const junk of [undefined, null, '', 'blackboard', 'DARK', 7]) {
-    assert.equal(themeLib.cleanThemePref(junk), 'light');
-    assert.equal(themeLib.resolveTheme(junk, dark), 'light');
+    assert.equal(themeLib.cleanThemePref(junk), 'system');
+    assert.equal(themeLib.resolveTheme(junk, dark), 'dark');
+    assert.equal(themeLib.resolveTheme(junk, light), 'light');
+    assert.equal(themeLib.resolveTheme(junk, null), 'light');
   }
 });
 
@@ -367,6 +373,9 @@ check('the theme is painted before the app loads, from a file a strict script po
   assert.ok(boot < indexHtml.indexOf('type="module"'), 'theme-boot.js runs before the app bundle');
   assert.doesNotMatch(indexHtml, /<script>(?!<)/, 'no inline script in index.html');
   assert.match(themeBoot, new RegExp(`getItem\\('${themeLib.THEME_STORAGE_KEY}'\\)`));
+  // The first paint uses the same default the app applies, so a first open on
+  // a device in dark mode never flashes paper.
+  assert.match(themeBoot, new RegExp(`var p='${themeLib.DEFAULT_THEME_PREF}'`));
 });
 
 check('browser chrome colour matches the desk of each theme', () => {

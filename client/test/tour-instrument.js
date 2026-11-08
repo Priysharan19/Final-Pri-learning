@@ -1,9 +1,10 @@
-// Pri Learning · E2E flow — the v1.1 instrument interface (PRI_FEATURE_INSTRUMENT).
+// Pri Learning · E2E flow — the Instrument interface, the one student interface
+// every build ships (client/interface.config.mjs, V1 decision D7).
 //
-// Builds the client WITH the flag (the other suites build without it, so they
-// keep testing the interface production ships) and walks the new shell as a
-// signed-in Class 10 student, in paper and night, at phone, tablet and web:
-//   · the flag is really on: html.ui-instrument, the tab bar, no rail;
+// Walks the shell as a signed-in Class 10 student, in paper and night, at
+// phone, tablet and web (every other browser suite now runs on the same
+// interface; this one owns its own shell, Index, command bar and offline tabs):
+//   · the interface is really the Instrument: html.ui-instrument, the tab bar, no rail;
 //   · the Index lists the syllabus from the server, a chapter opens its plate,
 //     the plate's figures are the server's (answers / correct), accuracy is
 //     withheld below the floor, and the scope actually draws;
@@ -15,8 +16,7 @@
 //   · nothing moves after paint (Chromium layout-shift entries).
 // Screens are written to PRI_VISUAL_OUT (or a temp dir) for review.
 //
-// Usage: node client/test/tour-instrument.js [--browser=webkit]
-// Leaves an instrument build in client/dist: CI runs it last in its group.
+// Usage: node client/test/tour-instrument.js [--no-build] [--browser=webkit]
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -730,7 +730,6 @@ export const offlineFlow = {
 };
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  process.env.PRI_FEATURE_INSTRUMENT = '1';
   const { runFlows } = await import('./e2e.mjs');
   process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow]) ? 1 : 0);
 }

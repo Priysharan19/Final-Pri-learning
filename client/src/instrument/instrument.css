@@ -205,6 +205,26 @@ html.ui-instrument .shell.is-focus .in-bar { display: none; }
 .in-also-text small { font-size: 12.5px; line-height: 1.4; color: var(--in-tx-3); text-wrap: pretty; }
 .in-also .home-card { border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); margin-bottom: 12px; }
 .in-also-gen { display: grid; gap: 10px; justify-items: start; max-width: 720px; }
+/* What else the resolver offers, and the placement offer, in the same list
+   material as the entries above. A card that needs the cloud while offline is
+   shown and stays shut, saying why (home.needsConnection). */
+.in-alts { margin-bottom: 12px; }
+.in-also-link:disabled { cursor: default; opacity: 0.6; }
+.in-also .home-card .btn { border-radius: 4px; }
+/* The week, as the v1.0 Home gave it: today's count against the goal and the
+   last seven days. Practised days are filled in graphite; today is the one
+   current place, ringed in the signal colour. */
+.in-week { margin-top: 12px; }
+.in-week .home-week { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; margin: 0; padding: 14px 16px; border: 0; border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
+.in-week .goal-copy { flex: 1 1 220px; min-width: 0; }
+.in-week .goal-title { font: 500 14.5px var(--in-ui); letter-spacing: -0.01em; color: var(--in-tx); }
+.in-week .goal-sub { margin-top: 2px; font: 400 12.5px var(--in-mono); color: var(--in-tx-3); font-variant-numeric: tabular-nums; }
+.in-week .week-strip { display: grid; grid-template-columns: repeat(7, 24px); gap: 6px; margin: 0; }
+.in-week .week-day { display: grid; justify-items: center; gap: 4px; }
+.in-week .week-dot { width: 22px; height: 22px; max-width: none; margin: 0; border: 0; border-radius: 3px; background: var(--in-l3); color: transparent; font-size: 0; box-shadow: inset 0 0 0 1px var(--in-edge); }
+.in-week .week-dot.hit { background: var(--in-tx-2); box-shadow: none; }
+.in-week .week-dot.today { box-shadow: 0 0 0 1.5px var(--in-signal); }
+.in-week .week-lbl { font: 500 10.5px var(--in-mono); letter-spacing: 0.04em; color: var(--in-tx-3); }
 .in-also-gen .genbar { max-width: none; }
 html.ui-instrument .genbar-head { border-radius: 6px; border-color: var(--in-edge-2); background: var(--in-l1); min-height: 44px; }
 html.ui-instrument .genbar-head.open { border-radius: 6px 6px 0 0; }
@@ -306,6 +326,11 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 .in-seg10 i.x { background: var(--in-slip); }
 .in-resume b { display: block; font: 500 13.5px var(--in-ui); color: var(--in-tx); }
 .in-resume small { font: 400 12px var(--in-mono); color: var(--in-tx-3); }
+/* The resolver's next action wears the resume card: one primary action. */
+.in-nextact .in-nextact-k { display: block; margin-bottom: 3px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+.in-nextact b { font-size: 14.5px; }
+.in-nextact > div > small:last-child { font-family: var(--in-ui); font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
+.in-cloud-note { margin: -6px 0 14px; }
 .in-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; padding: 0 14px;
   border-radius: 4px; border: 0; font: 500 13.5px var(--in-ui); color: var(--in-tx); background: var(--in-l3);
@@ -380,6 +405,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
   .in-next { order: 2; }
   .in-strip { order: 3; }
   .in-resume { order: 4; margin: 14px 0 0; }
+  .in-cloud-note { order: 4; margin: 10px 0 0; }
   .in-spine > nav { order: 5; margin-top: 18px; }
   .in-plate { order: 6; }
   .in-plate .in-scope { display: none; }
@@ -388,7 +414,9 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
   .in-kpis div { flex: 1; min-width: 0; padding: 10px 10px; }
   .in-kpis small { font-size: 10.5px; }
 }
-.in-next { position: relative; margin-top: 16px; height: 250px; border-radius: 8px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); overflow: hidden; }
+/* The ghost numeral bleeds past the edge on purpose; clip (not a scroll
+   container) is the honest overflow for decoration. hidden is the fallback. */
+.in-next { position: relative; margin-top: 16px; height: 250px; border-radius: 8px; background: var(--in-void); box-shadow: inset 0 0 0 1px var(--in-edge); overflow: hidden; overflow: clip; }
 .in-next .in-eqn, .in-next .in-readout-hint { display: none; }
 .in-next .in-scope { position: absolute; inset: 0; height: 100%; border-radius: 0; box-shadow: none; background: none; }
 .in-next-ghost { position: absolute; right: -6px; top: -40px; font: 500 170px/1 var(--in-ui); letter-spacing: -0.08em; color: color-mix(in srgb, var(--cc) 7%, transparent); pointer-events: none; }
