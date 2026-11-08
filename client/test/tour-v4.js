@@ -114,12 +114,19 @@ const reviewRows = (page) => page.evaluate(() => {
     if (!meta) continue;
     const label = meta.innerText.replace(/\s+/g, ' ');
     const q = /Q(\d+)\b/.exec(label);
-    // Signed: a JEE Main wrong answer is awarded −1 (shown as -1 or −1).
-    const marks = /([-−]?\d+)\/(\d+) marks/.exec(label);
-    if (!q || !marks) continue;
+    // "✔ 4/4 marks", "✖ 0/4 marks", or a JEE Main wrong answer's
+    // "✖ −1 (negative mark) of 4" (examRoom.tagNegative).
+    const marks = /(\d+)\/(\d+) marks/.exec(label);
+    const negative = /[-−](\d+) \(negative mark\) of (\d+)/.exec(label);
+    if (!q || (!marks && !negative)) continue;
     const body = card.innerText.replace(/\s+/g, ' ');
     const given = /Your answer:\s*(.*?)\s*Correct answer:/.exec(body);
-    rows.push({ n: Number(q[1]), awarded: Number(marks[1].replace('−', '-')), marks: Number(marks[2]), given: given ? given[1] : null });
+    rows.push({
+      n: Number(q[1]),
+      awarded: negative ? -Number(negative[1]) : Number(marks[1]),
+      marks: Number((negative || marks)[2]),
+      given: given ? given[1] : null
+    });
   }
   return rows;
 });
