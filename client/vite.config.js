@@ -452,7 +452,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
-    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument)
+    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
+    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin)
   };
 }
 

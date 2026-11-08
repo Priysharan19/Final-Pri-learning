@@ -15,19 +15,27 @@
 //                    Android) ships it from one setting"). The v1.0 paper shell
 //                    is no longer built for students.
 //
-// INTERFACE_SKIN     the token set the Instrument wears.
-//                    'instrument'  the plain Instrument tokens: matte graphite
-//                                  and paper, ivory primary action, one signal
-//                                  orange. This is what D8 ships whenever the
-//                                  Aurora skin has not passed its contrast,
-//                                  reduced-motion and ink-alignment gates.
+// INTERFACE_SKIN     what the Instrument's chrome wears.
+//                    'aurora'      the owner's 22 Oct choice (D7), on chrome
+//                                  only (D9): glass bars, menus and palette,
+//                                  one violet for the current place and focus,
+//                                  light pools on the Index, Map and Settings
+//                                  (client/src/instrument/aurora.css). Content
+//                                  keeps the Instrument's tokens exactly.
+//                    'instrument'  the plain Instrument tokens everywhere:
+//                                  matte graphite and paper, ivory primary
+//                                  action, one signal orange. D8's fallback:
+//                                  if a gate in client/test/aurora-skin-check.mjs
+//                                  or tour-instrument cannot pass at candidate
+//                                  freeze, set INTERFACE_SKIN to 'instrument'
+//                                  here — that one line is the whole switch.
 //
 // client/test/interface-decisions-check.mjs holds the build, the bundles' recorded
 // features.json and this file to one another.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const STUDENT_INTERFACE = 'instrument';
-export const INTERFACE_SKIN = 'instrument';
+export const INTERFACE_SKIN = 'aurora';
 
 export const STUDENT_INTERFACES = Object.freeze(['instrument']);
-export const INTERFACE_SKINS = Object.freeze(['instrument']);
+export const INTERFACE_SKINS = Object.freeze(['aurora', 'instrument']);
