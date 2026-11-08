@@ -70,5 +70,5 @@ These are the lines #659 added to the privacy notice (English and Hindi), the Ap
 ## After counsel's review
 
 1. Apply the reviewed wording to the four documents above, and to the store forms in App Store Connect and Play Console.
-2. Set `PRI_PARENT_REPORT=on` (and `PRI_PARENT_REPORT_EMAILS=on` for the weekly sends) on the deployment, and build the apps with `PRI_FEATURE_PARENT_REPORT=1`.
+2. Set `PRI_PARENT_REPORT=on` (and `PRI_PARENT_REPORT_EMAILS=on` for the weekly sends) on the deployment, and build the apps with `PRI_FEATURE_PARENT_REPORT=1`. Add `/parent-report` back to the accessibility walk (`client/test/a11y-check.mjs`, as #659 had it) in the same change, so the screen is walked in the builds that ship it.
 3. Record the review, the owner's Yes and the date in `docs/release/V1_DECISIONS_2026-11-01.md` (D22).
