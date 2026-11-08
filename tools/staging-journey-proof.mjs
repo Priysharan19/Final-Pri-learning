@@ -21,10 +21,12 @@
 // to a reserved domain such as example.com bounces, and bounces count against
 // the sending domain. Never a real person's address.
 //
-// A step that needs to read an email (a sign-up code, the verification code
-// that unlocks marking, a guardian's link) is BLOCKED (mailbox) unless
-// PRI_STAGING_MAILBOX_CMD names a command that prints the newest code for an
-// address (`$PRI_STAGING_MAILBOX_CMD <address>`); none exists yet.
+// A step that needs an email code (sign-up, the guardian's approval, deletion)
+// reads it from the owner's dedicated test inbox over IMAP, configured ONLY in
+// ~/Developer/.pri-fleet/staging-inbox.env (mode 600, outside the repo; see
+// tools/staging-inbox.mjs). Each account gets <local>+pri-<run>-<n>@<domain>;
+// evidence and screenshots show only the tag. With no inbox file those steps
+// are BLOCKED (mailbox) and the rest still runs.
 //
 // Output: docs/release/evidence/staging-journeys/<sha>/report.md, results.json
 // and the screenshots, unless --out says otherwise. Run it after every merge
@@ -36,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { imapMailbox, loadInbox, redactAddress, tagAddress } from './staging-inbox.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(ROOT, 'client', 'package.json'));
@@ -98,6 +101,21 @@ export async function runJourney(args) {
   // never leave a staging account nobody can sign in to and delete.
   const password = `Pri-${randomBytes(9).toString('base64url')}-staging`;
   const recovery = join(tmpdir(), 'pri-staging-journey', `${runTag}.json`);
+  const inbox = args.accounts ? (args.inbox || loadInbox()) : { ok: false, reason: 'no --accounts' };
+  const mailbox = inbox.ok ? (args.mailbox || imapMailbox(inbox.config)) : null;
+  const inboxAddress = inbox.ok ? inbox.config.PRI_STAGING_INBOX_ADDRESS : null;
+  run.mailbox = inbox.ok ? 'test inbox present (mode 600)' : `no test inbox: ${inbox.reason}`;
+  const addressFor = (role, n) => inboxAddress ? tagAddress(inboxAddress, runTag, n) : `delivered+pri-${runTag}-${role}@resend.dev`;
+  const typeCode = async (page, idPrefix, code) => { await page.locator(`#${idPrefix}-0`).click(); await page.keyboard.type(code, { delay: 30 }); };
+  const waitCode = async (s, to, purposes, since) => {
+    for (const purpose of [].concat(purposes)) {
+      const got = await mailbox.waitForCode(to, purpose, since, 120000).catch(err => ({ code: null, error: String(err?.message || err).slice(0, 120) }));
+      if (got.code) { s.notes.push(`a ${purpose} code reached the test inbox after ${Math.round(got.waitedMs / 1000)} s`); return got.code; }
+      if (got.error) s.notes.push(`the test inbox could not be read: ${got.error}`);
+    }
+    s.defects.push({ what: `no ${[].concat(purposes).join('/')} code reached the test inbox within 120 s; staging email delivery to that address may be restricted (for example a Resend sandbox domain)`, where: 'staging email delivery (Resend) to the test inbox', repro: 'request a code on staging for a plus-address of the test inbox', lane: 'owner (email delivery)' });
+    return null;
+  };
   const remember = () => {
     if (!args.accounts) return;
     mkdirSync(dirname(recovery), { recursive: true, mode: 0o700 });
@@ -132,7 +150,9 @@ export async function runJourney(args) {
   }
   async function shot(s, page, name) {
     const file = join(out, `${String(++shotN).padStart(2, '0')}-${s.id}-${name}.png`);
-    await page.screenshot({ path: file, fullPage: false }).catch(() => null);
+    const mask = [page.locator('input[type="email"], #signup-destination, #signup-password-email, #guardian-destination, #delete-request-email, #signup-parent-destination')];
+    if (inboxAddress) mask.push(page.getByText(inboxAddress.slice(inboxAddress.lastIndexOf('@')), { exact: false }));
+    await page.screenshot({ path: file, fullPage: false, mask }).catch(() => null);
     s.shots.push(relative(out, file));
   }
   async function api(page, method, path, body) {
@@ -199,23 +219,48 @@ export async function runJourney(args) {
     }
 
     // ── 2 · sign-up and sign-in ────────────────────────────────────────────
-    const adult = { name: 'Staging Proof Adult', email: `delivered+pri-${runTag}-adult@resend.dev` };
+    const adult = { name: 'Staging Proof Adult', email: addressFor('adult', 4) };
     current = step('2', 'Sign-up and sign-in (email code on the card; a password account signs in before verifying)');
     let adultCtxA = null;
+    const coder = { email: null, id: null, ctx: null };
     {
       // 2a · the card's sign-up: an email code. Its mail cannot be read.
       const { ctx, page } = await newContext(SIZES[0], 'phone');
       await page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
       const card = page.locator('[data-signin-card="page"]');
       await card.waitFor({ timeout: 45000 });
-      const codeAddress = `delivered+pri-${runTag}-code@resend.dev`;
+      const codeAddress = addressFor('code', 1);
+      const sentAt = Date.now();
       await card.locator('#signup-destination').fill(codeAddress);
       await card.getByTestId('signup-send-code').click();
       const codeStep = await card.locator('#signup-code-0').waitFor({ timeout: 20000 }).then(() => true, () => false);
       check(current, 'email-code sign-up: the card sends a code and shows the six code boxes', codeStep);
       await shot(current, page, 'email-code-sent');
-      current.blocked.push('email-code sign-up cannot finish: the six-digit code goes to a mailbox this harness cannot read (no account is created without it). Closes when PRI_STAGING_MAILBOX_CMD reads a dedicated test inbox.');
-      await ctx.close();
+      if (!mailbox) {
+        current.blocked.push(`email-code sign-up cannot finish: the six-digit code goes to a mailbox this harness cannot read (${run.mailbox}). Closes with the owner's test inbox file.`);
+        await ctx.close();
+      } else {
+        const code = await waitCode(current, codeAddress, 'sign-in', sentAt);
+        if (code) {
+          await typeCode(page, 'signup-code', code);
+          await card.locator('#signup-flow-name').waitFor({ timeout: 30000 }).catch(() => {});
+          if (await card.locator('#signup-flow-name').count()) {
+            await card.locator('#signup-flow-name').fill('Staging Proof Coder');
+            await card.getByTestId('signup-age-18').click();
+            await card.getByTestId('signup-agree').check();
+            await card.getByTestId('signup-age-next').click();
+          }
+          if (await card.getByTestId('signup-class-10').waitFor({ timeout: 30000 }).then(() => true, () => false)) {
+            await card.getByTestId('signup-class-10').click(); await card.getByTestId('signup-class-next').click();
+          }
+          const shell = await page.locator('.shell').waitFor({ timeout: 60000 }).then(() => true, () => false);
+          const me = await api(page, 'GET', '/v1/account/me');
+          await shot(current, page, 'email-code-signed-up');
+          const inApp = check(current, 'email-code sign-up finishes: a verified account, inside the app', shell && me.status === 200 && me.data?.account?.emailVerified === true, `${me.status} shell=${shell}`);
+          if (me.data?.account?.id) { coder.email = codeAddress; coder.id = me.data.account.id; run.created.push({ role: 'adult (email code)', email: codeAddress, id: coder.id, codeOnly: true }); remember(); }
+          if (inApp) coder.ctx = { ctx, page, label: 'phone-code' }; else await ctx.close();
+        } else await ctx.close();
+      }
 
       // 2b · a password account, made through the server route the app's
       // Settings → Cloud account panel uses (the card itself only signs in).
@@ -270,9 +315,15 @@ export async function runJourney(args) {
       }
     }
 
+    if (mailbox && !coder.ctx && current.status !== 'FAIL') finish(current, 'FAIL');
+    // The UI steps below use the verified email-code account when there is one.
+    const ui = coder.ctx || (run.entered ? adultCtxA : null);
+    const uiAccount = coder.ctx ? { email: coder.email, id: coder.id, codeOnly: true } : { email: adult.email, id: adult.id, codeOnly: false };
+    run.entered = !!ui;
+
     // ── 3 · a minor: guardian consent is requested and the account waits ──
     current = step('3', 'Minor account: guardian consent requested, account held pending');
-    const child = { name: 'Staging Proof Child', email: `delivered+pri-${runTag}-child@resend.dev`, guardian: `delivered+pri-${runTag}-guardian@resend.dev` };
+    const child = { name: 'Staging Proof Child', email: addressFor('child', 5), guardian: addressFor('guardian', 6) };
     {
       const { ctx, page } = await newContext(SIZES[1], 'tablet-child');
       await page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
@@ -304,8 +355,64 @@ export async function runJourney(args) {
       await shot(current, fresh.page, 'child-sign-in');
       const held = check(current, 'signing in shows the guardian step, not the app', !shellOpen && (step === 'parent' || step === 'parent-wait' || /parent|guardian/i.test(String(step))), `card step ${step}, shell open ${shellOpen}`);
       await fresh.ctx.close();
-      current.blocked.push('the guardian confirmation link goes to the guardian mailbox, which this harness cannot read; closes with PRI_STAGING_MAILBOX_CMD reading a dedicated test inbox, then: open the link, confirm, and check the account opens');
-      finish(current, made && pending && held ? 'PASS' : 'FAIL');
+      let approved = true;
+      if (!mailbox) {
+        current.blocked.push(`the guardian's approval code goes to the guardian's mailbox, which this harness cannot read (${run.mailbox}); closes with the owner's test inbox file`);
+      } else {
+        // The real minor journey: code sign-up, the parent step, the parent
+        // approves on their own device with the code they were sent.
+        const kidAddress = addressFor('child-code', 2); const parentAddress = addressFor('guardian-code', 3);
+        const K = await newContext(SIZES[0], 'phone-child');
+        await K.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
+        const kcard = K.page.locator('[data-signin-card="page"]');
+        await kcard.waitFor({ timeout: 45000 });
+        const t0 = Date.now();
+        await kcard.locator('#signup-destination').fill(kidAddress);
+        await kcard.getByTestId('signup-send-code').click();
+        await kcard.locator('#signup-code-0').waitFor({ timeout: 20000 });
+        const kidCode = await waitCode(current, kidAddress, 'sign-in', t0);
+        approved = false;
+        if (kidCode) {
+          await typeCode(K.page, 'signup-code', kidCode);
+          await kcard.locator('#signup-flow-name').waitFor({ timeout: 30000 });
+          await kcard.locator('#signup-flow-name').fill('Staging Proof Minor');
+          await kcard.getByTestId('signup-age-13').click();
+          if (await kcard.getByTestId('signup-agree').count()) await kcard.getByTestId('signup-agree').check();
+          await kcard.getByTestId('signup-age-next').click();
+          await kcard.getByTestId('signup-class-8').waitFor({ timeout: 30000 });
+          await kcard.getByTestId('signup-class-8').click(); await kcard.getByTestId('signup-class-next').click();
+          await kcard.locator('#signup-parent-name').waitFor({ timeout: 30000 });
+          const kme = await api(K.page, 'GET', '/v1/account/me');
+          if (kme.data?.account?.id) { run.created.push({ role: 'child (email code)', email: kidAddress, id: kme.data.account.id, codeOnly: true }); remember(); }
+          await kcard.locator('#signup-parent-name').fill('Staging Proof Guardian');
+          await kcard.locator('#signup-parent-destination').fill(parentAddress);
+          const t1 = Date.now();
+          await kcard.getByTestId('signup-parent-send').click();
+          const waiting = await kcard.getByTestId('signup-parent-waiting').waitFor({ timeout: 20000 }).then(() => true, () => false);
+          check(current, 'a 13-year-old signed up by email code waits for a parent, with no way into the app', waiting && !(await K.page.locator('.shell').count()));
+          await shot(current, K.page, 'minor-waiting');
+          const parentCode = await waitCode(current, parentAddress, 'guardian', t1);
+          if (parentCode) {
+            const G = await newContext(SIZES[0], 'phone-parent');
+            await G.page.goto(args.origin + '/guardian/consent', { waitUntil: 'domcontentloaded' });
+            const emailRadio = G.page.getByRole('radio', { name: 'Email' });
+            if (await emailRadio.count()) await emailRadio.click();
+            await G.page.locator('#guardian-destination').fill(parentAddress);
+            await G.page.getByTestId('guardian-agree').check();
+            await typeCode(G.page, 'guardian-code', parentCode);
+            await G.page.getByTestId('guardian-approve').click();
+            const ok = await G.page.getByText('account is approved', { exact: false }).waitFor({ timeout: 20000 }).then(() => true, () => false);
+            await shot(current, G.page, 'parent-approved');
+            check(current, 'the parent approves on their own device with the code they were sent', ok);
+            await G.ctx.close();
+            if (await kcard.getByTestId('signup-parent-check').count()) await kcard.getByTestId('signup-parent-check').click();
+            approved = check(current, 'once approved, the minor enters the app', await K.page.locator('.shell').waitFor({ timeout: 60000 }).then(() => true, () => false));
+            await shot(current, K.page, 'minor-in-app');
+          }
+        }
+        await K.ctx.close();
+      }
+      finish(current, made && pending && held && approved ? 'PASS' : 'FAIL');
       if (made && !held) current.defects.push({ what: 'a pending minor reached the app (or no guardian step) on password sign-in', where: 'SignUpFlow / activation gate', repro: 'register a Class 8 account with a guardian, sign in with password on the card', lane: 'L2' });
     }
 
@@ -338,7 +445,7 @@ export async function runJourney(args) {
       ['9', 'Offline mid-answer: the draft is kept and read when back online', 'needs an issued question to answer']
     ]) {
       const s = step(id, name);
-      s.blocked.push(`${why}; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD).`);
+      s.blocked.push(mailbox && coder.ctx ? `not yet built: this step is written against the real flow now that a verified account exists on staging (${why})` : `${why}; that needs a verified email, so the mailbox (${run.mailbox}).`);
       finish(s, 'BLOCKED');
     }
 
@@ -347,23 +454,38 @@ export async function runJourney(args) {
     {
       const B = await newContext(SIZES[1], 'tablet-B');
       await B.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
-      const login = await api(B.page, 'POST', '/v1/account/login', { email: adult.email, password, deviceId: `staging-proof-${runTag}-B` });
-      const bIn = check(current, 'a second browser signs in to the same account', login.status === 200 && (await signedInAs(B.page)) === adult.id, `${login.status}`);
+      let bIn;
+      if (uiAccount.codeOnly) {
+        const bcard = B.page.locator('[data-signin-card="page"]');
+        await bcard.waitFor({ timeout: 45000 });
+        const t0 = Date.now();
+        await bcard.locator('#signup-destination').fill(uiAccount.email);
+        await bcard.getByTestId('signup-send-code').click();
+        await bcard.locator('#signup-code-0').waitFor({ timeout: 20000 });
+        const code = await waitCode(current, uiAccount.email, 'sign-in', t0);
+        if (code) await typeCode(B.page, 'signup-code', code);
+        if (await bcard.getByTestId('signup-class-10').waitFor({ timeout: 20000 }).then(() => true, () => false)) { await bcard.getByTestId('signup-class-10').click(); await bcard.getByTestId('signup-class-next').click(); }
+        await B.page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {});
+        bIn = check(current, 'a second browser signs in to the same account (email code)', (await signedInAs(B.page)) === uiAccount.id);
+      } else {
+        const login = await api(B.page, 'POST', '/v1/account/login', { email: adult.email, password, deviceId: `staging-proof-${runTag}-B` });
+        bIn = check(current, 'a second browser signs in to the same account', login.status === 200 && (await signedInAs(B.page)) === adult.id, `${login.status}`);
+      }
       let hasControl = null;
       if (run.entered) {
-        await adultCtxA.page.goto(args.origin + '/settings', { waitUntil: 'domcontentloaded' });
-        await adultCtxA.page.waitForTimeout(3000);
-        const control = adultCtxA.page.getByRole('button', { name: /sign out everywhere|sign out of all/i });
+        await ui.page.goto(args.origin + '/settings', { waitUntil: 'domcontentloaded' });
+        await ui.page.waitForTimeout(3000);
+        const control = ui.page.getByRole('button', { name: /sign out everywhere|sign out of all/i });
         hasControl = check(current, 'Settings offers "Sign out everywhere"', await control.count() > 0);
-        await shot(current, adultCtxA.page, 'settings-sign-out-everywhere');
-        if (hasControl) { await control.first().click(); await adultCtxA.page.waitForTimeout(3000); }
+        await shot(current, ui.page, 'settings-sign-out-everywhere');
+        if (hasControl) { await control.first().click(); await ui.page.waitForTimeout(3000); }
         else current.defects.push({ what: 'no "Sign out everywhere" control in Settings on this build', where: 'Settings (cloud account security)', repro: 'sign in, open /settings', lane: 'L2 (open PR #709 adds it)' });
       } else {
         current.blocked.push('Settings could not be opened: the unverified account never got past the sign-in card (step 2)');
       }
       if (!hasControl) {
         // The server half, through the route the control calls. Labelled API-only.
-        const all = await api(adultCtxA.page, 'POST', '/v1/account/logout-all', {});
+        const all = await api((ui || adultCtxA).page, 'POST', '/v1/account/logout-all', {});
         check(current, 'API only: POST /v1/account/logout-all revokes the account\'s sessions', all.status === 200, `${all.status} ${JSON.stringify(all.data)}`);
       }
       const bMe = await api(B.page, 'GET', '/v1/account/me');
@@ -381,6 +503,43 @@ export async function runJourney(args) {
       if (!run.entered) {
         current.blocked.push('in-app deletion is in Settings, which the unverified account cannot reach (step 2); the public deletion page sends an email code to the mailbox. The accounts are deleted below through DELETE /v1/account with the password (the route the Settings form calls), labelled API cleanup');
         finish(current, 'BLOCKED');
+      } else if (uiAccount.codeOnly) {
+        // Sign in again (step 10 signed every session out), then delete in Settings with a code.
+        const D = await newContext(SIZES[1], 'tablet-delete');
+        await D.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
+        const dcard = D.page.locator('[data-signin-card="page"]');
+        await dcard.waitFor({ timeout: 45000 });
+        let t0 = Date.now();
+        await dcard.locator('#signup-destination').fill(uiAccount.email);
+        await dcard.getByTestId('signup-send-code').click();
+        await dcard.locator('#signup-code-0').waitFor({ timeout: 20000 });
+        const signIn = await waitCode(current, uiAccount.email, 'sign-in', t0);
+        if (signIn) await typeCode(D.page, 'signup-code', signIn);
+        if (await dcard.getByTestId('signup-class-10').waitFor({ timeout: 20000 }).then(() => true, () => false)) { await dcard.getByTestId('signup-class-10').click(); await dcard.getByTestId('signup-class-next').click(); }
+        await D.page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {});
+        await D.page.goto(args.origin + '/settings#cloud-account-title', { waitUntil: 'domcontentloaded' });
+        const send = D.page.getByTestId('cloud-delete-send-code');
+        const found = check(current, 'Settings offers deletion by a code sent to the account\'s own address', await send.waitFor({ timeout: 30000 }).then(() => true, () => false));
+        let deleted = false;
+        if (found) {
+          t0 = Date.now();
+          await send.click();
+          await D.page.locator('#cloud-delete-code-0').waitFor({ timeout: 15000 });
+          const code = await waitCode(current, uiAccount.email, ['delete', 'sign-in'], t0);
+          if (code) {
+            await typeCode(D.page, 'cloud-delete-code', code);
+            await D.page.locator('#cloud-delete-phrase').fill('DELETE');
+            await shot(current, D.page, 'delete-with-code');
+            await D.page.getByTestId('cloud-delete-with-code').click();
+            await D.page.waitForFunction(() => !document.querySelector('#cloud-delete-code-0'), null, { timeout: 20000 }).catch(() => {});
+            await D.page.waitForTimeout(3000);
+            deleted = check(current, 'the account is deleted: its session is gone', (await api(D.page, 'GET', '/v1/account/me')).status === 401);
+            if (deleted) run.deleted.push({ role: 'adult (email code)', email: uiAccount.email, via: 'in-app Settings (email code)' });
+          }
+        }
+        await D.ctx.close();
+        finish(current, found && deleted ? 'PASS' : 'FAIL');
+        if (!(found && deleted)) current.defects.push({ what: 'in-app deletion of an email-code account did not complete', where: 'Settings → Cloud account → delete with a code', repro: 'email-code account, Settings, send code, enter it, type DELETE, delete', lane: 'L2' });
       } else {
         const D = adultCtxA;
         await D.page.goto(args.origin + '/settings#cloud-account-title', { waitUntil: 'domcontentloaded' });
@@ -413,6 +572,26 @@ export async function runJourney(args) {
         if (run.deleted.some(d => d.email === acct.email)) continue;
         const C = await newContext(SIZES[1], 'cleanup').catch(() => null);
         if (!C) { run.notDeleted.push({ ...acct, why: 'no browser for cleanup' }); continue; }
+        if (acct.codeOnly) {
+          // No password: the public deletion page, with a code from the test inbox.
+          try {
+            if (!mailbox) { run.notDeleted.push({ ...acct, why: 'a code-only account needs the test inbox to delete' }); continue; }
+            await C.page.goto(args.origin + '/account/delete-request', { waitUntil: 'domcontentloaded' });
+            await C.page.locator('#delete-request-email').fill(acct.email);
+            const t0 = Date.now();
+            await C.page.getByTestId('delete-request-send').click();
+            await C.page.locator('#delete-request-code-0').waitFor({ timeout: 15000 });
+            const note = { notes: [], defects: [] };
+            const code = await waitCode(note, acct.email, ['delete', 'sign-in'], t0);
+            if (!code) { run.notDeleted.push({ ...acct, why: 'the deletion code never reached the test inbox' }); continue; }
+            await typeCode(C.page, 'delete-request-code', code);
+            const done = await C.page.getByTestId('delete-request-done').waitFor({ timeout: 20000 }).then(() => true, () => false);
+            if (done) run.deleted.push({ role: acct.role, email: acct.email, via: 'public deletion page (email code)' });
+            else run.notDeleted.push({ ...acct, why: 'the public deletion page did not confirm' });
+          } catch (err) { run.notDeleted.push({ ...acct, why: String(err?.message || err).slice(0, 160) }); }
+          finally { await C.ctx.close().catch(() => {}); }
+          continue;
+        }
         try {
           await C.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
           const login = await api(C.page, 'POST', '/v1/account/login', { email: acct.email, password, deviceId: `staging-proof-${runTag}-cleanup` });
@@ -430,8 +609,8 @@ export async function runJourney(args) {
       else rmSync(recovery, { force: true });
     }
     run.finishedAt = now();
-    writeFileSync(join(out, 'results.json'), JSON.stringify(run, null, 2) + '\n');
-    writeFileSync(join(out, 'report.md'), report(run));
+    writeFileSync(join(out, 'results.json'), redactAddress(JSON.stringify(run, null, 2), inboxAddress) + '\n');
+    writeFileSync(join(out, 'report.md'), redactAddress(report(run), inboxAddress));
   }
   return run;
 }
@@ -442,6 +621,7 @@ export function report(run) {
   const lines = [];
   lines.push(`# Staging journey proof · ${run.sha.slice(0, 9)}`, '');
   lines.push(`Origin \`${run.origin}\` · started ${run.startedAt} · finished ${run.finishedAt || '—'} · accounts ${run.accounts ? 'made and deleted by this run' : 'not made (no --accounts)'}.`);
+  lines.push(`Mailbox: ${run.mailbox || 'not checked (no --accounts)'}.`);
   lines.push(`Deployed: web \`${run.deployed?.web || '?'}\`, server \`${run.deployed?.server || '?'}\`, readiness \`${run.deployed?.ready || '?'}\`, built ${run.deployed?.buildTimestamp || '?'}, database ${run.deployed?.engine || '?'}.`, '');
   lines.push('Real deployed product, real browser (Playwright Chromium, headless), nothing stubbed. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is device, human or examiner evidence.', '');
   lines.push('| Step | Status | What was proved or found |', '|---|---|---|');

@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 // The staging journey proof (2b below): staging only, one release, no secrets in its evidence.
 import { parseArgs as journeyArgs, redact as journeyRedact, report as journeyReport } from './staging-journey-proof.mjs';
+import { codeFromSubject, imapSession, loadInbox, mailboxOver, redactAddress, tagAddress } from './staging-inbox.mjs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -88,6 +89,67 @@ ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(en
     'the report lists each step\'s status, its defects with the owning lane, and every account it could not delete');
 }
 
+
+// ── 2c · staging-inbox: the test inbox file, plus-tags, codes, IMAP ────────
+{
+  const { mkdtempSync, writeFileSync: write, chmodSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const net = await import('node:net');
+  const dir = mkdtempSync(join(tmpdir(), 'pri-inbox-'));
+  const file = join(dir, 'staging-inbox.env');
+  const SECRET = 'not-a-real-password-7731';
+  write(file, `# test\nPRI_STAGING_INBOX_ADDRESS=qa@inbox.example\nPRI_STAGING_INBOX_IMAP_HOST=127.0.0.1\nPRI_STAGING_INBOX_IMAP_PORT=993\nPRI_STAGING_INBOX_USER=qa@inbox.example\nPRI_STAGING_INBOX_PASSWORD="${SECRET}"\n`);
+  chmodSync(file, 0o644);
+  const loose = loadInbox(file);
+  ok(!loose.ok && /mode 644/.test(loose.reason) && !loose.config, 'an inbox file readable by others is refused, and nothing in it is returned');
+  chmodSync(file, 0o600);
+  const good = loadInbox(file);
+  ok(good.ok && good.config.PRI_STAGING_INBOX_PASSWORD === SECRET, 'a mode-600 inbox file is read (quotes stripped)');
+  ok(!loadInbox(join(dir, 'missing.env')).ok, 'no inbox file: no inbox (the account steps are then BLOCKED, mailbox)');
+  write(file, 'PRI_STAGING_INBOX_ADDRESS=qa@inbox.example\nPRI_STAGING_INBOX_IMAP_PORT=143\nPRI_STAGING_INBOX_IMAP_HOST=h\nPRI_STAGING_INBOX_USER=u\nPRI_STAGING_INBOX_PASSWORD=' + SECRET + '\n');
+  chmodSync(file, 0o600);
+  const plain = loadInbox(file);
+  ok(!plain.ok && /TLS/.test(plain.reason) && !plain.reason.includes(SECRET), 'a plain-text IMAP port is refused, and the reason never carries a value from the file');
+  const tagged = tagAddress('qa@inbox.example', 'ab12cd', 3);
+  ok(tagged === 'qa+pri-ab12cd-3@inbox.example', 'each account gets a plus-address tag');
+  ok(redactAddress(`to ${tagged} and qa@inbox.example`, 'qa@inbox.example') === 'to <inbox>+pri-ab12cd-3 and <inbox>', 'evidence shows only the plus-tag, never the inbox address');
+  ok(codeFromSubject('482913 is your Pri Learning code')?.purpose === 'sign-in'
+    && codeFromSubject('=?UTF-8?Q?104857_is_the_code_to_approve_your_child=E2=80=99s_Pri_Learning_account?=')?.code === '104857'
+    && codeFromSubject('=?UTF-8?B?' + Buffer.from('771020 is the code to delete your Pri Learning account').toString('base64') + '?=')?.purpose === 'delete'
+    && codeFromSubject('Your weekly report') === null, 'codes are read from Pri subjects, encoded or not, with their purpose');
+  // A fake IMAP server: one message for the tagged address, older mail for another.
+  let sawLogin = '';
+  const server = net.createServer(sock => {
+    sock.setEncoding('utf8'); sock.write('* OK fake IMAP ready\r\n');
+    let buf = '';
+    sock.on('data', d => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf('\r\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 2);
+        const [tag, cmd] = line.split(' ');
+        if (cmd === 'LOGIN') { sawLogin = line; sock.write(`${tag} OK logged in\r\n`); }
+        else if (cmd === 'SELECT') sock.write('* 2 EXISTS\r\n' + `${tag} OK [READ-WRITE] selected\r\n`);
+        else if (cmd === 'UID' && / SEARCH /.test(line)) sock.write((line.includes(tagged) ? '* SEARCH 7\r\n' : '* SEARCH\r\n') + `${tag} OK search done\r\n`);
+        else if (cmd === 'UID' && / FETCH /.test(line)) {
+          const hdr = `Subject: 482913 is your Pri Learning code\r\nTo: ${tagged}\r\nDate: ${new Date().toUTCString()}\r\n\r\n`;
+          sock.write(`* 1 FETCH (UID 7 BODY[HEADER.FIELDS (SUBJECT TO DATE)] {${Buffer.byteLength(hdr)}}\r\n${hdr})\r\n${tag} OK fetch done\r\n`);
+        } else if (cmd === 'LOGOUT') { sock.write(`* BYE\r\n${tag} OK bye\r\n`); sock.end(); }
+        else sock.write(`${tag} BAD unknown\r\n`);
+      }
+    });
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const open = () => new Promise(r => { const c = net.connect(server.address().port, '127.0.0.1', () => r(c)); });
+  const box = mailboxOver(() => imapSession(open), { PRI_STAGING_INBOX_USER: 'qa@inbox.example', PRI_STAGING_INBOX_PASSWORD: 'p"w\\x' }, { pollMs: 20 });
+  const got = await box.waitForCode(tagged, 'sign-in', Date.now() - 1000, 2000);
+  ok(got.code === '482913', 'the IMAP reader finds the code sent to that exact plus-tag');
+  ok(sawLogin.includes('"p\\"w\\\\x"'), 'credentials are quoted and escaped in LOGIN');
+  const other = await box.waitForCode(tagAddress('qa@inbox.example', 'zz', 9), 'sign-in', Date.now(), 100);
+  const wrongKind = await box.waitForCode(tagged, 'delete', Date.now() - 1000, 100);
+  ok(other.code === null && wrongKind.code === null, 'no code for another tag or another purpose: the wait times out with null, never a guess');
+  server.close();
+}
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
 const SHA = 'a'.repeat(40);
