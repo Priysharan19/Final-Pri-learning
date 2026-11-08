@@ -721,6 +721,14 @@ export const offlineFlow = {
     await check('the service worker finished the offline build', !!held && held.of > 0 && held.warmed === held.of, JSON.stringify(held));
     await page.context().setOffline(true);
     await page.waitForFunction(() => !navigator.onLine, null, { timeout: 5000 }).catch(() => {});
+    // The bar says what cannot happen offline, and on demand what still works.
+    const banner = page.locator('[data-offline-banner]');
+    await banner.waitFor({ timeout: 10000 }).catch(() => {});
+    await check('offline, a one-line banner says checking answers needs a connection',
+      await banner.count() === 1 && /Checking answers needs a connection/.test(await banner.innerText()));
+    await banner.locator('summary').click().catch(() => {});
+    await check('and "What still works" opens to list scripts, the report and notes opened before, with the work kept on the device',
+      /Your scripts/.test(await banner.innerText()) && /Your report/.test(await banner.innerText()) && /kept on this device/.test(await banner.innerText()));
     for (const [name, href, ready] of [['the Map', '/map', '[data-map-chapter]'], ['the Report', '/progress', '[data-instrument-report]'], ['Scripts', '/review', '.in-led-bar, [data-state="empty"]']]) {
       await page.locator(`.in-tab[href="${href}"]`).click();
       const painted = await page.waitForSelector(ready, { timeout: 30000 }).then(() => true, () => false);

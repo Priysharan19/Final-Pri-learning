@@ -99,6 +99,26 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         <span className={`in-status${online ? '' : ' is-off'}`} role="status"><i aria-hidden="true" /><span className="in-status-t">{online ? t('inst.online') : t('inst.offline')}</span></span>
         {accountMenu}
       </header>
+      {/* Offline (audit-interface item 15, from #660 without its chronograph
+          styling): one line saying what cannot happen — nothing is checked
+          without a connection — and, on demand, what still works. Each item
+          is served from this device: scripts and the solutions their receipts
+          carried, the Report, and any notes chapter opened before. A native
+          disclosure, so a keyboard and a screen reader get it for free. */}
+      {!online && (
+        <aside className="in-offline no-print" aria-labelledby="in-offline-h" data-offline-banner>
+          <p className="in-offline-h" id="in-offline-h"><b>{t('inst.offlineTitle')}</b> {t('inst.offlineOneLine')}</p>
+          <details className="in-offline-more">
+            <summary>{t('inst.offlineStill')}</summary>
+            <ul>
+              <li>{t('inst.offlineItemHistory')}</li>
+              <li>{t('inst.offlineItemProgress')}</li>
+              <li>{t('inst.offlineItemNotes')}</li>
+            </ul>
+            <p className="in-offline-kept">{t('inst.offlineKept')}</p>
+          </details>
+        </aside>
+      )}
       {/* Mounted only while open: every opening starts from an empty query. */}
       {open && <CommandBar open onClose={() => setOpen(false)} user={user} pages={pages} actions={actions} returnFocus={returnFocus} />}
     </>

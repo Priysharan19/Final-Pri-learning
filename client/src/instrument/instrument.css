@@ -1292,3 +1292,15 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
   html.ui-instrument .login-legal { line-height: 1.2; }
   html.ui-instrument .login-legal a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 8px; }
 }
+
+/* Offline: one line under the bar, and what still works on demand. Matte, no
+   colour alarm: offline is a state, not an error. */
+.in-offline { padding: 8px 20px; border-bottom: 1px solid var(--in-edge); background: var(--in-l2); font-size: 13px; color: var(--in-tx-2); }
+.in-offline-h { margin: 0; }
+.in-offline-h b { font-weight: 600; color: var(--in-tx); }
+.in-offline-more { margin-top: 4px; }
+.in-offline-more summary { display: inline-flex; align-items: center; min-height: 32px; cursor: pointer; font: 500 12.5px var(--in-ui); color: var(--in-tx); text-decoration: underline; text-decoration-color: var(--in-edge-3); text-underline-offset: 3px; }
+.in-offline-more ul { margin: 4px 0 6px; padding-left: 18px; display: grid; gap: 2px; }
+.in-offline-kept { margin: 0 0 4px; color: var(--in-tx-3); font-size: 12.5px; max-width: 60em; }
+@media (pointer: coarse) { .in-offline-more summary { min-height: 44px; } }
+@media (max-width: 760px) { .in-offline { padding: 8px 16px; } }
