@@ -12,7 +12,7 @@ The hidden production study route is:
 
 It mounts the same `InkAnswer` + PencilKit surface + **server reader** path used by Practice. The device must be signed in to an account the server allows to read handwriting (a verified adult, or a minor with a confirmed guardian), because the server reader is the only reader: a session that is signed out cannot collect a single sample.
 
-Which server the build talks to is a release decision (`docs/release/device-matrix.md`, "Which server a device build talks to"): the first full collection runs on a **development build** of the frozen SHA pointed at **staging**; a TestFlight build talks to production only. Record the kind in the session setup.
+Which server the build talks to is a release decision (`docs/release/device-matrix.md`, "Which server a device build talks to"): the store build (TestFlight) of the frozen SHA names `https://app.prilearning.com`, which fronts **staging** at that SHA until GO. Record the build kind in the session setup. The step-by-step session procedure (consent, the D17 prompt, the exports, the commit path and the 24 test writers) is `WRITER_SESSION_PROTOCOL.md`.
 
 ## 2. Use only the assigned anonymous writer codes
 
