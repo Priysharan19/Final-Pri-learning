@@ -273,8 +273,10 @@ jobs:
           # together with every file those tabs import statically.
           grep -Eq 'INSTALL BUDGET: PASS — 63/63 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
-          # One interface from one setting on web, iOS and Android (D7).
-          grep -Fq 'INTERFACE SETTING: PASS — 25/25 checks' suites.log
+          # The V1 interface decisions in source: one interface from one
+          # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
+          # language switch says questions stay in English (D11).
+          grep -Fq 'INTERFACE DECISIONS: PASS — 34/34 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused

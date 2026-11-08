@@ -22,7 +22,7 @@
 //                                  Aurora skin has not passed its contrast,
 //                                  reduced-motion and ink-alignment gates.
 //
-// client/test/interface-setting-check.mjs holds the build, the bundles' recorded
+// client/test/interface-decisions-check.mjs holds the build, the bundles' recorded
 // features.json and this file to one another.
 // ─────────────────────────────────────────────────────────────────────────────
 

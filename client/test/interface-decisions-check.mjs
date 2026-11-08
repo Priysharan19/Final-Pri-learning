@@ -1,5 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · one student interface, from one setting, on every build
+// Pri Learning · the V1 interface decisions D7–D11, held in source
+//
+// D7  one student interface, from one setting, on every build (sections 1–5);
+// D8  the plain Instrument tokens are what ships until the Aurora skin passes
+//     its gates (the setting's INTERFACE_SKIN);
+// D10 anything the V1 evidence does not cover is hidden from students,
+//     starting with Classes (section 6);
+// D11 the Hindi switch stays and the app says questions stay in English
+//     (section 7).
 //
 // V1 decision D7: "One student UI: the Instrument structure ... Every build
 // (web, iOS, Android) ships it from one setting." The setting is
@@ -22,7 +30,7 @@
 // CI build job runs ios-bundle-features-check.mjs after npm run sync:ios);
 // install-budget-check.mjs checks the web dist's features.json.
 //
-// Usage: node client/test/interface-setting-check.mjs
+// Usage: node client/test/interface-decisions-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -81,8 +89,28 @@ ok(/flags\.instrument === INSTRUMENT_BUILD/.test(bundleCheck) && /flags\.skin ==
   'ios-bundle-features-check holds each generated bundle to the setting');
 ok(/eq\(flags\?\.instrument, INSTRUMENT,/.test(read('client/test/install-budget-check.mjs')), 'install-budget-check holds the web dist to it');
 
+// ── 6 · D10: what V1 evidence does not cover is hidden, starting with Classes ─
+ok(/const CLASSES_ON = featureEnabled\('extendedTracks'\);/.test(app), 'D10: the student Classes tab follows the classroom flag');
+ok(/\.\.\.\(CLASSES_ON \? \[\{ to: '\/classes'/.test(app), 'D10: the nav lists Classes only where that flag is on');
+ok(/<Route path="\/classes" element=\{CLASSES_ON && Classes \?[^}]*: <Navigate /.test(app), 'D10: and the route redirects where it is off');
+{
+  const states = vite.featureStates('build', {});
+  ok(states.extendedTracks === false, 'D10: a production build is made with the classroom flag off');
+}
+
+// ── 7 · D11: the Hindi switch stays, and says questions stay in English ──────
+const en = (await import('../src/i18n/strings.en.js')).default;
+const hi = (await import('../src/i18n/strings.hi.js')).default;
+ok(/Questions and worked solutions stay in English/.test(en['lang.help']), 'D11: the English note says questions and worked solutions stay in English');
+ok(/अंग्रेज़ी/.test(hi['lang.help']), 'D11: and its Hindi says the same');
+const login = read('client/src/pages/Login.jsx');
+ok(/function LanguagePicker\(\)[\s\S]{0,1600}\{chosen !== 'en' && <p className="muted lang-note" data-lang-note role="note">\{t\('lang\.help'\)\}<\/p>\}/.test(login),
+  'D11: the welcome screen\'s language switch says it the moment another language is chosen');
+ok(/\{t\('lang\.help'\)\}/.test(read('client/src/pages/SettingsLegacy.jsx')), 'D11: and Settings says it under its own switch');
+ok(/LANGUAGES\.map/.test(login), 'D11: the switch itself stays on the welcome screen');
+
 if (failures.length) {
-  console.log(`INTERFACE SETTING: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
+  console.log(`INTERFACE DECISIONS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`INTERFACE SETTING: PASS — ${pass}/${pass} checks — web, iOS and Android build the ${setting.STUDENT_INTERFACE} interface (${setting.INTERFACE_SKIN} skin) from client/interface.config.mjs; no build variable can fork it.`);
+console.log(`INTERFACE DECISIONS: PASS — ${pass}/${pass} checks — D7: web, iOS and Android build the ${setting.STUDENT_INTERFACE} interface (${setting.INTERFACE_SKIN} skin, D8) from client/interface.config.mjs and no build variable can fork it; D10: Classes hidden where the classroom flag is off; D11: the language switch says questions stay in English.`);

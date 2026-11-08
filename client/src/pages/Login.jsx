@@ -245,16 +245,22 @@ function fmtWait(ms, t) {
 function LanguagePicker() {
   const { chosen, t } = useLanguage();
   const pick = (id) => { rememberSignInLanguage(id); setLanguage(id); };
+  // V1 decision D11: the switch stays, and the app says plainly that
+  // questions and worked solutions remain in English — here, on the first
+  // screen, the moment another language is chosen, as Settings already does.
   return (
-    <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
-      role="group" aria-label={t('login.chooseLanguage')}>
-      {LANGUAGES.map(l => (
-        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
-          lang={l.htmlLang} aria-pressed={chosen === l.id}
-          aria-label={t('lang.switchTo', { language: l.english })}
-          onClick={() => pick(l.id)}>{l.label}</button>
-      ))}
-    </div>
+    <>
+      <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
+        role="group" aria-label={t('login.chooseLanguage')}>
+        {LANGUAGES.map(l => (
+          <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+            lang={l.htmlLang} aria-pressed={chosen === l.id}
+            aria-label={t('lang.switchTo', { language: l.english })}
+            onClick={() => pick(l.id)}>{l.label}</button>
+        ))}
+      </div>
+      {chosen !== 'en' && <p className="muted lang-note" data-lang-note role="note">{t('lang.help')}</p>}
+    </>
   );
 }
 

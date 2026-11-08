@@ -1281,3 +1281,7 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
   .in-btn, .in-ch, .in-tab, .in-flt, .in-pal-item, .in-cmd { transition: none; }
   .in-btn:active, .in-flt:active, .in-ch:active, .in-pal-item:active, .in-tab:active { transform: none; }
 }
+
+/* D11: on the welcome screen, under the language switch, once another
+   language is chosen: questions and worked solutions stay in English. */
+html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--in-tx-3); text-wrap: pretty; }
