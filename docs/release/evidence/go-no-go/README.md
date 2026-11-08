@@ -7,8 +7,11 @@ dossier that close issue #686 steps 25, 27, 28 and 30 (`docs/operations/postgres
 | File | Written by | Holds |
 |---|---|---|
 | `<sha>.json` | people, starting from `node scripts/release-dossier.mjs template <sha>` | the facts only people supply: when the candidate was frozen and by whom, the soak window and who watched it, the staging-acceptance run and its tester, each external gate's sign-off (examiner, counsel, security, native build, store, production data) with the name and the evidence, and the owner's **GO** or **NO-GO** for exactly this SHA |
-| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub post (an issue or a comment) that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
+| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub comment that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
 | `<sha>.md` | `node scripts/release-dossier.mjs <sha>` | the dossier: every machine check (nomination, Release Staging Proof on the SHA, merge freeze, staging build time), every evidence ledger row for the SHA (device matrix, reader evaluation), every gate with its person, and the verdict |
+
+Wherever this page links an approval, the link may be a comment or an issue opened from a prefilled link
+(the approvals section below; `docs/release/OWNER-APPROVALS.md`).
 
 ## Approvals are GitHub posts, not names in a file
 
@@ -25,7 +28,7 @@ GitHub and refuses it unless:
   `lastEditedAt`, a comment's from `updated_at`);
 - an issue is **open and has never been closed**: closing an approval issue withdraws it;
 - its **first line** is exactly the line below (under other text, in an HTML comment, in a code
-  block or indented by four spaces it is refused), and it holds no other approval line, so one post
+  block or indented by four spaces or a tab it is refused), and it holds no other approval line, so one post
   approves one thing:
   - for a waiver: `Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted, comma-separated list>`
   - for the GO: `Pri-Release-GO: <sha> target=deploy/production`

@@ -189,9 +189,10 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
     if (edited) problems.push(`${what} was edited after it was posted; post a new ${kind} rather than editing one`);
     if (created > now) problems.push(`${what} is dated in the future`);
   }
-  // The first line with text, as written: four spaces or a tab before it would make it a code block.
+  // The first line with text, as written: indentation reaching column 4 (four spaces, or up to three
+  // and a tab, which Markdown expands to the next tab stop) would make it a code block.
   const firstRaw = String(body).split(/\r?\n/).find(line => line.trim() !== '');
-  const first = firstRaw !== undefined && !/^(?: {4}|\t)/.test(firstRaw) ? firstRaw.trim() : null;
+  const first = firstRaw !== undefined && !/^(?: {4}| {0,3}\t)/.test(firstRaw) ? firstRaw.trim() : null;
   const approvalLines = (String(body).match(APPROVAL_LINE) || []).length;
   if (first !== marker) problems.push(`${what} does not start with the exact line: ${marker}`);
   if (approvalLines > 1) problems.push(`${what} holds ${approvalLines} approval lines; one post approves one thing`);

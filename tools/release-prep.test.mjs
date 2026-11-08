@@ -476,6 +476,7 @@ const scratch = [];
       await waiverRefused('whose closings GitHub did not report', waiverMarker(SHA, ['device-matrix']), { closed: null });
       await waiverRefused('whose waiver line is an indented code block', `    ${waiverMarker(SHA, ['device-matrix'])}`);
       await waiverRefused('whose waiver line follows a tab', `\t${waiverMarker(SHA, ['device-matrix'])}`);
+      for (const indent of [' \t', '  \t', '   \t']) await waiverRefused(`whose waiver line follows ${JSON.stringify(indent)} (a tab stop at column 4: a code block)`, `${indent}${waiverMarker(SHA, ['device-matrix'])}`);
       {
         const x = world({ device: 'android-blocked' });
         x.approveIssue(1501, waiverMarker(SHA, ['device-matrix']));
