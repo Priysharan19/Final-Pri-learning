@@ -82,6 +82,8 @@ export const PR_SUPERSEDED_ONLY = Object.freeze([
 const yamlKey = name => new RegExp(`(^|[{,\\s])["']?${name}["']?\\s*:`, 'gm');
 const CONCURRENCY_KEY = yamlKey('concurrency');
 const TYPES_KEY = yamlKey('types');
+// Every uses: key, block or flow, with the rest of its line.
+const USES_KEY = /(^|[{,\s])["']?uses["']?[ \t]*:([^\n]*)/gm;
 /** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
 export function prSupersededOnlyProblems(source, prefix) {
   if (source.includes('\r')) return ['the workflow must use LF line endings'];
@@ -102,9 +104,18 @@ export function prSupersededOnlyProblems(source, prefix) {
   if (block.filter(line => line === cancel).length !== 1) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
   const comment = block.filter(line => /^  # /.test(line)).map(line => line.slice(4)).join(' ');
   if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
-  // A local reusable workflow brings its own concurrency, outside this file's guard (and its
-  // github.workflow is this workflow's name): the pinned workflows call none.
-  if (/^\s*-?\s*["']?uses["']?\s*:\s*["']?\.\//m.test(source)) problems.push('a pinned workflow must not call a local reusable workflow (uses: ./…): its concurrency would escape this check');
+  // A reusable workflow (a job's uses: …/.github/workflows/…, in this repository or another) brings
+  // its own concurrency group into the run, outside this file's guard: the pinned workflows call
+  // none. A step's action (./.github/actions/…, owner/action@sha) carries no concurrency. A uses:
+  // value this cannot read on its own line fails closed.
+  for (const match of source.matchAll(USES_KEY)) {
+    const raw = match[2].replace(/[ \t]+#.*$/, '').trim();
+    const value = raw.replace(/^(["'])(.*?)\1.*$/, '$2').replace(/[,}\]].*$/, '').trim();
+    if (!value || /^[|>&*!]/.test(value)) problems.push(`a uses: value this check cannot read (${JSON.stringify(raw || 'nothing on its line')}) fails closed`);
+    else if (/\.github\/workflows\//i.test(value)) problems.push(`a pinned workflow must not call a reusable workflow (uses: ${value}): its own concurrency group would escape this check`);
+  }
+  // Callable, a pinned workflow would run inside another workflow's run, with that run's event and ref.
+  if (/\bworkflow_call\b/.test(source.split('\n').filter(line => !/^\s*#/.test(line)).join('\n'))) problems.push('a pinned workflow must not be callable (on: workflow_call): a caller\'s pull_request run would bring its own ref into this group');
   // A merged pull request's `closed` run has github.ref = refs/heads/main: it would share one group
   // with every other such run. The pattern holds only with GitHub's default pull_request types.
   if ([...source.matchAll(TYPES_KEY)].length) problems.push('the triggers must keep GitHub\'s default pull_request types (no types: key): a closed pull request runs with github.ref = refs/heads/main');
@@ -172,7 +183,8 @@ export function prefixCollision(source, prefixes) {
     // The literal text may be a shorter piece of a pinned "<prefix>-" that the first expression
     // completes (ink-${{ matrix.lane }}-… can become ink-physical-evidence-…). Only an expression
     // whose expansion is known can rule that out: github.ref starts "refs/", run ids are digits,
-    // SHAs are hex. Anything else (matrix, inputs, vars, head_ref…) fails closed.
+    // SHAs from GitHub are hex. Anything else (matrix, inputs, even one named like a SHA, since a
+    // dispatch input is free text; vars, head_ref…) fails closed.
     const at = value.indexOf('${{');
     if (at < 0) continue;
     const head = value.slice(0, at);
@@ -183,7 +195,7 @@ export function prefixCollision(source, prefixes) {
       const next = pinned.slice(head.length);
       const known = /^github\.ref$/.test(expr) ? next.startsWith('refs/') || 'refs/'.startsWith(next)
         : /^github\.(run_id|run_number|run_attempt)$/.test(expr) ? /^[0-9]/.test(next)
-          : /^(github\.sha|inputs\.\w*sha|github\.event\.workflow_run\.head_sha)(\s*\|\|\s*(github\.sha|inputs\.\w*sha))*$/.test(expr) ? /^[0-9a-f]/.test(next)
+          : /^(github\.sha|github\.event\.workflow_run\.head_sha)(\s*\|\|\s*github\.sha)*$/.test(expr) ? /^[0-9a-f]/.test(next)
             : null;
       if (known === null || known === true) return { prefix, literal: value, completes: true };
     }
@@ -235,12 +247,24 @@ export function prefixCollision(source, prefixes) {
     ['a job-level quoted key', s => job(s, `    "concurrency":\n      group: ${prefix}-\${{ github.ref }}\n`)],
     ['a top-level key with a trailing comment', s => s.replace(/^concurrency:$/m, 'concurrency: # pinned')],
     ['a top-level one-line form instead of the block', s => s.replace(/^concurrency:\n(?:  .*\n)+/m, `concurrency: ${prefix}-\${{ github.ref }}\n`)],
-    ['a job that calls a local reusable workflow', s => job(s, `    uses: ./.github/workflows/shared.yml\n`)]
+    ['a job that calls a local reusable workflow', s => job(s, `    uses: ./.github/workflows/shared.yml\n`)],
+    ['a job that calls a reusable workflow in another repository', s => job(s, `    uses: example-org/shared-workflows/.github/workflows/report.yml@0123456789abcdef0123456789abcdef01234567 # v2.1.0\n`)],
+    ['a job that calls this repository\'s reusable workflow by its full path', s => job(s, `    uses: Priysharan19/Final-Pri-learning/.github/workflows/promotions-report.yml@0123456789abcdef0123456789abcdef01234567\n`)],
+    ['a quoted reusable-workflow call', s => job(s, `    uses: 'example-org/shared/.github/workflows/report.yml@v1'\n`)],
+    ['a reusable-workflow call in a flow mapping', s => s.replace(/\njobs:\n/, '\njobs:\n  report: { uses: example-org/shared/.github/workflows/report.yml@v1, secrets: inherit }\n')],
+    ['a uses: value on the next line', s => job(s, `    uses:\n      example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a uses: value as a block scalar', s => job(s, `    uses: >-\n      example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an on: workflow_call trigger', s => s.replace(/^on:\n/m, 'on:\n  workflow_call:\n')],
+    ['a quoted workflow_call trigger', s => s.replace(/^on:\n/m, 'on:\n  "workflow_call": {}\n')]
   ]) {
     const mutated = mutate(good);
     assert.notEqual(mutated, good, `the mutation "${name}" applies`);
     assert.ok(prSupersededOnlyProblems(mutated, prefix).length > 0, `the policy refuses ${name}`);
   }
+  // A step's own action carries no concurrency: a local action is not a reusable workflow.
+  const withLocalAction = good.replace(/(\n      - uses: actions\/setup-node@[^\n]*\n)/, '$1      - uses: ./.github/actions/setup-pri\n');
+  assert.notEqual(withLocalAction, good, 'the local-action control applies');
+  assert.deepEqual(prSupersededOnlyProblems(withLocalAction, prefix), [], 'a step that uses a local action (./.github/actions/…) is not a reusable-workflow call');
   for (const [name, other] of [
     ['an unquoted group', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }}\n`],
     ['a single-quoted group', `name: Other\nconcurrency:\n  group: '${prefix}-\${{ github.ref }}'\n`],
@@ -283,7 +307,9 @@ export function prefixCollision(source, prefixes) {
     ['a matrix value completing ink-physical-evidence', 'ink-${{ matrix.lane }}-${{ github.ref }}'],
     ['an input completing a kalp gate', 'kalp-${{ inputs.gate }}-${{ github.ref }}'],
     ['a variable completing pri-reason', 'pri-${{ vars.lane }}-${{ github.ref }}'],
-    ['github.head_ref after a piece of a prefix', 'promo${{ github.head_ref }}']
+    ['github.head_ref after a piece of a prefix', 'promo${{ github.head_ref }}'],
+    ['a dispatch input named like a SHA (free text, not hex)', 'pri-${{ inputs.release_sha }}'],
+    ['a SHA input behind the workflow_run SHA', 'pri-${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}']
   ]) assert.ok(prefixCollision(`name: Other\nconcurrency:\n  group: ${group}\n`, prefixes)?.completes === true, `another workflow cannot reach a pinned group through ${name}`);
   for (const [name, group] of [
     ['ink-structural-v4-${{ github.ref }} (a real workflow: refs/ never completes -candidate-)', 'ink-structural-v4-${{ github.ref }}'],
