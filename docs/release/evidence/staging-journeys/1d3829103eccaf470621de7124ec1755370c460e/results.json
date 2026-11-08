@@ -1,0 +1,1589 @@
+{
+  "origin": "https://pri-learning-staging-staging.up.railway.app",
+  "sha": "1d3829103eccaf470621de7124ec1755370c460e",
+  "startedAt": "2026-11-08T13:24:55.780Z",
+  "accounts": true,
+  "steps": [
+    {
+      "id": "0",
+      "name": "Release identity: staging serves the nominated SHA",
+      "status": "PASS",
+      "checks": [
+        {
+          "label": "web, server and readiness all report the nominated SHA",
+          "ok": true,
+          "detail": "{\"web\":\"1d3829103eccaf470621de7124ec1755370c460e\",\"server\":\"1d3829103eccaf470621de7124ec1755370c460e\",\"ready\":\"1d3829103eccaf470621de7124ec1755370c460e\",\"buildTimestamp\":\"2026-11-07T07:12:14.000Z\",\"engine\":\"postgres\"}"
+        },
+        {
+          "label": "/v1/ready says the replica can serve",
+          "ok": true,
+          "detail": "ready"
+        }
+      ],
+      "notes": [],
+      "evidence": [
+        {
+          "path": "/release.json",
+          "status": 200,
+          "response": {
+            "schemaVersion": 1,
+            "repository": "Priysharan19/Final-Pri-learning",
+            "branch": "main",
+            "productVersion": "4.0",
+            "curriculumVersion": "CATALOG-2026-09",
+            "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+            "buildTimestamp": "2026-11-07T07:12:14.000Z"
+          }
+        },
+        {
+          "path": "/v1/health",
+          "status": 200,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144297854
+          }
+        },
+        {
+          "path": "/v1/ready",
+          "status": 200,
+          "response": {
+            "ready": true,
+            "state": "ready",
+            "service": "pri-learning-platform",
+            "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+            "database": {
+              "engine": "postgres"
+            },
+            "checks": {
+              "database": {
+                "state": "ok",
+                "code": null,
+                "engine": "postgres",
+                "schemaVersion": "13",
+                "billingSchemaVersion": "6",
+                "expectedSchemaVersion": "13",
+                "expectedBillingSchemaVersion": "6",
+                "latencyMs": 137
+              },
+              "authEmail": {
+                "state": "ok",
+                "code": null,
+                "required": true,
+                "credential": "valid",
+                "sender": "unknown"
+              },
+              "paidCeiling": {
+                "state": "ok",
+                "code": null
+              },
+              "billing": {
+                "state": "not_configured",
+                "code": null
+              },
+              "handwriting": {
+                "state": "ok",
+                "code": null
+              },
+              "working": {
+                "state": "ok",
+                "code": null
+              },
+              "staffMfa": {
+                "state": "not_required",
+                "code": null
+              }
+            },
+            "failing": [],
+            "degraded": [],
+            "checkedAt": 1794144299216
+          }
+        }
+      ],
+      "shots": [],
+      "defects": [],
+      "blocked": []
+    },
+    {
+      "id": "1",
+      "name": "First open: the app loads, offers sign-in and can be installed (phone 390×844, tablet 820×1180)",
+      "status": "PASS",
+      "checks": [
+        {
+          "label": "phone: the sign-in card is shown to a new visitor",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "phone: a web app manifest with a name and icons (installable)",
+          "ok": true,
+          "detail": "{\"href\":\"/manifest.webmanifest\",\"status\":200,\"name\":\"Pri Learning\",\"display\":\"standalone\",\"icons\":3,\"start\":\"/\"}"
+        },
+        {
+          "label": "phone: a service worker is installed and active (opens again offline)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "tablet: the sign-in card is shown to a new visitor",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "tablet: a web app manifest with a name and icons (installable)",
+          "ok": true,
+          "detail": "{\"href\":\"/manifest.webmanifest\",\"status\":200,\"name\":\"Pri Learning\",\"display\":\"standalone\",\"icons\":3,\"start\":\"/\"}"
+        },
+        {
+          "label": "tablet: a service worker is installed and active (opens again offline)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "no uncaught errors on first open",
+          "ok": true,
+          "detail": ""
+        }
+      ],
+      "notes": [],
+      "evidence": [
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:02.678Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144302500
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:03.384Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:03.384Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "tablet",
+          "at": "2026-11-08T13:25:06.928Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144306752
+          }
+        },
+        {
+          "context": "tablet",
+          "at": "2026-11-08T13:25:07.717Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "tablet",
+          "at": "2026-11-08T13:25:07.721Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        }
+      ],
+      "shots": [
+        "01-1-phone-first-open.png",
+        "02-1-tablet-first-open.png"
+      ],
+      "defects": [],
+      "blocked": []
+    },
+    {
+      "id": "2",
+      "name": "Sign-up and sign-in (email code on the card; a password account signs in before verifying)",
+      "status": "FAIL",
+      "checks": [
+        {
+          "label": "email-code sign-up: the card sends a code and shows the six code boxes",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "a password account is registered (POST /v1/account/register, as Settings → Cloud account does)",
+          "ok": true,
+          "detail": "201 {\"account\":{\"id\":\"acct_e8da3b42-7c42-46b0-828c-c646c8352eac\",\"email\":\"delivered+pri-d91d72-adult@resend.dev\",\"name\":\"Staging Proof Adult\",\"role\":\"student\",\"emailVerified\":false},\"verificationRequired\":true}"
+        },
+        {
+          "label": "the server signs the password account in before its email is verified (session for that account)",
+          "ok": true,
+          "detail": "200"
+        },
+        {
+          "label": "the account is still unverified (its code never left the mailbox)",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "label": "held at the card, the student is told the email must be verified",
+          "ok": false,
+          "detail": "We couldn’t confirm your account’s guardian approval. Please try again."
+        }
+      ],
+      "notes": [
+        "the card stays on its class step and says: \"We couldn’t confirm your account’s guardian approval. Please try again.\""
+      ],
+      "evidence": [
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:11.388Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144311140
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:12.189Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:12.191Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:13.796Z",
+          "method": "POST",
+          "path": "/v1/account/otp/request",
+          "status": 202,
+          "request": {
+            "channel": "email",
+            "destination": "delivered+pri-d91d72-code@resend.dev"
+          },
+          "response": {
+            "ok": true,
+            "channel": "email",
+            "challengeId": "[redacted]",
+            "expiresInMs": 600000,
+            "resendAfterMs": 30000
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:17.341Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144317106
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:18.036Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:18.036Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "phone",
+          "method": "POST",
+          "path": "/v1/account/register",
+          "status": 201,
+          "request": {
+            "name": "Staging Proof Adult",
+            "email": "delivered+pri-d91d72-adult@resend.dev",
+            "password": "[redacted]",
+            "isAdult": true,
+            "year": 10
+          },
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            },
+            "verificationRequired": true
+          }
+        },
+        {
+          "context": "phone",
+          "at": "2026-11-08T13:25:18.718Z",
+          "method": "POST",
+          "path": "/v1/account/register",
+          "status": 201,
+          "request": {
+            "name": "Staging Proof Adult",
+            "email": "delivered+pri-d91d72-adult@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "staging-proof-d91d72",
+            "isAdult": true,
+            "year": 10
+          },
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            },
+            "verificationRequired": true
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:21.686Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144321502
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:22.451Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:22.451Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:25.071Z",
+          "method": "POST",
+          "path": "/v1/account/login",
+          "status": 200,
+          "request": {
+            "email": "delivered+pri-d91d72-adult@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "device-bd152350-25ac-46fd-9603-fe3c2e201809"
+          },
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:25.728Z",
+          "method": "GET",
+          "path": "/v1/account/guardian/state",
+          "status": 200,
+          "request": null,
+          "response": {
+            "accountId": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+            "required": false,
+            "state": "not-required",
+            "ageBasis": "adult",
+            "blockerCode": null,
+            "eligible": false,
+            "emailVerified": false,
+            "guardianEmail": null,
+            "noticeVersion": null,
+            "renewalRequired": false,
+            "method": null
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:25:26.863Z",
+          "method": "GET",
+          "path": "/v1/account/guardian/state",
+          "status": 200,
+          "request": null,
+          "response": {
+            "accountId": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+            "required": false,
+            "state": "not-required",
+            "ageBasis": "adult",
+            "blockerCode": null,
+            "eligible": false,
+            "emailVerified": false,
+            "guardianEmail": null,
+            "noticeVersion": null,
+            "renewalRequired": false,
+            "method": null
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:26:26.980Z",
+          "method": "GET",
+          "path": "/v1/account/me",
+          "status": 200,
+          "request": null,
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        }
+      ],
+      "shots": [
+        "03-2-email-code-sent.png",
+        "04-2-password-sign-in.png"
+      ],
+      "defects": [
+        {
+          "what": "an ADULT whose email is not verified signs in with a password and is told \"We couldn’t confirm your account’s guardian approval. Please try again.\" — the guardian is not the blocker (the server's /guardian/state says required:false, not-required, eligible:false because emailVerified:false), and the card offers no way to verify the email, so the student is stuck",
+          "where": "client/src/components/onboardingAuthority.js decideOnboardingAuthority (an unverified adult returns \"unavailable\") → SignUpFlow.jsx finish() shows signup.consentCheckUnavailable",
+          "repro": "POST /v1/account/register {isAdult:true} (as Settings → Cloud account does), then on a new device: \"Sign in with password\" on the card, class 10, Continue",
+          "lane": "L2 (account/activation logic) with L3 (card copy)"
+        }
+      ],
+      "blocked": [
+        "email-code sign-up cannot finish: the six-digit code goes to a mailbox this harness cannot read (no account is created without it). Closes when PRI_STAGING_MAILBOX_CMD reads a dedicated test inbox."
+      ]
+    },
+    {
+      "id": "3",
+      "name": "Minor account: guardian consent requested, account held pending",
+      "status": "PASS",
+      "checks": [
+        {
+          "label": "a Class 8 account names its guardian and is registered",
+          "ok": true,
+          "detail": "201 {\"account\":{\"id\":\"acct_c98e1f36-5f89-493e-9d93-4882e95b49ba\",\"email\":\"delivered+pri-d91d72-child@resend.dev\",\"name\":\"Staging Proof Child\",\"role\":\"student\",\"emailVerified\":false},\"verificationRequired\":true}"
+        },
+        {
+          "label": "the server holds the account pending guardian consent",
+          "ok": true,
+          "detail": "{\"accountId\":\"acct_c98e1f36-5f89-493e-9d93-4882e95b49ba\",\"required\":true,\"state\":\"pending\",\"ageBasis\":\"child\",\"blockerCode\":\"GUARDIAN_CONSENT_PENDING\",\"eligible\":false,\"emailVerified\":false,\"guardianEmail\":\"d••••••••••••••••••••••••••••@resend.dev\",\"noticeVersion\":\"2026-10-22\",\"renewalRequired\":false,\"method\":\"guardian-email-confirmation\"}"
+        },
+        {
+          "label": "practice is refused to it before consent (403 GUARDIAN_CONSENT_PENDING; the gate that answers first is recorded, not assumed)",
+          "ok": true,
+          "detail": "403 GUARDIAN_CONSENT_PENDING"
+        },
+        {
+          "label": "signing in shows the guardian step, not the app",
+          "ok": true,
+          "detail": "card step parent, shell open false"
+        }
+      ],
+      "notes": [],
+      "evidence": [
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:30.296Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144390120
+          }
+        },
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:31.085Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:31.085Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "tablet-child",
+          "method": "POST",
+          "path": "/v1/account/register",
+          "status": 201,
+          "request": {
+            "name": "Staging Proof Child",
+            "email": "delivered+pri-d91d72-child@resend.dev",
+            "password": "[redacted]",
+            "isAdult": false,
+            "year": 8,
+            "guardianName": "Staging Proof Guardian",
+            "guardianEmail": "delivered+pri-d91d72-guardian@resend.dev"
+          },
+          "response": {
+            "account": {
+              "id": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+              "email": "delivered+pri-d91d72-child@resend.dev",
+              "name": "Staging Proof Child",
+              "role": "student",
+              "emailVerified": false
+            },
+            "verificationRequired": true
+          }
+        },
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:31.965Z",
+          "method": "POST",
+          "path": "/v1/account/register",
+          "status": 201,
+          "request": {
+            "name": "Staging Proof Child",
+            "email": "delivered+pri-d91d72-child@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "staging-proof-d91d72-child",
+            "isAdult": false,
+            "year": 8,
+            "guardianName": "Staging Proof Guardian",
+            "guardianEmail": "delivered+pri-d91d72-guardian@resend.dev"
+          },
+          "response": {
+            "account": {
+              "id": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+              "email": "delivered+pri-d91d72-child@resend.dev",
+              "name": "Staging Proof Child",
+              "role": "student",
+              "emailVerified": false
+            },
+            "verificationRequired": true
+          }
+        },
+        {
+          "context": "tablet-child",
+          "method": "GET",
+          "path": "/v1/account/guardian/state",
+          "status": 200,
+          "response": {
+            "accountId": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+            "required": true,
+            "state": "pending",
+            "ageBasis": "child",
+            "blockerCode": "GUARDIAN_CONSENT_PENDING",
+            "eligible": false,
+            "emailVerified": false,
+            "guardianEmail": "d••••••••••••••••••••••••••••@resend.dev",
+            "noticeVersion": "2026-10-22",
+            "renewalRequired": false,
+            "method": "guardian-email-confirmation"
+          }
+        },
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:32.983Z",
+          "method": "GET",
+          "path": "/v1/account/guardian/state",
+          "status": 200,
+          "request": null,
+          "response": {
+            "accountId": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+            "required": true,
+            "state": "pending",
+            "ageBasis": "child",
+            "blockerCode": "GUARDIAN_CONSENT_PENDING",
+            "eligible": false,
+            "emailVerified": false,
+            "guardianEmail": "d••••••••••••••••••••••••••••@resend.dev",
+            "noticeVersion": "2026-10-22",
+            "renewalRequired": false,
+            "method": "guardian-email-confirmation"
+          }
+        },
+        {
+          "context": "tablet-child",
+          "method": "POST",
+          "path": "/v1/practice/issue",
+          "status": 403,
+          "response": {
+            "error": {
+              "code": "GUARDIAN_CONSENT_PENDING",
+              "message": "A parent or guardian needs to confirm this account. Until they do, your work stays on this device — nothing is lost."
+            }
+          }
+        },
+        {
+          "context": "tablet-child",
+          "at": "2026-11-08T13:26:33.694Z",
+          "method": "POST",
+          "path": "/v1/practice/issue",
+          "status": 403,
+          "request": {
+            "generator": "c8-rational-numbers",
+            "difficulty": 1,
+            "curriculum": "in"
+          },
+          "response": {
+            "error": {
+              "code": "GUARDIAN_CONSENT_PENDING",
+              "message": "A parent or guardian needs to confirm this account. Until they do, your work stays on this device — nothing is lost."
+            }
+          }
+        },
+        {
+          "context": "tablet-child-2",
+          "at": "2026-11-08T13:26:36.667Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144396486
+          }
+        },
+        {
+          "context": "tablet-child-2",
+          "at": "2026-11-08T13:26:37.405Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "tablet-child-2",
+          "at": "2026-11-08T13:26:37.405Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "tablet-child-2",
+          "at": "2026-11-08T13:26:40.011Z",
+          "method": "POST",
+          "path": "/v1/account/login",
+          "status": 200,
+          "request": {
+            "email": "delivered+pri-d91d72-child@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "device-0f92056a-3334-4a3b-8cf3-342ada882512"
+          },
+          "response": {
+            "account": {
+              "id": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+              "email": "delivered+pri-d91d72-child@resend.dev",
+              "name": "Staging Proof Child",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "tablet-child-2",
+          "at": "2026-11-08T13:26:40.702Z",
+          "method": "GET",
+          "path": "/v1/account/guardian/state",
+          "status": 200,
+          "request": null,
+          "response": {
+            "accountId": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+            "required": true,
+            "state": "pending",
+            "ageBasis": "child",
+            "blockerCode": "GUARDIAN_CONSENT_PENDING",
+            "eligible": false,
+            "emailVerified": false,
+            "guardianEmail": "d••••••••••••••••••••••••••••@resend.dev",
+            "noticeVersion": "2026-10-22",
+            "renewalRequired": false,
+            "method": "guardian-email-confirmation"
+          }
+        }
+      ],
+      "shots": [
+        "05-3-child-sign-in.png"
+      ],
+      "defects": [],
+      "blocked": [
+        "the guardian confirmation link goes to the guardian mailbox, which this harness cannot read; closes with PRI_STAGING_MAILBOX_CMD reading a dedicated test inbox, then: open the link, confirm, and check the account opens"
+      ]
+    },
+    {
+      "id": "5",
+      "name": "Server-issued question, typed answer, server mark (and the #723 ₹/crore form)",
+      "status": "BLOCKED",
+      "checks": [
+        {
+          "label": "the server refuses an unverified account a question (EMAIL_UNVERIFIED), as designed",
+          "ok": true,
+          "detail": "403 EMAIL_UNVERIFIED"
+        }
+      ],
+      "notes": [],
+      "evidence": [
+        {
+          "context": "phone-A",
+          "method": "POST",
+          "path": "/v1/practice/issue",
+          "status": 403,
+          "response": {
+            "error": {
+              "code": "EMAIL_UNVERIFIED",
+              "message": "Verify your email address before using this feature."
+            }
+          }
+        }
+      ],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "the unverified account never got past the sign-in card (step 2), so Practice could not be opened in the app",
+        "marking needs a verified email (server/platform/practice.js: requireVerifiedEmail on every practice route); verification needs the code from the mailbox. Closes with PRI_STAGING_MAILBOX_CMD."
+      ]
+    },
+    {
+      "id": "4",
+      "name": "Account-bound sync and recovery (second browser, same progress and History)",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "there is no marked work to compare until step 5 runs; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD)."
+      ]
+    },
+    {
+      "id": "6",
+      "name": "Handwritten answer through the real reader (SYNTHETIC ink)",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "reading and marking a handwritten answer are practice routes, behind the verified-email gate; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD)."
+      ]
+    },
+    {
+      "id": "7",
+      "name": "Photo answer through the real reader (SYNTHETIC photo)",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "the photo path issues and marks through the same verified-email gate; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD)."
+      ]
+    },
+    {
+      "id": "8",
+      "name": "History and persistence after reload, both browsers",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "there are no marked attempts to find until steps 5–7 run; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD)."
+      ]
+    },
+    {
+      "id": "9",
+      "name": "Offline mid-answer: the draft is kept and read when back online",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "needs an issued question to answer; that needs a verified email, so the mailbox (PRI_STAGING_MAILBOX_CMD)."
+      ]
+    },
+    {
+      "id": "10",
+      "name": "Sign out everywhere: a second browser is signed out",
+      "status": "BLOCKED",
+      "checks": [
+        {
+          "label": "a second browser signs in to the same account",
+          "ok": true,
+          "detail": "200"
+        },
+        {
+          "label": "API only: POST /v1/account/logout-all revokes the account's sessions",
+          "ok": true,
+          "detail": "200 {\"ok\":true,\"revoked\":3}"
+        },
+        {
+          "label": "the second browser is signed out (its /v1/account/me answers 401)",
+          "ok": true,
+          "detail": "401"
+        }
+      ],
+      "notes": [],
+      "evidence": [
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:26:45.564Z",
+          "method": "POST",
+          "path": "/v1/practice/issue",
+          "status": 403,
+          "request": {
+            "generator": "c8-rational-numbers",
+            "difficulty": 1,
+            "curriculum": "in"
+          },
+          "response": {
+            "error": {
+              "code": "EMAIL_UNVERIFIED",
+              "message": "Verify your email address before using this feature."
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:48.788Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144408456
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:49.487Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:49.487Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:49.666Z",
+          "method": "POST",
+          "path": "/v1/account/login",
+          "status": 200,
+          "request": {
+            "email": "delivered+pri-d91d72-adult@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "staging-proof-d91d72-B"
+          },
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:50.151Z",
+          "method": "GET",
+          "path": "/v1/account/me",
+          "status": 200,
+          "request": null,
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "phone-A",
+          "at": "2026-11-08T13:26:50.995Z",
+          "method": "POST",
+          "path": "/v1/account/logout-all",
+          "status": 200,
+          "request": {},
+          "response": {
+            "ok": true,
+            "revoked": 3
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:51.518Z",
+          "method": "GET",
+          "path": "/v1/account/me",
+          "status": 401,
+          "request": null,
+          "response": {
+            "error": {
+              "code": "AUTH_REQUIRED",
+              "message": "Sign in is required."
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:52.246Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144412011
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:52.587Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "tablet-B",
+          "at": "2026-11-08T13:26:52.587Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        }
+      ],
+      "shots": [
+        "06-10-second-browser-after.png"
+      ],
+      "defects": [],
+      "blocked": [
+        "Settings could not be opened: the unverified account never got past the sign-in card (step 2)"
+      ]
+    },
+    {
+      "id": "11",
+      "name": "Account deletion in the app (Settings → Cloud account), and cleanup",
+      "status": "BLOCKED",
+      "checks": [],
+      "notes": [],
+      "evidence": [
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:26:58.874Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144418636
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:26:59.571Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:26:59.571Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:26:59.688Z",
+          "method": "POST",
+          "path": "/v1/account/login",
+          "status": 200,
+          "request": {
+            "email": "delivered+pri-d91d72-adult@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "staging-proof-d91d72-cleanup"
+          },
+          "response": {
+            "account": {
+              "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac",
+              "email": "delivered+pri-d91d72-adult@resend.dev",
+              "name": "Staging Proof Adult",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:01.722Z",
+          "method": "DELETE",
+          "path": "/v1/account",
+          "status": 200,
+          "request": {
+            "password": "[redacted]",
+            "accountId": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac"
+          },
+          "response": {
+            "deleted": true
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:04.936Z",
+          "method": "GET",
+          "path": "/v1/health",
+          "status": 200,
+          "request": null,
+          "response": {
+            "ok": true,
+            "service": "pri-learning-platform",
+            "releaseIdentity": {
+              "schemaVersion": 1,
+              "repository": "Priysharan19/Final-Pri-learning",
+              "branch": "main",
+              "productVersion": "4.0",
+              "curriculumVersion": "CATALOG-2026-09",
+              "releaseSha": "1d3829103eccaf470621de7124ec1755370c460e",
+              "buildTimestamp": "2026-11-07T07:12:14.000Z"
+            },
+            "schemaVersion": "13",
+            "billingSchemaVersion": "6",
+            "database": {
+              "engine": "postgres",
+              "reachable": true
+            },
+            "syncQuota": {
+              "maxBytesPerAccount": 67108864,
+              "maxEventsPerAccount": 200000
+            },
+            "checkedAt": 1794144424722
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:05.693Z",
+          "method": "GET",
+          "path": "/v1/account/identity/providers",
+          "status": 200,
+          "request": null,
+          "response": {
+            "providers": {
+              "google": {
+                "clientId": "486995326924-ge3ds613hsgrdrk515sd2sh6930ovf63.apps.googleusercontent.com"
+              },
+              "apple": null
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:05.693Z",
+          "method": "GET",
+          "path": "/v1/account/otp/channels",
+          "status": 200,
+          "request": null,
+          "response": {
+            "channels": {
+              "email": true,
+              "sms": false
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:05.943Z",
+          "method": "POST",
+          "path": "/v1/account/login",
+          "status": 200,
+          "request": {
+            "email": "delivered+pri-d91d72-child@resend.dev",
+            "password": "[redacted]",
+            "deviceId": "staging-proof-d91d72-cleanup"
+          },
+          "response": {
+            "account": {
+              "id": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba",
+              "email": "delivered+pri-d91d72-child@resend.dev",
+              "name": "Staging Proof Child",
+              "role": "student",
+              "emailVerified": false
+            }
+          }
+        },
+        {
+          "context": "cleanup",
+          "at": "2026-11-08T13:27:07.961Z",
+          "method": "DELETE",
+          "path": "/v1/account",
+          "status": 200,
+          "request": {
+            "password": "[redacted]",
+            "accountId": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba"
+          },
+          "response": {
+            "deleted": true
+          }
+        }
+      ],
+      "shots": [],
+      "defects": [],
+      "blocked": [
+        "in-app deletion is in Settings, which the unverified account cannot reach (step 2); the public deletion page sends an email code to the mailbox. The accounts are deleted below through DELETE /v1/account with the password (the route the Settings form calls), labelled API cleanup"
+      ]
+    }
+  ],
+  "created": [
+    {
+      "role": "adult",
+      "email": "delivered+pri-d91d72-adult@resend.dev",
+      "id": "acct_e8da3b42-7c42-46b0-828c-c646c8352eac"
+    },
+    {
+      "role": "child",
+      "email": "delivered+pri-d91d72-child@resend.dev",
+      "id": "acct_c98e1f36-5f89-493e-9d93-4882e95b49ba"
+    }
+  ],
+  "deleted": [
+    {
+      "role": "adult",
+      "email": "delivered+pri-d91d72-adult@resend.dev",
+      "via": "API cleanup (DELETE /v1/account with the password)"
+    },
+    {
+      "role": "child",
+      "email": "delivered+pri-d91d72-child@resend.dev",
+      "via": "API cleanup (DELETE /v1/account with the password)"
+    }
+  ],
+  "notDeleted": [],
+  "deployed": {
+    "web": "1d3829103eccaf470621de7124ec1755370c460e",
+    "server": "1d3829103eccaf470621de7124ec1755370c460e",
+    "ready": "1d3829103eccaf470621de7124ec1755370c460e",
+    "buildTimestamp": "2026-11-07T07:12:14.000Z",
+    "engine": "postgres"
+  },
+  "entered": false,
+  "finishedAt": "2026-11-08T13:27:08.006Z"
+}
