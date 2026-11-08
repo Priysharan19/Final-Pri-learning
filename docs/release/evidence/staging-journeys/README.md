@@ -22,11 +22,49 @@
   - If a code never arrives within 120 s, that is recorded as a finding (staging delivery to that address may be restricted, for example by a Resend sandbox domain).
 - **With the inbox:**
   - The adult signs up by email code, the real student path, and lands verified and inside the app.
-  - A 13-year-old signs up by code, waits at the parent step, the parent approves on `/guardian/consent` with the code they were sent, and the child gets in.
-  - Sign out everywhere and deletion run in Settings.
+  - A 13-year-old signs up by code, waits at the parent step, the parent approves on `/guardian/consent` with the code they were sent, and the child gets in. Then the parent withdraws from the link in their email, and the child's next question is refused (`403 GUARDIAN_CONSENT_WITHDRAWN`). The run also checks that a parent who approved by code is sent a withdrawal link to keep.
+  - Steps 4–9 run as the verified adult, on the phone (WebKit), in the order a student meets them (`tools/staging-journey-steps.mjs`):
+    - **5:** a typed answer. A surely wrong answer is tried twice: the open try says only "wrong", and the second resolves with the server's worked solution and marking criteria. "Same question" from History then gets the revealed key typed in, and it must earn full marks. Nothing knows an answer in advance: the key is learnt the way a student learns it. It also notes (never as pass or fail) what happens to `₹<amount>` typed on a ₹-priced crore, lakh or million box (#723).
+    - **6:** SYNTHETIC ink (strokes from `tools/acceptance/simulated-ink.mjs`, replayed as pointer events) goes through the real reader.
+      - D17: from the first stroke until the student accepts the prompt naming OpenAI, no request may reach `/v1/handwriting*` or `/recognize`. A build without the prompt fails this check.
+      - The transcript is then corrected explicitly and confirmed. The server must report the reading as corrected, with a receipt.
+      - The same Submit is sent again and must return the same attempt, buying no read.
+    - **7:** a SYNTHETIC photo (`tools/acceptance/synthetic-png.mjs`) is attached, read once, the answer confirmed, and the server marks it.
+    - **9:** the phone goes offline mid-answer. Nothing is marked, the student is told why, and the draft is kept. Back online, Try again is marked exactly once.
+    - **4:** a second browser (Chromium tablet) signs in to the same account by code, and its History holds the same marked attempts.
+    - **8:** both browsers are reloaded, and both still show every marked attempt.
+    - Steps 6 and 7 are SYNTHETIC-PASS at best.
+  - **Paid reads:** every request to `/v1/handwriting*`, `/recognize` and question-photo identify is counted. So is a Submit that bought a read.
+    - The profile caps a run's paid reads (`train` 6, `full` 20). A full journey buys 2: one ink read and one photo read.
+    - That is inside D20 (5 a day per kind on Free) and D21 (120 an hour for the deployment).
+    - A 429 or 503 cap from the reader is recorded as a note.
+  - **`--profile full`** adds two steps for a second verified account, B:
+    - **12:** isolation. B's submit, repeat, reveal and hint on A's question id must each answer `404 QUESTION_NOT_FOUND`.
+    - **13:** the free practice cap. B is issued questions until the server refuses with `402 FREE_CAP_REACHED`, and Practice must show the cap screen.
+  - Sign out everywhere (on the step-4 browser) and deletion run in Settings.
   - Code-only accounts left over are deleted through the public deletion page (`/account/delete-request`) with an inbox code.
-  - Steps 4–9 (sync, typed mark, handwriting, photo, History, offline) are built next, against the real flow, now that a verified account can exist.
+  - The guardian's links come from message bodies: `tools/staging-journey-mail.mjs` fetches only those two subjects, with `BODY.PEEK`, and never prints or stores the link.
 - **Without the inbox:** those steps are BLOCKED (mailbox) and the rest runs.
+
+## Local proof (not staging evidence)
+
+The account steps cannot be tried on staging until the inbox exists, so `tools/staging-journey-local.mjs` runs the same journey code against the in-process platform from `client/test/support/online-session.mjs`. That means the real server routes, database and marking engine, and the built client, with three stand-ins:
+
+- The handwriting reader is a SYNTHETIC stand-in. It returns the text the harness drew and never looks at the picture.
+- Codes come from the server's test email outbox, read through the inbox's own subject parser.
+- Links come from the undelivered auth-delivery outbox.
+
+The free cap runs at its shipped 20, and the paid-call ceiling at 120 an hour and 300 a day.
+
+```bash
+node --input-type=module -e "const { ensureBuild } = await import('./client/test/e2e.mjs'); ensureBuild(true);"
+~/Developer/.pri-fleet/heavy-slot.sh L8 node tools/staging-journey-local.mjs [--profile full] [--dist <another client build>]
+```
+
+- Its report opens with "LOCAL journey proof (not staging)".
+- Evidence is written outside the repository.
+- The entry takes no origin. `runJourney` accepts a loopback origin only with the in-process platform object in hand, so the CLI still refuses everything but staging. The deployment contract test proves both.
+- A local SYNTHETIC-PASS says the harness and the product agree on the flow. It is not evidence about the real reader or staging.
 
 ## Baseline: `1d3829103` (9 Nov 2026)
 

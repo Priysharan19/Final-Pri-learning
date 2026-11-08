@@ -39,11 +39,27 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { imapMailbox, loadInbox, redactAddress, tagAddress } from './staging-inbox.mjs';
+import { imapLinkReader } from './staging-journey-mail.mjs';
+import { codeSignIn, guardianWithdraw, isPaidReadRequest, isReaderRequest, stepFreeCap, stepHandwriting, stepHistory, stepIsolation, stepOffline, stepPhoto, stepSecondBrowser, stepTypedMark } from './staging-journey-steps.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(ROOT, 'client', 'package.json'));
 const STAGING = 'https://pri-learning-staging-staging.up.railway.app';
 const ALLOWED_ORIGINS = new Set([STAGING]);
+const LOOPBACK = /^http:\/\/(?:127\.0\.0\.1|localhost):\d{2,5}$/;
+
+/**
+ * The one origin rule: staging, or — only for the in-process platform that
+ * tools/staging-journey-local.mjs booted in THIS process — its loopback
+ * origin. A command line can never supply that object, so the CLI stays
+ * staging-only; parseArgs refuses every other origin before this is reached.
+ */
+export function assertJourneyOrigin(args) {
+  if (ALLOWED_ORIGINS.has(args.origin)) return 'staging';
+  const local = args.localPlatform;
+  if (local && typeof local === 'object' && LOOPBACK.test(String(args.origin)) && local.origin === args.origin && typeof local.close === 'function') return 'local';
+  throw new Error(`refused: ${args.origin} is not the staging origin (${STAGING}); this harness never touches production`);
+}
 // The phone runs in WebKit, the engine of the shipped iOS shell (WKWebView);
 // the tablet runs in Chromium (the Android shell's WebView engine).
 const SIZES = [
@@ -55,9 +71,12 @@ const READER_WAIT_MS = 3 * 60 * 1000;
 // Per-run budgets, inside staging's own limits per client identity:
 // register 8/h, OTP request 20/h, login 12 per 15 min. A train run must leave
 // room for a second run in the same hour; `full` uses the rest.
+// paidReads: requests that buy a reading from the paid provider (handwriting,
+// photo), at most 20 a run; the steps read 2 (one ink, one photo), well inside
+// D20's 5 a day per kind on Free and D21's 120 an hour for the deployment.
 export const PROFILES = {
-  train: { register: 3, otpRequest: 9, login: 5 },
-  full: { register: 4, otpRequest: 16, login: 9 }
+  train: { register: 3, otpRequest: 9, login: 5, paidReads: 6 },
+  full: { register: 4, otpRequest: 16, login: 9, paidReads: 20 }
 };
 const SECRET_KEY = /token|code|password|secret|cookie|nonce|challenge|session|csrf|otp|hash/i;
 
@@ -101,11 +120,14 @@ const now = () => new Date().toISOString();
 const tag = () => randomBytes(3).toString('hex');
 
 export async function runJourney(args) {
+  const where = assertJourneyOrigin(args);
+  if (where === 'local' && !args.out) throw new Error('a local run writes its evidence outside the repository: pass `out`');
   const { chromium, webkit } = require('playwright');
   const sha = args.sha;
   const out = args.out || join(ROOT, 'docs', 'release', 'evidence', 'staging-journeys', sha);
   mkdirSync(out, { recursive: true });
-  const run = { origin: args.origin, sha, profile: args.profile, startedAt: now(), accounts: args.accounts, steps: [], created: [], deleted: [], notDeleted: [] };
+  const run = { origin: args.origin, sha, profile: args.profile, startedAt: now(), accounts: args.accounts, steps: [], created: [], deleted: [], notDeleted: [], marked: [] };
+  if (where === 'local') run.local = args.localLabel || 'LOCAL in-process platform with a SYNTHETIC reader and test email adapters — not staging evidence';
   const browsers = { chromium: await chromium.launch({ headless: !args.headed }), webkit: await webkit.launch({ headless: !args.headed }) };
   const runTag = tag();
   let shotN = 0;
@@ -116,8 +138,15 @@ export async function runJourney(args) {
   const recovery = join(tmpdir(), 'pri-staging-journey', `${runTag}.json`);
   const inbox = args.accounts ? (args.inbox || loadInbox()) : { ok: false, reason: 'no --accounts' };
   const mailbox = inbox.ok ? (args.mailbox || imapMailbox(inbox.config)) : null;
+  // Links (a guardian's consent and withdrawal) are in message bodies.
+  const links = inbox.ok ? (args.links || imapLinkReader(inbox.config, args.origin)) : null;
   const inboxAddress = inbox.ok ? inbox.config.PRI_STAGING_INBOX_ADDRESS : null;
-  run.mailbox = inbox.ok ? 'test inbox present (mode 600)' : `no test inbox: ${inbox.reason}`;
+  run.mailbox = inbox.ok ? (args.mailboxLabel || 'test inbox present (mode 600)') : `no test inbox: ${inbox.reason}`;
+  // Every request to the reader's routes, and every exchange with /v1/practice,
+  // kept in memory for the steps' own checks (never written as they are: the
+  // evidence in results.json is the redacted copy).
+  const readerLog = []; const exchanges = []; const paidLog = [];
+  const lastCodeAt = new Map();
   const addressFor = (role, n) => inboxAddress ? tagAddress(inboxAddress, runTag, n) : `delivered+pri-${runTag}-${role}@resend.dev`;
   const typeCode = async (page, idPrefix, code) => { await page.locator(`#${idPrefix}-0`).click(); await page.keyboard.type(code, { delay: 30 }); };
   const waitCode = async (s, to, purposes, since) => {
@@ -130,7 +159,8 @@ export async function runJourney(args) {
     return null;
   };
   const remember = () => {
-    if (!args.accounts) return;
+    // A local run's accounts live in an in-process database that goes with it.
+    if (!args.accounts || where === 'local') return;
     mkdirSync(dirname(recovery), { recursive: true, mode: 0o700 });
     writeFileSync(recovery, JSON.stringify({ origin: args.origin, password, accounts: run.created }, null, 2), { mode: 0o600 });
     chmodSync(recovery, 0o600);
@@ -150,6 +180,18 @@ export async function runJourney(args) {
     const ctx = await browsers[size.engine].newContext({ viewport: size.viewport, isMobile: size.isMobile, hasTouch: size.hasTouch, deviceScaleFactor: 2, serviceWorkers: 'allow' });
     const page = await ctx.newPage();
     page.on('pageerror', err => current?.notes.push(`${label}: uncaught page error: ${String(err.message || err).slice(0, 200)}`));
+    page.on('request', request => {
+      let url; try { url = new URL(request.url()); } catch { return; }
+      if (url.origin !== args.origin) return;
+      // When a code was last asked for each address: the server allows one per 30 s per purpose.
+      if (request.method() === 'POST' && /^\/v1\/account\/otp\/(request|reauth-request|delete-request)$/.test(url.pathname)) {
+        let dest = null; try { dest = request.postDataJSON()?.destination; } catch { dest = null; }
+        if (dest) lastCodeAt.set(String(dest).toLowerCase(), Date.now());
+      }
+      if (!isReaderRequest(url.pathname)) return;
+      readerLog.push({ context: label, at: Date.now(), method: request.method(), path: url.pathname, step: current?.id || null });
+      if (isPaidReadRequest(request.method(), url.pathname)) paidLog.push({ context: label, at: Date.now(), path: url.pathname, via: 'read', step: current?.id || null });
+    });
     page.on('response', async response => {
       const url = new URL(response.url());
       if (url.origin !== args.origin || !url.pathname.startsWith('/v1/')) return;
@@ -158,6 +200,14 @@ export async function runJourney(args) {
       try { reqBody = request.postDataJSON(); } catch { reqBody = request.postData() ? '[non-JSON body]' : null; }
       try { resBody = await response.json(); } catch { resBody = null; }
       current?.evidence.push({ context: label, at: now(), method: request.method(), path: url.pathname, status: response.status(), request: redact(reqBody), response: redact(resBody) });
+      if (request.method() === 'POST' && url.pathname.startsWith('/v1/practice/')) {
+        exchanges.push({ context: label, at: Date.now(), path: url.pathname, status: response.status(), request: reqBody && typeof reqBody === 'object' ? reqBody : null, response: resBody });
+        // A Submit that carried its picture and was not answered from a kept read bought one.
+        if (/\/submit$/.test(url.pathname) && reqBody?.image && resBody?.reading && resBody.reading.reused === false) paidLog.push({ context: label, at: Date.now(), path: url.pathname, via: 'submit', step: current?.id || null });
+      }
+      if (isReaderRequest(url.pathname) && [429, 503].includes(response.status())) {
+        current?.notes.push(`${label}: the reader route ${url.pathname} answered ${response.status()} ${resBody?.error?.code || ''} (a cap: ${JSON.stringify(redact({ limit: resBody?.error?.limit, plan: resBody?.error?.plan, resetAt: resBody?.error?.resetAt }))})`);
+      }
     });
     return { ctx, page, label };
   }
@@ -180,6 +230,30 @@ export async function runJourney(args) {
     }, { method, path, body });
   }
   const signedInAs = async page => (await api(page, 'GET', '/v1/account/me')).data?.account?.id || null;
+  // The server allows one code per address and purpose every 30 s.
+  const codeCooldown = async email => {
+    const last = lastCodeAt.get(String(email).toLowerCase());
+    const wait = last ? last + 31000 - Date.now() : 0;
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  };
+  const paidReads = () => paidLog.length;
+  // What the practice steps (tools/staging-journey-steps.mjs) work with.
+  const h = {
+    args, run, origin: args.origin, SIZES, profile: PROFILES[args.profile], redact,
+    begin: (id, name) => (current = step(id, name)), current: () => current,
+    check, finish, shot, api, newContext, signedInAs, typeCode, codeCooldown,
+    waitCode: (s, to, purposes, since) => waitCode(s, to, purposes, since),
+    mailbox, links,
+    readerRequests: () => readerLog, exchanges: () => exchanges, paidReads,
+    readBudgetLeft: () => paidReads() < PROFILES[args.profile].paidReads,
+    lastSubmitBody: path => exchanges.filter(e => e.path === path && e.request).at(-1)?.request || null,
+    marked: m => run.marked.push(m),
+    // Local only: the in-process SYNTHETIC reader is told what was drawn (it never sees the picture).
+    local: where === 'local' ? {
+      platform: args.localPlatform,
+      script: ({ text, confidence }) => { Object.assign(args.localPlatform.reader, { text: String(text), lines: null, confidence, down: false, gate: null }); args.localPlatform.forgetKeptReads?.(); }
+    } : null
+  };
 
   try {
     // ── 0 · which release is staging serving? ──────────────────────────────
@@ -376,6 +450,8 @@ export async function runJourney(args) {
       const held = check(current, 'signing in shows the guardian step, not the app', !shellOpen && (step === 'parent' || step === 'parent-wait' || /parent|guardian/i.test(String(step))), `card step ${step}, shell open ${shellOpen}`);
       await fresh.ctx.close();
       let approved = true;
+      let withdrew = !mailbox;   // without a mailbox the minor journey is BLOCKED below
+      let minorConsent = null;
       if (!mailbox) {
         current.blocked.push(`the guardian's approval code goes to the guardian's mailbox, which this harness cannot read (${run.mailbox}); closes with the owner's test inbox file`);
       } else {
@@ -415,11 +491,16 @@ export async function runJourney(args) {
           if (parentCode) {
             const G = await newContext(SIZES[0], 'phone-parent');
             await G.page.goto(args.origin + '/guardian/consent', { waitUntil: 'domcontentloaded' });
+            // The page renders after the bundle loads: wait for it before choosing Email.
+            await G.page.locator('#guardian-destination').waitFor({ timeout: 45000 });
             const emailRadio = G.page.getByRole('radio', { name: 'Email' });
             if (await emailRadio.count()) await emailRadio.click();
+            await G.page.waitForFunction(() => document.querySelector('#guardian-destination')?.getAttribute('type') === 'email', null, { timeout: 10000 }).catch(() => {});
             await G.page.locator('#guardian-destination').fill(parentAddress);
             await G.page.getByTestId('guardian-agree').check();
             await typeCode(G.page, 'guardian-code', parentCode);
+            const approvedAt = Date.now();
+            minorConsent = { parentAddress, requestedAt: t1, approvedAt };
             await G.page.getByTestId('guardian-approve').click();
             const ok = await G.page.getByText('account is approved', { exact: false }).waitFor({ timeout: 20000 }).then(() => true, () => false);
             await shot(current, G.page, 'parent-approved');
@@ -428,15 +509,53 @@ export async function runJourney(args) {
             if (await kcard.getByTestId('signup-parent-check').count()) await kcard.getByTestId('signup-parent-check').click();
             approved = check(current, 'once approved, the minor enters the app', await K.page.locator('.shell').waitFor({ timeout: 60000 }).then(() => true, () => false));
             await shot(current, K.page, 'minor-in-app');
+            // The guardian withdraws; the child's next question is refused.
+            if (approved && links) withdrew = await guardianWithdraw(h, current, { K, ...minorConsent }).catch(err => { current.notes.push(`the harness stopped the withdrawal: ${String(err?.message || err).slice(0, 200)}`); return false; });
+            else if (approved) current.blocked.push('the guardian\'s withdrawal link is in the body of an email; this run has no link reader');
           }
         }
         await K.ctx.close();
       }
-      finish(current, made && pending && held && approved ? 'PASS' : 'FAIL');
+      finish(current, made && pending && held && approved && withdrew && current.checks.every(c => c.ok) ? 'PASS' : current.blocked.length && current.checks.every(c => c.ok) ? 'BLOCKED' : 'FAIL');
       if (made && !held) current.defects.push({ what: 'a pending minor reached the app (or no guardian step) on password sign-in', where: 'SignUpFlow / activation gate', repro: 'register a Class 8 account with a guardian, sign in with password on the card', lane: 'L2' });
     }
 
     // ── 4–9 need an issued question, which needs a verified email ──────────
+    // With the mailbox, the verified email-code adult (step 2) drives them in
+    // the phone (WebKit); a second browser (Chromium) joins for 4 and 8. The
+    // order is the student's: mark (5, 6, 7, 9), then the second device (4, 8).
+    let second = null;
+    if (mailbox && coder.ctx) {
+      const A = coder.ctx; const account = { id: coder.id, email: coder.email };
+      // One step that throws (a selector that never came) fails that step, not the journey.
+      const safely = async fn => {
+        try { return await fn(); } catch (err) {
+          current?.notes.push(`the harness stopped this step: ${String(err?.stack || err).split('\n').slice(0, 3).join(' | ')}`);
+          if (current?.status === 'PENDING') finish(current, 'FAIL');
+          return null;
+        }
+      };
+      await safely(() => stepTypedMark(h, A, account));
+      const unverified = await api(adultCtxA.page, 'POST', '/v1/practice/issue', { generator: 'c8-rational-numbers', difficulty: 1, curriculum: 'in' });
+      check(current, 'and an UNVERIFIED account (the password account of step 2) is refused a question (403 EMAIL_UNVERIFIED), as designed', unverified.status === 403 && unverified.data?.error?.code === 'EMAIL_UNVERIFIED', `${unverified.status} ${unverified.data?.error?.code}`);
+      if (current.status === 'PASS' && !current.checks.every(c => c.ok)) finish(current, 'FAIL');
+      await safely(() => stepHandwriting(h, A, account));
+      await safely(() => stepPhoto(h, A, account));
+      await safely(() => stepOffline(h, A, account));
+      const joined = await safely(() => stepSecondBrowser(h, A, account));
+      second = joined?.B || null;
+      await safely(() => stepHistory(h, A, second));
+      if (args.profile === 'full') {
+        // Account B: another verified adult, made by code here and deleted at cleanup.
+        const s12 = h.begin('12', 'Cross-account isolation (full): account B is refused account A\'s question by id (404 QUESTION_NOT_FOUND)');
+        const bAddress = addressFor('isolation', 7);
+        const other = await safely(() => codeSignIn(h, SIZES[1], 'tablet-other', bAddress, { name: 'Staging Proof Other', s: s12 })) || {};
+        if (other.id) { run.created.push({ role: 'adult B (email code)', email: bAddress, id: other.id, codeOnly: true }); remember(); }
+        await safely(() => stepIsolation(h, other, account, s12));
+        await safely(() => stepFreeCap(h, other));
+        await other.ctx?.close().catch(() => {});
+      }
+    } else {
     current = step('5', 'Server-issued question, typed answer, server mark (and the #723 ₹/crore form)');
     {
       const { page } = adultCtxA;
@@ -464,19 +583,24 @@ export async function runJourney(args) {
       ['9', 'Offline mid-answer: the draft is kept and read when back online', 'needs an issued question to answer']
     ]) {
       const s = step(id, name);
-      s.blocked.push(mailbox && coder.ctx ? `not yet built: this step is written against the real flow now that a verified account exists on staging (${why})` : `${why}; that needs a verified email, so the mailbox (${run.mailbox}).`);
+      s.blocked.push(mailbox ? `${why}; the verified email-code account of step 2 did not reach the app, so there is no account to drive them with` : `${why}; that needs a verified email, so the mailbox (${run.mailbox}).`);
       finish(s, 'BLOCKED');
+    }
     }
 
     // ── 10 · sign out everywhere ───────────────────────────────────────────
     current = step('10', 'Sign out everywhere: a second browser is signed out');
     {
-      const B = await newContext(SIZES[1], 'tablet-B');
-      await B.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
+      // The second browser of step 4, when there is one: still signed in to the same account.
+      const B = second || await newContext(SIZES[1], 'tablet-B');
+      if (!second) await B.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
       let bIn;
-      if (uiAccount.codeOnly) {
+      if (second) {
+        bIn = check(current, 'the second browser of step 4 (Chromium) is still signed in to the same account', (await signedInAs(B.page)) === uiAccount.id);
+      } else if (uiAccount.codeOnly) {
         const bcard = B.page.locator('[data-signin-card="page"]');
         await bcard.waitFor({ timeout: 45000 });
+        await codeCooldown(uiAccount.email);
         const t0 = Date.now();
         await bcard.locator('#signup-destination').fill(uiAccount.email);
         await bcard.getByTestId('signup-send-code').click();
@@ -528,6 +652,7 @@ export async function runJourney(args) {
         await D.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
         const dcard = D.page.locator('[data-signin-card="page"]');
         await dcard.waitFor({ timeout: 45000 });
+        await codeCooldown(uiAccount.email);
         let t0 = Date.now();
         await dcard.locator('#signup-destination').fill(uiAccount.email);
         await dcard.getByTestId('signup-send-code').click();
@@ -597,6 +722,7 @@ export async function runJourney(args) {
             if (!mailbox) { run.notDeleted.push({ ...acct, why: 'a code-only account needs the test inbox to delete' }); continue; }
             await C.page.goto(args.origin + '/account/delete-request', { waitUntil: 'domcontentloaded' });
             await C.page.locator('#delete-request-email').fill(acct.email);
+            await codeCooldown(acct.email);
             const t0 = Date.now();
             await C.page.getByTestId('delete-request-send').click();
             await C.page.locator('#delete-request-code-0').waitFor({ timeout: 15000 });
@@ -632,8 +758,12 @@ export async function runJourney(args) {
     run.usage = {
       register: calls.filter(e => e.path === '/v1/account/register').length,
       otpRequest: calls.filter(e => /^\/v1\/account\/otp\/(request|reauth-request|delete-request|guardian\/request)$/.test(e.path)).length,
-      login: calls.filter(e => e.path === '/v1/account/login').length
+      login: calls.filter(e => e.path === '/v1/account/login').length,
+      paidReads: paidLog.length
     };
+    // Every request to the reader's routes (a status probe included), by step.
+    run.reads = { paid: paidLog.map(r => ({ step: r.step, context: r.context, path: r.path.replace(/[0-9a-f-]{36}/g, ':id'), via: r.via })),
+      readerRequests: readerLog.length, readerRequestsByStep: readerLog.reduce((m, r) => ({ ...m, [r.step || '-']: (m[r.step || '-'] || 0) + 1 }), {}) };
     run.budget = PROFILES[args.profile];
     run.overBudget = Object.keys(run.budget).filter(k => run.usage[k] > run.budget[k]);
     run.finishedAt = now();
@@ -647,12 +777,15 @@ export function report(run) {
   const order = s => Number(s.id);
   const steps = [...run.steps].sort((a, b) => order(a) - order(b));
   const lines = [];
-  lines.push(`# Staging journey proof · ${run.sha.slice(0, 9)}`, '');
+  lines.push(`# ${run.local ? 'LOCAL journey proof (not staging)' : 'Staging journey proof'} · ${run.sha.slice(0, 9)}`, '');
+  if (run.local) lines.push(`> **${run.local}.** A local pass is not staging evidence and not real-reader evidence.`, '');
   lines.push(`**Verdict: ${verdictOf(run).verdict}** (profile ${run.profile || 'train'}). PROVEN only when every step passed; INCOMPLETE when a step is BLOCKED; FAIL when a step failed.`, '');
   lines.push(`Origin \`${run.origin}\` · started ${run.startedAt} · finished ${run.finishedAt || '—'} · accounts ${run.accounts ? 'made and deleted by this run' : 'not made (no --accounts)'}.`);
   lines.push(`Mailbox: ${run.mailbox || 'not checked (no --accounts)'}.`);
   lines.push(`Deployed: web \`${run.deployed?.web || '?'}\`, server \`${run.deployed?.server || '?'}\`, readiness \`${run.deployed?.ready || '?'}\`, built ${run.deployed?.buildTimestamp || '?'}, database ${run.deployed?.engine || '?'}.`, '');
-  lines.push('Real deployed product, real browsers (Playwright: the phone in WebKit, the engine of the iOS shell; the tablet in Chromium; headless), nothing stubbed. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is device, human or examiner evidence.', '');
+  lines.push(run.local
+    ? 'The in-process platform server (client/test/support/online-session.mjs) serving the built client, in real browsers (the phone in WebKit, the tablet in Chromium; headless). Its handwriting reader is a SYNTHETIC stand-in that returns the text the harness drew and never looks at the picture; email codes and links are read from the server\'s test outbox. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is staging, real-reader, device, human or examiner evidence.'
+    : 'Real deployed product, real browsers (Playwright: the phone in WebKit, the engine of the iOS shell; the tablet in Chromium; headless), nothing stubbed. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is device, human or examiner evidence.', '');
   lines.push('| Step | Status | What was proved or found |', '|---|---|---|');
   for (const s of steps) {
     const passed = s.checks.filter(c => c.ok).length;
@@ -670,7 +803,8 @@ export function report(run) {
     if (s.evidence.length) lines.push(`- /v1 evidence: ${s.evidence.length} request(s) in results.json (step ${s.id})`);
     lines.push('');
   }
-  if (run.usage) lines.push(`Staging limits spent: register ${run.usage.register}/${run.budget.register}, OTP requests ${run.usage.otpRequest}/${run.budget.otpRequest}, logins ${run.usage.login}/${run.budget.login} (profile budget)${run.overBudget?.length ? ` — **OVER BUDGET: ${run.overBudget.join(', ')}**` : ''}.`, '');
+  if (run.usage) lines.push(`Staging limits spent: register ${run.usage.register}/${run.budget.register}, OTP requests ${run.usage.otpRequest}/${run.budget.otpRequest}, logins ${run.usage.login}/${run.budget.login}, paid reads ${run.usage.paidReads ?? 0}/${run.budget.paidReads ?? '–'} (profile budget)${run.overBudget?.length ? ` — **OVER BUDGET: ${run.overBudget.join(', ')}**` : ''}.`, '');
+  if (run.reads) lines.push(`Reader traffic: ${run.reads.readerRequests} request(s) to /v1/handwriting* and /recognize (by step ${JSON.stringify(run.reads.readerRequestsByStep)}); paid reads ${run.reads.paid.length} (${run.reads.paid.map(r => `step ${r.step} ${r.via}`).join(', ') || 'none'}). D20 allows 5 a day per kind on Free.`, '');
   lines.push('## Test accounts', '');
   lines.push(`Made: ${run.created.length ? run.created.map(a => `${a.role} ${a.email}`).join(', ') : 'none'}.`);
   lines.push(`Deleted: ${run.deleted.length ? run.deleted.map(a => `${a.role} (${a.via})`).join(', ') : 'none'}.`);
