@@ -79,6 +79,15 @@ ok(/example domain/.test(email('Pri Learning <noreply@example.com>')), 'prefligh
 ok(/not an address the server can read/.test(email('Pri Learning')), 'preflight warns about a sender with no address');
 ok(/only provider the server supports/.test(preflight({ PRI_AUTH_EMAIL_PROVIDER: 'smtp' })), 'preflight warns about an unsupported provider');
 ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(envExample), '.env.production.example documents the Postgres variables');
+// D3: launch signs in with an email code and a password. SMS, Apple and Google
+// stay off, so the template leaves them unset and preflight flags a leftover.
+ok(!/^PRI_SMS_PROVIDER=\S/m.test(envExample) && !/^PRI_(GOOGLE|APPLE)_(WEB_CLIENT_ID|CLIENT_IDS)=\S/m.test(envExample),
+  '.env.production.example leaves SMS, Google and Apple sign-in off (D3)');
+ok(!/launch keeps off/.test(bare), 'preflight raises no sign-in warning when SMS, Google and Apple are unset');
+ok(/PRI_SMS_PROVIDER is set/.test(preflight({ PRI_SMS_PROVIDER: 'msg91' })), 'preflight warns that a set PRI_SMS_PROVIDER offers phone codes at launch (D3)');
+ok(/PRI_GOOGLE_CLIENT_IDS is set/.test(preflight({ PRI_GOOGLE_CLIENT_IDS: 'id.apps.googleusercontent.com' }))
+  && /PRI_APPLE_CLIENT_IDS, PRI_APPLE_WEB_CLIENT_ID are set/.test(preflight({ PRI_APPLE_CLIENT_IDS: 'com.example', PRI_APPLE_WEB_CLIENT_ID: 'com.example.web' })),
+  'preflight warns that Google or Apple sign-in would show at launch (D3)');
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
 const SHA = 'a'.repeat(40);

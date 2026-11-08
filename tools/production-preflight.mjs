@@ -178,6 +178,20 @@ if (emailWarnings.length) {
   console.log('');
 }
 
+// Sign-in at launch (decision D3, docs/release/V1_DECISIONS_2026-11-01.md):
+// an email code and a password. SMS stays off, and Apple and Google arrive
+// together in a later update. Each is switched on by its own variable alone,
+// so a value carried over from a test deployment would offer it to students.
+// A warning rather than a refusal: the owner may confirm a different default.
+const smsSet = has('PRI_SMS_PROVIDER');
+const providerVariables = ['PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID'].filter(has);
+if (smsSet || providerVariables.length) {
+  console.log('Sign-in methods that launch keeps off (decision D3):\n');
+  if (smsSet) console.log('  ! PRI_SMS_PROVIDER is set, so students would be offered a phone code. Leave it unset for launch unless the owner has changed D3.');
+  if (providerVariables.length) console.log(`  ! ${providerVariables.join(', ')} ${providerVariables.length === 1 ? 'is' : 'are'} set, so a Google or Apple button would show. They arrive together in a later update; leave them empty for launch unless the owner has changed D3.`);
+  console.log('');
+}
+
 if (present.length) {
   console.log(`Already set here: ${present.map(i => i.name).join(', ')}\n`);
 }
