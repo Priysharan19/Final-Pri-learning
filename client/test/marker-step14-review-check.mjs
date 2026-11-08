@@ -40,6 +40,10 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
     const k = fmt(q.answer.value);
     for (const input of [k, `₹${k}`, `₹ ${k}`, `Rs ${k}`, `Rs. ${k}`]) check(G, verdict(q, input).correct === true, `d${d} s${s} (box "${q.answerSuffix}"): "${input}" is the amount, and correct`);
     check(G, verdict(q, `₹${fmt(q.answer.value + 1)}`).correct === false, `d${d} s${s}: a rupee mark does not make a wrong amount right`);
+    // The box's own word written out is the box's unit (the correct-answer sweep);
+    // a unit the box is not, beside a word that is no unit, is a different quantity.
+    check(G, verdict(q, `₹${k} ${q.answerSuffix}`).correct === true, `d${d} s${s}: "₹${k} ${q.answerSuffix}" — the box's word written out — is correct`);
+    check(G, verdict(q, `${k} kg`).correct === false, `d${d} s${s}: "${k} kg" beside "${q.answerSuffix}" is not the amount`);
   }
   // Every rupee-scale box the banks serve, at D1–D3.
   let seen = 0;
