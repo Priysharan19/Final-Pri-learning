@@ -234,9 +234,11 @@ jobs:
           # crash-report disclosures, and the generated third-party notices page.
           # 374 (L7): no notice makes a coverage claim D24 forbids, in either language.
           # 375 (L7): the D18 wording matches the accounts stream's code (#736).
-          grep -Fq 'LEGAL PAGES: PASS — 375/375 checks' suites.log
+          # 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737).
+          grep -Fq 'LEGAL PAGES: PASS — 378/378 checks' suites.log
           # 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination.
-          grep -Fq 'LEGAL PROMISES GATE: PASS — 16/16 checks' suites.log
+          # 19 (L7): the D17 prompt promise.
+          grep -Fq 'LEGAL PROMISES GATE: PASS — 19/19 checks' suites.log
           # L7: the counsel question sheet quotes the current text and code locations.
           grep -Fq 'COUNSEL QUESTIONS: PASS — 13/13 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
