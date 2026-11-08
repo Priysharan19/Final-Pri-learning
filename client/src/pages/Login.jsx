@@ -592,8 +592,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </div>
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
-              <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              {/* One clear privacy statement, not a repeated marketing paragraph
+                  below the form. The headline already says what Pri does. */}
+              <p className="muted auth-privacy">{t('login.heroPrivacy')}</p>
+              {/* Screen readers hear the fuller capability and server-check
+                  explanation; the visible subtitle and privacy line are enough
+                  without two dense paragraphs below the button. */}
+              <p className="sr-only">{t('login.heroSub')}</p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
