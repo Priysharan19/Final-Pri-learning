@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 // The staging journey proof (2b below): staging only, one release, no secrets in its evidence.
 import { PROFILES as journeyProfiles, parseArgs as journeyArgs, redact as journeyRedact, report as journeyReport, verdictOf as journeyVerdict } from './staging-journey-proof.mjs';
 import { codeFromSubject, imapSession, loadInbox, mailboxOver, redactAddress, tagAddress } from './staging-inbox.mjs';
+import { e2eAddress, parseLatest, testMailbox, testMailboxState, TEST_MAILBOX_LABEL } from './staging-test-mailbox.mjs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -157,6 +158,28 @@ ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(en
   const wrongKind = await box.waitForCode(tagged, 'delete', Date.now() - 1000, 100);
   ok(other.code === null && wrongKind.code === null, 'no code for another tag or another purpose: the wait times out with null, never a guess');
   server.close();
+}
+
+// ── 2d · staging test mailbox (L2): the default code source on staging ─────
+{
+  ok(e2eAddress('ab12cd', 2) === 'pri-ab12cd-2@e2e.prilearning.test', 'test-mailbox addresses are pri-<run>-<n>@e2e.prilearning.test');
+  ok(testMailboxState({ testMailbox: 'on' }) === 'on' && testMailboxState({ checks: { testMailbox: { state: 'off' } } }) === 'off' && testMailboxState({}) === 'unknown',
+    '/v1/ready says whether the test mailbox is on (either placement); silence is unknown, never on');
+  const now = Date.now();
+  ok(parseLatest({ to: 'x', subject: '482913 is your Pri Learning code', receivedAt: now })?.purpose === 'sign-in'
+    && parseLatest({ message: { subject: '771020 is the code to delete your Pri Learning account', receivedAt: new Date(now).toISOString() } })?.code === '771020'
+    && parseLatest({ code: '123456', purpose: 'guardian' })?.purpose === 'guardian' && parseLatest({ subject: 'Your weekly report' }) === null,
+    'a captured message gives its code and purpose from the subject Pri sends; anything else gives nothing');
+  const replies = [{ status: 404, body: {} }, { status: 200, body: { subject: '111111 is your Pri Learning code', receivedAt: now - 10 * 60000 } }, { status: 200, body: { subject: '482913 is your Pri Learning code', receivedAt: now } }];
+  let calls = 0; let askedFor = '';
+  const fake = async url => { askedFor = url; const r = replies[Math.min(calls++, replies.length - 1)]; return { status: r.status, json: async () => r.body }; };
+  const box = testMailbox('https://staging.example', { fetchImpl: fake, pollMs: 1 });
+  const got = await box.waitForCode('pri-ab-1@e2e.prilearning.test', 'sign-in', now - 1000, 2000);
+  ok(got.code === '482913' && askedFor.endsWith('/v1/test-mailbox/latest?to=pri-ab-1%40e2e.prilearning.test'),
+    'the reader polls /v1/test-mailbox/latest for that exact address, waits through 404, and skips a code older than the request');
+  const wrong = await testMailbox('https://s.example', { fetchImpl: async () => ({ status: 200, json: async () => ({ subject: '482913 is your Pri Learning code', receivedAt: now }) }), pollMs: 1 }).waitForCode('a@e2e.prilearning.test', 'delete', now - 1000, 30);
+  ok(wrong.code === null, 'a code for another purpose is never returned: the wait times out with null');
+  ok(/real inbox not exercised/.test(TEST_MAILBOX_LABEL), 'steps that used the test mailbox say delivery to a real inbox was not exercised');
 }
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
