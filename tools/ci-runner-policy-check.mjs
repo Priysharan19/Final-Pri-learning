@@ -115,29 +115,44 @@ export function prSupersededOnlyProblems(source, prefix) {
  */
 export function groupLiterals(source) {
   const unreadable = [];
-  const nameLine = (source.match(/^name:[ \t]*(.*)$/m) || [])[1];
-  const name = nameLine === undefined ? '' : nameLine.trim().replace(/^(["'])(.*)\1$/, '$2');
+  // name: a plain value up to a " #" comment, or a quoted value.
+  const nameRaw = (source.match(/^name:[ \t]*(.*)$/m) || [])[1];
+  const nameText = nameRaw === undefined ? '' : nameRaw.trim();
+  const quotedName = nameText.match(/^(["'])(.*?)\1/);
+  const name = quotedName ? quotedName[2] : nameText.replace(/\s+#.*$/, '').trim();
+  const EXPR = /^\$\{\{\s*github\.workflow\s*\}\}/;
   const readable = value => value && !/^[>|{&!*]/.test(value) && !/\bformat\s*\(/.test(value)
-    && (!/\$\{\{\s*github\.workflow\s*\}\}/.test(value) || (name && !/^[>|&!*]/.test(name)));
+    // A group that starts with an expression is readable only when it is github.workflow and the name is.
+    && (!/^\$\{\{/.test(value) || (EXPR.test(value) && name && !/^[>|&!*]/.test(name)));
   const values = [];
   const take = raw => {
-    const value = String(raw || '').trim();
+    const value = String(raw || '').trim().replace(/^(["'])(.*)\1$/, '$2').replace(/^["']/, '');
     // A flow sequence is never a concurrency group (GitHub needs a string): it is a
     // matrix key that happens to be called group (ci.yml's browser groups).
     if (value.startsWith('[')) return;
     if (!readable(value)) { unreadable.push(value || '(empty)'); return; }
-    // Only the start of a group decides a prefix collision, so quotes come off each end on their own
-    // (a flow mapping's value is cut at the first } of its own ${{ … }}).
-    values.push(value.replace(/^["']/, '').replace(/["']$/, '').replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
+    values.push(value.replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
   };
-  for (const m of source.matchAll(/^[ \t]*["']?group["']?[ \t]*:[ \t]*([^\n#]*)/gm)) take(m[1]);
-  // A group inside a flow mapping, wherever the mapping starts (same line as its key or the next).
-  for (const m of source.matchAll(/[{,][ \t]*["']?group["']?[ \t]*:[ \t]*([^,}\n]*)/g)) take(m[1]);
-  for (const m of source.matchAll(/(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*([^\n#]*)$/gm)) {
+  // A value runs to the end of the line or to a " #" comment; ${{ … }} is kept whole.
+  const VALUE = String.raw`((?:\$\{\{[^}]*\}\}|[^#\n])*)`;
+  for (const m of source.matchAll(new RegExp(String.raw`^[ \t]*["']?group["']?[ \t]*:[ \t]*` + VALUE, 'gm'))) take(m[1]);
+  // A group inside a flow mapping, wherever the mapping starts; its value ends at , or } outside ${{ … }}.
+  for (const m of source.matchAll(/[{,][ \t]*["']?group["']?[ \t]*:[ \t]*((?:\$\{\{[^}]*\}\}|[^,}\n])*)/g)) take(m[1]);
+  const lines = source.split('\n');
+  for (const [index, line] of lines.entries()) {
+    const m = line.match(new RegExp(String.raw`(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*` + VALUE));
+    if (!m) continue;
     const value = m[1].trim();
-    if (!value) continue; // a block: its group: line is read above
     if (value.startsWith('{')) continue; // its group is read by the flow-mapping pass above
-    take(value);
+    if (value) { take(value); continue; }
+    // No value on the key's line: the next content line is either the block (a key: line, read
+    // above, or a flow mapping) or a plain scalar continuing the value, which is the group itself.
+    const indent = line.match(/^[ \t]*/)[0].length;
+    const next = lines.slice(index + 1).find(l => l.trim() && !l.trim().startsWith('#'));
+    if (!next || next.match(/^[ \t]*/)[0].length <= indent) { unreadable.push('(empty)'); continue; }
+    const content = next.trim();
+    if (/^["']?[A-Za-z0-9_-]+["']?[ \t]*:/.test(content) || content.startsWith('{')) continue;
+    take(content.replace(/\s+#.*$/, ''));
   }
   return { values, unreadable };
 }
@@ -210,7 +225,13 @@ export function prefixCollision(source, prefixes) {
     ['a group built from a quoted github.workflow name', `name: "${prefix}"\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
     ['a flow-mapping concurrency', `name: Other\nconcurrency: { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`],
     ['a job-level flow-mapping concurrency', `name: Other\njobs:\n  a:\n    concurrency: { group: '${prefix}-\${{ github.ref }}' }\n`],
-    ['a flow mapping on the line after its key', `name: Other\nconcurrency:\n  { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`]
+    ['a flow mapping on the line after its key', `name: Other\nconcurrency:\n  { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`],
+    ['a one-line concurrency with a trailing comment', `name: Other\nconcurrency: ${prefix}-\${{ github.ref }}  # one run per ref\n`],
+    ['a job-level quoted one-line concurrency with a trailing comment', `name: Other\njobs:\n  a:\n    concurrency: '${prefix}-\${{ github.ref }}' # note\n`],
+    ['a group with a trailing comment', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }} # note\n`],
+    ['a concurrency value on the next line', `name: Other\nconcurrency:\n  ${prefix}-\${{ github.ref }}\n`],
+    ['a flow-mapping group built from github.workflow', `name: ${prefix}\nconcurrency: { group: "\${{ github.workflow }}-\${{ github.ref }}" }\n`],
+    ['a github.workflow group whose name: carries a comment', `name: ${prefix} # copied\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
   ]) {
     assert.ok(prefixCollision(other, prefixes)?.prefix === prefix, `another workflow cannot share a pinned group through ${name}`);
   }
@@ -221,7 +242,9 @@ export function prefixCollision(source, prefixes) {
     ['an anchored group', `name: Other\nconcurrency:\n  group: &g ${prefix}-\${{ github.ref }}\n`],
     ['a tagged group', `name: Other\nconcurrency:\n  group: !!str ${prefix}-\${{ github.ref }}\n`],
     ['a group built with format()', `name: Other\nconcurrency:\n  group: \${{ format('{0}-{1}', '${prefix}', github.ref) }}\n`],
-    ['a github.workflow group with an unreadable name', `name: >-\n  ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
+    ['a github.workflow group with an unreadable name', `name: >-\n  ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a group starting with another expression', `name: Other\nconcurrency:\n  group: \${{ matrix.lane }}-\${{ github.ref }}\n`],
+    ['a concurrency key with nothing under it', `name: Other\nconcurrency:\njobs: {}\n`]
   ]) {
     assert.equal(prefixCollision(other, prefixes)?.prefix, '(unreadable)', `a group the check cannot read fails closed: ${name}`);
   }
