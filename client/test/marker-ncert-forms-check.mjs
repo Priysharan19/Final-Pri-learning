@@ -777,3 +777,5 @@ await import('./marker-adversarial-corpus-check.mjs');
 await import('./marker-exact-bounds-check.mjs');
 // The independent R4 review of #723: its four regressions, pinned.
 await import('./marker-step14-review-check.mjs');
+// Its follow-ups on the policies train: set/point/surd guards, ratios, intervals, √0.
+await import('./marker-review-followups-check.mjs');
