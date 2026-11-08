@@ -54,11 +54,13 @@ assert.match(appHealth, /cancel-in-progress:\s*\$\{\{ github\.ref != 'refs\/head
 
 // Thirteen workflows that had no concurrency group (#748) now give pull-request
 // runs one group per pull request (github.ref is refs/pull/<n>/merge there), so a
-// newer push supersedes the queued or running check; every other run (a push to
-// main, a schedule, a manual dispatch) is keyed by its own run id. A pull-request
-// group can therefore never cancel, or replace while pending, a main, scheduled or
-// evidence run, and main runs never replace each other. Concurrency groups are
-// repository-wide, so each prefix is also unique across every workflow.
+// newer push supersedes the queued or running check; every other run (a push, a
+// manual dispatch) is keyed by its own run id. A pull-request group can therefore
+// never cancel, or replace while pending, a run on main, and main runs never
+// replace each other. The block must be the file's ONLY concurrency key in any
+// YAML form (a job-level one keyed on github.ref would bring the hazard back), and
+// concurrency groups are repository-wide and case-insensitive, so no other
+// workflow may produce a group with one of these prefixes.
 export const PR_SUPERSEDED_ONLY = Object.freeze([
   ['kalp-01-design-system.yml', 'kalp-01'],
   ['kalp-02-information-architecture.yml', 'kalp-02'],
@@ -74,50 +76,102 @@ export const PR_SUPERSEDED_ONLY = Object.freeze([
   ['ink-structural-v4-group-relations.yml', 'ink-structural-v4-group-relations'],
   ['ink-writer-generalization.yml', 'ink-writer-generalization']
 ]);
+// Any mention of a concurrency key: block or one-line, quoted or not, in a flow mapping too.
+const CONCURRENCY_KEY = /(^|[{,\s])["']?concurrency["']?\s*:/gm;
 /** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
 export function prSupersededOnlyProblems(source, prefix) {
-  const problems = [];
-  const blocks = [...source.matchAll(/^([ \t]*)concurrency:[ \t]*\n((?:\1  .*\n)+)/gm)];
-  if (blocks.length !== 1 || blocks[0][1] !== '') return [`needs exactly one top-level concurrency block (found ${blocks.length}${blocks.some(b => b[1] !== '') ? ', one of them job-level' : ''})`];
-  const body = blocks[0][2];
-  const settings = body.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
-  const comment = body.split('\n').filter(line => line.trim().startsWith('#')).map(line => line.trim().replace(/^#\s?/, '')).join(' ');
+  if (source.includes('\r')) return ['the workflow must use LF line endings'];
+  const keys = [...source.matchAll(CONCURRENCY_KEY)].length;
+  const lines = source.split('\n');
+  const at = lines.findIndex(line => line === 'concurrency:');
+  if (keys !== 1 || at < 0) return [`needs exactly one concurrency key, a top-level block written "concurrency:" alone on its line (found ${keys} concurrency key${keys === 1 ? '' : 's'}${at < 0 ? ', none of them that block' : ''})`];
+  const block = [];
+  for (let i = at + 1; i < lines.length && !/^\S/.test(lines[i]); i += 1) block.push(lines[i]);
+  while (block.length && block.at(-1) === '') block.pop();
   const group = `  group: ${prefix}-\${{ github.event_name == 'pull_request' && github.ref || github.run_id }}`;
   const cancel = "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}";
-  if (settings.length !== 2 || settings[0] !== group) problems.push(`group must be exactly "${group.trim()}": only a pull_request run is keyed by its ref; every other run by its own run id`);
-  if (settings[1] !== cancel) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
+  const problems = [];
+  for (const line of block) {
+    if (line !== group && line !== cancel && !/^  # /.test(line)) problems.push(`unexpected line in the concurrency block: ${JSON.stringify(line)} (only comments, the group and cancel-in-progress, two-space indented)`);
+  }
+  if (block.filter(line => line === group).length !== 1) problems.push(`group must be exactly "${group.trim()}": only a pull_request run is keyed by its ref; every other run by its own run id`);
+  if (block.filter(line => line === cancel).length !== 1) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
+  const comment = block.filter(line => /^  # /.test(line)).map(line => line.slice(4)).join(' ');
   if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
+  // A closed pull request's run has a different github.ref; the pattern holds while the trigger keeps its default types.
+  if (/^\s*types:.*\bclosed\b|^\s*-\s*closed\s*$/m.test(source)) problems.push('a pull_request trigger with type closed breaks "one group per pull request"');
   return problems;
+}
+/** Every concurrency group expression a workflow can produce, lower-cased with quotes removed and github.workflow resolved. */
+export function groupLiterals(source) {
+  const name = (source.match(/^name:\s*["']?([^"'\n]+?)["']?\s*$/m) || [])[1] || '';
+  const values = [
+    ...[...source.matchAll(/^[ \t]*["']?group["']?[ \t]*:[ \t]*(\S[^\n]*)$/gm)].map(m => m[1]),
+    ...[...source.matchAll(/(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*([^\s#{&][^\n#]*)$/gm)].map(m => m[1])
+  ];
+  return values.map(value => value.trim().replace(/^["']|["']$/g, '').replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
+}
+/** The pinned prefix another workflow's group could collide with, or null. */
+export function prefixCollision(source, prefixes) {
+  for (const literal of groupLiterals(source)) {
+    const hit = prefixes.find(prefix => literal.startsWith(`${prefix.toLowerCase()}-`));
+    if (hit) return { prefix: hit, literal };
+  }
+  return null;
 }
 {
   const prefixes = PR_SUPERSEDED_ONLY.map(([, prefix]) => prefix);
-  assert.equal(new Set(prefixes).size, prefixes.length, 'the pull-request-only concurrency prefixes are distinct');
+  assert.equal(new Set(prefixes.map(p => p.toLowerCase())).size, prefixes.length, 'the pull-request-only concurrency prefixes are distinct');
+  for (const a of prefixes) for (const b of prefixes) if (a !== b) assert.ok(!`${b}-`.toLowerCase().startsWith(`${a}-`.toLowerCase()), `the prefix ${b} does not start with ${a}-, so their groups can never meet`);
   for (const [file, prefix] of PR_SUPERSEDED_ONLY) {
-    assert.deepEqual(prSupersededOnlyProblems(read(file), prefix), [], `${file}: pull-request runs share one group per pull request; main, scheduled and dispatched runs are never cancelled or replaced`);
+    assert.deepEqual(prSupersededOnlyProblems(read(file), prefix), [], `${file}: pull-request runs share one group per pull request; runs on main and dispatched runs are never cancelled or replaced`);
   }
-  // Repository-wide groups: no other workflow's group expression starts with one of these prefixes.
+  // Repository-wide, case-insensitive groups: no other workflow produces a group with one of these prefixes.
   const workflowDir = new URL('../.github/workflows/', import.meta.url);
   const pinned = new Set(PR_SUPERSEDED_ONLY.map(([file]) => file));
   for (const name of readdirSync(workflowDir).filter(n => /\.ya?ml$/.test(n) && !pinned.has(n))) {
-    for (const [, literal] of read(name).matchAll(/^\s*group:\s*([^$\n]*)\$\{\{/gm)) {
-      assert.ok(!prefixes.some(prefix => literal === `${prefix}-`), `${name}: its concurrency group "${literal}…" would share a group with a pull-request-only workflow`);
-    }
+    const hit = prefixCollision(read(name), prefixes);
+    assert.equal(hit, null, `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
   }
   // Mutation controls: the dangerous variants are refused, not merely absent today.
-  const good = read(PR_SUPERSEDED_ONLY[0][0]);
-  const prefix = PR_SUPERSEDED_ONLY[0][1];
+  const good = read(PR_SUPERSEDED_ONLY[6][0]); // ink-physical-evidence.yml: it also runs on push to main
+  const prefix = PR_SUPERSEDED_ONLY[6][1];
+  const job = (s, text) => s.replace(/\njobs:\n(  [A-Za-z0-9_-]+:\n)/, `\njobs:\n$1${text}`);
   for (const [name, mutate] of [
-    ['a group keyed on github.ref for every event (a pending main run would be replaced by the next)', s => s.replace(/group: .*\n/, `group: ${prefix}-\${{ github.ref }}\n`)],
-    ['a group keyed on the branch name (github.head_ref)', s => s.replace(/group: .*\n/, `group: ${prefix}-\${{ github.head_ref || github.run_id }}\n`)],
-    ['cancel-in-progress for every event', s => s.replace(/cancel-in-progress: .*\n/, 'cancel-in-progress: true\n')],
+    ['a group keyed on github.ref for every event (a pending main run would be replaced by the next)', s => s.replace(/  group: .*\n/, `  group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a group keyed on the branch name (github.head_ref)', s => s.replace(/  group: .*\n/, `  group: ${prefix}-\${{ github.head_ref || github.run_id }}\n`)],
+    ['cancel-in-progress for every event', s => s.replace(/  cancel-in-progress: .*\n/, '  cancel-in-progress: true\n')],
     ['no run-id fallback', s => s.replace(/ \|\| github\.run_id/, '')],
     ['the "one group per branch" wording', s => s.replace('one group per pull request', 'one group per branch')],
-    ['a second, job-level concurrency block', s => s.replace(/\njobs:\n(  [a-z0-9-]+:\n)/, '\njobs:\n$1    concurrency:\n      group: x\n')]
+    ['a third setting in the block', s => s.replace(/(  cancel-in-progress: .*\n)/, '$1  queue: max\n')],
+    ['a continuation line in the block', s => s.replace(/(  group: .*)\n/, '$1\n    || true\n')],
+    ['a pull_request trigger with type closed', s => s.replace(/pull_request:\n/, 'pull_request:\n    types: [opened, synchronize, closed]\n')],
+    ['CRLF line endings', s => s.replace(/\n/g, '\r\n')],
+    ['a job-level block', s => job(s, `    concurrency:\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level one-line form', s => job(s, `    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level flow form', s => job(s, `    concurrency: { group: "${prefix}-\${{ github.ref }}", cancel-in-progress: true }\n`)],
+    ['a job-level block with a trailing comment', s => job(s, `    concurrency: # main runs\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level block with an anchor', s => job(s, `    concurrency: &jc\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level quoted key', s => job(s, `    "concurrency":\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a top-level key with a trailing comment', s => s.replace(/^concurrency:$/m, 'concurrency: # pinned')],
+    ['a top-level one-line form instead of the block', s => s.replace(/^concurrency:\n(?:  .*\n)+/m, `concurrency: ${prefix}-\${{ github.ref }}\n`)]
   ]) {
     const mutated = mutate(good);
     assert.notEqual(mutated, good, `the mutation "${name}" applies`);
     assert.ok(prSupersededOnlyProblems(mutated, prefix).length > 0, `the policy refuses ${name}`);
   }
+  for (const [name, other] of [
+    ['an unquoted group', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }}\n`],
+    ['a single-quoted group', `name: Other\nconcurrency:\n  group: '${prefix}-\${{ github.ref }}'\n`],
+    ['a double-quoted group', `name: Other\nconcurrency:\n  group: "${prefix}-\${{ github.ref }}"\n`],
+    ['a group differing only in case', `name: Other\nconcurrency:\n  group: ${prefix.toUpperCase()}-\${{ github.ref }}\n`],
+    ['a one-line concurrency', `name: Other\nconcurrency: ${prefix}-\${{ github.ref }}\n`],
+    ['a job-level one-line concurrency', `name: Other\njobs:\n  a:\n    concurrency: ${prefix}-\${{ github.ref }}\n`],
+    ['a group built from github.workflow', `name: ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
+  ]) {
+    assert.ok(prefixCollision(other, prefixes)?.prefix === prefix, `another workflow cannot share a pinned group through ${name}`);
+  }
+  assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${prefix}x-\${{ github.ref }}\n`, prefixes), null, 'a different prefix that merely starts the same is not a collision');
 }
 
 assert.match(hybrid, /pull_request:\s*\n\s+paths:/,
