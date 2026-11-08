@@ -217,7 +217,9 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   eq([featureDefines('build', {}).__PRI_FEATURE_EXAM_HANDWRITING__, featureDefines('build', { PRI_FEATURE_EXAM_HANDWRITING: '1' }).__PRI_FEATURE_EXAM_HANDWRITING__, [...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].includes('EXAM_HANDWRITING')],
     ['false', 'true', true], 'and the build constant the exam room reads says so');
   const room = (await import('node:fs')).readFileSync(new URL('../src/pages/ExamRoom.jsx', import.meta.url), 'utf8');
-  ok(/const inkAllowed = featureEnabled\('examHandwriting'\);/.test(room) && /if \(!inkAllowed\) return 'type';/.test(room) &&
+  // A board mock (D22) is typed whatever the flag says, so the gate is the
+  // flag AND "not a mock": never more writing surface than the flag allows.
+  ok(/const inkAllowed = featureEnabled\('examHandwriting'\) && exam\?\.mock !== true;/.test(room) && /if \(!inkAllowed\) return 'type';/.test(room) &&
     /if \(mode === 'ink' && !inkAllowed\) return;/.test(room) && /\{inkAllowed && \(\s*<div className="row" role="group" aria-label=\{t\('examRoom\.modeGroup'/.test(room),
     'gate off: every written exam answer is typed, the Write by hand switch is not rendered and cannot be set — no writing surface exists on a paper, so none can be left unread');
   // The same module, as a gate-off and a gate-on production build resolve it.
