@@ -84,29 +84,49 @@ const CONCURRENCY_KEY = yamlKey('concurrency');
 const TYPES_KEY = yamlKey('types');
 // Every uses: key, block or flow, with the rest of its line.
 const USES_KEY = /(^|[{,\s])["']?uses["']?[ \t]*:([^\n]*)/gm;
-// GitHub reads a workflow after YAML has decoded it, so the checks read the same keys and values:
-// every double-quoted escape (\xNN, \uNNNN, \UNNNNNNNN, \/, \", \\, \t, \N, \_, …) and escaped line
-// break is decoded in one left-to-right pass, anywhere in the file, and an explicit "? key" entry
-// becomes "key:". Decoding inside a run: script or a single-quoted string only adds matches, so it
-// errs closed. A key that is an alias (*name :) cannot be read here and fails closed.
-const YAML_ESCAPES = Object.freeze({ 0: '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b', ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\x85', _: '\xa0', L: '\u2028', P: '\u2029' });
-export function decodeYaml(source) {
-  return source
-    .replace(/\\(?:\r?\n[ \t]*|x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8})|([0abt\tnvfre "\/\\N_LP]))/g, (whole, x, u, U, ch) => {
-      if (ch !== undefined) return YAML_ESCAPES[ch];
-      if (x === undefined && u === undefined && U === undefined) return '';
-      const code = parseInt(x ?? u ?? U, 16);
-      return code <= 0x10ffff ? String.fromCodePoint(code) : '\ufffd';
-    })
-    .replace(/^([ \t]*(?:-[ \t]+)?)\?[ \t]+([^\n]*?)[ \t]*\n[ \t]*:/gm, '$1$2:');
+// Plain YAML only. The checks below read a workflow's text with regular expressions, and YAML can
+// spell a key or a value in ways those cannot follow: double-quoted escapes and line continuations,
+// explicit "? key" entries, anchors, aliases, tags and merge keys. GitHub decodes them, so a
+// workflow that uses any of them OUTSIDE its block scalars (run: scripts and the like, which YAML
+// reads as plain text) is not read at all: a pinned workflow is refused and any other workflow's
+// group is unreadable, so both fail closed. Comments are kept in the structure, so nothing after a
+// quoted # can hide; a block scalar is blanked from the column of the key that owns it.
+export function structureText(source) {
+  const out = [];
+  let blockIndent = -1;
+  for (const line of source.split('\n')) {
+    const indent = line.match(/^ */)[0].length;
+    if (blockIndent >= 0) {
+      if (line.trim() === '' || indent > blockIndent) { out.push(''); continue; }
+      blockIndent = -1;
+    }
+    const text = line.replace(/\$\{\{.*?\}\}/g, 'EXPR');
+    out.push(text);
+    const bare = text.replace(/[ \t]+#.*$/, '');
+    const keyed = bare.match(/^([ \t]*(?:-[ \t]+)*)[^\s#][^\n]*:[ \t]*[|>][-+0-9]*[ \t]*$/);
+    const itemed = bare.match(/^([ \t]*(?:-[ \t]+)*)-[ \t]+[|>][-+0-9]*[ \t]*$/);
+    if (keyed) blockIndent = keyed[1].length;
+    else if (itemed) blockIndent = itemed[1].length;
+  }
+  return out.join('\n');
 }
-// An alias name starts with a letter, digit, _ or - (so Markdown **bold**: in a script is not one).
-const ALIAS_KEY = /(^|[{,\s])\*[A-Za-z0-9_-][^\s:,{}[\]]*[ \t]*:(?=\s|$)/m;
+const NON_CANONICAL = Object.freeze([
+  [/\\/, 'a backslash (an escape or a line continuation)'],
+  [/^[ \t]*(?:-[ \t]+)*\?(?:[ \t]|$)|[{,[][ \t]*\?[ \t]/m, 'an explicit key (? key)'],
+  [/(?:^[ \t]*(?:-[ \t]+)*|:[ \t]+|[{,[][ \t]*)[&*][^\s,[\]{}]/m, 'an anchor or alias'],
+  [/(?:^[ \t]*(?:-[ \t]+)*|:[ \t]+|[{,[][ \t]*)![^\s=]/m, 'a tag'],
+  [/(^|[\s{,])<<[ \t]*:/m, 'a merge key (<<:)']
+]);
+/** The YAML forms outside block scalars that this check cannot read (empty for plain YAML). */
+export function nonCanonical(source) {
+  const text = structureText(source);
+  return NON_CANONICAL.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
+}
 /** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
-export function prSupersededOnlyProblems(raw, prefix) {
-  if (raw.includes('\r')) return ['the workflow must use LF line endings'];
-  const source = decodeYaml(raw);
-  if (ALIAS_KEY.test(source)) return ['a key written as an alias (*name :) cannot be read by this check; it fails closed'];
+export function prSupersededOnlyProblems(source, prefix) {
+  if (source.includes('\r')) return ['the workflow must use LF line endings'];
+  const odd = nonCanonical(source);
+  if (odd.length) return [`a pinned workflow must be plain YAML: ${odd.join(', ')} outside a run: script cannot be read by this check, so it fails closed`];
   const keys = [...source.matchAll(CONCURRENCY_KEY)].length;
   const lines = source.split('\n');
   const at = lines.findIndex(line => line === 'concurrency:');
@@ -147,10 +167,8 @@ export function prSupersededOnlyProblems(raw, prefix) {
  * value (a block scalar, an anchor, alias or tag, a value on the next line, format()) is
  * returned as `unreadable` rather than guessed at.
  */
-export function groupLiterals(raw) {
-  const source = decodeYaml(raw);
-  const unreadable = [];
-  if (ALIAS_KEY.test(source)) unreadable.push('a key written as an alias (*name :)');
+export function groupLiterals(source) {
+  const unreadable = [...nonCanonical(source)];
   // name: a plain value up to a " #" comment, or a quoted value.
   const nameRaw = (source.match(/^name:[ \t]*(.*)$/m) || [])[1];
   const nameText = nameRaw === undefined ? '' : nameRaw.trim();
@@ -290,7 +308,18 @@ export function prefixCollision(source, prefixes) {
     ['an explicit ? concurrency key', s => job(s, `    ? concurrency\n    : ${prefix}-\${{ github.ref }}\n`)],
     ['a types key written with an escape', s => s.replace(/pull_request:\n/, 'pull_request:\n    "t\\x79pes": [closed]\n')],
     ['an explicit ? types key', s => s.replace(/pull_request:\n/, 'pull_request:\n    ? types\n    : [closed]\n')],
-    ['a key written as an alias', s => job(s, `    env: { K: &k uses }\n    *k : example-org/shared/.github/workflows/report.yml@v1\n`)]
+    ['a key written as an alias', s => job(s, `    env: { K: &k uses }\n    *k : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    // Seventh review: a backslash ending a comment or a plain value, explicit keys with comments or block-scalar keys, tags and anchors on keys.
+    ['a job-level concurrency after a comment ending in a backslash', s => job(s, `    # see C:\\\n    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level concurrency after a plain value ending in a backslash', s => job(s, `    env:\n      P: C:\\\n    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a reusable-workflow call after a comment ending in a backslash', s => job(s, `    # C:\\\n    uses: example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an explicit ? concurrency key with a comment', s => job(s, `    ? concurrency # c\n    : ${prefix}-\${{ github.ref }}\n`)],
+    ['an explicit ? uses key with a comment line before its value', s => job(s, `    ? uses\n    # note\n    : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an explicit block-scalar uses key', s => job(s, `    ? |-\n      uses\n    : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a tag on a job-level concurrency key', s => job(s, `    !!str concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['an anchor on a uses key', s => job(s, `    &u uses: example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an alias key whose anchor name starts with a dot', s => job(s, `    env: { K: &.k uses }\n    *.k : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a merge key', s => job(s, `    <<: { concurrency: ${prefix}-\${{ github.ref }} }\n`)]
   ]) {
     const mutated = mutate(good);
     assert.notEqual(mutated, good, `the mutation "${name}" applies`);
@@ -300,6 +329,11 @@ export function prefixCollision(source, prefixes) {
   const withLocalAction = good.replace(/(\n      - uses: actions\/setup-node@[^\n]*\n)/, '$1      - uses: ./.github/actions/setup-pri\n');
   assert.notEqual(withLocalAction, good, 'the local-action control applies');
   assert.deepEqual(prSupersededOnlyProblems(withLocalAction, prefix), [], 'a step that uses a local action (./.github/actions/…) is not a reusable-workflow call');
+  // Block scalars are text to YAML and are skipped; the keys beside them are not.
+  assert.deepEqual(nonCanonical('      - run: |\n          echo "a && b" \\\n            *.md\n        env: { A: 1 }\n'), [], 'a run: script may hold backslashes, && and globs');
+  assert.deepEqual(nonCanonical('      - run: |\n          echo hi\n        env: { A: *alias }\n'), ['an anchor or alias'], 'a key beside a run: script, at the column of run:, is still read');
+  assert.deepEqual(nonCanonical('x: { a: "x #", b: *alias }\n'), ['an anchor or alias'], 'a quoted # never hides the rest of a flow mapping');
+  assert.deepEqual(nonCanonical("on:\n  schedule:\n    - cron: '*/5 * * * *'\njobs:\n  a:\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n    steps:\n      - run: npm ci && npm test\n"), [], 'quoted cron stars and && inside a value are plain text');
   for (const [name, other] of [
     ['an unquoted group', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }}\n`],
     ['a single-quoted group', `name: Other\nconcurrency:\n  group: '${prefix}-\${{ github.ref }}'\n`],
@@ -317,14 +351,7 @@ export function prefixCollision(source, prefixes) {
     ['a group with a trailing comment', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }} # note\n`],
     ['a concurrency value on the next line', `name: Other\nconcurrency:\n  ${prefix}-\${{ github.ref }}\n`],
     ['a flow-mapping group built from github.workflow', `name: ${prefix}\nconcurrency: { group: "\${{ github.workflow }}-\${{ github.ref }}" }\n`],
-    ['a github.workflow group whose name: carries a comment', `name: ${prefix} # copied\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
-    // Sixth review: escapes, double-quoted line continuations and explicit keys, as GitHub decodes them.
-    ['a group with an escaped hyphen', `name: Other\nconcurrency:\n  group: "${prefix}\\x2D\${{ github.ref }}"\n`],
-    ['a group split by a double-quoted line continuation', `name: Other\nconcurrency:\n  group: "ink-\\\n    physical-evidence-\${{ github.ref }}"\n`],
-    ['a group key written with an escape', `name: Other\nconcurrency:\n  "gr\\x6Fup": ${prefix}-\${{ github.ref }}\n`],
-    ['an explicit ? group key', `name: Other\nconcurrency:\n  ? group\n  : ${prefix}-\${{ github.ref }}\n`],
-    ['a one-line concurrency key written with an escape', `name: Other\n"con\\x63urrency": ${prefix}-\${{ github.ref }}\n`],
-    ['a group written with a \\U escape', `name: Other\nconcurrency:\n  group: "${prefix}\\U0000002D\${{ github.ref }}"\n`]
+    ['a github.workflow group whose name: carries a comment', `name: ${prefix} # copied\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
   ]) {
     assert.ok(prefixCollision(other, prefixes)?.prefix === prefix, `another workflow cannot share a pinned group through ${name}`);
   }
@@ -340,15 +367,29 @@ export function prefixCollision(source, prefixes) {
     ['a quoted group starting with another expression', `name: Other\nconcurrency:\n  group: '\${{ matrix.lane }}-\${{ github.ref }}'\n`],
     ['a github.workflow group in a reusable workflow (the caller names it)', `name: Shared\non:\n  workflow_call:\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
     ['a concurrency key with nothing under it', `name: Other\nconcurrency:\njobs: {}\n`],
-    ['a concurrency key written as an alias', `name: Other\nenv: { K: &c concurrency }\n*c : ${prefix}-\${{ github.ref }}\n`]
+    ['a concurrency key written as an alias', `name: Other\nenv: { K: &c concurrency }\n*c : ${prefix}-\${{ github.ref }}\n`],
+    // Sixth and seventh reviews: forms GitHub decodes but a regular expression cannot follow are not read at all.
+    ['a group with an escaped hyphen', `name: Other\nconcurrency:\n  group: "${prefix}\\x2D\${{ github.ref }}"\n`],
+    ['a group split by a double-quoted line continuation', `name: Other\nconcurrency:\n  group: "ink-\\\n    physical-evidence-\${{ github.ref }}"\n`],
+    ['a group key written with an escape', `name: Other\nconcurrency:\n  "gr\\x6Fup": ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit ? group key', `name: Other\nconcurrency:\n  ? group\n  : ${prefix}-\${{ github.ref }}\n`],
+    ['a one-line concurrency key written with an escape', `name: Other\n"con\\x63urrency": ${prefix}-\${{ github.ref }}\n`],
+    ['a group written with a \\U escape', `name: Other\nconcurrency:\n  group: "${prefix}\\U0000002D\${{ github.ref }}"\n`],
+    ['a group key after a comment that ends in a backslash', `name: Other\nconcurrency:\n  # see C:\\\n  group: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit ? concurrency key with a comment', `name: Other\n? concurrency # c\n: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit key indicator alone on its line', `name: Other\n?\n  concurrency\n: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit block-scalar key', `name: Other\nconcurrency:\n  ? |-\n    group\n  : ${prefix}-\${{ github.ref }}\n`],
+    ['a tag on the group key after another key', `name: Other\nconcurrency:\n  cancel-in-progress: false\n  !!str group: '${prefix}-\${{ github.ref }}'\n`],
+    ['an anchor on the group key after another key', `name: Other\nconcurrency:\n  cancel-in-progress: false\n  &g group: ${prefix}-\${{ github.ref }}\n`],
+    ['an anchor on the group key in a flow mapping', `name: Other\nconcurrency: { &a group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['a tag on the group key in a flow mapping', `name: Other\nconcurrency: { !!str group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['an explicit group key in a flow mapping', `name: Other\nconcurrency: { ? group : '${prefix}-\${{ github.ref }}' }\n`],
+    ['an alias key whose anchor name starts with a dot', `name: Other\nenv: { K: &.c concurrency }\n*.c : ${prefix}-\${{ github.ref }}\n`],
+    ['a merge key bringing in a concurrency mapping', `name: Other\nx: &m { concurrency: ${prefix}-\${{ github.ref }} }\njobs:\n  a:\n    <<: *m\n`]
   ]) {
     assert.equal(prefixCollision(other, prefixes)?.prefix, '(unreadable)', `a group the check cannot read fails closed: ${name}`);
   }
   assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${prefix}x-\${{ github.ref }}\n`, prefixes), null, 'a different prefix that merely starts the same is not a collision');
-  // Decoding is exact: an escaped backslash stays a backslash, and an impossible code point is not a hyphen.
-  assert.equal(decodeYaml('"u\\\\x73es": x'), '"u\\x73es": x', 'an escaped backslash before x73 decodes to a literal backslash, not to "s"');
-  assert.equal(decodeYaml('"a\\UFFFFFFFFb"'), '"a\ufffdb"', 'a \\U escape beyond Unicode decodes to the replacement character, never throws');
-  assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: "${prefix}\\\\x2D\${{ github.ref }}"\n`, prefixes), null, 'an escaped backslash in a group is not read as an escape');
   // An expression that can complete a pinned prefix fails closed; a known expansion that cannot does not.
   for (const [name, group] of [
     ['a matrix value completing ink-physical-evidence', 'ink-${{ matrix.lane }}-${{ github.ref }}'],
