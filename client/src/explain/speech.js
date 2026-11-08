@@ -96,8 +96,8 @@ const WORDS = {
     power: (a, n) => `${a} to the power of ${n}`,
     times: 'times', divide: 'divided by', over: 'divided by', plusMinus: 'plus or minus',
     le: 'less than or equal to', ge: 'greater than or equal to', ne: 'not equal to',
-    lt: 'less than', gt: 'greater than',
-    equals: 'equals', plus: 'plus', minus: 'minus',
+    lt: 'less than', gt: 'greater than', to: 'to',
+    equals: 'equals', approx: 'approximately equals', plus: 'plus', minus: 'minus',
     pi: 'pi', theta: 'theta', degrees: 'degrees'
   },
   hi: {
@@ -110,9 +110,12 @@ const WORDS = {
     // Hindi relations are postpositional and come AFTER the right-hand side:
     // "x < 3" is "x, 3 से कम है". relationClauses() reorders before these
     // are used; read infix, "x से कम 3" would say the opposite inequality.
+    // An arrow is the same: "x \to 0" is "x, 0 की ओर" (towards 0), whether
+    // it is a limit, a map or a change of limits.
     le: 'से कम या बराबर है', ge: 'से अधिक या बराबर है', ne: 'के बराबर नहीं है',
-    lt: 'से कम है', gt: 'से अधिक है',
-    equals: 'बराबर', plus: 'धन', minus: 'ऋण', and: 'और',
+    lt: 'से कम है', gt: 'से अधिक है', to: 'की ओर',
+    // "≈" is read like "=", infix: "x लगभग बराबर 3.14".
+    equals: 'बराबर', approx: 'लगभग बराबर', plus: 'धन', minus: 'ऋण', and: 'और',
     pi: 'पाई', theta: 'थीटा', degrees: 'डिग्री'
   }
 };
@@ -127,11 +130,19 @@ const WORDS = {
 //   -2 < x \le 5    →  -2, x «से कम है» और x, 5 «से कम या बराबर है»
 // An operand is the run of mathematical tokens on either side of the symbol:
 // numbers, single-letter symbols, LaTeX commands, operators and brackets. A
-// word of two or more letters (prose: "so", "hence") or punctuation ends it.
+// word of two or more letters (prose: "so", "hence") or punctuation ends it,
+// and so does a closing bracket the operand did not open: in "P(X \le 2)" or
+// "\lim_{x \to 0} f(x)" the right-hand side is 2 or 0, not "2)" or "0} f(x)".
+//
+// Every spelling of a relation is listed: a generator may write \ne or \neq,
+// \le or \leq, and each must be spoken the same. A LaTeX token here is the
+// whole command, so \to is never \top and \ne never \neg.
 const RELATION_TOKENS = [
-  [/^(?:\\leq?|≤)$/, 'le'], [/^(?:\\geq?|≥)$/, 'ge'], [/^(?:\\neq|≠)$/, 'ne'],
-  [/^(?:<|\\lt)$/, 'lt'], [/^(?:>|\\gt)$/, 'gt']
+  [/^(?:\\leq?|≤)$/, 'le'], [/^(?:\\geq?|≥)$/, 'ge'], [/^(?:\\neq?|≠)$/, 'ne'],
+  [/^(?:<|\\lt)$/, 'lt'], [/^(?:>|\\gt)$/, 'gt'], [/^\\(?:to|rightarrow)$/, 'to']
 ];
+const OPENING = new Set(['(', '[', '{']);
+const CLOSING = new Set([')', ']', '}']);
 const FUNCTION_WORDS = /^(?:sin|cos|tan|cot|sec|cosec|csc|log|ln|exp|lim|max|min)$/;
 const TOKEN = /\\[a-zA-Z]+|[A-Za-z]+|\d+(?:\.\d+)?|\s+|./gu;
 
@@ -164,7 +175,10 @@ function relationClauses(text, w) {
       relations.push(relationOf(tokens[i]));
       i++;
       let operand = '';
-      while (i < tokens.length && isMathToken(tokens[i])) operand += tokens[i++];
+      for (let depth = 0; i < tokens.length && isMathToken(tokens[i]); operand += tokens[i++]) {
+        if (OPENING.has(tokens[i])) depth++;
+        else if (CLOSING.has(tokens[i]) && depth-- === 0) break;
+      }
       operands.push(operand.trim());
     }
     const clauses = relations.map((rel, k) => `${operands[k]}, ${operands[k + 1]} ${w[rel]}`);
@@ -199,13 +213,18 @@ export function speechText(value, language = DEFAULT_LANGUAGE) {
     .replace(new RegExp(`${OPERAND}\\s*\\^\\{([^{}]+)\\}`, 'g'), (_, a, n) => ` ${w.power(a, n)} `)
     .replace(new RegExp(`${OPERAND}\\s*\\^([\\w-]+)`, 'g'), (_, a, n) => ` ${w.power(a, n)} `);
 
+  // A command is matched whole — (?![a-zA-Z]) ends its name — so \le never
+  // takes the first letters of \left, \pm of \pmod, or \cdot of \cdots. The
+  // Unicode arrow is left alone: in prose it means "then" as often as "to".
   s = s
-    .replace(/\\times|×|\\cdot/g, ` ${w.times} `)
-    .replace(/\\div|÷/g, ` ${w.divide} `)
-    .replace(/\\pm|±/g, ` ${w.plusMinus} `)
-    .replace(/\\leq?|≤/g, ` ${w.le} `)
-    .replace(/\\geq?|≥/g, ` ${w.ge} `)
-    .replace(/\\neq|≠/g, ` ${w.ne} `)
+    .replace(/\\(?:times|cdot)(?![a-zA-Z])|×/g, ` ${w.times} `)
+    .replace(/\\div(?![a-zA-Z])|÷/g, ` ${w.divide} `)
+    .replace(/\\pm(?![a-zA-Z])|±/g, ` ${w.plusMinus} `)
+    .replace(/\\leq?(?![a-zA-Z])|≤/g, ` ${w.le} `)
+    .replace(/\\geq?(?![a-zA-Z])|≥/g, ` ${w.ge} `)
+    .replace(/\\neq?(?![a-zA-Z])|≠/g, ` ${w.ne} `)
+    .replace(/\\(?:to|rightarrow)(?![a-zA-Z])/g, ` ${w.to} `)
+    .replace(/\\approx(?![a-zA-Z])|≈/g, ` ${w.approx} `)
     .replace(/\\pi|π/g, ` ${w.pi} `)
     .replace(/\\theta|θ/g, ` ${w.theta} `)
     .replace(/\^\\circ|°/g, ` ${w.degrees} `)
@@ -215,8 +234,8 @@ export function speechText(value, language = DEFAULT_LANGUAGE) {
     // Relations and signs, only where they stand as operators: "=" anywhere,
     // "+" anywhere, and "-" only when it is not a hyphen inside a word.
     .replace(/\s*=\s*/g, ` ${w.equals} `)
-    .replace(/\s*<\s*/g, ` ${w.lt} `)
-    .replace(/\s*>\s*/g, ` ${w.gt} `)
+    .replace(/\s*(?:<|\\lt(?![a-zA-Z]))\s*/g, ` ${w.lt} `)
+    .replace(/\s*(?:>|\\gt(?![a-zA-Z]))\s*/g, ` ${w.gt} `)
     .replace(/\s*\+\s*/g, ` ${w.plus} `)
     .replace(/\s*−\s*/g, ` ${w.minus} `)
     .replace(/(^|[\s(=,$])-(?=\s*[\w(\\])/g, `$1 ${w.minus} `)
