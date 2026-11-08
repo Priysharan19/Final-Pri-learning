@@ -11,24 +11,21 @@
     "shape": {
       "format": "pri-device-evidence-export",
       "version": 1,
-      "sha": "<40-hex candidate SHA>",
-      "tester": "<the full name of the person who ran the cases>",
-      "buildKind": "development | testflight",
-      "server": "staging | production",
+      "sha": "<required: the full 40-hex commit of the build on the device>",
+      "tester": "<required: the full name of the person who ran the cases>",
       "records": [
         {
-          "case": "<a device-matrix item id>",
-          "result": "pass | fail | blocked",
-          "device": "<model as Settings shows it>",
-          "os": "<OS name and version>",
-          "pencil": "<Apple Pencil model: required for a pass of the iPad WRITE case>",
-          "severity": "<P0-P3: required on a fail>",
-          "notes": "<required on blocked, at least five characters>",
-          "build": "<optional build label>"
+          "case": "<required: a device-matrix item id from the checklist>",
+          "result": "<required: pass, fail or blocked>",
+          "device": "<the device model as Settings shows it; a pass or fail needs it>",
+          "os": "<the OS name and version as the device shows it; a pass or fail needs it>",
+          "pencil": "<the Apple Pencil model; a pass of the iPad WRITE case needs it>",
+          "notes": "<what the tester saw; a fail or blocked needs at least five characters>",
+          "build": "<a build label, if any>"
         }
       ]
     },
-    "rules": "The importer writes only through scripts/device-matrix-record.mjs: a tester that names an agent, CI, a bot or a placeholder, a simulator or emulator device, an unknown case, a short SHA or a duplicate case refuses the WHOLE file and writes nothing. release-record items are not imported: they go where their recordIn says."
+    "rules": "One export per sitting. Every value is what a person entered on the device: text (minutes and failures: whole numbers), never a <placeholder> from this shape, and only the fields the shape names. The importer checks every record by scripts/device-matrix-record.mjs's own rules and writes only through it. One bad record refuses the WHOLE file and nothing is written: a tester that names an agent, CI, a bot or a placeholder, or a simulator or emulator device (whatever the result), an unknown case, a short SHA, a duplicate case, a value that is not text, a placeholder, or a field the recorder does not record. release-record items are not imported: they go where their recordIn says."
   },
   "matrixCases": 18,
   "items": [

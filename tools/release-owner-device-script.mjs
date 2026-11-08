@@ -17,6 +17,9 @@
 // device: results are the owner's, recorded on real hardware and imported
 // with tools/release-device-import.mjs, which writes only through the
 // recorder's own validation (simulators, agents and placeholders refused).
+// Its evidenceExport.shape comes from the importer, so it names exactly the
+// fields this checkout's recorder keeps, and every value in it is a
+// <placeholder> the importer refuses.
 //
 //   node tools/release-owner-device-script.mjs --write   # regenerate the JSON
 //   node tools/release-owner-device-script.mjs --check   # exit 1 if it is stale
@@ -25,11 +28,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CASES } from '../scripts/device-matrix-record.mjs';
+import { EXPORT_FORMAT, SOAKS_RECORDED, exportShape } from './release-device-import.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const SCRIPT_JSON = join(ROOT, 'docs', 'release', 'owner-device-script.json');
 export const APPLE_FAMILIES = Object.freeze(['IPH', 'IPD']);
-export const EXPORT_FORMAT = 'pri-device-evidence-export';
+export { EXPORT_FORMAT };
 
 const SIGNED_IN = 'Signed in to the adult test account on this device.';
 /** What the owner does for each matrix step id. Keyed by step, shared by both Apple families. */
@@ -78,6 +82,16 @@ export const RELEASE_RECORD_ITEMS = Object.freeze([
   }
 ]);
 
+/** The device soak (OWNER-DEVICE-SCRIPT.md A17 and B5), where the recorder keeps soak records (#737). */
+export const SOAK_ITEM = Object.freeze({
+  id: 'SOAK', kind: 'soak', family: 'IPD', title: 'Soak: continuous use through the second sitting', billingRequired: false,
+  precondition: 'The second sitting (the TIMED, BACKGROUND, STORAGE, MEMORY, EXPORT and SHARE cases) run on the iPad in one go. Part B runs one more soak on the TestFlight build.',
+  steps: ['Note the time the second sitting starts and the time it ends.', 'Note every crash, hang, lost piece of work or wrong mark in between.'],
+  expected: 'No crash or lost work in 45 minutes or more.',
+  evidence: ['The minutes of continuous use.', 'The number of failures, with a note on each.'],
+  recordIn: 'the export\'s soaks list, with the same SHA, tester, build kind and server as its records'
+});
+
 /** The checklist, generated. Throws when a matrix step has no owner instructions. */
 export function ownerDeviceScript(cases = CASES) {
   const items = [];
@@ -90,6 +104,7 @@ export function ownerDeviceScript(cases = CASES) {
       ...(kase.pencil ? { pencilRequired: true } : {})
     });
   }
+  if (SOAKS_RECORDED) items.push({ ...SOAK_ITEM, steps: [...SOAK_ITEM.steps], evidence: [...SOAK_ITEM.evidence] });
   items.push(...RELEASE_RECORD_ITEMS.map(item => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
   return {
     format: 'pri-owner-device-script', version: 1,
@@ -99,12 +114,8 @@ export function ownerDeviceScript(cases = CASES) {
     evidenceExport: {
       format: EXPORT_FORMAT, version: 1,
       import: 'node tools/release-device-import.mjs <export.json>',
-      shape: {
-        format: EXPORT_FORMAT, version: 1, sha: '<40-hex candidate SHA>', tester: '<the full name of the person who ran the cases>',
-        buildKind: 'development | testflight', server: 'staging | production',
-        records: [{ case: '<a device-matrix item id>', result: 'pass | fail | blocked', device: '<model as Settings shows it>', os: '<OS name and version>', pencil: '<Apple Pencil model: required for a pass of the iPad WRITE case>', severity: '<P0-P3: required on a fail>', notes: '<required on blocked, at least five characters>', build: '<optional build label>' }]
-      },
-      rules: 'The importer writes only through scripts/device-matrix-record.mjs: a tester that names an agent, CI, a bot or a placeholder, a simulator or emulator device, an unknown case, a short SHA or a duplicate case refuses the WHOLE file and writes nothing. release-record items are not imported: they go where their recordIn says.'
+      shape: exportShape(),
+      rules: 'One export per sitting. Every value is what a person entered on the device: text (minutes and failures: whole numbers), never a <placeholder> from this shape, and only the fields the shape names. The importer checks every record by scripts/device-matrix-record.mjs\'s own rules and writes only through it. One bad record refuses the WHOLE file and nothing is written: a tester that names an agent, CI, a bot or a placeholder, or a simulator or emulator device (whatever the result), an unknown case, a short SHA, a duplicate case, a value that is not text, a placeholder, or a field the recorder does not record. release-record items are not imported: they go where their recordIn says.'
     },
     matrixCases: items.filter(item => item.kind === 'device-matrix').length,
     items

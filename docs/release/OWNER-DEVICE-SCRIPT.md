@@ -59,18 +59,23 @@ the recorder's case list (`node tools/release-owner-device-script.mjs --write`),
 when it is stale, so it always names the cases the release requires. It holds instructions only;
 nothing in it is a result.
 
-When the console exports your results (format `pri-device-evidence-export`; the JSON's
-`evidenceExport` gives the shape), import them with:
+When the console exports your results (format `pri-device-evidence-export`, one export per
+sitting), import them with:
 
 ```bash
 node tools/release-device-import.mjs <export.json>
 ```
 
+The JSON's `evidenceExport.shape` names the fields this checkout's recorder keeps, and every value
+in it is a `<placeholder>`: a form filled from it cannot be imported. With #737 the export also
+carries the build kind, the server, a fail's severity and the soak (A17, B5) in its `soaks` list.
+
 The importer writes **only through the recorder**, after checking every record by the recorder's
 own rules. One bad record refuses the whole file, and nothing is written: an agent or placeholder
-tester, a simulator, an unknown case, a short SHA, a missing Pencil model or a duplicate case.
-In-app deletion and the sandbox purchase are not device-matrix cases; they go where the JSON's
-`recordIn` says.
+tester or a simulator (whatever the result), an unknown case, a short SHA, a missing Pencil model,
+a duplicate case, a value that is not text, or a field the recorder does not record. The records
+reach the ledger in one append. In-app deletion and the sandbox purchase are not device-matrix
+cases; they go where the JSON's `recordIn` says.
 
 ## Part A — the candidate on staging (development build)
 
