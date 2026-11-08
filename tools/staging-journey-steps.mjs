@@ -667,6 +667,9 @@ export async function stepFreeCap(h, other) {
   const notice = other.page.locator('.card[role="status"]').filter({ hasText: /free questions/i });
   // A question already issued today (the one the app opened on) is resumed, as
   // it should be: it was counted when it was issued. Next asks for one more.
+  // UNVERIFIED: this resume-then-Next handling was added after the last local
+  // run (that run showed the resumed question instead of the cap screen); the
+  // server half of step 13 (402 FREE_CAP_REACHED at 20) passed locally.
   const resumed = await Promise.race([
     other.page.locator('.qpage[data-question-id] .q-prompt').first().waitFor({ timeout: 30000 }).then(() => true, () => false),
     notice.first().waitFor({ timeout: 30000 }).then(() => false, () => false)
