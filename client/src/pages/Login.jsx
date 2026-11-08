@@ -598,7 +598,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
-              <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+              <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
                 <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
                 <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink>
               </p>

@@ -305,8 +305,8 @@ function HistoryForProfile() {
                       {!(!item.repeat && Number.isInteger(item.marksPossible)) && (item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·')}
                       <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                     </span>
-                    {item.viaInk && <span className="in-led-ic" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
-                    {item.hasPhoto && <span className="in-led-ic" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
+                    {item.viaInk && <span className="in-led-ic" data-history-via="ink" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
+                    {item.hasPhoto && <span className="in-led-ic" data-history-via="photo" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
                   </span>
                   {/* The day heading is outside the row's button, so a screen
                       reader moving row by row would hear only a time: the

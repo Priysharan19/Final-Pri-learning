@@ -1285,3 +1285,10 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
 /* D11: on the welcome screen, under the language switch, once another
    language is chosen: questions and worked solutions stay in English. */
 html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-align: center; font-size: 12.5px; line-height: 1.45; color: var(--in-tx-3); text-wrap: pretty; }
+
+/* #487: the welcome footer's legal links drew 15 px tall. On a touch screen
+   each is a 44 px target; the separators stay in the running text. */
+@media (pointer: coarse) {
+  html.ui-instrument .login-legal { line-height: 1.2; }
+  html.ui-instrument .login-legal a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; }
+}

@@ -94,7 +94,11 @@ export const flow = {
       `categories read ${JSON.stringify(cats)}`);
     await check('the week strip draws seven days in the profile’s week', await page.locator('.week-day').count() === 7,
       `${await page.locator('.week-day').count()} days drawn`);
-    const nav = await page.locator('.sidebar').innerText();
+    // The Instrument's navigation: the tab bar, and the More menu opened.
+    await page.locator('#in-more-btn').click();
+    await page.waitForSelector('#in-more-menu', { timeout: 15000 });
+    const nav = `${await page.locator('[data-instrument-bar]').innerText()}\n${await page.locator('#in-more-menu').innerText()}`;
+    await page.keyboard.press('Escape');
     await check('the navigation carries no NSW jargon', !HSC.test(nav) && !/\bYear\b/.test(nav), `nav reads ${JSON.stringify(nav)}`);
 
     await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
