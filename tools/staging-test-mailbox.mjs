@@ -20,6 +20,7 @@
 // Same interface as tools/staging-inbox.mjs: waitForCode(to, purpose, since, timeoutMs).
 // ─────────────────────────────────────────────────────────────────────────────
 import { codeFromSubject } from './staging-inbox.mjs';
+import { linkFromBody, linkKindOfSubject } from './staging-journey-mail.mjs';
 
 export const TEST_MAILBOX_DOMAIN = 'e2e.prilearning.test';
 export const TEST_MAILBOX_LABEL = 'VERIFIED VIA STAGING TEST MAILBOX: delivery to a real inbox not exercised';
@@ -63,6 +64,29 @@ export function testMailbox(origin, { fetchImpl = globalThis.fetch, pollMs = 300
           }
         }
         if (Date.now() - started > timeoutMs) return { code: null, waitedMs: Date.now() - started };
+        await new Promise(res => setTimeout(res, pollMs));
+      }
+    }
+  };
+}
+
+/** Links (a guardian's consent and withdrawal) from the captured message's subject and text; same interface as staging-journey-mail.mjs. */
+export function testMailboxLinks(origin, { fetchImpl = globalThis.fetch, pollMs = 3000 } = {}) {
+  return {
+    async waitForLink(to, kind, since, timeoutMs = 120000) {
+      const started = Date.now();
+      for (;;) {
+        const r = await fetchImpl(`${origin}/v1/test-mailbox/latest?to=${encodeURIComponent(to)}`, { headers: { Accept: 'application/json' } }).catch(() => null);
+        if (r && r.status === 200) {
+          const body = await r.json().catch(() => null);
+          const m = body?.message && typeof body.message === 'object' ? body.message : body;
+          const at = Number(m?.receivedAt) || (m?.receivedAt ? Date.parse(m.receivedAt) : 0);
+          if (m && (!at || at >= since - 60000) && linkKindOfSubject(String(m.subject || '')) === kind) {
+            const link = linkFromBody(String(m.text || ''), kind, origin);
+            if (link) return { link, waitedMs: Date.now() - started };
+          }
+        }
+        if (Date.now() - started > timeoutMs) return { link: null, waitedMs: Date.now() - started };
         await new Promise(res => setTimeout(res, pollMs));
       }
     }

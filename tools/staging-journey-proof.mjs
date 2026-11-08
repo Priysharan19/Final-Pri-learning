@@ -39,6 +39,7 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { imapMailbox, loadInbox, redactAddress, tagAddress } from './staging-inbox.mjs';
+import { e2eAddress, testMailbox, testMailboxLinks, testMailboxState, TEST_MAILBOX_LABEL } from './staging-test-mailbox.mjs';
 import { imapLinkReader } from './staging-journey-mail.mjs';
 import { codeSignIn, guardianWithdraw, isPaidReadRequest, isReaderRequest, stepFreeCap, stepHandwriting, stepHistory, stepIsolation, stepOffline, stepPhoto, stepSecondBrowser, stepTypedMark } from './staging-journey-steps.mjs';
 
@@ -136,18 +137,26 @@ export async function runJourney(args) {
   // never leave a staging account nobody can sign in to and delete.
   const password = `Pri-${randomBytes(9).toString('base64url')}-staging`;
   const recovery = join(tmpdir(), 'pri-staging-journey', `${runTag}.json`);
-  const inbox = args.accounts ? (args.inbox || loadInbox()) : { ok: false, reason: 'no --accounts' };
-  const mailbox = inbox.ok ? (args.mailbox || imapMailbox(inbox.config)) : null;
+  // Code source, in order: a mailbox handed in (the local proof entry); L2's
+  // staging test mailbox when /v1/ready says it is on (the default); the
+  // owner's IMAP inbox file if it exists. Codes from the test mailbox prove
+  // the app and server, not delivery to a real inbox, and say so.
+  const readyNow = args.accounts && !args.mailbox ? await fetch(args.origin + '/v1/ready').then(r => r.json()).catch(() => null) : null;
+  run.testMailbox = testMailboxState(readyNow);
+  const useTestMailbox = args.accounts && !args.mailbox && run.testMailbox === 'on';
+  const inbox = useTestMailbox ? { ok: false, reason: 'the staging test mailbox is the code source' } : args.accounts ? (args.inbox || loadInbox()) : { ok: false, reason: 'no --accounts' };
+  const mailbox = useTestMailbox ? testMailbox(args.origin) : inbox.ok ? (args.mailbox || imapMailbox(inbox.config)) : (args.mailbox || null);
   // Links (a guardian's consent and withdrawal) are in message bodies.
-  const links = inbox.ok ? (args.links || imapLinkReader(inbox.config, args.origin)) : null;
+  const links = useTestMailbox ? testMailboxLinks(args.origin) : inbox.ok ? (args.links || imapLinkReader(inbox.config, args.origin)) : (args.links || null);
   const inboxAddress = inbox.ok ? inbox.config.PRI_STAGING_INBOX_ADDRESS : null;
-  run.mailbox = inbox.ok ? (args.mailboxLabel || 'test inbox present (mode 600)') : `no test inbox: ${inbox.reason}`;
+  run.mailbox = useTestMailbox ? TEST_MAILBOX_LABEL : inbox.ok ? (args.mailboxLabel || 'test inbox present (mode 600)')
+    : args.mailbox ? (args.mailboxLabel || 'a mailbox handed in') : `no code source: the staging test mailbox is ${run.testMailbox}; ${inbox.reason}`;
   // Every request to the reader's routes, and every exchange with /v1/practice,
   // kept in memory for the steps' own checks (never written as they are: the
   // evidence in results.json is the redacted copy).
   const readerLog = []; const exchanges = []; const paidLog = [];
   const lastCodeAt = new Map();
-  const addressFor = (role, n) => inboxAddress ? tagAddress(inboxAddress, runTag, n) : `delivered+pri-${runTag}-${role}@resend.dev`;
+  const addressFor = (role, n) => useTestMailbox ? e2eAddress(runTag, n) : inboxAddress ? tagAddress(inboxAddress, runTag, n) : `delivered+pri-${runTag}-${role}@resend.dev`;
   const typeCode = async (page, idPrefix, code) => { await page.locator(`#${idPrefix}-0`).click(); await page.keyboard.type(code, { delay: 30 }); };
   const waitCode = async (s, to, purposes, since) => {
     for (const purpose of [].concat(purposes)) {
@@ -276,7 +285,15 @@ export async function runJourney(args) {
       run.deployed.handwriting = reader;
       const readerOk = check(current, `/v1/ready reports the handwriting reader ok (waited ${Math.round((Date.now() - started) / 1000)} s)`, reader === 'ok', String(reader));
       if (!readerOk) current.defects.push({ what: `the handwriting reader is '${reader}' 3 minutes after the deploy`, where: '/v1/ready checks.handwriting', repro: `GET ${args.origin}/v1/ready`, lane: 'L4 (reader) / owner (provider key)' });
-      finish(current, same && ready.data?.ready === true && readerOk ? 'PASS' : 'FAIL');
+      // L2's staging test mailbox: absent (not deployed yet) is BLOCKED; off is a defect.
+      const tm = testMailboxState(ready.data);
+      if (tm === 'on') check(current, 'the staging test mailbox is on (/v1/ready testMailbox)', true);
+      else if (tm === 'off') {
+        check(current, 'the staging test mailbox is on (/v1/ready testMailbox)', false, 'off');
+        current.defects.push({ what: 'staging reports testMailbox off, so no email code can be read', where: '/v1/ready testMailbox (RAILWAY_ENVIRONMENT_NAME must be staging)', repro: `GET ${args.origin}/v1/ready`, lane: 'L2' });
+      } else current.blocked.push('/v1/ready does not report testMailbox yet: L2\'s staging test mailbox is not deployed');
+      const base = same && ready.data?.ready === true && readerOk;
+      finish(current, !base || tm === 'off' ? 'FAIL' : tm === 'on' ? 'PASS' : 'BLOCKED');
       if (!same) current.defects.push({ what: 'staging is not serving the nominated SHA', where: 'deployment', repro: `GET ${args.origin}/release.json`, lane: 'L8 (deploy)' });
     }
 
@@ -798,6 +815,7 @@ export function report(run) {
     for (const c of s.checks) lines.push(`- ${c.ok ? '✔' : '✖'} ${c.label}${c.detail ? ` — \`${c.detail.replace(/`/g, "'").slice(0, 300)}\`` : ''}`);
     for (const d of s.defects) lines.push(`- **Defect** (${d.lane}): ${d.what}. Where: ${d.where}. Repro: ${d.repro}.`);
     for (const b of s.blocked) lines.push(`- **Blocked:** ${b}`);
+    if (run.mailbox === TEST_MAILBOX_LABEL && s.notes.some(n => /code reached|link reached/.test(n))) lines.push(`- **${TEST_MAILBOX_LABEL}**`);
     for (const n of s.notes) lines.push(`- Note: ${n}`);
     if (s.shots.length) lines.push(`- Screenshots: ${s.shots.map(f => `[${f}](${f})`).join(', ')}`);
     if (s.evidence.length) lines.push(`- /v1 evidence: ${s.evidence.length} request(s) in results.json (step ${s.id})`);
