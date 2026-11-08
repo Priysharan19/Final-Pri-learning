@@ -16,7 +16,10 @@
 //      an endpoint outside the radical grammar (2/√2 + 10⁻¹⁵) fell back to
 //      floats, an intersection depended on the order it was written in, and
 //      bound text skipped the number guards ("x > 1 2", "x > 1200%");
-//   6  √0 was read as a non-zero radical (x >= sqrt(0) refused for x >= 0).
+//   6  √0 was read as a non-zero radical (x >= sqrt(0) refused for x >= 0);
+//   7  a matrix with unbalanced or mismatched brackets — "(1,2;3,4]",
+//      "[[1,2],[3,4]]]]" — was credited (#680 Cycle 104 cases, found while
+//      rebuilding #680's case set).
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -118,6 +121,17 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
   check(G, sameRadical(R('2/sqrt(2)'), R('sqrt(2)')) && sameRadical(R('sqrt(2)*sqrt(8)'), R('4')), '2/√2 is √2 and √2·√8 is 4, exactly');
   check(G, compareRadical(R('sqrt(2)'), rationalAsRadical(exactValue('1.4142135623730951'))) === -1, '√2 is below 1.4142135623730951, exactly');
   check(G, compareRadical(R('1+sqrt(3)'), rationalAsRadical(exactValue('2.7320508075688772'))) === 1, '1 + √3 is above 2.7320508075688772, exactly');
+}
+
+// ── 7 · a matrix's brackets balance and close in kind ───────────────────────
+{
+  const G = 'matrix';
+  const q = { answerType: 'matrix', answer: { rows: [[1, 2], [3, 4]] } };
+  for (const input of ['[[1,2],[3,4]]', '[1 2; 3 4]', '((1,2),(3,4))', '2[[0.5,1],[1.5,2]]']) check(G, verdict(q, input).correct === true, `"${input}" is the matrix`);
+  for (const input of ['(1,2;3,4]', '[[1,2],[3,4]]]]', '[[1,2],[3,4]', '((1,2),(3,4)]']) {
+    const r = verdict(q, input);
+    check(G, r.correct === false && r.invalid === true, `"${input}" has unbalanced or mismatched brackets and is left unread (got ${state(r)})`);
+  }
 }
 
 const pass = Object.values(groups).reduce((n, g) => n + g.pass, 0);

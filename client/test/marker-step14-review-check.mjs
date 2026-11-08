@@ -56,6 +56,25 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
   check(G, seen >= 20, `the sweep reached the rupee-scale boxes (${seen})`);
 }
 
+// ── P1b · ₹ on a count is a wrong unit (the correct-answer sweep's audit) ───
+{
+  const G = 'p1-rupee-count';
+  let seen = 0;
+  for (const [id, d] of [['c7-equation-context-reasoning', 3], ['c7-formula-evaluation-reasoning', 3]]) for (let s = 1; s <= 40; s++) {
+    const q = generateQuestion(id, d, s);
+    if (q.answerType !== 'numeric' || q.answerSuffix || !/₹|\bRs\b|rupee/i.test(q.prompt)) continue;
+    const ask = String(q.prompt).replace(/\$/g, ' ').split(/(?<=[.?!])\s+/).pop();
+    if (!/\bhow many\b|\bnumber of\b/i.test(ask)) continue;
+    seen++;
+    const k = fmt(q.answer.value);
+    check(G, verdict(q, k).correct === true, `${id} d${d} s${s}: the count ${k} is correct`);
+    check(G, verdict(q, `₹${k}`).correct !== true && verdict(q, `Rs ${k}`).correct !== true, `${id} d${d} s${s}: "₹${k}" on "${ask.slice(0, 50)}" is not the count`);
+  }
+  check(G, seen >= 10, `the sweep reached the counts asked in rupee-priced questions (${seen})`);
+  const notes = { answerType: 'numeric', answer: { value: 500 }, prompt: 'Uday saves ₹50 a week. How many rupees does he save in 10 weeks?' };
+  check(G, verdict(notes, '₹500').correct === true, '"How many rupees …" asks for money: ₹500 is correct');
+}
+
 // ── P2 · a written unit is credited only in the asked dimension ─────────────
 {
   const G = 'p2-unit-dimension';

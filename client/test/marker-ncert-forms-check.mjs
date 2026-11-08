@@ -779,3 +779,5 @@ await import('./marker-exact-bounds-check.mjs');
 await import('./marker-step14-review-check.mjs');
 // Its follow-ups on the policies train: set/point/surd guards, ratios, intervals, √0.
 await import('./marker-review-followups-check.mjs');
+// #680's own comments: the cases they preserve (not the lost original 197).
+await import('./marker-680-sourced-check.mjs');
