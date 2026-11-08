@@ -14,6 +14,9 @@
 //     the check proves on every run that it catches each way of breaking that;
 //   · each required-reason API category the Swift code uses is declared with an
 //     allowed reason, and none is declared without a use;
+//   · every store URL is on a D5 host (prilearning.com for the site,
+//     app.prilearning.com for the app), the console fields carry the D5 value,
+//     the <PRI_PUBLIC_ORIGIN> stand-in is gone and no listing offers SMS (D3);
 //   · the Android manifest asks for INTERNET only and refuses backup and
 //     cleartext; no signing material is tracked, and the upload key must live
 //     outside the repository.
@@ -157,6 +160,82 @@ const BREAKAGES = {
 for (const [breakage, apply] of Object.entries(BREAKAGES)) {
   check(privacyDisagreements(apply(stated)).length > 0, `the agreement check catches: ${breakage}`);
 }
+
+// ── Store URLs and the sign-in channel (owner defaults D5 and D3) ────────────
+// D5 puts the app on app.prilearning.com and the public site, /support included,
+// on prilearning.com. Every URL a store draft asks the owner to type must be on
+// one of those two hosts, the fields the consoles ask for must carry the D5
+// value, and the old <PRI_PUBLIC_ORIGIN> stand-in must not come back. Whether
+// the site is deployed is not something this check can see: it is not, and the
+// drafts say so. D3 keeps SMS off, so no listing text or reviewer note may offer
+// an SMS or phone code while the Apple and Play phone rows say No at launch.
+const STORE_DOCS = ['docs/release/store/app-store-listing.md', 'docs/release/store/play-listing.md',
+  'docs/release/app-store-privacy-labels.md', 'docs/release/play-data-safety.md'];
+const D5 = Object.freeze({
+  site: 'https://prilearning.com',
+  app: 'https://app.prilearning.com',
+  sitePaths: ['', '/privacy', '/terms', '/support', '/refunds', '/delete-account'],
+  appPaths: ['/account/delete-request']
+});
+// [document, the row's first cell, the URL that row must carry]
+const STORE_FIELDS = [
+  ['docs/release/store/app-store-listing.md', 'Support URL', `${D5.site}/support`],
+  ['docs/release/store/app-store-listing.md', 'Marketing URL', D5.site],
+  ['docs/release/store/app-store-listing.md', 'Privacy policy URL', `${D5.site}/privacy`],
+  ['docs/release/store/app-store-listing.md', 'User privacy choices URL (optional)', `${D5.site}/delete-account`],
+  ['docs/release/store/play-listing.md', 'Website', D5.site],
+  ['docs/release/store/play-listing.md', 'Privacy policy', `${D5.site}/privacy`],
+  ['docs/release/store/play-listing.md', 'Account deletion URL', `${D5.site}/delete-account`],
+  ['docs/release/app-store-privacy-labels.md', 'Privacy policy URL', `${D5.site}/privacy`],
+  ['docs/release/play-data-safety.md', 'Account deletion URL', `${D5.site}/delete-account`],
+  ['docs/release/play-data-safety.md', 'Account deletion URL / Add a link that users can use to request that their account and associated data is deleted', `${D5.site}/delete-account`]
+];
+function storeUrlProblems(docs, appRoutes) {
+  const problems = [];
+  for (const [file, text] of Object.entries(docs)) {
+    if (/<PRI_PUBLIC_ORIGIN>|\[OWNER: production origin\]/.test(text)) problems.push(`${file} still carries the <PRI_PUBLIC_ORIGIN> stand-in`);
+    for (const [, url] of text.matchAll(/(https?:\/\/[^\s`|)>"'\]]*prilearning[^\s`|)>"'\]]*)/gi)) {
+      const clean = url.replace(/[.,;:]+$/, '').replace(/#.*$/, '');
+      const site = clean.startsWith(`${D5.site}/`) || clean === D5.site ? clean.slice(D5.site.length) : null;
+      const app = clean.startsWith(`${D5.app}/`) || clean === D5.app ? clean.slice(D5.app.length) : null;
+      if (site !== null) { if (!D5.sitePaths.includes(site)) problems.push(`${file}: ${clean} is not a page the site publishes`); }
+      else if (app === '') continue; // the app's host named on its own, as in "the app is on https://app.prilearning.com"
+      else if (app !== null) { if (!D5.appPaths.includes(app) || !appRoutes.includes(app)) problems.push(`${file}: ${clean} is not a public app route`); }
+      else problems.push(`${file}: ${clean} is on neither D5 host (${D5.site}, ${D5.app})`);
+    }
+  }
+  for (const [file, field, want] of STORE_FIELDS) {
+    const rows = (docs[file] || '').split('\n').filter(line => line.startsWith(`| ${field} |`));
+    if (rows.length !== 1) { problems.push(`${file} has ${rows.length} "${field}" rows, not one`); continue; }
+    const urls = [...rows[0].matchAll(/https?:\/\/[^\s`|)>*]+/g)].map(m => m[0].replace(/[.,;:]+$/, ''));
+    if (urls[0] !== want) problems.push(`${file} "${field}" gives ${urls[0] || 'no URL'}, not ${want} (D5)`);
+  }
+  for (const file of ['docs/release/store/app-store-listing.md', 'docs/release/store/play-listing.md']) {
+    const quoted = (docs[file] || '').split('\n').filter(line => line.startsWith('>')).join('\n');
+    const sms = quoted.match(/[^.\n]*\b(?:SMS|text message|phone code|mobile number)\b[^.\n]*/i);
+    if (sms) problems.push(`${file} listing or reviewer text offers an SMS route while SMS is off at launch (D3): "${sms[0].trim()}"`);
+  }
+  return problems;
+}
+const storeDocs = Object.fromEntries(STORE_DOCS.map(file => [file, read(file)]));
+const mainJsx = read('client/src/main.jsx');
+const appRoutes = D5.appPaths.filter(path => mainJsx.includes(`'${path}'`));
+const urlProblems = storeUrlProblems(storeDocs, appRoutes);
+check(urlProblems.length === 0, `every store URL is on a D5 host, the console fields carry the D5 value, and no listing offers SMS (${urlProblems.join('; ') || 'they do'})`);
+const withDoc = (file, edit) => ({ ...storeDocs, [file]: edit(storeDocs[file]) });
+const URL_BREAKAGES = {
+  'the <PRI_PUBLIC_ORIGIN> stand-in back in a listing': () => withDoc('docs/release/store/play-listing.md', t => t.replace('https://prilearning.com/privacy', '<PRI_PUBLIC_ORIGIN>/privacy')),
+  'a www. host': () => withDoc('docs/release/store/app-store-listing.md', t => t.replace('> Privacy notice: https://prilearning.com/privacy', '> Privacy notice: https://www.prilearning.com/privacy')),
+  'another domain': () => withDoc('docs/release/app-store-privacy-labels.md', t => t.replace('https://prilearning.com/privacy', 'https://prilearning.in/privacy')),
+  'a site path the site does not publish': () => withDoc('docs/release/store/play-listing.md', t => t.replace('https://prilearning.com/delete-account', 'https://prilearning.com/account/delete')),
+  'the support field pointing at the app host': () => withDoc('docs/release/store/app-store-listing.md', t => t.replace('| Support URL | `https://prilearning.com/support`', '| Support URL | `https://app.prilearning.com/support`')),
+  'the Play deletion field left blank': () => withDoc('docs/release/play-data-safety.md', t => t.replace('| Account deletion URL | **`https://prilearning.com/delete-account`**', '| Account deletion URL | **OWNER**')),
+  'an SMS code back in the reviewer notes': () => withDoc('docs/release/store/app-store-listing.md', t => t.replace('must confirm by an email link or a code sent by email', 'must confirm by email link or SMS code'))
+};
+for (const [breakage, apply] of Object.entries(URL_BREAKAGES)) {
+  check(storeUrlProblems(apply(), appRoutes).length > 0, `the store URL check catches: ${breakage}`);
+}
+check(storeUrlProblems(storeDocs, []).length > 0, 'the store URL check catches: the app deletion route gone from client/src/main.jsx');
 
 // Required-reason APIs: what the Swift code calls decides what must be declared.
 const swift = PKGS.flatMap(p => readdirSync(join(ROOT, p), { recursive: true })

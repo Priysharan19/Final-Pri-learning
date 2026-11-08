@@ -1,6 +1,6 @@
 # Terms of use
 
-**Last updated: 2 November 2026**
+**Last updated: 8 November 2026**
 
 These terms are an agreement between you and Priysharan Tripathi,
 5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning on
@@ -68,9 +68,9 @@ If you are under 18, a parent or guardian must make or approve the purchase.
 Questions, solutions and explanations are ours. Your work is yours: what you
 write and answer belongs to you, and we claim no ownership of it.
 
-Pri Learning follows the NCERT syllabus and public examination patterns. It is
-not endorsed by, affiliated with or approved by NCERT, CBSE, the NTA or any
-examination authority.
+Pri Learning is maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and
+JEE Advanced. It is not endorsed by, affiliated with or approved by NCERT, CBSE,
+the NTA or any examination authority.
 
 ## Availability
 

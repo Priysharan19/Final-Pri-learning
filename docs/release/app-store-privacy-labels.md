@@ -1,7 +1,7 @@
 # App Store "App Privacy" (nutrition label) — answers derived from the code
 
-**Status:** engineering draft, reconciled with the code on `main` at `a5778a319` (2026-11-02; first
-reconciled at `7bef402f7`, 2026-10-18). **Not legally reviewed.** The 20 October handover records that
+**Status:** engineering draft, reconciled with the code on `main` at `1d3829103` (2026-11-08, §7;
+before that at `a5778a319`, 2026-11-02, and first at `7bef402f7`, 2026-10-18). **Not legally reviewed.** The 20 October handover records that
 App Privacy was published in App Store Connect with 14 data types; that cannot be verified from the
 repository and the live entry must be compared with §3 before submission. Every row cites the code
 path that justifies it; a row marked **OWNER** is a decision the repository cannot make.
@@ -34,8 +34,8 @@ counsel (`docs/legal/review-status.json`).
 |---|---|---|
 | Do you or your third-party partners collect data from this app? | **Yes** | Checking any answer needs a signed-in account and a connection: the server issues each question and grades it (`server/platform/practice.js`, `exams.js`). Sign-in, sync and reading also send data (`accounts.js`, `sync.js`, `handwriting.js`). A signed-out device can browse but nothing is marked and no `/v1` call carries user data (`client/src/platform/cloudTransport.js`). |
 | Is any data used to track the user? | **No** | No advertising or analytics SDK; `NSPrivacyTracking = false`, empty `NSPrivacyTrackingDomains`; the client may reach only its own origin (`tools/check-client-network-boundary.mjs`). |
-| Privacy policy URL | `<PRI_PUBLIC_ORIGIN>/privacy` (expected `https://prilearning.com/privacy` — **OWNER** confirms the production origin, decision D5). The notice was filled on 19 Oct and corrected against the code on 2 Nov 2026; it is **not yet reviewed by counsel** and says so above itself until `docs/legal/review-status.json` records a review. | `client/src/pages/Legal.jsx`, `docs/legal/privacy.md`. |
-| Account deletion (Guideline 5.1.1(v)) | In-app for every sign-in method: Settings → Account → Delete cloud account (password, Apple/Google re-auth, or a fresh one-time code to the account's email). Also `<PRI_PUBLIC_ORIGIN>/account/delete-request` for someone without the app. Immediate; no grace period. | `CloudAccountSecurity.jsx` → `DELETE /v1/account`; `AccountDeleteRequest.jsx` → `/v1/account/otp/delete-request` + `/delete-confirm`; `server/test/account-deletion-public-check.mjs`. |
+| Privacy policy URL | `https://prilearning.com/privacy` (D5: `prilearning.com` is the public site, `app.prilearning.com` the app; **OWNER** confirms D5 before the first signed build). The site in `site/` renders `docs/legal/privacy.md` word for word; it is **not deployed** and DNS is untouched, so the URL must resolve before it is entered. The notice was filled on 19 Oct and corrected against the code on 2 Nov 2026; it is **not yet reviewed by counsel** and says so above itself until `docs/legal/review-status.json` records a review. | `client/src/pages/Legal.jsx`, `docs/legal/privacy.md`. |
+| Account deletion (Guideline 5.1.1(v)) | In-app for every sign-in method: Settings → Account → Delete cloud account (password, Apple/Google re-auth, or a fresh one-time code to the account's email). Also, for someone without the app, `https://prilearning.com/delete-account`, which links to the working form at `https://app.prilearning.com/account/delete-request` (D5). Immediate; no grace period. Separately, the privacy notice promises that an under-18 account no guardian confirmed, or whose guardian withdrew, is erased after 30 days, and that a guardian can ask for erasure without the child's login (D18): **not yet in the code** at `1d3829103`, and `scripts/release-nominate.mjs` refuses a production nomination until it is (`tools/legal-promises.mjs`). | `CloudAccountSecurity.jsx` → `DELETE /v1/account`; `AccountDeleteRequest.jsx` → `/v1/account/otp/delete-request` + `/delete-confirm`; `server/test/account-deletion-public-check.mjs`. |
 | Sign in with Apple (Guideline 4.8) | Present in the native shell (`ios/PriLearning.swiftpm/AppleSignInBridge.swift`) alongside Google. Owner decision D3: the first submission ships email code and password only, and Apple and Google arrive together in an update, so neither is offered and 4.8 is not engaged. **OWNER** confirms the production `/v1/account/identity/providers` answer matches before submission. | `client/src/platform/socialSignIn.js`, `server/platform/identities.js`, `oidc.js`. |
 | Sharing personal data with third-party AI (Guideline 5.1.2(i), as the owner reads it — counsel to confirm) | Handwriting images and photos go to OpenAI; with the opt-in working check, working lines and question text too. Today: disclosure in Settings → Handwriting and the privacy notice; server reading is **on by default** for a signed-in adult. Owner default D17: a one-time prompt naming OpenAI before the first read or photo, with nothing sent until it is accepted and a declined path that stays typed-only — being built in the handwriting stream. Until it lands, this row and `privacy.md` describe default-on; when it lands, both change. | `client/src/ink/cloudReader.js` rule 1; `settings.cloudHandwritingCopy` in `client/src/i18n/strings.en.js`. |
 
@@ -105,7 +105,9 @@ way round.
 
 ## 4. Owner decisions before the label is entered
 
-1. Production origin for the privacy policy and deletion URLs (D5).
+1. Production origin for the privacy policy and deletion URLs: D5 sets `https://prilearning.com`
+   (site) and `https://app.prilearning.com` (app); confirm it, deploy the site and point DNS (none
+   of which an agent does).
 2. Counsel review of `docs/legal/privacy.md`, recorded in `docs/legal/review-status.json`.
 3. Guideline 5.1.2(i): D17 (one-time OpenAI prompt) is the default; confirm it has landed in the
    release build, or that default-on plus disclosure is submitted knowingly.
@@ -116,6 +118,8 @@ way round.
 8. Whether a zero-data-retention arrangement exists with OpenAI (`data-retention.md` §4 records
    none); if one is made, the third-party cells and the notice change.
 9. Whether `PRI_SENTRY_DSN` will be set on production; if so, Crash Data gains a third party.
+10. D18: the 30-day erasure and the guardian's erasure request are in the release build (the
+    nomination gate checks this); counsel sets the period (`docs/legal/counsel/QUESTIONS-FOR-COUNSEL.md`).
 
 ## 5. Mismatches found and fixed on 2026-10-18
 
@@ -146,3 +150,20 @@ way round.
 Re-verified and unchanged on 2026-11-02: the telemetry event allowlist (`EVENTS` / `TYPES`);
 `FORBIDDEN_FIELDS` in `handwriting.js`, `working.js` and `questionPhoto.js`; `store: false` on every
 provider call; the deletion routes; the client network boundary; `NSPrivacyTracking = false`.
+
+## 7. Re-checked on 2026-11-08 at `1d3829103`
+
+`main` moved 62 commits from `a5778a319` to `1d3829103`; none changed what leaves the device (the
+only server change is the compressed-body survival check, `server/test/compressed-body-survival-check.mjs`).
+Re-verified and unchanged: the collected set on the §3 line (thirteen types), `FORBIDDEN_FIELDS`,
+`store: false`, the telemetry allowlist, the deletion routes, `channels.sms: false` with no
+`PRI_SMS_PROVIDER`, the client network boundary and `NSPrivacyTracking = false`.
+
+| # | What was stale | Fix |
+|---|---|---|
+| 17 | The privacy-policy and deletion URLs were a public-origin placeholder | D5 origins written in: `https://prilearning.com/privacy`, `https://prilearning.com/delete-account` and the form at `https://app.prilearning.com/account/delete-request`. `tools/store-readiness-check.mjs` now refuses the placeholder in the store drafts and holds every store URL to the D5 hosts |
+| 18 | The D18 promise in the privacy notice was not mentioned here | Recorded in the account-deletion row and §4 item 10, with the fact that it is not yet in the code |
+
+D17 is unchanged: still the default, still not in the code. Until it lands, every disclosure
+describes reading as on for a signed-in account and switchable off in Settings → Handwriting, which
+is what `client/src/ink/cloudReader.js` does.

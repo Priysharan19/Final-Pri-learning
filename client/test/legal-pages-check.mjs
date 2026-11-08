@@ -737,6 +737,33 @@ ok(/thirdPartyNotices-\[\^\/\]\*\\\.js\$\/, 'third-party licence notices'/.test(
   'the build keeps the licence chunk out of every install, as it does the Hindi notices');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Coverage wording (owner default D24): a notice describes what the app is for,
+// never how much of a syllabus it covers. The terms said "follows the NCERT
+// syllabus" until 8 November 2026, which the content audit contradicts (Class 8
+// follows the earlier book, Class 9 has 8 of the 15 chapters in the CBSE
+// 2026-27 list). A negation ("does not predict a percentile") is not a claim,
+// so only the claiming phrases are refused, in both languages.
+// ─────────────────────────────────────────────────────────────────────────────
+const COVERAGE_CLAIMS = [
+  /\bfollows?\s+the\s+(?:NCERT|CBSE)\s+syllabus\b/i,
+  /\bsyllabus[-\s]+(?:aligned|complete)\b|\b(?:complete|full|entire)\s+syllabus\b/i,
+  /\bevery\s+(?:chapter|topic)\b|\ball\s+chapters\b/i,
+  /\bcertified\b|\bexaminer[-\s]grade\b|\blike\s+an\s+examiner\b/i,
+  /पाठ्यक्रम\s+(?:और\s+[^।]*?)?का\s+अनुसरण|पूरा\s+पाठ्यक्रम|संपूर्ण\s+पाठ्यक्रम|हर\s+अध्याय|सभी\s+अध्याय/
+];
+const coverageClaimIn = text => COVERAGE_CLAIMS.map(re => text.match(re)?.[0]).find(Boolean);
+for (const [slug] of PAGES) {
+  for (const lang of ['en', 'hi']) {
+    const claim = coverageClaimIn(readDoc(slug, lang));
+    ok(!claim, `${slug}${lang === 'hi' ? '.hi' : ''}.md makes no coverage claim D24 forbids${claim ? ` (found "${claim}")` : ''}`);
+  }
+}
+ok(coverageClaimIn('Pri Learning follows the NCERT syllabus and public examination patterns.'),
+  'the coverage refusal catches the English sentence the terms carried until 8 November 2026');
+ok(coverageClaimIn('Pri Learning NCERT के पाठ्यक्रम और सार्वजनिक परीक्षा-प्रारूपों का अनुसरण करता है।'),
+  'the coverage refusal catches the Hindi sentence the terms carried until 8 November 2026');
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The client build imports these documents from outside client/, so the
 // container's build context has to carry them. It did not, and the production
 // image failed to build with "Module not found" — a regression only the

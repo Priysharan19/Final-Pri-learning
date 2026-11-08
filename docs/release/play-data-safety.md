@@ -1,6 +1,6 @@
 # Google Play Data safety form — answers derived from the code
 
-**Status:** engineering draft, reconciled with the code at `a5778a319` (2026-11-02; earlier at `795c00568`, 2026-10-19, and `7bef402f7`, 2026-10-18).
+**Status:** engineering draft, reconciled with the code at `1d3829103` (2026-11-08, §6c; earlier at `a5778a319`, 2026-11-02, `795c00568`, 2026-10-19, and `7bef402f7`, 2026-10-18).
 **Not submitted, not legally reviewed.** Every row cites the code path that justifies it; a row
 marked **OWNER** is a decision the repository cannot make. Companions:
 `docs/release/app-store-privacy-labels.md` (the Apple equivalent), `docs/legal/privacy.md` (what
@@ -27,8 +27,8 @@ iPhone and iPad apps use.
 |---|---|---|
 | Does your app collect or share any of the required user data types? | **Yes** | Grading is online-only: every checked answer is issued and graded by the server for a signed-in account (`server/platform/practice.js`, `exams.js`). Sign-in, sync, reading and telemetry also send data. Signed out, nothing carrying user data is sent (`client/src/platform/cloudTransport.js`) and nothing is marked. |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | HTTPS/HSTS in production (`server/platform/headers.js`, `server/test/security-headers-check.mjs`); the Android manifest refuses cleartext (`android/app/src/main/AndroidManifest.xml`, `usesCleartextTraffic="false"`). |
-| Do you provide a way for users to request that their data is deleted? | **Yes** | In-app: Settings → Account → Delete (`DELETE /v1/account`, every sign-in method). Public URL: **`<PRI_PUBLIC_ORIGIN>/account/delete-request`** (`AccountDeleteRequest.jsx`, `otp.js`). Immediate (`deleteAccountRows()`). |
-| Account deletion URL | **OWNER:** the production origin (expected `https://prilearning.com`). The path is fixed: `/account/delete-request`. | `client/src/main.jsx`; `server/app.js` serves the SPA for non-`/v1` paths. |
+| Do you provide a way for users to request that their data is deleted? | **Yes** | In-app: Settings → Account → Delete (`DELETE /v1/account`, every sign-in method). Public form: **`https://app.prilearning.com/account/delete-request`** (`AccountDeleteRequest.jsx`, `otp.js`). Immediate (`deleteAccountRows()`). |
+| Account deletion URL | **`https://prilearning.com/delete-account`** (D5; **OWNER** confirms D5 before the first signed build). The site page names Pri Learning and its developer, gives the in-app steps, links to the form at `https://app.prilearning.com/account/delete-request`, and shows what is removed and kept, rendered word for word from `docs/legal/privacy.md`. The site is **not deployed** and DNS is untouched: the URL must resolve before it is entered. | `site/` (generator and check, `tools/site-check.mjs`); `client/src/main.jsx`; `server/app.js` serves the SPA for non-`/v1` paths on the app host. |
 | Target audience and Families policy | **OWNER / counsel — see `docs/release/store/play-listing.md` §5.** Class 7 students are about 12, so a truthful target audience includes the 9–12 band; on our reading (for counsel to confirm) that brings the app under the Families policy. | Child accounts are gated server-side until a guardian confirms (`requireGuardianConsent` in `router.js`); the confirmation is not DPDP-verifiable (`guardianConsent.js` header). |
 
 ## 2. Data types collected
@@ -45,7 +45,7 @@ Every type below is **linked to the account**, **not used for tracking or advert
 | Play data type | Collected? | Shared? | Required / optional | Purpose | Why (code) |
 |---|---|---|---|---|---|
 | **Personal info → Name** | Yes | No | Required for an account | Account management, App functionality | `accounts.name`; guardian name (`guardian_consents`). |
-| **Personal info → Email address** | Yes (unless the account signed up by phone) | Yes — email delivery provider (Resend) | Required (email or phone) | Account management; Fraud prevention, security, and compliance | `accounts.js`; `authDelivery.js`; `otpEmail.js`. A guardian's email for a child's account. A new-device sign-in notice goes to the account's own address through the same Resend account (`sessionAlerts.js`, `securityEmail.js`); the notice carries no address, token, link or code. |
+| **Personal info → Email address** | Yes, from every account (SMS is off at launch, D3, so no account signs up by phone) | Yes — email delivery provider (Resend) | Required | Account management; Fraud prevention, security, and compliance | `accounts.js`; `authDelivery.js`; `otpEmail.js`. A guardian's email for a child's account. A new-device sign-in notice goes to the account's own address through the same Resend account (`sessionAlerts.js`, `securityEmail.js`); the notice carries no address, token, link or code. |
 | **Personal info → Phone number** | **No at launch.** SMS sign-in and guardian phone codes are off (owner decision D3); the client shows the SMS option only when `GET /v1/account/otp/channels` reports `sms: true`, which needs `PRI_SMS_PROVIDER`, and both environments report `false` | — | — | — | `otp.js` (`account_phones.phone_e164`), `smsProvider.js`, `SignUpFlow.jsx` (`channels.sms`). The notice describes no mobile-number route. **If SMS is ever turned on:** tick Phone number here (shared with the SMS provider), add `PhoneNumber` to the Apple manifest and label, and describe it in `docs/legal/privacy.md`, before `PRI_SMS_PROVIDER` is set. |
 | **Personal info → User IDs** | Yes | No | Required | Account management, App functionality | Opaque `acct_…` id (`security.js`). |
 | **Personal info → Other info** | Yes, from every account (the "18 or older" declaration, class and track); plus, for an under-18 account, the guardian-consent record | Guardian email with the delivery provider (child accounts only) | Age declaration, class and track: required for every account. Consent record: required for a child's account | App functionality (age gate, which maths to set, guardian confirmation) | `accounts.age_basis` (a registration with no age decision is refused, `AGE_DECLARATION_REQUIRED`); class/track in the synced profile (`syncWorker.js safeProfile`); the consent record (`guardianConsent.js`). Matches the Apple "Other Data" row. |
@@ -92,7 +92,7 @@ to the privacy notice before release.
 |---|---|---|
 | Is this data processed ephemerally? | The **handwriting image and photo** are ephemeral on Pri's server (memory for the request only; `handwritingProvider.js`, `data-retention.md` §4). The **transcription** of them is not (90 days). Everything else is stored against the account until deletion or its stated TTL. | — |
 | Is this data required or optional? | See the column in §2. Answers cannot be marked without an account, so account data is required for the core feature. | `router.js` (`/practice`, `/exams` need a session and, for a child, guardian consent). |
-| Can users request deletion? | **Yes** — immediate; `data-retention.md` §2 lists the retained, unlinked categories (payment ledger, de-texted problem reports, an `account.delete` audit row). | `deleteAccountRows()`; `server/test/account-lifecycle-journey-check.mjs`. |
+| Can users request deletion? | **Yes** — immediate; `data-retention.md` §2 lists the retained, unlinked categories (payment ledger, de-texted problem reports, an `account.delete` audit row). The privacy notice also promises that an under-18 account no guardian confirmed, or whose guardian withdrew, is erased after 30 days, and that a guardian can ask for erasure without the child's login (D18): **not yet in the code** at `1d3829103`; `scripts/release-nominate.mjs` refuses a production nomination until it is (`tools/legal-promises.mjs`). | `deleteAccountRows()`; `server/test/account-lifecycle-journey-check.mjs`. |
 | Independent security review? | **No** (not claimed). | `docs/security/accepted-risks.md` R-12 (external penetration test not yet scheduled). |
 
 ## 4. Third parties the server sends data to
@@ -114,7 +114,8 @@ the providers' own identity endpoints only when the student taps them.
 
 ## 5. Owner decisions before submission
 
-1. The production origin for the deletion URL.
+1. The production origin for the deletion URL: D5 sets `https://prilearning.com/delete-account`;
+   confirm it, deploy the site and point DNS.
 2. Target audience / Families policy (`docs/release/store/play-listing.md` §5).
 3. Whether service-provider transfers are declared as "shared" (this draft: yes).
 4. SMS stays off at launch (D3); confirm `PRI_SMS_PROVIDER` is unset on production at submission.
@@ -125,6 +126,8 @@ the providers' own identity endpoints only when the student taps them.
 8. Whether `PRI_SENTRY_DSN` will be set for release; if so, Crash logs → Shared (or service provider) and the notice names Sentry.
 9. Confirm Google's Play services / Billing library data practices (§2 Android permissions) need no additional declaration.
 10. Whether "Fraud prevention, security, and compliance" is ticked for Email address (new-device notices; this draft: yes).
+11. D17: the one-time prompt naming OpenAI is in the release build, or the Photos and user-generated-content rows are submitted knowingly as "on by default, switchable off". Google's prominent-disclosure rule is the reason it matters here.
+12. D18: the 30-day erasure and the guardian's erasure request are in the release build (the nomination gate checks this); counsel sets the period.
 
 ## 6. Mismatches found and fixed on 2026-10-18
 
@@ -164,6 +167,18 @@ routes, the Android permissions table and the absence of any tracking, crash or 
 
 Re-verified and unchanged on 2026-10-19: the daily free-plan cap (#563/#537, `practiceAllowance.js`) stores a per-account daily count in `idempotency_keys` — account data already covered by App activity; the privacy/consent copy change (#283/#284) does not change what is sent; the guardian-consent record still carries `notice_version`; the telemetry event allowlist is unchanged; no provider module (`handwritingProvider.js`, `questionPhotoProvider.js`, `workingProvider.js`, `tutorProvider.js`) changed what it sends; `FORBIDDEN_FIELDS` still exclude the expected answer, solution and marks.
 
+## 6c. Re-checked on 2026-11-08 at `1d3829103`
+
+`main` moved 62 commits from `a5778a319`; none changed what leaves the device. Re-verified and
+unchanged: the telemetry allowlist, `FORBIDDEN_FIELDS`, `store: false`, the deletion routes, the
+Android permissions, `channels.sms: false`, and the absence of any tracking, crash or ads SDK.
+
+| # | What was stale | Fix |
+|---|---|---|
+| 19 | The deletion URL was a public-origin placeholder followed by `/account/delete-request` | D5: `https://prilearning.com/delete-account`, which links to the form at `https://app.prilearning.com/account/delete-request`; `tools/store-readiness-check.mjs` now refuses the placeholder and holds store URLs to the D5 hosts |
+| 20 | Email address said "unless the account signed up by phone" and "Required (email or phone)" | SMS is off at launch (D3): every account has an email address |
+| 21 | The D18 erasure promise and the D17 prompt were not owner items here | §5 items 11 and 12 |
+
 ## 7. Play Console entry sheet
 
 Type these answers in Play Console → **App content → Data safety**, in this order. Anything in
@@ -181,7 +196,7 @@ Read the overview and press **Next**.
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** |
 | Which of the following methods of account creation does your app support? | **Username and password**, **Username and other authentication** (one-time code by email). Not OAuth in the first submission: owner decision D3 ships email code and password only, with Sign in with Google and Apple arriving together in an update — tick OAuth when that update is the one being submitted. **[OWNER: confirm production `/v1/account/identity/providers` matches at submission]** |
-| Account deletion URL / Add a link that users can use to request that their account and associated data is deleted | **[OWNER: production origin]**`/account/delete-request` (expected `https://prilearning.com/account/delete-request`) |
+| Account deletion URL / Add a link that users can use to request that their account and associated data is deleted | **`https://prilearning.com/delete-account`** (D5) **[OWNER: confirm D5 and that the page resolves]** |
 | Do you provide a way for users to request that some or all of their data is deleted, without requiring them to delete their account? | **No** (deletion is whole-account; in-app Settings → Account → Delete). **[OWNER: answer Yes only if support will delete partial data on request]** |
 | Has your app successfully completed an independent security review (MASA)? | **No** |
 
@@ -225,6 +240,6 @@ provider.]**
 
 ### Step 5 — Preview and submit
 
-Check the preview against §2 and §4. **Do not submit** while any of these is open: §5 items 1–10,
+Check the preview against §2 and §4. **Do not submit** while any of these is open: §5 items 1–12,
 `docs/release/store/play-listing.md` §5 (target audience / Families), and the privacy-notice
 rewrite. Submitting is the owner's action.
