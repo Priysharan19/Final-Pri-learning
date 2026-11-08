@@ -70,9 +70,10 @@
 //   Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted,comma list>
 // An `internal-test-track` exception (TestFlight / Play internal) never waives release-stage evidence.
 // `device-matrix:AND` and `device-matrix:ANT` waive one Android family each (owner default D1: iPhone
-// and iPad launch first). They can never waive an iPhone or iPad case: with them, every case of the
-// IPH and IPD families must still be `pass`. A record waives the whole matrix or named families,
-// never both.
+// and iPad launch first). A family waiver can never waive an iPhone or iPad case: with family waivers,
+// every case of the IPH and IPD families must still be `pass`. (The whole-matrix `device-matrix`
+// waiver is unchanged: it waives every family, Apple included, as an explicit scope change.) A record
+// waives the whole matrix or named families, never both, and names each requirement once.
 // Evidence class of such an approval: GITHUB-ACCOUNT-AUTHENTICATED. GitHub proves the account, not
 // the person: anything holding that account's token can post as it, so the owner posts it in the
 // GitHub web UI themself, and the dossier never calls it more than that.
@@ -101,10 +102,11 @@ export const EVIDENCE_REQUIREMENTS = Object.freeze(['device-matrix', 'device-mat
 /**
  * Family-scoped device-matrix waivers (owner default D1, V1_DECISIONS_2026-11-01.md: the public
  * launch is iPhone and iPad first, Android after Google's closed test). Each names one Android
- * family; no requirement names an Apple family, so nothing can waive an iPhone or iPad case.
+ * family; no family waiver names an Apple family, so a family waiver can never waive an iPhone or
+ * iPad case. The whole-matrix `device-matrix` waiver is unchanged and still waives every family.
  */
 export const DEVICE_FAMILY_WAIVERS = Object.freeze({ 'device-matrix:AND': 'AND', 'device-matrix:ANT': 'ANT' });
-/** The families every release must pass case by case, whatever an override says. */
+/** The families every release must pass case by case when Android is waived by family. */
 export const NEVER_WAIVED_FAMILIES = Object.freeze(['IPH', 'IPD']);
 export const OVERRIDE_SCOPES = Object.freeze(['public-release', 'internal-test-track']);
 export const RELEASE_TARGET = 'deploy/production';
@@ -441,10 +443,11 @@ export function loadOverride(path, sha) {
     if (!waives.length) problems.push('override waives nothing (waives: [])');
     for (const item of waives) {
       if (/^device-matrix:/i.test(item) && !DEVICE_FAMILY_WAIVERS[item] && NEVER_WAIVED_FAMILIES.some(family => item.toUpperCase().endsWith(`:${family}`))) {
-        problems.push(`${JSON.stringify(item)}: an iPhone or iPad case can never be waived; D1 launches on them, so every Apple case must pass`);
+        problems.push(`${JSON.stringify(item)}: no family waiver covers an iPhone or iPad case; D1 launches on them, so with family waivers every Apple case must pass`);
       } else if (!EVIDENCE_REQUIREMENTS.includes(item)) problems.push(`unknown evidence requirement ${JSON.stringify(item)}; known: ${EVIDENCE_REQUIREMENTS.join(', ')}`);
     }
     if (waives.includes('device-matrix') && waives.some(item => DEVICE_FAMILY_WAIVERS[item])) problems.push('waive the whole device matrix or named Android families, not both');
+    if (new Set(waives).size !== waives.length) problems.push('waives names a requirement more than once');
     if (!by) problems.push('override needs "by": the named human who accepts the release without this evidence');
     else if (NOT_A_HUMAN.test(by)) problems.push(`"by" ${JSON.stringify(by)} does not name a human (the word ${JSON.stringify(by.match(NOT_A_HUMAN)[0])} marks an agent, CI or placeholder)`);
     if (!Number.isFinite(Date.parse(at))) problems.push('override needs "at": an ISO date-time');

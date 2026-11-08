@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · the owner device script as data (docs/release/owner-device-script.json)
+//
+// docs/release/OWNER-DEVICE-SCRIPT.md is the owner's Apple-only device script
+// (owner default D1). The Owner Console renders the same script as a tick-box
+// checklist the owner works through on the device. This generator writes that
+// checklist from two sources so it can never drift from the matrix:
+//
+//   · scripts/device-matrix-record.mjs CASES — every iPhone and iPad case id,
+//     title and expected result, exactly as the recorder knows them;
+//   · OWNER_STEPS below — what the owner does for each step id (precondition,
+//     steps, evidence to capture). A matrix step with no entry here fails the
+//     generator, so a new case cannot reach the release without instructions.
+//
+// The checklist holds instructions only. It holds no result, no tester, no
+// device: results are the owner's, recorded on real hardware and imported
+// with tools/release-device-import.mjs, which writes only through the
+// recorder's own validation (simulators, agents and placeholders refused).
+//
+//   node tools/release-owner-device-script.mjs --write   # regenerate the JSON
+//   node tools/release-owner-device-script.mjs --check   # exit 1 if it is stale
+// ─────────────────────────────────────────────────────────────────────────────
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CASES } from '../scripts/device-matrix-record.mjs';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+export const SCRIPT_JSON = join(ROOT, 'docs', 'release', 'owner-device-script.json');
+export const APPLE_FAMILIES = Object.freeze(['IPH', 'IPD']);
+export const EXPORT_FORMAT = 'pri-device-evidence-export';
+
+const SIGNED_IN = 'Signed in to the adult test account on this device.';
+/** What the owner does for each matrix step id. Keyed by step, shared by both Apple families. */
+export const OWNER_STEPS = Object.freeze({
+  INSTALL: { precondition: 'The development build of the candidate SHA is installed from Xcode on this device (Part A), or the TestFlight build (Part B).', steps: ['Open the app.', 'Open its diagnostics and read the release SHA.'], evidence: ['The release SHA the diagnostics show (it must equal the candidate).'] },
+  OTP: { precondition: 'The test mailbox is open on this device.', steps: ['Sign in to the adult test account with the email code.', 'Close the app fully, then reopen it.'], evidence: ['Whether you were still signed in after reopening.'] },
+  GUARDIAN: { precondition: 'Signed out. The other device is to hand as "the parent\'s own device", with the parent mailbox.', steps: ['Create a child test account on this device.', 'On the OTHER device, open /guardian/consent in Safari and approve with the parent\'s code.', 'Watch this device.'], evidence: ['Whether questions and sync were refused before approval.', 'Whether the child screen moved on by itself after approval.'] },
+  ISSUE: { precondition: SIGNED_IN, steps: ['Open Practice and get a question.', 'Turn on aeroplane mode, then turn it off.'], evidence: ['Whether the offline state showed and the question came back.'] },
+  WRITE: { precondition: SIGNED_IN, steps: ['Write the answer: a finger on iPhone; the Apple Pencil on iPad, with your palm resting on the screen.', 'Press "Read my answer".'], evidence: ['Lag or dropped strokes, if any.', 'Whether the palm drew (iPad).', 'Whether the one-time prompt naming OpenAI (D17) appeared before anything was sent.', 'iPad: the Apple Pencil model.'] },
+  PHOTO: { precondition: SIGNED_IN, steps: ['Photograph a page of working.', 'Photograph it again holding the device sideways.'], evidence: ['Whether the photo was sent for reading.', 'Whether the sideways photo shows the right way up.'] },
+  TRANSCRIPT: { precondition: 'A handwritten or photographed answer has been read.', steps: ['Correct one misread line.', 'Confirm the transcript.'], evidence: ['Whether an unsure reading asked you to confirm before marking.'] },
+  MARK: { precondition: SIGNED_IN, steps: ['Submit a wrong answer.', 'Submit the right answer.'], evidence: ['The mark shown (earned / possible) and its first-error feedback.', 'Whether the worked solution appeared after the right answer.'] },
+  HISTORY: { precondition: 'Both devices signed in to the same adult test account.', steps: ['Close and reopen the app.', 'Open History on this device and on the other one.'], evidence: ['Whether every attempt is in History on both devices.'] },
+  VOICEOVER: { precondition: 'Settings → Accessibility → Display & Text Size → Larger Text at the largest size; VoiceOver on.', steps: ['Sign in, open Practice, reach the answer box and the mode switch.', 'Press "Read my answer", listen to the transcript, submit, listen to the mark.', 'Turn VoiceOver off afterwards.'], evidence: ['Any control read without a name.', 'Whether the writing surface was announced.'] },
+  KEYBOARD: { precondition: 'A hardware keyboard attached; Settings → Accessibility → Keyboards → Full Keyboard Access on.', steps: ['Tab through the sign-in card and the question card.', 'Activate controls with Space or Return.'], evidence: ['Whether every control was reached in order with visible focus.', 'Any focus trap. With no hardware keyboard, record the case blocked.'] },
+  TEXTSIZE: { precondition: 'Larger Text at the largest size (run it together with the VoiceOver case).', steps: ['Walk the same path as the VoiceOver case.'], evidence: ['Anything clipped, or any sideways scroll.'] },
+  ROTATE: { precondition: 'iPad: ink, a typed answer and a transcript on the page.', steps: ['Rotate the iPad.', 'Scroll, then write again.'], evidence: ['Whether all three were kept and the ink stayed on the ruled paper.'] },
+  SPLITVIEW: { precondition: 'iPad: an attempt open.', steps: ['Put Pri in Split View at half the screen, then a third.', 'Write with the Pencil.'], evidence: ['Whether the card and the writing surface fit without sideways scroll.', 'Whether the ink lands where the pen touches.'] },
+  STAGEMANAGER: { precondition: 'iPad: Stage Manager on, an attempt open.', steps: ['Resize and drag the Pri window mid-attempt.'], evidence: ['Whether the ink stayed aligned and nothing was lost.'] },
+  REINSTALL: { precondition: 'Attempts in History on this device.', steps: ['Sign out.', 'Delete the app.', 'Reinstall the same build and sign in.'], evidence: ['Whether History holds every earlier attempt with marks, nothing duplicated.'] },
+  TIMED: { precondition: 'A timed paper of at least 30 minutes available; run it on both devices at once.', steps: ['Start the paper.', 'Handwrite at least six answers.', 'Lock and unlock once.', 'Submit at the end.'], evidence: ['The paper\'s length in minutes and the number of handwritten answers.', 'Whether the analysis shows every answer.'] },
+  BACKGROUND: { precondition: 'An unsent handwritten answer and typed working on the page.', steps: ['Switch to another app for two minutes.', 'Return and submit.'], evidence: ['Whether the ink, the working and any transcript were exactly as left.'] },
+  STORAGE: { precondition: 'The device filled to under 500 MB free (a large video download).', steps: ['Write, read, submit, and check History.', 'Free the storage afterwards.'], evidence: ['Any crash or lost work; whether the app said plainly when it could not keep a photo.'] },
+  MEMORY: { precondition: 'An unsent draft and a transcript on the page.', steps: ['Open several heavy apps until Pri is reclaimed.', 'Reopen Pri.'], evidence: ['Whether the draft, the transcript and the session came back without signing in.'] },
+  EXPORT: { precondition: SIGNED_IN, steps: ['Export the account through the share sheet.', 'Open the file.'], evidence: ['Whether the JSON holds only this account\'s attempts.'] },
+  SHARE: { precondition: SIGNED_IN, steps: ['Share and print (or save as PDF) a paper or progress page.'], evidence: ['Whether every question, answer and mark is legible and nothing comes from another profile.'] }
+});
+
+/** Steps that are not matrix cases: their results go to the release record, not the device ledger. */
+export const RELEASE_RECORD_ITEMS = Object.freeze([
+  ...APPLE_FAMILIES.map(family => ({
+    id: `REC-${family}-DELETE`, kind: 'release-record', family, title: 'In-app account deletion', billingRequired: false,
+    precondition: 'The last step: every other case on this device is done.',
+    steps: ['Settings → Account → Delete, for each test account on this device.', 'Confirm with the password or the code.', 'Try to sign in with the same address.'],
+    expected: 'You are signed out; the account is gone, and signing in again starts a new account.',
+    evidence: ['Whether each account is gone.'],
+    recordIn: 'GO/NO-GO record gates.store.evidence ("in-app deletion, iPhone and iPad, <SHA>, by <name>"); App Review guideline 5.1.1(v)'
+  })),
+  {
+    id: 'REC-IPD-PURCHASE', kind: 'release-record', family: 'IPD', title: 'Sandbox purchase and restore', billingRequired: true,
+    precondition: 'The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6). Until then this item is BLOCKED.',
+    steps: ['Settings → App Store → Sandbox Account: sign in to a sandbox Apple Account.', 'Buy the monthly plan on the Premium screen.', 'Delete and reinstall the app, then "Restore purchases".'],
+    expected: 'Premium after the purchase and after the restore, confirmed by the server (/v1/entitlements).',
+    evidence: ['The /v1/entitlements answer after each step.'],
+    recordIn: 'the release record, ios/PriLearning.swiftpm/RELEASE.md §11 (docs/billing/storekit-certification.md step 4)'
+  }
+]);
+
+/** The checklist, generated. Throws when a matrix step has no owner instructions. */
+export function ownerDeviceScript(cases = CASES) {
+  const items = [];
+  for (const kase of cases.filter(c => APPLE_FAMILIES.includes(c.family))) {
+    const owner = OWNER_STEPS[kase.step];
+    if (!owner) throw new Error(`no owner steps for matrix step ${kase.step} (${kase.id}): add it to OWNER_STEPS`);
+    items.push({
+      id: kase.id, kind: 'device-matrix', family: kase.family, title: kase.title, billingRequired: false,
+      precondition: owner.precondition, steps: [...owner.steps], expected: kase.expect, evidence: [...owner.evidence],
+      ...(kase.pencil ? { pencilRequired: true } : {})
+    });
+  }
+  items.push(...RELEASE_RECORD_ITEMS.map(item => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
+  return {
+    format: 'pri-owner-device-script', version: 1,
+    generatedBy: 'node tools/release-owner-device-script.mjs --write',
+    caseSource: 'scripts/device-matrix-record.mjs CASES (families IPH, IPD)',
+    note: 'Instructions only: nothing here is a result. Results are recorded by the named owner on real hardware.',
+    evidenceExport: {
+      format: EXPORT_FORMAT, version: 1,
+      import: 'node tools/release-device-import.mjs <export.json>',
+      shape: {
+        format: EXPORT_FORMAT, version: 1, sha: '<40-hex candidate SHA>', tester: '<the full name of the person who ran the cases>',
+        buildKind: 'development | testflight', server: 'staging | production',
+        records: [{ case: '<a device-matrix item id>', result: 'pass | fail | blocked', device: '<model as Settings shows it>', os: '<OS name and version>', pencil: '<Apple Pencil model: required for a pass of the iPad WRITE case>', severity: '<P0-P3: required on a fail>', notes: '<required on blocked, at least five characters>', build: '<optional build label>' }]
+      },
+      rules: 'The importer writes only through scripts/device-matrix-record.mjs: a tester that names an agent, CI, a bot or a placeholder, a simulator or emulator device, an unknown case, a short SHA or a duplicate case refuses the WHOLE file and writes nothing. release-record items are not imported: they go where their recordIn says.'
+    },
+    matrixCases: items.filter(item => item.kind === 'device-matrix').length,
+    items
+  };
+}
+
+export function scriptText(cases = CASES) { return `${JSON.stringify(ownerDeviceScript(cases), null, 2)}\n`; }
+
+async function main() {
+  const flag = process.argv[2];
+  const text = scriptText();
+  if (flag === '--write') { writeFileSync(SCRIPT_JSON, text); console.log(`wrote docs/release/owner-device-script.json (${ownerDeviceScript().matrixCases} iPhone and iPad cases)`); return; }
+  if (flag === '--check') {
+    let current = '';
+    try { current = readFileSync(SCRIPT_JSON, 'utf8'); } catch { current = ''; }
+    if (current !== text) { console.error('OWNER DEVICE SCRIPT: STALE — run node tools/release-owner-device-script.mjs --write'); process.exit(1); }
+    console.log(`OWNER DEVICE SCRIPT: CURRENT — ${ownerDeviceScript().matrixCases} iPhone and iPad cases`);
+    return;
+  }
+  console.error('Usage: node tools/release-owner-device-script.mjs --write | --check');
+  process.exit(2);
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) await main();

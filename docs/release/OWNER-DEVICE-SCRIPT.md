@@ -2,17 +2,17 @@
 
 Owner default D1 launches V1 on iPhone and iPad first. Android follows after Google's closed test,
 and its two families are waived by name at the release (`device-matrix:AND` and
-`device-matrix:ANT`; `docs/release/evidence/go-no-go/README.md`). The release still requires
-**every iPhone and iPad case to pass**, on real hardware, recorded by a named person. This script
-runs those cases in a sensible order on your two devices and says where each result goes. It
-replaces walking the four-family, 36-case matrix by hand.
+`device-matrix:ANT`; `docs/release/evidence/go-no-go/README.md`). With those family waivers the
+release still requires **every iPhone and iPad case to pass**, on real hardware, recorded by a named
+person. This script runs those cases in a sensible order on your two devices and says where each
+result goes. It replaces walking the whole four-family matrix by hand.
 
 - **Who:** you, the owner. You are the named tester on every row. An agent can prepare the build
   and the shell commands; it never records a result (the recorder refuses agent names).
 - **Devices:** your iPhone (16 Pro Max) and your iPad Pro 11-inch (4th generation) with its Apple
   Pencil. Have both charged and side by side.
-- **Time:** Part A takes about 100 minutes, and splits into two sittings of about 50 (A1–A9, then
-  A10–A16). The timed paper alone is 30 minutes, and both devices run it at once. Part B takes about
+- **Time:** Part A takes about 115 minutes in two sittings: A1–A13 (about 55 minutes), then
+  A14–A18 (about 60). The timed paper alone is 30 minutes, and both devices run it at once. Part B takes about
   30 minutes after the promotion.
 - **Case ids:** these follow the matrix in L4's #737 (`docs/release/device-matrix.md`): 19 iPhone
   and 22 iPad cases. On a `main` without #737, only the 18 journey cases (01–09) exist; record those
@@ -26,7 +26,7 @@ replaces walking the four-family, 36-case matrix by hand.
    staging. The Director's plan instead has the TestFlight build reach staging through
    `app.prilearning.com` before GO. Until the Director and L4 settle that, follow #737.
 2. **The SHA.** Open the app's diagnostics on each device. The release SHA shown there must equal
-   the candidate (`docs/release/FREEZE-RUNBOOK.md` F1).
+   the candidate (`docs/release/FREEZE-RUNBOOK.md` F1, on #754).
 3. **Accounts.** These are test accounts only, never a student's, and every one is deleted in A16:
    - an adult account on your test mailbox;
    - two child accounts, one per device, each with a parent address you can read;
@@ -46,9 +46,31 @@ replaces walking the four-family, 36-case matrix by hand.
 
    A pass is `rec --case DM-IPH-01-INSTALL --result pass "${IPH[@]}"`.
    A fail adds a severity and what you saw: `--result fail --severity P1 --notes "…"`.
-   A case you cannot run is `--result blocked --notes "why"`.
+   A case you cannot run is `--result blocked --notes "<what is missing>"` (at least five characters).
    The recorder refuses a row it cannot believe, and writes nothing then. Each case's full
    expected result is `node scripts/device-matrix-record.mjs cases --markdown`.
+
+## The same script as a checklist
+
+`docs/release/owner-device-script.json` is this script as data, for the Owner Console's tick-box
+checklist. Each item has an id, a family, a title, a precondition, short steps, the expected result,
+the evidence to capture, and whether billing must be configured first. The JSON is generated from
+the recorder's case list (`node tools/release-owner-device-script.mjs --write`), and a test fails
+when it is stale, so it always names the cases the release requires. It holds instructions only;
+nothing in it is a result.
+
+When the console exports your results (format `pri-device-evidence-export`; the JSON's
+`evidenceExport` gives the shape), import them with:
+
+```bash
+node tools/release-device-import.mjs <export.json>
+```
+
+The importer writes **only through the recorder**, after checking every record by the recorder's
+own rules. One bad record refuses the whole file, and nothing is written: an agent or placeholder
+tester, a simulator, an unknown case, a short SHA, a missing Pencil model or a duplicate case.
+In-app deletion and the sandbox purchase are not device-matrix cases; they go where the JSON's
+`recordIn` says.
 
 ## Part A — the candidate on staging (development build)
 
@@ -70,10 +92,10 @@ replaces walking the four-family, 36-case matrix by hand.
 | A14 | `-17-TIMED` ×2 | **Second sitting.** Start a timed paper of at least 30 minutes on **both** devices. Handwrite at least six answers on each, alternating devices. Lock and unlock once. Submit at the end | the clock runs right through the lock; every answer is recorded; the analysis shows them | `-17-TIMED` for each, with `--notes "<minutes> min, <n> handwritten"` |
 | A15 | `-18-BACKGROUND`, `-19-STORAGE`, `-20-MEMORY` ×2 | **Background:** leave an unsent handwritten answer and typed working, switch apps for 2 minutes, then return. **Storage:** fill the device to under 500 MB free (a large video download), then write, read, submit and check History. **Memory:** open several heavy apps until Pri is reclaimed, then reopen it | the page exactly as left; plain messages and no crash under low storage; the draft, transcript and session restored without signing in | six rows. Free the storage afterwards |
 | A16 | `-21-EXPORT`, `-22-SHARE` ×2, then **in-app deletion** | Export the account through the share sheet and open the file. Share and print (or save as PDF) a paper. Then delete **each** test account from the app: Settings → Account → Delete, confirming with the password or code | the JSON holds only this account's attempts; the PDF is legible; after deletion you are signed out, and the account is gone (signing in again starts a new account) | `-21-EXPORT` and `-22-SHARE` for each. Deletion is not a matrix case: write it in the GO/NO-GO record as store-gate evidence (`gates.store.evidence`: "in-app deletion, iPhone and iPad, `$SHA`, by <name>"). Apple requires it (guideline 5.1.1(v)) |
-| A17 | soak | The second sitting (A14–A16) on the iPad is the soak | no crash or lost work in 45 minutes or more | `node scripts/device-matrix-record.mjs soak --device "iPad Pro 11-inch (4th generation)" --os "iPadOS …" --pencil "…" --sha "$SHA" --tester "$ME" --build-kind development --server staging --minutes <n> --failures <n>` (#737) |
-| A18 | sandbox purchase and restore | **BLOCKED until billing.** The Paid Apps Agreement is not signed, so the products cannot be priced (`production-config-v1.md` row 8). When it is: sign in to a Sandbox Apple Account (Settings → App Store), buy the monthly plan on the Premium screen, delete and reinstall, then "Restore purchases" | Premium after the purchase and after the restore, confirmed by the server (`/v1/entitlements`) | **BLOCKED** today. When unblocked, the StoreKit certification step 4 scenarios go in the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11; `docs/billing/storekit-certification.md` step 4) |
+| A17 | soak | The second sitting (A14–A16) on the iPad is the soak window | no crash or lost work in 45 minutes or more | `node scripts/device-matrix-record.mjs soak --device "iPad Pro 11-inch (4th generation)" --os "iPadOS …" --pencil "…" --sha "$SHA" --tester "$ME" --build-kind development --server staging --minutes <n> --failures <n>` (#737) |
+| A18 | sandbox purchase and restore | **BLOCKED until billing.** The Paid Apps Agreement is not signed, so the products cannot be priced (`docs/operations/production-config-v1.md` row 8, on #752). When it is: sign in to a Sandbox Apple Account (Settings → App Store), buy the monthly plan on the Premium screen, delete and reinstall, then "Restore purchases" | Premium after the purchase and after the restore, confirmed by the server (`/v1/entitlements`) | **BLOCKED** today. When unblocked, the StoreKit certification step 4 scenarios go in the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11; `docs/billing/storekit-certification.md` step 4) |
 
-Then check the report: `node scripts/device-matrix-record.mjs report --sha "$SHA"`. **Every IPH and
+Then check the report: `node scripts/device-matrix-record.mjs report --sha "$SHA" --build-kind development` (drop `--build-kind` on a `main` without #737). **Every IPH and
 IPD row must read PASS.** A `fail` blocks the release until it is fixed and re-recorded on a new build.
 
 ## Part B — the store build on production (after promotion, release held)
@@ -90,7 +112,7 @@ before the store release is approved. Use the same steps, recorded with
 | B4 | `-16-REINSTALL` | A13 |
 | B5 | one soak (`soak … --build-kind testflight --server production`) | A17 |
 | B6 | in-app deletion of every production test account | A16 |
-| B7 | sandbox purchase and restore: **BLOCKED until billing**, and it also needs the owner's decision on sandbox in production (`production-config-v1.md` note 8) | A18 |
+| B7 | sandbox purchase and restore: **BLOCKED until billing**, and it also needs the owner's decision on sandbox in production (`docs/operations/production-config-v1.md` note 8, on #752) | A18 |
 
 ## What this script does not do
 

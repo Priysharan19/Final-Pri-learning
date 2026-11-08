@@ -37,10 +37,11 @@ acceptance: a family without hardware leaves the matrix incomplete, and the only
 without it is a public-release waiver as above, shown on every report.
 
 Under owner default D1 (iPhone and iPad launch first), the two Android families can be waived
-**by name**: `device-matrix:AND` and `device-matrix:ANT`. No requirement names an Apple family, so
-an iPhone or iPad case can never be waived; with family waivers, every iPhone and iPad case must
-still be `pass`. A record that tries `device-matrix:IPH` or `device-matrix:IPD` is refused, and so
-is one that waives the whole matrix and a family at once. The approving comment's marker lists the
+**by name**: `device-matrix:AND` and `device-matrix:ANT`. No family waiver names an Apple family,
+so with family waivers every iPhone and iPad case must still be `pass`. A record that tries
+`device-matrix:IPH` or `device-matrix:IPD` is refused, and so is one that waives the whole matrix
+and a family at once, or names a requirement twice. The whole-matrix `device-matrix` waiver is
+unchanged: it waives every family, Apple included, as an explicit scope change the dossier lists. The approving comment's marker lists the
 family waivers exactly, for example
 `Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=device-matrix:AND,device-matrix:ANT`.
 The Apple cases are run with `docs/release/OWNER-DEVICE-SCRIPT.md`.

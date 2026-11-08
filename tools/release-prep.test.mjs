@@ -216,7 +216,7 @@ const scratch = [];
   assert.deepEqual([...NEVER_WAIVED_FAMILIES], ['IPH', 'IPD'], 'iPhone and iPad are never waived'); count += 1;
   ok(Object.values(DEVICE_FAMILY_WAIVERS).every(f => FAMILIES.some(family => family.id === f)) && NEVER_WAIVED_FAMILIES.every(f => FAMILIES.some(family => family.id === f)), 'every family named here is a family of the device matrix');
   for (const apple of ['device-matrix:IPH', 'device-matrix:IPD', 'device-matrix:iph']) {
-    ok(loadOverride(overrideFile({ ...goodOverride, waives: [apple] }), SHA).problems.some(p => /iPhone or iPad case can never be waived/.test(p)), `an override waiving ${apple} is refused by name`);
+    ok(loadOverride(overrideFile({ ...goodOverride, waives: [apple] }), SHA).problems.some(p => /no family waiver covers an iPhone or iPad case/.test(p)), `an override waiving ${apple} is refused by name`);
   }
   ok(loadOverride(overrideFile({ ...goodOverride, waives: ['device-matrix', 'device-matrix:AND'] }), SHA).problems.some(p => /the whole device matrix or named Android families, not both/.test(p)), 'an override cannot waive the whole matrix and a family at once');
   eq(loadOverride(overrideFile({ ...goodOverride, waives: ['device-matrix:ANT', 'device-matrix:AND'] }), SHA).problems.length, 0, 'an override waiving the two Android families by name is well-formed');
@@ -484,6 +484,48 @@ const scratch = [];
       assert.deepEqual(uncovered, [], `the owner device script names every one of the ${appleCases.length} iPhone and iPad cases`); count += 1;
       ok(!/DM-(AND|ANT)-/.test(ownerScript) && /device-matrix:AND/.test(ownerScript) && /device-matrix:ANT/.test(ownerScript), 'the owner script is Apple-only and points at the two Android family waivers');
       ok(/BLOCKED until billing/.test(ownerScript) && /in-app deletion/i.test(ownerScript) && /largest/.test(ownerScript) && /VoiceOver/.test(ownerScript) && /REINSTALL/.test(ownerScript), 'the owner script covers restore after reinstall, in-app deletion, VoiceOver at the largest text size, and sandbox purchase marked BLOCKED until billing');
+      ok(loadOverride(overrideFile({ ...goodOverride, waives: ['device-matrix:AND', 'device-matrix:AND', 'device-matrix:ANT'] }), SHA).problems.some(p => /more than once/.test(p)), 'a waives list naming a family twice is refused (it would otherwise record the family twice)');
+
+      // ── the Owner Console's checklist (docs/release/owner-device-script.json) and its importer ──
+      const { ownerDeviceScript, scriptText, SCRIPT_JSON } = await import('./release-owner-device-script.mjs');
+      const { importExport, importPlan } = await import('./release-device-import.mjs');
+      eq(readFileSync(SCRIPT_JSON, 'utf8'), scriptText(), 'the committed owner-device-script.json is exactly what the generator makes from the matrix (run --write after a matrix change)');
+      const checklist = JSON.parse(readFileSync(SCRIPT_JSON, 'utf8'));
+      const matrixItems = checklist.items.filter(item => item.kind === 'device-matrix');
+      assert.deepEqual(matrixItems.map(item => item.id), appleCases.map(kase => kase.id), 'the checklist has every iPhone and iPad case once, in the matrix order'); count += 1;
+      ok(matrixItems.every(item => { const kase = appleCases.find(k => k.id === item.id); return item.title === kase.title && item.expected === kase.expect && item.family === kase.family; }), 'each case carries the recorder\'s own title and expected result');
+      ok(checklist.items.every(item => typeof item.precondition === 'string' && item.precondition && Array.isArray(item.steps) && item.steps.length && Array.isArray(item.evidence) && item.evidence.length && typeof item.billingRequired === 'boolean'), 'every item has a precondition, steps, the evidence to capture and whether billing must come first');
+      ok(checklist.items.every(item => !['result', 'tester', 'device', 'os', 'sha', 'recordedAt'].some(key => key in item)), 'nothing is pre-filled: no item carries a result, tester, device, OS or SHA');
+      ok(!checklist.items.some(item => /^(AND|ANT)$/.test(item.family)), 'the checklist is Apple-only');
+      ok(matrixItems.filter(item => item.pencilRequired).map(item => item.id).join(',') === appleCases.filter(k => k.pencil).map(k => k.id).join(','), 'the Pencil case is marked as needing the Pencil model');
+      const records = checklist.items.filter(item => item.kind === 'release-record');
+      eq(records.map(item => `${item.id}:${item.billingRequired}`).join(','), 'REC-IPH-DELETE:false,REC-IPD-DELETE:false,REC-IPD-PURCHASE:true', 'in-app deletion on both devices, and the sandbox purchase that needs billing first, go to the release record');
+      ok(checklist.evidenceExport.format === 'pri-device-evidence-export' && /release-device-import\.mjs/.test(checklist.evidenceExport.import), 'the checklist names the export format and the import command');
+      assert.throws(() => ownerDeviceScript([...appleCases, { ...appleCases[0], id: 'DM-IPH-99-NEW', step: 'NEWSTEP' }]), /no owner steps for matrix step NEWSTEP/); count += 1;
+
+      const exportDir = mkdtempSync(join(tmpdir(), 'pri-device-import-')); scratch.push(exportDir);
+      const importLedger = join(exportDir, 'results.jsonl');
+      const pencilCase = appleCases.find(kase => kase.pencil).id;
+      const good = { format: 'pri-device-evidence-export', version: 1, sha: SHA, tester: 'Priya Example', buildKind: 'development', server: 'staging',
+        records: [{ case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16 Pro Max', os: 'iOS 26.1' }, { case: pencilCase, result: 'pass', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.1', pencil: 'Apple Pencil Pro' }] };
+      const { written } = importExport(good, { ledger: importLedger });
+      ok(written.length === 2 && validateLedger(importLedger).length === 0 && readLedger(importLedger).every(r => r.recorder === 'scripts/device-matrix-record.mjs' && r.tester === 'Priya Example' && r.sha === SHA), 'a console export is written through the recorder and the ledger validates');
+      const refusedImport = (name, exported, pattern) => {
+        const before = existsSync(importLedger) ? readFileSync(importLedger, 'utf8') : null;
+        let error = null;
+        try { importExport(exported, { ledger: importLedger }); } catch (e) { error = e; }
+        ok(error && error.problems.some(p => pattern.test(p)) && (existsSync(importLedger) ? readFileSync(importLedger, 'utf8') : null) === before, `the import refuses ${name}, and writes nothing`);
+      };
+      refusedImport('an agent as tester', { ...good, tester: 'Claude Code' }, /does not name a human/);
+      refusedImport('a simulator', { ...good, records: [{ ...good.records[0], device: 'iPhone 16 Pro Simulator' }] }, /simulator/);
+      refusedImport('an unknown case', { ...good, records: [{ ...good.records[0], case: 'DM-IPH-99-NOPE' }] }, /unknown case id/);
+      refusedImport('a short SHA', { ...good, sha: 'abc123' }, /40-hex/);
+      refusedImport('a Pencil case passed without the Pencil model', { ...good, records: [{ ...good.records[1], pencil: undefined }] }, /Apple Pencil case/);
+      refusedImport('a case twice', { ...good, records: [good.records[0], good.records[0]] }, /appears twice/);
+      refusedImport('a good record followed by a bad one (all or nothing)', { ...good, records: [good.records[0], { ...good.records[1], device: 'Xcode simulator' }] }, /simulator/);
+      refusedImport('another format', { ...good, format: 'something-else' }, /format must be/);
+      refusedImport('a field the format does not have', { ...good, records: [{ ...good.records[0], result: 'pass', evidenceClass: 'PHYSICAL-HUMAN' }] }, /unknown key/);
+      eq(importPlan({ ...good, records: [] }).problems.some(p => /non-empty/.test(p)), true, 'an export with no records is refused');
     }
     ok(!(await run(world({ device: 'all-blocked' }))).ok, 'an all-blocked device matrix refuses the release stage (Q4 #696 counterexample)');
 

@@ -1,0 +1,393 @@
+{
+  "format": "pri-owner-device-script",
+  "version": 1,
+  "generatedBy": "node tools/release-owner-device-script.mjs --write",
+  "caseSource": "scripts/device-matrix-record.mjs CASES (families IPH, IPD)",
+  "note": "Instructions only: nothing here is a result. Results are recorded by the named owner on real hardware.",
+  "evidenceExport": {
+    "format": "pri-device-evidence-export",
+    "version": 1,
+    "import": "node tools/release-device-import.mjs <export.json>",
+    "shape": {
+      "format": "pri-device-evidence-export",
+      "version": 1,
+      "sha": "<40-hex candidate SHA>",
+      "tester": "<the full name of the person who ran the cases>",
+      "buildKind": "development | testflight",
+      "server": "staging | production",
+      "records": [
+        {
+          "case": "<a device-matrix item id>",
+          "result": "pass | fail | blocked",
+          "device": "<model as Settings shows it>",
+          "os": "<OS name and version>",
+          "pencil": "<Apple Pencil model: required for a pass of the iPad WRITE case>",
+          "severity": "<P0-P3: required on a fail>",
+          "notes": "<required on blocked, at least five characters>",
+          "build": "<optional build label>"
+        }
+      ]
+    },
+    "rules": "The importer writes only through scripts/device-matrix-record.mjs: a tester that names an agent, CI, a bot or a placeholder, a simulator or emulator device, an unknown case, a short SHA or a duplicate case refuses the WHOLE file and writes nothing. release-record items are not imported: they go where their recordIn says."
+  },
+  "matrixCases": 18,
+  "items": [
+    {
+      "id": "DM-IPH-01-INSTALL",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Install and first launch",
+      "billingRequired": false,
+      "precondition": "The development build of the candidate SHA is installed from Xcode on this device (Part A), or the TestFlight build (Part B).",
+      "steps": [
+        "Open the app.",
+        "Open its diagnostics and read the release SHA."
+      ],
+      "expected": "The build installs from its test track and opens to the sign-in card. The release identity shown in the app's diagnostics equals the build SHA being recorded.",
+      "evidence": [
+        "The release SHA the diagnostics show (it must equal the candidate)."
+      ]
+    },
+    {
+      "id": "DM-IPH-02-OTP",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Email one-time-code sign-in",
+      "billingRequired": false,
+      "precondition": "The test mailbox is open on this device.",
+      "steps": [
+        "Sign in to the adult test account with the email code.",
+        "Close the app fully, then reopen it."
+      ],
+      "expected": "A 6-digit code reaches a real mailbox on this device; entering it signs in; the session survives closing and reopening the app.",
+      "evidence": [
+        "Whether you were still signed in after reopening."
+      ]
+    },
+    {
+      "id": "DM-IPH-03-GUARDIAN",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Guardian consent for a child account",
+      "billingRequired": false,
+      "precondition": "Signed out. The other device is to hand as \"the parent's own device\", with the parent mailbox.",
+      "steps": [
+        "Create a child test account on this device.",
+        "On the OTHER device, open /guardian/consent in Safari and approve with the parent's code.",
+        "Watch this device."
+      ],
+      "expected": "A child account is held at \"waiting for your parent\" until the parent approves on /guardian/consent on THEIR OWN device with THEIR code; the child screen moves on by itself. Sync and server questions are refused until then.",
+      "evidence": [
+        "Whether questions and sync were refused before approval.",
+        "Whether the child screen moved on by itself after approval."
+      ]
+    },
+    {
+      "id": "DM-IPH-04-ISSUE",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Server-issued question",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Open Practice and get a question.",
+        "Turn on aeroplane mode, then turn it off."
+      ],
+      "expected": "A question is issued by the server and shown; aeroplane mode shows the offline state and the question is back when the network returns.",
+      "evidence": [
+        "Whether the offline state showed and the question came back."
+      ]
+    },
+    {
+      "id": "DM-IPH-05-WRITE",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Handwriting input",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Write the answer: a finger on iPhone; the Apple Pencil on iPad, with your palm resting on the screen.",
+        "Press \"Read my answer\"."
+      ],
+      "expected": "Writing with this family's input (finger / Apple Pencil / stylus) draws without lag or dropped strokes; on tablets the palm does not draw; \"Read my answer\" sends the picture.",
+      "evidence": [
+        "Lag or dropped strokes, if any.",
+        "Whether the palm drew (iPad).",
+        "Whether the one-time prompt naming OpenAI (D17) appeared before anything was sent.",
+        "iPad: the Apple Pencil model."
+      ]
+    },
+    {
+      "id": "DM-IPH-06-PHOTO",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Photo of working",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Photograph a page of working.",
+        "Photograph it again holding the device sideways."
+      ],
+      "expected": "The camera or picker captures a page of working; the picture is sent for reading; a photo taken sideways is shown the right way up.",
+      "evidence": [
+        "Whether the photo was sent for reading.",
+        "Whether the sideways photo shows the right way up."
+      ]
+    },
+    {
+      "id": "DM-IPH-07-TRANSCRIPT",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Transcript shown; explicit correction or confirmation",
+      "billingRequired": false,
+      "precondition": "A handwritten or photographed answer has been read.",
+      "steps": [
+        "Correct one misread line.",
+        "Confirm the transcript."
+      ],
+      "expected": "The transcript is shown line by line; a misread line can be corrected; when the reader is unsure the student must confirm before marking.",
+      "evidence": [
+        "Whether an unsure reading asked you to confirm before marking."
+      ]
+    },
+    {
+      "id": "DM-IPH-08-MARK",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "Server mark and criterion feedback",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Submit a wrong answer.",
+        "Submit the right answer."
+      ],
+      "expected": "The mark comes from the server with marks earned / possible and the first-error feedback; a wrong answer gets its second try; a correct answer shows the worked solution.",
+      "evidence": [
+        "The mark shown (earned / possible) and its first-error feedback.",
+        "Whether the worked solution appeared after the right answer."
+      ]
+    },
+    {
+      "id": "DM-IPH-09-HISTORY",
+      "kind": "device-matrix",
+      "family": "IPH",
+      "title": "History and persistent sync",
+      "billingRequired": false,
+      "precondition": "Both devices signed in to the same adult test account.",
+      "steps": [
+        "Close and reopen the app.",
+        "Open History on this device and on the other one."
+      ],
+      "expected": "The attempt is in History, is still there after the app is closed and reopened, and appears on a second signed-in device after sync.",
+      "evidence": [
+        "Whether every attempt is in History on both devices."
+      ]
+    },
+    {
+      "id": "DM-IPD-01-INSTALL",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Install and first launch",
+      "billingRequired": false,
+      "precondition": "The development build of the candidate SHA is installed from Xcode on this device (Part A), or the TestFlight build (Part B).",
+      "steps": [
+        "Open the app.",
+        "Open its diagnostics and read the release SHA."
+      ],
+      "expected": "The build installs from its test track and opens to the sign-in card. The release identity shown in the app's diagnostics equals the build SHA being recorded.",
+      "evidence": [
+        "The release SHA the diagnostics show (it must equal the candidate)."
+      ]
+    },
+    {
+      "id": "DM-IPD-02-OTP",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Email one-time-code sign-in",
+      "billingRequired": false,
+      "precondition": "The test mailbox is open on this device.",
+      "steps": [
+        "Sign in to the adult test account with the email code.",
+        "Close the app fully, then reopen it."
+      ],
+      "expected": "A 6-digit code reaches a real mailbox on this device; entering it signs in; the session survives closing and reopening the app.",
+      "evidence": [
+        "Whether you were still signed in after reopening."
+      ]
+    },
+    {
+      "id": "DM-IPD-03-GUARDIAN",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Guardian consent for a child account",
+      "billingRequired": false,
+      "precondition": "Signed out. The other device is to hand as \"the parent's own device\", with the parent mailbox.",
+      "steps": [
+        "Create a child test account on this device.",
+        "On the OTHER device, open /guardian/consent in Safari and approve with the parent's code.",
+        "Watch this device."
+      ],
+      "expected": "A child account is held at \"waiting for your parent\" until the parent approves on /guardian/consent on THEIR OWN device with THEIR code; the child screen moves on by itself. Sync and server questions are refused until then.",
+      "evidence": [
+        "Whether questions and sync were refused before approval.",
+        "Whether the child screen moved on by itself after approval."
+      ]
+    },
+    {
+      "id": "DM-IPD-04-ISSUE",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Server-issued question",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Open Practice and get a question.",
+        "Turn on aeroplane mode, then turn it off."
+      ],
+      "expected": "A question is issued by the server and shown; aeroplane mode shows the offline state and the question is back when the network returns.",
+      "evidence": [
+        "Whether the offline state showed and the question came back."
+      ]
+    },
+    {
+      "id": "DM-IPD-05-WRITE",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Handwriting input",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Write the answer: a finger on iPhone; the Apple Pencil on iPad, with your palm resting on the screen.",
+        "Press \"Read my answer\"."
+      ],
+      "expected": "Writing with this family's input (finger / Apple Pencil / stylus) draws without lag or dropped strokes; on tablets the palm does not draw; \"Read my answer\" sends the picture.",
+      "evidence": [
+        "Lag or dropped strokes, if any.",
+        "Whether the palm drew (iPad).",
+        "Whether the one-time prompt naming OpenAI (D17) appeared before anything was sent.",
+        "iPad: the Apple Pencil model."
+      ],
+      "pencilRequired": true
+    },
+    {
+      "id": "DM-IPD-06-PHOTO",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Photo of working",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Photograph a page of working.",
+        "Photograph it again holding the device sideways."
+      ],
+      "expected": "The camera or picker captures a page of working; the picture is sent for reading; a photo taken sideways is shown the right way up.",
+      "evidence": [
+        "Whether the photo was sent for reading.",
+        "Whether the sideways photo shows the right way up."
+      ]
+    },
+    {
+      "id": "DM-IPD-07-TRANSCRIPT",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Transcript shown; explicit correction or confirmation",
+      "billingRequired": false,
+      "precondition": "A handwritten or photographed answer has been read.",
+      "steps": [
+        "Correct one misread line.",
+        "Confirm the transcript."
+      ],
+      "expected": "The transcript is shown line by line; a misread line can be corrected; when the reader is unsure the student must confirm before marking.",
+      "evidence": [
+        "Whether an unsure reading asked you to confirm before marking."
+      ]
+    },
+    {
+      "id": "DM-IPD-08-MARK",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "Server mark and criterion feedback",
+      "billingRequired": false,
+      "precondition": "Signed in to the adult test account on this device.",
+      "steps": [
+        "Submit a wrong answer.",
+        "Submit the right answer."
+      ],
+      "expected": "The mark comes from the server with marks earned / possible and the first-error feedback; a wrong answer gets its second try; a correct answer shows the worked solution.",
+      "evidence": [
+        "The mark shown (earned / possible) and its first-error feedback.",
+        "Whether the worked solution appeared after the right answer."
+      ]
+    },
+    {
+      "id": "DM-IPD-09-HISTORY",
+      "kind": "device-matrix",
+      "family": "IPD",
+      "title": "History and persistent sync",
+      "billingRequired": false,
+      "precondition": "Both devices signed in to the same adult test account.",
+      "steps": [
+        "Close and reopen the app.",
+        "Open History on this device and on the other one."
+      ],
+      "expected": "The attempt is in History, is still there after the app is closed and reopened, and appears on a second signed-in device after sync.",
+      "evidence": [
+        "Whether every attempt is in History on both devices."
+      ]
+    },
+    {
+      "id": "REC-IPH-DELETE",
+      "kind": "release-record",
+      "family": "IPH",
+      "title": "In-app account deletion",
+      "billingRequired": false,
+      "precondition": "The last step: every other case on this device is done.",
+      "steps": [
+        "Settings → Account → Delete, for each test account on this device.",
+        "Confirm with the password or the code.",
+        "Try to sign in with the same address."
+      ],
+      "expected": "You are signed out; the account is gone, and signing in again starts a new account.",
+      "evidence": [
+        "Whether each account is gone."
+      ],
+      "recordIn": "GO/NO-GO record gates.store.evidence (\"in-app deletion, iPhone and iPad, <SHA>, by <name>\"); App Review guideline 5.1.1(v)"
+    },
+    {
+      "id": "REC-IPD-DELETE",
+      "kind": "release-record",
+      "family": "IPD",
+      "title": "In-app account deletion",
+      "billingRequired": false,
+      "precondition": "The last step: every other case on this device is done.",
+      "steps": [
+        "Settings → Account → Delete, for each test account on this device.",
+        "Confirm with the password or the code.",
+        "Try to sign in with the same address."
+      ],
+      "expected": "You are signed out; the account is gone, and signing in again starts a new account.",
+      "evidence": [
+        "Whether each account is gone."
+      ],
+      "recordIn": "GO/NO-GO record gates.store.evidence (\"in-app deletion, iPhone and iPad, <SHA>, by <name>\"); App Review guideline 5.1.1(v)"
+    },
+    {
+      "id": "REC-IPD-PURCHASE",
+      "kind": "release-record",
+      "family": "IPD",
+      "title": "Sandbox purchase and restore",
+      "billingRequired": true,
+      "precondition": "The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6). Until then this item is BLOCKED.",
+      "steps": [
+        "Settings → App Store → Sandbox Account: sign in to a sandbox Apple Account.",
+        "Buy the monthly plan on the Premium screen.",
+        "Delete and reinstall the app, then \"Restore purchases\"."
+      ],
+      "expected": "Premium after the purchase and after the restore, confirmed by the server (/v1/entitlements).",
+      "evidence": [
+        "The /v1/entitlements answer after each step."
+      ],
+      "recordIn": "the release record, ios/PriLearning.swiftpm/RELEASE.md §11 (docs/billing/storekit-certification.md step 4)"
+    }
+  ]
+}
