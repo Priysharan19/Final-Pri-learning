@@ -270,8 +270,9 @@ jobs:
           # npm run test:budget measures the one production build: every build
           # ships the Instrument from client/interface.config.mjs (D7), whose
           # Map, Report and Scripts tabs are held in the warm pass (#658),
-          # together with every file those tabs import statically.
-          grep -Eq 'INSTALL BUDGET: PASS — 63/63 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          # together with every file those tabs import statically; 63 → 65: no
+          # tab carries a stylesheet of its own (they are in the boot one).
+          grep -Eq 'INSTALL BUDGET: PASS — 65/65 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
           # The V1 interface decisions in source: one interface from one
           # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the

@@ -363,6 +363,17 @@ if (INSTRUMENT) {
     `every file a Map, Report or Scripts chunk imports statically is installed or warmed, so the tab does not crash on a first open offline — missing: ${JSON.stringify(uncarried)}`);
   ok(!/prefetchInstrumentTabs/.test(readFileSync(join(ROOT, 'client', 'src', 'App.jsx'), 'utf8')),
     'and the shell no longer relies on an idle prefetch to get them');
+  // A warmed stylesheet is still fetched by Vite's runtime CSS preload the
+  // moment its tab first opens, and that step is what failed on a first visit
+  // offline in WebKit ("Unable to preload CSS for …/MapPage-….css"). The
+  // Instrument's stylesheets are therefore part of the boot stylesheet, and no
+  // tab chunk carries one of its own.
+  const tabSheets = emitted().filter(url => /(^|\/)(instrument|MapPage|ReportHead|History|Progress|ledger|map|report)-[^/]*\.css$/.test(url.slice(1)));
+  eq(tabSheets.length, 0, `no Instrument or tab stylesheet is emitted on its own, so opening a tab never preloads CSS: ${JSON.stringify(tabSheets)}`);
+  const bootSheets = PRECACHE.filter(url => /\.css$/.test(url) && readFileSync(join(DIST, 'index.html'), 'utf8').includes(url));
+  const bootCss = bootSheets.map(url => readFileSync(join(DIST, url.slice(1)), 'utf8')).join('\n');
+  ok(['.in-bar', '.in-map', '.in-led-row', '.in-report'].every(sel => bootCss.includes(sel)),
+    `the boot stylesheet carries the shell, Map, Scripts and Report rules (${bootSheets.join(', ') || 'no boot stylesheet'})`);
 }
 // V1 decision D10: the student Classes page follows the classroom-product
 // flag, and a production build made with it off (both builds this suite

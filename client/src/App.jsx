@@ -82,7 +82,7 @@ const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
 const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   document.documentElement.classList.add('ui-instrument');
-  import('./instrument/instrument.css');
+  // Its stylesheets are in the boot stylesheet (main.jsx).
   // The Map, Report and Scripts tabs are part of the warm pass in this build
   // (vite.config.js: no on-demand rule names them), so the service worker
   // keeps them for a first open offline without a runtime prefetch (#658).

@@ -717,7 +717,8 @@ export const offlineFlow = {
         setTimeout(() => resolve(null), 180000);
       });
     });
-    await check('the service worker finished the offline build', !!held, JSON.stringify(held));
+    // Complete, not merely answered: {warmed: 0, of: N} is a reply too.
+    await check('the service worker finished the offline build', !!held && held.of > 0 && held.warmed === held.of, JSON.stringify(held));
     await page.context().setOffline(true);
     await page.waitForFunction(() => !navigator.onLine, null, { timeout: 5000 }).catch(() => {});
     for (const [name, href, ready] of [['the Map', '/map', '[data-map-chapter]'], ['the Report', '/progress', '[data-instrument-report]'], ['Scripts', '/review', '.in-led-bar, [data-state="empty"]']]) {
