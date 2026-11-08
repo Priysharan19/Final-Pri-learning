@@ -29,13 +29,6 @@ final class ShellContainerView: UIView {
         subviews.first?.frame = bounds
         onLayout?()
     }
-
-    // Rotation, a status bar that appears or the Dynamic Island's region all
-    // change the safe area without always changing the bounds.
-    override func safeAreaInsetsDidChange() {
-        super.safeAreaInsetsDidChange()
-        onLayout?()
-    }
 }
 
 struct WebShell: UIViewRepresentable {
@@ -74,20 +67,6 @@ struct WebShell: UIViewRepresentable {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
-        // Safe area from the first paint (#release-blocker 2026-10-20): the web
-        // view is full screen with contentInsetAdjustmentBehavior = .never, so
-        // WebKit's env(safe-area-inset-*) is 0 here and the page would draw
-        // under the status bar and the Dynamic Island. The shell states the
-        // real insets as --pri-inset-* on <html>; Coordinator.applySafeArea()
-        // keeps them current on rotation and size changes.
-        let launchInsets = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow?.safeAreaInsets }.first ?? .zero
-        config.userContentController.addUserScript(WKUserScript(
-            source: Coordinator.safeAreaScript(launchInsets, viewWidth: UIScreen.main.bounds.width,
-                                               category: UIApplication.shared.preferredContentSizeCategory),
-            injectionTime: .atDocumentStart,
-            forMainFrameOnly: true
-        ))
         config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
@@ -122,10 +101,9 @@ struct WebShell: UIViewRepresentable {
         context.coordinator.attachBilling(to: webView)
         context.coordinator.attachCloud(to: webView)
         context.coordinator.attachHost(to: webView)
-        container.onLayout = { [weak coordinator = context.coordinator, weak container] in
+        container.onLayout = { [weak coordinator = context.coordinator] in
             coordinator?.ink.webViewDidResize()
             coordinator?.applyTextSize()
-            if let container { coordinator?.applySafeArea(container.safeAreaInsets) }
         }
 
         webView.load(URLRequest(url: URL(string: "prilearning://app/")!))
@@ -229,10 +207,7 @@ struct WebShell: UIViewRepresentable {
             }
             contentSizeObserver = NotificationCenter.default.addObserver(
                 forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
-            ) { [weak self, weak webView] _ in
-                self?.applyTextSize()
-                if let container = webView?.superview { self?.applySafeArea(container.safeAreaInsets) }
-            }
+            ) { [weak self] _ in self?.applyTextSize() }
             applyTextSize()
         }
 
@@ -371,37 +346,6 @@ struct WebShell: UIViewRepresentable {
                 completionHandler: nil)
         }
 
-        /// The CSS px the page is laid out in per point: below 1 when large
-        /// Dynamic Type narrows the viewport (viewportContent above).
-        static func cssPerPoint(viewWidth: CGFloat, category: UIContentSizeCategory) -> CGFloat {
-            let content = viewportContent(width: viewWidth, category: category)
-            guard let range = content.range(of: "width="), !content.hasPrefix("width=device-width"),
-                  let css = Double(content[range.upperBound...].prefix { $0.isNumber }), viewWidth > 0 else { return 1 }
-            return CGFloat(css) / viewWidth
-        }
-
-        /// Sets --pri-inset-top/right/bottom/left on <html>. Only four numbers
-        /// reach this script. An inline custom property beats the :root
-        /// fallback (env(), which is 0 inside this shell) in theme.css.
-        static func safeAreaScript(_ insets: UIEdgeInsets, viewWidth: CGFloat, category: UIContentSizeCategory) -> String {
-            let k = cssPerPoint(viewWidth: viewWidth, category: category)
-            func px(_ v: CGFloat) -> String { String(format: "%.2fpx", max(0, Double(v * k))) }
-            return "(function(t,r,b,l){var s=document.documentElement.style;"
-                + "s.setProperty('--pri-inset-top',t);s.setProperty('--pri-inset-right',r);"
-                + "s.setProperty('--pri-inset-bottom',b);s.setProperty('--pri-inset-left',l);})"
-                + "('\(px(insets.top))','\(px(insets.right))','\(px(insets.bottom))','\(px(insets.left))');"
-        }
-
-        private var appliedSafeArea: String?
-        func applySafeArea(_ insets: UIEdgeInsets) {
-            guard let webView = shellWebView else { return }
-            let script = Self.safeAreaScript(insets, viewWidth: webView.bounds.width,
-                                             category: UIApplication.shared.preferredContentSizeCategory)
-            guard script != appliedSafeArea else { return }
-            appliedSafeArea = script
-            webView.evaluateJavaScript(script, completionHandler: nil)
-        }
-
         func detachHost() {
             if let openURLObserver { NotificationCenter.default.removeObserver(openURLObserver) }
             if let contentSizeObserver { NotificationCenter.default.removeObserver(contentSizeObserver) }
@@ -469,8 +413,6 @@ struct WebShell: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             // Simulator/CI only: prove the bridge contract inside real WebKit.
             applyTextSize()
-            appliedSafeArea = nil
-            if let container = webView.superview { applySafeArea(container.safeAreaInsets) }
             #if DEBUG
             guard !bridgeSelfCheckRan else { return }
             if BridgeSelfCheck.requested {

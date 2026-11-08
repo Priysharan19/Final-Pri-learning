@@ -14,9 +14,9 @@
 //     what stays on the device, and the welcome screen promised "an engine
 //     that learns exactly how you write".
 //
-// This suite pins their removal, in both languages and in the legal text, so
-// the claim cannot drift back in with a later copy edit. It reads source: the
-// strings catalogues, the Settings page, the welcome copy and the notices.
+// This suite pins their removal, in both languages, so the claim cannot drift
+// back in with a later copy edit. It reads source: the strings catalogues, the
+// Settings page and the welcome copy. (The legal notices are the legal lane's.)
 //
 // Usage: node client/test/handwriting-claims-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,12 +65,10 @@ for (const [key, text] of flat(hi)) ok(!CLAIM_HI.test(text), `HI ${key} does not
 // ── 3 · The welcome and the notices match ───────────────────────────────────
 ok(/deterministic engine/.test(en['login.point3']) && !/learns/.test(en['login.point3']), 'the welcome\'s third point states the deterministic engine, not a learning one');
 ok(/नियम-आधारित इंजन/.test(hi['login.point3']) && !/सीखता/.test(hi['login.point3']), 'and so does its Hindi');
-const privacy = read('docs/legal/privacy.md').replace(/\s+/g, ' ');
-const privacyHi = read('docs/legal/privacy.hi.md').replace(/\s+/g, ' ');
-ok(/- Your handwriting strokes\./.test(privacy) && !/adapts to your hand/.test(privacy),
-  'the privacy notice lists handwriting strokes on the device, with no adapting model');
-ok(/- आपकी हैंडराइटिंग के स्ट्रोक।/.test(privacyHi) && !/लिखावट के अनुसार ढलता/.test(privacyHi),
-  'and the Hindi notice says the same');
+// The privacy notices (docs/legal/**) belong to the legal lane, which is
+// rewriting them (#698): their "model that adapts to your hand" line is handed
+// over there rather than edited from the interface lane, so it is not pinned
+// here. The in-app catalogues above are.
 ok(!/calibration\)/.test(read('docs/i18n.md')), 'docs/i18n.md no longer names a calibration surface');
 
 // ── 3b · No resident handwriting model, no iPad-only wording on every platform ─
@@ -105,4 +103,4 @@ if (failures.length) {
   console.log(`HANDWRITING CLAIMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`HANDWRITING CLAIMS: PASS — ${pass}/${pass} checks — no student-facing text says Pri learns or adapts to a hand; the calibration feature is gone from Settings, the catalogues and the privacy notice.`);
+console.log(`HANDWRITING CLAIMS: PASS — ${pass}/${pass} checks — no student-facing text says Pri learns or adapts to a hand; the calibration feature is gone from Settings and the catalogues.`);
