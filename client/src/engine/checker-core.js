@@ -176,8 +176,14 @@ function moneyQuestion(question) {
   // something that is not money, whatever the prompt is priced in: 2000 paise
   // is not a 20% profit (#518).
   if (suffix.trim()) return false;
+  // A question priced in rupees can still ask for a count, a percentage, a
+  // ratio or a time: "How many ₹20 notes does Uday have?", "the greatest
+  // number of copies it can print". ₹ on that answer is a wrong unit, not the
+  // answer's unit (the correct-answer sweep's audit).
+  if (COUNT_ASK.test(askingSentences(prompt.replace(/\$/g, ' ')))) return false;
   return RUPEE_MARK.test(prompt) || /\bpaise\b/i.test(prompt);
 }
+const COUNT_ASK = /\bhow\s+many\b(?!\s+(?:rupees|paise)\b)|\bnumber\s+of\b(?!\s+(?:rupees|paise)\b)|\bper\s?cent(?:age)?\b|%|\bratio\b|\bfraction\b|\bhow\s+long\b/i;
 /** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
 function paiseAsked(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? '');

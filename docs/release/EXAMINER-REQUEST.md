@@ -25,7 +25,7 @@ V1 launches with **marks for the final answer only** (D12): method marks are off
    node client/test/correct-answer-sweep-check.mjs    # must print PASS
    node client/test/false-positive-sweep-check.mjs    # must print PASS
    ```
-   and records below the candidate SHA, the dossier's rubric digest, the sample digest (the last line of the sample file) and the #680 manifest digest (`sha256sum client/test/fixtures/680-reconstructed.json`). A signature over any other digest does not carry over: every marking change produces a new digest and re-requests review.
+   and records below the candidate SHA, the dossier's rubric digest, the sample digest (the last line of the sample file) and the #680 case-set digest (`sha256sum client/test/fixtures/680-sourced.json`). A signature over any other digest does not carry over: every marking change produces a new digest and re-requests review.
 3. Exports the attachments to PDF and records their SHA-256 values.
 4. Agrees a fee and a deadline, and records the examiner's identity and qualification with the release governor (outside this repository if the examiner prefers).
 
@@ -34,13 +34,13 @@ V1 launches with **marks for the final answer only** (D12): method marks are off
 | Release-candidate SHA | `<sha>` |
 | Dossier rubric digest | `<digest>` |
 | Served-question sample digest | `<digest>` |
-| #680 reconstructed manifest digest | `<digest>` |
+| #680 case-set digest (`680-sourced.json`) | `<digest>` |
 
 ## Attachments (Part A)
 
 - **A1 · The final-answer rules** — `docs/content/marking-tolerance.md` (hashed into the dossier digest): exactness of whole-number answers, the decimal band, named precision, fractions and surds, percentages, angles, rupees and paise, intervals, sets, points, ratios.
 - **A2 · The interim policies, with the questions to rule on** — section "Questions for the examiner" in this email.
-- **A3 · The #680 case set** — `client/test/fixtures/680-reconstructed.json`, run by `client/test/marker-680-reconstructed-check.mjs`: the 197 wrong answers that an earlier version of the marker credited (104 shifted interval boundaries, 93 malformed or mismatched answers), the 44 valid answers that must still be credited and the 26 far-wrong answers that must be refused, each with Pri's current verdict. Where the original payload could not be recovered, the case is marked "reconstructed" with the rule it was rebuilt from.
+- **A3 · The #680 case set** — `client/test/fixtures/680-sourced.json`, run by `client/test/marker-680-sourced-check.mjs`. Issue #680 reported 197 wrong answers an earlier version of the marker credited (104 shifted interval boundaries, 93 malformed or mismatched answers), with 44 valid and 26 far-wrong controls. **The original manifest of those cases was never committed and is lost.** This file holds every case #680's own comments preserve: 91 cases, each quoting the comment it comes from (73 verbatim, 18 rebuilt from a stated rule) — 55 of the 197 wrong answers, 35 of the 44 valid controls and 1 of the 26 far-wrong controls — with Pri's current verdict. The families it cannot fill are covered, from other sources, by `client/test/marker-adversarial-corpus-check.mjs` (219 cases) and `client/test/marker-exact-bounds-check.mjs` (107 cases); the examiner should treat those as the same families, not as the lost originals.
 - **A4 · A sample of served questions** — `docs/marking/examiner-sample-v1.md`: one question for each of the 84 chapters served, with the printed answer and Pri's verdict on the key, the key with its unit, ₹ on an amount, the key written as a sum still to do, a neighbouring wrong value and a contradicting unit. The examiner fills in the last column.
 
 ## Email
@@ -57,7 +57,7 @@ V1 launches with **marks for the final answer only** (D12): method marks are off
 >
 > 1. Read the attached final-answer rules (A1) and tell me any rule a board examiner would not apply.
 > 2. Rule on the interim policies below (A2). I have taken a default for each; your decision replaces it.
-> 3. Look at the attached case set (A3): wrong answers an earlier version wrongly accepted, and right answers that must stay accepted. Tell me any verdict you disagree with.
+> 3. Look at the attached case set (A3): wrong answers an earlier version wrongly accepted, and right answers that must stay accepted (the original list was lost; this is what our records preserve). Tell me any verdict you disagree with.
 > 4. Mark the attached sample of real questions from the app (A4): for each question, mark the listed answers as you would on a board paper, and note every disagreement with the app's verdict.
 >
 > **Questions for the examiner (A2).**

@@ -351,6 +351,14 @@ export function parseMatrixInput(raw) {
     .replace(/\\\\/g, '],[')
     .replace(/\\left|\\right/g, '')
     .replace(/[−–—]/g, '-');
+  // A matrix's brackets balance and close in kind: "(1,2;3,4]" and
+  // "[[1,2],[3,4]]]]" are not matrices (#680 follow-up, Cycle 104 cases).
+  const stack = [];
+  for (const ch of s) {
+    if ('([{'.includes(ch)) stack.push(ch);
+    else if (')]}'.includes(ch) && stack.pop() !== '([{'[')]}'.indexOf(ch)]) throw new Error('Unbalanced brackets');
+  }
+  if (stack.length) throw new Error('Unbalanced brackets');
   // leading scalar: "1/3[[...]]", "(1/3)((...))", "2 × [1 2; 3 4]"
   let scalar = 1;
   const lead = s.match(/^(.*?)\s*[*×·]?\s*((?:\[\[|\(\(|\{\{|\[|\().*)$/s);
