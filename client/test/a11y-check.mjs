@@ -702,7 +702,7 @@ async function run() {
     await step('practice · symbol palette + working', '/practice', async () => {
       const sym = page.locator('.editor-tool').first();
       if (await sym.count()) await sym.click();
-      const wk = page.getByRole('button', { name: /Show working for partial credit/ });
+      const wk = page.getByRole('button', { name: /^Show working/ });
       if (await wk.count()) await wk.click();
       await wait(page, SETTLE);
     });
@@ -1079,7 +1079,7 @@ async function run() {
         throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
       });
       await wait(page, 900);
-      const wk = page.getByRole('button', { name: /Show working for partial credit/ });
+      const wk = page.getByRole('button', { name: /^Show working/ });
       if (await wk.count()) { await wk.click(); await wait(page, SETTLE); }
     });
 
