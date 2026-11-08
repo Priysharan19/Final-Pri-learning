@@ -57,6 +57,7 @@ export function canonicalUnit(raw) {
 }
 
 /** The dimension a canonical unit measures, so km and m compare as lengths. */
+export function unitDimension(c) { return dimension(c); }
 function dimension(c) {
   if (!c) return null;
   if (c.includes('/')) return `rate:${c.split('/').map(dimension).join('/')}`;
@@ -197,6 +198,33 @@ export function unitsNamed(text) {
     }
   }
   return named;
+}
+
+/**
+ * The units a question STATES a quantity in: after a number ("8 cm by 4 cm",
+ * "12.5 m²", "for 2 seconds") or after "in" / "per" ("in cm²", "per hour").
+ * Unlike unitsNamed, a letter that is a function or a point ("g(x)", "∠M") or
+ * an ordinal ("the second term") states no unit. Returns canonical units.
+ */
+export function unitsStated(text) {
+  const words = String(text ?? '')
+    .replace(/\$/g, ' ')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, ' $1 ')
+    .replace(/\^\{?([23])\}?/g, '^$1')
+    .replace(/\\[,;! ]/g, ' ')
+    .replace(/(\d)([a-zA-Z°])/g, '$1 $2')
+    .replace(/[(),;:?!]/g, ' ')
+    .replace(/\.(?=\s|$)/g, ' ')
+    .split(/\s+/).filter(Boolean);
+  const stated = new Set();
+  for (let i = 1; i < words.length; i++) {
+    if (!/^[-+]?\d[\d.,]*$/.test(words[i - 1]) && !/^(?:in|per)$/i.test(words[i - 1])) continue;
+    for (let k = 1; k <= 3 && i + k <= words.length; k++) {
+      const c = canonicalUnit(words.slice(i, i + k).join(' '));
+      if (c) stated.add(c);
+    }
+  }
+  return stated;
 }
 
 /** Is the question's unit written, as a whole unit, anywhere in the text? */

@@ -3,7 +3,7 @@ import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import
 const scratch=mkdtempSync(join(tmpdir(),'q1-set-http-'));const keys=['NODE_ENV','PRI_PLATFORM_DB','PRI_AUTH_DELIVERY_KEY','PRI_PUBLIC_ORIGIN'];const prev=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
 Object.assign(process.env,{NODE_ENV:'test',PRI_PLATFORM_DB:join(scratch,'db.sqlite'),PRI_AUTH_DELIVERY_KEY:'be'.repeat(32)});delete process.env.PRI_PUBLIC_ORIGIN;
 const {startApp,registerAccount,verifyEmail}=await import('./support/app-harness.mjs');
-const h=await startApp({engine:process.env.PRI_TEST_PG_ADMIN_URL?'postgres':'sqlite'});console.log('Q1_TEST_ENGINE '+h.engine);
+const h=await startApp({engine:(await import('./support/engine.mjs')).requestedEngine()});console.log('engine: '+h.engine);console.log('Q1_TEST_ENGINE '+h.engine);
 const sample={generator:'c11-sets',difficulty:1,seed:1,curriculum:'in'};
 function independentlySolve(prompt){
  const groups=[...prompt.matchAll(/\\\{([0-9,\s]+)\\\}/g)].map(m=>m[1].split(',').map(x=>Number(x.trim())));

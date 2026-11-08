@@ -9,7 +9,7 @@ const prev=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
 Object.assign(process.env,{NODE_ENV:'test',PRI_PLATFORM_DB:join(scratch,'platform.db'),PRI_AUTH_DELIVERY_KEY:'ad'.repeat(32)});
 delete process.env.PRI_PUBLIC_ORIGIN;
 const {startApp,registerAccount,verifyEmail}=await import('./support/app-harness.mjs');
-const h=await startApp({engine:process.env.PRI_TEST_PG_ADMIN_URL?'postgres':'sqlite'});
+const h=await startApp({engine:(await import('./support/engine.mjs')).requestedEngine()});console.log('engine: '+h.engine);
 const cases=[
  {generator:'c8-exponents-ncert-mastery',difficulty:4,seed:1,actual:(p)=>{if(!/\(3\.2\\times10\\?\^?\{6\}\)\(1\.2/.test(p))throw Error('Unexpected exponent prompt: '+p);return 32n*12n*10n**10n;}, answers:[['3840000000000',true],['3.84*10^12',true],['3840000000000.001',false],['3840000000000.2',false]]},
  {generator:'c7-place-value-systems-reasoning',difficulty:1,seed:6,actual:p=>{if(!/2.*crores.*11.*lakhs.*45.*thousands.*47.*hundreds/i.test(p))throw Error('Unexpected place-value prompt: '+p);return 2n*10000000n+11n*100000n+45n*1000n+47n*100n;},answers:[['21149700',true],['21149700.000000004',false],['21149700.01',false]]}

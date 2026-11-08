@@ -188,6 +188,15 @@ jobs:
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
+          # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
+          grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
+          grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39253/39253 checks' suites.log
+          grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
+          grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
+          grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
@@ -564,7 +573,7 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 66/66 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

@@ -3,7 +3,7 @@ import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import
 const scratch=mkdtempSync(join(tmpdir(),'q1-point-http-'));const keys=['NODE_ENV','PRI_PLATFORM_DB','PRI_AUTH_DELIVERY_KEY','PRI_PUBLIC_ORIGIN'];const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
 Object.assign(process.env,{NODE_ENV:'test',PRI_PLATFORM_DB:join(scratch,'db.sqlite'),PRI_AUTH_DELIVERY_KEY:'cd'.repeat(32)});delete process.env.PRI_PUBLIC_ORIGIN;
 const {startApp,registerAccount,verifyEmail}=await import('./support/app-harness.mjs');
-const h=await startApp({engine:process.env.PRI_TEST_PG_ADMIN_URL?'postgres':'sqlite'});console.log('Q1_ENGINE '+h.engine);
+const h=await startApp({engine:(await import('./support/engine.mjs')).requestedEngine()});console.log('engine: '+h.engine);console.log('Q1_ENGINE '+h.engine);
 const sample={generator:'c8-plotting-reasoning',difficulty:1,seed:7,curriculum:'in'};
 const cases=[
   ['canonical','(-10,6)',true],
