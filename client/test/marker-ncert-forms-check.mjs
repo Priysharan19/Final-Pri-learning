@@ -32,6 +32,15 @@ function wrong(question, input, label) {
   const verdict = checkAnswer(question, input);
   ok(verdict.correct === false, `${label} — expected wrong, got correct`);
 }
+// D13 (owner default, interim until the examiner rules on #499): a numeric box
+// holds a value, so a form with an operation still to do is refused — returned
+// unread, no try spent — whatever it equals. Cases below that pinned such a
+// form as accepted before D13 now pin its refusal.
+function unevaluated(question, input, label) {
+  const verdict = checkAnswer(question, input);
+  ok(verdict.correct === false && verdict.invalid === true && /Work it out first/.test(verdict.feedback || ''),
+    `${label} — expected refused as unevaluated (D13), got correct=${verdict.correct} invalid=${verdict.invalid} (${verdict.feedback || ''})`);
+}
 
 // ── 1. Solution sets, the way NCERT writes them ──────────────────────────────
 // "The zeroes of the polynomial are …" is answered as a set, in any order, with
@@ -175,13 +184,16 @@ for (const [source, expected, label] of vocabulary) {
 
 // The vocabulary reaches the marker, not just the evaluator.
 const combinatorics = { answerType: 'numeric', answer: { value: 10 } };
-correct(combinatorics, '5C2', 'vocabulary: nCr answers a numeric question');
-correct(combinatorics, '5!/(2!*3!)', 'vocabulary: the factorial definition of the same number');
+// D13: the vocabulary is read (see the evaluator cases above), but a count or
+// a factorial left to work out is not a numeric answer.
+unevaluated(combinatorics, '5C2', 'vocabulary (D13): nCr left to evaluate is refused');
+unevaluated(combinatorics, '5!/(2!*3!)', 'vocabulary (D13): the factorial definition left to evaluate is refused');
+correct(combinatorics, '10', 'vocabulary: the count itself');
 wrong(combinatorics, '5P2', 'vocabulary: a permutation is not a combination');
 
 const trig = { answerType: 'numeric', answer: { value: 2 } };
-correct(trig, 'sec(pi/3)', 'vocabulary: sec answers a numeric question');
-correct(trig, '1/cos(pi/3)', 'vocabulary: the reciprocal written out');
+unevaluated(trig, 'sec(pi/3)', 'vocabulary (D13): sec left to evaluate is refused');
+unevaluated(trig, '1/cos(pi/3)', 'vocabulary (D13): the reciprocal left to evaluate is refused');
 
 // ── 6. Indian money: a rupee answer to a rupee question ─────────────────────
 // The product is India-first. A student who answers "₹9.75" to a question
@@ -202,8 +214,12 @@ for (const [input, label] of [
   ['INR 9.75', 'the currency code'],
   ['9.75 rupees', 'the word after the number'],
   ['9.75 Rupees', 'the word capitalised'],
-  ['$9.75', 'the dollar sign still works'],
+  ['₹9.75/-', 'the Indian "/-" after the amount (D14)'],
 ]) correct(rupees, input, `money: ${label}`);
+// D14: a currency that is not the rupee contradicts a rupee question. Before
+// D14 "$9.75" was read as ₹9.75; a typeset pair "$9.75$" is still maths.
+wrong(rupees, '$9.75', 'money (D14): a dollar sign is a contradicting currency');
+correct(rupees, '$9.75$', 'money (D14): a typeset pair of dollar signs is not money');
 wrong(rupees, '₹9.85', 'money: a rupee sign does not make a wrong number right');
 wrong(rupees, '₹', 'money: a currency sign alone is not an answer');
 wrong(rupees, 'rupees', 'money: the word alone is not an answer');
@@ -312,8 +328,8 @@ for (const [input, label] of [
 const conversion = { answerType: 'numeric', answer: { value: 120000 }, prompt: 'Convert $12$ m² to cm².' };
 correct(conversion, '120000', 'exactness: the answer');
 correct(conversion, '1.2e5', 'exactness: scientific notation');
-correct(conversion, '12*100^2', 'exactness: the calculation left unevaluated');
-correct(conversion, '(1/3)*360000', 'exactness: floating-point noise is still the answer');
+unevaluated(conversion, '12*100^2', 'exactness (D13): the calculation left unevaluated is refused');
+unevaluated(conversion, '(1/3)*360000', 'exactness (D13): a product left to take is refused');
 correct(conversion, '120,000', 'exactness: a thousands separator');
 for (const [input, label] of [
   ['120001', 'one too many'],
@@ -334,7 +350,7 @@ correct(roundedTarget, '3.14159', 'non-integer answers accept themselves');
 const smallInteger = { answerType: 'numeric', answer: { value: 12 } };
 correct(smallInteger, '12', 'small integer: itself');
 correct(smallInteger, '36/3', 'small integer: a calculation');
-correct(smallInteger, 'sqrt(144)', 'small integer: a surd that lands on it');
+unevaluated(smallInteger, 'sqrt(144)', 'small integer (D13): a root that is whole is still to take');
 wrong(smallInteger, '12.01', 'small integer: a hundredth out is wrong');
 
 // A relative band grows with the target. Without an absolute cap the default

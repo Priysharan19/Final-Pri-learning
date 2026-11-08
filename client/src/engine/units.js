@@ -8,14 +8,16 @@
 
 // canonical spelling ← the ways it is written (lower-cased, spaces collapsed)
 const SPELLINGS = {
-  mm: ['mm', 'millimetre', 'millimetres', 'millimeter', 'millimeters'],
-  cm: ['cm', 'centimetre', 'centimetres', 'centimeter', 'centimeters'],
-  m: ['m', 'metre', 'metres', 'meter', 'meters', 'mtr', 'mtrs'],
+  // D14: the right unit in any spelling passes, including the plurals and
+  // short forms Indian classrooms write ("12 cms", "5 gms", "2 ltrs", "60 kmph").
+  mm: ['mm', 'mms', 'millimetre', 'millimetres', 'millimeter', 'millimeters'],
+  cm: ['cm', 'cms', 'centimetre', 'centimetres', 'centimeter', 'centimeters'],
+  m: ['m', 'metre', 'metres', 'meter', 'meters', 'mtr', 'mtrs', 'mts'],
   km: ['km', 'kilometre', 'kilometres', 'kilometer', 'kilometers', 'kms'],
-  g: ['g', 'gm', 'gram', 'grams'],
+  g: ['g', 'gm', 'gms', 'gram', 'grams'],
   kg: ['kg', 'kgs', 'kilogram', 'kilograms'],
-  ml: ['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'],
-  l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr'],
+  ml: ['ml', 'mls', 'millilitre', 'millilitres', 'milliliter', 'milliliters'],
+  l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr', 'ltrs'],
   s: ['s', 'sec', 'secs', 'second', 'seconds'],
   min: ['min', 'mins', 'minute', 'minutes'],
   h: ['h', 'hr', 'hrs', 'hour', 'hours'],
@@ -23,6 +25,9 @@ const SPELLINGS = {
 };
 const CANON = new Map();
 for (const [c, list] of Object.entries(SPELLINGS)) for (const w of list) CANON.set(w, c);
+// Whole-unit spellings that are not a base unit with a power or a rate written
+// out: "kmph" is km/h, "cc" is cm³.
+const WHOLE = new Map([['kmph', 'km/h'], ['kmhr', 'km/h'], ['cc', 'cm³']]);
 const POWER = { '²': '²', '2': '²', '^2': '²', '³': '³', '3': '³', '^3': '³' };
 
 /**
@@ -33,6 +38,7 @@ export function canonicalUnit(raw) {
   let s = String(raw ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/\.(?=\s|$)/g, '').trim();
   if (!s) return null;
   if (s === '°') return '°';
+  if (WHOLE.has(s)) return WHOLE.get(s);
   // a rate: km/h, m/s, m/s²
   const rate = s.split(/\s*(?:\/|\bper\b)\s*/);
   if (rate.length === 2) {
@@ -40,7 +46,8 @@ export function canonicalUnit(raw) {
     return a && b ? `${a}/${b}` : null;
   }
   let power = '';
-  const sq = s.match(/^(?:square|sq)\s*(.+)$/), cu = s.match(/^(?:cubic|cu)\s*(.+)$/);
+  // "sq cm", "sq. cm" and "sq.cm" alike.
+  const sq = s.match(/^(?:square|sq)\.?\s*(.+)$/), cu = s.match(/^(?:cubic|cu)\.?\s*(.+)$/);
   if (sq) { power = '²'; s = sq[1]; } else if (cu) { power = '³'; s = cu[1]; }
   const tail = s.match(/^(.*?)\s*(\^?[23]|[²³])$/);
   if (tail && !power) { power = POWER[tail[2]]; s = tail[1]; }

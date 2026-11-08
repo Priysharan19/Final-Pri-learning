@@ -98,7 +98,9 @@ expect('3.84e14 key, decimal typed', num(384000000000000), '384000000000000.2', 
 expect('1e9 key, grouped', num(1000000000), '1,000,000,000', true);
 expect('1e9 key, power', num(1000000000), '10^9', true);
 expect('3.84e12 key, scientific', num(3840000000000), '3.84*10^12', true);
-expect('small key, float noise', num(3), '0.1*3*10', true);
+// D13 (owner default): a product still to take is refused whatever it equals;
+// before D13 this pinned the binary64 noise of 0.1·3·10 as still 3.
+expect('small key, a written product is unevaluated (D13)', num(3), '0.1*3*10', false);
 expect('authored tol still applies', { answerType: 'numeric', answer: { value: 1000000000, tol: 0.5 } }, '999999999.8', true);
 
 // ── 6 · a blank entry is refused, a nonempty interval is never erased (Q1) ──

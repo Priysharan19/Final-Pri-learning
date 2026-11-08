@@ -29,6 +29,8 @@ const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l
 // normalize(). The sign carries no value, so it is stripped before parsing —
 // but it can never rescue a wrong number, because the number is still compared.
 const CURRENCY_LEAD = /^\s*(?:[₹$]|Rs\.?|INR|रु\.?|₨)\s*/i;
+// "₹500/-", "Rs. 500/-": the "/-" closing an Indian amount says "no paise".
+const RUPEE_CLOSE = /\s*\/-\s*$/;
 // The trailing currency word or sign, with the whitespace around it:
 // "9.75 rupees", "9.75 Rs.", "50 paise", "9.75 ₹". It was the pattern
 //   /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i
@@ -85,7 +87,7 @@ export function cleanInput(raw, { stripUnits = true } = {}) {
   // "x = 3" → "3", and the bare "= 3" a student writes when continuing the
   // question's own line. Nothing valid begins with an equals sign.
   s = s.replace(/^[a-zA-Zθ]?\s*[=≈]\s*/, '');
-  s = s.replace(CURRENCY_LEAD, '');
+  s = s.replace(CURRENCY_LEAD, '').replace(RUPEE_CLOSE, '');
   // A full stop that ends a sentence rather than a number: "2pi.", "9.75.",
   // "3sqrt(2)." — it never carries value. A run of dots is left alone, because
   // "0.333..." means something else.
@@ -134,7 +136,19 @@ const GIVEN_PERCENT = /(?:\$[^$]*\d[^$]*\$|\\\([^)]*\d[^)]*\\\)|\d[\d.,/]*)\s*pe
 // asks in paise; a rupee sign or word beside the answer box asks in rupees,
 // whatever the prompt mentions on the way; otherwise a prompt that talks in
 // paise ("How many paise are there in half a rupee?") asks in paise.
-const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b|\d\s*\/-\s*$/i;
+// D14: a currency is a unit, and the India curriculum prices everything in
+// rupees. A dollar sign written as money — one "$" against the number, not
+// the pair that delimits typeset maths — or a euro, pound or yen sign or a
+// foreign currency's name contradicts every question here. Only a bank priced
+// in dollars (answerPrefix "$", refused at the server by D15) reads a "$".
+const DOLLAR_AS_MONEY = /^\s*\(?\s*(?:US\s*)?\$\s*[\d.]|[\d.]\s*\$\s*\)?\s*$/i;
+const FOREIGN_CURRENCY = /[€£¥]|\b(?:usd|eur|gbp|dollars?|euros?|cents?)\b/i;
+function foreignCurrency(question, text) {
+  if (String(question?.answerPrefix ?? '').trim() === '$') return false;
+  const s = String(text ?? '');
+  return FOREIGN_CURRENCY.test(s) || ((s.match(/\$/g) || []).length === 1 && DOLLAR_AS_MONEY.test(s));
+}
 /** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
 function moneyQuestion(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
@@ -447,12 +461,190 @@ function brokenRun(piece) {
   return false;
 }
 
+// ── D13: a numeric box holds a value, not a sum still to be done ────────────
+// Owner default D13 (docs/release/V1_DECISIONS_2026-11-01.md, interim until the
+// examiner rules on #499): an unevaluated answer is refused. A numeric box
+// accepts a single value, a fraction, a mixed number, a surd or a multiple of
+// π, and refuses anything with an operation left to do — "2 + 3", "3² − 4",
+// "√25", "2 × 2.5", "8!/7!", "⁴C₂", "π + π" — whatever its value.
+//
+// The decision is made from the written form alone, never from the key, so
+// the refusal tells a student nothing about the answer; it is returned as
+// unreadable input (no try is spent) and names the forms the box takes.
+//
+// What counts as done:
+//   · a number, signed or not, decimal or whole, or in standard form (a × 10ⁿ,
+//     or 10ⁿ alone);
+//   · a fraction of whole numbers, simplified or not ("10/4" is a fraction —
+//     whether a question wants it in lowest terms is its own rule), and a
+//     mixed number;
+//   · a surd √n or ∛n whose root is not whole (√25 is 5 with the root still
+//     to take), with a rational multiplier or divisor: 3√2, √3/2, 1/√2, √18;
+//   · a rational multiple of π: 2π, π/3, 2π/3, (2/3)π — e counts like π;
+//   · a sum of such terms where no two are like terms, so nothing is left to
+//     add: 2 + √3, (1 + √5)/2, π/2 + 1. "√2 + √8" adds like terms (√8 = 2√2).
+//   · e, and the logarithm of a whole number (ln 2, 3 log 5), count like π:
+//     each is an exact value with nothing left to take. (An interpretation of
+//     D13's "single value" for the examiner to confirm: the listed forms are
+//     read as examples of "no operation left to do".)
+// Any other operation (a power other than 10ⁿ, a factorial, a trigonometric
+// or counting function, a product of two numbers, a fraction of fractions) is
+// still to be done.
+const D13_REFUSAL = 'Work it out first: a numeric answer is a single value — a number, a fraction, a mixed number, a surd or a multiple of π — with no operation left to do.';
+const D13_MAX_NODES = 64;
+const D13_MIXED = /^-?\d+\s+\d+\s*\/\s*\d+$|^-?\d+\s*\(\d+\)\s*\/\s*\(\d+\)$/;
+const isWholeLiteral = node => node?.t === 'num' && /^\d+$/.test(String(node.s ?? node.v));
+const unsign = node => { while (node?.t === 'neg' || node?.t === 'group') node = node.v; return node; };
+function squareFree(n) {
+  let out = 1;
+  for (let p = 2; p * p <= n; p++) { let k = 0; while (n % p === 0) { n /= p; k++; } if (k % 2) out *= p; }
+  return out * n;
+}
+function perfectPower(n, k) { const r = Math.round(n ** (1 / k)); return [r - 1, r, r + 1].some(c => c >= 0 && c ** k === n); }
+/**
+ * One evaluated term — a rational coefficient times at most one surd and at
+ * most one π (or e) — as { rational, surd, transcendental, pi } or null when it
+ * is not one. `surd` is the like-term key of its root ("2:2" for √8 and √2).
+ */
+function evaluatedTerm(node) {
+  node = unsign(node);
+  if (!node) return null;
+  if (node.t === 'num') return { coefficients: 1, surd: null, pi: null, zero: Number(node.v) === 0 };
+  if (node.t === 'const' && node.v === 'pi') return { coefficients: 0, surd: null, pi: 'pi' };
+  if (node.t === 'var' && node.v === 'e') return { coefficients: 0, surd: null, pi: 'e' };
+  // A logarithm of a whole number is an exact value like π: ln 2, 3 log 5.
+  // ln 1, log 100 and the like still have a value to take, and two logs in
+  // one answer are like terms (ln 2 + ln 3 is ln 6).
+  if (node.t === 'call' && (node.fn === 'ln' || node.fn === 'log' || node.fn === 'log10') && !node.args) {
+    let arg = node.arg;
+    while (arg?.t === 'group') arg = arg.v;
+    if (!isWholeLiteral(arg)) return null;
+    const n = Number(arg.s ?? arg.v);
+    if (!Number.isSafeInteger(n) || n < 2 || (node.fn !== 'ln' && /^10*$/.test(String(n)))) return null;
+    return { coefficients: 0, surd: null, pi: 'log' };
+  }
+  if (node.t === 'call' && (node.fn === 'sqrt' || node.fn === 'cbrt') && !node.args) {
+    const k = node.fn === 'sqrt' ? 2 : 3;
+    let arg = node.arg;
+    while (arg?.t === 'group') arg = arg.v;
+    if (!isWholeLiteral(arg)) return null;
+    const n = Number(arg.s ?? arg.v);
+    if (!Number.isSafeInteger(n) || n < 2 || perfectPower(n, k)) return null;
+    return { coefficients: 0, surd: k === 2 ? `2:${squareFree(n)}` : `3:${n}`, pi: null };
+  }
+  if (node.t === 'bin' && node.op === '*') {
+    const l = evaluatedTerm(node.l), r = evaluatedTerm(node.r);
+    if (!l || !r || l.zero || r.zero) return null;
+    // Standard form is a number times a power of ten: 3.2 × 10⁵, never 10⁵ × 10².
+    if (l.tenPower || (r.tenPower && (l.coefficients !== 1 || l.surd || l.pi || l.standard))) return null;
+    // Two numbers multiplied, two roots or two πs: there is a product still to take.
+    if (l.coefficients + r.coefficients > 1 || (l.surd && r.surd) || (l.pi && r.pi)) return null;
+    return { coefficients: l.coefficients + r.coefficients, surd: l.surd || r.surd, pi: l.pi || r.pi, standard: Boolean(r.tenPower || l.standard || r.standard) };
+  }
+  if (node.t === 'bin' && node.op === '/') {
+    const den = unsign(node.r);
+    const num = evaluatedTerm(node.l);
+    if (!num || num.tenPower || num.standard) return null;
+    // n/d with whole numbers is a fraction; a surd or a π over a whole number,
+    // a whole number over a surd (1/√2) — each is one term.
+    if (isWholeLiteral(den)) {
+      if (Number(den.s ?? den.v) === 0) return null;
+      const top = unsign(node.l);
+      // "2.5/5" divides a decimal: not a fraction of whole numbers.
+      if (num.coefficients && !num.surd && !num.pi && !isWholeLiteral(top)) return null;
+      return num.coefficients > 1 ? null : { ...num, coefficients: Math.max(1, num.coefficients) };
+    }
+    // A whole number over one surd or π term: 1/√2, 3/(2√2), 1/(2π). A root
+    // or π on both sides ("√6/√2", "π/π") is a quotient still to take.
+    const under = evaluatedTerm(node.r);
+    if (!under || under.tenPower || (!under.surd && !under.pi)) return null;
+    if (num.surd || num.pi || !isWholeLiteral(unsign(node.l))) return null;
+    return { coefficients: 1, surd: under.surd, pi: under.pi ? `1/${under.pi}` : null };
+  }
+  if (node.t === 'bin' && node.op === '^') {
+    // Standard form: 10ⁿ for a whole n, written as the literal 10, alone
+    // (10⁹, 10⁻³) or as the factor of a number (the product above checks
+    // that). Any other power — 2³, (10)¹, 10^(1/2) — is still to evaluate.
+    if (!(node.l?.t === 'num' && String(node.l.s ?? node.l.v) === '10')) return null;
+    if (!isWholeLiteral(unsign(node.r))) return null;
+    return { coefficients: 0, surd: null, pi: null, tenPower: true };
+  }
+  return null;
+}
+/** The like-term key of a term: what it must not share with another term of a sum. */
+const likeKey = t => `${t.surd || ''}|${t.pi || ''}`;
+/** Is this AST a value with nothing left to do (see D13 above)? */
+function evaluatedValue(ast) {
+  const node = unsign(ast);
+  if (!node) return false;
+  // A sum or difference of terms, none like another.
+  if (node.t === 'bin' && (node.op === '+' || node.op === '-')) {
+    const terms = [];
+    for (const stack = [node]; stack.length;) {
+      const n = stack.pop();
+      if (n?.t === 'bin' && (n.op === '+' || n.op === '-')) stack.push(n.r, n.l);
+      else terms.push(n);
+    }
+    const read = terms.map(evaluatedTerm);
+    // A term of nothing ("+ 0") is an addition still to do; so is 10ⁿ alone.
+    if (read.some(t => !t || t.tenPower || t.zero)) return false;
+    const keys = read.map(likeKey);
+    return new Set(keys).size === keys.length;
+  }
+  // A fraction whose numerator is such a sum: (1 + √5)/2.
+  if (node.t === 'bin' && node.op === '/' && unsign(node.l)?.t === 'bin' && ['+', '-'].includes(unsign(node.l).op)) {
+    return evaluatedValue(node.l) && isWholeLiteral(unsign(node.r)) && Number(unsign(node.r).s ?? unsign(node.r).v) !== 0;
+  }
+  // A whole number over such a sum: 1/(1 + √2).
+  if (node.t === 'bin' && node.op === '/' && unsign(node.r)?.t === 'bin' && ['+', '-'].includes(unsign(node.r).op)) {
+    return isWholeLiteral(unsign(node.l)) && evaluatedValue(node.r);
+  }
+  // A power of ten on its own (10⁹, 10⁻³) is a single value in standard form.
+  return Boolean(evaluatedTerm(node));
+}
+/**
+ * D13: the refusal for a numeric answer that still has an operation to do, or
+ * null. `cleaned` is the answer as parseNumericInput reads it (units, labels
+ * and a percentage sign the question asked for already taken off). Input the
+ * parser cannot read is not refused here — the reader's own message names it.
+ */
+export function unevaluatedRefusal(cleaned) {
+  // A percentage sign left on the answer is its unit (44.5% on a probability):
+  // what it is written on is the value judged.
+  const s = String(cleaned ?? '').trim().replace(/\s*%$/, '');
+  if (!s || D13_MIXED.test(s)) return null;
+  let ast;
+  try { ast = parse(s); } catch { return null; }
+  if (ast.t === 'equation') return null;
+  // Letters other than π and e are not a number at all; the reader says so.
+  // Read without recursion: the tree of a long sum is as deep as it is long.
+  let nodes = 0, letters = 0;
+  for (const stack = [ast]; stack.length;) {
+    const n = stack.pop();
+    if (!n || typeof n !== 'object') continue;
+    nodes++;
+    if (n.t === 'var' && n.v !== 'e') letters++;
+    for (const key of ['l', 'r', 'v', 'arg']) if (n[key] && typeof n[key] === 'object') stack.push(n[key]);
+    if (Array.isArray(n.args)) stack.push(...n.args);
+  }
+  if (letters) return null;
+  // The largest form D13 accepts — a few unlike terms over a whole number —
+  // is a couple of dozen nodes; anything far past that has work left in it.
+  if (nodes > D13_MAX_NODES) return D13_REFUSAL;
+  return evaluatedValue(ast) ? null : D13_REFUSAL;
+}
+
 /** Parse a numeric-ish student answer: "2 1/2", "3/4", "50%", "$1,200", "sqrt(2)+1". */
-export function parseNumericInput(raw) {
-  let s = cleanInput(raw);
+/** The text parseNumericInput reads a value from: cleaned, a one-element roster "{5}" opened. */
+export function numericSource(raw) {
+  const s = cleanInput(raw);
   // A single value written as a one-element roster: "{5}"
   const roster = bracedInner(s);
-  if (roster !== null && !roster.includes(',')) s = cleanInput(roster);
+  return roster !== null && !roster.includes(',') ? cleanInput(roster) : s;
+}
+
+export function parseNumericInput(raw) {
+  const s = numericSource(raw);
   if (!s) throw new Error('Empty answer');
   // Digits broken up by commas or spaces are one number only when they are
   // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567 ·
@@ -687,6 +879,13 @@ function checkAnswerWithinBudget(question, rawInput) {
             }
           }
         }
+        // A currency other than the rupee contradicts the question, money or
+        // not: "$500" is not ₹500, and "$12" is not 12 cm (D14).
+        if (typeof rawInput === 'string' && foreignCurrency(question, rawInput)) {
+          return { correct: false, feedback: moneyQuestion(question)
+            ? 'Check the unit — this question asks for an amount in rupees (₹).'
+            : 'Check the unit — this question does not ask for an amount of money.' };
+        }
         // A unit the student wrote that contradicts the question's unit is a
         // wrong answer, never stripped and ignored: 12 cm is not 12 m.
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
@@ -721,6 +920,10 @@ function checkAnswerWithinBudget(question, rawInput) {
             rawInput = withoutUnit(rawInput);          // the question's own unit, in any spelling ("24 centimetres")
           }
         }
+        // D13: a value with an operation still to do is refused whatever it
+        // equals — "2 + 3" is not 5 written down. Decided from the form alone.
+        const unevaluated = unevaluatedRefusal(numericSource(rawInput));
+        if (unevaluated) return { correct: false, invalid: true, feedback: unevaluated };
         const parsed = parseNumericInput(rawInput);
         const { meta } = parsed;
         let value = parsed.value;

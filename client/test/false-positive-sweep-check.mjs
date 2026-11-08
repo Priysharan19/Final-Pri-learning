@@ -445,7 +445,11 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
     expect(`list: "${input.replace(/\n/g, '⏎')}" is not -2`, !verdict(neg, input).correct);
   expect('list: -2 itself is accepted', verdict(neg, '-2').correct);
   expect('list: k = -2 is accepted', verdict(neg, 'k = -2').correct);
-  expect('list: 3 - 5 written as arithmetic is still read as -2', verdict(neg, '3 - 5').correct && verdict(neg, '3-5').correct);
+  // D13: arithmetic left undone is refused as unevaluated — never read as a list, never credited.
+  expect('list: 3 - 5 written as arithmetic is refused as unevaluated (D13), not read as a list', ['3 - 5', '3-5'].every(input => {
+    const r = verdict(neg, input);
+    return r.correct === false && r.invalid === true && /Work it out first/.test(r.feedback || '');
+  }));
   // Any separator between two things is a list, not only before a signed digit (re-review of #667).
   for (const input of ['0, —2', '0\t-2', '0\u2028-2', '0, -(2)', '0., -2']) expect(`list: "${JSON.stringify(input)}" is not -2`, !verdict(neg, input).correct);
   const root6 = { answerType: 'numeric', prompt: 'Find the product of the roots.', answer: { value: Math.sqrt(6) } };

@@ -1037,7 +1037,11 @@ export function numsClose(a, b, tol) {
   // A rounded decimal is right only when it is the target rounded to the
   // places it was written to: 141.43 is not 100√2 to two places (141.42),
   // though it sits inside the relative band (#518).
-  const band = Number.isInteger(b) ? numericBand(b) : Math.min(numericBand(b), 0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9));
+  // The places of an evaluated exact form (17496√2) cap at twelve, and half a
+  // unit of the twelfth place is below binary64 noise once |b| passes ~2000,
+  // so the band never falls under four units of b's last binary place.
+  const band = Number.isInteger(b) ? numericBand(b)
+    : Math.min(numericBand(b), Math.max(0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9), Math.abs(b) * 4 * Number.EPSILON));
   return Math.abs(a - b) <= band;
 }
 
