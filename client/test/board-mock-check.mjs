@@ -57,7 +57,7 @@ ok(/await assertExamAllowed\(profile\);\s*const created = await createIndiaExam\
 // ── 3. Where it is offered, and what is said ────────────────────────────────
 const exams = read('pages/Exams.jsx');
 ok(/boardMockOf\(\{ track, grade: user\.year, variant: 'standard' \}\)/.test(exams) && /start\(\{ mock: true \}\)/.test(exams), 'the Exams page offers a mock only where one is set');
-ok(/onRetry=\{\(\) => start\(\{ retry: true \}\)\}/.test(exams), 'a retry after signing in starts the same kind of paper');
+ok(/onRetry=\{start\}/.test(exams) && /options\?\.mock === undefined && refusal !== null && lastStart\.current/.test(exams), 'a retry after signing in starts the same kind of paper');
 for (const [lang, cat] of [['en', en], ['hi', hi]]) {
   for (const k of ['mock.intro', 'mock.start', 'mock.notOfficial', 'mock.typed', 'mock.resultNote']) ok(typeof cat[k] === 'string' && cat[k].length > 3, `${k} exists in ${lang}`);
 }

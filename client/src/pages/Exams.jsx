@@ -55,10 +55,13 @@ export default function Exams() {
 
   // `mock`: a board mock (D22, engine/boardMock.js) — a typed, timed CBSE
   // Class X Standard or Class XII paper, labelled "Pri mock in board format".
-  // A retry (after signing in, say) starts the same kind of paper again.
+  // The refusal's Retry (after signing in, say) starts the same kind of paper
+  // again: while a refusal is on screen, a start that does not name a kind
+  // repeats the last one. (For a CBSE Class X/XII student the only start
+  // button on the page is the mock's.)
   const lastStart = useRef(false);
   async function start(options) {
-    const mock = options?.mock === true || (options?.retry === true && lastStart.current);
+    const mock = options?.mock === true || (options?.mock === undefined && refusal !== null && lastStart.current);
     lastStart.current = mock;
     setBusy(true);
     setError('');
@@ -81,7 +84,7 @@ export default function Exams() {
     <div className="verdict verdict-technical" role="alert" data-exam-start-refused={refusal} style={{ marginTop: 14, gridColumn: '1 / -1' }}>
       <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('exams.notStartedLabel')}</span></span>
       <div>
-        <CheckRefusal kind={refusal} context="exam" user={user} refreshUser={refreshUser} onRetry={() => start({ retry: true })} busy={busy} />
+        <CheckRefusal kind={refusal} context="exam" user={user} refreshUser={refreshUser} onRetry={start} busy={busy} />
       </div>
     </div>
   ) : null;
