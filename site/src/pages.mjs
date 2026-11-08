@@ -120,7 +120,7 @@ export function supportPage({ lang, docs }) {
   <h2 id="contact">Contact</h2>
   <dl class="contact">
     <dt>Email</dt><dd><a href="mailto:${email}">${email}</a></dd>
-    <dt>Reply</dt><dd>Within 3 working days.</dd>
+    <dt>Reply</dt><dd>We acknowledge within 48 hours and answer within 30 days; where the law sets a shorter time, that applies.</dd>
     <dt>About a subscription</dt><dd>Write from the email address on the account, with the date of the charge.</dd>
   </dl>
   <h2 id="questions">Common questions</h2>
@@ -149,7 +149,7 @@ ${grievance.html}
   <h2 id="contact">संपर्क</h2>
   <dl class="contact">
     <dt>ईमेल</dt><dd><a href="mailto:${email}">${email}</a></dd>
-    <dt>उत्तर</dt><dd>3 कार्य-दिवसों के भीतर।</dd>
+    <dt>उत्तर</dt><dd>हम 48 घंटों के भीतर पावती देते हैं और 30 दिनों के भीतर उत्तर; जहाँ कानून इससे कम समय तय करता है, वहाँ वही लागू होता है।</dd>
     <dt>सदस्यता के बारे में</dt><dd>खाते वाले ईमेल पते से लिखिए और शुल्क की तारीख़ बताइए।</dd>
   </dl>
   <h2 id="questions">आम सवाल</h2>
@@ -206,7 +206,7 @@ export function deleteAccountPage({ lang, docs }) {
   <h2 id="in-the-app">In the app</h2>
   <ol class="steps">
     <li>Open <b>Settings → Account</b>.</li>
-    <li>Choose <b>Delete account</b> and confirm it with your password, with your Apple or Google sign-in, or with a code sent to the email address or mobile number on the account.</li>
+    <li>Choose <b>Delete account</b> and confirm it with your password, with your Apple or Google sign-in, or with a code sent to the email address on the account.</li>
   </ol>
   <h2 id="without-the-app">Without the app</h2>
   <p>Open the app's deletion page at <a href="${appDelete}">${appDelete.replace(/^https:\/\//, '')}</a>, enter the email address on the account, and enter the code sent to it. The page answers the same way whether or not an account exists at that address, so nobody can use it to find out who has one.</p>
@@ -226,7 +226,7 @@ ${quoted.html}
   <h2 id="in-the-app">ऐप में</h2>
   <ol class="steps">
     <li><b>सेटिंग्स → खाता</b> खोलिए।</li>
-    <li><b>खाता मिटाएँ</b> चुनिए और अपने पासवर्ड, Apple या Google साइन-इन, या खाते के ईमेल पते अथवा मोबाइल नंबर पर भेजे गए कोड से पुष्टि कीजिए।</li>
+    <li><b>खाता मिटाएँ</b> चुनिए और अपने पासवर्ड, Apple या Google साइन-इन, या खाते के ईमेल पते पर भेजे गए कोड से पुष्टि कीजिए।</li>
   </ol>
   <h2 id="without-the-app">ऐप के बिना</h2>
   <p>ऐप का खाता-मिटाने वाला पन्ना <a href="${appDelete}">${appDelete.replace(/^https:\/\//, '')}</a> खोलिए, खाते का ईमेल पता लिखिए, और उस पर भेजा गया कोड डालिए। उस पते पर खाता हो या न हो, पन्ना एक ही तरह उत्तर देता है, ताकि कोई उससे यह पता न लगा सके कि किसका खाता है।</p>
@@ -420,7 +420,7 @@ export function homePage({ docs }) {
       <p><b>Under 18? A parent or guardian confirms first.</b> They get a link or a code, and can withdraw at any time.</p>
       <p><b>Your handwriting is read by OpenAI while you are signed in. You can turn it off.</b> Pri keeps no copy. Handwriting goes as a picture drawn from your strokes and nothing else: not the question, not the expected answer, not your name. A photograph sends whatever is in the frame, so keep out of shot what you would not want sent.</p>
       <p><b>Delete your account whenever you like.</b> In the app, or <a href="${r['delete-account']}">without it</a>. Deletion is immediate.</p>
-      <p><b>Questions and grievances.</b> A named grievance officer, a reply within 3 working days, and the Data Protection Board of India if we do not resolve it. See <a href="${r.support}">Support</a>.</p>
+      <p><b>Questions and grievances.</b> A named grievance officer, an acknowledgement within 48 hours and an answer within 30 days, and the Data Protection Board of India if we do not resolve it. See <a href="${r.support}">Support</a>.</p>
     </div>
   </div>
 </section>`;

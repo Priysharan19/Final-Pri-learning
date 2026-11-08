@@ -114,7 +114,13 @@ export const REQUIRED = {
   'hi/delete-account/index.html': [`${APP_ORIGIN}/account/delete-request`]
 };
 
-export const ALLOWED_EXTERNAL_HOSTS = new Set([new URL(APP_ORIGIN).host]);
+// Each external host the site may link to, with the reason. A link is not a
+// request: the CSP still lets no page load anything from another origin.
+export const ALLOWED_EXTERNAL_LINKS = new Map([
+  [new URL(APP_ORIGIN).host, 'the app itself (D5), for the account-deletion form'],
+  ['reportaproblem.apple.com', 'where Apple takes App Store refund requests; docs/legal/refund-policy.md links to it in both languages']
+]);
+export const ALLOWED_EXTERNAL_HOSTS = new Set(ALLOWED_EXTERNAL_LINKS.keys());
 
 const TRACKING = /googletagmanager|google-analytics|gtag\(|analytics\.js|fbq\(|facebook\.net|hotjar|mixpanel|segment\.(io|com)|posthog|plausible\.io|clarity\.ms|amplitude|sentry\.io|doubleclick|matomo/i;
 
@@ -140,10 +146,26 @@ export const NOTICE_PREMISES = [
     why: 'says a guardian confirms first, which privacy.md no longer says' },
   { page: 'index.html', says: /Deletion is immediate/, notice: 'privacy', requires: /deletion is immediate/,
     why: 'says deletion is immediate, which privacy.md no longer says' },
-  { page: 'index.html', says: /3 working days/, notice: 'grievance', requires: /3 working days/,
+  { page: 'index.html', says: /48 hours/, notice: 'grievance', requires: /48 hours/,
+    why: 'quotes an acknowledgement period grievance.md no longer gives' },
+  { page: 'index.html', says: /30 days/, notice: 'grievance', requires: /30 days/,
     why: 'quotes a reply period grievance.md no longer gives' },
-  { page: 'support/index.html', says: /3 working days/, notice: 'grievance', requires: /3 working days/,
+  { page: 'support/index.html', says: /48 hours/, notice: 'grievance', requires: /48 hours/,
+    why: 'quotes an acknowledgement period grievance.md no longer gives' },
+  { page: 'support/index.html', says: /30 days/, notice: 'grievance', requires: /30 days/,
     why: 'quotes a reply period grievance.md no longer gives' },
+  { page: 'index.html', says: /working days/, notice: 'grievance', forbids: /48 hours[\s\S]*30 days/,
+    why: 'quotes a working-day period grievance.md does not give' },
+  { page: 'support/index.html', says: /working days/, notice: 'grievance', forbids: /48 hours[\s\S]*30 days/,
+    why: 'quotes a working-day period grievance.md does not give' },
+  // D3: SMS is off at launch. The site may offer a phone or SMS route only once
+  // privacy.md stops saying that no sign-in by SMS is offered.
+  { page: 'delete-account/index.html', says: /mobile number|\bSMS\b|text message|phone/i, notice: 'privacy', forbids: /We do not offer sign-in by SMS/,
+    why: 'offers a phone route, but privacy.md says no sign-in by SMS is offered (D3)' },
+  { page: 'hi/delete-account/index.html', says: /मोबाइल|एसएमएस|फ़ोन|फोन/, notice: 'privacy', forbids: /We do not offer sign-in by SMS/,
+    why: 'offers a phone route, but privacy.md says no sign-in by SMS is offered (D3)' },
+  { page: 'support/index.html', says: /mobile number|\bSMS\b|text message/i, notice: 'privacy', forbids: /We do not offer sign-in by SMS/,
+    why: 'offers an SMS route, but privacy.md says no sign-in by SMS is offered (D3)' },
   { page: 'index.html', says: /Data Protection Board of India/, notice: 'grievance', requires: /Data Protection Board of India/,
     why: 'names an escalation grievance.md no longer names' },
   { page: 'index.html', says: /no standing outside it/, notice: 'terms', requires: /no standing outside it/,
@@ -409,6 +431,37 @@ export function checkSite({ rendered, committed, vercel, docs = readNotices() })
   return { failures, checks };
 }
 
+// ── The store drafts point here (D5) ────────────────────────────────────────
+// The App Store and Play drafts give https://prilearning.com/privacy, /support,
+// /terms and /delete-account as the URLs the owner types into the consoles.
+// Each must be a page this site publishes, so a renamed route fails here
+// before a store reviewer meets a 404. (tools/store-readiness-check.mjs holds
+// the drafts to the D5 hosts; this holds the site to the drafts.)
+export const STORE_DOCS = Object.freeze([
+  'docs/release/store/app-store-listing.md',
+  'docs/release/store/play-listing.md',
+  'docs/release/app-store-privacy-labels.md',
+  'docs/release/play-data-safety.md'
+]);
+
+export function readStoreDocs() {
+  return Object.fromEntries(STORE_DOCS.map(doc => [doc, readFileSync(join(ROOT, doc), 'utf8')]));
+}
+
+export function storeLinkProblems(storeDocs, files) {
+  const problems = [];
+  let links = 0;
+  for (const [doc, text] of Object.entries(storeDocs)) {
+    for (const m of String(text).matchAll(new RegExp(`${SITE_ORIGIN.replace(/[.]/g, '\\.')}(\\/[^\\s\`|)>"'\\]*]*)?`, 'g'))) {
+      links += 1;
+      const route = (m[1] || '/').replace(/[.,;:]+$/, '').split('#')[0] || '/';
+      if (!resolveRoute(route, files)) problems.push(`${doc}: ${m[0]} is not a page this site publishes`);
+    }
+  }
+  if (links === 0) problems.push('the store drafts give no prilearning.com URL, so nothing ties them to this site');
+  return problems;
+}
+
 export function loadVercel() {
   try { return JSON.parse(readFileSync(join(ROOT, 'site/vercel.json'), 'utf8')); } catch { return null; }
 }
@@ -417,7 +470,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const rendered = renderSite();
   const committed = readOutput();
   const docs = readNotices();
-  const { failures, checks } = checkSite({ rendered, committed, vercel: loadVercel(), docs });
+  const result = checkSite({ rendered, committed, vercel: loadVercel(), docs });
+  const storeProblems = storeLinkProblems(readStoreDocs(), committed);
+  const failures = [...result.failures, ...storeProblems];
+  const checks = result.checks + 1;
   if (failures.length) {
     console.error(`SITE: FAIL — ${failures.length} of ${checks} checks`);
     for (const f of failures) console.error(`  ✗ ${f}`);

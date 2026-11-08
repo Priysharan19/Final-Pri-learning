@@ -5,7 +5,7 @@
 //   node tools/site-check.test.mjs && node tools/site-check.mjs
 import assert from 'node:assert/strict';
 import { readNotices, renderSite } from '../site/build.mjs';
-import { NOTICE_PREMISES, authoredText, checkSite, loadVercel } from './site-check.mjs';
+import { NOTICE_PREMISES, authoredText, checkSite, loadVercel, readStoreDocs, storeLinkProblems } from './site-check.mjs';
 
 const rendered = renderSite();
 const vercel = loadVercel();
@@ -149,9 +149,21 @@ expectFailure('guarantee stretched over photographs', run(mutate('index.html', s
   expectFailure('keeps-no-copy outlives the notice', failures, /index\.html: says Pri keeps no copy, which privacy\.md no longer says/);
 }
 {
-  const failures = run(clone(), vercel, withNotice('grievance', s => s.replaceAll('3 working days', '5 working days')));
+  const failures = run(clone(), vercel, withNotice('grievance', s => s.replaceAll('30 days', '45 days').replaceAll('48 hours', '72 hours')));
   expectFailure('reply period on the home page', failures, /index\.html: quotes a reply period grievance\.md no longer gives/);
   expectFailure('reply period on support', failures, /support\/index\.html: quotes a reply period grievance\.md no longer gives/);
+  expectFailure('acknowledgement period on the home page', failures, /index\.html: quotes an acknowledgement period grievance\.md no longer gives/);
+  expectFailure('acknowledgement period on support', failures, /support\/index\.html: quotes an acknowledgement period grievance\.md no longer gives/);
+}
+{
+  // The old "3 working days" may not come back while grievance.md gives none.
+  const failures = run(mutate('support/index.html', s => s.replace('We acknowledge within 48 hours', 'We reply within 3 working days')));
+  expectFailure('working days back on support', failures, /support\/index\.html: quotes a working-day period grievance\.md does not give/);
+}
+{
+  // D3: no phone route on the deletion page while privacy.md says no SMS sign-in.
+  expectFailure('mobile number back on the deletion page', run(mutate('delete-account/index.html', s => s.replace('a code sent to the email address on the account', 'a code sent to the email address or mobile number on the account'))), /delete-account\/index\.html: offers a phone route/);
+  expectFailure('mobile number back on the Hindi deletion page', run(mutate('hi/delete-account/index.html', s => s.replace('खाते के ईमेल पते पर भेजे गए कोड', 'खाते के ईमेल पते अथवा मोबाइल नंबर पर भेजे गए कोड'))), /hi\/delete-account\/index\.html: offers a phone route/);
 }
 expectFailure('escalation outlives the notice', run(clone(), vercel, withNotice('grievance', s => s.replaceAll('Data Protection Board of India', 'Data Protection Board'))), /index\.html: names an escalation grievance\.md no longer names/);
 expectFailure('standing sentence outlives the terms', run(clone(), vercel, withNotice('terms', s => s.replaceAll('no standing outside it', 'no effect outside it'))), /support\/index\.html: repeats a sentence terms\.md no longer has/);
@@ -220,5 +232,22 @@ expectFailure('CSP weakened', run(clone(), { ...vercel, headers: [{ source: '/(.
 expectFailure('redirect to nowhere', run(clone(), { ...vercel, redirects: [...vercel.redirects, { source: '/old', destination: '/nowhere', permanent: true }] }), /redirect \/old → \/nowhere does not resolve/);
 expectFailure('redirect shadowing a page', run(clone(), { ...vercel, redirects: [...vercel.redirects, { source: '/privacy', destination: '/', permanent: true }] }), /shadows a real page/);
 expectFailure('vercel.json missing', run(clone(), null), /vercel\.json parses/);
+
+// 9. The store drafts' prilearning.com URLs are pages this site publishes (D5).
+{
+  const storeDocs = readStoreDocs();
+  assert.deepEqual(storeLinkProblems(storeDocs, clone()), [], 'every prilearning.com URL in the store drafts is a page of the clean render');
+  checks++;
+  const withoutDelete = clone();
+  withoutDelete.delete('delete-account/index.html');
+  assert.ok(storeLinkProblems(storeDocs, withoutDelete).some(p => /https:\/\/prilearning\.com\/delete-account is not a page this site publishes/.test(p)), 'a store URL whose page is gone is caught');
+  checks++;
+  const renamed = { ...storeDocs, 'docs/release/store/app-store-listing.md': storeDocs['docs/release/store/app-store-listing.md'].replace('https://prilearning.com/support', 'https://prilearning.com/help') };
+  assert.ok(storeLinkProblems(renamed, clone()).some(p => /prilearning\.com\/help is not a page/.test(p)), 'a store URL naming a route the site does not have is caught');
+  checks++;
+  const none = Object.fromEntries(Object.keys(storeDocs).map(doc => [doc, '']));
+  assert.ok(storeLinkProblems(none, clone()).length > 0, 'drafts that name no site URL are caught');
+  checks++;
+}
 
 console.log(`SITE SELF-TEST: PASS — ${checks} checks; every planted regression was caught and the clean render passed.`);

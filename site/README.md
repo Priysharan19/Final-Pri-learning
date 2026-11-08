@@ -56,14 +56,23 @@ The contract fails when:
   basis in the notice (`NOTICE_PREMISES` in `tools/site-check.mjs`): "on for a
   signed-in account" needs `privacy.md` to say "on by default", "after you
   agree" is refused while it does, the stroke-image guarantee may not be
-  stretched over photographs, "keeps no copy", "3 working days", the Data
-  Protection Board and "no standing outside it" each need their sentence;
+  stretched over photographs, "keeps no copy", "48 hours" and "30 days", the
+  Data Protection Board and "no standing outside it" each need their sentence,
+  "working days" is refused while `grievance.md` gives 48 hours and 30 days,
+  and the deletion and support pages may not offer a phone or SMS route while
+  `privacy.md` says no sign-in by SMS is offered (D3);
+- a `https://prilearning.com/…` URL in the App Store or Play drafts
+  (`docs/release/store/*.md`, `app-store-privacy-labels.md`,
+  `play-data-safety.md`) is not a page this site publishes, so a renamed route
+  fails here before a store reviewer meets a 404;
 - the site's own copy uses a banned phrase, states final-answer-only marking
   before the D12 server switch exists on `main`, or gives a price other than
   `₹199` / `₹1,499` in any spelling (`₹`, `Rs`, `INR`, `rupees`);
 - a required sentence is missing, any internal link or fragment is broken, an
-  hreflang pair is not returned by the other page, anything loads from another
-  origin, or a page carries an inline `style` (the CSP would drop it);
+  hreflang pair is not returned by the other page, a link leaves for a host not
+  in `ALLOWED_EXTERNAL_LINKS` (the app, and Apple's refund page that the refund
+  policy names), anything loads from another origin, or a page carries an
+  inline `style` (the CSP would drop it);
 - `vercel.json` stops being a plain static deployment.
 
 `tools/site-check.test.mjs` plants each of those regressions in memory and proves
