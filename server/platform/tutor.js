@@ -36,6 +36,17 @@
 //      sent. Its cache key is scoped to the account: a free-text exchange is
 //      never read back by another account. The fixed-ladder levels keep the
 //      content-keyed shared cache, because their requests carry no free text.
+//  10. A diagnosis (level "diagnose") explains work the deterministic engine
+//      has ALREADY judged: what was right, the first place it went wrong and
+//      why, and the single next step. The engine's verdict is the input, never
+//      the output — nothing in the reply is a mark, and the mark does not move.
+//      One model call (one unit of the ceiling, one of the daily allowance); its
+//      mathematics must be copied from the verified solution, the question or
+//      the student's own lines (diagnosisGroundingIssues), and while the attempt
+//      is open the answer guard runs on every part as well. A reply that fails
+//      either check, or no model at all, gives the deterministic diagnosis built
+//      from the engine's first break and the solution's next step.
+//
 //   9. POST /stream answers an ask/nudge/socratic turn as server-sent events.
 //      Every refusal above still happens first, as JSON, before a byte of the
 //      stream; the model's text is released one guarded sentence at a time
@@ -71,9 +82,9 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
-import { buildGuard, captionWordingOk, createReleaseGate, leakedExpressions, solutionSpans } from './tutorGuard.js';
+import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
-  MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
+  MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
   TUTOR_TURN_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
 } from './tutorProvider.js';
 
@@ -114,6 +125,28 @@ export const GENERIC_HELP = Object.freeze({
     nudge: 'प्रश्न में दी गई जानकारी फिर से देखें, और तय करें कि पहले किस हिस्से पर काम करना है।',
     socratic: 'अगला कौन-सा क़दम है जिससे दोनों पक्ष संतुलित रहें, और क्यों?',
     walkthrough: 'जाँचे हुए हल को एक-एक क़दम करके देखें।'
+  })
+});
+
+/** The deterministic diagnosis's sentences. {n} is a line number (1-based), {line} the student's line. */
+export const DIAGNOSIS_TEXT = Object.freeze({
+  en: Object.freeze({
+    rightLines: 'Your working checks out up to {line}.',
+    rightNone: 'You set out to work towards the answer — the checker could not verify a line yet.',
+    wrongAt: 'Your working first goes wrong at line {n}: {line}. It does not follow from the line before it.',
+    wrongFinal: 'Each line the checker could judge holds, but your final answer does not match.',
+    wrongUnplaced: 'The checker could not point to one line, but the working does not reach the right answer.',
+    nextStep: 'Next: {step}.',
+    nextGeneric: 'Next: go back to the last line that checks out and redo the step after it.'
+  }),
+  hi: Object.freeze({
+    rightLines: 'आपका हल {line} तक सही है।',
+    rightNone: 'आपने उत्तर की ओर काम शुरू किया — जाँचकर्ता अभी कोई पंक्ति सत्यापित नहीं कर सका।',
+    wrongAt: 'आपके हल में पहली गलती पंक्ति {n} में है: {line}। यह पिछली पंक्ति से नहीं निकलती।',
+    wrongFinal: 'जाँची गई हर पंक्ति सही है, पर आपका अंतिम उत्तर मेल नहीं खाता।',
+    wrongUnplaced: 'जाँचकर्ता कोई एक पंक्ति नहीं बता सका, पर हल सही उत्तर तक नहीं पहुँचता।',
+    nextStep: 'अगला क़दम: {step}।',
+    nextGeneric: 'अगला क़दम: आख़िरी सही पंक्ति पर लौटें और उसके बाद का क़दम फिर से करें।'
   })
 });
 
@@ -171,12 +204,15 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
   const evidence = issued.resolved
     ? await issued.workEvidence(request.studentWork.lines)
     : { firstBreak: -1, verifiedLines: 0, misconception: null };
+  const diagnose = request.level === TUTOR_DIAGNOSE_LEVEL;
   return {
     ok: true,
     request: {
       ...request,
       questionVersion: issued.version.slice(0, 60),
       question: checked.question,
+      // A diagnosis's open/resolved state is the server's, never the device's.
+      ...(diagnose ? { resolved: !!issued.resolved } : {}),
       studentWork: {
         ...request.studentWork,
         // Which line is the first mistake is a verdict on the student's working.
@@ -184,11 +220,24 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
         // whether a guessed line is right, so it is withheld with the rest.
         firstBreak: issued.resolved ? evidence.firstBreak : -1,
         verifiedLines: issued.resolved ? evidence.verifiedLines : 0,
-        misconception: null
+        misconception: null,
+        // The per-line verdict for a diagnosis is re-derived from the server's
+        // own Step Check, and withheld like the rest until resolution. The final
+        // answer's status is not in the escrow, so the device's word is dropped.
+        ...(diagnose ? {
+          lineStatus: issued.resolved ? lineStatusFrom(request.studentWork.lines.length, evidence) : request.studentWork.lines.map(() => 'unknown'),
+          finalAnswer: 'unknown',
+          lostMarks: []
+        } : {})
       }
     }
   };
 }
+/** Per-line status from the Step Check's evidence: verified lines ok, the first break, the rest unjudged. */
+export function lineStatusFrom(count, { firstBreak = -1, verifiedLines = 0 } = {}) {
+  return Array.from({ length: count }, (_, i) => (i === firstBreak ? 'break' : i < verifiedLines && (firstBreak < 0 || i < firstBreak) ? 'ok' : 'unknown'));
+}
+
 const isText = (value, max, { required = false } = {}) =>
   (value === undefined && !required) || (typeof value === 'string' && value.length <= max && (!required || value.trim().length > 0));
 const closed = (object, allowed) => Object.keys(object).filter(key => !allowed.includes(key));
@@ -254,11 +303,14 @@ export function validateTutorRequest(body) {
   if (body.context === 'exam' || body.mode === 'exam' || body.examId !== undefined) {
     return invalid('Help is not available during an exam.', 'TUTOR_EXAM_LOCKED', 403);
   }
-  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history']);
+  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history', 'resolved']);
   if (unknown.length) return invalid(`Unexpected field: ${unknown.join(', ')}.`);
   if (body.context !== 'practice') return invalid('The tutor helps with practice questions only; send context "practice".', 'TUTOR_CONTEXT_REQUIRED');
   if (!TUTOR_REQUEST_LEVELS.includes(body.level)) return invalid(`level must be one of ${TUTOR_REQUEST_LEVELS.join(', ')}.`);
   const asking = body.level === TUTOR_TURN_LEVEL;
+  const diagnosing = body.level === TUTOR_DIAGNOSE_LEVEL;
+  if (!diagnosing && body.resolved !== undefined) return invalid('resolved is only sent with level "diagnose".');
+  if (diagnosing && body.resolved !== undefined && typeof body.resolved !== 'boolean') return invalid('resolved is true or false.');
   if (!asking && (body.message !== undefined || body.history !== undefined)) return invalid('message and history are only sent with level "ask".');
   const locale = body.locale === undefined ? 'en' : body.locale;
   if (!TUTOR_LOCALES.includes(locale)) return invalid(`locale must be one of ${TUTOR_LOCALES.join(', ')}.`);
@@ -282,8 +334,17 @@ export function validateTutorRequest(body) {
 
   const work = body.studentWork === undefined ? {} : body.studentWork;
   if (!plain(work)) return invalid('studentWork must be an object.');
-  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'verifiedLines', 'misconception']);
+  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'verifiedLines', 'misconception', ...(diagnosing ? ['lineStatus', 'finalAnswer', 'lostMarks'] : [])]);
   if (wUnknown.length) return invalid(`Unexpected studentWork field: ${wUnknown.join(', ')}.`);
+  if (diagnosing) {
+    if (work.lineStatus !== undefined && (!Array.isArray(work.lineStatus) || work.lineStatus.length > LIMITS.lines || !work.lineStatus.every(v => ['ok', 'break', 'unknown'].includes(v)))) {
+      return invalid('studentWork.lineStatus is the checker\'s per-line verdict: "ok", "break" or "unknown".');
+    }
+    if (work.finalAnswer !== undefined && !['correct', 'wrong', 'unknown'].includes(work.finalAnswer)) return invalid('studentWork.finalAnswer is "correct", "wrong" or "unknown".');
+    if (work.lostMarks !== undefined && (!Array.isArray(work.lostMarks) || work.lostMarks.length > 8 || !work.lostMarks.every(v => typeof v === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(v)))) {
+      return invalid('studentWork.lostMarks is a short list of stable reason ids, not free text.');
+    }
+  }
   if (work.lines !== undefined && (!Array.isArray(work.lines) || work.lines.length > LIMITS.lines || !work.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line))) {
     return invalid(`studentWork.lines must be at most ${LIMITS.lines} lines of at most ${LIMITS.line} characters.`);
   }
@@ -342,11 +403,21 @@ export function validateTutorRequest(body) {
   }
 
   const lines = (work.lines || []).map(l => l.trim()).filter(Boolean);
+  // A diagnosis explains judged work: with nothing written there is nothing to explain.
+  if (diagnosing && !lines.length && !(work.typedAnswer || '').trim()) return invalid('A diagnosis needs the working or the answer it explains.', 'TUTOR_NOTHING_TO_DIAGNOSE');
+  // The per-line verdict follows the trimmed lines; anything unstated is 'unknown'.
+  const lineStatus = diagnosing ? lines.map((_, i) => {
+    const firstBreak = Number.isInteger(work.firstBreak) ? work.firstBreak : -1;
+    const stated = Array.isArray(work.lineStatus) ? work.lineStatus[i] : undefined;
+    if (stated) return stated;
+    return lineStatusFrom(lines.length, { firstBreak, verifiedLines: Number.isInteger(work.verifiedLines) ? work.verifiedLines : 0 })[i];
+  }) : null;
   return {
     ok: true,
     request: {
       level: body.level,
       ...(asking ? { message, history } : {}),
+      ...(diagnosing ? { resolved: body.resolved === true } : {}),
       locale,
       questionId: issued ? body.serverQuestionId : body.questionId,
       questionVersion: body.questionVersion || '1',
@@ -358,7 +429,8 @@ export function validateTutorRequest(body) {
         typedAnswer: work.typedAnswer ? work.typedAnswer.trim() : '',
         firstBreak: Number.isInteger(work.firstBreak) ? work.firstBreak : -1,
         verifiedLines: Number.isInteger(work.verifiedLines) ? Math.min(work.verifiedLines, lines.length) : 0,
-        misconception: work.misconception || null
+        misconception: work.misconception || null,
+        ...(diagnosing ? { lineStatus, finalAnswer: work.finalAnswer || 'unknown', lostMarks: work.lostMarks || [] } : {})
       },
       captions
     }
@@ -380,7 +452,12 @@ export function tutorCacheKey(request, scope = null) {
     request.question.prompt, request.question.steps, request.question.answer, request.question.hints,
     request.studentWork.lines, request.studentWork.typedAnswer, request.studentWork.firstBreak,
     request.studentWork.verifiedLines, request.studentWork.misconception, request.captions,
-    ...(asking ? [scope, request.message, request.history] : [])
+    ...(asking ? [scope, request.message, request.history] : []),
+    // A diagnosis's key also covers the verdict it explains and whether the
+    // attempt is open — an open attempt's reply is guarded, a resolved one's is not.
+    ...(request.level === TUTOR_DIAGNOSE_LEVEL
+      ? [!!request.resolved, request.studentWork.lineStatus, request.studentWork.finalAnswer, request.studentWork.lostMarks]
+      : [])
   ]);
   return createHash('sha256').update(material).digest('hex');
 }
@@ -401,6 +478,85 @@ export function deterministicHelp(request) {
   if (hints.length) return hints[Math.min(TUTOR_LEVELS.indexOf(request.level), hints.length - 1)];
   return (GENERIC_HELP[request.locale] || GENERIC_HELP.en)[request.level];
 }
+
+/** The index of the solution step the student should take next: the one after the last verified step result they reached. */
+export function nextStepIndex(request) {
+  const steps = request.question.steps;
+  const lines = request.studentWork.lines;
+  const firstBreak = request.studentWork.firstBreak;
+  const good = lines.slice(0, Math.max(0, firstBreak >= 0 ? Math.min(firstBreak, request.studentWork.verifiedLines) : request.studentWork.verifiedLines)).map(normalizeMath);
+  // The first step whose result the student has not reached in a verified
+  // line: a skipped step (cos A and cos B never found) comes before a later
+  // step they did write (the identity).
+  const reached = steps.map(step => {
+    const spans = mathSpans(step.d);
+    const result = spans.length ? normalizeMath(spans[spans.length - 1]) : '';
+    return !!result && good.includes(result);
+  });
+  const first = reached.indexOf(false);
+  return first < 0 ? steps.length - 1 : first;
+}
+
+/**
+ * The diagnosis with no model: the engine's first break, the lines it verified,
+ * and the verified solution's next step. While the attempt is open the next
+ * step is its heading only, and only if the answer guard passes it; once the
+ * question is resolved it is the whole verified step.
+ */
+export function deterministicDiagnosis(request) {
+  const copy = DIAGNOSIS_TEXT[request.locale] || DIAGNOSIS_TEXT.en;
+  const lines = request.studentWork.lines;
+  const firstBreak = request.studentWork.firstBreak;
+  const status = request.studentWork.lineStatus || lineStatusFrom(lines.length, request.studentWork);
+  let lastOk = -1;
+  for (let i = 0; i < lines.length && status[i] === 'ok'; i += 1) lastOk = i;
+  const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
+  const asMath = line => `$${String(line).replace(/\$/g, '')}$`;
+  const didRight = lastOk >= 0 ? fill(copy.rightLines, { line: asMath(lines[lastOk]) }) : copy.rightNone;
+  const wentWrong = firstBreak >= 0 && firstBreak < lines.length
+    ? fill(copy.wrongAt, { n: firstBreak + 1, line: asMath(lines[firstBreak]) })
+    : request.studentWork.finalAnswer === 'wrong' && lines.length && status.every(v => v === 'ok') ? copy.wrongFinal : copy.wrongUnplaced;
+  const index = nextStepIndex(request);
+  const step = request.question.steps[index] || {};
+  let nextStep = copy.nextGeneric;
+  let referencesStepIndex = -1;
+  if (request.resolved) {
+    const text = [step.h, step.d].filter(Boolean).join(' — ');
+    if (text) { nextStep = fill(copy.nextStep, { step: text }); referencesStepIndex = index; }
+  } else if (step.h) {
+    const guard = buildGuard(request.question, { studentLines: lines, verifiedLines: request.studentWork.verifiedLines });
+    const candidate = fill(copy.nextStep, { step: step.h });
+    if (!leakedExpressions(candidate, guard, { prompt: request.question.prompt }).length) { nextStep = candidate; referencesStepIndex = index; }
+  }
+  return {
+    didRight, wentWrong, nextStep,
+    creditedLines: status.map((v, i) => (v === 'ok' ? i : -1)).filter(i => i >= 0),
+    wentWrongLine: firstBreak >= 0 && firstBreak < lines.length ? firstBreak : -1,
+    referencesStepIndex
+  };
+}
+
+/** Why a model diagnosis may not be shown: grounding always, the answer guard while the attempt is open. */
+export function diagnosisIssues(reply, request) {
+  const parts = [reply.didRight, reply.wentWrong, reply.nextStep];
+  const issues = parts.flatMap(part => diagnosisGroundingIssues(part, { question: request.question, studentLines: request.studentWork.lines }));
+  if (!request.resolved) {
+    if (reply.revealsAnswer) issues.push('declared');
+    const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
+    // Quoting the student's own line back to them reveals nothing they did not
+    // write, even when it matches an intermediate step of the solution: a
+    // `step:` or `verbatim:` hit on their own line is excused. The answer and the
+    // next step's result (`value:`, `range:`, `expression:`) never are.
+    const own = request.studentWork.lines.map(normalizeMath);
+    const ownProse = request.studentWork.lines.map(proseKey);
+    const excused = leak => (leak.startsWith('step:') && own.includes(leak.slice(5)))
+      || (leak.startsWith('verbatim:') && ownProse.some(line => line.includes(leak.slice(9))));
+    for (const part of parts) issues.push(...leakedExpressions(part, guard, { prompt: request.question.prompt }).filter(leak => !excused(leak)));
+  }
+  return issues;
+}
+
+const diagnosisMessage = d => [d.didRight, d.wentWrong, d.nextStep].filter(Boolean).join(' ');
 
 const positiveInt = value => { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : null; };
 
@@ -444,7 +600,7 @@ export function createTutorRouter(db, {
 
   router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
-    res.json({ available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true });
+    res.json({ available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true, diagnosis: true });
   });
 
   async function cached(key, at) {
@@ -501,6 +657,46 @@ export function createTutorRouter(db, {
     };
   }
 
+  /**
+   * One model call, checked; the deterministic diagnosis otherwise. A provider
+   * failure is not an error here: the engine's own diagnosis is still useful,
+   * so it is returned (not cached) with the code that explains it.
+   */
+  async function diagnose(request) {
+    const fallback = (reason, model = null) => {
+      const diagnosis = deterministicDiagnosis(request);
+      return {
+        tutor: {
+          level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+          source: 'fallback', guarded: reason === 'TUTOR_ANSWER_GUARD' || reason === 'TUTOR_GROUNDING_GUARD', reason, model, resolved: !!request.resolved
+        },
+        cache: reason === 'TUTOR_ANSWER_GUARD' || reason === 'TUTOR_GROUNDING_GUARD'
+      };
+    };
+    const overBudget = await consumePaidCall(db, { env });
+    if (overBudget) return { ...fallback('PAID_CAPACITY_REACHED'), cache: false };
+    let reply;
+    try { reply = await ask(request, { env }); } catch (error) {
+      return { ...fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED'), cache: false };
+    }
+    const issues = diagnosisIssues(reply, request);
+    if (issues.length) {
+      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
+      return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
+    }
+    const diagnosis = {
+      didRight: reply.didRight, wentWrong: reply.wentWrong, nextStep: reply.nextStep,
+      creditedLines: reply.creditedLines, wentWrongLine: reply.wentWrongLine, referencesStepIndex: reply.referencesStepIndex
+    };
+    return {
+      tutor: {
+        level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: reply.referencesStepIndex,
+        source: 'model', guarded: false, model: reply.model || null, effort: reply.effort || null, resolved: !!request.resolved
+      },
+      cache: true
+    };
+  }
+
   async function walkthrough(request) {
     const overBudget = await consumePaidCall(db, { env });
     if (overBudget) return { refusal: overBudget };
@@ -544,7 +740,19 @@ export function createTutorRouter(db, {
       const hit = await cached(key, at);
       if (hit) return res.json({ tutor: { ...hit, cached: true } });
 
+      const diagnosing = request.level === TUTOR_DIAGNOSE_LEVEL;
+      // A diagnosis still helps with no model: the engine's own diagnosis is
+      // served (never cached) when the tutor is unconfigured or the allowance is spent.
+      const deterministicOnly = reason => {
+        const diagnosis = deterministicDiagnosis(request);
+        return res.json({ tutor: {
+          level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+          source: 'fallback', guarded: false, reason, model: null, resolved: !!request.resolved, cached: false
+        } });
+      };
+
       if (!providerConfig(env).configured) {
+        if (diagnosing) return deterministicOnly('TUTOR_NOT_CONFIGURED');
         return res.status(503).json({ error: { code: 'TUTOR_NOT_CONFIGURED', message: 'The AI tutor is not available on this deployment.' } });
       }
 
@@ -554,7 +762,14 @@ export function createTutorRouter(db, {
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) {
         res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
+        if (diagnosing) return deterministicOnly('TUTOR_DAILY_LIMIT');
         return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help. The question's own hints still work.", retryable: true } });
+      }
+
+      if (diagnosing) {
+        const outcome = await diagnose(request);
+        if (outcome.cache) await remember(key, outcome.tutor, at);
+        return res.json({ tutor: { ...outcome.tutor, cached: false } });
       }
 
       try {
