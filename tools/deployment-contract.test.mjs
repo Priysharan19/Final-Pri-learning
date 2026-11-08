@@ -7,6 +7,8 @@
 //    nominated SHA on both server and web, at this checkout's schema versions,
 //    and fails on each single drift.
 import assert from 'node:assert/strict';
+// The staging journey proof (2b below): staging only, one release, no secrets in its evidence.
+import { parseArgs as journeyArgs, redact as journeyRedact, report as journeyReport } from './staging-journey-proof.mjs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
@@ -65,6 +67,27 @@ ok(!/^  PRI_PLATFORM_DB$/m.test(preflight({ PRI_DATABASE_URL: 'postgresql://role
   'preflight does not ask for PRI_PLATFORM_DB once PRI_DATABASE_URL selects Postgres');
 const envExample = readFileSync(join(ROOT, '.env.production.example'), 'utf8');
 ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(envExample), '.env.production.example documents the Postgres variables');
+
+// ── 2b · staging-journey-proof: staging only, one release, no secrets ──────
+{
+  const SHA40 = 'b'.repeat(40);
+  const STAGING = 'https://pri-learning-staging-staging.up.railway.app';
+  ok(journeyArgs(['--sha', SHA40]).origin === STAGING, 'the journey proof defaults to the staging origin');
+  assert.throws(() => journeyArgs(['--sha', SHA40, '--origin', 'https://prilearning.com']), /refused/); count += 1;
+  assert.throws(() => journeyArgs(['--sha', SHA40, '--origin', 'https://final-pri-learning-production.up.railway.app']), /refused/); count += 1;
+  assert.throws(() => journeyArgs([]), /--sha/); count += 1;
+  ok(journeyArgs(['--sha', SHA40, '--accounts']).accounts === true && journeyArgs(['--sha', SHA40]).accounts === false, 'accounts are made only with an explicit --accounts');
+  const red = journeyRedact({ email: 'delivered+x@resend.dev', password: 'Pri-secret-staging', challengeId: 'abc', token: 't', nested: { sessionToken: 's', blockerCode: null, error: { code: 'EMAIL_UNVERIFIED' } }, blockerCode: 'GUARDIAN_CONSENT_PENDING', eligible: false });
+  const flat = JSON.stringify(red);
+  ok(!/Pri-secret|"abc"|"t"|"s"/.test(flat) && red.password === '[redacted]' && red.challengeId === '[redacted]', 'evidence redacts passwords, challenge ids and tokens');
+  ok(red.nested.error.code === 'EMAIL_UNVERIFIED' && red.blockerCode === 'GUARDIAN_CONSENT_PENDING' && red.nested.blockerCode === null && red.eligible === false,
+    'evidence keeps machine error codes, nulls and booleans');
+  const md = journeyReport({ sha: SHA40, origin: STAGING, startedAt: 'a', finishedAt: 'b', accounts: true, deployed: {}, created: [{ role: 'adult', email: 'x@resend.dev' }], deleted: [], notDeleted: [{ role: 'adult', email: 'x@resend.dev', why: 'test' }],
+    steps: [{ id: '2', name: 'n', status: 'FAIL', checks: [{ label: 'l', ok: false, detail: '' }], notes: [], evidence: [], shots: [], defects: [{ what: 'w', where: 'x', repro: 'r', lane: 'L2' }], blocked: [] }] });
+  ok(/\| 2 · n \| \*\*FAIL\*\*/.test(md) && /\*\*Defect\*\* \(L2\)/.test(md) && /\*\*Not deleted: adult x@resend\.dev — test\.\*\*/.test(md),
+    'the report lists each step\'s status, its defects with the owning lane, and every account it could not delete');
+}
+
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
 const SHA = 'a'.repeat(40);
