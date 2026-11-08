@@ -193,7 +193,7 @@ export default function IndexPage() {
         {recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT) && (
           <div className="in-resume" data-instrument-resume data-home-primary data-kind="last-chapter">
             <div>
-              <b>{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
+              <b id="home-next-title">{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
             </div>
             <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
