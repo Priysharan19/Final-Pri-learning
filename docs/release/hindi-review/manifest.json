@@ -1,0 +1,22 @@
+{
+  "generator": "tools/hindi-review-packet.mjs",
+  "status": "No native-speaker review on record",
+  "catalogue": {
+    "strings": 2872,
+    "hiSha256": "e884566b56dd7f90d09970bd7e76670f889f73ad5966ab64eac527f733a5ab9d",
+    "enSha256": "582135b43729d0f91546cf1e37d7ad523bccb0b7a92f41dd24cb4dd5f6c1e3e5"
+  },
+  "sources": {
+    "client/src/components/photoSubmissionGuard.js": "8b937b3d8937d75b",
+    "client/src/components/authoritativeGrade.js": "32d983eddcbb5578",
+    "client/src/components/signedOutInkRecovery.js": "9318fbbca8d861b5",
+    "client/src/explain/speech.js": "70b376be93ee0bf4",
+    "client/src/engine/prerequisiteSkillsHi.js": "a6c90014cb837dbb",
+    "client/src/i18n/languages.js": "4a27e1358a74b9a1",
+    "client/src/i18n/ncertTerms.js": "96d498bb26a5ad29",
+    "docs/legal/privacy.hi.md": "68aededa7310366a",
+    "docs/legal/terms.hi.md": "59c6094eff63e662",
+    "docs/legal/refund-policy.hi.md": "592d052b625be803",
+    "docs/legal/grievance.hi.md": "c4650e4d3b230aa4"
+  }
+}
