@@ -332,7 +332,7 @@ html.ui-instrument .content:has(> [data-instrument-index]), html.ui-instrument .
 /* The resolver's next action wears the resume card: one primary action. */
 .in-nextact .in-nextact-k { display: block; margin-bottom: 3px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
 .in-nextact b { font-size: 14.5px; }
-.in-nextact > div > small:last-child { font-family: var(--in-ui); font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
+.in-nextact > div > small:last-child { display: block; margin-top: 2px; font-family: var(--in-ui); font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .in-cloud-note { margin: -6px 0 14px; }
 .in-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 34px; padding: 0 14px;
