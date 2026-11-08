@@ -43,7 +43,11 @@ export function parseLatest(body) {
   const at = Number(m.receivedAt ?? m.capturedAt ?? m.at ?? 0) || (m.receivedAt ? Date.parse(m.receivedAt) : 0);
   const fromSubject = m.subject ? codeFromSubject(String(m.subject)) : null;
   if (fromSubject) return { ...fromSubject, at };
-  if (/^\d{6}$/.test(String(m.code || '')) && m.purpose) return { code: String(m.code), purpose: String(m.purpose), at };
+  // L2's reply also names the code and its purpose (#764); used when the subject does not parse.
+  if (/^\d{6}$/.test(String(m.code || '')) && m.purpose) {
+    const p = String(m.purpose).toLowerCase();
+    return { code: String(m.code), purpose: p.includes('guardian') ? 'guardian' : p.includes('delete') ? 'delete' : 'sign-in', at };
+  }
   const first = /^(\d{6})\b/.exec(String(m.text || '').trim());
   return first ? { code: first[1], purpose: null, at } : null;
 }

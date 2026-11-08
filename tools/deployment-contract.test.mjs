@@ -285,6 +285,10 @@ ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(en
     'the reader polls /v1/test-mailbox/latest for that exact address, waits through 404, and skips a code older than the request');
   const wrong = await testMailbox('https://s.example', { fetchImpl: async () => ({ status: 200, json: async () => ({ subject: '482913 is your Pri Learning code', receivedAt: now }) }), pollMs: 1 }).waitForCode('a@e2e.prilearning.test', 'delete', now - 1000, 30);
   ok(wrong.code === null, 'a code for another purpose is never returned: the wait times out with null');
+  ok(parseLatest({ to: 'x', subject: '104857 is the code to approve your child\u2019s Pri Learning account', text: '104857', receivedAt: now, code: '104857', purpose: 'guardian' })?.purpose === 'guardian'
+    && parseLatest({ subject: 'unparsed', code: '204857', purpose: 'guardian-consent' })?.purpose === 'guardian'
+    && parseLatest({ subject: 'unparsed', code: '304857', purpose: 'account-delete' })?.purpose === 'delete',
+    "L2's guardian subject (typographic apostrophe) reads as 'guardian'; the reply's own code and purpose are used when the subject does not parse");
   ok(/real inbox not exercised/.test(TEST_MAILBOX_LABEL), 'steps that used the test mailbox say delivery to a real inbox was not exercised');
 }
 
