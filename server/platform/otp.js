@@ -98,9 +98,11 @@ export function createOtpRouter(db, {
     const challenge = await createChallenge(db, { channel, purpose, destination, accountId, providerName, providerGeneratesCode: delegated, now });
     try {
       if (keptForTest) {
+        // The email this address would have been sent, word for word.
+        const mail = otpEmailMessage(challenge.code, purpose, env.PRI_PUBLIC_ORIGIN, { intent });
         await depositTestMail(db, {
-          to: destination, kind: 'code', purpose, code: challenge.code,
-          subject: otpEmailMessage(challenge.code, purpose, undefined, { intent }).subject, now
+          to: destination, kind: 'code', code: challenge.code, subject: mail.subject, text: mail.text, now,
+          purpose: intent === 'account-delete' ? 'delete' : purpose === 'guardian-consent' ? 'guardian' : 'sign-in'
         });
       } else if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
       else if (delegated) await sms.start({ to: destination, purpose });

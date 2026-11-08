@@ -375,7 +375,7 @@ jobs:
           # The staging test mailbox: on only on staging and in the harness, only for
           # @e2e.prilearning.test; every other address is sent; off, the route is a 404.
           node server/test/test-mailbox-check.mjs | tee test-mailbox.log
-          grep -Fq 'TEST MAILBOX: PASS — 82/82 checks' test-mailbox.log
+          grep -Fq 'TEST MAILBOX: PASS — 94/94 checks' test-mailbox.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs

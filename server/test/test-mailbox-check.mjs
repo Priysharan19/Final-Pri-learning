@@ -109,6 +109,11 @@ try {
   // ── 2 · on, in this harness ────────────────────────────────────────────────
   let r = await h.request('/v1/ready');
   c.eq(r.data?.testMailbox, 'on', '/v1/ready says the mailbox is on in the harness');
+  c.deq(r.data?.checks?.testMailbox, { state: 'on', code: null }, 'and mirrors it as checks.testMailbox.state');
+  const unknownPath = await h.request('/v1/no-such-endpoint-anywhere');
+  r = await latest(reserved('nobody.yet'));
+  c.ok(r.status === 404 && JSON.stringify(r.data) === JSON.stringify(unknownPath.data),
+    'on, a reserved address with nothing kept answers exactly like a path that does not exist');
 
   // A reserved address: the code is kept, never sent, and verifies the account.
   const student = reserved('student.one');
@@ -117,9 +122,12 @@ try {
   c.eq(resendTo(student).length, 0, 'and nothing for it reaches the Resend transport');
   r = await latest(student);
   c.eq(r.status, 200, 'the mailbox has its message');
-  const kept = r.data?.message;
+  const kept = r.data;
   c.ok(kept?.kind === 'code' && /^\d{6}$/.test(kept.code) && kept.purpose === 'sign-in' && kept.synthetic === true && kept.to === student,
-    'the newest message is the sign-in code, marked synthetic', JSON.stringify(kept));
+    'the newest message is the sign-in code, top level, marked synthetic');
+  c.eq(kept.subject, `${kept.code} is your Pri Learning code`, 'with the real subject line');
+  c.ok(kept.text.startsWith(`${kept.code}\n\n`) && /valid for 10 minutes/.test(kept.text), 'the real plain-text body');
+  c.ok(Number.isInteger(kept.receivedAt) && Math.abs(kept.receivedAt - Date.now()) < 60_000, 'and when it was received, in epoch ms');
   c.eq(r.headers.get('cache-control'), 'no-store', 'and is never cached');
   c.ok(r.headers.get('ratelimit-remaining') != null, 'the reading is rate-limited');
   const challenge = await h.db.get('SELECT code_hash FROM otp_challenges ORDER BY created_at DESC LIMIT 1');
@@ -169,7 +177,7 @@ try {
   c.ok(drained.sent >= 2, `the delivery worker handles both (${JSON.stringify(drained)})`);
   c.deq(sent.map(m => m.to).sort(), ['normal.student@mailbox-check.example'], 'only the normal address reaches the email transport');
   r = await latest(linkStudent, '&kind=link');
-  const link = r.data?.message;
+  const link = r.data;
   c.ok(r.status === 200 && link?.purpose === 'verify-email' && /\/account-action#action=verify-email&token=/.test(link.link || ''),
     'the reserved address\'s verification link is in the mailbox', JSON.stringify(link));
   const delivered = await h.db.get(`SELECT o.provider_message_id, o.delivered_at, o.token_ciphertext FROM auth_delivery_outbox o
@@ -190,12 +198,39 @@ try {
   r = await post('/v1/account/login', { email: linkStudent, password: PASSWORD, deviceId: 'second-device' });
   c.eq(r.status, 200, 'the reserved account signs in on a second device');
   await flushSessionAlerts();
-  r = await latest(linkStudent, '&kind=notice');
-  c.ok(r.status === 200 && r.data?.message?.purpose === 'new-device', 'the new-device notice is kept in the mailbox');
+  r = await latest(linkStudent);
+  c.ok(r.status === 200 && r.data?.kind === 'notice' && r.data?.purpose === 'new-device' && r.data?.code === null,
+    'the newest message is now the new-device notice, kept in the mailbox');
+  c.ok(r.data?.subject === 'New sign-in to your Pri Learning account' && /signed in to from a device/.test(r.data?.text || ''), 'with its real subject and body');
+  r = await latest(linkStudent, '&kind=link');
+  c.eq(r.data?.purpose, 'verify-email', 'the earlier link can still be asked for by kind');
   c.eq(resend.length, resendBefore, 'and nothing reaches Resend for it');
 
+  // ── 4b · the other two code purposes: deletion and a parent's approval ────
+  await freshLimits();
+  r = await post('/v1/account/otp/delete-request', { email: student });
+  c.eq(r.status, 202, 'the public deletion page asks for a code for the reserved account');
+  r = await latest(student);
+  c.ok(r.data?.purpose === 'delete' && r.data?.subject === `${r.data?.code} is the code to delete your Pri Learning account` && /DELETE/.test(r.data?.text || ''),
+    'the deletion code is kept with purpose "delete" and its real subject');
+  await freshLimits();
+  const child = reserved('child.one');
+  r = await post('/v1/account/otp/request', { channel: 'email', destination: child });
+  const childCode = (await latest(child)).data.code;
+  const childChallenge = (await h.db.get('SELECT id FROM otp_challenges ORDER BY created_at DESC LIMIT 1')).id;
+  r = await post('/v1/account/otp/verify', { channel: 'email', destination: child, challengeId: childChallenge, code: childCode });
+  const childJar = {};
+  r = await post('/v1/account/otp/verify', { channel: 'email', destination: child, signupTicket: r.data.signupTicket, profile: { name: 'Synthetic Child', year: '9', isAdult: false } }, childJar);
+  c.eq(r.status, 201, 'a synthetic child account is made');
+  await freshLimits();
+  const parent = reserved('parent.one');
+  r = await post('/v1/account/otp/guardian/request', { guardianName: 'Synthetic Parent', channel: 'email', destination: parent }, childJar);
+  c.eq(r.status, 202, 'the child asks a reserved parent address');
+  r = await latest(parent);
+  c.ok(r.data?.purpose === 'guardian' && r.data?.subject === `${r.data?.code} is the code to approve your child’s Pri Learning account`,
+    'the parent\'s code is kept with purpose "guardian" and its real subject');
+
   // ── 5 · off: the route is /v1's ordinary 404, and mail is sent ─────────────
-  const unknownPath = await h.request('/v1/no-such-endpoint-anywhere');
   for (const [label, vars] of [
     ['in Railway production', { RAILWAY_ENVIRONMENT_NAME: 'production' }],
     ['for a production origin', { RAILWAY_ENVIRONMENT_NAME: 'staging', PRI_PUBLIC_ORIGIN: 'https://app.prilearning.com' }],

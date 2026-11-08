@@ -336,6 +336,8 @@ function retryDelay(attempt) {
   return Math.min(15 * 60_000, 60_000 * (2 ** Math.max(0, Math.min(4, attempt - 1))));
 }
 
+const pick = message => ({ subject: message.subject, text: message.text });
+
 export async function drainAuthDeliveryOutbox(db, {
   send,
   publicOrigin = process.env.PRI_PUBLIC_ORIGIN,
@@ -395,7 +397,7 @@ export async function drainAuthDeliveryOutbox(db, {
       // link in the test mailbox instead of an email — the same single-use,
       // one-hour bearer, recorded as delivered like any other.
       const result = testMailboxAccepts(env, row.destination)
-        ? (await depositTestMail(db, { to: row.destination, kind: 'link', purpose: row.kind, link: actionUrl, subject: authEmailMessage(row.kind, actionUrl).subject, now }),
+        ? (await depositTestMail(db, { to: row.destination, kind: 'link', purpose: row.kind, link: actionUrl, ...pick(authEmailMessage(row.kind, actionUrl)), now }),
           { providerMessageId: 'test-mailbox' })
         : await send({
           outboxId: row.id,

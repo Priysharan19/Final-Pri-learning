@@ -221,7 +221,8 @@ export async function readinessReport(db, {
     billing: billingCheck(),
     handwriting,
     working: { state: workingConfig(env).configured ? 'ok' : 'not_configured', code: null },
-    staffMfa
+    staffMfa,
+    testMailbox: { state: testMailboxEnabled(env) ? 'on' : 'off', code: null }
   };
   const failing = [];
   if (database.state !== 'ok') failing.push(database.code);
@@ -242,7 +243,7 @@ export async function readinessReport(db, {
     service: 'pri-learning-platform',
     releaseSha,
     database: { engine: db.dialect },
-    testMailbox: testMailboxEnabled(env) ? 'on' : 'off',
+    testMailbox: checks.testMailbox.state,
     checks,
     failing,
     degraded,

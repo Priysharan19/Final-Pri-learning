@@ -21,10 +21,18 @@
 // of the address, never the address; the address is synthetic either way.
 //
 // RETRIEVAL. GET /v1/test-mailbox/latest?to=<address>[&kind=code|link|notice]
-// answers only while the mailbox is on and only for a reserved address. In
-// every other case the request falls through to /v1's ordinary 404, before any
-// rate limit or database read, so the route cannot be told apart from one that
-// does not exist — in production it does not answer at all.
+// answers 200 with the NEWEST message kept for exactly that address:
+//   { to, subject, text, receivedAt, code, purpose, kind, link, expiresAt, synthetic }
+// `subject` and `text` are the real subject line and plain-text body the
+// address would have been sent. For a code, `purpose` is 'sign-in' (sign-in
+// and re-authentication codes: the same email), 'delete' (the public deletion
+// page's code) or 'guardian' (a parent's approval code), and `link` is null;
+// for a link or a notice, `code` is null and `purpose` names it
+// ('verify-email', 'reset-password', 'guardian-consent', 'guardian-withdraw',
+// 'new-device'). In every other case — the mailbox off, an address that is not
+// a reserved one, or nothing kept for it — the request falls through to /v1's
+// ordinary 404, so all three bodies are identical; when off or not reserved it
+// leaves before any rate limit or read. In production it never answers.
 // ─────────────────────────────────────────────────────────────────────────────
 import { asStore } from './store.js';
 import { asyncRouter } from './asyncRouter.js';
@@ -48,7 +56,7 @@ const parse = value => { try { return JSON.parse(value); } catch { return null; 
  * Keep one message for a reserved address. Refuses any other address, so a bug
  * upstream can never put a real person's code or link in a readable mailbox.
  */
-export async function depositTestMail(db, { to, kind, purpose = null, code = null, link = null, subject = null, now = Date.now() }) {
+export async function depositTestMail(db, { to, kind, purpose = null, code = null, link = null, subject = null, text = null, now = Date.now() }) {
   db = asStore(db);
   const address = normalise(to);
   if (!isTestMailboxAddress(address)) {
@@ -61,7 +69,8 @@ export async function depositTestMail(db, { to, kind, purpose = null, code = nul
     code: code == null ? null : String(code).slice(0, 16),
     link: link == null ? null : String(link).slice(0, 2048),
     subject: subject == null ? null : String(subject).slice(0, 200),
-    createdAt: now, expiresAt: now + TEST_MAIL_TTL_MS, synthetic: true
+    text: text == null ? null : String(text).slice(0, 4000),
+    receivedAt: now, expiresAt: now + TEST_MAIL_TTL_MS, synthetic: true
   };
   await db.run(`INSERT INTO platform_meta(key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [keyFor(address, kind), JSON.stringify(entry)]);
@@ -75,7 +84,7 @@ export async function pruneTestMailbox(db, now = Date.now(), { cap = TEST_MAILBO
   const rows = await db.all('SELECT key, value FROM platform_meta WHERE key LIKE ?', [`${PREFIX}%`]);
   const entries = rows.map(row => ({ key: row.key, entry: parse(row.value) }));
   const doomed = new Set(entries.filter(({ entry }) => !entry || !(Number(entry.expiresAt) > now)).map(({ key }) => key));
-  const live = entries.filter(({ key }) => !doomed.has(key)).sort((a, b) => Number(b.entry.createdAt) - Number(a.entry.createdAt));
+  const live = entries.filter(({ key }) => !doomed.has(key)).sort((a, b) => Number(b.entry.receivedAt) - Number(a.entry.receivedAt));
   for (const { key } of live.slice(Math.max(0, cap))) doomed.add(key);
   for (const key of doomed) await db.run('DELETE FROM platform_meta WHERE key = ?', [key]);
   return doomed.size;
@@ -89,7 +98,7 @@ export async function latestTestMail(db, to, { kind = null, now = Date.now() } =
   const rows = await db.all('SELECT value FROM platform_meta WHERE key IN (?, ?, ?)', TEST_MAIL_KINDS.map(k => keyFor(address, k)));
   const live = rows.map(row => parse(row.value))
     .filter(entry => entry && entry.to === address && Number(entry.expiresAt) > now && (!kind || entry.kind === kind));
-  live.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+  live.sort((a, b) => Number(b.receivedAt) - Number(a.receivedAt));
   return live[0] || null;
 }
 
@@ -104,15 +113,16 @@ export function createTestMailboxRouter(db, { env = process.env } = {}) {
     if (testMailboxEnabled(env) && isTestMailboxAddress(req.query?.to)) return next();
     return next('router');
   });
-  router.get('/latest', rateLimit(db, 'test-mailbox', { limit: TEST_MAILBOX_READS_PER_HOUR, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  router.get('/latest', rateLimit(db, 'test-mailbox', { limit: TEST_MAILBOX_READS_PER_HOUR, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const kind = req.query?.kind == null ? null : String(req.query.kind);
     res.set('Cache-Control', 'no-store');
     if (kind !== null && !TEST_MAIL_KINDS.includes(kind)) {
       return res.status(400).json({ error: { code: 'TEST_MAIL_KIND_INVALID', message: 'kind is code, link or notice.' } });
     }
     const entry = await latestTestMail(db, req.query.to, { kind });
-    if (!entry) return res.status(404).json({ error: { code: 'TEST_MAILBOX_EMPTY', message: 'Nothing has been kept for this test address.' } });
-    res.json({ message: entry });
+    // Nothing kept: the same ordinary 404 as when the mailbox is off.
+    if (!entry) return next('router');
+    res.json(entry);
   });
   return router;
 }
