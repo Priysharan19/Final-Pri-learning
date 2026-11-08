@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
-  CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
+  CONTAINER_CONTEXT, DEVICE_FAMILY_WAIVERS, EVIDENCE_REQUIREMENTS, NEVER_WAIVED_FAMILIES, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
   goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker,
   READER_FLOORS, RELEASE_CANDIDATE_JOBS, RELEASE_CANDIDATE_WORKFLOW, readerArtifactName, readerFloorProblems, releaseCandidateRun, releaseCandidateTitle
 } from '../scripts/release-nominate.mjs';
@@ -211,7 +211,16 @@ const scratch = [];
   ok(loadOverride(overrideFile({ ...goodOverride, approval: 'https://example.com/ok' }), SHA).problems.some(p => /approval/.test(p)), 'an approval that is not a GitHub comment link is refused');
   ok(loadOverride(overrideFile('not json'), SHA).problems.some(p => /not JSON/.test(p)), 'a corrupt override is refused');
   ok(loadOverride(join(tmpdir(), 'pri-no-such-override.json'), SHA).problems.some(p => /no such file/.test(p)), 'a missing override file is refused');
-  assert.deepEqual([...EVIDENCE_REQUIREMENTS], ['device-matrix', 'reader-evidence'], 'the two release-evidence requirements'); count += 1;
+  assert.deepEqual([...EVIDENCE_REQUIREMENTS], ['device-matrix', 'device-matrix:AND', 'device-matrix:ANT', 'reader-evidence'], 'the release-evidence requirements: the whole matrix, the two Android families (D1), the reader'); count += 1;
+  assert.deepEqual({ ...DEVICE_FAMILY_WAIVERS }, { 'device-matrix:AND': 'AND', 'device-matrix:ANT': 'ANT' }, 'only the two Android families have a family waiver'); count += 1;
+  assert.deepEqual([...NEVER_WAIVED_FAMILIES], ['IPH', 'IPD'], 'iPhone and iPad are never waived'); count += 1;
+  ok(Object.values(DEVICE_FAMILY_WAIVERS).every(f => FAMILIES.some(family => family.id === f)) && NEVER_WAIVED_FAMILIES.every(f => FAMILIES.some(family => family.id === f)), 'every family named here is a family of the device matrix');
+  for (const apple of ['device-matrix:IPH', 'device-matrix:IPD', 'device-matrix:iph']) {
+    ok(loadOverride(overrideFile({ ...goodOverride, waives: [apple] }), SHA).problems.some(p => /iPhone or iPad case can never be waived/.test(p)), `an override waiving ${apple} is refused by name`);
+  }
+  ok(loadOverride(overrideFile({ ...goodOverride, waives: ['device-matrix', 'device-matrix:AND'] }), SHA).problems.some(p => /the whole device matrix or named Android families, not both/.test(p)), 'an override cannot waive the whole matrix and a family at once');
+  eq(loadOverride(overrideFile({ ...goodOverride, waives: ['device-matrix:ANT', 'device-matrix:AND'] }), SHA).problems.length, 0, 'an override waiving the two Android families by name is well-formed');
+  eq(waiverMarker(SHA, ['device-matrix:ANT', 'device-matrix:AND', 'reader-evidence']), `Pri-Evidence-Waiver: ${SHA} scope=public-release target=deploy/production waives=device-matrix:AND,device-matrix:ANT,reader-evidence`, 'the approval marker lists family waivers by name, sorted');
 
   // ── the stubbed world ─────────────────────────────────────────────────────
   function world(evidenceOptions = {}) {
@@ -427,6 +436,55 @@ const scratch = [];
     const staggered = await run(approved(world({ device: 'android-blocked' }), { ...goodOverride, waives: ['device-matrix'] }), { overridePath: overrideFile({ ...goodOverride, waives: ['device-matrix'] }) });
     ok(staggered.ok && staggered.overrides.length === 1 && /AND, ANT not all pass/.test(staggered.overrides[0].state), 'blocked Android families release only through an approved, visible device-matrix waiver that names them');
     ok(!(await run(world({ device: 'android-blocked' }))).ok, 'blocked Android families without a waiver refuse the release stage');
+
+    // ── D1: Android families waived by name; an iPhone or iPad case never ──
+    {
+      const familyOverride = { ...goodOverride, waives: ['device-matrix:AND', 'device-matrix:ANT', 'reader-evidence'] };
+      const appleOnly = await run(approved(world({ device: 'android-blocked', reader: 'none' }), familyOverride), { overridePath: overrideFile(familyOverride) });
+      ok(appleOnly.ok && appleOnly.promotion.length > 0 && appleOnly.overrides.map(o => o.requirement).join(',') === 'device-matrix:AND,device-matrix:ANT,reader-evidence',
+        `D1: every iPhone and iPad case passed, the two Android families waived by name: the nomination passes and lists both family waivers (failed: ${failed(appleOnly).join('; ')})`);
+      ok(appleOnly.results.some(r => r.ok === true && /every family not waived \(every iPhone and iPad case pass/.test(r.label) && /every case passes in IPH, IPD/.test(r.detail)), 'the device row says the Apple families passed case by case');
+      ok(appleOnly.results.filter(r => r.ok === null && /device matrix family (AND|ANT) — WAIVED by recorded override/.test(r.label)).length === 2, 'each waived Android family is its own visible WAIVED row');
+      ok(appleOnly.overrides.filter(o => o.requirement.startsWith('device-matrix:')).every(o => /blocked \d+/.test(o.state) && o.githubLogin === APPROVER && o.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED'), 'each family override carries the family\'s state and the authenticated approver');
+      const appleCase = async (name, extraLine) => {
+        const w = approved(world({ device: 'android-blocked', reader: 'none' }), familyOverride);
+        writeFileSync(w.ledger, readFileSync(w.ledger, 'utf8') + JSON.stringify(extraLine) + '\n');
+        const report = await run(w, { overridePath: overrideFile(familyOverride) });
+        ok(!report.ok && report.promotion.length === 0 && !report.overrides.some(o => o.requirement.startsWith('device-matrix')) && failed(report).some(l => /every family not waived/.test(l)),
+          `D1: ${name} refuses the release even with both Android families waived`);
+      };
+      await appleCase('one failed iPhone case', { recordedAt: '2026-10-20T00:00:00Z', case: 'DM-IPH-02-OTP', result: 'fail', device: 'iPhone 16 Pro', os: 'iOS 26.0.1', sha: SHA, tester: 'Priya Example', notes: 'no code', evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' });
+      await appleCase('one blocked iPad case', { recordedAt: '2026-10-20T00:00:00Z', case: 'DM-IPD-05-WRITE', result: 'blocked', sha: SHA, notes: 'no Pencil to hand', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' });
+      {
+        // an Apple case never run: drop the iPad Pencil case's pass from the ledger
+        const w = approved(world({ device: 'android-blocked', reader: 'none' }), familyOverride);
+        writeFileSync(w.ledger, readFileSync(w.ledger, 'utf8').split('\n').filter(line => !line.includes('"DM-IPD-05-WRITE"')).join('\n'));
+        const report = await run(w, { overridePath: overrideFile(familyOverride) });
+        ok(!report.ok && failed(report).some(l => /every family not waived/.test(l)), 'D1: an iPad case that was never run refuses the release even with both Android families waived');
+      }
+      const onlyAnd = { ...familyOverride, waives: ['device-matrix:AND', 'reader-evidence'] };
+      const andOnly = await run(approved(world({ device: 'android-blocked', reader: 'none' }), onlyAnd), { overridePath: overrideFile(onlyAnd) });
+      ok(!andOnly.ok && failed(andOnly).some(l => /every family not waived/.test(l)) && andOnly.results.some(r => /not complete in families that are not waived: ANT/.test(r.detail || '')), 'waiving the Android phone family leaves the Android tablet family required');
+      // The approving comment must name the family waivers exactly: a whole-matrix approval does not cover them.
+      const mismatched = approved(world({ device: 'android-blocked', reader: 'none' }), { ...goodOverride, waives: ['device-matrix', 'reader-evidence'] });
+      const viaWholeApproval = await run(mismatched, { overridePath: overrideFile(familyOverride) });
+      ok(!viaWholeApproval.ok && viaWholeApproval.overrides.length === 0, 'an approval comment that names other waivers does not authorise the family waivers');
+      const complete = await run(approved(world({ reader: 'none' }), familyOverride), { overridePath: overrideFile(familyOverride) });
+      ok(complete.ok && !complete.overrides.some(o => o.requirement.startsWith('device-matrix')) && complete.results.some(r => r.ok === null && /family waivers not needed/.test(r.label)), 'a complete matrix records no family waiver: the waivers waive nothing');
+      // deviceEvidence itself refuses to waive an Apple family.
+      const ledger = world({ device: 'android-blocked' }).ledger;
+      for (const family of ['IPH', 'IPD', 'XYZ']) { assert.throws(() => deviceEvidence(SHA, { ledger, waivedFamilies: [family] }), /cannot be waived/, `deviceEvidence cannot waive ${family}`); count += 1; }
+      const scoped = deviceEvidence(SHA, { ledger, waivedFamilies: ['AND', 'ANT'] });
+      ok(scoped.ok && scoped.waivedFamilies.join(',') === 'AND,ANT' && /waived by family: AND pass 0 of \d+, ANT pass 0 of \d+/.test(scoped.detail), 'deviceEvidence with both Android families waived reports their state and passes on the Apple families');
+      eq(deviceEvidence(SHA, { ledger }).detail, deviceEvidence(SHA, { ledger, waivedFamilies: [] }).detail, 'with nothing waived the detail is exactly what it was');
+      // The owner's Apple-only script covers every case the release requires (it drifts with the matrix, or this fails).
+      const ownerScript = readFileSync(join(ROOT, 'docs', 'release', 'OWNER-DEVICE-SCRIPT.md'), 'utf8');
+      const appleCases = CASES.filter(kase => NEVER_WAIVED_FAMILIES.includes(kase.family));
+      const uncovered = appleCases.filter(kase => !ownerScript.includes(kase.id) && !ownerScript.includes(`\`-${kase.seq}-${kase.step}\``)).map(kase => kase.id);
+      assert.deepEqual(uncovered, [], `the owner device script names every one of the ${appleCases.length} iPhone and iPad cases`); count += 1;
+      ok(!/DM-(AND|ANT)-/.test(ownerScript) && /device-matrix:AND/.test(ownerScript) && /device-matrix:ANT/.test(ownerScript), 'the owner script is Apple-only and points at the two Android family waivers');
+      ok(/BLOCKED until billing/.test(ownerScript) && /in-app deletion/i.test(ownerScript) && /largest/.test(ownerScript) && /VoiceOver/.test(ownerScript) && /REINSTALL/.test(ownerScript), 'the owner script covers restore after reinstall, in-app deletion, VoiceOver at the largest text size, and sandbox purchase marked BLOCKED until billing');
+    }
     ok(!(await run(world({ device: 'all-blocked' }))).ok, 'an all-blocked device matrix refuses the release stage (Q4 #696 counterexample)');
 
     // Authentication negative controls: each leaves the evidence unwaived.

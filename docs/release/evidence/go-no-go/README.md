@@ -7,7 +7,7 @@ dossier that close issue #686 steps 25, 27, 28 and 30 (`docs/operations/postgres
 | File | Written by | Holds |
 |---|---|---|
 | `<sha>.json` | people, starting from `node scripts/release-dossier.mjs template <sha>` | the facts only people supply: when the candidate was frozen and by whom, the soak window and who watched it, the staging-acceptance run and its tester, each external gate's sign-off (examiner, counsel, security, native build, store, production data) with the name and the evidence, and the owner's **GO** or **NO-GO** for exactly this SHA |
-| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub comment that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
+| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "device-matrix:AND" \| "device-matrix:ANT" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub comment that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
 | `<sha>.md` | `node scripts/release-dossier.mjs <sha>` | the dossier: every machine check (nomination, Release Staging Proof on the SHA, merge freeze, staging build time), every evidence ledger row for the SHA (device matrix, reader evaluation), every gate with its person, and the verdict |
 
 ## Approvals are GitHub comments, not names in a file
@@ -35,6 +35,15 @@ A device matrix is **device-complete** only when every case is `pass` for the SH
 (`docs/release/device-matrix.md`). `blocked` rows are recorded and never omitted, but they are not
 acceptance: a family without hardware leaves the matrix incomplete, and the only way to release
 without it is a public-release waiver as above, shown on every report.
+
+Under owner default D1 (iPhone and iPad launch first), the two Android families can be waived
+**by name**: `device-matrix:AND` and `device-matrix:ANT`. No requirement names an Apple family, so
+an iPhone or iPad case can never be waived; with family waivers, every iPhone and iPad case must
+still be `pass`. A record that tries `device-matrix:IPH` or `device-matrix:IPD` is refused, and so
+is one that waives the whole matrix and a family at once. The approving comment's marker lists the
+family waivers exactly, for example
+`Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=device-matrix:AND,device-matrix:ANT`.
+The Apple cases are run with `docs/release/OWNER-DEVICE-SCRIPT.md`.
 
 ## Verdict
 
