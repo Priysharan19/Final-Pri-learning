@@ -70,6 +70,7 @@ enum JourneySelfCheck {
     }
     static var phase: String? {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--journey-staging") { return "staging" }
         if args.contains("--journey-marking-relaunch") { return "markingRelaunch" }
         if args.contains("--journey-marking") { return "marking" }
         if args.contains("--journey-offline-draft") { return "offlineDraft" }
@@ -556,6 +557,78 @@ enum JourneySelfCheck {
       const verdicts = await historyVerdicts(graded.map(g => g.id));
       if (verdicts.join() !== 'Correct,Correct') throw new Error('History shows ' + verdicts.join());
       return 'History: typed Correct, handwritten Correct ' + JSON.stringify(graded.map(g => g.server));
+    });
+    return JSON.stringify(steps);
+    """#
+
+    // `--journey-staging` (scripts/journey-staging.mjs): the DEPLOYED staging
+    // service (PRI_CLOUD_ORIGIN, a DEBUG build only), a real emailed code read
+    // from the owner's test inbox by the test process, and the REAL reader.
+    // There is no answer oracle on staging: the leg proves the journey works
+    // end to end on the deployed service — the D17 prompt, a reading, a
+    // server mark, History — not that any answer is right. It ends by
+    // deleting the test account it made.
+    private static let staging = helpers + cardHelpers + oracleHelpers + cloudHelpers.replacingOccurrences(of: helpers, with: "") + #"""
+    let inkId = null;
+    await step('stagingCardOnboarding', async () => cardOnboard(email));
+    await step('stagingInkRead', async () => {
+      at = 'practice'; await route('/practice'); await waitFor(() => q('.q-prompt') && qid(), 60000); await sleep(800);
+      const passed = [];
+      for (let i = 0; i < 12; i++) {
+        at = 'question ' + (i + 1);
+        await nextQuestion();
+        if (!byLabel('Write: answer by handwriting')) { passed.push('no-write-tab'); continue; }
+        const id = qid();
+        at = 'write'; await writeMode();
+        const echoed = await writeOnNativeSurface();
+        at = 'saved'; await inkSavedTruthfully(id);
+        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
+        at = 'permission'; const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
+        if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
+        await sleep(1000);
+        if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+        q('[data-reader-permission="accept"]').click();
+        at = 'reading';
+        try { await waitFor(() => q('.ink-preview .ink-line') || q('[data-ink-retry-reading]'), 120000); } catch (e) { throw new Error('no reading in 120 s: status "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"'); }
+        if (!q('.ink-preview .ink-line')) throw new Error('the deployed reader refused: "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"');
+        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => n.getAttribute('data-text'));
+        inkId = id;
+        return echoed + ' strokes; after the D17 prompt the deployed reader returned ' + lines.length + ' line(s): ' + JSON.stringify(lines).slice(0, 60);
+      }
+      throw new Error('no handwriting question in 12: ' + passed.join(','));
+    });
+    await step('stagingConfirmedMarked', async () => {
+      if (!inkId) throw new Error('nothing was read to confirm');
+      // The student's own final answer when the reading proposes none.
+      const field = q('[data-ink-final-answer]');
+      if (field && !field.value) { setValue(field, '7'); await sleep(300); }
+      let got = null;
+      for (let press = 0; press < 3 && !['evaluated', 'miss'].includes(got); press++) {
+        got = await checked(pressSubmit, 90000);
+        if (got !== 'confirm') break;
+      }
+      if (!['evaluated', 'miss'].includes(got)) throw new Error('expected the deployed server to mark the confirmed reading, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 120));
+      return 'the deployed server marked the confirmed reading: ' + (got === 'evaluated' ? (q('.eval-card').getAttribute('data-outcome') + ' ' + seen('.eval-marks')) : '"' + seen('.verdict .verdict-title') + '", a try left');
+    });
+    await step('stagingHistory', async () => {
+      if (!inkId) throw new Error('no handwritten attempt to find');
+      await route('/review');
+      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 60000);
+      await sleep(800);
+      if (!q('.hist-row[data-question-id="' + inkId + '"]')) throw new Error('History does not hold the handwritten attempt');
+      return 'History holds the handwritten attempt';
+    });
+    await step('stagingDeleteAccount', async () => {
+      at = 'settings'; await settings();
+      at = 'phrase'; setValue(await waitFor(() => q('#cloud-delete-phrase'), 30000), 'DELETE'); await sleep(150);
+      at = 'send'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-send-code]'); return b && !b.disabled && b; })).click();
+      at = 'code box'; await waitFor(() => q('#cloud-delete-code-0'), 60000);
+      at = 'code'; const sent = await oracle({ kind: 'emailCode', to: email, purpose: 'reauth' });
+      if (!/^\d{6}$/.test(sent.code || '')) throw new Error('no six-digit deletion code arrived: ' + (sent.reason || 'none'));
+      setValue(q('#cloud-delete-code-0'), sent.code); await sleep(300);
+      at = 'delete'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-with-code]'); return b && !b.disabled && b; })).click();
+      at = 'deleted'; await waitFor(() => /Cloud account deleted/.test(document.body.innerText) || q(GATE), 60000);
+      return 'the test account deleted itself on staging with the emailed code';
     });
     return JSON.stringify(steps);
     """#
@@ -1083,6 +1156,7 @@ enum JourneySelfCheck {
         switch phase {
         case "relaunch": script = relaunch
         case "marking": script = marking
+        case "staging": script = staging
         case "markingRelaunch": script = markingRelaunch
         case "offlineDraft": script = offlineDraft
         case "offlineRelaunch": script = offlineRelaunch

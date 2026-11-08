@@ -58,6 +58,8 @@
 //   node scripts/iphone-journey.mjs                 # an iPhone simulator
 //   node scripts/iphone-journey.mjs --family ipad
 //   node scripts/iphone-journey.mjs --cloud --dynamic-type --evidence out.json
+//   node scripts/iphone-journey.mjs --staging --family iphone|ipad --app <DEBUG .app> [--origin <url>] --evidence out.json
+//     (the deployed staging service, the real reader, a real emailed code: scripts/journey-staging.mjs)
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -227,7 +229,9 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
 
 const sim = pickDevice();
 const udid = sim.udid;
-console.log(`Native student journey on ${sim.name} (${udid}) — ${TIER} evidence (programmatic strokes; not a physical device, a Pencil or a real provider)\n`);
+console.log(process.argv.includes('--staging')
+  ? `Native student journey on ${sim.name} (${udid}) against the deployed staging service — SIMULATOR + DEPLOYED evidence (programmatic strokes; not a physical device, a Pencil or a finger)\n`
+  : `Native student journey on ${sim.name} (${udid}) — ${TIER} evidence (programmatic strokes; not a physical device, a Pencil or a real provider)\n`);
 ensureBooted(sim);
 // `main` declares iPhone + iPad (the V1 shipping target, #504), so both
 // families build the canonical package itself. --app reuses a prebuilt
@@ -243,6 +247,14 @@ const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw'
 try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
 installApp(udid, app);
+
+// --staging: the deployed staging service, the real reader and a real emailed
+// code instead of the local legs (scripts/journey-staging.mjs; SIMULATOR +
+// DEPLOYED evidence). Exits here with its own verdict.
+if (process.argv.includes('--staging')) {
+  const { runStagingLeg, STAGING_ORIGIN } = await import('./journey-staging.mjs');
+  process.exit(await runStagingLeg({ sim, udid, bundleId, launchAndRead, run, origin: argOf('origin') || STAGING_ORIGIN, out: argOf('evidence') }));
+}
 
 console.log('Leg 1 · no server: the app opens to the sign-in card and nothing opens without an account …');
 const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, { loops: 110 });
