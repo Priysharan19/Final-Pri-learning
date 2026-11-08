@@ -47,6 +47,12 @@ All of these hold on the tip of `main`:
    for acceptance.
 5. A TestFlight build of the tip can be archived. `ios/PriLearning.swiftpm/RELEASE.md` §11 and
    `node scripts/check-native-archive.mjs <archive> --sha <SHA> --probe` pass.
+6. **The iOS build number is new.** `main` still says `1.0 (2)`, and build 2 is reported uploaded to
+   App Store Connect. A build number can never be reused (`RELEASE.md` §2). #615's bump to 3
+   (`179bf28c1`) was not ported; #737 hands it to the release lane. The App Store Connect holder
+   reads the highest build already uploaded for `com.prilearning.app`, under TestFlight → Builds.
+   L4 then sets `bundleVersion` above it in both `Package.swift` mirrors, **in the last train**.
+   A bump made during the freeze moves `main` and voids the soak (§5).
 
 ## 3. Freeze day, in order
 
@@ -63,14 +69,14 @@ the operator. `SHA` is the full 40-hex commit.
 | F6 | **Release Candidate gates** | `gh workflow run release-candidate.yml --ref main -f measure_cloud_reader=true`. Leave `release_sha` empty: the run checks out the commit `main` is at, which is the SHA. Then `gh run list --workflow release-candidate.yml --limit 1 --json displayTitle,conclusion,databaseId` | Director (the provider calls use the repository secret the owner set) | run named `Release Candidate · <SHA>`, conclusion `success`, artifact `cloud-reader-eval-<SHA>` |
 | F7 | **Start the soak** | Use the later of: F2's freeze time, or the time staging first served the SHA (the F5 run or the green `Release Staging Proof` on the SHA). Record `soak.startedAt` and `soak.watchedBy` | soak watcher | staging `buildTimestamp` ≤ `soak.startedAt` |
 | F8 | **Acceptance A–D** (during the soak) | `node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<Full Name>"`. Record `acceptance` = { `result: "PASS"`, `report`: the report path, `tester`, `at` } | acceptance tester | `STAGING ACCEPTANCE: PASS` |
-| F9 | **Devices** (during the soak) | `docs/release/OWNER-DEVICE-SCRIPT.md` on the TestFlight build of the SHA. Each case is recorded through `scripts/device-matrix-record.mjs record … --sha $SHA --tester "<Full Name>"`. The Android families stay `blocked` (D1) and take the family waivers of §4 | device testers | `node scripts/device-matrix-record.mjs report --sha $SHA`: every iPhone and iPad case `pass` |
+| F9 | **Devices** (during the soak) | Part A of `docs/release/OWNER-DEVICE-SCRIPT.md`: the full Apple matrix on the development build of the SHA against staging, as #737's `device-matrix.md` requires. Each case is recorded through `scripts/device-matrix-record.mjs record … --sha $SHA --tester "<Full Name>"`. The Android families stay `blocked` (D1) and take the family waivers of §4. Part B (the TestFlight build against production) follows F16, before the store release | device testers | `node scripts/device-matrix-record.mjs report --sha $SHA`: every iPhone and iPad case `pass` |
 | F10 | **Reader evidence** | `gh run download <F6 run id> -n cloud-reader-eval-$SHA -D handwriting/v17/cloud-reader-eval/` (untracked during the freeze) | Director | the report clears Gate C's floors (`READER_FLOORS`), or a waiver names `reader-evidence` |
 | F11 | **Human gates** | Each signer records `gates.<id>` = { `status: "PASS"`, `by`, `at`, `evidence` } | gate signers | the six step-23 rows PASS |
 | F12 | **End the soak** | At least 24 h after F7: record `soak.endedAt` and `soak.incidents` (`"none"`, or a list). An incident restarts the soak after the fix, on a new SHA | soak watcher | a window of 24 h or more, no incident |
 | F13 | **Release-stage nomination** | `node scripts/release-nominate.mjs $SHA [--override docs/release/evidence/go-no-go/$SHA.override.json] [--production-engine postgres]` | Director | `NOMINATION: PASS`, with the promotion commands printed and not run |
 | F14 | **Dossier** | `node scripts/release-dossier.mjs $SHA` | Director | `DOSSIER: NO-GO` with exactly one reason left: the owner's GO |
 | F15 | **GO** | The owner posts a comment in the GitHub web UI whose own line reads `Pri-Release-GO: <SHA> target=deploy/production`. It must come **after** `soak.endedAt` and `candidate.frozenAt`, and must never be edited. Record `go` = { `decision: "GO"`, `by`, `githubLogin`, `approval`: the comment URL, `at`, `sha`, `statement` }. Then run F14 again | owner | `DOSSIER: GO-READY` |
-| F16 | Cutover and promotion | `postgres-cutover.md` §4.6 steps 6–9, then `docs/operations/production-config-v1.md` §2 against production | owner (D27) | the production manifest check passes, and H2–H9 are recorded |
+| F16 | Cutover and promotion | `postgres-cutover.md` §4.6 steps 6–9, then `docs/operations/production-config-v1.md` §2 against production. With the release held, run Part B of `OWNER-DEVICE-SCRIPT.md` on the TestFlight build against production | owner (D27) | the production manifest check passes; H2–H9 are recorded; the Part B rows pass |
 | F17 | Lift the freeze | Commit the record, the dossier and any override in one PR **after** the promotion. The Director resumes the trains. After the next merge, run F14 again for step 30 | Director | step 30 `CERTIFIED` once a later merge reaches staging on its own |
 
 ## 4. What must be green
