@@ -59,7 +59,13 @@ const ENV = {
   // browser, by tour-free-cap.js — which boots this platform with the default
   // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
   // the cap raised by configuration so it is never read as a fault.
-  PRI_FREE_PRACTICE_PER_DAY: '100000'
+  PRI_FREE_PRACTICE_PER_DAY: '100000',
+  // Likewise the per-account read allowance (D20 defaults: 5 reads and 5
+  // question photos a day on the free plan), proved at its defaults by
+  // server/test/premium-authority-check.mjs: a flow that reads one account's
+  // writing more than five times is not a flow about the allowance.
+  PRI_AI_DAILY_FREE: '100000',
+  PRI_AI_DAILY_PREMIUM: '100000'
 };
 // PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
 // page's own origin, which is this server's ephemeral loopback port.

@@ -94,6 +94,12 @@ Object.assign(process.env, {
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM']) delete process.env[name];
+// This suite is about dedupe and round trips, not the per-account allowance
+// (D20 defaults: 5 reads a day free), which premium-authority-check.mjs proves
+// at its defaults. Raised by configuration, as marking suites raise the cap.
+const RAISED_AI_ALLOWANCE = '100000';
+process.env.PRI_AI_DAILY_FREE = RAISED_AI_ALLOWANCE;
+process.env.PRI_AI_DAILY_PREMIUM = RAISED_AI_ALLOWANCE;
 
 const { startApp, registerAccount, verifyEmail, cookieHeader, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
@@ -420,7 +426,7 @@ try {
     const overAllowance = await transcribe(s.jar, picture('9', 'ok', 'z'));
     c.eq(overAllowance.status, 429, 'a Read over the allowance is refused');
     c.deq(await attemptState(), untouched, 'and likewise consumed nothing of the attempt');
-    delete process.env.PRI_AI_DAILY_FREE;
+    process.env.PRI_AI_DAILY_FREE = RAISED_AI_ALLOWANCE;
     const typed = await h.request(`/v1/practice/${sqid}/submit`, { method: 'POST', jar: s.jar, headers: { 'Idempotency-Key': 'dedupe-first-real-try' },
       body: { submissionId: 'dedupe-first-real-try', answer: '5', mode: 'typed' } });
     c.deq([typed.status, typed.data.correct, typed.data.resolved], [200, false, false], 'the question is still on its FIRST try: a wrong answer now leaves a second try');
@@ -645,7 +651,7 @@ try {
     c.eq(over.headers.get('ratelimit-reset'), String(Math.ceil(overError.resetAt / 1000)), 'matching its header');
     c.eq(callsFor('allowance two'), 0, 'and nothing was sent');
     c.deq([(await transcribe(capped.jar, picture('allowance one'))).status, await allowanceUsed(capped.id)], [200, 1], 'a picture already read is served without touching the exhausted allowance');
-    delete process.env.PRI_AI_DAILY_FREE;
+    process.env.PRI_AI_DAILY_FREE = RAISED_AI_ALLOWANCE;
   }
 
   // ── 15 · Fail closed: no ceiling, no server reading — kept transcript or not ─

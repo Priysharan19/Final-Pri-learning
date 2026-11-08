@@ -21,6 +21,7 @@ import { createPlatformDb } from '../platform/db.js';
 import { ensureBillingSchema } from '../platform/billingSchema.js';
 import { createHandwritingRouter } from '../platform/handwriting.js';
 import { createWorkingRouter } from '../platform/working.js';
+import { createQuestionPhotoRouter } from '../platform/questionPhoto.js';
 import { consumeAiAllowance, aiAllowance, aiAllowanceConfigProblems, AI_ALLOWANCE_DEFAULTS } from '../platform/aiAllowance.js';
 import { serverEntitlementCapabilities } from '../platform/entitlements.js';
 import { sha256 } from '../platform/security.js';
@@ -34,17 +35,30 @@ const env = {
   PRI_PAID_CALLS_PER_HOUR: '100000', PRI_PAID_CALLS_PER_DAY: '1000000',
   PRI_AI_DAILY_FREE: '5', PRI_AI_DAILY_PREMIUM: '12'
 };
-const EXPECTED_CHECKS = 44; // every check is unconditional
+const EXPECTED_CHECKS = 52; // every check is unconditional
 const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
 
-// ── configuration ────────────────────────────────────────────────────────────
-ok(aiAllowance({}).free === AI_ALLOWANCE_DEFAULTS.free && aiAllowance({}).premium === AI_ALLOWANCE_DEFAULTS.premium, 'defaults apply when unset');
-ok(AI_ALLOWANCE_DEFAULTS.premium > AI_ALLOWANCE_DEFAULTS.free, 'Premium includes more than free');
-ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM: '0' }).length === 1,
-  'a non-positive or nonsense value is a configuration problem (production refuses to boot)');
-ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 1 && aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).premium === 50,
-  'Premium below free is flagged, and never applied below free');
+// ── configuration (owner default D20: 5 free / 25 Premium a day, per kind) ──
+const D20 = { free: 5, premium: 25 };
+ok(JSON.stringify(aiAllowance({}, 'handwriting')) === JSON.stringify(D20) && JSON.stringify(AI_ALLOWANCE_DEFAULTS.handwriting) === JSON.stringify(D20),
+  'D20: reads of the student\'s writing default to 5 a day free and 25 a day Premium');
+ok(JSON.stringify(aiAllowance({}, 'question-photo')) === JSON.stringify(D20), 'D20: question photos default to 5 a day free and 25 a day Premium, as their own kind');
+ok(aiAllowance({}, 'working').free === 120 && aiAllowance({}, 'working').premium === 1200, 'the working check is not a read (not named by D20) and keeps its allowance');
+ok(Object.keys(AI_ALLOWANCE_DEFAULTS).every(kind => AI_ALLOWANCE_DEFAULTS[kind].premium > AI_ALLOWANCE_DEFAULTS[kind].free), 'Premium includes more than free for every kind');
+ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM: '0' }).length === 1 &&
+  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_HANDWRITING: 'five' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM_PHOTO: '1.5' }).length === 1,
+  'a non-positive or nonsense value, global or per kind, is a configuration problem (production refuses to boot)');
+ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 3 &&
+  ['handwriting', 'question-photo', 'working'].every(kind => aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }, kind).premium === 50) &&
+  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '30' }).length === 1,
+  'Premium below free is flagged for each kind it affects, and never applied below free');
+ok(aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'question-photo').free === 3 &&
+  aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'handwriting').free === 9,
+  'a per-kind setting wins over the older global one, which still applies to the kinds it does not name');
 ok(aiAllowanceConfigProblems({}).length === 0, 'the defaults are a valid configuration');
+let unknownKind = false;
+try { aiAllowance({}, 'video'); } catch { unknownKind = true; }
+ok(unknownKind, 'an unknown kind has no allowance (a programming error, not a free pass)');
 
 // ── the server's own entitlement decides ─────────────────────────────────────
 const T = Date.now();
@@ -62,7 +76,7 @@ ok(!caps({ plan: 'free', status: 'active', current_period_end: T + DAY }) && !ca
 const db = createPlatformDb(':memory:');
 ensureBillingSchema(db);
 const accounts = {
-  free: ['free', 'free', null, null], premium: ['premium', 'active', T + 30 * DAY, null], trial: ['premium', 'trialing', T + 7 * DAY, null],
+  free: ['free', 'free', null, null], premium: ['premium', 'active', T + 30 * DAY, null], d20free: ['free', 'free', null, null], d20premium: ['premium', 'active', T + 30 * DAY, null], trial: ['premium', 'trialing', T + 7 * DAY, null],
   grace: ['premium', 'grace', T - DAY, T + DAY], graceOver: ['premium', 'grace', T - 2 * DAY, T - DAY], expired: ['premium', 'active', T - DAY, null],
   revoked: ['premium', 'revoked', T + 30 * DAY, null], grant: ['premium', 'active', T + 30 * DAY, null], other: ['free', 'free', null, null],
   upgrader: ['free', 'free', null, null], capped: ['free', 'free', null, null],
@@ -87,6 +101,11 @@ app.use('/working', createWorkingRouter(db, { check: async () => { checkCalls +=
 const fullEnv = { ...env, PRI_PAID_CALLS_PER_HOUR: '1', PRI_PAID_CALLS_PER_DAY: '1' };
 const fullDb = db;
 app.use('/handwriting-full', createHandwritingRouter(fullDb, { transcribe: okRead, probe: async () => ({ usable: true }), env: fullEnv }));
+// The same routes at the D20 defaults: no allowance variable set at all.
+const d20Env = Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith('PRI_AI_DAILY_')));
+let photoCalls = 0;
+app.use('/d20/handwriting', createHandwritingRouter(db, { transcribe: okRead, probe: async () => ({ usable: true }), env: d20Env }));
+app.use('/d20/question-photo', createQuestionPhotoRouter(db, { identify: async () => { photoCalls += 1; return { isMathsQuestion: true, readable: true, questionText: 'Solve 2x+3=11', candidates: [] }; }, env: d20Env }));
 const server = await new Promise(resolve => { const l = app.listen(0, '127.0.0.1', () => resolve(l)); });
 const base = `http://127.0.0.1:${server.address().port}`;
 const post = async (path, account, body, headers = {}) => {
@@ -151,6 +170,23 @@ try {
   ok(later.allowed && later.plan === 'free', 'a new window restores the allowance');
   ok(await consumeAiAllowance(db, { accountId: 'free', kind: 'video', env }).then(() => false, e => /unknown/.test(e.message)), 'an unknown kind is a programming error');
   ok(db.prepare("SELECT plan,status FROM entitlement_snapshots WHERE account_id='free'").get().plan === 'free', 'no request changed the server\'s entitlement record');
+  // 9 · D20 at its defaults, over HTTP: 5 / 25 a day for each kind, separately.
+  const d20 = async (account, path, body) => { let n = 0; let last = null; for (let i = 0; i < 40; i++) { last = await post(path, account, body()); if (last.status !== 200) break; n += 1; } return { n, r: last }; };
+  const ink = () => ({ image: freshPicture() });
+  const photo = () => ({ image: freshPicture() });
+  const before20 = readCalls;
+  const freeInk = await d20('d20free', '/d20/handwriting/transcribe', ink);
+  ok(freeInk.n === 5 && readCalls - before20 === 5 && freeInk.r.status === 429 && freeInk.r.data.error.limit === 5 && freeInk.r.data.error.kind === 'handwriting',
+    `D20: a free account gets exactly 5 reads of its writing a day (${freeInk.n}, ${readCalls - before20} provider calls)`);
+  ok(/5 readings of your writing/.test(freeInk.r.data.error.message) && /type your answer/.test(freeInk.r.data.error.message) && /Premium includes 25 a day/.test(freeInk.r.data.error.message) && !/on-device/i.test(freeInk.r.data.error.message),
+    'the refusal names the count, the typed alternative and Premium\'s figure, and promises no on-device reader (D16)');
+  const freePhoto = await d20('d20free', '/d20/question-photo/identify', photo);
+  ok(freePhoto.n === 5 && photoCalls === 5 && freePhoto.r.status === 429 && freePhoto.r.data.error.kind === 'question-photo',
+    `D20: photos are their own kind — 5 more for the same free account after its reads ran out (${freePhoto.n})`);
+  const premiumInk = await d20('d20premium', '/d20/handwriting/transcribe', ink);
+  const premiumPhoto = await d20('d20premium', '/d20/question-photo/identify', photo);
+  ok(premiumInk.n === 25 && premiumPhoto.n === 25 && premiumInk.r.data.error.plan === 'premium' && !/Premium includes/.test(premiumInk.r.data.error.message),
+    `D20: Premium gets exactly 25 of each kind (${premiumInk.n} reads, ${premiumPhoto.n} photos)`);
 } finally {
   await new Promise(resolve => server.close(resolve));
 }

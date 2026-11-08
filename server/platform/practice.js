@@ -41,7 +41,7 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // The free plan's daily cap is decided here, per account, where a creditable
 // question is issued (#537): practiceAllowance.js reads the server's own
 // entitlement record and its own count, inside the issue transaction.
-import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
+import { practiceAllowanceVerdict, practiceModeCounted, premiumContentRefusal, recordPracticeIssue, refusePracticeCap, refusePremiumContent } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
 
@@ -452,6 +452,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const sealed = readPrepared(body.prepared);
       if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
       if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      // JEE Advanced's own questions are Premium (D19). Decided from the
+      // server's entitlement record before anything is generated or written,
+      // so a refused bind leaves the prepared token for an account that may.
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: sealed.g, now });
+      if (premiumGap) return refusePremiumContent(res, premiumGap);
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
@@ -461,6 +466,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     } else {
       const request = readQuestionRequest(body, ISSUE_FIELDS);
       if (request.error) return reject(res, ...request.error);
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
+      if (premiumGap) return refusePremiumContent(res, premiumGap);
       let seed = null;
       if (body.seed !== undefined) {
         if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
@@ -575,6 +582,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // toward the free day exactly as a retry from History does on the device
     // (#537) — decided and counted under the account's issue lock.
     const outcome = await db.transaction(async () => {
+      // A JEE Advanced question seen while Premium was live is not repeated
+      // once it has lapsed (D19): the repeat is a new issue.
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: typeof q._generator === 'string' ? q._generator : q.subtopic, now });
+      if (premiumGap) return { premium: premiumGap };
       const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
       if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
@@ -582,6 +593,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await recordPracticeIssue(db, { accountId, now });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    if (outcome.premium) return refusePremiumContent(res, outcome.premium);
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
   });
@@ -1357,6 +1369,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (original.multipart || original.custom) return reject(res, 409, 'NOTEBOOK_TWIN_UNAVAILABLE', 'This question has no generated twin.');
     await ensureBanks();
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
+    const premiumGap = await premiumContentRefusal(db, { accountId, generator, now });
+    if (premiumGap) return refusePremiumContent(res, premiumGap);
     let chosen;
     try {
       chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
@@ -1372,10 +1386,19 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const trySpent = !repeat && await contentTried(db, accountId, q, now);
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    await db.transaction(async () => {
+    // A twin is a question the account is issued in a capped mode ('review'),
+    // so it counts toward the free day like a History repeat (D19: 20
+    // questions a day) and is refused at the cap; before this it was issued
+    // uncounted, so a wrong answer's twins were an unlimited free supply.
+    const outcome = await db.transaction(async () => {
+      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+      if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+      await recordPracticeIssue(db, { accountId, now });
+      return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
       twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },

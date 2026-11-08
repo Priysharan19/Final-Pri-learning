@@ -59,6 +59,9 @@ export const ENGINE_SUITES = [
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
+  // question of the free day — decided under the same lock and RLS scope.
+  'premium-practice-content-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.
