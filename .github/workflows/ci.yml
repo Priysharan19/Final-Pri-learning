@@ -800,6 +800,7 @@ jobs:
             node client/test/tour-otp-onboarding.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-account-deletion.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-unverified-email.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
