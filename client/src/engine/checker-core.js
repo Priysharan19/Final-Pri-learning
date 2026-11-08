@@ -618,15 +618,19 @@ export function unevaluatedRefusal(cleaned) {
   if (ast.t === 'equation') return null;
   // Letters other than π and e are not a number at all; the reader says so.
   // Read without recursion: the tree of a long sum is as deep as it is long.
-  let nodes = 0, letters = 0;
+  let nodes = 0, letters = 0, bounded = false;
   for (const stack = [ast]; stack.length;) {
     const n = stack.pop();
     if (!n || typeof n !== 'object') continue;
     nodes++;
     if (n.t === 'var' && n.v !== 'e') letters++;
+    // A call with several arguments — sum(k; k; 1; 15), nCr(10, 3) — is a
+    // count or a sum still to take, and the letter it binds is not free.
+    if (n.t === 'call' && Array.isArray(n.args)) bounded = true;
     for (const key of ['l', 'r', 'v', 'arg']) if (n[key] && typeof n[key] === 'object') stack.push(n[key]);
     if (Array.isArray(n.args)) stack.push(...n.args);
   }
+  if (bounded) return D13_REFUSAL;
   if (letters) return null;
   // The largest form D13 accepts — a few unlike terms over a whole number —
   // is a couple of dozen nodes; anything far past that has work left in it.
