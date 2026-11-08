@@ -10,7 +10,6 @@ on:
       - 'client/test/ink-interaction-guard-check.mjs'
       - 'tools/ink-foundation/live_structural_infer.py'
       - 'scripts/serve-lan.mjs'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4-live-lan.yml'
   workflow_dispatch:
 

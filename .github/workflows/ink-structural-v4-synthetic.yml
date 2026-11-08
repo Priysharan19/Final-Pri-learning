@@ -15,7 +15,6 @@ on:
       - 'tools/ink-foundation/evaluate_structural_dev.py'
       - 'scripts/ink-structural-pretrain-dev.sh'
       - 'scripts/ink-structural-rebuild-dev.sh'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4-synthetic.yml'
   pull_request:
     paths:
@@ -31,7 +30,6 @@ on:
       - 'tools/ink-foundation/evaluate_structural_dev.py'
       - 'scripts/ink-structural-pretrain-dev.sh'
       - 'scripts/ink-structural-rebuild-dev.sh'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4-synthetic.yml'
 
 permissions:
