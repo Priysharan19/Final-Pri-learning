@@ -107,6 +107,24 @@ jobs:
           echo "::error::Staging did not prove exact SHA $CANDIDATE_SHA within $((SECONDS - started)) s ($attempt attempts). No release authorization."
           exit 1
 
+      # #653: whose address do the anonymous rate limiters count? A runner has
+      # one public address for the job, so it can tell per-client from
+      # per-edge-node, which a client whose own address rotates cannot. ADVISORY
+      # until #653 is closed: on 8 Nov 2026 staging counted the Railway edge
+      # node (docs/operations/railway-proxy-identity.md), and a blocking step
+      # would stop every train on a configuration fix that is the owner's.
+      # Read-only: anonymous GETs to the published content index.
+      - name: Proxy identity of the anonymous rate limiters (advisory, #653)
+        shell: bash
+        run: |
+          set -uo pipefail
+          node tools/verify-deployment-proxy.mjs --origin "$STAGING_ORIGIN" \
+            > "$RUNNER_TEMP/release-audit/proxy-identity.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/release-audit/proxy-identity.txt"
+          echo "$(tail -n 1 "$RUNNER_TEMP/release-audit/proxy-identity.txt") — exit $status, advisory until #653 is closed" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
       - name: Archive exact-SHA read-only proof
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

@@ -6,6 +6,9 @@
 // 2. tools/verify-deployment.mjs passes only an origin serving exactly the
 //    nominated SHA on both server and web, at this checkout's schema versions,
 //    and fails on each single drift.
+// 3. tools/verify-deployment-proxy.mjs (#653) tells a server that counts its
+//    anonymous rate limits per client apart from one that counts the proxy's
+//    edge node, or that a forged X-Forwarded-For can escape.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -14,6 +17,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import { parseArgs, verifyDeployment } from './verify-deployment.mjs';
+import { classify } from './verify-deployment-proxy.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 let count = 0;
@@ -192,6 +196,36 @@ try {
   assert.throws(() => parseArgs(['--origin', 'https://x.example'])); count += 1;
 } finally {
   server.close();
+}
+
+// ── 4 · verify-deployment-proxy: whose address the rate limiters count ─────
+{
+  const t0 = 1_800_000_000; // a run that started at this second
+  const open = t0 + 60;     // a window opened during the run
+  const sample = (node, reset, forged = false) => ({ node, reset, forged });
+  const nodes = ['sin1.a', 'sin1.b', 'sin1.c'];
+  // One client at a fixed address: one bucket whichever edge node carries it.
+  const fixed = [...Array(12)].map((_, i) => sample(nodes[i % 3], open));
+  const clean = classify([...fixed, ...[...Array(4)].map((_, i) => sample(nodes[i % 3], open, true))], t0);
+  ok(clean.verdict === 'PER-CLIENT', 'one bucket across edge nodes, forged headers inside it: PER-CLIENT');
+  const spoofed = classify([...fixed, sample('sin1.a', open, true), sample('sin1.b', open + 3, true)], t0);
+  ok(spoofed.verdict === 'SPOOFABLE', 'a forged X-Forwarded-For that gets a bucket of its own is SPOOFABLE');
+  // The staging measurement of 8 Nov 2026: one bucket per edge node.
+  const perNode = classify([...Array(12)].map((_, i) => sample(nodes[i % 3], open + (i % 3))), t0);
+  ok(perNode.verdict === 'PER-EDGE-NODE', 'one bucket per edge node over several nodes is PER-EDGE-NODE');
+  // A client whose own address changes per connection: buckets vary within a node.
+  const rotating = classify([...Array(12)].map((_, i) => sample(nodes[i % 3], open + i)), t0);
+  ok(rotating.verdict === 'INCONCLUSIVE', 'a client whose address changes per connection is INCONCLUSIVE, not a pass');
+  const single = classify([...Array(12)].map(() => sample('sin1.a', open)), t0);
+  ok(single.verdict === 'INCONCLUSIVE', 'a single edge node cannot tell node from client: INCONCLUSIVE');
+  // A bucket that existed before the run can roll over during it; it is not counted.
+  const stale = classify([...Array(12)].map((_, i) => sample(nodes[i % 3], t0 + 10 + (i % 3))), t0);
+  ok(stale.verdict === 'INCONCLUSIVE' && stale.facts.counted === 0, 'buckets opened before the run are not counted');
+  const once = classify([sample('sin1.a', open), sample('sin1.b', open + 1), ...[...Array(8)].map(() => sample('sin1.c', open + 2))], t0);
+  ok(once.verdict !== 'PER-EDGE-NODE', 'a node seen once is not enough to call the identity per node');
+  const proxySource = readFileSync(join(ROOT, 'tools', 'verify-deployment-proxy.mjs'), 'utf8');
+  ok(/agent: false/.test(proxySource) && !/method: '(POST|PUT|PATCH|DELETE)'/.test(proxySource) && /'\/v1\/content\/published-index'/.test(proxySource),
+    'the proxy probe only sends anonymous GETs to the published content index, each on a new connection');
 }
 
 console.log(`DEPLOYMENT CONTRACT — PASS — ${count}/${count} checks`);

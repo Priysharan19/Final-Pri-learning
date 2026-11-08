@@ -1,0 +1,154 @@
+#!/usr/bin/env node
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · whose address does the server count anonymous requests against?
+//
+// Issue #653. In production the server sets Express `trust proxy` to
+// PRI_TRUSTED_PROXY_HOPS, and every anonymous rate limiter (login, register,
+// OTP, password reset) keys on `req.ip`. Get the hop count wrong and either a
+// client mints a fresh bucket per request by sending its own X-Forwarded-For
+// (too many hops), or everyone behind one proxy shares a bucket (too few). The
+// value cannot be read from outside, but its effect can.
+//
+// Read-only and anonymous. It sends unauthenticated GETs to
+// /v1/content/published-index (limit 60 a minute per identity), each on a new
+// connection, and reads two response headers:
+//   · RateLimit-Reset: when the bucket's window ends. A window opens at the
+//     bucket's first request, so the value identifies the bucket.
+//   · x-hikari-trace (falling back to x-railway-edge): which Railway edge
+//     node carried the request.
+// Then it sends a few requests with forged X-Forwarded-For / X-Real-IP.
+//
+// Verdicts (exit 0 PASS, 1 FAIL, 2 INCONCLUSIVE):
+//   · PER-EDGE-NODE (FAIL): every edge node maps to exactly one bucket and
+//     every bucket to one node, over at least two nodes each seen at least
+//     twice. The server is counting the Railway edge, not the client: hops
+//     too few for the real chain, or the edge leaks its own address.
+//   · SPOOFABLE (FAIL): this client's plain requests share one bucket, but a
+//     forged header lands in a different one.
+//   · PER-CLIENT (PASS): one bucket for this client across several edge
+//     nodes, and no forged header escapes it.
+//   · INCONCLUSIVE: one edge node only, a client whose own address changes
+//     between connections (some VPNs and carrier NATs), or too few samples
+//     from windows opened during the run. Run it from a fixed address, for
+//     example a CI runner or a server shell.
+//
+//   node tools/verify-deployment-proxy.mjs --origin https://staging.example.com
+//
+// Staging only, unless the owner asks for production: the requests are
+// harmless, but this lane does not probe production.
+// ─────────────────────────────────────────────────────────────────────────────
+import { request } from 'node:https';
+import { pathToFileURL } from 'node:url';
+
+const PATH = '/v1/content/published-index';
+const WINDOW_SECONDS = 60;
+// Fewer than the 60-a-minute limit even if every request shares one bucket.
+const PLAIN_REQUESTS = 24;
+const FORGED = [
+  { 'x-forwarded-for': '203.0.113.7' },
+  { 'x-forwarded-for': '203.0.113.7, 198.51.100.9' },
+  { 'x-forwarded-for': '203.0.113.7, 198.51.100.9, 192.0.2.44' },
+  { 'x-real-ip': '203.0.113.8' }
+];
+const FORGED_ROUNDS = 2;
+const REQUEST_TIMEOUT_MS = 15_000;
+// A run must finish inside one window, or a bucket could roll over mid-run.
+const RUN_BUDGET_MS = 50_000;
+
+/**
+ * Classify samples. Each sample is { node, reset, forged } with reset in
+ * seconds since the epoch. Only samples from windows opened during the run
+ * (reset >= startedAt + WINDOW_SECONDS - 1) are counted: a bucket that already
+ * existed when the run began can roll over halfway through it.
+ */
+export function classify(samples, startedAtSeconds) {
+  const fresh = samples.filter(s => s.node && Number.isFinite(s.reset) && s.reset >= startedAtSeconds + WINDOW_SECONDS - 1);
+  const plain = fresh.filter(s => !s.forged);
+  const forged = fresh.filter(s => s.forged);
+  const nodes = new Map();      // node → Set(bucket)
+  const buckets = new Map();    // bucket → Set(node)
+  const seen = new Map();       // node → plain samples
+  for (const s of plain) {
+    if (!nodes.has(s.node)) nodes.set(s.node, new Set());
+    nodes.get(s.node).add(s.reset);
+    if (!buckets.has(s.reset)) buckets.set(s.reset, new Set());
+    buckets.get(s.reset).add(s.node);
+    seen.set(s.node, (seen.get(s.node) || 0) + 1);
+  }
+  const facts = {
+    samples: samples.length, counted: fresh.length, plain: plain.length, forged: forged.length,
+    nodes: nodes.size, buckets: buckets.size
+  };
+  if (plain.length < 8) return { verdict: 'INCONCLUSIVE', reason: 'too few samples from windows opened during the run (wait a minute and run again)', facts };
+  if (nodes.size < 2) return { verdict: 'INCONCLUSIVE', reason: 'every request reached the same edge node, so node and client cannot be told apart', facts };
+  if (buckets.size === 1) {
+    const [only] = buckets.keys();
+    const escaped = forged.filter(s => s.reset !== only);
+    if (escaped.length) return { verdict: 'SPOOFABLE', reason: `${escaped.length} of ${forged.length} forged requests got a bucket of their own`, facts };
+    if (!forged.length) return { verdict: 'INCONCLUSIVE', reason: 'no forged request was counted', facts };
+    return { verdict: 'PER-CLIENT', reason: `one bucket for this client across ${nodes.size} edge nodes; no forged header escaped it`, facts };
+  }
+  const oneToOne = [...nodes.values()].every(set => set.size === 1) && [...buckets.values()].every(set => set.size === 1);
+  const repeated = [...seen.values()].every(n => n >= 2);
+  if (oneToOne && repeated) {
+    return { verdict: 'PER-EDGE-NODE', reason: `${nodes.size} edge nodes, ${buckets.size} buckets, one bucket per node: the server counts the Railway edge, not the client`, facts };
+  }
+  return { verdict: 'INCONCLUSIVE', reason: 'buckets vary within an edge node: this client\'s own address changes between connections; run from a fixed address', facts };
+}
+
+function probe(origin, headers = {}) {
+  return new Promise(resolve => {
+    // agent: false — a new connection (and so a fresh edge choice) per request.
+    const req = request(new URL(PATH, origin), { method: 'GET', agent: false, headers: { 'user-agent': 'pri-verify-deployment-proxy', ...headers }, timeout: REQUEST_TIMEOUT_MS }, res => {
+      res.resume();
+      const node = String(res.headers['x-hikari-trace'] || res.headers['x-railway-edge'] || '');
+      const reset = Number(res.headers['ratelimit-reset']);
+      resolve({ status: res.statusCode, node, reset, remaining: Number(res.headers['ratelimit-remaining']) });
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', err => resolve({ status: 0, node: '', reset: NaN, error: String(err.message || err) }));
+    req.end();
+  });
+}
+
+export async function verifyProxyIdentity({ origin }) {
+  const started = Date.now();
+  const startedAt = Math.floor(started / 1000);
+  const samples = [];
+  const order = [];
+  for (let i = 0; i < PLAIN_REQUESTS; i++) order.push(null);
+  for (let r = 0; r < FORGED_ROUNDS; r++) for (const h of FORGED) order.push(h);
+  for (const headers of order) {
+    if (Date.now() - started > RUN_BUDGET_MS) break;
+    const s = await probe(origin, headers || {});
+    samples.push({ ...s, forged: !!headers, forgedWith: headers ? Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('') : null });
+  }
+  const result = classify(samples, startedAt);
+  return { ...result, samples, elapsedMs: Date.now() - started };
+}
+
+function parseArgs(argv) {
+  const args = { origin: null };
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--origin') { args.origin = argv[++i]; continue; }
+    throw new Error(`Unknown argument: ${argv[i]}`);
+  }
+  if (!args.origin || !/^https:\/\/[^/]+\/?$/.test(args.origin)) throw new Error('--origin https://host is required');
+  return args;
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const { origin } = parseArgs(process.argv.slice(2));
+  const out = await verifyProxyIdentity({ origin });
+  const byNode = new Map();
+  for (const s of out.samples) {
+    const k = `${s.node || '(no node)'} bucket ${Number.isFinite(s.reset) ? s.reset : '?'}`;
+    byNode.set(k, (byNode.get(k) || 0) + 1);
+  }
+  for (const [k, n] of [...byNode.entries()].sort()) console.log(`  ${String(n).padStart(3)} × ${k}`);
+  const errors = out.samples.filter(s => s.status !== 200);
+  if (errors.length) console.log(`  ${errors.length} request(s) did not answer 200: ${[...new Set(errors.map(s => s.status || s.error))].join(', ')}`);
+  console.log(`  ${JSON.stringify(out.facts)} in ${Math.round(out.elapsedMs / 1000)} s`);
+  console.log(`PROXY IDENTITY: ${out.verdict} — ${out.reason} (${origin}, ${new Date().toISOString()})`);
+  process.exit(out.verdict === 'PER-CLIENT' ? 0 : out.verdict === 'INCONCLUSIVE' ? 2 : 1);
+}
