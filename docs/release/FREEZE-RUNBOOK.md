@@ -39,7 +39,13 @@ All of these hold on the tip of `main`:
 
 1. Every merge train has landed. There are no open P0 or P1 issues at the tip (D6;
    `docs/release/open-pr-dispositions.md`), and every remaining open PR has a recorded verdict.
-2. The four required contexts are green on the tip (`docs/release/release-policy.md`).
+2. The four required contexts are green on the tip (`docs/release/release-policy.md`), and
+   **Main Integrity is green on the tip.** Main Integrity fails a merge whose pull request still had
+   any workflow cancelled, failed or timed out on its head. Train 1 (`63deeb757`) was merged with
+   18 cancelled workflows on #749's head. When Main Integrity fails, the chained Release Staging
+   Proof is skipped and `release-nominate` refuses the SHA. So before a train merges, the workflows
+   on its head must have finished green (run them again rather than leave them cancelled), or that
+   merge can never be the candidate.
 3. Staging serves the tip: the `Release Staging Proof` run on the tip is green, which means
    `verify:deployment` passed 14/14 on staging. The `Staging Journey Proof` of #746 is green too,
    once that PR is on `main`.
@@ -91,7 +97,7 @@ the operator. `SHA` is the full 40-hex commit.
 | nomination (release stage): device matrix | F9. Every case passes; or every iPhone and iPad case passes and an authenticated public-release waiver names `device-matrix:AND` and `device-matrix:ANT` (the family waivers of L9's device-matrix PR, branch `task/l9-device-matrix-d1`). The whole-matrix `device-matrix` waiver remains as it was | device testers; owner for the waiver |
 | nomination (release stage): reader evidence | F6 + F10 with ≥ 20 writers and ≥ 1,000 expressions (the real-writer study), or an authenticated waiver naming `reader-evidence` | owner and writers |
 | dossier 21: candidate frozen | F2, by a named human, at a time in the past | owner |
-| dossier 25: Release Staging Proof on the SHA | green on the SHA (Main Integrity starts it after the merge) | — |
+| dossier 25: Release Staging Proof on the SHA | it concluded `success` on the SHA (`skipped` does not count). It runs only after Main Integrity passes on the merge (§2 item 2) | the Director, who keeps train heads free of cancelled runs |
 | dossier 25: soak ≥ 24 h, watched, no incident, staging built before the soak, `main` still at the SHA | F7, F12, and no merge during the freeze | soak watcher; Director keeps the freeze |
 | dossier: acceptance A–D | F8 | acceptance tester |
 | dossier 23: examiner, counsel, security, native, store, data | F11 | gate signers |
@@ -117,8 +123,11 @@ the operator. `SHA` is the full 40-hex commit.
   (`docs/operations/production-config-v1.md` note 7).
 - **One SHA, one record.** Nothing carries over to a new SHA: no soak, no sign-off, no device row,
   no GO.
+- **No cancelled run on a train's head.** A train merged while workflows on its head were cancelled
+  turns Main Integrity red on `main`, skips the Release Staging Proof and refuses F4 on that SHA
+  (`63deeb757`, §6).
 
-## 6. Rehearsal on `main` = `1d3829103`, 9 Nov 2026
+## 6. Rehearsal on `main` = `1d3829103` and `63deeb757`, 9 Nov 2026
 
 The rehearsal was read-only. Nothing was dispatched, frozen or nominated for real. The record and
 the dossier were written to a scratch directory outside the repository. Times are UTC.
@@ -154,7 +163,20 @@ recorded.
 the acceptance row failed. The 25 h window and the staging build time in that same record
 passed, which shows the refusal came from the names alone.
 
-**Defect found and fixed in this PR.** Row 21 reported an agent's name as
+**Re-run on `63deeb757`** (Train 1, merged 14:37 UTC), with the same command: **`CANDIDATE: FAIL —
+18/20`**. Two rows failed:
+
+- **Production Container:** it did not run, as on `1d3829103`.
+- **No workflow run failed or was cancelled:** Main Integrity's `push` run on `63deeb757` failed,
+  because #749 was merged while 18 of its pull-request workflows were cancelled.
+
+Because Main Integrity failed, the Release Staging Proof was **skipped** on `63deeb757`, although
+staging serves that SHA. §2 item 2 now requires Main Integrity to be green before the freeze.
+
+**Two defects found and fixed in this PR.** First, the dossier counted a **skipped** Release Staging
+Proof as green, so a SHA whose staging proof never ran passed step 25. Before the fix, the dossier
+was `GO-READY` with a skipped proof; now only `success` counts (`tools/release-prep.test.mjs`, one
+new check, which fails without the fix). Second, row 21 reported an agent's name as
 "`candidate.frozenAt / candidate.by not recorded`", which would send the operator looking for a
 field that is already filled in. It now names what is wrong: the declarer is not a human, the
 time is missing, the time is not a date, or the time is in the future

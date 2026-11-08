@@ -572,6 +572,9 @@ const scratch = [];
   await noGo('main moved past the SHA (soak void)', () => {}, /merge freeze held/, w => { w.tip = OTHER; });
   await noGo('the Release Staging Proof never ran on the SHA', () => {}, /Release Staging Proof/, w => { w.runs = w.runs.filter(run => run.name !== 'Release Staging Proof'); });
   await noGo('the Release Staging Proof is red on the SHA', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'failure'; });
+  // Found re-running the freeze rehearsal on 63deeb757 (Train 1): Main Integrity failed on the
+  // merge, so the chained Release Staging Proof was SKIPPED, and a skipped run counted as green.
+  await noGo('the Release Staging Proof was skipped on the SHA (it verified nothing)', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'skipped'; });
   await noGo('a gate is NOT_RECORDED', r => { r.gates.counsel = { status: 'NOT_RECORDED' }; }, /counsel/);
   await noGo('a gate is BLOCKED', r => { r.gates.store = { status: 'BLOCKED', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: 'Paid Apps Agreement not signed' }; }, /Store readiness/);
   await noGo('a gate PASS is unsigned', r => { r.gates.examiner.by = ''; }, /examiner/);

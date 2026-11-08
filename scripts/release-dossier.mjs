@@ -206,8 +206,11 @@ export async function buildDossier({
   try {
     runsOnSha = await ghAll(gh, `repos/${repo}/actions/runs?head_sha=${expected}&per_page=${GH_PAGE}`, 'workflow_runs');
     const proof = evaluateRuns(runsOnSha.filter(run => run?.name === PROOF_WORKFLOW));
-    const green = proof.latest.filter(run => run.status === 'completed' && GREEN.has(run.conclusion));
-    row(25, green.length > 0 && proof.red.length === 0 && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
+    // `success` only: a skipped proof verified nothing. Release Staging Proof is skipped whenever Main
+    // Integrity did not pass on the merge (63deeb757, Train 1: 18 cancelled PR workflows), and a
+    // skipped run must never stand in for the 14/14 it did not run.
+    const green = proof.latest.filter(run => run.status === 'completed' && run.conclusion === 'success');
+    row(25, green.length > 0 && green.length === proof.latest.length && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
       proof.latest.length ? proof.latest.map(run => `${run.event || 'run'}: ${run.status}/${run.conclusion || '…'}${run.html_url ? ' ' + run.html_url : ''}`).join('; ') : `no ${PROOF_WORKFLOW} run has this head SHA (dispatch it, or wait for Main Integrity to trigger it)`);
   } catch (error) {
     if (error?.code === 'ENOENT') throw Object.assign(new Error('gh (GitHub CLI) is not installed or not on PATH'), { code: 'DEPENDENCY' });
