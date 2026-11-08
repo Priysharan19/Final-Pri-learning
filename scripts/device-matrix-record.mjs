@@ -321,13 +321,18 @@ export function casesMarkdown() {
   return lines.join('\n');
 }
 
+// Ledger fields are free text typed by a tester (or edited by hand): flatten
+// every line ending and escape backslashes before pipes so a note can never add
+// a forged row or column to the matrix table the GO/NO-GO dossier embeds.
+function mdCell(text) { return String(text ?? '').replace(/\r\n|[\r\n\u000b\u000c\u0085\u2028\u2029]/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|'); }
+
 export function reportMarkdown(summary, soak = { soaks: [], minutes: 0, failures: 0 }) {
   const scope = `${summary.sha ? `build ${summary.sha}` : 'all builds'}${summary.buildKind ? ` · ${summary.buildKind} builds` : ' · every build kind (development and store rows are listed, never merged into one verdict)'}`;
   const lines = [
     `Physical-device matrix — ${scope} — pass ${summary.counts.pass} · fail ${summary.counts.fail} · blocked ${summary.counts.blocked} · not run ${summary.counts['not run']} of ${summary.rows.length} — open defects P0 ${summary.bySeverity.P0} · P1 ${summary.bySeverity.P1} · P2 ${summary.bySeverity.P2} · P3 ${summary.bySeverity.P3}${summary.releaseBlocking ? ` — ${summary.releaseBlocking} RELEASE-BLOCKING` : ''}`,
     '',
     `Rows by build kind: ${BUILD_KINDS.map(k => `${k} pass ${summary.byBuildKind[k].pass} / fail ${summary.byBuildKind[k].fail} / blocked ${summary.byBuildKind[k].blocked}`).join(' · ')}`,
-    `Soak: ${soak.soaks.length} record(s), ${soak.minutes} min in total, ${soak.failures} failure(s)${soak.soaks.length ? ` — ${soak.soaks.map(s => `${s.device} (${s.os}, ${s.buildKind} → ${s.server}) ${s.minutes} min by ${s.tester}, ${s.failures} failure(s)`).join('; ')}` : ''}`,
+    `Soak: ${soak.soaks.length} record(s), ${soak.minutes} min in total, ${soak.failures} failure(s)${soak.soaks.length ? ` — ${soak.soaks.map(s => `${mdCell(s.device)} (${mdCell(s.os)}, ${mdCell(s.buildKind)} → ${mdCell(s.server)}) ${mdCell(s.minutes)} min by ${mdCell(s.tester)}, ${mdCell(s.failures)} failure(s)`).join('; ')}` : ''}`,
     '',
     '| Case | Group | Result | Severity | Device | OS | Pencil | Build | Server | Build SHA | Tester | Recorded | Notes |',
     '|---|---|---|---|---|---|---|---|---|---|---|---|---|'
@@ -335,7 +340,7 @@ export function reportMarkdown(summary, soak = { soaks: [], minutes: 0, failures
   for (const row of summary.rows) {
     const r = row.latest;
     lines.push(r
-      ? `| \`${row.id}\` | ${row.group} | ${r.result.toUpperCase()} | ${r.severity || '—'} | ${r.device || '—'} | ${r.os || '—'} | ${r.pencil || '—'} | ${r.buildKind || '—'} | ${r.server || '—'} | \`${r.sha.slice(0, 12)}\` | ${r.tester || '—'} | ${r.recordedAt.slice(0, 10)} | ${r.notes || ''} |`
+      ? `| \`${mdCell(row.id)}\` | ${mdCell(row.group)} | ${mdCell(String(r.result).toUpperCase())} | ${mdCell(r.severity || '—')} | ${mdCell(r.device || '—')} | ${mdCell(r.os || '—')} | ${mdCell(r.pencil || '—')} | ${mdCell(r.buildKind || '—')} | ${mdCell(r.server || '—')} | \`${mdCell(String(r.sha).slice(0, 12))}\` | ${mdCell(r.tester || '—')} | ${mdCell(String(r.recordedAt).slice(0, 10))} | ${mdCell(r.notes || '')} |`
       : `| \`${row.id}\` | ${row.group} | not run | — | — | — | — | — | — | — | — | — | |`);
   }
   lines.push('', 'Every PASS/FAIL row is PHYSICAL-HUMAN evidence recorded by the named tester on real hardware, on the build kind and server it names. Simulator/emulator results are never written here (CI holds them). "not run" rows are open until a human records them. A release needs zero open P0 and P1 on the store build against production.');

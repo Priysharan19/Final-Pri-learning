@@ -110,7 +110,7 @@ async function run() {
     'the compile-time constant follows the state');
   ok(featureDefines('build', {}).__PRI_FEATURE_PLACEMENT__ === 'false', 'and the placement constant is untouched');
   ok(!FEATURE_FLAGS.includes('EXTENDED_TRACKS') && PENDING_FEATURE_FLAGS.includes('EXTENDED_TRACKS'),
-    'the flag is recorded in features.json but not yet asserted on the tracked iPad bundles, which predate it');
+    'the flag is recorded in features.json but not yet asserted off in the generated iPad bundles');
 
   // ── 2 · features.js honours the constant ───────────────────────────────────
   {

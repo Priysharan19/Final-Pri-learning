@@ -70,10 +70,11 @@ node scripts/device-matrix-record.mjs soak --device "iPad Pro 11-inch (4th gener
 
 ## Before a session
 
-1. The build is a nominated `main` SHA (`node scripts/release-nominate.mjs <sha>`): a development build of
-   it on your paired device pointed at staging, or, after promotion, the store build from its test track
-   (TestFlight; Play internal testing). Write down the SHA the app's diagnostics show — it is recorded with
-   every case and must equal the nominated one — and the build kind and server.
+1. The build is a nominated `main` SHA (`node scripts/release-nominate.mjs <sha> --candidate`; the
+   release-stage run without `--candidate` later requires this matrix to be complete for the SHA): a
+   development build of it on your paired device pointed at staging, or, after promotion, the store build
+   from its test track (TestFlight; Play internal testing). Write down the SHA the app's diagnostics show —
+   it is recorded with every case and must equal the nominated one — and the build kind and server.
 2. The server side of the same journey already passed on staging without a device:
    `node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<name>"` (steps 0, A–E).
    A device case that fails where the staging acceptance passed is a shell or input defect; one that

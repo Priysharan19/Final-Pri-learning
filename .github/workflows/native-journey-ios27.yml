@@ -89,10 +89,26 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
 
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
+
+      # The web bundle inside the package is generated, never tracked (D28):
+      # build the client and sync it into both packages before the one
+      # xcodebuild below, and prove the sync is complete. Without this the
+      # simulator app carries an empty Web folder and the journey fails at the
+      # first page.
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Build the web client and generate the iOS web bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
 
       # The toolchain is what this lane says it is, or the lane stops here.
       - name: Pinned toolchain (Xcode 27.1, iOS 27.0 simulator runtime)

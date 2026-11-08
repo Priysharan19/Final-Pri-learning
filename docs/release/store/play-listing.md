@@ -1,6 +1,6 @@
 # Google Play listing — Pri Learning (draft)
 
-**Status:** draft prepared 2026-10-18. Android phones and tablets are **in V1** since the owner's
+**Status:** original price-gated draft prepared 2026-10-18; reconciled against `98a30194caf349885a24b11d75edf01ac50df428` on 20 October. A conservative price-unverified public-copy candidate is preserved in `task04-acceptance/02-Google-Play-Listing-and-Assets.md` (a passing price-match source check is not live-price evidence). Android phones and tablets are **in V1** since the owner's
 scope change of 2026-10-16 (`docs/release/PRI_V1_RELEASE_SCOPE.md` §22, issue #504); Google Play
 Billing certification is a release blocker (§22.2). **Not entered in Play Console.** The same truthfulness
 rules as `app-store-listing.md` apply: no superiority, accuracy, syllabus-complete or
@@ -8,7 +8,8 @@ production-ready claims.
 
 | Fact | Value |
 |---|---|
-| Package name | `com.prilearning.app` — **OWNER** confirms against `android/app/build.gradle` `applicationId` before creating the app (the package name cannot be changed later) |
+| Package name | `com.prilearning.app` — verified `android/app/build.gradle.kts` `applicationId`; owner still verifies Play Console app identity and signing |
+| Android version contract | `versionName "4.0"`, `minSdk 26`, `targetSdk 36`; `versionCode` is a positive operator-supplied unique integer for release |
 | Devices | Android phones and tablets (V1, §22.1) |
 | Billing | Google Play Billing (`server/platform/googleBilling.js`); web/Razorpay purchasing is out of V1 |
 | Intended prices | ₹199 / month, ₹1,499 / year — **OWNER** creates and prices the Play subscription products; they are separate from the App Store products |
@@ -138,15 +139,14 @@ not apply for the "Teacher Approved" programme until counsel has reviewed the co
 |---|---|
 | App icon | 512 × 512 PNG, 32-bit, the P′ mark (owner decision 2026-10-02) — **generated:** `docs/release/store/play/icon-512.png` |
 | Feature graphic | 1024 × 500 JPG or 24-bit PNG; wordmark, P′ mark and the first sentence of the short description on ruled paper; no price or ranking text — **generated:** `docs/release/store/play/feature-graphic-1024x500.png` (24-bit RGB, no alpha) |
-| Phone screenshots | 2–8, 16:9 or 9:16, each side 320–3840 px; at least 4 at 1080 px or more for promotion eligibility |
-| 7-inch tablet screenshots | Up to 8; required for tablet listing |
-| 10-inch tablet screenshots | Up to 8; required for tablet listing |
+| Phone screenshots | Play requires at least two screenshots across device types. Up to 8 phone shots; 24-bit PNG/JPEG, each side 320–3840 px, with longer side no more than twice the shorter; four ≥1080px 9:16 or 16:9 shots are recommended for discovery |
+| 7-inch tablet screenshots | Up to 8; include genuine app captures in the applicable Console slot; Google recommends at least 4 large-screen shots, 1080–7680 px, 16:9 or 9:16 |
+| 10-inch tablet screenshots | Up to 8; verify current Console slot and capture from exact reviewed build, not fixture screenshots |
 
 Both graphics are rendered by `node tools/play-graphics.mjs` from `client/public/favicon.svg` and the
 `client/src/theme.css` tokens; `node tools/play-listing-check.mjs` checks §1 and the graphics.
 
-**Screenshots: still to capture — none exist yet.** They must be real captures from the Android
-release build on hardware or an emulator; none are generated or mocked.
+**Existing screenshots (19 October 2026):** twelve genuine **Android 36 emulator** captures under `docs/release/store/play/screenshots/` (six phone, six tablet). Their `README.md` records a local fixture server/account and injected synthetic writing strokes. They do **not** prove physical-device, production or final signed-build acceptance. New exact-release captures remain required. The Pixel 7 1080×2400 image is taller than Play's general 2:1 screenshot aspect maximum: do not directly upload it without compliant truthful recapture/crop.
 
 Shots (same order and captions as `app-store-listing.md` §7, captured on Android hardware from the
 release build with demo data): handwriting in progress; reading shown back with the correction

@@ -37,7 +37,7 @@ node scripts/ink-physical-study-status.mjs       # today: collected writers: 0 �
 node tools/legal-status.mjs                      # today: 7 placeholders across 8 documents
 ```
 
-Software is not the blocker for V1. The rows below are.
+Software correctness and release acceptance are also blockers until independently proved (central issue #686). The rows below are operational prerequisites, not evidence that marking, login, handwriting, physical devices or store gates are already certified.
 
 ---
 
@@ -46,7 +46,7 @@ Software is not the blocker for V1. The rows below are.
 | Step | Who | Action | Evidence it produces | Gate that consumes it |
 |---|---|---|---|---|
 | 1.1 | owner | Nominate one exact `main` SHA as the candidate; write it into the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11) | the SHA in the release record | every later row |
-| 1.2 | owner (Railway) | Change the production service's **source branch** from `task/pri-03-handwriting-production-wiring` to `main` and deploy the nominated SHA | `curl -fsS https://<origin>/v1/health` → `releaseIdentity.releaseSha` = nominated SHA | `docs/release/release-policy.md` "Production must not remain sourced from a feature branch"; `PRI_R1_SCOPE_EVIDENCE.md` §2.10 |
+| 1.2 | owner (Railway) | Confirm the production service remains sourced from **`deploy/production`**, never directly from `main`. Only after the staging soak, required evidence and exact-SHA founder GO, perform the approved fast-forward of `deploy/production` to the nominated `main` SHA; do not reconnect the service or deploy early. | `curl -fsS https://<origin>/v1/health` → `releaseIdentity.releaseSha` = approved SHA, after authorised promotion | `docs/release/release-policy.md` "Staging first, production by promotion"; `docs/operations/postgres-cutover.md` §4.6 |
 | 1.3 | operator | `npm run build && npm run sync:ios && npm run verify:release:native && npm run release:matrix` on the nominated SHA | matrix output pasted into the release record | CI contexts *Client build and offline-first boundary*, release matrix |
 | 1.4 | owner (GitHub) | Set the App Health workflow variable `PRI_APP_URL` to the live origin | `.github/workflows/app-health-agent.yml` runs green against the live origin | release evidence (`docs/production-deployment.md` §6) |
 

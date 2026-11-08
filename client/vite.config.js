@@ -414,9 +414,9 @@ function releaseIdentityManifest(identity) {
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
 export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 // Flags built and recorded in features.json like the ones above, but not yet
-// asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
-// check.mjs), because those bundles predate the flag and carry no record of
-// it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
+// asserted off in the generated iPad bundles (client/test/ios-bundle-features-
+// check.mjs, run by the CI build job right after `npm run sync:ios`). Move a
+// name into FEATURE_FLAGS once every build that ships is made with it off.
 //   EXTENDED_TRACKS — the Olympiad track and the Teacher role in onboarding,
 //   classroom panels for students (src/platform/features.js).
 //   EXAM_HANDWRITING — handwriting as an input in TIMED exams (the exam room's
@@ -444,7 +444,7 @@ export function featureDefines(command, env = process.env) {
 }
 
 // The flags a build was made with, written beside it as features.json so the
-// tracked iPad bundles can be checked for a flag-on test build committed by
+// generated iPad bundles can be checked for a flag-on test build synced by
 // mistake (client/test/ios-bundle-features-check.mjs). Records every known
 // PRI_FEATURE_* flag, including ones whose code lives on other branches.
 function featureManifest(states) {

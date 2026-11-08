@@ -7,16 +7,18 @@
 // "pictures" are byte strings. No network, no provider, no mailbox.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
-  CONTAINER_CONTEXT, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, evaluateRuns, ghAll, latestCheckRuns, nominate,
-  parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands
+  CONTAINER_CONTEXT, EVIDENCE_REQUIREMENTS, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
+  goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker,
+  READER_FLOORS, RELEASE_CANDIDATE_JOBS, RELEASE_CANDIDATE_WORKFLOW, readerArtifactName, readerFloorProblems, releaseCandidateRun, releaseCandidateTitle
 } from '../scripts/release-nominate.mjs';
+import { EXTERNAL_GATES, LINE_BREAKS, buildDossier, cell, inline, para, parseArgs as parseDossierArgs, recordProblems, recordTemplate, renderMarkdown } from '../scripts/release-dossier.mjs';
 import {
   BUILD_KINDS, CASES, DEFAULT_LEDGER, FAMILIES, GROUPS, JOURNEY, SEVERITIES, SOAK_MIN_MINUTES, casesMarkdown, problemsWith, readLedger, recordResult, recordSoak, reportMarkdown, soakLedgerFor, soakSummary, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
@@ -30,14 +32,16 @@ let count = 0;
 const ok = (value, message) => { assert.ok(value, message); count += 1; };
 const eq = (actual, expected, message) => { assert.equal(actual, expected, message); count += 1; };
 const read = path => readFileSync(join(ROOT, path), 'utf8');
+const DEFAULT_REPO_FOR_TESTS = 'Priysharan19/Final-Pri-learning';
 const SHA = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
 const PROD_POINTER = 'c'.repeat(40);
 const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // ═════════════════════════════════════════════════════════════════════════════
-// 1 · release-nominate: the gate, with git, gh and the hosts stubbed
+// 1 · release-nominate: the gate, with git, gh, the hosts and the evidence ledgers stubbed
 // ═════════════════════════════════════════════════════════════════════════════
+const scratch = [];
 {
   const schemaSource = `export const SCHEMA_VERSION = ${SCHEMA_VERSION};\nexport const BILLING_SCHEMA_VERSION = ${BILLING_SCHEMA_VERSION};\n`;
   eq(parseSchemaVersions(schemaSource).schemaVersion, SCHEMA_VERSION, 'parseSchemaVersions reads SCHEMA_VERSION');
@@ -46,39 +50,182 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   assert.throws(() => parseNominateArgs([]), /40-hex/, 'a SHA is required'); count += 1;
   assert.throws(() => parseNominateArgs([SHA, '--bogus']), /Unknown argument/, 'unknown flags are refused'); count += 1;
+  assert.throws(() => parseNominateArgs([SHA, '--production-engine', 'mysql']), /postgres or sqlite/, '--production-engine takes postgres or sqlite only'); count += 1;
+  assert.throws(() => parseNominateArgs([SHA, '--override']), /needs a value/, '--override needs a path'); count += 1;
   const parsed = parseNominateArgs([SHA, '--no-fetch', '--staging', 'https://s.example', '--json']);
-  ok(parsed.sha === SHA && parsed.fetch === false && parsed.staging === 'https://s.example' && parsed.json === true, 'parseArgs reads the SHA and flags');
+  ok(parsed.sha === SHA && parsed.fetch === false && parsed.staging === 'https://s.example' && parsed.json === true && parsed.stage === 'release', 'parseArgs reads the SHA and flags; the default stage is release');
+  const cand = parseNominateArgs([SHA, '--candidate', '--override', 'x.json', '--production-engine', 'postgres']);
+  ok(cand.stage === 'candidate' && cand.override === 'x.json' && cand.productionEngine === 'postgres', 'parseArgs reads --candidate, --override and --production-engine');
 
   const runs = evaluateRuns([
-    { name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success' },
-    { name: 'Derived apply', path: '.github/workflows/x.yml', status: 'completed', conclusion: 'skipped' },
-    { name: 'dependabot', path: 'dynamic/dependabot/dependabot-updates', status: 'completed', conclusion: 'failure' }
+    { name: 'CI', path: '.github/workflows/ci.yml', event: 'push', status: 'completed', conclusion: 'success' },
+    { name: 'Derived apply', path: '.github/workflows/x.yml', event: 'workflow_run', status: 'completed', conclusion: 'skipped' },
+    { name: 'dependabot', path: 'dynamic/dependabot/dependabot-updates', event: 'dynamic', status: 'completed', conclusion: 'failure' }
   ]);
   ok(runs.ok && runs.ignored.length === 1 && runs.relevant.length === 2, 'Dependabot version-update runs are listed, not counted; skipped is green');
   ok(!evaluateRuns([{ name: 'CI', path: 'a.yml', status: 'in_progress', conclusion: null }]).ok, 'an in-progress run blocks');
   ok(!evaluateRuns([{ name: 'CI', path: 'a.yml', status: 'completed', conclusion: 'cancelled' }]).ok, 'a cancelled run blocks');
   ok(!evaluateRuns([]).ok, 'no run at all blocks');
+  // Dedupe by (workflow, event): the newest run of each decides.
+  const health = (conclusion, at, extra = {}) => ({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion, run_started_at: at, ...extra });
+  const flaky = evaluateRuns([health('failure', '2026-10-23T18:15:00Z', { run_number: 40 }), health('success', '2026-10-24T18:15:00Z', { run_number: 41 })]);
+  ok(flaky.ok && flaky.superseded.length === 1 && flaky.superseded[0].conclusion === 'failure' && flaky.latest.length === 1, 'a flaky scheduled run superseded by a later green schedule on the same SHA is listed, not counted');
+  const genuine = evaluateRuns([health('success', '2026-10-23T18:15:00Z', { run_number: 40 }), health('failure', '2026-10-24T18:15:00Z', { run_number: 41 })]);
+  ok(!genuine.ok && genuine.red.length === 1, 'a workflow whose newest run is red still disqualifies the SHA (a genuine failure reproduces)');
+  const otherEvent = evaluateRuns([
+    { name: 'CI', workflow_id: 2, event: 'push', status: 'completed', conclusion: 'success', run_started_at: '2026-10-23T18:20:00Z' },
+    { name: 'CI', workflow_id: 2, event: 'pull_request', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-23T18:15:00Z' }
+  ]);
+  ok(!otherEvent.ok && otherEvent.latest.length === 2, 'a later run of a different event never supersedes a red run (push does not stand in for pull_request)');
+  const stillRunning = evaluateRuns([health('failure', '2026-10-23T18:15:00Z'), { ...health(null, '2026-10-24T18:15:00Z'), status: 'in_progress' }]);
+  ok(!stillRunning.ok && stillRunning.pending.length === 1 && stillRunning.superseded.length === 1, 'a newer run still in progress supersedes the red one but blocks until it completes');
+  const sameStamp = evaluateRuns([health('failure', '2026-10-23T18:15:00Z', { run_number: 40, run_attempt: 1 }), health('success', '2026-10-23T18:15:00Z', { run_number: 40, run_attempt: 2 })]);
+  ok(sameStamp.ok, 'with equal start times the higher attempt wins');
+  eq(runGroupKey({ workflow_id: 7, event: 'schedule' }), 'id:7|schedule', 'runs group by workflow id and event');
+  eq(runGroupKey({ path: 'a.yml', event: 'push' }), 'path:a.yml|push', 'without a workflow id the path identifies the workflow');
   const latest = latestCheckRuns([
     { name: 'J', status: 'completed', conclusion: 'failure', completed_at: '2026-10-18T10:00:00Z' },
     { name: 'J', status: 'completed', conclusion: 'success', completed_at: '2026-10-18T11:00:00Z' }
   ]);
   eq(latest.get('J').conclusion, 'success', 'a rerun replaces the earlier attempt of the same check');
 
-  // The promotion commands are the ones release-policy.md prints.
+  // The promotion commands are the ones release-policy.md prints; the verify
+  // command takes the engine production serves.
   const policy = read('docs/release/release-policy.md');
-  const commands = promotionCommands(SHA);
+  const commands = promotionCommands(SHA, { engine: 'sqlite' });
   for (const generic of ['git merge-base --is-ancestor <approved-sha> origin/main', 'git merge-base --is-ancestor origin/deploy/production <approved-sha>', 'git push origin <approved-sha>:refs/heads/deploy/production']) {
     ok(policy.includes(generic), `release-policy.md still documents: ${generic}`);
     ok(commands.some(line => line.startsWith(generic.replace(/<approved-sha>/g, SHA))), `promotion prints: ${generic.replace(/<approved-sha>/g, '<sha>')}`);
   }
   ok(commands.some(line => line.includes(`${PRODUCTION_ORIGIN}/v1/health`)), 'promotion ends with the production health check');
+  ok(commands.some(line => /--engine sqlite --persistent-storage-proven --auth-email-proven$/.test(line)), 'on SQLite the verify command asks for the persistent-storage proof');
+  ok(promotionCommands(SHA, { engine: 'postgres' }).some(line => /--engine postgres --auth-email-proven$/.test(line)) && !promotionCommands(SHA, { engine: 'postgres' }).some(line => /persistent-storage/.test(line)), 'on Postgres the verify command names postgres and no storage proof');
+  assert.throws(() => promotionCommands(SHA), /production engine/, 'the promotion commands cannot be printed without the engine'); count += 1;
+
+  // ── evidence fixtures: a device ledger and a reader-evaluation directory ──
+  // A reader report that clears Gate C's floors (READER_FLOORS), measured inside
+  // the fixture Release Candidate run's window (09:00–11:00 on 30 Oct).
+  const READER_CORPUS = { writers: 24, samples: 1200, split: 'test' };
+  const READER_RESULTS = { exact: 1190, lines: 1200, charPct: 99.8, worstWriterExactPct: 95.0, providerErrors: 0 };
+  function evidence({ device = 'complete', reader = 'at-sha', readerFields = {} } = {}) {
+    const dir = mkdtempSync(join(tmpdir(), 'pri-nominate-evidence-'));
+    scratch.push(dir);
+    const ledger = join(dir, 'results.jsonl');
+    const lines = [];
+    if (device !== 'none') {
+      for (const kase of CASES) {
+        const android = kase.family === 'AND' || kase.family === 'ANT';
+        const failing = device === 'one-fail' && kase.id === 'DM-IPH-02-OTP';
+        const sha = device === 'other-sha' ? OTHER : SHA;
+        const blocked = device === 'all-blocked' || (device === 'android-blocked' && android);
+        if (!blocked && android) {
+          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          continue;
+        }
+        lines.push(JSON.stringify(blocked
+          ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no device of this family available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
+          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+      }
+      if (device === 'one-missing') lines.pop();
+    }
+    writeFileSync(ledger, lines.length ? lines.join('\n') + '\n' : '');
+    const readerDir = join(dir, 'cloud-reader-eval');
+    mkdirSync(readerDir);
+    if (reader !== 'none') {
+      writeFileSync(join(readerDir, '2026-10-30.json'), JSON.stringify({
+        format: 'pri-cloud-reader-eval', version: 1, evidenceClass: reader === 'dry-run' ? 'synthetic-dry-run' : 'real-human', measuredAt: '2026-10-30T10:00:00Z',
+        releaseSha: reader === 'other-sha' ? OTHER : reader === 'no-sha' ? undefined : SHA, corpus: READER_CORPUS, results: READER_RESULTS, ...readerFields
+      }));
+    }
+    return { dir, ledger, readerDir };
+  }
+  {
+    const full = evidence();
+    eq(validateLedger(full.ledger).length, 0, 'the complete device fixture passes the recorder\'s own validation (it is what a real ledger would hold)');
+    const dev = deviceEvidence(SHA, { ledger: full.ledger });
+    ok(dev.ok && dev.counts.pass === 36 && dev.counts.blocked === 0 && /device-complete/.test(dev.detail), 'deviceEvidence: every case of all four families passed on real hardware is device-complete');
+    const androidBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'android-blocked' }).ledger });
+    ok(!androidBlocked.ok && androidBlocked.counts.pass === 18 && androidBlocked.counts.blocked === 18 && androidBlocked.incompleteFamilies.join(',') === 'AND,ANT' && /never acceptance/.test(androidBlocked.detail),
+      'deviceEvidence: Android families blocked for lack of hardware are reported by name and are NOT device-complete (V1 scope §22.1: each device class)');
+    const allBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'all-blocked' }).ledger });
+    ok(!allBlocked.ok && allBlocked.counts.pass === 0 && allBlocked.counts.blocked === 36, 'deviceEvidence: a matrix of 36 blocked rows and no physical pass is not acceptance (Q4 #696 counterexample)');
+    ok(!deviceEvidence(OTHER, { ledger: full.ledger }).ok, 'deviceEvidence: another SHA has no evidence of its own');
+    ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-fail' }).ledger }).ok, 'deviceEvidence: one fail is incomplete');
+    ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-missing' }).ledger }).ok, 'deviceEvidence: one not-run case is incomplete');
+    const rd = readerEvidence(SHA, { dir: full.readerDir });
+    ok(rd.ok && rd.file === '2026-10-30.json' && /24 writer/.test(rd.detail) && /clears Gate C floors/.test(rd.detail), 'readerEvidence: a real-human report naming the SHA and clearing Gate C\'s floors counts');
+    // Gate C's floors (Q4 #696 holdout 13: 0/1 exact from 1 writer is not a measurement).
+    const C = fields => ({ ...READER_CORPUS, ...fields });
+    const R = fields => ({ ...READER_RESULTS, ...fields });
+    const floorDrifts = [
+      ['the Q4 holdout: 0/1 exact from one writer', { corpus: { writers: 1, samples: 1, split: 'test' }, results: { exact: 0, lines: 1 } }, /1 writer\(s\), floor 20/],
+      ['the old fixture: 31/40 from 3 writers', { corpus: C({ writers: 3, samples: 40 }), results: R({ exact: 31, lines: 40 }) }, /3 writer\(s\), floor 20/],
+      ['19 writers', { corpus: C({ writers: 19 }) }, /19 writer\(s\), floor 20/],
+      ['999 expressions', { results: R({ exact: 999, lines: 999 }) }, /999 expression\(s\) read, floor 1000/],
+      ['the train split', { corpus: C({ split: 'train' }) }, /split train, not the writer-disjoint test split/],
+      ['no split', { corpus: { writers: 24, samples: 1200 } }, /split \(none\)/],
+      ['97.83% exact', { results: R({ exact: 1174 }) }, /exact 97\.83%/],
+      ['98% read but 30 provider errors (96.75% of expressions)', { results: R({ exact: 1190, providerErrors: 30 }) }, /exact 96\.75% \(provider errors count as misreads\)/],
+      ['characters 99.4%', { results: R({ charPct: 99.4 }) }, /characters 99\.4%, floor 99\.5%/],
+      ['no character rate', { results: R({ charPct: null }) }, /characters \?%/],
+      ['worst writer 89.9%', { results: R({ worstWriterExactPct: 89.9 }) }, /worst writer 89\.9%, floor 90%/],
+      ['no worst-writer rate', { results: R({ worstWriterExactPct: undefined }) }, /worst writer \?%/],
+      ['more exact lines than lines (impossible counts)', { results: R({ exact: 1300 }) }, /exact \?%/],
+      ['a negative error count', { results: R({ providerErrors: -5 }) }, /providerErrors is not a count/],
+      ['writers as text', { corpus: C({ writers: 'many' }) }, /\? writer\(s\)/]
+    ];
+    for (const [name, fields, pattern] of floorDrifts) {
+      const below = readerEvidence(SHA, { dir: evidence({ readerFields: fields }).readerDir });
+      ok(!below.ok && pattern.test(below.detail) && /below Gate C floors/.test(below.detail), `readerEvidence: ${name} is named and refused (${below.detail})`);
+    }
+    ok(readerEvidence(SHA, { dir: evidence({ readerFields: { results: R({ exact: 1176 }) } }).readerDir }).ok, 'readerEvidence: exactly 98.00% exact, 99.5% characters and 90% worst writer at 20 writers and 1,000 expressions is the floor, not below it');
+    ok(readerEvidence(SHA, { dir: evidence({ readerFields: { corpus: C({ writers: 20 }), results: R({ exact: 980, lines: 1000, charPct: 99.5, worstWriterExactPct: 90 }) } }).readerDir }).ok, 'readerEvidence: a report exactly at every floor clears it');
+    eq(readerFloorProblems({ corpus: READER_CORPUS, results: READER_RESULTS }).length, 0, 'readerFloorProblems: the fixture clears every floor');
+    {
+      const gate = read('client/test/ink-release-evidence-gate.mjs');
+      const num = key => Number(new RegExp(`${key}:\\s*([0-9.]+)`).exec(gate)?.[1]);
+      ok(num('minTestWriters') === READER_FLOORS.minWriters && num('minTestExpressions') === READER_FLOORS.minLines && num('minExactPct') === READER_FLOORS.minExactPct
+        && num('minCharPct') === READER_FLOORS.minCharPct && num('minWorstWriterExactPct') === READER_FLOORS.minWorstWriterExactPct && READER_FLOORS.split === 'test',
+        'the reader floors are Gate C\'s numbers in client/test/ink-release-evidence-gate.mjs: neither copy can drift lower alone');
+    }
+    ok(!readerEvidence(SHA, { dir: evidence({ reader: 'dry-run' }).readerDir }).ok, 'readerEvidence: a dry run (synthetic) never counts');
+    ok(/none records releaseSha/.test(readerEvidence(SHA, { dir: evidence({ reader: 'other-sha' }).readerDir }).detail), 'readerEvidence: a report for another SHA is named, not accepted');
+    ok(/NOT MEASURED/.test(readerEvidence(SHA, { dir: join(full.dir, 'absent') }).detail), 'readerEvidence: no directory is NOT MEASURED');
+    ok(!readerEvidence(SHA, { dir: evidence({ reader: 'no-sha' }).readerDir }).ok, 'readerEvidence: a report without releaseSha cannot be tied to the SHA');
+  }
+  const overrideFile = (body, name = 'override.json') => { const dir = mkdtempSync(join(tmpdir(), 'pri-override-')); scratch.push(dir); const file = join(dir, name); writeFileSync(file, typeof body === 'string' ? body : JSON.stringify(body)); return file; };
+  const APPROVER = 'Priysharan19';
+  const approvalUrl = id => `https://github.com/${DEFAULT_REPO_FOR_TESTS}/issues/686#issuecomment-${id}`;
+  const goodOverride = { sha: SHA, scope: 'public-release', waives: ['device-matrix', 'reader-evidence'], by: 'Priya Example', githubLogin: APPROVER, approval: approvalUrl(1001), at: '2026-11-01T09:00:00Z', reason: 'Owner-approved staggered launch: Apple first, Android families follow on a later build (scope change recorded).' };
+  eq(loadOverride(overrideFile(goodOverride), SHA).problems.length, 0, 'a complete override by a named human for this SHA is accepted');
+  ok(loadOverride(overrideFile({ ...goodOverride, sha: OTHER }), SHA).problems.some(p => /not the nominated/.test(p)), 'an override for another SHA is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, by: 'CI' }), SHA).problems.some(p => /does not name a human/.test(p)), 'an override "by" CI is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, by: 'Claude agent' }), SHA).problems.some(p => /does not name a human/.test(p)), 'an override "by" an agent is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, waives: ['everything'] }), SHA).problems.some(p => /unknown evidence requirement/.test(p)), 'an override may only waive a known requirement by name');
+  ok(loadOverride(overrideFile({ ...goodOverride, waives: [] }), SHA).problems.some(p => /waives nothing/.test(p)), 'an override that waives nothing is refused');
+  ok(loadOverride(overrideFile({ ...goodOverride, reason: 'because' }), SHA).problems.some(p => /reason/.test(p)), 'an override needs a reason');
+  ok(loadOverride(overrideFile({ ...goodOverride, at: 'yesterday' }), SHA).problems.some(p => /ISO date-time/.test(p)), 'an override needs an ISO time');
+  ok(loadOverride(overrideFile({ ...goodOverride, scope: undefined }), SHA).problems.some(p => /"scope"/.test(p)), 'an override must say whether it is a public-release waiver or an internal test-track exception');
+  ok(loadOverride(overrideFile({ ...goodOverride, githubLogin: '' }), SHA).problems.some(p => /githubLogin/.test(p)), 'an override must name the approver\'s GitHub account');
+  ok(loadOverride(overrideFile({ ...goodOverride, approval: undefined }), SHA).problems.some(p => /approval/.test(p)), 'an unsigned override (no approving comment) is refused (Q4 #696 counterexample)');
+  ok(loadOverride(overrideFile({ ...goodOverride, approval: 'https://example.com/ok' }), SHA).problems.some(p => /approval/.test(p)), 'an approval that is not a GitHub comment link is refused');
+  ok(loadOverride(overrideFile('not json'), SHA).problems.some(p => /not JSON/.test(p)), 'a corrupt override is refused');
+  ok(loadOverride(join(tmpdir(), 'pri-no-such-override.json'), SHA).problems.some(p => /no such file/.test(p)), 'a missing override file is refused');
+  assert.deepEqual([...EVIDENCE_REQUIREMENTS], ['device-matrix', 'reader-evidence'], 'the two release-evidence requirements'); count += 1;
 
   // ── the stubbed world ─────────────────────────────────────────────────────
-  function world() {
+  function world(evidenceOptions = {}) {
+    const ev = evidence(evidenceOptions);
     const w = {
       mainAncestors: new Set([SHA, OTHER]), tip: OTHER, knownCommits: new Set([SHA, OTHER, PROD_POINTER]), prodPointer: PROD_POINTER, ffFromProd: true,
       schemaSource,
-      runs: [{ name: 'CI', path: '.github/workflows/ci.yml', status: 'completed', conclusion: 'success' }],
+      runs: [
+        { name: 'CI', workflow_id: 1, path: '.github/workflows/ci.yml', event: 'push', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:10:00Z' },
+        { name: 'Release Staging Proof', workflow_id: 9, path: '.github/workflows/release-staging-proof.yml', event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-10-18T00:40:00Z', html_url: 'https://github.com/x/y/actions/runs/1' },
+        { id: 77, name: 'Release Candidate', display_title: releaseCandidateTitle(SHA), workflow_id: 12, path: RELEASE_CANDIDATE_WORKFLOW, head_sha: SHA, event: 'workflow_dispatch', status: 'completed', conclusion: 'success', run_started_at: '2026-10-30T09:00:00Z', updated_at: '2026-10-30T11:00:00Z', html_url: 'https://github.com/x/y/actions/runs/77' }
+      ],
+      rcJobs: RELEASE_CANDIDATE_JOBS.map((name, id) => ({ id, name, status: 'completed', conclusion: 'success' })),
+      rcArtifacts: [{ id: 501, name: readerArtifactName(SHA), expired: false }],
       checks: [...REQUIRED_CONTEXTS, CONTAINER_CONTEXT].map(name => ({ name, status: 'completed', conclusion: 'success', completed_at: '2026-10-18T12:00:00Z' })),
       staging: {
         health: { ok: true, service: 'pri-learning-platform', releaseIdentity: { releaseSha: SHA, buildTimestamp: '2026-10-18T00:00:00.000Z' }, schemaVersion: String(SCHEMA_VERSION), billingSchemaVersion: String(BILLING_SCHEMA_VERSION), database: { engine: 'postgres', reachable: true } },
@@ -86,8 +233,16 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         readyStatus: 200,
         web: { releaseSha: SHA }
       },
-      production: { health: { ok: true, releaseIdentity: { releaseSha: PROD_POINTER } } },
+      production: { health: { ok: true, releaseIdentity: { releaseSha: PROD_POINTER }, database: { engine: 'sqlite', reachable: true } }, reachable: true },
+      ledger: ev.ledger, readerDir: ev.readerDir,
+      commitTime: '2026-10-17T00:00:00Z',
+      comments: new Map(), permissions: new Map([[APPROVER.toLowerCase(), 'admin'], ['someone-else', 'write']]),
       gitCalls: [], ghCalls: []
+    };
+    // An approving comment on the fake GitHub: { id, body, login, type, created, updated, issue }.
+    w.approve = (id, body, { login = APPROVER, type = 'User', created = '2026-11-01T09:00:00Z', updated = created, issue = 686 } = {}) => {
+      w.comments.set(String(id), { id, body, user: { login, type }, created_at: created, updated_at: updated, issue_url: `https://api.github.com/repos/${DEFAULT_REPO_FOR_TESTS}/issues/${issue}` });
+      return approvalUrl(id);
     };
     w.git = async args => {
       w.gitCalls.push(args.join(' '));
@@ -108,13 +263,20 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         throw new Error('not an ancestor');
       }
       if (cmd === 'rev-list') return '1\n';
+      if (cmd === 'show' && args[1] === '-s' && args[2] === '--format=%cI') return w.commitTime + '\n';
       if (cmd === 'show') return w.schemaSource;
       throw new Error(`unexpected git ${args.join(' ')}`);
     };
     w.gh = async path => {
       w.ghCalls.push(path);
-      if (path.includes('/actions/runs')) return { workflow_runs: w.runs };
+      let rm = /\/actions\/runs\/(\d+)\/(jobs|artifacts)\?/.exec(path);
+      if (rm) return rm[2] === 'jobs' ? { jobs: rm[1] === '77' ? w.rcJobs : [] } : { artifacts: rm[1] === '77' ? w.rcArtifacts : [] };
+      if (path.includes('/actions/runs')) return { workflow_runs: path.includes(`head_sha=${SHA}`) ? w.runs : (w.tipRuns || []) };
       if (path.includes('/check-runs')) return { check_runs: w.checks };
+      let m = /\/issues\/comments\/(\d+)$/.exec(path);
+      if (m) { if (!w.comments.has(m[1])) throw new Error('HTTP 404: Not Found'); return w.comments.get(m[1]); }
+      m = /\/collaborators\/([^/]+)\/permission$/.exec(path);
+      if (m) return { permission: w.permissions.get(decodeURIComponent(m[1]).toLowerCase()) || 'none' };
       throw new Error(`unexpected gh ${path}`);
     };
     w.fetchImpl = async url => {
@@ -126,18 +288,20 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (path === '/v1/ready') return json(w.staging.readyStatus, w.staging.ready);
         if (path === '/release.json') return json(200, w.staging.web);
       }
-      if (origin === PRODUCTION_ORIGIN && path === '/v1/health') return json(200, w.production.health);
+      if (origin === PRODUCTION_ORIGIN && path === '/v1/health') { if (!w.production.reachable) throw new Error('ECONNREFUSED'); return json(200, w.production.health); }
       return json(404, null);
     };
     return w;
   }
-  const run = (w, extra = {}) => nominate({ sha: SHA, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: true, ...extra });
+  const run = (w, extra = {}) => nominate({ sha: SHA, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: true, deviceLedger: w.ledger, readerEvalDir: w.readerDir, ...extra });
   const failed = report => report.results.filter(r => r.ok === false).map(r => r.label);
 
   const good = world();
   const pass = await run(good);
-  ok(pass.ok, `a green, deployed, fast-forwardable SHA is nominated (failed: ${failed(pass).join('; ')})`);
-  ok(pass.promotion.length === promotionCommands(SHA).length, 'a nomination prints the promotion commands');
+  ok(pass.ok, `a green, deployed, fast-forwardable SHA with complete evidence is nominated (failed: ${failed(pass).join('; ')})`);
+  ok(pass.stage === 'release' && pass.engine === 'sqlite' && pass.overrides.length === 0, 'the default run is the release stage, on the evidence, with the engine production serves');
+  ok(pass.promotion.length === promotionCommands(SHA, { engine: 'sqlite' }).length && pass.promotion.some(line => /--engine sqlite --persistent-storage-proven/.test(line)), 'a nomination prints the promotion commands with the deployed engine (SQLite today)');
+  ok(pass.results.some(r => r.ok === true && /device matrix complete/.test(r.label)) && pass.results.some(r => r.ok === true && /reader evaluation recorded/.test(r.label)), 'the device matrix and the reader evidence are checks, not reminders');
   ok(good.gitCalls.every(call => !/\bpush\b/.test(call)), 'nominate never runs git push');
   ok(good.gitCalls.some(call => call.startsWith('fetch')), 'nominate fetches origin first');
   ok(good.ghCalls.some(p => p.includes(`head_sha=${SHA}`)), 'nominate asks GitHub for the runs on exactly this SHA');
@@ -153,13 +317,158 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
   ok(pass.results.some(r => r.label.startsWith('position on origin/main') && /behind/.test(r.detail)), 'a certified SHA need not be the tip; the position is informational');
 
+  // The deployed engine drives the verify command.
+  const pg = world(); pg.production.health.database.engine = 'postgres';
+  const pgReport = await run(pg);
+  ok(pgReport.ok && pgReport.engine === 'postgres' && pgReport.promotion.some(line => /--engine postgres --auth-email-proven$/.test(line)) && !pgReport.promotion.some(line => /persistent-storage/.test(line)), 'when production serves Postgres the verify command says postgres and drops the SQLite storage proof');
+  const cutover = await run(world(), { productionEngine: 'postgres' });
+  ok(cutover.ok && cutover.engine === 'postgres' && cutover.results.some(r => /given with --production-engine/.test(r.detail || '')), '--production-engine postgres prints the post-cutover verify command although production serves SQLite now');
+  const dark = world(); dark.production.reachable = false;
+  const darkReport = await run(dark);
+  ok(!darkReport.ok && failed(darkReport).some(l => /engine known/.test(l)), 'an unreachable production with no --production-engine refuses: the verify command would guess');
+  ok((await run(dark, { productionEngine: 'sqlite' })).ok, 'an unreachable production is nominated when the engine is given explicitly');
+  const noEngine = world(); delete noEngine.production.health.database;
+  ok(!(await run(noEngine)).ok, 'a production health without an engine refuses without --production-engine');
+
+  // The candidate stage: everything but the evidence, and no promotion.
+  const early = world({ device: 'none', reader: 'none' });
+  const earlyReport = await run(early, { stage: 'candidate' });
+  ok(earlyReport.ok && earlyReport.stage === 'candidate' && earlyReport.promotion.length === 0, 'the candidate stage passes without evidence and prints no promotion');
+  ok(earlyReport.results.some(r => r.ok === null && /release evidence/.test(r.label) && /not checked at the candidate stage/.test(r.detail)), 'the candidate stage says the evidence is not yet required');
+  ok(!(await run(early)).ok, 'the same world fails at the release stage');
+  await assert.rejects(run(world(), { stage: 'later' }), /stage must be/, 'an unknown stage is refused'); count += 1;
+
+  // The evidence gate at the release stage.
+  const evidenceDrifts = [
+    ['no device evidence at all', { device: 'none' }, /device matrix complete/],
+    ['one device case not run', { device: 'one-missing' }, /device matrix complete/],
+    ['one device case failed', { device: 'one-fail' }, /device matrix complete/],
+    ['device evidence for another build', { device: 'other-sha' }, /device matrix complete/],
+    ['no reader evaluation', { reader: 'none' }, /reader evaluation recorded/],
+    ['a dry-run reader evaluation', { reader: 'dry-run' }, /reader evaluation recorded/],
+    ['a reader evaluation of another SHA', { reader: 'other-sha' }, /reader evaluation recorded/]
+  ];
+  for (const [name, options, label] of evidenceDrifts) {
+    const report = await run(world(options));
+    ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} at the release stage (failed: ${failed(report).join('; ') || 'none'})`);
+  }
+  {
+    // The strict Release Candidate gates on exactly this SHA (Q4 #696 holdout 17
+    // and the exact-SHA binding hazard): attributed to the SHA, named after the
+    // commit it checked out, completed `success`, both blocking jobs `success`.
+    const rcRun = w => w.runs.find(r => r.path === RELEASE_CANDIDATE_WORKFLOW);
+    const rcDrifts = [
+      ['no Release Candidate run on the SHA (Q4 holdout 17)', w => { w.runs = w.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW); }],
+      ['a run dispatched with another release_sha (it tested another commit)', w => { rcRun(w).display_title = releaseCandidateTitle(OTHER); }],
+      ['a run of a workflow version without the exact-SHA binding (plain run name)', w => { rcRun(w).display_title = 'Release Candidate'; }],
+      ['a run attributed to another commit', w => { rcRun(w).head_sha = OTHER; }],
+      ['a run of another workflow file that borrows the title', w => { rcRun(w).path = '.github/workflows/ci.yml'; }],
+      ['a red Release Candidate run', w => { rcRun(w).conclusion = 'failure'; }],
+      ['a cancelled Release Candidate run', w => { rcRun(w).conclusion = 'cancelled'; }],
+      ['a skipped Release Candidate run (green to the workflow summary, proof of nothing)', w => { rcRun(w).conclusion = 'skipped'; }],
+      ['a Release Candidate run still in progress', w => { Object.assign(rcRun(w), { status: 'in_progress', conclusion: null }); }],
+      ['a skipped handwriting-gates job', w => { w.rcJobs[0].conclusion = 'skipped'; }],
+      ['a failed release-identity job', w => { w.rcJobs[1].conclusion = 'failure'; }],
+      ['a run without the release-identity job', w => { w.rcJobs = w.rcJobs.slice(0, 1); }],
+      ['a newer red Release Candidate run after an older green one', w => { w.runs.push({ ...rcRun(w), id: 78, conclusion: 'failure', run_started_at: '2026-10-31T09:00:00Z', updated_at: '2026-10-31T11:00:00Z' }); }]
+    ];
+    for (const [name, drift] of rcDrifts) {
+      const w = world(); drift(w);
+      const report = await run(w);
+      ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => /Release Candidate/.test(l)), `refuses ${name} (failed: ${failed(report).join('; ')})`);
+    }
+    const only = world(); only.runs = only.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW);
+    const onlyReport = await run(only);
+    const onlyFailed = failed(onlyReport);
+    ok(!onlyReport.ok && onlyFailed.length === 2 && /strict Release Candidate gates passed on exactly this SHA/.test(onlyFailed[0]) && /reader evaluation recorded/.test(onlyFailed[1])
+      && onlyReport.results.some(r => r.ok === false && /no passing Release Candidate run on this SHA/.test(r.detail || '')),
+      `with every CI context green and the device matrix complete, a missing exact-SHA Release Candidate run alone refuses the release, and the reader report cannot be bound without it (failed: ${onlyFailed.join('; ')})`);
+    const onlyCandidate = await run(only, { stage: 'candidate' });
+    ok(onlyCandidate.ok && onlyCandidate.promotion.length === 0, 'the candidate stage does not need the Release Candidate run, and prints no promotion');
+    const waiveAll = world({ device: 'none', reader: 'none' }); waiveAll.runs = waiveAll.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW);
+    waiveAll.approve(1009, `Approved.\n${waiverMarker(SHA, ['device-matrix', 'reader-evidence'])}\n`);
+    const waiveAllReport = await run(waiveAll, { overridePath: overrideFile({ ...goodOverride, approval: approvalUrl(1009) }) });
+    ok(!waiveAllReport.ok && failed(waiveAllReport).some(l => /strict Release Candidate gates/.test(l)), 'an approved waiver of both evidence rows never waives the strict Release Candidate gates');
+    const bound = await run(world());
+    ok(bound.ok && bound.results.some(r => r.ok === true && /reader evaluation recorded/.test(r.label) && /measured by Release Candidate run 77 \(artifact cloud-reader-eval-a{40}, id 501\)/.test(r.detail)), 'the accepted reader row names the Release Candidate run and artifact that measured it');
+    eq(bound.results.filter(r => r.ok === true && /^Release Candidate job passed \(not skipped\): /.test(r.label)).length, RELEASE_CANDIDATE_JOBS.length, 'each blocking Release Candidate job is its own check');
+    const unbound = async (name, mutate, pattern, options) => {
+      const w = world(options); mutate(w);
+      const report = await run(w);
+      ok(!report.ok && failed(report).length === 1 && /reader evaluation recorded/.test(failed(report)[0]) && report.results.some(r => r.ok === false && pattern.test(r.detail || '')), `${name} is not release evidence (failed: ${failed(report).join('; ')})`);
+    };
+    await unbound('a reader report the Release Candidate run did not measure (no artifact)', w => { w.rcArtifacts = []; }, /run 77 has no unexpired artifact cloud-reader-eval-a{40}/);
+    await unbound('a reader report whose artifact expired', w => { w.rcArtifacts[0].expired = true; }, /no unexpired artifact/);
+    await unbound('a reader report backed only by another commit\'s artifact', w => { w.rcArtifacts[0].name = readerArtifactName(OTHER); }, /no unexpired artifact cloud-reader-eval-a{40}/);
+    await unbound('a reader report measured before the Release Candidate run', () => {}, /measuredAt 2026-10-29T10:00:00Z is outside run 77/, { readerFields: { measuredAt: '2026-10-29T10:00:00Z' } });
+    await unbound('a reader report measured after the Release Candidate run', () => {}, /is outside run 77/, { readerFields: { measuredAt: '2026-10-30T12:00:00Z' } });
+    await unbound('a reader report with no measuredAt', () => {}, /measuredAt \? is outside run 77/, { readerFields: { measuredAt: undefined } });
+    eq(releaseCandidateRun([], SHA), null, 'releaseCandidateRun: no runs, no run');
+    eq(releaseCandidateRun([{ path: `${RELEASE_CANDIDATE_WORKFLOW}@refs/heads/main`, head_sha: SHA, display_title: releaseCandidateTitle(SHA), id: 5 }], SHA)?.id, 5, 'releaseCandidateRun: a path with a @ref suffix is the same workflow file');
+    eq(releaseCandidateRun([{ path: RELEASE_CANDIDATE_WORKFLOW, head_sha: SHA.toUpperCase(), display_title: releaseCandidateTitle(SHA) }], SHA), null, 'releaseCandidateRun: the SHA comparison is exact');
+    // The workflow side of the binding: the run name is the checked-out commit, and both jobs prove it.
+    const wf = read('.github/workflows/release-candidate.yml');
+    ok(/^run-name: Release Candidate · \$\{\{ inputs\.release_sha \|\| github\.sha \}\}$/m.test(wf) && releaseCandidateTitle(SHA) === `Release Candidate · ${SHA}`, 'release-candidate.yml names every run after the commit it checks out, the exact title nominate() accepts');
+    eq((wf.match(/^ {10}ref: \$\{\{ inputs\.release_sha \|\| github\.sha \}\}$/gm) || []).length, 2, 'both Release Candidate jobs check out that exact commit, never a moving branch');
+    ok(!/ref: \$\{\{[^}]*github\.ref[^}]*\}\}/.test(wf), 'no Release Candidate checkout follows github.ref (a branch can move between dispatch and checkout)');
+    eq((wf.match(/EXPECTED: \$\{\{ inputs\.release_sha \|\| github\.sha \}\}/g) || []).length, 2, 'both jobs receive the named commit through the environment, not interpolated into the script');
+    eq((wf.match(/\[\[ "\$EXPECTED" =~ \^\[0-9a-f\]\{40\}\$ \]\]/g) || []).length, 2, 'both jobs refuse a release_sha that is not a full 40-hex lowercase SHA');
+    eq((wf.match(/\[ "\$sha" = "\$EXPECTED" \] \|\| \{ echo "::error::checked out/g) || []).length, 2, 'both jobs fail when HEAD is not the named commit');
+    for (const name of RELEASE_CANDIDATE_JOBS) ok(wf.includes(`    name: ${name}\n`), `the blocking job nominate() requires exists in release-candidate.yml: ${name}`);
+    ok(wf.includes('name: cloud-reader-eval-${{ steps.candidate.outputs.sha }}') && readerArtifactName(SHA) === `cloud-reader-eval-${SHA}`, 'the artifact nominate() binds a reader report to is the one release-candidate.yml uploads');
+  }
+  {
+    const approved = (w, override = goodOverride, id = 1001, options = {}) => { w.approve(id, `Approved.\n${waiverMarker(SHA, override.waives)}\n`, options); return w; };
+    const waivedWorld = approved(world({ device: 'none', reader: 'none' }));
+    const waived = await run(waivedWorld, { overridePath: overrideFile(goodOverride) });
+    ok(waived.ok && waived.overrides.length === 2 && waived.overrides.every(o => o.by === 'Priya Example' && o.githubLogin === APPROVER && o.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED') && waived.promotion.length > 0, 'a public-release override approved on GitHub by a repository admin waives both requirements by name and the nomination says so');
+    ok(waived.results.filter(r => r.ok === null && /WAIVED by recorded override/.test(r.label)).length === 2, 'each waived requirement is a visible WAIVED row, never silent');
+    ok(waived.results.some(r => r.ok === true && /approved on GitHub by a repository admin/.test(r.label)), 'the GitHub approval is its own visible check');
+    const staggered = await run(approved(world({ device: 'android-blocked' }), { ...goodOverride, waives: ['device-matrix'] }), { overridePath: overrideFile({ ...goodOverride, waives: ['device-matrix'] }) });
+    ok(staggered.ok && staggered.overrides.length === 1 && /AND, ANT not all pass/.test(staggered.overrides[0].state), 'blocked Android families release only through an approved, visible device-matrix waiver that names them');
+    ok(!(await run(world({ device: 'android-blocked' }))).ok, 'blocked Android families without a waiver refuse the release stage');
+    ok(!(await run(world({ device: 'all-blocked' }))).ok, 'an all-blocked device matrix refuses the release stage (Q4 #696 counterexample)');
+
+    // Authentication negative controls: each leaves the evidence unwaived.
+    const refusedWith = async (name, w, override, pattern) => {
+      const report = await run(w, { overridePath: overrideFile(override) });
+      ok(!report.ok && report.overrides.length === 0 && report.promotion.length === 0 && failed(report).some(l => /device matrix complete/.test(l)) && report.results.some(r => r.ok === false && pattern.test(`${r.label} ${r.detail || ''}`)),
+        `${name} waives nothing (failed: ${failed(report).join('; ')})`);
+    };
+    await refusedWith('a forged override whose approving comment does not exist (Q4 #696 counterexample)', world({ device: 'none', reader: 'none' }), goodOverride, /could not be read from GitHub/);
+    await refusedWith('an override whose comment was written by another account', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { login: 'someone-else' }), goodOverride, /written by someone-else, not/);
+    {
+      const w = approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { login: 'someone-else' });
+      await refusedWith('an override approved by a collaborator without admin permission', w, { ...goodOverride, githubLogin: 'someone-else' }, /write permission .*needs a repository admin/);
+    }
+    await refusedWith('an override approved by a bot account', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { type: 'Bot' }), goodOverride, /Bot account/);
+    await refusedWith('an override whose approving comment was edited', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { updated: '2026-11-02T09:00:00Z' }), goodOverride, /edited after it was posted/);
+    await refusedWith('an override approved before the commit existed (stale approval)', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { created: '2026-10-16T00:00:00Z' }), goodOverride, /predates the commit/);
+    await refusedWith('an override whose comment approves another SHA', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(OTHER, goodOverride.waives)); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose comment approves fewer waivers than the file claims', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, ['reader-evidence'])); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose comment approves a different target', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, goodOverride.waives).replace('deploy/production', 'deploy/staging')); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose approval link points at another repository', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, approval: 'https://github.com/evil/fork/issues/1#issuecomment-1001' }, /is in evil\/fork, not/);
+    await refusedWith('an override whose comment id belongs to another issue', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { issue: 999 }), goodOverride, /does not belong to #686/);
+    await refusedWith('an internal test-track exception at the release stage', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, scope: 'internal-test-track' }, /never approval for a public production release/);
+    const partial = await run(approved(world({ device: 'none' }), { ...goodOverride, waives: ['reader-evidence'] }), { overridePath: overrideFile({ ...goodOverride, waives: ['reader-evidence'] }) });
+    ok(!partial.ok && failed(partial).some(l => /device matrix complete/.test(l)), 'an override that waives only the reader evidence does not waive the device matrix');
+    const evidenceWins = await run(approved(world()), { overridePath: overrideFile(goodOverride) });
+    ok(evidenceWins.ok && evidenceWins.overrides.length === 0, 'when the evidence exists the override is not used: the nomination stands on the evidence');
+    const wrongSha = await run(world({ device: 'none', reader: 'none' }), { overridePath: overrideFile({ ...goodOverride, sha: OTHER }) });
+    ok(!wrongSha.ok && failed(wrongSha).some(l => /override is well-formed/.test(l)) && failed(wrongSha).some(l => /device matrix complete/.test(l)), 'an override for another SHA is refused and waives nothing');
+    const byCi = await run(world({ device: 'none', reader: 'none' }), { overridePath: overrideFile({ ...goodOverride, by: 'CI' }) });
+    ok(!byCi.ok && byCi.overrides.length === 0, 'an override signed by CI is refused and waives nothing');
+    const missing = await run(world({ device: 'none', reader: 'none' }), { overridePath: join(tmpdir(), 'pri-no-such-override.json') });
+    ok(!missing.ok && failed(missing).some(l => /override is well-formed/.test(l)), 'a missing override file is a failed check, not a silent pass');
+  }
+
   const drifts = [
     ['a SHA that is not on origin/main', w => { w.mainAncestors.delete(SHA); }, /SHA is on origin\/main/],
-    ['a workflow still running', w => { w.runs.push({ name: 'Native Ink', path: 'n.yml', status: 'in_progress', conclusion: null }); }, /has completed/],
-    ['a red workflow', w => { w.runs.push({ name: 'CodeQL', path: 'c.yml', status: 'completed', conclusion: 'failure' }); }, /failed or was cancelled/],
+    ['a workflow still running', w => { w.runs.push({ name: 'Native Ink', workflow_id: 3, path: 'n.yml', event: 'push', status: 'in_progress', conclusion: null }); }, /has completed/],
+    ['a red workflow', w => { w.runs.push({ name: 'CodeQL', workflow_id: 4, path: 'c.yml', event: 'push', status: 'completed', conclusion: 'failure' }); }, /failed or was cancelled/],
     ['a required context missing', w => { w.checks = w.checks.filter(c => c.name !== REQUIRED_CONTEXTS[0]); }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[0])}`)],
     ['a required context red', w => { w.checks.find(c => c.name === REQUIRED_CONTEXTS[2]).conclusion = 'failure'; }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[2])}`)],
-    ['an unrelated scheduled workflow red on the SHA', w => { w.runs.push({ name: 'Pri App Health Agent', path: '.github/workflows/app-health-agent.yml', status: 'completed', conclusion: 'failure' }); }, /no workflow run on this SHA failed or was cancelled/],
+    ['an unrelated scheduled workflow red on the SHA', w => { w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-19T18:15:00Z' }); }, /no workflow run on this SHA failed or was cancelled/],
     ['Production Container absent (path-filtered)', w => { w.checks = w.checks.filter(c => c.name !== CONTAINER_CONTEXT); }, /Production Container green/],
     ['staging running another SHA', w => { w.staging.health.releaseIdentity.releaseSha = OTHER; }, /staging runs the nominated SHA/],
     ['staging web bundle from another build', w => { w.staging.web.releaseSha = OTHER; }, /release\.json/],
@@ -177,6 +486,14 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     ok(!report.ok && report.promotion.length === 0 && failed(report).some(l => label.test(l)), `refuses ${name} (failed: ${failed(report).join('; ') || 'none'})`);
     ok(w.gitCalls.every(call => !/\bpush\b/.test(call)), `no git push while refusing ${name}`);
   }
+  {
+    // A flaky scheduled run that a later schedule passed does not refuse the SHA.
+    const w = world();
+    w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'failure', run_started_at: '2026-10-19T18:15:00Z' });
+    w.runs.push({ name: 'Pri App Health Agent', workflow_id: 7, path: '.github/workflows/app-health-agent.yml', event: 'schedule', status: 'completed', conclusion: 'success', run_started_at: '2026-10-20T18:15:00Z' });
+    const report = await run(w);
+    ok(report.ok && report.results.some(r => r.ok === null && /superseded/.test(r.label) && /Pri App Health Agent/.test(r.detail)), 'a superseded flaky scheduled run is listed, not counted');
+  }
   const unreachable = world();
   unreachable.fetchImpl = async () => { throw new Error('ECONNREFUSED'); };
   ok(!(await run(unreachable)).ok, 'an unreachable staging refuses the nomination');
@@ -187,6 +504,148 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(!badSha.ok && badSha.results.length === 1, 'a non-40-hex SHA is refused before anything runs');
   const source = read('scripts/release-nominate.mjs');
   ok(!/\[\s*'push'/.test(source) && !/execFile\w*\([^)]*push/.test(source), 'the source never passes "push" to git; the push is only printed');
+  ok(!/--engine (sqlite|postgres)\b/.test(source), 'the source never hard-codes the engine of the verify command');
+  ok(!/device-matrix\.md\),\n/.test(source) || !/Before promoting:.*device matrix/.test(source), 'the device matrix is no longer printed as a reminder');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 1b · release-dossier: one record for one SHA (#686 steps 25, 27, 28, 30)
+  // ═══════════════════════════════════════════════════════════════════════════
+  assert.throws(() => parseDossierArgs([]), /40-hex/, 'the dossier needs a SHA'); count += 1;
+  assert.throws(() => parseDossierArgs([SHA, '--record']), /needs a value/, '--record needs a path'); count += 1;
+  const dArgs = parseDossierArgs([SHA.toUpperCase(), '--json', '--no-fetch']);
+  ok(dArgs.command === 'build' && dArgs.sha === SHA && dArgs.json && !dArgs.fetch && dArgs.record.endsWith(join('go-no-go', `${SHA}.json`)) && dArgs.out.endsWith(join('go-no-go', `${SHA}.md`)), 'the dossier defaults its record and output to docs/release/evidence/go-no-go/<sha>');
+  eq(parseDossierArgs(['template', SHA]).command, 'template', 'template <sha> is the record skeleton command');
+  const tpl = recordTemplate(SHA);
+  ok(tpl.sha === SHA && tpl.go.decision === null && tpl.go.sha === SHA && EXTERNAL_GATES.every(g => tpl.gates[g.id].status === 'NOT_RECORDED'), 'the template records no GO and every gate NOT_RECORDED');
+  eq(recordProblems(tpl, SHA).length, 0, 'the template is well-formed');
+  ok(recordProblems({ ...tpl, sha: OTHER }, SHA).some(p => /not/.test(p)), 'a record for another SHA is a problem');
+  ok(recordProblems({ ...tpl, go: { ...tpl.go, decision: 'MAYBE' } }, SHA).some(p => /go\.decision/.test(p)), 'go.decision is GO, NO-GO or null');
+  ok(recordProblems({ ...tpl, gates: { ...tpl.gates, examiner: { status: 'DONE' } } }, SHA).some(p => /gates\.examiner\.status/.test(p)), 'a gate status outside PASS/BLOCKED/NOT_RECORDED is a problem');
+  assert.deepEqual(EXTERNAL_GATES.map(g => g.id), ['examiner', 'counsel', 'security', 'native', 'store', 'data'], 'the six gates only people can close'); count += 1;
+
+  const NOW = Date.parse('2026-11-05T12:00:00Z');
+  function fullRecord() {
+    const r = recordTemplate(SHA);
+    r.candidate = { frozenAt: '2026-11-03T09:00:00Z', by: 'Priya Example', note: 'merge freeze declared' };
+    r.stagingProof = { result: 'DEPLOYMENT VERIFIED: PASS — 14/14', runUrl: 'https://github.com/x/y/actions/runs/1', at: '2026-11-03T09:30:00Z' };
+    r.soak = { startedAt: '2026-11-03T10:00:00Z', endedAt: '2026-11-04T11:00:00Z', watchedBy: 'Priya Example', incidents: 'none', mergeFreezeDeclaredBy: 'Priya Example' };
+    r.acceptance = { result: 'PASS', report: 'tools/acceptance/out/2026-11-03/report.json', tester: 'Priya Example', at: '2026-11-03T12:00:00Z' };
+    for (const g of EXTERNAL_GATES) r.gates[g.id] = { status: 'PASS', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: `signed ${g.id} record` };
+    r.go = { decision: 'GO', by: 'Priya Example', githubLogin: APPROVER, approval: approvalUrl(2001), at: '2026-11-04T15:00:00Z', sha: SHA, statement: 'GO for exactly this SHA.' };
+    return r;
+  }
+  const dossier = (w, record, extra = {}) => buildDossier({ sha: SHA, record, git: w.git, gh: w.gh, fetchImpl: w.fetchImpl, fetchOrigin: false, deviceLedger: w.ledger, readerEvalDir: w.readerDir, now: NOW, ...extra });
+  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; w.approve(2001, `GO.\n${goMarker(SHA)}`, { created: '2026-11-04T15:00:00Z' }); return w; };
+  const ready = await dossier(frozen(), fullRecord());
+  ok(ready.verdict === 'GO-READY' && ready.reasons.length === 0, `a frozen, soaked, evidenced, signed and GO-recorded SHA is GO-READY (reasons: ${ready.reasons.join('; ')})`);
+  ok(ready.rows.find(r => r.step === 28).ok === true && /GO by Priya Example \(Priysharan19, https:\/\/github\.com\/.*issuecomment-2001/.test(ready.rows.find(r => r.step === 28).detail) && ready.rows.find(r => r.step === 28).evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED', 'the owner GO row names the person, the approving GitHub comment and its evidence class, and quotes the statement');
+  ok(ready.rows.find(r => r.step === 30).ok === null && /not yet/.test(ready.rows.find(r => r.step === 30).detail), 'before the promotion step 30 is informational: not yet');
+  ok(/# GO\/NO-GO dossier — `a{40}`/.test(ready.markdown) && /## Verdict: \*\*GO-READY\*\*/.test(ready.markdown) && ready.markdown.includes('git push origin ' + SHA + ':refs/heads/deploy/production'), 'the markdown names the SHA, the verdict and prints step 29 only when GO-READY');
+  ok(/PHYSICAL-HUMAN/.test(ready.markdown) && /real-human/.test(ready.markdown) && /pushes nothing, deploys nothing and authorises nothing/.test(ready.markdown), 'the markdown states the evidence classes and that it authorises nothing');
+  ok(/\| PASS \| Independent examiner result/.test(ready.markdown) && /Kalp Example/.test(ready.markdown), 'the gate table names who signed each gate');
+  ok(frozen().gitCalls.every(call => !/\bpush\b/.test(call)), 'the dossier never runs git push');
+
+  const noGo = async (name, mutateRecord, label, mutateWorld = () => {}) => {
+    const w = frozen(); mutateWorld(w);
+    const record = fullRecord(); mutateRecord(record);
+    const result = await dossier(w, record);
+    ok(result.verdict === 'NO-GO' && result.reasons.some(r => label.test(r)) && !result.markdown.includes('git push origin'), `NO-GO when ${name} (reasons: ${result.reasons.join('; ')})`);
+  };
+  await noGo('the owner has not recorded GO', r => { r.go.decision = null; }, /owner GO for exactly this SHA/);
+  await noGo('the owner recorded NO-GO', r => { r.go.decision = 'NO-GO'; r.go.statement = 'wait for counsel'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO names another SHA', r => { r.go.sha = OTHER; }, /owner GO for exactly this SHA/);
+  await noGo('the GO is signed by an agent', r => { r.go.by = 'Claude agent'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO is dated in the future', r => { r.go.at = '2026-11-06T00:00:00Z'; }, /owner GO for exactly this SHA/);
+  await noGo('the GO has no GitHub approval link (an unsigned GO)', r => { r.go.approval = ''; }, /owner GO for exactly this SHA/);
+  await noGo('the GO approval comment does not exist', r => { r.go.approval = approvalUrl(2999); }, /owner GO for exactly this SHA/);
+  await noGo('the GO comment approves another SHA', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(OTHER), { created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment says NO-GO-style text without the exact marker', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, `NO-GO ${SHA}`, { created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment was posted by a non-admin', r => { r.go.githubLogin = 'someone-else'; }, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { login: 'someone-else', created: '2026-11-04T15:00:00Z' }); });
+  await noGo('the GO comment was edited after posting', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-04T15:00:00Z', updated: '2026-11-04T16:00:00Z' }); });
+  await noGo('the GO comment was posted before the soak ended (stale GO)', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-04T10:00:00Z' }); });
+  await noGo('the GO comment was posted before the candidate was frozen', r => { r.soak.startedAt = '2026-11-02T00:00:00Z'; r.soak.endedAt = '2026-11-03T01:00:00Z'; }, /owner GO for exactly this SHA/, w => { w.approve(2001, goMarker(SHA), { created: '2026-11-03T08:00:00Z' }); w.staging.health.releaseIdentity.buildTimestamp = '2026-11-01T09:40:00.000Z'; });
+  await noGo('the soak is shorter than 24 h', r => { r.soak.endedAt = '2026-11-04T09:59:00Z'; }, /soak window/);
+  await noGo('the soak has not ended', r => { r.soak.endedAt = '2026-11-06T10:00:00Z'; }, /soak window/);
+  await noGo('an incident is recorded during the soak', r => { r.soak.incidents = ['500 on /v1/sync/push at 03:12Z']; }, /no \/v1 500/);
+  await noGo('nobody watched the soak', r => { r.soak.watchedBy = 'automation'; }, /watched by a named person/);
+  await noGo('staging built the SHA after the soak began', () => {}, /before the soak began/, w => { w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T10:30:00.000Z'; });
+  await noGo('main moved past the SHA (soak void)', () => {}, /merge freeze held/, w => { w.tip = OTHER; });
+  await noGo('the Release Staging Proof never ran on the SHA', () => {}, /Release Staging Proof/, w => { w.runs = w.runs.filter(run => run.name !== 'Release Staging Proof'); });
+  await noGo('the Release Staging Proof is red on the SHA', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'failure'; });
+  await noGo('a gate is NOT_RECORDED', r => { r.gates.counsel = { status: 'NOT_RECORDED' }; }, /counsel/);
+  await noGo('a gate is BLOCKED', r => { r.gates.store = { status: 'BLOCKED', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: 'Paid Apps Agreement not signed' }; }, /Store readiness/);
+  await noGo('a gate PASS is unsigned', r => { r.gates.examiner.by = ''; }, /examiner/);
+  await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance A–D/);
+  await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance A–D/);
+  await noGo('the candidate was never frozen', r => { r.candidate = { frozenAt: '', by: '' }; }, /candidate SHA frozen/);
+  await noGo('the device evidence is missing (the nomination fails)', () => {}, /release-stage nomination/, w => { writeFileSync(w.ledger, ''); });
+  await noGo('the record is for another SHA', r => { r.sha = OTHER; }, /operator record/);
+  {
+    // Step 30 after the promotion: production serves the SHA, main moved on, staging serves the tip with a green proof.
+    const w = frozen(); w.tip = OTHER; w.mainAncestors.add(OTHER); w.production.health.releaseIdentity.releaseSha = SHA; w.staging.health.releaseIdentity.releaseSha = OTHER; w.staging.web.releaseSha = OTHER;
+    w.tipRuns = [{ name: 'Release Staging Proof', workflow_id: 9, event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: '2026-11-05T01:00:00Z' }];
+    const after = await dossier(w, fullRecord());
+    const thirty = after.rows.find(r => r.step === 30);
+    ok(/CERTIFIED/.test(thirty.label) && /staging serves b{40}/.test(thirty.detail), 'after the promotion a later merge that reached staging unaided with a green proof certifies step 30');
+    w.tipRuns[0].conclusion = 'failure';
+    const afterRed = await dossier(w, fullRecord());
+    ok(/not yet certified/.test(afterRed.rows.find(r => r.step === 30).label), 'a red proof on the later merge does not certify step 30');
+    ok(after.verdict === 'NO-GO' && after.reasons.some(r => /merge freeze held/.test(r)), 'that later state is no longer GO-READY for this SHA (the soak belongs to one SHA), which is correct after a promotion');
+  }
+  {
+    const withOverride = frozen();
+    writeFileSync(withOverride.ledger, '');
+    withOverride.approve(1002, waiverMarker(SHA, ['device-matrix']));
+    const overridePath = overrideFile({ ...goodOverride, waives: ['device-matrix'], approval: approvalUrl(1002) });
+    const record = fullRecord(); record.overrides = overridePath;
+    const result = await dossier(withOverride, record);
+    ok(result.verdict === 'GO-READY' && result.rows.some(r => r.step === 'override' && /device-matrix waived/.test(r.label) && /Priya Example \(Priysharan19, https:/.test(r.detail) && r.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED') && /## Overrides/.test(result.markdown) && /device-matrix waived/.test(result.markdown), 'a recorded override is carried into the dossier by name, person, GitHub approval and reason');
+  }
+  {
+    // Evidence text is untrusted: a detail ending in a backslash before a pipe
+    // must not close its cell and forge a PASS column (CodeQL incomplete-escaping).
+    const forged = renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['x'], rows: [{ step: 25, ok: false, label: 'Staging proof', detail: String.raw`evil\| PASS | forged`, who: 'bot' }], nomination: { results: [] }, generatedAt: 't', recordPath: null }, {});
+    const row = forged.split('\n').find(l => l.includes('evil')) || '';
+    const boundaries = [...row.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length;
+    ok(boundaries === 5, `dossier evidence cannot break out of its table cell (${boundaries} cell boundaries, want 5): ${row}`);
+  }
+  {
+    // Q4 #696 holdout: a bare carriage return survived the old cell(); after
+    // CommonMark line-ending normalisation it opened a forged GO heading.
+    const render = (detail, extra = {}) => renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['x'], rows: [{ step: 25, ok: false, label: 'Staging proof', detail, who: 'fixture' }], nomination: { results: [] }, generatedAt: 't', recordPath: null, ...extra }, {});
+    const normalise = text => text.replace(/\r\n?/g, '\n');
+    const forgedHeading = text => /^ {0,3}#{1,6}[ \t]+GO CERTIFIED/m.test(normalise(text));
+    const q4 = render('not approved\r\r# GO CERTIFIED (FORGED)\r\r');
+    ok(!/\r/.test(q4) && !forgedHeading(q4), 'a bare carriage return in evidence cannot open a forged GO heading (Q4 #696 holdout: 4 CRs survived before)');
+    for (const [name, sep] of [['\\r', '\r'], ['\\n', '\n'], ['\\r\\n', '\r\n'], ['U+2028', '\u2028'], ['U+2029', '\u2029'], ['U+0085', '\u0085'], ['vertical tab', '\u000b'], ['form feed', '\u000c']]) {
+      const md = render(`ok${sep}| PASS | forged | bot |${sep}# GO CERTIFIED`);
+      const rows = normalise(md).split('\n').filter(l => l.includes('forged'));
+      ok(rows.length === 1 && [...rows[0].matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 5 && !forgedHeading(md) && !LINE_BREAKS.test(md.replace(/\n/g, '')),
+        `a ${name} line break in evidence stays inside its one table row and opens no heading`);
+      LINE_BREAKS.lastIndex = 0;
+    }
+    // Text that starts a Markdown line outside a table: reasons, device, reader, controller.
+    const lead = renderMarkdown({ sha: 'a'.repeat(40), verdict: 'NO-GO', reasons: ['# GO CERTIFIED (reason)'],
+      rows: [
+        { step: 'device', ok: false, label: 'device', detail: '# GO CERTIFIED (device)\r> quoted', evidenceClass: 'PHYSICAL-HUMAN\r# GO CERTIFIED (class)' },
+        { step: 'reader', ok: false, label: 'reader', detail: '1. GO CERTIFIED (reader)', evidenceClass: 'real-human' },
+        { step: 26, ok: null, label: 'controller', detail: '## GO CERTIFIED (controller)' }
+      ], nomination: { results: [] }, generatedAt: 't', recordPath: null }, {});
+    ok(!forgedHeading(lead) && !/^ {0,3}>/m.test(normalise(lead)) && !/^ {0,3}1\. GO/m.test(normalise(lead)) && /^- \\# GO CERTIFIED \(reason\)$/m.test(lead) && /^\\# GO CERTIFIED \(device\)/m.test(lead) && /^1\\\. GO CERTIFIED \(reader\)/m.test(lead),
+      'untrusted text that starts a line (NO-GO reasons, device, reader and controller details) cannot become a heading, quote or list');
+    eq(inline('a\r\nb\rc\nd\u2028e'), 'a b c d e', 'inline() flattens every line ending to one space');
+    eq(cell('x\\|y\rz'), 'x\\\\\\|y z', 'cell() flattens line endings, then escapes the backslash before the pipe');
+    eq(para('  # h'), '  \\# h', 'para() escapes an indented heading marker');
+    eq(para('fine text'), 'fine text', 'para() leaves ordinary text alone');
+    // The device-matrix table the dossier embeds holds tester-typed text too.
+    const matrix = reportMarkdown({ sha: 'a'.repeat(40), counts: { pass: 1, fail: 0, blocked: 0, 'not run': 0 }, rows: [{ id: 'DM-IPH-01-INSTALL', latest: { result: 'pass', device: 'iPhone | forged', os: 'iOS 26', pencil: null, sha: 'a'.repeat(40), tester: 'Priya\rExample', recordedAt: '2026-10-19T01:00:00Z', notes: String.raw`ok\| PASS |` + '\r\r# GO CERTIFIED (matrix)' } }] });
+    const matrixRow = normalise(matrix).split('\n').find(l => l.includes('DM-IPH-01-INSTALL')) || '';
+    ok(!/\r/.test(matrix) && !forgedHeading(matrix) && [...matrixRow.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 10, `a device-matrix note cannot add a row, a column or a heading to the matrix table (${matrixRow})`);
+  }
+  const dossierSource = read('scripts/release-dossier.mjs');
+  ok(!/\[\s*'push'/.test(dossierSource) && !/railway|update_ref|deploy\/production'\]/.test(dossierSource.replace(/\/\/.*$/gm, '')), 'the dossier source never pushes, deploys or moves the pointer');
+  ok(existsSync(join(ROOT, 'docs/release/evidence/go-no-go/README.md')) && /release-dossier\.mjs/.test(read('docs/release/evidence/go-no-go/README.md')) && /template/.test(read('docs/release/evidence/go-no-go/README.md')), 'the go-no-go directory is committed with a README naming the generator and the template');
+  for (const dir of scratch) rmSync(dir, { recursive: true, force: true });
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -903,6 +1362,8 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(/takeover|pre-registration/i.test(readme), 'the README warns about the unverified-password-account takeover on step A');
   const pkg = JSON.parse(read('package.json'));
   ok(pkg.scripts['test:release:prep']?.includes('tools/release-prep.test.mjs') && pkg.scripts['test:release:prep'].includes('device-matrix-record.mjs validate'), 'test:release:prep runs this file and the ledger validation');
+  ok(pkg.scripts['test:release:prep'].includes('node client/test/q4-release-negative-controls.mjs') && pkg.scripts['test:release:prep'].includes('node client/test/release-source-policy-consistency-check.mjs'),
+    'test:release:prep also runs Q4\'s independent release holdout (17 negative controls) and the production-source policy check, so CI keeps both');
   ok(pkg.scripts.test.includes('npm run test:release:prep'), 'npm test (the CI deterministic suite) runs test:release:prep');
 }
 

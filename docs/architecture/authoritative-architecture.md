@@ -20,7 +20,7 @@ The old `/api` routes are development-only reference code. They are not mounted 
 
 `ios/PriLearning.swiftpm` is the canonical native package. `ios/PriLearning 2.swiftpm` is a compatibility copy and must remain source-identical while it exists. The native shell serves the built web app over `prilearning://`, preserving a stable local origin and IndexedDB/localStorage, then adds native ink, camera/photo, billing, cloud and share bridges.
 
-The native package does not define a separate web application architecture. `scripts/sync-ios.mjs` places the same `client/dist` build into both native bundles.
+The native package does not define a separate web application architecture. `scripts/sync-ios.mjs` places the same `client/dist` build into both native bundles at build and archive time; the bundles are generated, never tracked in git (decision D28, 1 November 2026), and `npm run check:ios` proves each is a complete copy of the build.
 
 ## Data authority
 

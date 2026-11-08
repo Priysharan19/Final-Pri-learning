@@ -31,6 +31,7 @@
 //   node tools/ink-cloud-reader-eval.mjs --dry-run --out /tmp/eval
 // Exit: 0 measured (or dry-run complete) · 2 NOT MEASURED · 1 error/refused.
 // ─────────────────────────────────────────────────────────────────────────────
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
@@ -278,6 +279,16 @@ function argAfter(argv, name, fallback = null) {
   return i >= 0 && argv[i + 1] ? argv[i + 1] : fallback;
 }
 
+/** PRI_RELEASE_SHA when the build set it (CI), else the checked-out commit; null outside a git checkout. */
+export function releaseShaFor(env = process.env) {
+  const given = String(env.PRI_RELEASE_SHA || '').trim().toLowerCase();
+  if (/^[0-9a-f]{40}$/.test(given)) return given;
+  try {
+    const head = execFileSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().toLowerCase();
+    return /^[0-9a-f]{40}$/.test(head) ? head : null;
+  } catch { return null; }
+}
+
 export async function main(argv = process.argv.slice(2), env = process.env) {
   const dryRun = argv.includes('--dry-run');
   const requestedSplit = argAfter(argv, '--split');
@@ -369,6 +380,11 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     version: 1,
     evidenceClass: dryRun ? 'synthetic-dry-run' : 'real-human',
     measuredAt: new Date().toISOString(),
+    // The exact commit this measurement describes. Release nomination
+    // (scripts/release-nominate.mjs) accepts a real-human report only when it
+    // names the nominated SHA: the painter, the prompt and the confidence floor
+    // are code, so a measurement belongs to one commit.
+    releaseSha: releaseShaFor(env),
     provider: dryRun
       ? { kind: 'FAKE — pipeline test only; these numbers say nothing about any reader' }
       : { kind: status.provider, endpointHost: status.endpointHost, primaryModel: config.primaryModel, fallbackModel: config.fallbackModel, confidenceFloor: config.confidenceFloor },

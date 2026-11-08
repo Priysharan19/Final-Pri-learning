@@ -10,7 +10,7 @@ A release candidate must preserve all of these properties:
 - compatibility package: `ios/PriLearning 2.swiftpm`, synchronized with the canonical native source/configuration;
 - bundle identifier: `com.prilearning.app` unless a deliberate migration is reviewed separately;
 - real `AppIcon` asset; no `.placeholder(...)` release icon;
-- bundled web mirror exactly matches the current client build;
+- bundled web mirror (`Resources/Web`) is generated from the current client build by `npm run build && npm run sync:ios` and proven complete by `npm run check:ios`; it is never committed (decision D28, 1 November 2026) and never read from git;
 - release Web Inspector exposure is disabled (`isInspectable` may exist only under `#if DEBUG`);
 - production native cloud origin comes only from signed Info.plist `PRICloudOrigin` / build setting `PRI_CLOUD_ORIGIN`;
 - release cloud origin must validate as HTTPS; absent/invalid configuration fails closed — and because grading is online-only such a build can never mark an answer, so it is unshippable (archive gate, §6);
@@ -35,15 +35,17 @@ Version changes are production changes and must pass the normal PR/current-head 
 
 ## 3. Deterministic repository preflight
 
-Start from a clean checkout of the exact candidate SHA. From the repository root:
+Start from a clean checkout of the exact candidate SHA. `Resources/Web` is empty but for its README on a fresh checkout: the web bundle is generated here, never pulled from git. From the repository root:
 
 ```bash
 npm ci --prefix client
 npm run build
 npm run verify:release
-npm run sync:ios
-npm run check:ios
+npm run sync:ios                                   # generates Resources/Web in both packages
+npm run check:ios                                  # each bundle is a complete copy of client/dist
 npm run verify:release:native
+node client/test/ios-bundle-features-check.mjs     # flag-off production bundle
+node client/test/native-shell-csp-check.mjs --require-generated
 node scripts/check-native-package-sync.mjs
 npm run test:ink:bridge
 ```
@@ -102,7 +104,7 @@ This inventory is an engineering map, not legal advice and not an App Store priv
 
 After the exact candidate SHA is merged/approved and preflight is green:
 
-1. open `ios/PriLearning.swiftpm` in the supported Xcode release environment;
+1. on that checkout run `npm run build && npm run sync:ios && npm run check:ios` first (the archive copies the generated `Resources/Web`; an archive made before the sync ships an empty web folder), then open `ios/PriLearning.swiftpm` in the supported Xcode release environment;
 2. select the `PriLearning` scheme and a generic/eligible iOS device destination suitable for archiving;
 3. verify production signing team and bundle identifier;
 4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
