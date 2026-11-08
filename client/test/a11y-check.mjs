@@ -1123,6 +1123,14 @@ async function run() {
       await wait(page, 800);
     });
 
+    // The Premium screen (D22): the plans, the store's own prices, Restore,
+    // the renewal disclosure and the legal links, with a working close button.
+    await step('premium · plans, renewal terms and close', '/premium', async () => {
+      await goTo(page, BASE, '/premium');
+      await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
