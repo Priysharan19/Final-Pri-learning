@@ -25,6 +25,7 @@ a ticket). Each decision (`D4`, `D12`, …) is the owner default of
 | 8 | Apple billing | `PRI_APPLE_MONTHLY_PRODUCT_ID=com.prilearning.app.premium.monthly`, `PRI_APPLE_ANNUAL_PRODUCT_ID=com.prilearning.app.premium.annual`, `PRI_APPLE_APP_ID=<the numeric App Apple ID from App Store Connect → App Information>`, `PRI_APPLE_BUNDLE_ID=com.prilearning.app`, `PRI_APPLE_ROOT_CA_PEM=<Apple Root CA - G3, PEM>` (or `PRI_APPLE_ROOT_CA_FILE`), `PRI_APPLE_ENVIRONMENTS=Production`, `PRI_APPLE_ALLOW_SANDBOX` **unset** (see note 8); display: `PRI_DISPLAY_CURRENCY=INR`, `PRI_DISPLAY_MONTHLY_PRICE=199`, `PRI_DISPLAY_ANNUAL_PRICE=1499` | D19 prices (₹199 a month, ₹1,499 a year); `docs/billing/storekit-certification.md` §2 production trust | `server/platform/appleBilling.js`, `appleSignedData.js`, `config.js` `platformConfigStatus` (a product id without trust and App ID fails closed), `billing.js` `commercialConfig` | probes `apple-products` and `display-prices` (`/v1/billing/config`), `billing-provider-complete` (`/v1/ready` `checks.billing.state = ok`); §3 check H8 for the store side | yes (the variables). The products are created but **not priced**: pricing needs the Paid Apps Agreement (`BLOCKED_EXTERNAL`, owner) |
 | 9 | Auth email sender | `PRI_AUTH_EMAIL_PROVIDER=resend`; `PRI_RESEND_API_KEY=<production key, sending access>`; `PRI_AUTH_EMAIL_FROM=Pri Learning <verify@mail.prilearning.com>`; `mail.prilearning.com` verified in Resend (its SPF and DKIM records in the `prilearning.com` DNS) | V1 hard blocker #13 (verification and reset email); the sending domain the privacy notices name (`docs/release/play-data-safety.md`) | `server/platform/authDelivery.js` (`probeAuthEmail`), `server/platform/readiness.js` | `--auth-email-proven` and probe `auth-email-sender` (`state ok`, `credential valid`, `sender` verified, or unknown for a sending-only key); §3 check H9 for the delivered message's From and DKIM domain | yes |
 | 10 | Sign-in methods | no `PRI_SMS_PROVIDER`; `PRI_GOOGLE_WEB_CLIENT_ID`, `PRI_APPLE_WEB_CLIENT_ID`, `PRI_GOOGLE_CLIENT_IDS`, `PRI_APPLE_CLIENT_IDS` **unset** | D3 — email code and password at launch; Apple and Google later, together; SMS off | `server/platform/otp.js` (`GET /v1/account/otp/channels`), `server/platform/identities.js` (`GET /v1/account/identity/providers`) | probes `sign-in-channels` and `provider-sign-in-off` | yes |
+| 11 | Staging test mailbox off | nothing to set. L2's test mailbox for the reserved `@e2e.prilearning.test` addresses turns itself on only where `RAILWAY_ENVIRONMENT_NAME` is `staging`; the production environment is named `production` | the Director's 9 Nov addition: the staging journeys' inbox never exists in production | L2's change (not yet on `main`) | probe `test-mailbox-off` (`/v1/ready` `checks.testMailbox.state = off`). Until L2's change lands the field is absent and the probe accepts that (`orAbsent`); once it exists, anything but `off` fails | **no — lands with L2's test-mailbox PR** |
 
 ### Notes
 
@@ -58,7 +59,8 @@ a ticket). Each decision (`D4`, `D12`, …) is the owner default of
 
 ## 2. The machine check
 
-From a checkout at the nominated SHA:
+The values are set on Railway with part B of `docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md`, which
+also holds the App Store Connect steps for row 8. Then, from a checkout at the nominated SHA:
 
 ```bash
 npm run verify:deployment -- --origin https://app.prilearning.com --sha <40-hex SHA> \
@@ -72,13 +74,16 @@ with one more unauthenticated GET each (never a write, never a credential), plus
 Both flags are opt-in: without them `verify-deployment` sends its three GETs and prints the same
 14 rows as always (`tools/verify-deployment.test.mjs` pins that byte for byte).
 
-Expected result: `DEPLOYMENT VERIFIED: PASS — 26/26` (the 14 standard rows, the handwriting row, the
-ten probes and the public origin). Against **staging** the same command is a rehearsal and some rows
+Expected result: `DEPLOYMENT VERIFIED: PASS — 27/27` (the 14 standard rows, the handwriting row, the
+eleven probes and the public origin). Against **staging** the same command is a rehearsal and some rows
 differ on purpose (a staging build made with the tutor on, staging's billing products): read each
 failed row rather than counting.
 
 The block between the markers is the manifest's machine-readable half. It holds only what an
 anonymous caller can already see; a change to a value above changes it here in the same commit.
+A value is matched exactly, or with `{ "oneOf": [...] }`; `"orAbsent": true` beside `oneOf` also
+accepts a field that does not exist yet (row 11, before L2's change), and still refuses any other
+value once it does.
 
 <!-- pri-expected-public-config:start -->
 ```json
@@ -97,7 +102,8 @@ anonymous caller can already see; a change to a value above changes it here in t
     { "id": "billing-provider-complete", "decision": "Apple billing trust and App ID", "path": "/v1/ready", "json": { "checks.billing.state": "ok" } },
     { "id": "auth-email-sender", "decision": "auth email sender domain", "path": "/v1/ready", "json": { "checks.authEmail.state": "ok", "checks.authEmail.credential": "valid", "checks.authEmail.sender": { "oneOf": ["verified", "unknown"] } } },
     { "id": "sign-in-channels", "decision": "D3 email code on, SMS off", "path": "/v1/account/otp/channels", "status": 200, "json": { "channels.email": true, "channels.sms": false } },
-    { "id": "provider-sign-in-off", "decision": "D3 Apple and Google sign-in later", "path": "/v1/account/identity/providers", "status": 200, "json": { "providers.google": null, "providers.apple": null } }
+    { "id": "provider-sign-in-off", "decision": "D3 Apple and Google sign-in later", "path": "/v1/account/identity/providers", "status": 200, "json": { "providers.google": null, "providers.apple": null } },
+    { "id": "test-mailbox-off", "decision": "staging-only test mailbox off", "path": "/v1/ready", "json": { "checks.testMailbox.state": { "oneOf": ["off"], "orAbsent": true } } }
   ]
 }
 ```

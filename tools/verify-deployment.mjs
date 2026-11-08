@@ -99,7 +99,10 @@ const FIELD_PATH = /^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
 const CONFIG_KEYS = new Set(['format', 'version', 'environment', 'publicOrigin', 'probes']);
 const PROBE_KEYS = new Set(['id', 'decision', 'path', 'status', 'json']);
 const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-const isOneOf = value => isObject(value) && Object.keys(value).length === 1 && Object.hasOwn(value, 'oneOf');
+// A matcher: { oneOf: [...] }, optionally with orAbsent: true (the field may be missing, as on a
+// build from before the field existed; when present it must be one of the values).
+const MATCHER_KEYS = new Set(['oneOf', 'orAbsent']);
+const isOneOf = value => isObject(value) && Object.hasOwn(value, 'oneOf') && Object.keys(value).every(key => MATCHER_KEYS.has(key));
 
 /** The problems with an expected-config object; empty when it can be checked. */
 export function expectedConfigProblems(config) {
@@ -133,8 +136,9 @@ export function expectedConfigProblems(config) {
       else {
         for (const [field, expected] of Object.entries(probe.json)) {
           if (!FIELD_PATH.test(field)) problems.push(`${where}: json field ${JSON.stringify(field)} must be a dotted path`);
-          if (isObject(expected) && Object.hasOwn(expected, 'oneOf') && !(isOneOf(expected) && Array.isArray(expected.oneOf) && expected.oneOf.length > 0)) {
-            problems.push(`${where}: json ${field} oneOf must be a non-empty array and the only key`);
+          if (isObject(expected) && (Object.hasOwn(expected, 'oneOf') || Object.hasOwn(expected, 'orAbsent'))
+            && !(isOneOf(expected) && Array.isArray(expected.oneOf) && expected.oneOf.length > 0 && (!Object.hasOwn(expected, 'orAbsent') || expected.orAbsent === true))) {
+            problems.push(`${where}: json ${field} must be { oneOf: [non-empty] } with at most orAbsent: true`);
           }
         }
       }
@@ -186,8 +190,9 @@ export function probeMismatches(probe, answer) {
   if (probe.status !== undefined && answer.status !== probe.status) mismatches.push(`status ${answer.status}, expected ${probe.status}`);
   for (const [path, expected] of Object.entries(probe.json || {})) {
     const actual = field(answer.body, path);
-    const ok = isOneOf(expected) ? expected.oneOf.some(item => isDeepStrictEqual(actual, item)) : isDeepStrictEqual(actual, expected);
-    if (!ok) mismatches.push(`${path} ${show(actual)}, expected ${isOneOf(expected) ? `one of ${expected.oneOf.map(show).join(' | ')}` : show(expected)}`);
+    const absentOk = isOneOf(expected) && expected.orAbsent === true && actual === undefined;
+    const ok = absentOk || (isOneOf(expected) ? expected.oneOf.some(item => isDeepStrictEqual(actual, item)) : isDeepStrictEqual(actual, expected));
+    if (!ok) mismatches.push(`${path} ${show(actual)}, expected ${isOneOf(expected) ? `one of ${expected.oneOf.map(show).join(' | ')}${expected.orAbsent ? ' (or absent)' : ''}` : show(expected)}`);
   }
   return mismatches;
 }

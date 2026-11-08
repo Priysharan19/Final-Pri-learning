@@ -173,12 +173,28 @@ try {
   eq(probe('billing-provider-complete')?.json, { 'checks.billing.state': 'ok' }, 'Apple trust and App ID are set with the products');
   eq(probe('auth-email-sender')?.json, { 'checks.authEmail.state': 'ok', 'checks.authEmail.credential': 'valid', 'checks.authEmail.sender': { oneOf: ['verified', 'unknown'] } }, 'the sender is never unverified, invalid or the test sender');
   eq([probe('sign-in-channels')?.json, probe('provider-sign-in-off')?.json], [{ 'channels.email': true, 'channels.sms': false }, { 'providers.google': null, 'providers.apple': null }], 'D3: email code on; SMS, Apple and Google sign-in off');
+  eq([probe('test-mailbox-off')?.path, probe('test-mailbox-off')?.json], ['/v1/ready', { 'checks.testMailbox.state': { oneOf: ['off'], orAbsent: true } }], 'the staging-only test mailbox is off in production (absent until L2\'s change lands)');
   const doc = readFileSync(MANIFEST, 'utf8');
   for (const [decision, needle] of [['D4', 'PRI_FEATURE_TUTOR'], ['D12', 'PRI_METHOD_MARKS'], ['D18', 'PRI_CHILD_ERASURE=enforce'], ['D21', 'PRI_PAID_CALLS_PER_HOUR=120'], ['D21', 'PRI_PAID_CALLS_PER_DAY=300'],
     ['D22', 'PRI_PARENT_REPORT'], ['#653', 'PRI_TRUSTED_PROXY_HOPS'], ['D5', 'PRI_PUBLIC_ORIGIN=https://app.prilearning.com'], ['Apple billing', 'PRI_APPLE_ROOT_CA_PEM'], ['sender', 'verify@mail.prilearning.com']]) {
     ok(doc.includes(needle), `the manifest table states ${decision}: ${needle}`);
   }
   ok(doc.includes(`DEPLOYMENT VERIFIED: PASS — ${14 + 1 + manifestConfig.probes.length + 1}/${14 + 1 + manifestConfig.probes.length + 1}`), 'the manifest states the full count the production check prints');
+  // The owner's Railway click-list pastes these values: it must agree with the manifest, hold secrets
+  // only as <placeholders>, and set none of the variables the manifest requires unset.
+  const clickList = readFileSync(join(ROOT, 'docs', 'release', 'OWNER-CLICK-LIST-APPLE-RAILWAY.md'), 'utf8');
+  const block = (clickList.match(/```dotenv\n([\s\S]*?)\n```/) || [])[1] || '';
+  const env = Object.fromEntries(block.split('\n').filter(line => /^[A-Z0-9_]+=/.test(line)).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+  eq([env.PRI_PUBLIC_ORIGIN, env.PRI_APPLE_MONTHLY_PRODUCT_ID, env.PRI_APPLE_ANNUAL_PRODUCT_ID],
+    [manifestConfig.publicOrigin, probe('apple-products').json['products.appleMonthly'], probe('apple-products').json['products.appleAnnual']], 'the click-list pastes the manifest\'s origin and Apple product ids');
+  eq([env.PRI_DISPLAY_CURRENCY, Number(env.PRI_DISPLAY_MONTHLY_PRICE), Number(env.PRI_DISPLAY_ANNUAL_PRICE)],
+    [probe('display-prices').json['display.currency'], probe('display-prices').json['display.monthly'], probe('display-prices').json['display.annual']], 'and its D19 display prices');
+  eq([env.PRI_PAID_CALLS_PER_HOUR, env.PRI_PAID_CALLS_PER_DAY, env.PRI_APPLE_ENVIRONMENTS, env.NODE_ENV], ['120', '300', 'Production', 'production'], 'and D21\'s ceilings, Production-only Apple and NODE_ENV');
+  ok(/verify@mail\.prilearning\.com/.test(env.PRI_AUTH_EMAIL_FROM || ''), 'and the auth email sender of row 9');
+  for (const secret of ['PRI_RESEND_API_KEY', 'PRI_METRICS_TOKEN', 'PRI_DATABASE_URL', 'PRI_APPLE_APP_ID', 'PRI_TRUSTED_PROXY_HOPS']) ok(/^<[^>]+>$/.test(env[secret] || ''), `${secret} is a <placeholder> the owner fills, never a value`);
+  const mustBeUnset = ['PRI_FEATURE_TUTOR', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_PARENT_REPORT', 'PRI_PARENT_REPORT_EMAILS', 'PRI_SMS_PROVIDER', 'PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_ALLOW_SANDBOX'];
+  ok(mustBeUnset.every(name => !(name in env)) && !Object.keys(env).some(name => name.startsWith('PRI_TUTOR_')), 'the pasted block sets none of the variables the manifest requires unset');
+  ok(mustBeUnset.every(name => clickList.split('**B2')[0].includes(`\`${name}\``)), 'and step B1 names every one of them for deletion');
 
   // ── 4 · --expect-config against a matching and a drifting deployment ─────
   reset();
@@ -201,7 +217,9 @@ try {
     ['auth-email-sender', 'the provider\'s shared test sender', r => { r['/v1/ready'][1].checks.authEmail.sender = 'test_sender'; r['/v1/ready'][1].checks.authEmail.state = 'degraded'; }],
     ['sign-in-channels', 'SMS on (D3)', r => { r['/v1/account/otp/channels'][1].channels.sms = true; }],
     ['provider-sign-in-off', 'Google web sign-in on (D3)', r => { r['/v1/account/identity/providers'][1].providers.google = { clientId: 'x.apps.googleusercontent.com' }; }],
-    ['provider-sign-in-off', 'a providers answer missing a field', r => { delete r['/v1/account/identity/providers'][1].providers.apple; }]
+    ['provider-sign-in-off', 'a providers answer missing a field', r => { delete r['/v1/account/identity/providers'][1].providers.apple; }],
+    ['test-mailbox-off', 'the staging test mailbox on in production', r => { r['/v1/ready'][1].checks.testMailbox = { state: 'on', code: null }; }],
+    ['test-mailbox-off', 'a test mailbox reporting no state', r => { r['/v1/ready'][1].checks.testMailbox = { code: null, state: null }; }]
   ];
   for (const [id, name, mutate] of drifts) {
     reset();
@@ -214,6 +232,18 @@ try {
   routes['/v1/billing/config'][1].display.monthly = 299;
   report = await run({ expectedConfig: localConfig });
   eq(report.results.find(r => !r.ok)?.detail, 'display.monthly 299, expected 199', 'a mismatch names the field, the value seen and the value expected');
+  // orAbsent: a field that does not exist yet passes; once it exists only the listed values pass.
+  reset();
+  report = await run({ expectedConfig: localConfig });
+  ok(report.ok && report.results.find(r => /test-mailbox-off/.test(r.label))?.detail === 'checks.testMailbox.state missing', 'a build without the test mailbox passes test-mailbox-off (the field is absent)');
+  reset();
+  routes['/v1/ready'][1].checks.testMailbox = { state: 'off', code: null };
+  ok((await run({ expectedConfig: localConfig })).ok, 'a test mailbox reporting off passes');
+  reset();
+  routes['/v1/ready'][1].checks.testMailbox = { state: 'on', code: null };
+  report = await run({ expectedConfig: localConfig });
+  eq(report.results.find(r => !r.ok)?.detail, 'checks.testMailbox.state "on", expected one of "off" (or absent)', 'a test mailbox reporting on fails, and the message says absent would have passed');
+  eq(probeMismatches({ json: { a: { oneOf: [1] } } }, { status: 200, body: {} }), ['a missing, expected one of 1'], 'without orAbsent a missing field still fails a oneOf');
   // The public origin must serve this release; it is not merely reachable.
   const other = createServer((req, res) => {
     const body = req.url === '/v1/health' ? { ...healthy()['/v1/health'][1], releaseIdentity: { ...identity, releaseSha: 'b'.repeat(40) } }
@@ -260,6 +290,9 @@ try {
     ['a probe expecting nothing', c => ({ ...c, probes: [{ id: 'empty', decision: 'x', path: '/v1/ready' }] })],
     ['an unknown probe key', c => ({ ...c, probes: [{ ...c.probes[0], method: 'POST' }] })],
     ['an empty oneOf', c => ({ ...c, probes: [{ id: 'one', decision: 'x', path: '/v1/ready', json: { 'checks.authEmail.sender': { oneOf: [] } } }] })],
+    ['orAbsent without oneOf', c => ({ ...c, probes: [{ id: 'abs', decision: 'x', path: '/v1/ready', json: { 'checks.testMailbox.state': { orAbsent: true } } }] })],
+    ['orAbsent that is not true', c => ({ ...c, probes: [{ id: 'abs', decision: 'x', path: '/v1/ready', json: { 'checks.testMailbox.state': { oneOf: ['off'], orAbsent: 'yes' } } }] })],
+    ['a matcher with an unknown key', c => ({ ...c, probes: [{ id: 'abs', decision: 'x', path: '/v1/ready', json: { 'checks.testMailbox.state': { oneOf: ['off'], orMissing: true } } }] })],
     ['a public origin with a path', c => ({ ...c, publicOrigin: 'https://app.prilearning.com/app' })]
   ];
   for (const [name, mutate] of bad) {
