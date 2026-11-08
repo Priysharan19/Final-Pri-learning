@@ -3788,18 +3788,19 @@ const routes = {
     const q = row.payload;
     const resolvedRow = !!row.answered;
     const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
-    if (!resolvedRow && used < 1) {
-      row.tutorLevel = 1;
-      await put('questions', row);
-    }
     const solution = row.serverQuestionId ? (row.serverReceipt?.solution
       ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
           solutionText: row.serverReceipt.solution.solutionText }
       : null)
       : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
     const work = tutorWork(q, body?.work);
+    // Nothing written: nothing to diagnose, and nothing charged (F5).
     if (!work.lines.length && !work.typedAnswer) {
-      return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: Number(row.tutorLevel) || 0 };
+      return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: used };
+    }
+    if (!resolvedRow && used < 1) {
+      row.tutorLevel = 1;
+      await put('questions', row);
     }
     const finalAnswer = ['correct', 'wrong'].includes(body?.finalAnswer) ? body.finalAnswer : 'unknown';
     const request = tutorRequest(p, row, q, solution, {

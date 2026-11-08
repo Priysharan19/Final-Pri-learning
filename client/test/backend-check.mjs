@@ -1694,6 +1694,10 @@ async function run() {
     const rowAfterDiag = await idb.get('questions', wid);
     eq('a resolved diagnosis charges nothing and moves no mark', [rowAfterDiag.tutorLevel, rowAfterDiag.answered, rowAfterDiag.resolution?.correct],
       [rowBeforeDiag.tutorLevel, rowBeforeDiag.answered, rowBeforeDiag.resolution?.correct]);
+    const emptyFirst = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    eq('an empty diagnosis request is refused before anything is charged',
+      [(await POST(`/practice/${emptyFirst.question.id}/tutor/diagnose`, { work: { lines: [] } })).code, (await idb.get('questions', emptyFirst.question.id)).tutorLevel || 0],
+      ['TUTOR_NOTHING_TO_DIAGNOSE', 0]);
     const openDiag = await answerableQuestion({ mode: 'topic', subtopic: topicId });
     await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
     eq('an open attempt’s diagnosis is sent as open', tutorCalls.at(-1)?.resolved, false);

@@ -135,7 +135,7 @@ export const DIAGNOSIS_TEXT = Object.freeze({
     rightNone: 'You set out to work towards the answer — the checker could not verify a line yet.',
     wrongAt: 'Your working first goes wrong at line {n}: {line}. It does not follow from the line before it.',
     wrongFinal: 'Each line the checker could judge holds, but your final answer does not match.',
-    wrongUnplaced: 'The checker could not point to one line, but the working does not reach the right answer.',
+    wrongUnplaced: 'The checker has not placed a break in these lines.',
     nextStep: 'Next: {step}.',
     nextGeneric: 'Next: go back to the last line that checks out and redo the step after it.'
   }),
@@ -144,7 +144,7 @@ export const DIAGNOSIS_TEXT = Object.freeze({
     rightNone: 'आपने उत्तर की ओर काम शुरू किया — जाँचकर्ता अभी कोई पंक्ति सत्यापित नहीं कर सका।',
     wrongAt: 'आपके हल में पहली गलती पंक्ति {n} में है: {line}। यह पिछली पंक्ति से नहीं निकलती।',
     wrongFinal: 'जाँची गई हर पंक्ति सही है, पर आपका अंतिम उत्तर मेल नहीं खाता।',
-    wrongUnplaced: 'जाँचकर्ता कोई एक पंक्ति नहीं बता सका, पर हल सही उत्तर तक नहीं पहुँचता।',
+    wrongUnplaced: 'जाँचकर्ता ने इन पंक्तियों में कोई गलती चिह्नित नहीं की है।',
     nextStep: 'अगला क़दम: {step}।',
     nextGeneric: 'अगला क़दम: आख़िरी सही पंक्ति पर लौटें और उसके बाद का क़दम फिर से करें।'
   })
@@ -515,7 +515,9 @@ export function deterministicDiagnosis(request) {
   const didRight = lastOk >= 0 ? fill(copy.rightLines, { line: asMath(lines[lastOk]) }) : copy.rightNone;
   const wentWrong = firstBreak >= 0 && firstBreak < lines.length
     ? fill(copy.wrongAt, { n: firstBreak + 1, line: asMath(lines[firstBreak]) })
-    : request.studentWork.finalAnswer === 'wrong' && lines.length && status.every(v => v === 'ok') ? copy.wrongFinal : copy.wrongUnplaced;
+    // Only a resolved question's final-answer status is spoken; an open attempt
+    // is told nothing about correctness that the engine did not place (F3).
+    : request.resolved && request.studentWork.finalAnswer === 'wrong' && lines.length && status.every(v => v === 'ok') ? copy.wrongFinal : copy.wrongUnplaced;
   const index = nextStepIndex(request);
   const step = request.question.steps[index] || {};
   let nextStep = copy.nextGeneric;
@@ -557,6 +559,20 @@ export function diagnosisIssues(reply, request) {
 }
 
 const diagnosisMessage = d => [d.didRight, d.wentWrong, d.nextStep].filter(Boolean).join(' ');
+
+/**
+ * The open-attempt diagnosis: engine-only, one shape, no code, no model, no
+ * spend. Its fields are the same whatever the student wrote, so a right guess
+ * and a wrong guess cannot be told apart by anything but the engine's own
+ * (already withheld or already shown) verdict.
+ */
+export function openDiagnosis(request) {
+  const diagnosis = deterministicDiagnosis({ ...request, resolved: false });
+  return {
+    level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+    source: 'checker', resolved: false, cached: false
+  };
+}
 
 const positiveInt = value => { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : null; };
 
@@ -673,8 +689,7 @@ export function createTutorRouter(db, {
         cache: reason === 'TUTOR_ANSWER_GUARD' || reason === 'TUTOR_GROUNDING_GUARD'
       };
     };
-    const overBudget = await consumePaidCall(db, { env });
-    if (overBudget) return { ...fallback('PAID_CAPACITY_REACHED'), cache: false };
+    // The paid-call unit was taken by the route before the daily allowance (F5).
     let reply;
     try { reply = await ask(request, { env }); } catch (error) {
       return { ...fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED'), cache: false };
@@ -684,9 +699,12 @@ export function createTutorRouter(db, {
       const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
       return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
     }
+    // Which lines are credited and which is at fault are the ENGINE's, never the
+    // model's (F2): the model only words them.
+    const engine = deterministicDiagnosis(request);
     const diagnosis = {
       didRight: reply.didRight, wentWrong: reply.wentWrong, nextStep: reply.nextStep,
-      creditedLines: reply.creditedLines, wentWrongLine: reply.wentWrongLine, referencesStepIndex: reply.referencesStepIndex
+      creditedLines: engine.creditedLines, wentWrongLine: engine.wentWrongLine, referencesStepIndex: reply.referencesStepIndex
     };
     return {
       tutor: {
@@ -736,11 +754,20 @@ export function createTutorRouter(db, {
       const grounded = await groundIssued(db, req.platformSession.account_id, checked.request, at);
       if (!grounded.ok) return res.status(grounded.status).json({ error: { code: grounded.code, message: grounded.message } });
       const request = grounded.request;
+      const diagnosing = request.level === TUTOR_DIAGNOSE_LEVEL;
+      // An OPEN attempt is diagnosed by the engine alone, with no model call and
+      // one fixed response shape (F1/F2). A model reply on open work could be
+      // refused by the answer guard exactly when a guess is right, and that
+      // refusal — or a model's own "this is right" — would be an answer oracle.
+      // Here nothing in the reply depends on whether the student's guess is
+      // correct: only on the engine's verdict (withheld until resolution for a
+      // server-issued question) and the verified plan.
+      if (diagnosing && !request.resolved) return res.json({ tutor: openDiagnosis(request) });
+
       const key = tutorCacheKey(request, cacheScope(req.platformSession.account_id));
       const hit = await cached(key, at);
       if (hit) return res.json({ tutor: { ...hit, cached: true } });
 
-      const diagnosing = request.level === TUTOR_DIAGNOSE_LEVEL;
       // A diagnosis still helps with no model: the engine's own diagnosis is
       // served (never cached) when the tutor is unconfigured or the allowance is spent.
       const deterministicOnly = reason => {
@@ -754,6 +781,13 @@ export function createTutorRouter(db, {
       if (!providerConfig(env).configured) {
         if (diagnosing) return deterministicOnly('TUTOR_NOT_CONFIGURED');
         return res.status(503).json({ error: { code: 'TUTOR_NOT_CONFIGURED', message: 'The AI tutor is not available on this deployment.' } });
+      }
+
+      // A diagnosis takes its paid-call unit first, so a ceiling-reached fallback
+      // spends no daily allowance (F5).
+      if (diagnosing) {
+        const overBudget = await consumePaidCall(db, { env });
+        if (overBudget) return deterministicOnly('PAID_CAPACITY_REACHED');
       }
 
       // Per-account daily allowance, counted per request that reaches the model.

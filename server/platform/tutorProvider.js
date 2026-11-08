@@ -63,7 +63,10 @@ export const TUTOR_REQUEST_LEVELS = Object.freeze([...TUTOR_LEVELS, TUTOR_TURN_L
 //   PRI_TUTOR_REASONING_EFFORT           nudge/socratic/walkthrough (default medium)
 //   PRI_TUTOR_STREAM_REASONING_EFFORT    streamed turns        (default low)
 export const REASONING_EFFORTS = Object.freeze(['minimal', 'low', 'medium', 'high']);
-export const DEFAULT_EFFORT = Object.freeze({ diagnose: 'high', help: 'medium', stream: 'low' });
+// The ladder stays at 'low' (its pre-diagnosis default): the paid-call ceiling
+// counts calls, not tokens, so a deeper default would silently raise what each
+// unit costs. Only the diagnosis — resolved questions only — defaults to 'high'.
+export const DEFAULT_EFFORT = Object.freeze({ diagnose: 'high', help: 'low', stream: 'low' });
 /** The default time allowed for one call at each effort; PRI_TUTOR_TIMEOUT_MS overrides, MAX_TIMEOUT_MS caps. */
 export const EFFORT_TIMEOUT_MS = Object.freeze({ minimal: 20_000, low: DEFAULT_TIMEOUT_MS, medium: 30_000, high: 50_000 });
 const effortOf = (value, fallback) => {

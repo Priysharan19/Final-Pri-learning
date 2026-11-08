@@ -83,17 +83,17 @@ ok(!Object.keys(DIAGNOSIS_SCHEMA.properties).some(k => /mark|score|correct|verdi
 
 const keyEnv = { PRI_HANDWRITING_API_KEY: 'k-test' };
 const cfg = providerConfig(keyEnv);
-eq([cfg.effort.diagnose, cfg.effort.help, cfg.effort.stream], ['high', 'medium', 'low'], 'effort defaults: high for diagnosis, medium for the ladder, low for streamed turns');
+eq([cfg.effort.diagnose, cfg.effort.help, cfg.effort.stream], ['high', 'low', 'low'], 'effort defaults: high for diagnosis, low (unchanged) for the ladder, low for streamed turns');
 eq(cfg.model, 'gpt-5.6-terra', 'the model default is unchanged');
 const diagRequest = validateTutorRequest(body()).request;
 const nudgeRequest = validateTutorRequest({ ...body({ level: 'nudge' }), studentWork: { lines: LINES } }).request;
 eq(providerBody(diagRequest, cfg).reasoning, { effort: 'high' }, 'a diagnosis is sent with high effort');
-eq(providerBody(nudgeRequest, cfg).reasoning, { effort: 'medium' }, 'a nudge with medium effort');
+eq(providerBody(nudgeRequest, cfg).reasoning, { effort: 'low' }, 'a nudge keeps its low effort (F4)');
 eq(providerBody(nudgeRequest, cfg, { stream: true }).reasoning, { effort: 'low' }, 'a streamed turn with low effort, so reasoning does not eat its output cap');
 const tuned = providerConfig({ ...keyEnv, PRI_TUTOR_REASONING_EFFORT: 'LOW', PRI_TUTOR_DIAGNOSE_REASONING_EFFORT: 'medium', PRI_TUTOR_STREAM_REASONING_EFFORT: 'minimal' });
 eq([tuned.effort.diagnose, tuned.effort.help, tuned.effort.stream], ['medium', 'low', 'minimal'], 'each effort is configurable');
 eq(providerConfig({ ...keyEnv, PRI_TUTOR_DIAGNOSE_REASONING_EFFORT: 'extreme' }).effort.diagnose, 'high', 'an unknown effort falls back to the default');
-ok(cfg.timeouts.diagnose > cfg.timeouts.help && cfg.timeouts.help > cfg.timeouts.stream, 'a deeper effort gets a longer timeout');
+ok(cfg.timeouts.diagnose > cfg.timeouts.help && cfg.timeouts.help === cfg.timeouts.stream, 'a deeper effort gets a longer timeout');
 ok(Object.values(cfg.timeouts).every(ms => ms <= MAX_TIMEOUT_MS) && MAX_TIMEOUT_MS === 60_000, 'every default timeout is inside the 60 s cap');
 eq(providerConfig({ ...keyEnv, PRI_TUTOR_TIMEOUT_MS: '600000' }).timeouts.diagnose, 60_000, 'a configured timeout is capped at 60 s');
 eq(providerConfig({ ...keyEnv, PRI_TUTOR_TIMEOUT_MS: '9000' }).timeouts, { diagnose: 9000, help: 9000, stream: 9000 }, 'an explicit timeout applies to every call');
@@ -221,62 +221,65 @@ try {
   const exam = await call('acct-a', body({ context: 'exam' }));
   eq([exam.status, exam.json?.error?.code, calls.length, await paidCalls()], [403, 'TUTOR_EXAM_LOCKED', 0, before], 'an exam diagnosis is refused before any call or spend');
 
-  // A grounded model diagnosis.
-  const first = await call('acct-a', body());
-  eq([first.status, first.json?.tutor?.level, first.json?.tutor?.source, first.json?.tutor?.cached], [200, 'diagnose', 'model', false], 'a grounded diagnosis comes from the model');
+  // ── Open attempt: engine-only, one shape, no oracle (review F1/F2/F3) ──
+  const R = (over = {}, work = {}) => body({ resolved: true, ...over }, work);
+  const openRight = await call('acct-a', body({}, { lines: [LINES[0], '= 56/65'], firstBreak: -1, verifiedLines: 0, lineStatus: ['unknown', 'unknown'], finalAnswer: 'unknown' }));
+  const openWrong = await call('acct-a', body({}, { lines: [LINES[0], '= 16'], firstBreak: -1, verifiedLines: 0, lineStatus: ['unknown', 'unknown'], finalAnswer: 'unknown' }));
+  const shape = r => JSON.stringify({ ...r.json?.tutor, message: undefined });
+  eq(shape(openRight), shape(openWrong), 'an open diagnosis of a RIGHT guess and of a WRONG guess are identical');
+  eq(openRight.json?.tutor?.message, openWrong.json?.tutor?.message, 'word for word');
+  eq([openRight.json?.tutor?.source, 'reason' in (openRight.json?.tutor || {}), 'model' in (openRight.json?.tutor || {})], ['checker', false, false], 'with no code, no model and no guard flag');
+  ok(!/56/.test(JSON.stringify(openRight.json)), 'and no answer value');
+  ok(!/does not reach the right answer/.test(JSON.stringify(openRight.json)), 'and no unsupported claim that the work is wrong (F3)');
+  eq([calls.length, await paidCalls()], [0, before], 'an open diagnosis asks no model and spends nothing');
+  const openBroken = await call('acct-a', body());
+  eq([openBroken.json?.tutor?.diagnosis?.wentWrongLine, openBroken.json?.tutor?.diagnosis?.creditedLines], [1, [0]], 'credited and faulted lines while open are the engine\'s');
+  ok(/line 2/.test(openBroken.json?.tutor?.diagnosis?.wentWrong || ''), "and only the engine's first break is named");
+
+  // ── Resolved: the model words the engine's verdict ──
+  const first = await call('acct-a', R());
+  eq([first.status, first.json?.tutor?.level, first.json?.tutor?.source, first.json?.tutor?.cached], [200, 'diagnose', 'model', false], 'a resolved, grounded diagnosis comes from the model');
   eq(first.json?.tutor?.diagnosis?.wentWrong, GOOD.wentWrong, 'with the first break and why');
-  eq([first.json?.tutor?.diagnosis?.creditedLines, first.json?.tutor?.diagnosis?.wentWrongLine], [[0], 1], 'and the lines it credits and faults');
   ok(noMark(first.json.tutor), 'the diagnosis carries no mark, score or verdict');
   eq([calls.length, await paidCalls()], [1, before + 1], 'one model call, one paid call');
-  eq([calls[0].studentWork.lineStatus, calls[0].studentWork.finalAnswer, calls[0].resolved], [['ok', 'break'], 'wrong', false], "the model saw the engine's verdict and the open state");
+  eq([calls[0].studentWork.lineStatus, calls[0].studentWork.finalAnswer, calls[0].resolved], [['ok', 'break'], 'wrong', true], "the model saw the engine's verdict");
+  script = [{ ...GOOD, creditedLines: [0, 1], wentWrongLine: 0 }];
+  const claimed = await call('acct-a', R({}, { typedAnswer: '15' }));
+  eq([claimed.json?.tutor?.diagnosis?.creditedLines, claimed.json?.tutor?.diagnosis?.wentWrongLine], [[0], 1], 'the model\'s own line verdicts are ignored: the engine\'s stand (F2)');
+  const again = await call('acct-b', R());
+  eq([again.json?.tutor?.cached, calls.length], [true, 2], 'an identical diagnosis is served from the cache without a model call');
 
-  const again = await call('acct-b', body());
-  eq([again.json?.tutor?.cached, calls.length, await paidCalls()], [true, 1, before + 1], 'an identical diagnosis is served from the cache without spend');
-
-  // While open: a reply naming the answer is replaced, and never regenerated.
-  script = [{ ...GOOD, nextStep: 'Substitute to get $\\frac{56}{65}$.' }];
-  const leaking = await call('acct-a', body({}, { typedAnswer: '16' }));
-  eq([leaking.json?.tutor?.source, leaking.json?.tutor?.reason], ['fallback', 'TUTOR_ANSWER_GUARD'], 'an open diagnosis that states the answer is replaced');
-  ok(!/56/.test(JSON.stringify(leaking.json)), 'and the answer never reaches the student');
-  eq(calls.length, 2, 'with one model call, not a regeneration loop');
-  script = [{ ...GOOD, revealsAnswer: true }];
-  eq((await call('acct-a', body({}, { typedAnswer: '17' }))).json?.tutor?.reason, 'TUTOR_ANSWER_GUARD', 'a diagnosis that declares it reveals the answer is not shown while open');
-
-  // Resolved: the answer may be named, if it is copied.
   script = [{ ...GOOD, nextStep: 'Substituting gives $\\frac{56}{65}$, which is what the verified solution reaches.' }];
-  const afterReveal = await call('acct-a', body({ resolved: true }));
+  const afterReveal = await call('acct-a', R({}, { typedAnswer: '17' }));
   eq([afterReveal.json?.tutor?.source, afterReveal.json?.tutor?.resolved], ['model', true], 'once resolved, a diagnosis may name the copied answer');
-
-  // Invented mathematics is replaced, open or resolved.
   script = [{ ...GOOD, wentWrong: 'You needed $\\cos A = \\frac{5}{12}$ first.' }];
-  const invented = await call('acct-a', body({ resolved: true }, { typedAnswer: '18' }));
+  const invented = await call('acct-a', R({}, { typedAnswer: '18' }));
   eq([invented.json?.tutor?.source, invented.json?.tutor?.reason], ['fallback', 'TUTOR_GROUNDING_GUARD'], 'a diagnosis with invented maths is replaced by the deterministic one');
   ok(/line 2/.test(invented.json?.tutor?.diagnosis?.wentWrong || ''), "which names the engine's first break");
 
-  // The model failing still helps, and is not cached.
   script = [new TutorProviderError('down', { code: 'TUTOR_UNAVAILABLE', status: 503, retryable: true })];
-  const down = await call('acct-a', body({}, { typedAnswer: '19' }));
+  const down = await call('acct-a', R({}, { typedAnswer: '19' }));
   eq([down.status, down.json?.tutor?.source, down.json?.tutor?.reason], [200, 'fallback', 'TUTOR_UNAVAILABLE'], 'a provider failure gives the deterministic diagnosis');
-  const downAgain = await call('acct-a', body({}, { typedAnswer: '19' }));
-  eq([downAgain.json?.tutor?.cached, downAgain.json?.tutor?.source], [false, 'model'], 'and that fallback is not cached: the next ask reaches the model');
+  const downAgain = await call('acct-a', R({}, { typedAnswer: '19' }));
+  eq([downAgain.json?.tutor?.cached, downAgain.json?.tutor?.source], [false, 'model'], 'and that fallback is not cached');
 
-  // Unconfigured: deterministic, no model call.
   const n = calls.length;
   const unconfigured = await mount({ ask: stubAsk, env: { ...env, PRI_HANDWRITING_API_KEY: '' } });
-  const plain = await unconfigured('acct-a', body({}, { typedAnswer: '20' }));
+  const plain = await unconfigured('acct-a', R({}, { typedAnswer: '20' }));
   eq([plain.status, plain.json?.tutor?.source, plain.json?.tutor?.reason, calls.length], [200, 'fallback', 'TUTOR_NOT_CONFIGURED', n], 'with no model configured the deterministic diagnosis still helps');
 
-  // Over the per-account allowance: deterministic, no model call.
   const capped = await mount({ ask: stubAsk, env: { ...env, PRI_TUTOR_CALLS_PER_ACCOUNT_DAY: '1' } });
-  await capped('acct-limit', body({}, { typedAnswer: '21' }));
-  const overAllowance = await capped('acct-limit', body({}, { typedAnswer: '22' }));
+  await capped('acct-limit', R({}, { typedAnswer: '21' }));
+  const overAllowance = await capped('acct-limit', R({}, { typedAnswer: '22' }));
   eq([overAllowance.status, overAllowance.json?.tutor?.reason], [200, 'TUTOR_DAILY_LIMIT'], 'over the daily allowance, the deterministic diagnosis is served');
   eq(calls.length, n + 1, 'and the model is not asked');
 
-  // Over the deployment ceiling: deterministic, no model call.
+  const dayBucket = async id => Number((await db.get('SELECT count FROM rate_limits WHERE bucket = ?', [`tutor-day:${sha256(id).slice(0, 24)}`]))?.count || 0);
+  const dayBefore = await dayBucket('acct-b');
   const ceiling = await mount({ ask: stubAsk, env: { ...env, PRI_PAID_CALLS_PER_HOUR: '1' } });
-  const overCeiling = await ceiling('acct-b', body({}, { typedAnswer: '23' }));
+  const overCeiling = await ceiling('acct-b', R({}, { typedAnswer: '23' }));
   eq([overCeiling.status, overCeiling.json?.tutor?.reason, calls.length], [200, 'PAID_CAPACITY_REACHED', n + 1], 'over the paid-call ceiling, the deterministic diagnosis is served without a model call');
+  eq(await dayBucket('acct-b'), dayBefore, 'and spends none of the daily allowance (F5)');
 
   // Dark: the route does not exist.
   const dark = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
