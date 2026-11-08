@@ -59,13 +59,18 @@ export const OWNER_STEPS = Object.freeze({
   STORAGE: { precondition: 'The device filled to under 500 MB free (a large video download).', steps: ['Write, read, submit, and check History.', 'Free the storage afterwards.'], evidence: ['Any crash or lost work; whether the app said plainly when it could not keep a photo.'] },
   MEMORY: { precondition: 'An unsent draft and a transcript on the page.', steps: ['Open several heavy apps until Pri is reclaimed.', 'Reopen Pri.'], evidence: ['Whether the draft, the transcript and the session came back without signing in.'] },
   EXPORT: { precondition: SIGNED_IN, steps: ['Export the account through the share sheet.', 'Open the file.'], evidence: ['Whether the JSON holds only this account\'s attempts.'] },
-  SHARE: { precondition: SIGNED_IN, steps: ['Share and print (or save as PDF) a paper or progress page.'], evidence: ['Whether every question, answer and mark is legible and nothing comes from another profile.'] }
+  SHARE: { precondition: SIGNED_IN, steps: ['Share and print (or save as PDF) a paper or progress page.'], evidence: ['Whether every question, answer and mark is legible and nothing comes from another profile.'] },
+  // Matrix steps that #737 adds (96 cases): until it lands they are release-record items below.
+  VOICEOVERTEXT: { precondition: 'Larger Text at the largest size (AX5) and VoiceOver on, together.', steps: ['Sign in, open a question and answer it by handwriting or typing.', 'Listen to the transcript and the mark, then find the attempt in History.', 'Turn VoiceOver off afterwards.'], evidence: ['Any control not reached, or not named, in order.', 'Whether the prompt naming OpenAI (D17) was read in full with both of its buttons reachable.', 'Anything clipped off the screen.'] },
+  DELETE: { precondition: 'The last step on this device: every other case here is done.', steps: ['Settings → Account → Delete, confirming with a fresh email code, for each test account on this device.', 'Sign in again with the same address.', 'After sync, look at History on the other device.'], evidence: ['Whether the app went back to the sign-in card.', 'Whether signing in again started a new, empty account.', 'Whether the old History is gone on both devices.'] },
+  PURCHASE: { billingRequired: true, precondition: 'The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6), and a Sandbox Apple Account is signed in (Settings → App Store). Until then this case is BLOCKED.', steps: ['On the Premium screen, buy the monthly plan through the system sheet.', 'Once, cancel the sheet instead.'], evidence: ['The price the store sheet showed.', 'Whether Premium unlocked only after the server confirmed it (/v1/entitlements).', 'Whether cancelling changed nothing.'] },
+  RESTOREPURCHASE: { billingRequired: true, precondition: 'The purchase case passed with the same sandbox account. Until billing is configured this case is BLOCKED.', steps: ['Delete and reinstall the app, sign in and press "Restore purchases".', 'On the other device, signed in to the same store account, press "Restore purchases".'], evidence: ['Whether Premium came back on both devices once the server confirmed it.', 'What a restore with no purchase said.'] }
 });
 
-/** Steps that are not matrix cases: their results go to the release record, not the device ledger. */
+/** Steps that are not matrix cases on a recorder without them: their results go to the release record, not the device ledger. Each names the matrix step that replaces it (#737). */
 export const RELEASE_RECORD_ITEMS = Object.freeze([
   ...APPLE_FAMILIES.map(family => ({
-    id: `REC-${family}-DELETE`, kind: 'release-record', family, title: 'In-app account deletion', billingRequired: false,
+    id: `REC-${family}-DELETE`, kind: 'release-record', family, matrixStep: 'DELETE', title: 'In-app account deletion', billingRequired: false,
     precondition: 'The last step: every other case on this device is done.',
     steps: ['Settings → Account → Delete, for each test account on this device.', 'Confirm with the password or the code.', 'Try to sign in with the same address.'],
     expected: 'You are signed out; the account is gone, and signing in again starts a new account.',
@@ -73,7 +78,7 @@ export const RELEASE_RECORD_ITEMS = Object.freeze([
     recordIn: 'GO/NO-GO record gates.store.evidence ("in-app deletion, iPhone and iPad, <SHA>, by <name>"); App Review guideline 5.1.1(v)'
   })),
   {
-    id: 'REC-IPD-PURCHASE', kind: 'release-record', family: 'IPD', title: 'Sandbox purchase and restore', billingRequired: true,
+    id: 'REC-IPD-PURCHASE', kind: 'release-record', family: 'IPD', matrixStep: 'PURCHASE', title: 'Sandbox purchase and restore', billingRequired: true,
     precondition: 'The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6). Until then this item is BLOCKED.',
     steps: ['Settings → App Store → Sandbox Account: sign in to a sandbox Apple Account.', 'Buy the monthly plan on the Premium screen.', 'Delete and reinstall the app, then "Restore purchases".'],
     expected: 'Premium after the purchase and after the restore, confirmed by the server (/v1/entitlements).',
@@ -99,13 +104,15 @@ export function ownerDeviceScript(cases = CASES) {
     const owner = OWNER_STEPS[kase.step];
     if (!owner) throw new Error(`no owner steps for matrix step ${kase.step} (${kase.id}): add it to OWNER_STEPS`);
     items.push({
-      id: kase.id, kind: 'device-matrix', family: kase.family, title: kase.title, billingRequired: false,
+      id: kase.id, kind: 'device-matrix', family: kase.family, title: kase.title, billingRequired: owner.billingRequired === true,
       precondition: owner.precondition, steps: [...owner.steps], expected: kase.expect, evidence: [...owner.evidence],
       ...(kase.pencil ? { pencilRequired: true } : {})
     });
   }
   if (SOAKS_RECORDED) items.push({ ...SOAK_ITEM, steps: [...SOAK_ITEM.steps], evidence: [...SOAK_ITEM.evidence] });
-  items.push(...RELEASE_RECORD_ITEMS.map(item => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
+  // A release-record item stays only while the matrix has no case for its step on that family.
+  const inMatrix = (family, step) => cases.some(kase => kase.family === family && kase.step === step);
+  items.push(...RELEASE_RECORD_ITEMS.filter(item => !inMatrix(item.family, item.matrixStep)).map(({ matrixStep: _step, ...item }) => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
   return {
     format: 'pri-owner-device-script', version: 1,
     generatedBy: 'node tools/release-owner-device-script.mjs --write',
