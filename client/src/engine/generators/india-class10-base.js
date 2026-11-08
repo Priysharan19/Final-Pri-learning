@@ -13,7 +13,7 @@
 // every answer exact. Where a figure genuinely is not a whole number it is keyed
 // as an exact fraction, never as a rounded decimal.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, Frac, mcq, sgn } from '../qhelpers.js';
+import { ri, rc, nz, Frac, sgn } from '../qhelpers.js';
 import { formulaPlan, ANGLE_ALIASES } from './workingRubrics.js';
 
 // A negative value written inside a subtraction keeps its own brackets: 6 - (-1).

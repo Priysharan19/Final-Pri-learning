@@ -73,10 +73,11 @@ export function workedStepHits(text) {
       if (rule === '+0 term') continue;
       if (pattern.test(math)) out.push({ rule, math });
     }
-    // Test each side with the relation that ends it, so "x + 0 = 5" still
-    // reads as "x + 0" followed by "=".
-    const sides = math.split(new RegExp(`(?=${RELATION.source})`));
-    if (sides.some(side => hasVariable(side.replace(RELATION, '')) && ZERO_TERM.test(side.replace(RELATION, '') + ' =')))
+    // Split at every relation (split drops each one, however many there are),
+    // then test each side as if a relation followed it: "x + 0 = 5" gives the
+    // side "x + 0", read as "x + 0 =".
+    const sides = math.split(RELATION);
+    if (sides.some(side => hasVariable(side) && ZERO_TERM.test(`${side} =`)))
       out.push({ rule: '+0 term', math });
   }
   return out;

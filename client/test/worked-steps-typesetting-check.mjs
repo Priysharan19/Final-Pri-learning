@@ -77,7 +77,12 @@ const RULE_CASES = [
   ['$\\left[\\dfrac{x^{5}}{5}\\right]_{0}^{5} = \\dfrac{5^{5}}{5} - 0$', false], ['$-18 - 0 = -18$', false],
   ['$y(4) = 1(4)^{3} + 0 = 64$', false], ['$\\dfrac{2}{1 + 0} = \\dfrac{2}{1}$', false],
   ['$x = 8$', false], ['$-8 - 36$', false], ['$6 - (-1)$', false], ['$x_1 = 3$', false],
-  ['$10x = 20$', false], ['$a_1x + b_1y$', false], ['$y - 5 = 8(x - 1)$', false]
+  ['$10x = 20$', false], ['$a_1x + b_1y$', false], ['$y - 5 = 8(x - 1)$', false],
+  // Chains of two or more relations: every relation splits the span, so each
+  // side is judged on its own.
+  ['$x + 0 = 5 = y + 0$', true], ['$5 = 2 + 3 = x + 0$', true], ['$0 \\le x + 0 \\le 3$', true],
+  ['$x \\le 3 \\quad 2x + 0 \\ge 2$', true], ['$1 - 0 = 1 = 3 - 2$', false],
+  ['$y(1) = 1 - 0 = 1 \\Rightarrow k = 1$', false], ['$0 \\le x \\le 3 \\le 5 - 0$', false]
 ];
 for (const [text, defect] of RULE_CASES) {
   ok((workedStepHits(text).length > 0) === defect, `rule ${defect ? 'fires on' : 'passes'} ${text}`);

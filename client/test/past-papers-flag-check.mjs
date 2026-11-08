@@ -25,7 +25,6 @@ delete process.env.PRI_PAST_PAPERS;
 delete globalThis.__PRI_PAST_PAPERS__;
 
 const { pastPapersEnabled, pastPapersStatus, PAST_PAPERS_OFF_REASON } = await import('../src/engine/pastPapers.js');
-const { IN_CURRICULUM } = await import('../src/engine/curriculum-in.js');
 const { indiaScope, resolveIndiaTarget, indiaPyqAlternatives, indiaDifficultyWindow } = await import('../src/engine/indiaProduct.js');
 const { indiaPyqCells, indiaIssuableCells, narrowCells } = await import('../src/engine/indiaExamCells.js');
 const { PYQ_COVERAGE } = await import('../src/engine/pyq/pyqCoverage.js');
