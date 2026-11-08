@@ -313,6 +313,36 @@ function askedDimensions(question) {
   const kinds = new Set([...found].map(d => (d === 'volume' ? 'length³' : d)));
   return kinds.size === 1 ? found : new Set();
 }
+/**
+ * Does a unit written with no unit box beside the answer fit the asked
+ * quantity? Its dimension must be the asked one, and the question must state
+ * a quantity in it at any power (a generic "units" needs only the dimension).
+ */
+function unitFits(question, unit) {
+  const base = u => (u.includes('/') ? u : u.replace(/[²³]$/, ''));
+  const stated = [...unitsStated(question?.prompt)].map(base);
+  return askedDimensions(question).has(unitDimension(unit)) && (/^units/.test(unit) || stated.includes(base(unit)));
+}
+
+/**
+ * Each value of a set, point or surd-form answer is held to what the numeric
+ * box holds a value to (#723 review, item 2): no % on a question that does not
+ * ask for a percentage, no currency on one not about money, no unit that does
+ * not fit the asked quantity, and nothing left to evaluate (D13). Returns the
+ * reason the value is left unread, or null. Decided from the form alone.
+ */
+function componentRefusal(question, text) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return null;
+  const ans = question?.answer || {};
+  if (/%|\bper\s?cents?\b/i.test(raw) && !percentAnswerWanted(question, ans)) return 'Write each value on its own — this question does not ask for a percentage.';
+  if (foreignCurrency(question, raw) || (RUPEE_MARK.test(raw) && !moneyQuestion(question))) return 'Write each value on its own — this question does not ask for an amount of money.';
+  const unit = writtenUnit(raw);
+  if (unit && unit !== '°' && unit !== 'rad' && !unitFits(question, unit)) return `Write each value on its own — this question does not ask for an answer in ${unit}.`;
+  const unevaluated = unevaluatedRefusal(numericSource(raw.replace(/%\s*$/, '')));
+  if (unevaluated) return unevaluated;
+  return null;
+}
 const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;
 /**
  * Read a label off the answer when it names what the question asks for.
@@ -868,6 +898,13 @@ function checkAnswerWithinBudget(question, rawInput) {
     }
     // Surd-form questions: require k√r exactly (accepts 2sqrt5, 2*sqrt(5), 2√5)
     if (ans && ans.surdForm && type === 'numeric') {
+      // The guards the numeric box applies before reading a value apply here too.
+      if (!question.answerSuffix) {
+        const refusal = componentRefusal(question, rawInput);
+        if (refusal) return { correct: false, invalid: true, feedback: refusal };
+      } else if (unitContradicts(question.answerSuffix, rawInput)) {
+        return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
+      }
       const s = normalize(cleanInput(rawInput)).replace(/\s|\*/g, '').replace(/^\+/, '');
       const mm = s.match(/^(-?\d*)sqrt\(?(\d+)\)?$/);
       if (mm) {
@@ -978,10 +1015,7 @@ function checkAnswerWithinBudget(question, rawInput) {
             const wanted = askedDimensions(question);
             // Stated in the same unit, at any power: an area asked from lengths
             // in cm is in cm²; a rate must be stated whole.
-            const base = u => (u.includes('/') ? u : u.replace(/[²³]$/, ''));
-            const stated = [...unitsStated(question.prompt)].map(base);
-            const fits = wanted.has(unitDimension(got)) && (/^units/.test(got) || stated.includes(base(got)));
-            if (!fits) {
+            if (!unitFits(question, got)) {
               // A number written wrongly ("1, 234 cm") is told how a number is written first.
               try { parseNumericInput(rawInput); } catch (err) { if (err?.message === 'Not a single number') throw err; }
               return { correct: false, invalid: true, feedback: `This question does not ask for an answer in ${got}. Write the number on its own, or with the unit the question uses.` };
@@ -1117,7 +1151,21 @@ function checkAnswerWithinBudget(question, rawInput) {
       }
 
       case 'set': {
+        // A currency mark at the front of the list is read off with the list's
+        // braces, so it is judged on the answer as written first.
+        if (typeof rawInput === 'string' && (foreignCurrency(question, rawInput) || (RUPEE_MARK.test(rawInput) && !moneyQuestion(question)))) {
+          return { correct: false, invalid: true, feedback: 'Write each value on its own — this question does not ask for an amount of money.' };
+        }
+        // …and so is a unit at its end ("4 kg"), which the list's reader takes off.
+        const trailing = typeof rawInput === 'string' ? writtenUnit(rawInput.trim().replace(/[}\])]\s*$/, '')) : null;
+        if (trailing && trailing !== '°' && trailing !== 'rad' && !unitFits(question, trailing)) {
+          return { correct: false, invalid: true, feedback: `Write each value on its own — this question does not ask for an answer in ${trailing}.` };
+        }
         const parts = splitList(rawInput);
+        for (const part of parts) {
+          const refusal = componentRefusal(question, part);
+          if (refusal) return { correct: false, invalid: true, feedback: refusal };
+        }
         const parsedParts = parts.map(p => parseNumericInput(p));
         const values = parsedParts.map(p => p.value);
         const targets = [...ans.values];
@@ -1151,6 +1199,12 @@ function checkAnswerWithinBudget(question, rawInput) {
         const parts = (hasComma || hasSemi ? s.split(hasComma ? ',' : ';') : s.split(/ {2,}/)).map(p => p.trim());
         if (parts.some(p => !p)) throw new Error('Blank entry');
         if (parts.length !== 2) return { correct: false, feedback: 'Give your answer as a coordinate pair, like (2, -3).' };
+        // Each coordinate as written, before any unit or currency is stripped.
+        const written = String(rawInput ?? '').trim().replace(/^[A-Za-z]?\s*=\s*/, '').replace(/^\(/, '').replace(/\)\s*\.?$/, '');
+        for (const part of written.split(hasComma ? ',' : hasSemi ? ';' : / {2,}/)) {
+          const refusal = componentRefusal(question, part);
+          if (refusal) return { correct: false, invalid: true, feedback: refusal };
+        }
         const px = parseNumericInput(parts[0]), py = parseNumericInput(parts[1]);
         const x = px.value, y = py.value;
         const exactOk = ans.tol != null || (!exactlyNotWhole(px, ans.x) && !exactlyNotWhole(py, ans.y));
@@ -1178,7 +1232,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         const cross = (p, q, r, t) => p.n * t.n * q.d * r.d === q.n * r.n * p.d * t.d;   // p/q = r/t, i.e. p·t = q·r
         const ok = !!(ka && kb) && cross(qa, qb, ka, kb);
         if (ok && ans.simplified) {
-          const g = gcdInt(Math.round(a), Math.round(b));
+          // Simplest form is two whole numbers with no common factor: 0.2 : 0.6
+          // is 1 : 3 in proportion, not simplified (#723 review, item 3).
+          if (!Number.isInteger(a) || !Number.isInteger(b)) return { correct: false, feedback: 'Right proportions — but write the ratio in whole numbers, simplified fully.' };
+          const g = gcdInt(a, b);
           if (g > 1) return { correct: false, feedback: `Right proportions — but simplify the ratio fully (divide both parts by ${g}).` };
         }
         if (!ok && ka && kb && cross(qa, qb, kb, ka) && ans.a !== ans.b) {
