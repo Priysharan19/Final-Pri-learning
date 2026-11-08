@@ -21,6 +21,7 @@ import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById 
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
+import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
@@ -1269,6 +1270,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
             mode: q._practiceMode || 'practice', inputMode: mode,
+            // The mistake notebook's evidence (engine/mistakeNotebook.js): for
+            // a wrong resolution, the student's own first broken line and the
+            // examiner's note on it, exactly as the deterministic step check
+            // reported them — nothing about the mark changes. A notebook twin
+            // names the mistake it retries, so a right answer here fixes it.
+            ...(!response.correct && !invalid ? firstErrorOf(stepReport) : {}),
+            ...(typeof q._twinOf === 'string' && q._twinOf ? { twinOf: q._twinOf } : {}),
             // Hint rungs are now server-committed (`hintLevel`, `hintRungs`,
             // `markWeight`, `creditedMarks`); tutor levels are still
             // client-observed, so restored progress must not claim independent
@@ -1313,11 +1321,32 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
   const filed = a => a.correct !== true && a.revealed !== true && typeof a.misconception === 'string' && a.misconception &&
     NOTEBOOK_MODES.has(a.mode || 'practice') && typeof a.subtopic === 'string' && a.subtopic;
 
+  // The prompts of this account's resolved questions, by id, in one read per
+  // hundred: the student's own history, from this account's escrow, gone once
+  // that has expired.
+  const promptsOf = async (accountId, ids, now) => {
+    const out = new Map();
+    const wanted = [...new Set(ids.filter(id => typeof id === 'string' && UUID.test(id)))];
+    for (let i = 0; i < wanted.length; i += 100) {
+      const chunk = wanted.slice(i, i + 100);
+      // Only `?` placeholders are joined into the statement; every value is bound.
+      const rows = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND expires_at>? AND key IN (" + chunk.map(() => '?').join(',') + ')',
+        [accountId, now, ...chunk]);
+      for (const row of rows) {
+        try { out.set(row.key, JSON.parse(row.response_json)); } catch { /* unreadable escrow: no prompt */ }
+      }
+    }
+    return out;
+  };
+
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const now = Date.now();
+    const attempts = await serverAttempts(accountId, NOTEBOOK_SCAN);
+    // `entries`: the misconception groups builds already installed read. Kept
+    // unchanged so a device that has not updated still shows its notebook.
     const groups = new Map();
-    for (const a of await serverAttempts(accountId, NOTEBOOK_SCAN)) {
+    for (const a of attempts) {
       if (!filed(a)) continue;
       const g = groups.get(a.misconception) || (groups.size < NOTEBOOK_GROUPS ? groups.set(a.misconception, {
         key: a.misconception, misconception: { id: a.misconception, nameKey: misconceptionById(a.misconception)?.name || null,
@@ -1330,20 +1359,29 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (g.items.length < NOTEBOOK_ITEMS) g.items.push({ id: a.id, questionId: a.questionId, subtopic: a.subtopic,
         dotpoint: a.dotpoint || null, difficulty: Number(a.difficulty) || 2, answeredAt: a.at });
     }
-    // The prompt of a resolved question is the student's own history; it is
-    // read from this account's escrow and is gone once that has expired.
-    for (const g of groups.values()) {
-      for (const item of g.items) {
-        const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
-          [accountId, item.questionId, now]);
-        let q = null;
-        try { q = sealed ? JSON.parse(sealed.response_json) : null; } catch { q = null; }
-        item.prompt = q ? String(q.prompt || '') : null;
-        item.canTwin = !!q && !q.multipart && !q.custom;
-      }
+    // `notebook`: every wrong resolution, with the first broken line, fixed by
+    // a correct twin, on a spaced review schedule — the shared pure engine
+    // (engine/mistakeNotebook.js) over the same graded-attempt events. The
+    // same on every plan (D19, D22).
+    const book = buildNotebook(attempts.map(a => ({ ...a, attemptId: a.attemptId || a.id })), { now });
+    const prompts = await promptsOf(accountId, [...[...groups.values()].flatMap(g => g.items.map(i => i.questionId)), ...book.entries.map(e => e.questionId)], now);
+    const promptFields = questionId => {
+      const q = prompts.get(questionId) || null;
+      return { prompt: q ? String(q.prompt || '') : null, canTwin: !!q && !q.multipart && !q.custom };
+    };
+    for (const g of groups.values()) for (const item of g.items) Object.assign(item, promptFields(item.questionId));
+    for (const g of book.groups) if (g.misconception) g.misconception = { ...g.misconception, nameKey: misconceptionById(g.misconception.id)?.name || null };
+    for (const item of book.entries) {
+      Object.assign(item, promptFields(item.questionId));
+      if (item.misconception) item.misconception = { ...item.misconception, nameKey: misconceptionById(item.misconception.id)?.name || null };
     }
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt) });
+    return res.status(200).json({
+      entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt),
+      notebook: { total: book.total, shown: book.shown, dueCount: book.dueCount, nextDueAt: book.nextDueAt,
+        groups: book.groups.map(g => ({ key: g.key, subtopic: g.subtopic, misconception: g.misconception, count: g.count, open: g.open, lastAt: g.lastAt,
+          items: g.items.map(i => book.entries.find(e => e.id === i.id) || i) })) }
+    });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same
@@ -1362,7 +1400,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const row = await db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='graded-attempt'", [accountId, attemptId]);
     let attempt = null;
     try { attempt = row ? JSON.parse(row.payload_json) : null; } catch { attempt = null; }
-    if (!attempt || !filed(attempt)) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    // Every wrong resolution is in the notebook (engine/mistakeNotebook.js),
+    // so every one can be retried; one with a diagnosed slip is retried with
+    // a form drawn, where it can be, to spring the same slip.
+    if (!attempt || !isMistake({ ...attempt, attemptId: attempt.attemptId || attemptId })) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
     const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, attempt.questionId, now]);
     if (!sealed) return reject(res, 410, 'NOTEBOOK_TWIN_EXPIRED', 'The original question is no longer held, so no twin can be drawn.');
     const original = JSON.parse(sealed.response_json);
@@ -1376,11 +1417,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
         dotpoint: typeof original.dotpoint === 'string' ? original.dotpoint : undefined,
         avoid: new Set([opaqueContentHash(original.contentHash)]),
-        trap: { owner: original.subtopic, key: attempt.misconception } });
+        trap: typeof attempt.misconception === 'string' && attempt.misconception ? { owner: original.subtopic, key: attempt.misconception } : null });
     } catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
     const q = chosen.q;
     q._practiceMode = 'review';
     q._generator = generator;
+    // Sealed with the question: its graded attempt names the mistake it
+    // retries, and a right answer fixes that mistake in the notebook.
+    q._twinOf = attemptId;
     let repeat = chosen.repeat;
     if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
     const trySpent = !repeat && await contentTried(db, accountId, q, now);
@@ -1400,7 +1444,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
-      twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
+      twin: { of: attemptId, misconception: attempt.misconception || null, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
       ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
   });

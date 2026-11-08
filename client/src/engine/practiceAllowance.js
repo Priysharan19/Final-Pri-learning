@@ -51,3 +51,13 @@ export function premiumCapabilityForGenerator(generator) {
   const id = String(generator || '');
   return PREMIUM_PRACTICE_CONTENT.find(rule => rule.generator.test(id))?.capability ?? null;
 }
+
+/**
+ * Owner default D20: reads of the student's own writing (ink, or a photo of
+ * written working) and "Practise this" question photos are Free 5 a day and
+ * Premium 25 a day, PER KIND. ONE definition: the server's per-account
+ * allowance defaults to it (server/platform/aiAllowance.js, configurable per
+ * deployment) and the Premium screen states it. Modelled figures, to be
+ * revisited after real cost data.
+ */
+export const READ_ALLOWANCE = Object.freeze({ free: 5, premium: 25 });

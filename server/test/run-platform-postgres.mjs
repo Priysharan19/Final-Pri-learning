@@ -62,6 +62,9 @@ export const ENGINE_SUITES = [
   // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
   // question of the free day — decided under the same lock and RLS scope.
   'premium-practice-content-check.mjs',
+  // D22: the mistake notebook — derived from the server-grader's own events,
+  // read account-scoped under RLS.
+  'mistake-notebook-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.

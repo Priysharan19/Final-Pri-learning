@@ -15,6 +15,7 @@
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { consumeRateLimit, sha256 } from './security.js';
 import { asStore } from './store.js';
+import { READ_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
 
 // A rolling 24-hour window per account and kind. Housekeeping purges
 // rate_limits rows older than 24 hours (housekeeping.js
@@ -37,8 +38,8 @@ export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo
 // (/v1/question-photo). The working check is not a read and is not named by
 // D20; it keeps the allowance it had.
 export const AI_ALLOWANCE_DEFAULTS = Object.freeze({
-  handwriting: Object.freeze({ free: 5, premium: 25 }),
-  'question-photo': Object.freeze({ free: 5, premium: 25 }),
+  handwriting: Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),
+  'question-photo': Object.freeze({ free: READ_ALLOWANCE.free, premium: READ_ALLOWANCE.premium }),
   working: Object.freeze({ free: 120, premium: 1200 })
 });
 // Per-kind configuration. The older PRI_AI_DAILY_FREE / PRI_AI_DAILY_PREMIUM
