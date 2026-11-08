@@ -11,7 +11,9 @@
 //   · no layout shift once the screen has painted (Chromium only: WebKit has
 //     no layout-shift entries);
 //   · input answers inside 100 ms (Chromium event timing; headless and
-//     synthetic, so it is a regression floor, not a device measurement);
+//     synthetic, so it is a regression floor, not a device measurement).
+//     On Practice this is a real answer-mode switch on a real server-issued
+//     written question, timed in every one of the four cases (below);
 //   · a visual snapshot, compared with the committed baseline for this
 //     platform and engine when one exists.
 //
@@ -22,6 +24,7 @@
 //   PRI_UPDATE_SNAPSHOTS=1 node client/test/tour-interface-quality.js   (rewrite baselines)
 // Synthetic browser evidence (S1). It is never evidence about a device.
 // ─────────────────────────────────────────────────────────────────────────────
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -39,6 +42,105 @@ const SCREENS = ['/', '/practice', '/progress', '/exams', '/tasks', '/notes', '/
 // masked in snapshots; the layout around it is what the baseline holds.
 const MASK = ['.q-prompt', '.q-card .katex', '.home-greet', 'time', '[data-volatile]'];
 const MAX_INPUT_MS = 100;
+
+// ── Practice: a genuine answer-mode switch, timed (Step 06, issue #684) ───────
+// A Practice screen that happened to draw a multiple-choice question had no
+// Type / Write / Photo switch, so its input check was skipped and the run
+// passed with 196 checks; and where the switch was there, the first tab was
+// pressed, which is the mode already on (a press that changes nothing). Now
+// the isolated test server (NODE_ENV=test, booted below with
+// allowSeededPractice) issues the question tour-verified-mark-breakdown.js
+// pins: a two-mark written elimination question. Only the issue seed is
+// pinned; the server still issues the question and the client never sees the
+// answer. In every case (phone 390×844 and tablet 820×1180, light and dark)
+// a draft is typed, then Write and Type are pressed, each the mode that is
+// NOT on. Each press is timed in the page from the browser's own event
+// timestamp, so no Playwright round trip is inside the interval:
+//   · to the first frame that shows the pressed tab, and
+//   · to the first frame where the new mode can be used (an editable answer
+//     field; a writing canvas that has been sized and primed);
+// alongside Chromium's Event Timing entries for the press (only entries of at
+// least 16 ms exist; the in-page interval is measured for every press).
+// Both intervals and every entry must be inside MAX_INPUT_MS. A case with no
+// question, no switch, no usable mode or no measurement fails; nothing is
+// skipped. All four cases passing prints the PRACTICE INPUT TIMING sentinel
+// that ci.yml requires.
+const PRACTICE_SEED = { generator: 'c10-linear-pair-methods', difficulty: 2, curriculum: 'in', seed: 7 };
+const POST_ISSUE = /\/v1\/practice\/issue(?:\?.*)?$/;
+const PRACTICE_DRAFT = '12';
+// How long a press may take to reach a usable mode before the case fails as
+// unusable (a fail-closed bound, not the latency floor: that is MAX_INPUT_MS).
+const USABLE_LIMIT_MS = 5000;
+const PRACTICE_CASES = 4; // SIZES × SCHEMES
+
+// In the page: arm the measurement of one press on the `to` mode tab.
+const ARM_SWITCH = ({ to, limitMs }) => {
+  const card = document.querySelector('.qpage[data-question-id]');
+  const tabs = card ? [...card.querySelectorAll('.mode-tabs .mode-tab')] : [];
+  const target = tabs[to === 'type' ? 0 : 1];
+  const s = window.__priSwitch = {
+    to, armedAt: performance.now(), eventTiming: false, pressedMs: null, usableMs: null,
+    entries: [], error: null, done: false
+  };
+  if (!target) { s.error = 'no mode tab to press'; s.done = true; return; }
+  if (target.getAttribute('aria-pressed') === 'true') { s.error = `${to} is already the mode on`; s.done = true; return; }
+  s.eventTiming = typeof PerformanceObserver === 'function' && typeof PerformanceEventTiming === 'function'
+    && (PerformanceObserver.supportedEntryTypes || []).includes('event') && 'interactionId' in PerformanceEventTiming.prototype;
+  let observer = null;
+  if (s.eventTiming) {
+    observer = new PerformanceObserver(list => {
+      for (const e of list.getEntries()) {
+        if (!e.interactionId || e.startTime < s.armedAt) continue;
+        s.entries.push({
+          name: e.name, ms: e.duration, delay: Math.round(e.processingStart - e.startTime),
+          handlers: Math.round(e.processingEnd - e.processingStart),
+          onTarget: !!e.target && target.contains(e.target), on: String(e.target?.className || e.target?.tagName || 'none').slice(0, 30)
+        });
+      }
+    });
+    observer.observe({ type: 'event', durationThreshold: 16 });
+  }
+  const usable = () => {
+    if (to === 'type') {
+      const input = card.querySelector('[data-final-answer]');
+      if (!input || input.disabled || input.readOnly) return false;
+      const r = input.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }
+    // InkCanvas sets the CSS size of its canvases when it sizes and primes them.
+    const live = card.querySelector('.editor-shell .ink-wrap canvas.ink-canvas-live');
+    if (!live || !live.style.width || !live.width || !live.height) return false;
+    const r = live.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  window.__priSwitchStop = () => observer?.disconnect();
+  const onClick = e => {
+    if (!target.contains(e.target)) return;
+    window.removeEventListener('click', onClick, true);
+    const t0 = e.timeStamp;
+    // The state is read in a frame's animation callback, before that frame
+    // paints; the time is read in a task queued from it, after the paint.
+    const frame = () => requestAnimationFrame(() => {
+      const pressed = target.getAttribute('aria-pressed') === 'true';
+      const ready = usable();
+      const channel = new MessageChannel();
+      channel.port1.onmessage = () => {
+        const now = performance.now();
+        if (pressed && s.pressedMs === null) s.pressedMs = now - t0;
+        if (ready && s.usableMs === null) s.usableMs = now - t0;
+        if (s.pressedMs !== null && s.usableMs !== null) { s.done = true; return; }
+        if (now - t0 > limitMs) { s.error = `${to} was not usable ${Math.round(now - t0)} ms after the press`; s.done = true; return; }
+        frame();
+      };
+      channel.port2.postMessage(0);
+    });
+    frame();
+  };
+  window.addEventListener('click', onClick, true);
+};
+
+const round1 = n => (n === null || n === undefined ? null : Math.round(n * 10) / 10);
+const quantile = (sorted, q) => sorted[Math.min(sorted.length - 1, Math.ceil(q * sorted.length) - 1)];
 // A pixel differs when any channel moves by more than this; a snapshot fails
 // when more than this share of pixels differ (anti-aliasing noise stays under).
 const CHANNEL_TOLERANCE = 24;
@@ -150,6 +252,65 @@ export const flow = {
     const touch = async on => { if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', on ? { enabled: true, maxTouchPoints: 5 } : { enabled: false }); };
     if (!chromium) note('44px hit areas are checked in Chromium only (WebKit cannot emulate a coarse pointer here)');
 
+    // Practice (Chromium, where input is timed): every question issued while
+    // the page is on Practice is the pinned seed, forwarded to the real server.
+    // Issues anywhere else go through unchanged.
+    const issued = { n: 0, last: null };
+    if (chromium) {
+      await page.route(POST_ISSUE, async route => {
+        let from = '';
+        try { from = new URL(route.request().frame().url()).pathname; } catch { from = new URL(page.url()).pathname; }
+        if (!from.startsWith('/practice')) return route.continue();
+        issued.n++;
+        const original = route.request().postDataJSON() || {};
+        const response = await route.fetch({ postData: JSON.stringify({ ...original, ...PRACTICE_SEED }) });
+        issued.last = { status: response.status(), body: (await response.text()).slice(0, 300) };
+        await route.fulfill({ response });
+      });
+    }
+    const pinned = k => k?.kind === 'text' && k.text === '-6' && !!k.prompt?.includes('Solve by elimination');
+    const frames = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const pressAndTime = async to => {
+      await page.evaluate(ARM_SWITCH, { to, limitMs: USABLE_LIMIT_MS });
+      if (!(await page.evaluate(() => window.__priSwitch?.done === true))) {
+        await page.locator('.qpage[data-question-id] .mode-tabs .mode-tab').nth(to === 'type' ? 0 : 1).click({ timeout: 3000 });
+        await page.waitForFunction(() => window.__priSwitch?.done === true, null, { timeout: USABLE_LIMIT_MS + 3000 }).catch(() => {});
+        // Event Timing entries are delivered once the frame has been presented.
+        await page.waitForTimeout(300);
+      }
+      return page.evaluate(() => {
+        window.__priSwitchStop?.();
+        const s = window.__priSwitch;
+        return s ? { ...s, error: s.error || (s.done ? null : 'the press was never seen by the page') } : { error: 'the measurement never armed' };
+      });
+    };
+    const timePractice = async () => {
+      const tabs = page.locator('.qpage[data-question-id] .mode-tabs .mode-tab');
+      const answer = page.locator('.qpage[data-question-id] [data-final-answer]');
+      const out = { tabs: await tabs.count(), switches: [], draft: null, slow: [], error: null };
+      if (out.tabs !== 3) { out.error = `${out.tabs} answer-mode tabs on the card`; return out; }
+      // Start from Type, untimed: a phone with no saved mode opens on Write.
+      if (await tabs.nth(0).getAttribute('aria-pressed') !== 'true') {
+        await tabs.nth(0).click({ timeout: 3000 });
+        await answer.waitFor({ state: 'visible', timeout: USABLE_LIMIT_MS });
+      }
+      await answer.fill(PRACTICE_DRAFT);
+      await settle();
+      await frames();
+      await page.evaluate(() => { window.__priSlowInput = []; });
+      for (const to of ['write', 'type']) {
+        const s = await pressAndTime(to);
+        out.switches.push(s);
+        if (s.error) break;
+        await settle();
+        await frames();
+      }
+      out.slow = await page.evaluate(() => window.__priSlowInput || []);
+      out.draft = await answer.inputValue({ timeout: 2000 }).catch(() => null);
+      return out;
+    };
+    const practiceCases = [];
+
     for (const size of SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await touch(size.phone);
@@ -183,8 +344,32 @@ export const flow = {
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
         for (const route of SCREENS) {
           const tag = `${route}@${size.id}/${scheme}`;
+          const practice = route === '/practice';
+          let pinnedOk = false;
           await goto(route);
           await settle();
+          if (practice) {
+            // A question is on the card before anything is audited or timed.
+            await page.locator('.qpage[data-question-id] .q-prompt').waitFor({ timeout: 30000 });
+            if (chromium) {
+              // A question this account already held (issued before it ever
+              // opened Practice) is passed over for a new one, never answered.
+              let known = await online.answerOf();
+              for (let n = 0; n < 4 && !pinned(known); n++) {
+                const before = await page.locator('.qpage[data-question-id]').getAttribute('data-question-id');
+                await page.locator('.ctx-next').click();
+                await page.waitForFunction(id => {
+                  const next = document.querySelector('.qpage[data-question-id]');
+                  return next && next.getAttribute('data-question-id') !== id && !!next.querySelector('.q-prompt');
+                }, before, { timeout: 30000 });
+                known = await online.answerOf();
+              }
+              const tabs = await page.locator('.qpage[data-question-id] .mode-tabs .mode-tab').count();
+              pinnedOk = await check(`${tag}: the real server issued the pinned written question, with Type, Write and Photo`,
+                issued.n > 0 && pinned(known) && tabs === 3, JSON.stringify({ issued, known, tabs }).slice(0, 900));
+              await settle();
+            }
+          }
           // Nothing moves once the screen has painted and settled.
           if (chromium) {
             await page.evaluate(() => { window.__priShift = 0; });
@@ -251,6 +436,30 @@ export const flow = {
             await check(`${tag}: matches its visual baseline`, ratio <= MAX_DIFF_RATIO, `${(ratio * 100).toFixed(2)}% of pixels differ (${join(outDir, file)})`);
           }
 
+          // Practice: a genuine Type → Write → Type switch, timed (pressed last,
+          // after the snapshot). Never skipped: a missing switch fails.
+          if (chromium && practice) {
+            const r = await timePractice();
+            const presses = r.switches;
+            const both = !r.error && presses.length === 2 && presses.every(s => !s.error);
+            const inside = s => s.eventTiming === true && s.pressedMs !== null && s.usableMs !== null
+              && s.pressedMs <= MAX_INPUT_MS && s.usableMs <= MAX_INPUT_MS && s.entries.every(e => e.ms <= MAX_INPUT_MS);
+            const raw = {
+              error: r.error, tabs: r.tabs, draft: r.draft, slow: r.slow.slice(0, 4),
+              presses: presses.map(s => ({
+                to: s.to, error: s.error, eventTiming: s.eventTiming, frameMs: round1(s.pressedMs), usableMs: round1(s.usableMs),
+                entries: (s.entries || []).map(e => `${e.name} ${Math.round(e.ms)}ms (delay ${e.delay}, handlers ${e.handlers}) on ${e.onTarget ? 'the tab' : e.on}`)
+              }))
+            };
+            note(`practice timing ${tag}: ${JSON.stringify(raw)}`);
+            const usable = await check(`${tag}: Type → Write → Type: each press opens a usable mode and the typed draft is kept`,
+              both && r.draft === PRACTICE_DRAFT, JSON.stringify(raw));
+            const fast = await check(`${tag}: input answers inside ${MAX_INPUT_MS} ms`,
+              both && presses.every(inside) && r.slow.length === 0, JSON.stringify(raw));
+            practiceCases.push({ tag, pass: pinnedOk && usable && fast, presses });
+            continue;
+          }
+
           // Input answers fast (pressed last, after the snapshot): press the first safe control
           // (tabs/segmented choices, never a submit or a destructive action).
           if (chromium) {
@@ -268,10 +477,42 @@ export const flow = {
     }
     await touch(false);
     await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+
+    // Practice coverage is exact: four cases, each with two timed presses.
+    if (chromium) {
+      const measured = await check(`Practice input timing was measured in all ${PRACTICE_CASES} cases (phone and tablet, light and dark)`,
+        practiceCases.length === PRACTICE_CASES, practiceCases.map(c => c.tag).join(', ') || 'none');
+      const presses = practiceCases.flatMap(c => c.presses).filter(s => !s.error);
+      const stat = values => {
+        const v = values.filter(n => typeof n === 'number').sort((a, b) => a - b);
+        return v.length ? `max ${round1(v[v.length - 1])}, median ${round1(quantile(v, 0.5))}, p95 ${round1(quantile(v, 0.95))} ms (n=${v.length})` : 'none';
+      };
+      let checkout = 'unknown';
+      try { checkout = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: HERE, encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
+      const version = page.context().browser()?.version() || 'unknown';
+      const summary = `press→frame ${stat(presses.map(s => s.pressedMs))} · press→usable ${stat(presses.map(s => s.usableMs))}`
+        + ` · Event Timing ${stat(presses.flatMap(s => s.entries.map(e => e.ms)))} · Chromium ${version} · checkout ${checkout}`;
+      const passed = practiceCases.filter(c => c.pass).length;
+      if (measured && passed === PRACTICE_CASES && presses.length === 2 * PRACTICE_CASES) {
+        note(`PRACTICE INPUT TIMING: PASS — ${PRACTICE_CASES}/${PRACTICE_CASES} cases (390×844 and 820×1180, light and dark), `
+          + `${presses.length}/${2 * PRACTICE_CASES} answer-mode presses inside ${MAX_INPUT_MS} ms · ${summary}`);
+      } else {
+        note(`PRACTICE INPUT TIMING: FAIL — ${passed}/${PRACTICE_CASES} cases passed · ${summary}`);
+      }
+    }
   }
 };
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const { runOne } = await import('./e2e.mjs');
-  process.exit(await runOne(flow) ? 1 : 0);
+  // The pinned Practice seed is accepted ONLY by this isolated test server
+  // (NODE_ENV=test); the product and every deployment keep refusing it.
+  // It boots before runOne and serves client/dist from disk on every request,
+  // so the build runOne makes is what the browser loads; a checkout with no
+  // build yet is built first, because the server will not boot without one.
+  const argv = process.argv.slice(2);
+  const { runOne, ensureBuild } = await import('./e2e.mjs');
+  if (!argv.includes('--no-build') && !existsSync(join(HERE, '..', 'dist', 'index.html'))) { ensureBuild(true); argv.push('--no-build'); }
+  const { onlinePlatform } = await import('./support/online-session.mjs');
+  await onlinePlatform({ allowSeededPractice: true });
+  process.exit(await runOne(flow, argv) ? 1 : 0);
 }
