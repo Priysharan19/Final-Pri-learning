@@ -838,5 +838,76 @@ export const SOLVE_JEE_C11 = {
     let c = 0;
     for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (test((a + b) % pp === 0, a > qq)) c++;
     return keyInt(q, c, 'enumeration of 36 outcomes');
+  },
+
+  // The #408 replacement for the routine D4 quadratic. Each branch re-solves
+  // from the actual roots (quadratic formula, complex powers, numeric moduli)
+  // rather than the recurrence or |α|² = αβ the generator uses.
+  'c11-complex-quadratic-jee-reasoning'(q) {
+    const p = q.prompt;
+    let m;
+    m = p.match(/^Let \$\\alpha\$ and \$\\beta\$ be the roots of \$([^$]+) = 0\$\. Find \$\\alpha\^\{(\d+)\} \+ \\beta\^\{(\d+)\}\$\.$/);
+    if (m) {
+      const P = parsePoly(m[1]);
+      if (!P || P[2] !== 1 || Object.keys(P).some(k => Number(k) > 2)) return ['could not read the quadratic'];
+      const b = P[1] || 0, c = P[0] || 0, n = Number(m[2]);
+      if (n !== Number(m[3])) return ['the two powers differ'];
+      const disc = b * b - 4 * c;
+      if (disc >= 0) return ['the roots are real'];
+      // Roots by the formula, powers by repeated complex multiplication.
+      const alpha = [-b / 2, Math.sqrt(-disc) / 2], beta = [-b / 2, -Math.sqrt(-disc) / 2];
+      const s = [cpow(alpha, n), cpow(beta, n)];
+      const sum = [s[0][0] + s[1][0], s[0][1] + s[1][1]];
+      if (Math.abs(sum[1]) > 1e-6 * Math.max(1, Math.abs(sum[0]))) return ['the sum is not real'];
+      if (Math.abs(sum[0] - Math.round(sum[0])) > 1e-6 * Math.max(1, Math.abs(sum[0]))) return [`sum ${sum[0]} is not whole`];
+      return keyInt(q, Math.round(sum[0]), 'complex powers of the roots');
+    }
+    m = p.match(/^For how many integers \$k\$ are the roots of \$x\^2 \+ \(([^()]+)\)x \+ \(([^()]+)\) = 0\$ non-real and both strictly inside the circle \$\|z\| = (\d+)\$\?$/);
+    if (m) {
+      const Bk = parsePoly(m[1], 'k'), Ck = parsePoly(m[2], 'k'), r = Number(m[3]);
+      if (!Bk || !Ck) return ['could not read the coefficients'];
+      const at = (poly, k) => Object.entries(poly).reduce((acc, [e, co]) => acc + co * k ** Number(e), 0);
+      // Every integer k in a wide window: compute the roots and their moduli.
+      // C(k) grows like k², so nothing outside the window can be inside |z| = r.
+      let count = 0;
+      for (let k = -300; k <= 300; k++) {
+        const B = at(Bk, k), C = at(Ck, k), disc = B * B - 4 * C;
+        if (!Number.isInteger(disc)) return ['the coefficients are not whole numbers'];
+        if (disc >= 0) continue;                // real roots (a repeated one included)
+        const mod1 = Math.hypot(-B / 2, Math.sqrt(-disc) / 2), mod2 = Math.hypot(-B / 2, -Math.sqrt(-disc) / 2);
+        // On the circle is not strictly inside; float noise is far below 1e-9 here.
+        if (mod1 < r - 1e-9 && mod2 < r - 1e-9) count++;
+      }
+      return keyInt(q, count, 'integer scan of the actual roots');
+    }
+    m = p.match(/^Find the real number \$k\$ for which the roots of \$x\^2 \+ \(([^()]+)\)x \+ \(([^()]+)\) = 0\$ are non-real and both lie on the circle \$\|z\| = (\d+)\$\.$/);
+    if (!m) return ['could not read the prompt'];
+    const Bk = parsePoly(m[1], 'k'), Ck = parsePoly(m[2], 'k'), r = Number(m[3]);
+    if (!Bk || !Ck) return ['could not read the coefficients'];
+    const at = (poly, k) => Object.entries(poly).reduce((acc, [e, co]) => acc + co * k ** Number(e), 0);
+    // For each real k, compute the actual roots; where they are non-real, both
+    // have modulus |root|. Find every k in [-60, 60] where that modulus is r by
+    // a sign-change scan with bisection, then keep the non-real ones.
+    const roots = k => {
+      const B = at(Bk, k), C = at(Ck, k), disc = B * B - 4 * C;
+      return disc < 0 ? [[-B / 2, Math.sqrt(-disc) / 2], [-B / 2, -Math.sqrt(-disc) / 2]] : null;
+    };
+    const g = k => { const z = roots(k); return z ? Math.hypot(...z[0]) - r : NaN; };
+    const found = [];
+    const STEP = 1e-3;
+    for (let i = -60000; i < 60000; i++) {
+      const a = i * STEP, b = (i + 1) * STEP;
+      const ga = g(a), gb = g(b);
+      if (Number.isNaN(ga) || Number.isNaN(gb)) continue;
+      if (ga === 0) { found.push(a); continue; }
+      if (ga * gb < 0) {
+        let lo = a, hi = b;
+        for (let j = 0; j < 60; j++) { const mid = (lo + hi) / 2; if (g(lo) * g(mid) <= 0) hi = mid; else lo = mid; }
+        found.push((lo + hi) / 2);
+      }
+    }
+    const ks = found.filter(k => { const z = roots(k); return z && Math.abs(z[0][1]) > 1e-9 && Math.abs(Math.hypot(...z[1]) - r) < 1e-7; });
+    if (ks.length !== 1) return [`${ks.length} values of k satisfy the conditions (${ks.map(k => k.toFixed(6)).join(', ')})`];
+    return keyNear(q, ks[0], 1e-7, 'scan of the actual roots');
   }
 };

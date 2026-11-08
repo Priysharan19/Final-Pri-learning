@@ -128,8 +128,54 @@ function numericProbes(q, a) {
     const u = wrongUnit(q.answerSuffix);
     if (u) out.push({ input: `${fmt(v)} ${u}`, why: `wrong unit ${u} (asked ${String(q.answerSuffix).trim()})`, unit: true });
   }
-  if ((a.percent || /\bper\s?cent(?:age)?s?\b/i.test(q.prompt || '')) && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  // The word "percent" is a sign too, wherever it stands: 100 times the key
+  // with the word and a unit, braces or a second sign is never the key (#670).
+  // (Off a percentage question a key in −1…1 may be written as a percentage —
+  // 100% is 1, 44% is 0.44 — so only the doubled sign is probed there.)
+  const asksPercent = asksPercentage(q, a);
+  if (v !== 0) {
+    const spellings = asksPercent || Math.abs(v) > 1 ? [`${fmt(v * 100)} percent cm`, `{${fmt(v * 100)} percent}`, `${fmt(v * 100)} percent %`, `${fmt(v * 100)} percents`] : [`${fmt(v * 100)} percent %`];
+    for (const input of spellings) out.push({ input, why: 'a hundred times the key, with the word percent' });
+  }
+  if (asksPercent && v !== 0) out.push({ input: fmt(v / 100), why: 'the percentage as a bare decimal (the box shows %)' });
+  // Two numbers written as a list — a trap (or 0) beside the key, in either
+  // order — are not one answer. "0, -2" once read as 0 − 2 (issue #408 review).
+  const beside = [0, ...(q.traps || []).map(t => t?.value)].filter(x => typeof x === 'number' && Number.isFinite(x) && differs(x, v));
+  for (const t of new Set(beside)) {
+    for (const input of [`${fmt(t)}, ${fmt(v)}`, `${fmt(v)}, ${fmt(t)}`, `${fmt(t)},${fmt(v)}`, `${fmt(t)}\n${fmt(v)}`, `${fmt(t)}\t${fmt(v)}`]) out.push({ input, why: 'two numbers written as a list' });
+  }
+  // The same with a bracket, a dash or a sign the digit runs cannot see: "0, -(2)", "0, —2", "0, +(5)".
+  if (v < 0) out.push({ input: `0, -(${fmt(-v)})`, why: 'a list with a bracketed negative' }, { input: `0, —${fmt(-v)}`, why: 'a list with an em-dash minus' });
+  if (v > 0) out.push({ input: `0, +(${fmt(v)})`, why: 'a list with a bracketed signed value' });
+  // On a percentage question a typed % is the answer's unit: 100 times the key
+  // with the sign is 100 times too big, never the key read as ÷100.
+  if (asksPercent && v !== 0) {
+    out.push({ input: `${fmt(v * 100)}%`, why: 'a hundred times the percentage, with the % sign' }, { input: `${fmt(v / 100)}%`, why: 'the percentage as a decimal, with the % sign' },
+      { input: `(${fmt(v * 100)}%)`, why: 'a hundred times the percentage, bracketed with the sign' }, { input: `${fmt(v * 100)}%%`, why: 'a hundred times the percentage, two signs' },
+      { input: `${fmt(v * 100)}% + 0`, why: 'a hundred times the percentage, the sign used as arithmetic' });
+  }
+  // Off a percentage question the sign keeps its arithmetic meaning, so the key
+  // written with a % it never asked for is a hundredth of the key (0.2% for
+  // 0.2) or a wrong unit (72% for an area of 72): never the key. A percentage
+  // the prompt only gives ("20 percent of the marbles") does not change this.
+  if (!asksPercent && v !== 0 && Math.abs(v / 100 - v) > band * 1.0000001 && differs(v / 100, v)) out.push({ input: `${fmt(v)}%`, why: 'the key with a % sign the question did not ask for' });
   return out;
+}
+
+// Does the question ask for its answer as a percentage? Decided here in this
+// file's own words, apart from the checker, so a disagreement shows up as a
+// finding: a key declared percent, a % beside the box, or the word standing
+// for the asked quantity in the sentence that asks ("what percentage", "as a
+// percentage") — never a percentage the prompt gives ("20 percent of x", "95
+// per cent accurate"), wherever that given stands.
+function asksPercentage(q, a) {
+  if (a?.percent === true) return true;
+  if (a?.percent === false) return false;
+  if (/%/.test(String(q.answerSuffix || ''))) return true;
+  const sentences = String(q.prompt || '').split(/(?<=[.?!])\s+/).filter(Boolean);
+  const asks = sentences.filter(s => /\?\s*$/.test(s) || /\b(?:find|what|express|calculate|give|how|state|determine|work out|evaluate|compute|write)\b/i.test(s));
+  const text = (asks.length ? asks : sentences.slice(-1)).join(' ').replace(/(?:\$[^$]*\d[^$]*\$|\d[\d.,/]*)\s*per\s?cent(?:age)?s?\b/gi, ' ');
+  return /\bper\s?cent(?:age)?s?\b/i.test(text) || /\bas\s+an?\s+\\?%/i.test(text);
 }
 
 function setProbes(a) {
@@ -139,6 +185,8 @@ function setProbes(a) {
   const has = x => vals.some(v => Math.abs(v - x) <= Math.max(tol, bandOf(v, a.tol)));
   const list = arr => arr.map(fmt).join(', ');
   if (vals.length > 1) out.push({ input: list(vals.slice(1)), why: 'a solution dropped' });
+  // The word "percent" is never a ÷100 inside a list (#670 final review).
+  if (vals.some(v => Math.abs(v) > 1)) out.push({ input: vals.map(v => `${fmt(v * 100)} percent`).join(', '), why: 'every element a hundred times, with the word percent' });
   const extra = Math.max(...vals) + 1;
   out.push({ input: list([...vals, extra]), why: 'an extra solution' });
   for (let i = 0; i < vals.length; i++) {
@@ -157,6 +205,7 @@ function pointProbes(a) {
   if (a.x !== 0) out.push({ input: pt(-a.x, a.y), why: 'x negated' });
   if (a.y !== 0) out.push({ input: pt(a.x, -a.y), why: 'y negated' });
   out.push({ input: pt(a.x + 1, a.y), why: 'x shifted' }, { input: pt(a.x, a.y + 1), why: 'y shifted' });
+  if (Math.abs(a.x) > 1 || Math.abs(a.y) > 1) out.push({ input: `(${fmt(a.x * 100)} percent, ${fmt(a.y * 100)} percent)`, why: 'both coordinates a hundred times, with the word percent' });
   return out;
 }
 
@@ -389,6 +438,154 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const ix = w => methodMarks({ meta: { kind: 'expression', canonical: 'x^1' }, working: w, marks: 2, prompt: 'Simplify $x^{6} \\div x^{5}$.' })?.awarded || 0;
   expect('method: x = x earns nothing on x^6 ÷ x^5', ix('0 = 0\n1 = 1\nx = x') === 0);
   expect('method: a genuine step still earns on x^6 ÷ x^5', ix('x^6/x^5 = x^(6-5)\nx^(6-5) = x') >= 1);
+  // (d) A list of two signed numbers is not their difference (issue #408 review):
+  // "0, -2" was read as 0 − 2 and marked right for −2.
+  const neg = { answerType: 'numeric', prompt: 'Find the real number $k$.', answer: { value: -2 } };
+  for (const input of ['0, -2', '0,-2', 'k=0,-2', '0\n-2', '0; -2', '3, -5', '-5, 3'])
+    expect(`list: "${input.replace(/\n/g, '⏎')}" is not -2`, !verdict(neg, input).correct);
+  expect('list: -2 itself is accepted', verdict(neg, '-2').correct);
+  expect('list: k = -2 is accepted', verdict(neg, 'k = -2').correct);
+  expect('list: 3 - 5 written as arithmetic is still read as -2', verdict(neg, '3 - 5').correct && verdict(neg, '3-5').correct);
+  // Any separator between two things is a list, not only before a signed digit (re-review of #667).
+  for (const input of ['0, —2', '0\t-2', '0\u2028-2', '0, -(2)', '0., -2']) expect(`list: "${JSON.stringify(input)}" is not -2`, !verdict(neg, input).correct);
+  const root6 = { answerType: 'numeric', prompt: 'Find the product of the roots.', answer: { value: Math.sqrt(6) } };
+  for (const input of ['√2, √3', 'sqrt(2), sqrt(3)']) expect(`list: "${input}" is not √6`, !verdict(root6, input).correct);
+  const zero = { answerType: 'numeric', prompt: 'Find the sum of the roots.', answer: { value: 0 } };
+  for (const input of ['sqrt(2), -sqrt(2)', 'π, -π']) expect(`list: "${input}" is not 0`, !verdict(zero, input).correct);
+  const six = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 6 } };
+  expect('list: "2, (3)" is not 6', !verdict(six, '2, (3)').correct);
+  const sum = { answerType: 'numeric', prompt: 'Find the sum.', answer: { value: -15 } };
+  expect('a counting call keeps its argument commas: sum(k, k, -5, -1) is -15', verdict(sum, 'sum(k, k, -5, -1)').correct);
+  expect('a trailing comma separates nothing: "-2," is -2', verdict(neg, '-2,').correct);
+  const big = { answerType: 'numeric', prompt: 'Find the number.', answer: { value: -1234 } };
+  expect('list: grouped -1,234 is still one number', verdict(big, '-1,234').correct);
+  // A digit group led by 0 is no written number: "0,240" is the list 0 and 240.
+  const club = { answerType: 'numeric', prompt: 'How many students are in the club altogether?', answer: { value: 240 } };
+  expect('list: "0,240" is not 240', !verdict(club, '0,240').correct);
+  expect('list: "0 240" is not 240', !verdict(club, '0 240').correct);
+  const lakh = { answerType: 'numeric', prompt: 'Find the amount in rupees.', answer: { value: 1234567 } };
+  for (const input of ['1,234,567', '12,34,567', '1 234 567']) expect(`grouping: ${input} is still 1234567`, verdict(lakh, input).correct);
+  // (e) On a percentage question a typed % is the unit (P0, owner review of #667's batch 2):
+  // "6500%" was read as 6500 ÷ 100 and marked right for 65.
+  const own = { answerType: 'numeric', prompt: 'What is the least possible percentage of households that own all three?', answerSuffix: '%', answer: { value: 65 } };
+  for (const input of ['6500%', '6500 %', '13/20%', '0.65%', '0.65', '6500 percent']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  for (const input of ['65', '65%', '65 %', '65 percent', '65 per cent']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  const bySuffix = { answerType: 'numeric', prompt: 'Find the combined mean mark.', answerSuffix: '%', answer: { value: 66.3 } };
+  expect('percent: a % beside the box asks for a percentage, so 66.3% is 66.3', verdict(bySuffix, '66.3%').correct);
+  expect('percent: and 6630% is not', !verdict(bySuffix, '6630%').correct);
+  // The sign anywhere but once at the end is arithmetic, not the unit (#670 review).
+  for (const input of ['(6500%)', '6500%%', '6500% + 0', '6500%·1', 'percentage = (6500%)']) expect(`percent: "${input}" is not 65 %`, !verdict(own, input).correct);
+  expect('percent: "(65%)" is 65 %', verdict(own, '(65%)').correct);
+  const cv = { answerType: 'numeric', prompt: 'Find its coefficient of variation, as a percentage.', answerSuffix: '%', answer: { value: 20 / 3, simplestFraction: { n: 20, d: 3 }, requireFraction: false } };
+  for (const input of ['20/3%', '(20/3)%', '6 2/3%']) expect(`percent: "${input}" is 20/3 %`, verdict(cv, input).correct);
+  expect('percent: "2000/3%" is not 20/3 %', !verdict(cv, '2000/3%').correct);
+  const asSymbol = { answerType: 'numeric', prompt: 'Express 13/20 as a %.', answer: { value: 65 } };
+  expect('percent: "as a %" asks for a percentage: 65% accepted', verdict(asSymbol, '65%').correct);
+  expect('percent: and 6500% refused', !verdict(asSymbol, '6500%').correct);
+  const areaPct = { answerType: 'numeric', prompt: 'Find the area.', answer: { value: 72 } };
+  for (const input of ['7200%', '7200 percent']) expect(`percent: "${input}" is a wrong unit for an area of 72`, !verdict(areaPct, input).correct);
+  const accurate = { answerType: 'numeric', prompt: 'A test is 95 percent accurate. Find the probability that it gives a correct result twice.', answer: { value: 0.44 } };
+  expect('percent: a "percent" in the data does not make the question ask for one: 44% is 0.44', verdict(accurate, '44%').correct);
+  expect('percent: and 0.44% is not', !verdict(accurate, '0.44%').correct);
+  const prob = { answerType: 'numeric', prompt: 'Find the probability.', answer: { value: 0.44 } };
+  expect('percent: on a question not asking for a percentage, 44% is still 0.44', verdict(prob, '44%').correct);
+  // A given percentage INSIDE the asking sentence is still a given (repair of #670 on
+  // m-finish-10-marking): it once made "20%" a wrong 20 and "0.2%" a right 0.2.
+  const givenInAsk = { answerType: 'numeric', prompt: 'If 20 percent of the marbles are red, what is the probability of drawing a red marble?', answer: { value: 0.2 } };
+  expect('percent: "20%" is 0.2 when the only "percent" in the asking sentence is a given', verdict(givenInAsk, '20%').correct);
+  expect('percent: and "0.2%" is 0.002, refused', !verdict(givenInAsk, '0.2%').correct);
+  const findX = { answerType: 'numeric', prompt: 'If 20 percent of $x$ is 40, find $x$.', answer: { value: 200 } };
+  expect('percent: "200%" is not x = 200 — a given percent lends no unit', !verdict(findX, '200%').correct);
+  expect('percent: "200" is x', verdict(findX, '200').correct);
+  const whatPct = { answerType: 'numeric', prompt: 'What percentage of 50 is 10?', answer: { value: 20 } };
+  expect('percent: "what percentage" still asks for one: 20% accepted', verdict(whatPct, '20%').correct);
+  expect('percent: and 2000% refused', !verdict(whatPct, '2000%').correct);
+  // The sweep's own reading of "asks for a percentage" agrees on these shapes.
+  expect('sweep oracle: a given percent in the asking sentence is not an ask', !asksPercentage(givenInAsk, givenInAsk.answer));
+  expect('sweep oracle: "what percentage" is an ask', asksPercentage(whatPct, whatPct.answer));
+  expect('sweep oracle: a % beside the box is an ask', asksPercentage(own, own.answer));
+  // (f) A label is read off only when it names the asked quantity.
+  const b2 = { answerType: 'numeric', prompt: 'Find $b^2$.', answer: { value: 50 } };
+  for (const input of ['b^2 = 50', 'b² = 50', 'B^2=50']) expect(`label: "${input}" names b², accepted`, verdict(b2, input).correct);
+  for (const input of ['b = 50', 'a^2 = 50']) expect(`label: "${input}" is not b² = 50`, !verdict(b2, input).correct);
+  // Legacy, undecided: a one-letter label on an unrelated letter the question
+  // neither asks for nor gives is still read off as it always was.
+  expect('label (legacy): "c = 50" on a question that never mentions c is still read off', verdict(b2, 'c = 50').correct);
+  const tri = { answerType: 'numeric', prompt: 'In triangle ABC, $a = 7$ and $c = 9$. Find $b^2$.', answer: { value: 67 } };
+  expect('label: "c = 67" names the given c, refused', !verdict(tri, 'c = 67').correct);
+  expect('label: "b^2 = 67" accepted', verdict(tri, 'b^2 = 67').correct);
+  const henceB = { answerType: 'numeric', prompt: 'Find $b^2$ and hence $b$.', answer: { value: 5 } };
+  expect('label: "Find $b^2$ and hence $b$" asks for b too: "b = 5" accepted', verdict(henceB, 'b = 5').correct);
+  // "Solve 3x = -18": the equation does not GIVE x; "x = -6" is the answer (#670 final review).
+  const solve = { answerType: 'numeric', prompt: 'Solve $3x = -18$.', answer: { value: -6 } };
+  expect('label: "x = -6" answers "Solve 3x = -18"', verdict(solve, 'x = -6').correct);
+  const evalAt = { answerType: 'numeric', prompt: 'Evaluate $4x + 9$ when $x = 7$.', answer: { value: 37 } };
+  expect('label: "x = 37" names the given x, refused', !verdict(evalAt, 'x = 37').correct);
+  for (const [id, d] of [['c7-finding-unknown-current', 2], ['c8-linear-equations-both-sides', 2], ['y7-equations', 1], ['c8-rational-numbers-foundations', 2]]) {
+    if (!GENERATORS[id]) continue;
+    for (let i = 1; i <= 12; i++) {
+      const q = generateQuestion(id, d, i * 7919);
+      if (q.answerType !== 'numeric' || !/\bsolve\b/i.test(q.prompt)) continue;
+      const letters = (String(q.prompt).match(/\$[^$]*\$/g) || []).join(' ').match(/(?<![A-Za-z\\])[a-z](?![A-Za-z])/g) || [];
+      const unknown = letters.sort((x, y) => letters.filter(l => l === y).length - letters.filter(l => l === x).length)[0];
+      if (unknown) expect(`label: "${unknown} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${unknown} = ${fmt(q.answer.value)}`).correct);
+    }
+  }
+  // Round-5 check of #670: a value followed by a colon is not a ratio unless a number follows;
+  // "Given:" does not hide a given; "the … values of $c$" and "$\\angle B$" are asks;
+  // "Give your answer to 2 d.p." is not the ask; "Total cost" is not "the cost of one kilogram".
+  const colon = { answerType: 'numeric', prompt: 'For $x = 4$: find the value of $2x + 3$.', answer: { value: 11 } };
+  expect('label: "x = 11" names the given x (a colon is not a ratio)', !verdict(colon, 'x = 11').correct);
+  const givenColon = { answerType: 'numeric', prompt: 'Given: $a = 7$, $c = 9$. Find $b^2$.', answer: { value: 67 } };
+  expect('label: "a = 67" names the given a after "Given:"', !verdict(givenColon, 'a = 67').correct);
+  const sideA = { answerType: 'numeric', prompt: 'The triangle has sides $a = 9$, $b = 7$. Find the angle $A$ opposite side $a$.', answer: { value: 40 } };
+  expect('label: "a = 40" names the given side a, not the angle A', !verdict(sideA, 'a = 40').correct);
+  const decimals = { answerType: 'numeric', prompt: 'Find the area of the region. Give your answer to 2 decimal places.', answer: { value: 72.25 } };
+  expect('label: "Area = 72.25" — "give your answer" is not the ask', verdict(decimals, 'Area = 72.25').correct);
+  const perKg = { answerType: 'numeric', prompt: 'Find the cost of one kilogram of tur dal.', answer: { value: 72 } };
+  expect('label: "Total cost = 72" is not the cost of one kilogram', !verdict(perKg, 'Total cost = 72').correct);
+  expect('label: "cost = 72" is', verdict(perKg, 'cost = 72').correct);
+  for (const input of ['65%.', '{65%}', '{65 percent}', '(65 percent)']) expect(`percent: "${input}" is 65 %`, verdict(own, input).correct);
+  expect('percent: "6500 percents" is not 65 %', !verdict(own, '6500 percents').correct);
+  // A letter inside an expression or a ratio is not GIVEN (#670 final review): the
+  // asked c in "3x + 4y + c = 0 … find c", B in "∠A : ∠B = 7 : 5 … find ∠B".
+  const lineC = { answerType: 'numeric', prompt: 'The line $3x + 4y + c = 0$ is at a distance $2$ from the origin. Find the smaller of the two possible values of $c$.', answer: { value: -10 } };
+  expect('label: "c = -10" answers for the c in the line\'s equation', verdict(lineC, 'c = -10').correct);
+  const ratioB = { answerType: 'numeric', prompt: 'In triangle ABC, $\\angle A : \\angle B = 7 : 5$ and $\\angle C = 60^\\circ$. Find $\\angle B$.', answer: { value: 50 } };
+  expect('label: "B = 50" answers for the B in a ratio', verdict(ratioB, 'B = 50').correct);
+  for (const [id, d] of [['c11-line-distance-reasoning', 3], ['c7-angle-sum-reasoning', 3]]) {
+    if (!GENERATORS[id]) continue;
+    for (let i = 1; i <= 40; i++) {
+      const q = generateQuestion(id, d, i * 7919);
+      const L = (q.prompt.match(/values? of \$([a-z])\$/) || q.prompt.match(/Find \$(?:\\angle\s*)?([A-Za-z])\$/) || [])[1];
+      if (L) expect(`label: "${L} = key" answers ${id} seed ${i * 7919}`, verdict(q, `${L} = ${fmt(q.answer.value)}`).correct);
+    }
+  }
+  const bold = { answerType: 'numeric', prompt: 'Find the **median** of the data.', answer: { value: 6 } };
+  expect('label: bold markup does not hide the asked noun: "median = 6" accepted', verdict(bold, 'median = 6').correct);
+  expect('label: "Answer = 6" accepted', verdict(bold, 'Answer = 6').correct);
+  const pq = { answerType: 'numeric', prompt: 'Find $PQ^2$.', answer: { value: 87.2, simplestFraction: { n: 436, d: 5 }, requireFraction: false } };
+  expect('label: "PQ² = 436/5" accepted', verdict(pq, 'PQ² = 436/5').correct);
+  expect('label: "AB^2 = 436/5" (another length) refused', !verdict(pq, 'AB^2 = 436/5').correct);
+  const area = { answerType: 'numeric', prompt: 'Find the area of triangle PQR.', answer: { value: 72 } };
+  expect('label: "Area = 72" accepted', verdict(area, 'Area = 72').correct);
+  expect('label: "Perimeter = 72" refused', !verdict(area, 'Perimeter = 72').correct);
+  // A noun label must be the whole asked phrase or its trailing part (#670 review).
+  const md = { answerType: 'numeric', prompt: 'Find the mean deviation about the mean of the data.', answer: { value: 2.4 } };
+  expect('label: "Mean = 2.4" is not the mean deviation', !verdict(md, 'Mean = 2.4').correct);
+  expect('label: "mean deviation = 2.4" accepted', verdict(md, 'mean deviation = 2.4').correct);
+  const root = { answerType: 'numeric', prompt: 'Find the cube root of 91125.', answer: { value: 45 } };
+  expect('label: "Cube = 45" is not the cube root', !verdict(root, 'Cube = 45').correct);
+  expect('label: "cube root = 45" accepted', verdict(root, 'cube root = 45').correct);
+  const hence = { answerType: 'numeric', prompt: 'Find the area of triangle ABC, and hence find the height from A.', answer: { value: 8 } };
+  expect('label: only the last ask counts: "area = 8" refused', !verdict(hence, 'area = 8').correct);
+  expect('label: "height = 8" accepted', verdict(hence, 'height = 8').correct);
+  const sumAB = { answerType: 'numeric', prompt: 'Find $a + b$.', answer: { value: 7 } };
+  expect('label: "a = 7" claims a = 7, refused for a + b', !verdict(sumAB, 'a = 7').correct);
+  expect('label: "a + b = 7" accepted', verdict(sumAB, 'a + b = 7').correct);
+  const red = { answerType: 'numeric', prompt: 'Find $P(\\text{red})$ as a fraction in simplest form.', answer: { value: 0.4, simplestFraction: { n: 2, d: 5 } } };
+  expect('label: "P(red) = 2/5" accepted', verdict(red, 'P(red) = 2/5').correct);
+  expect('label: "P = 2/5" still accepted', verdict(red, 'P = 2/5').correct);
 }
 
 // ── Report ─────────────────────────────────────────────────────────────────
