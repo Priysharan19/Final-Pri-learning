@@ -15,16 +15,18 @@ result goes. It replaces walking the whole four-family matrix by hand.
   A14–A18 (about 60). The timed paper alone is 30 minutes, and both devices run it at once. Part B takes about
   30 minutes after the promotion.
 - **Case ids:** these follow the matrix in L4's #737 (`docs/release/device-matrix.md`): 23 iPhone
-  and 26 iPad cases at its head of 9 November (96 cases in all). On a `main` without #737, only the
-  18 journey cases (01–09) exist; record those and skip the rest.
+  and 26 iPad cases at its head of 9 November (96 cases in all). **Record nothing on a `main`
+  without #737**: those rows lack the build kind and server its ledger check requires, and the
+  importer refuses to import before it.
 
 ## Before you start (10 minutes)
 
-1. **The build.** Part A uses the **development build of the candidate SHA**, run from Xcode on
-   both paired devices and pointed at staging. That is the rule of #737's `device-matrix.md` ("Which
-   server a device build talks to"); its recorder refuses a TestFlight build recorded against
-   staging. The Director's plan instead has the TestFlight build reach staging through
-   `app.prilearning.com` before GO. Until the Director and L4 settle that, follow #737.
+1. **The build.** Part A uses the **TestFlight build of the candidate SHA**. Until GO,
+   `app.prilearning.com` fronts staging at the candidate (Director decision of 9 Nov under D5;
+   #737's `device-matrix.md`), so the store build itself is tested against staging; the Director
+   records which service it fronted (`npm run check:ios:archive -- … --probe`, #737). A development
+   build from Xcode is optional and earlier; its rows never replace TestFlight rows, and the
+   release-stage nomination counts only store-build rows against staging.
 2. **The SHA.** Open the app's diagnostics on each device. The release SHA shown there must equal
    the candidate (`docs/release/FREEZE-RUNBOOK.md` F1, on #754).
 3. **Accounts.** These are test accounts only, never a student's, and every one is deleted in A16:
@@ -38,7 +40,7 @@ result goes. It replaces walking the whole four-family matrix by hand.
    ```bash
    export SHA=<40-hex candidate SHA>
    export ME="<your full name>"
-   rec() { node scripts/device-matrix-record.mjs record --sha "$SHA" --tester "$ME" --build-kind development --server staging "$@"; }
+   rec() { node scripts/device-matrix-record.mjs record --sha "$SHA" --tester "$ME" --build-kind testflight --server staging "$@"; }
    IPH=(--device "iPhone 16 Pro Max" --os "iOS <as Settings shows it>")
    IPD=(--device "iPad Pro 11-inch (4th generation)" --os "iPadOS <as Settings shows it>")
    PEN=(--pencil "<your Apple Pencil model>")
@@ -60,7 +62,7 @@ when it is stale, so it always names the cases the release requires. It holds in
 nothing in it is a result.
 
 When the console exports your results (format `pri-device-evidence-export`, one export per
-sitting), import them with:
+sitting and build, stamped with `exportedAt`), import them soon after with:
 
 ```bash
 node tools/release-device-import.mjs <export.json>
@@ -74,14 +76,16 @@ The importer writes **only through the recorder**, after checking every record b
 own rules. One bad record refuses the whole file, and nothing is written: an agent or placeholder
 tester or a simulator (whatever the result), an unknown case, a short SHA, a missing Pencil model,
 a duplicate case, a value that is not text, or a field the recorder does not record. The records
-reach the ledger in one append. In-app deletion and the sandbox purchase are not device-matrix
+reach the ledger in one append. An export older than a result the ledger already holds for one of
+its cases (the same export twice, or an older one) is refused: export again. Record a case through
+the console or the `rec` helper, not both. In-app deletion and the sandbox purchase are not device-matrix
 cases on a `main` without #737; they go where the JSON's `recordIn` says.
 
-## Part A — the candidate on staging (development build)
+## Part A — the candidate on staging (TestFlight build)
 
 | # | Case ids | Do | You should see | Record |
 |---|---|---|---|---|
-| A1 | `DM-IPH-01-INSTALL`, `DM-IPD-01-INSTALL` | Install the development build on both devices and open it | the sign-in card; diagnostics show `$SHA` | `rec --case DM-IPH-01-INSTALL --result pass "${IPH[@]}"`, and the same for `IPD` |
+| A1 | `DM-IPH-01-INSTALL`, `DM-IPD-01-INSTALL` | Install the TestFlight build on both devices and open it | the sign-in card; diagnostics show `$SHA` | `rec --case DM-IPH-01-INSTALL --result pass "${IPH[@]}"`, and the same for `IPD` |
 | A2 | `DM-IPH-02-OTP`, `DM-IPD-02-OTP` | On each device, sign in to the adult account with the email code. Close the app fully, then reopen it | the 6-digit code arrives in your mailbox; you are still signed in after reopening | `-02-OTP` for each |
 | A3 | `DM-IPH-03-GUARDIAN`, `DM-IPD-03-GUARDIAN` | Sign out. On the iPad, create child account 1. On the **iPhone**, approve it in Safari at `/guardian/consent` with the parent's code. Then the reverse: child account 2 on the iPhone, approved from the iPad | each child screen waits at "waiting for your parent", then moves on by itself after approval; until then, questions and sync are refused | `-03-GUARDIAN` for each |
 | A4 | `-04-ISSUE` ×2 | Sign back in to the adult account. Open Practice and get a question. Turn on aeroplane mode, then turn it off | the question is the server's; aeroplane mode shows the offline state; the question returns | `-04-ISSUE` for each |
@@ -91,23 +95,23 @@ cases on a `main` without #737; they go where the JSON's `recordIn` says.
 | A8 | `-08-MARK` ×2 | Submit a wrong answer, then the right one | the server's mark (earned / possible) with first-error feedback; a second try; the worked solution after the right answer | `-08-MARK` for each |
 | A9 | `-09-HISTORY` ×2 | Close and reopen each app; look at History on **both** devices | each attempt is in History on its own device after reopening, and on the other device after sync | `-09-HISTORY` for each |
 | A10 | `-10-VOICEOVER`, `-12-TEXTSIZE`, `-23-VOICEOVERTEXT` ×2 | Settings → Accessibility → Display & Text Size → Larger Text: the **largest** size (AX5). Turn VoiceOver on. Then sign in, open Practice, reach the answer box and the mode switch, press "Read my answer", listen to the transcript, submit, listen to the mark, and find the attempt in History | every control is named and reached in order; focus never lands on an unlabelled element; the writing surface is announced; the OpenAI prompt (D17) is read in full with both buttons reachable; nothing is clipped and nothing scrolls sideways at the largest size | one run covers all three cases on each device: record `-10-VOICEOVER`, `-12-TEXTSIZE` and `-23-VOICEOVERTEXT` (the last only with #737). Turn VoiceOver off afterwards |
-| A11 | `-11-KEYBOARD` ×2 | Settings → Accessibility → Keyboards → Full Keyboard Access on, with a hardware keyboard attached | Tab reaches every control of the sign-in card and the question card in order; Space or Return activates it; focus is visible; nothing traps focus | `-11-KEYBOARD` for each. With no hardware keyboard, record `--result blocked --notes "no hardware keyboard"` |
+| A11 | `-11-KEYBOARD` ×2 | Settings → Accessibility → Keyboards → Full Keyboard Access on, with a hardware keyboard attached | Tab reaches every control of the sign-in card and the question card in order; Space or Return activates it; focus is visible; nothing traps focus | `-11-KEYBOARD` for each. With no hardware keyboard, record `--result blocked --notes "no hardware keyboard"`, but a blocked iPhone or iPad case blocks the release under D1: borrow a keyboard |
 | A12 | `DM-IPD-13-ROTATE`, `-14-SPLITVIEW`, `-15-STAGEMANAGER` | iPad only. With ink, a typed answer and a transcript on the page: rotate; then Split View at a half and a third; then Stage Manager, resizing and dragging the window | everything kept; the Pencil ink stays on the ruled paper and lands where the pen touches; no sideways scroll | three iPad rows |
 | A13 | `-16-REINSTALL` ×2 | Sign out, delete the app, reinstall the same build, sign in | History holds every earlier attempt with marks and feedback; Progress unchanged; nothing duplicated | `-16-REINSTALL` for each |
-| A14 | `-17-TIMED` ×2 | **Second sitting.** Start a timed paper of at least 30 minutes on **both** devices. Handwrite at least six answers on each, alternating devices. Lock and unlock once. Submit at the end | the clock runs right through the lock; every answer is recorded; the analysis shows them | `-17-TIMED` for each, with `--notes "<minutes> min, <n> handwritten"` |
+| A14 | `-17-TIMED` ×2 | **Second sitting.** Start a timed paper of at least 30 minutes on **both** devices. Handwrite at least six answers on each, alternating devices. Lock and unlock once. Submit at the end | the clock runs right through the lock; every answer is recorded; the analysis shows them | `-17-TIMED` for each, with notes giving the paper's minutes and handwritten count, e.g. `--notes "35 min, 7 handwritten"` |
 | A15 | `-18-BACKGROUND`, `-19-STORAGE`, `-20-MEMORY` ×2 | **Background:** leave an unsent handwritten answer and typed working, switch apps for 2 minutes, then return. **Storage:** fill the device to under 500 MB free (a large video download), then write, read, submit and check History. **Memory:** open several heavy apps until Pri is reclaimed, then reopen it | the page exactly as left; plain messages and no crash under low storage; the draft, transcript and session restored without signing in | six rows. Free the storage afterwards |
 | A16 | `-21-EXPORT`, `-22-SHARE` ×2, then **in-app deletion** (`-24-DELETE` ×2) | Export the account through the share sheet and open the file. Share and print (or save as PDF) a paper. Then delete **each** test account from the app: Settings → Account → Delete, confirming with a fresh email code; sign in again with the same address; after sync, look at History on the other device | the JSON holds only this account's attempts; the PDF is legible; after deletion you are back at the sign-in card, the account is gone (signing in again starts a new, empty account) and its History is gone on both devices | `-21-EXPORT` and `-22-SHARE` for each. With #737, deletion is the matrix case `-24-DELETE` on each device. Without it, deletion is not a matrix case: write it in the GO/NO-GO record as store-gate evidence (`gates.store.evidence`: "in-app deletion, iPhone and iPad, `$SHA`, by <name>"). Apple requires it (guideline 5.1.1(v)) |
-| A17 | soak | The second sitting (A14–A16) on the iPad is the soak window | no crash or lost work in 45 minutes or more | `node scripts/device-matrix-record.mjs soak --device "iPad Pro 11-inch (4th generation)" --os "iPadOS …" --pencil "…" --sha "$SHA" --tester "$ME" --build-kind development --server staging --minutes <n> --failures <n>` (#737) |
+| A17 | soak | The second sitting (A14–A16) on the iPad is the soak window | no crash or lost work in 45 minutes or more | `node scripts/device-matrix-record.mjs soak --device "iPad Pro 11-inch (4th generation)" --os "iPadOS …" --pencil "…" --sha "$SHA" --tester "$ME" --build-kind testflight --server staging --minutes <n> --failures <n>` (#737) |
 | A18 | sandbox purchase and restore (`-25-PURCHASE`, `-26-RESTOREPURCHASE` ×2) | **BLOCKED until billing.** The Paid Apps Agreement is not signed, so the products cannot be priced (`docs/operations/production-config-v1.md` row 8, on #752). When it is: sign in to a Sandbox Apple Account (Settings → App Store), buy the monthly plan on the Premium screen (and once cancel the sheet instead), then delete and reinstall and press "Restore purchases"; restore on the other device too | Premium after the purchase and after each restore, confirmed by the server (`/v1/entitlements`); a cancelled sheet changes nothing; the app shows only the store's price | Today: `--result blocked --notes "Paid Apps Agreement not active; products not priced"` for each. With #737 these are iPhone and iPad matrix cases, which no family waiver covers, so **the release cannot be nominated until billing works and they pass**. The StoreKit certification step 4 scenarios also go in the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11; `docs/billing/storekit-certification.md` step 4) |
 
-Then check the report: `node scripts/device-matrix-record.mjs report --sha "$SHA" --build-kind development` (drop `--build-kind` on a `main` without #737). **Every IPH and
+Then check the report: `node scripts/device-matrix-record.mjs report --sha "$SHA" --build-kind testflight`. **Every IPH and
 IPD row must read PASS.** A `fail` blocks the release until it is fixed and re-recorded on a new build.
 
-## Part B — the store build on production (after promotion, release held)
+## Part B — the same TestFlight build on production (after promotion, release held)
 
-#737 asks for a short re-run on the signed TestFlight build once production serves the candidate,
-before the store release is approved. Use the same steps, recorded with
-`--build-kind testflight --server production` instead of development/staging:
+#737's short list runs on the same TestFlight build once production serves the candidate, before
+the store release is approved. Use the same steps, recorded with `--server production` instead of
+`staging`:
 
 | # | Cases (both devices) | Same as |
 |---|---|---|
@@ -122,7 +126,7 @@ before the store release is approved. Use the same steps, recorded with
 ## What this script does not do
 
 - It does not cover Android. D1 waives the Android families by name, and the waiver is a GitHub
-  comment you post yourself.
+  post you make yourself (`OWNER-APPROVALS.md`, with #763).
 - It does not replace the real-writer study of the server reader (Gate C), the StoreKit
   certification runs, or the store submission.
 - It records nothing for you, and no agent may fill a row.

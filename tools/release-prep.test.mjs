@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
-  CONTAINER_CONTEXT, DEVICE_FAMILY_WAIVERS, EVIDENCE_REQUIREMENTS, NEVER_WAIVED_FAMILIES, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns,
+  CONTAINER_CONTEXT, DEVICE_FAMILY_WAIVERS, EVIDENCE_REQUIREMENTS, NEVER_WAIVED_FAMILIES, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, deviceEvidence, evaluateRuns, ghAll, latestCheckRuns, releaseDeviceRows,
   goMarker, loadOverride, nominate, parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands, readerEvidence, runGroupKey, verifyApproval, waiverMarker,
   READER_FLOORS, RELEASE_CANDIDATE_JOBS, RELEASE_CANDIDATE_WORKFLOW, readerArtifactName, readerFloorProblems, releaseCandidateRun, releaseCandidateTitle
 } from '../scripts/release-nominate.mjs';
@@ -488,46 +488,47 @@ const scratch = [];
 
       // ── the Owner Console's checklist (docs/release/owner-device-script.json) and its importer ──
       const { ownerDeviceScript, scriptText, SCRIPT_JSON, SOAK_ITEM } = await import('./release-owner-device-script.mjs');
-      const { importExport, importPlan, exportShape, parseArgs: parseImportArgs, recorderKeeps, SOAKS_RECORDED } = await import('./release-device-import.mjs');
+      const { importExport, importPlan, exportShape, parseArgs: parseImportArgs, IMPORT_READY, stageAppend, commitStages } = await import('./release-device-import.mjs');
       eq(readFileSync(SCRIPT_JSON, 'utf8'), scriptText(), 'the committed owner-device-script.json is exactly what the generator makes from the matrix (run --write after a matrix change)');
       const checklist = JSON.parse(readFileSync(SCRIPT_JSON, 'utf8'));
       const matrixItems = checklist.items.filter(item => item.kind === 'device-matrix');
       assert.deepEqual(matrixItems.map(item => item.id), appleCases.map(kase => kase.id), 'the checklist has every iPhone and iPad case once, in the matrix order'); count += 1;
       ok(matrixItems.every(item => { const kase = appleCases.find(k => k.id === item.id); return item.title === kase.title && item.expected === kase.expect && item.family === kase.family; }), 'each case carries the recorder\'s own title and expected result');
       ok(checklist.items.every(item => typeof item.precondition === 'string' && item.precondition && Array.isArray(item.steps) && item.steps.length && Array.isArray(item.evidence) && item.evidence.length && typeof item.billingRequired === 'boolean'), 'every item has a precondition, steps, the evidence to capture and whether billing must come first');
-      ok(checklist.items.every(item => !['result', 'tester', 'device', 'os', 'sha', 'recordedAt', 'minutes', 'failures'].some(key => key in item)), 'nothing is pre-filled: no item carries a result, tester, device, OS, SHA or soak figures');
+      ok(checklist.items.every(item => !['result', 'tester', 'device', 'os', 'sha', 'recordedAt', 'exportedAt', 'minutes', 'failures', 'matrixStep'].some(key => key in item)), 'nothing is pre-filled: no item carries a result, tester, device, OS, SHA, time or soak figures (nor the generator\'s bookkeeping)');
       ok(!checklist.items.some(item => /^(AND|ANT)$/.test(item.family)), 'the checklist is Apple-only');
       ok(matrixItems.filter(item => item.pencilRequired).map(item => item.id).join(',') === appleCases.filter(k => k.pencil).map(k => k.id).join(','), 'the Pencil case is marked as needing the Pencil model');
-      const records = checklist.items.filter(item => item.kind === 'release-record');
       const inMatrix = (family, step) => appleCases.some(kase => kase.family === family && kase.step === step);
-      eq(records.map(item => `${item.id}:${item.billingRequired}`).join(','), [!inMatrix('IPH', 'DELETE') && 'REC-IPH-DELETE:false', !inMatrix('IPD', 'DELETE') && 'REC-IPD-DELETE:false', !inMatrix('IPD', 'PURCHASE') && 'REC-IPD-PURCHASE:true'].filter(Boolean).join(','), 'in-app deletion on both devices, and the sandbox purchase that needs billing first, go to the release record until the matrix has cases for them (#737)');
+      const records = checklist.items.filter(item => item.kind === 'release-record');
+      eq(records.map(item => `${item.id}:${item.billingRequired}`).join(','), [!inMatrix('IPH', 'DELETE') && 'REC-IPH-DELETE:false', !inMatrix('IPD', 'DELETE') && 'REC-IPD-DELETE:false', !inMatrix('IPD', 'PURCHASE') && 'REC-IPD-PURCHASE:true', 'REC-IPD-STOREKIT:true'].filter(Boolean).join(','), 'deletion and the sandbox purchase go to the release record until the matrix has cases for them (#737); the StoreKit certification scenarios always do');
       ok(matrixItems.every(item => item.billingRequired === /-(PURCHASE|RESTOREPURCHASE)$/.test(item.id)), 'the matrix\'s purchase cases, and only they, need billing first');
-      ok(Object.keys(ownerDeviceScript().items[0]).every(key => key !== 'matrixStep') && records.every(item => !('matrixStep' in item)), 'the generator\'s own bookkeeping never reaches the checklist');
-      assert.deepEqual(checklist.items.filter(item => item.kind === 'soak').map(item => item.id), SOAKS_RECORDED ? [SOAK_ITEM.id] : [], 'the device soak (A17, B5) is on the checklist exactly where the recorder keeps soak records (#737)'); count += 1;
+      assert.deepEqual(checklist.items.filter(item => item.kind === 'soak').map(item => item.id), [SOAK_ITEM.id], 'the device soak (A17, B5) is on the checklist'); count += 1;
+      const install = checklist.items.find(item => /-01-INSTALL$/.test(item.id));
+      ok(/TestFlight build of the candidate/.test(install.precondition) && /staging/.test(install.precondition) && !/development build/i.test(install.precondition), 'the checklist installs the TestFlight build and runs it against staging (#737, the Director\'s 9 Nov decision under D5)');
       ok(checklist.evidenceExport.format === 'pri-device-evidence-export' && /release-device-import\.mjs/.test(checklist.evidenceExport.import), 'the checklist names the export format and the import command');
       const shape = exportShape();
       assert.deepEqual(checklist.evidenceExport.shape, shape, 'the checklist\'s export shape is the importer\'s own'); count += 1;
-      const keepsBuild = recorderKeeps('export', 'buildKind');
-      ok(('buildKind' in shape) === keepsBuild && ('server' in shape) === keepsBuild && ('severity' in shape.records[0]) === recorderKeeps('records', 'severity') && ('soaks' in shape) === SOAKS_RECORDED, 'the shape names a build kind, a server, a severity and soaks only where this checkout\'s recorder records them');
+      assert.deepEqual([Object.keys(shape), Object.keys(shape.records[0]), Object.keys(shape.soaks[0])], [['format', 'version', 'exportedAt', 'sha', 'tester', 'buildKind', 'server', 'records', 'soaks'], ['case', 'result', 'device', 'os', 'pencil', 'severity', 'notes', 'build'], ['device', 'os', 'pencil', 'minutes', 'failures', 'notes', 'build']], 'the export format v1 has a fixed set of fields'); count += 1;
       assert.throws(() => ownerDeviceScript([...appleCases, { ...appleCases[0], id: 'DM-IPH-99-NEW', step: 'NEWSTEP' }]), /no owner steps for matrix step NEWSTEP/); count += 1;
 
       const exportDir = mkdtempSync(join(tmpdir(), 'pri-device-import-')); scratch.push(exportDir);
       const importLedger = join(exportDir, 'results.jsonl');
+      const soakLedger = join(exportDir, 'soak.jsonl');
       const snapshot = () => readdirSync(exportDir).sort().map(name => { try { return `${name}\n${readFileSync(join(exportDir, name), 'utf8')}`; } catch { return `${name}/`; } }).join('\n--\n');
       const pencilCase = appleCases.find(kase => kase.pencil).id;
-      const good = { format: 'pri-device-evidence-export', version: 1, sha: SHA, tester: 'Priya Example', ...(keepsBuild ? { buildKind: 'development', server: 'staging' } : {}),
+      const blockedCase = appleCases[1].id;
+      const EXPORTED_AT = new Date(Date.now() - 60_000).toISOString();
+      const good = { format: 'pri-device-evidence-export', version: 1, exportedAt: EXPORTED_AT, sha: SHA, tester: 'Priya Example', buildKind: 'testflight', server: 'staging',
         records: [{ case: 'DM-IPH-01-INSTALL', result: 'pass', device: 'iPhone 16 Pro Max', os: 'iOS 26.1' }, { case: pencilCase, result: 'pass', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.1', pencil: 'Apple Pencil Pro' }] };
-      const appends = [];
-      const counting = (path, data) => { appends.push(path); writeFileSync(path, data, { flag: 'a' }); };
-      const { written } = importExport(good, { ledger: importLedger, append: counting });
-      ok(written.length === 2 && validateLedger(importLedger).length === 0 && readLedger(importLedger).every(r => r.recorder === 'scripts/device-matrix-record.mjs' && r.tester === 'Priya Example' && r.sha === SHA), 'a console export is written through the recorder and the ledger validates');
-      assert.deepEqual(appends, [importLedger], 'all of an export\'s records reach the ledger in one append, never one line at a time'); count += 1;
+      const soak = { device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.1', pencil: 'Apple Pencil Pro', minutes: 52, failures: 0 };
       const refusedImport = (name, exported, pattern) => {
         const before = snapshot();
         let error = null;
         try { importExport(exported, { ledger: importLedger }); } catch (e) { error = e; }
         ok(error && error.problems.some(p => pattern.test(p)) && snapshot() === before, `the import refuses ${name}, and writes nothing`);
       };
+      const ownProblems = exported => importPlan(exported, { ledger: importLedger }).problems.filter(p => !/predates build kinds|is not recorded by this checkout/.test(p));
+      // The importer's own refusals, on every checkout.
       refusedImport('an agent as tester', { ...good, tester: 'Claude Code' }, /does not name a human/);
       refusedImport('a simulator', { ...good, records: [{ ...good.records[0], device: 'iPhone 16 Pro Simulator' }] }, /simulator/);
       refusedImport('an unknown case', { ...good, records: [{ ...good.records[0], case: 'DM-IPH-99-NOPE' }] }, /unknown case id/);
@@ -537,10 +538,10 @@ const scratch = [];
       refusedImport('a case twice, once in lower case', { ...good, records: [good.records[0], { ...good.records[0], case: good.records[0].case.toLowerCase() }] }, /appears twice/);
       refusedImport('a good record followed by a bad one (all or nothing)', { ...good, records: [good.records[0], { ...good.records[1], device: 'Xcode simulator' }] }, /simulator/);
       refusedImport('another format', { ...good, format: 'something-else' }, /format must be/);
+      refusedImport('another version', { ...good, version: 2 }, /version must be 1/);
       refusedImport('a field the format does not have', { ...good, records: [{ ...good.records[0], result: 'pass', evidenceClass: 'PHYSICAL-HUMAN' }] }, /unknown key/);
       refusedImport('a top-level field the format does not have', { ...good, recordedAt: '2026-11-09T00:00:00Z' }, /unknown key "recordedAt"/);
       eq(importPlan({ ...good, records: [] }).problems.some(p => /no records and no soaks/.test(p)), true, 'an export with no records is refused');
-      // Values no person typed: not text, or the shape's own placeholders.
       refusedImport('a tester that is an object', { ...good, tester: { name: 'Priya Example' } }, /tester must be text, not object/);
       refusedImport('a tester that is a number', { ...good, tester: 12345 }, /tester must be text, not number/);
       refusedImport('a tester that is true', { ...good, tester: true }, /tester must be text, not boolean/);
@@ -549,59 +550,108 @@ const scratch = [];
       refusedImport('the checklist\'s own shape, imported as it stands', shape, /is placeholder text/);
       for (const name of Object.keys(shape).filter(key => !['format', 'version', 'records', 'soaks'].includes(key))) refusedImport(`the shape's ${name} placeholder in an otherwise good export`, { ...good, [name]: shape[name] }, new RegExp(`^${name} ".*" is placeholder text`));
       for (const name of Object.keys(shape.records[0])) refusedImport(`the shape's ${name} placeholder in an otherwise good record`, { ...good, records: [{ ...good.records[1], [name]: shape.records[0][name] }] }, new RegExp(`^records\\[0\\]: ${name} ".*" is placeholder text`));
+      for (const name of Object.keys(shape.soaks[0])) refusedImport(`the shape's ${name} placeholder in an otherwise good soak`, { ...good, records: [], soaks: [{ ...soak, [name]: shape.soaks[0][name] }] }, new RegExp(`^soaks\\[0\\]: ${name} (".*" is placeholder text|must be a whole number)`));
       refusedImport('"<name>" as the tester', { ...good, tester: '<name>' }, /tester "<name>" is placeholder text/);
       refusedImport('a device naming a placeholder inside other text', { ...good, records: [{ ...good.records[0], device: 'iPhone <model>' }] }, /device "iPhone <model>" is placeholder text/);
-      const blockedCase = appleCases[1].id;
-      ok(importPlan({ ...good, records: [{ case: blockedCase, result: 'blocked', notes: 'the code took > 10 minutes to arrive' }] }).problems.length === 0, 'notes may use < or > in what the tester saw; only a note that is wholly a placeholder is refused');
-      // A field this recorder would drop is refused, not dropped; with #737 the recorder's own rules decide it.
-      refusedImport('a build kind that is not one', { ...good, buildKind: 'simulator' }, keepsBuild ? /--build-kind/ : /buildKind is not recorded by this checkout/);
-      refusedImport('a severity on a pass', { ...good, records: [{ ...good.records[0], severity: 'P2' }] }, recorderKeeps('records', 'severity') ? /only a fail carries a severity/ : /severity is not recorded by this checkout/);
-      // The tester and the device are checked on every result, blocked included.
-      refusedImport('a blocked row recorded by an agent', { ...good, tester: 'Claude Code', records: [{ case: blockedCase, result: 'blocked', notes: 'no hardware keyboard to hand' }] }, /does not name a human \(the recorder's rule, applied to every result\)/);
+      refusedImport('the script\'s own TIMED notes example', { ...good, records: [{ case: blockedCase, result: 'blocked', notes: '<minutes> min, <n> handwritten' }] }, /notes ".*" is placeholder text/);
+      ok(ownProblems({ ...good, records: [{ case: blockedCase, result: 'blocked', notes: 'the code took > 10 minutes, then x < 5' }] }).length === 0, 'notes may use < or > in what the tester saw; only a <word> placeholder is refused');
+      for (const tester of ['Full Name', 'Your Name', 'your full name', 'Name', 'Tester', '​​​', 'Pr​iya Example', 'A1']) refusedImport(`the tester ${JSON.stringify(tester)}`, { ...good, tester }, /does not name a human/);
+      refusedImport('an export with no exportedAt', { ...good, exportedAt: undefined }, /exportedAt is required/);
+      refusedImport('an exportedAt that is not a date-time', { ...good, exportedAt: 'yesterday' }, /exportedAt must be an ISO date-time/);
+      refusedImport('an exportedAt in the future', { ...good, exportedAt: new Date(Date.now() + 3_600_000).toISOString() }, /exportedAt .* is in the future/);
+      refusedImport('a development build against production', { ...good, buildKind: 'development', server: 'production' }, /never run against production/);
+      refusedImport('a build kind that is not one', { ...good, buildKind: 'simulator' }, IMPORT_READY ? /buildKind must be one of/ : /buildKind is not recorded by this checkout/);
+      refusedImport('a build kind of __proto__', { ...good, buildKind: '__proto__' }, IMPORT_READY ? /buildKind must be one of/ : /buildKind is not recorded by this checkout/);
+      refusedImport('a server that is not one', { ...good, server: 'localhost' }, IMPORT_READY ? /server must be one of/ : /server is not recorded by this checkout/);
+      refusedImport('a severity on a pass', { ...good, records: [{ ...good.records[0], severity: 'P2' }] }, IMPORT_READY ? /only a fail carries a severity/ : /severity is not recorded by this checkout/);
+      refusedImport('a blocked row recorded by an agent', { ...good, tester: 'Claude Code', records: [{ case: blockedCase, result: 'blocked', notes: 'no hardware keyboard to hand' }] }, /does not name a human \(the recorder's rule and the importer's, applied to every result\)/);
       refusedImport('a blocked row on a simulator', { ...good, records: [{ case: blockedCase, result: 'blocked', device: 'iPhone 16 Simulator', notes: 'no hardware keyboard to hand' }] }, /simulator or emulator \(the recorder's rule, applied to every result\)/);
-      // A write that fails part-way is put back: the ledger is never left half-imported.
+      refusedImport('two soaks on one device in one export', { ...good, records: [], soaks: [soak, { ...soak, device: ` ${soak.device.toUpperCase()} ` }] }, /a second soak on/);
+      refusedImport('a soak whose minutes are text', { ...good, records: [], soaks: [{ ...soak, minutes: '52' }] }, /minutes must be a whole number/);
+      if (!IMPORT_READY) refusedImport('a complete, correct export on a recorder without build kinds (nothing is imported before #737)', good, /predates build kinds, servers, severities and soaks \(#737\)/);
+      // Staging and committing, on every checkout: exactly the appended bytes, one append per ledger, everything put back on a failure.
       {
-        const before = snapshot();
+        const stageDir = join(exportDir, 'stage');
+        mkdirSync(stageDir);
+        const real = join(stageDir, 'real.jsonl');
+        writeFileSync(real, 'line1\n');
+        assert.throws(() => stageAppend([], real, join(stageDir, 'copy-a.jsonl'), () => writeFileSync(join(stageDir, 'copy-a.jsonl'), 'rewritten\n')), /changed .* instead of appending/, 'a writer that rewrites the ledger instead of appending is refused'); count += 1;
+        const staged = [];
+        stageAppend(staged, real, join(stageDir, 'copy-b.jsonl'), () => writeFileSync(join(stageDir, 'copy-b.jsonl'), 'line2\n', { flag: 'a' }));
+        ok(staged.length === 1 && staged[0].bytes.toString() === 'line2\n' && readFileSync(real, 'utf8') === 'line1\n', 'staging keeps exactly the appended bytes and leaves the real ledger alone');
+        const appended = [];
+        commitStages(staged, { append: (path, data) => { appended.push(path); writeFileSync(path, data, { flag: 'a' }); } });
+        ok(appended.length === 1 && readFileSync(real, 'utf8') === 'line1\nline2\n', 'a ledger receives its new lines in one append');
+        const before = readFileSync(real, 'utf8');
+        const fresh = join(stageDir, 'made', 'deeper', 'soak.jsonl');
         let error = null;
-        try { importExport(good, { ledger: importLedger, append: (path, data) => { writeFileSync(path, data.subarray(0, 10), { flag: 'a' }); throw new Error('ENOSPC: no space left on device'); } }); } catch (e) { error = e; }
-        ok(error && /nothing written/.test(error.message) && error.exitCode === 2 && snapshot() === before, 'an append that fails part-way is cut back: the ledger is exactly as it was');
-        const fresh = join(exportDir, 'fresh', 'results.jsonl');
+        try { commitStages([{ real, existed: true, size: Buffer.byteLength(before), bytes: Buffer.from('line3\n') }, { real: fresh, existed: false, size: 0, bytes: Buffer.from('soak line\n') }], { append: (path, data) => { if (path === fresh) { writeFileSync(path, data.subarray(0, 3), { flag: 'a' }); throw new Error('ENOSPC: no space left on device'); } writeFileSync(path, data, { flag: 'a' }); } }); } catch (e) { error = e; }
+        ok(error && /nothing written/.test(error.message) && error.exitCode === 2 && readFileSync(real, 'utf8') === before && !existsSync(join(stageDir, 'made')), 'a second ledger that fails part-way puts the first back, removes its own partial file and the directories the import made');
+        const other = join(stageDir, 'other.jsonl');
+        writeFileSync(other, '');
         error = null;
-        try { importExport(good, { ledger: fresh, append: (path, data) => { writeFileSync(path, data.subarray(0, 10), { flag: 'a' }); throw new Error('ENOSPC: no space left on device'); } }); } catch (e) { error = e; }
-        ok(error && !existsSync(fresh), 'a ledger the failed import created is removed again');
-        rmSync(join(exportDir, 'fresh'), { recursive: true, force: true });
+        try { commitStages([{ real, existed: true, size: Buffer.byteLength(before), bytes: Buffer.from('line4\n') }, { real: other, existed: true, size: 0, bytes: Buffer.from('soak line\n') }], { append: (path, data) => { writeFileSync(path, data.subarray(0, 4), { flag: 'a' }); if (path === other) throw new Error('ENOSPC: no space left on device'); writeFileSync(path, data.subarray(4), { flag: 'a' }); }, restore: s => { if (s.real === other) throw new Error('EACCES'); writeFileSync(s.real, readFileSync(s.real).subarray(0, s.size)); } }); } catch (e) { error = e; }
+        ok(error && /could not be put back: .*other\.jsonl \(cut it back to 0 bytes\)/.test(error.message) && !/real\.jsonl/.test(error.message.split('could not be put back')[1]) && readFileSync(real, 'utf8') === before, 'a ledger that cannot be put back is named, and the others are still put back');
+        rmSync(stageDir, { recursive: true, force: true });
       }
-      const soak = { device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.1', pencil: 'Apple Pencil Pro', minutes: 52, failures: 0 };
-      if (SOAKS_RECORDED) {
-        const soakLedger = join(exportDir, 'soak.jsonl');
+      if (IMPORT_READY) {
+        const appends = [];
+        const counting = (path, data) => { appends.push(path); writeFileSync(path, data, { flag: 'a' }); };
+        const { written } = importExport(good, { ledger: importLedger, append: counting });
+        ok(written.length === 2 && validateLedger(importLedger).length === 0 && readLedger(importLedger).every(r => r.recorder === 'scripts/device-matrix-record.mjs' && r.tester === 'Priya Example' && r.sha === SHA && r.buildKind === 'testflight' && r.server === 'staging'), 'a console export is written through the recorder and the ledger validates');
+        assert.deepEqual(appends, [importLedger], 'all of an export\'s records reach the ledger in one append, never one line at a time'); count += 1;
+        // Review of 5bdc03594: the same export imported again, or an older one, never replaces a newer result.
+        refusedImport('the same export imported twice', good, /after this export was made/);
+        recordResult({ case: 'DM-IPH-01-INSTALL', result: 'fail', severity: 'P1', notes: 'the build would not open on the retest', device: 'iPhone 16 Pro Max', os: 'iOS 26.1', sha: SHA, tester: 'Priya Example', buildKind: 'testflight', server: 'staging' }, { ledger: importLedger });
+        refusedImport('an older export after a newer fail recorded with the recorder', { ...good, records: [good.records[0]] }, /DM-IPH-01-INSTALL\): the ledger already holds a result for it recorded at .*, after this export was made/);
+        ok(importPlan({ ...good, exportedAt: new Date().toISOString(), records: [good.records[0]] }, { ledger: importLedger }).problems.length === 0, 'an export made after the ledger\'s rows for its cases is accepted');
+        ok(importPlan({ ...good, server: 'production', records: [good.records[0]] }, { ledger: importLedger }).problems.length === 0, 'rows against another server are other evidence: they never make an export look older');
         appends.length = 0;
-        const imported = importExport({ ...good, records: [good.records[0]], soaks: [soak] }, { ledger: importLedger, append: counting });
+        const soakAt = new Date().toISOString();
+        const imported = importExport({ ...good, exportedAt: soakAt, records: [], soaks: [soak] }, { ledger: importLedger, append: counting });
         ok(imported.soaks.length === 1 && readLedger(soakLedger).length === 1 && validateLedger(importLedger).length === 0, 'a soak in the export is written by the recorder\'s recordSoak, and both ledgers validate');
-        assert.deepEqual(appends, [importLedger, soakLedger], 'one append for the records, one for the soaks'); count += 1;
-        refusedImport('a soak whose minutes are text', { ...good, records: [], soaks: [{ ...soak, minutes: '52' }] }, /minutes must be a whole number/);
-        refusedImport('a soak shorter than the recorder allows', { ...good, records: [], soaks: [{ ...soak, minutes: 5 }] }, /a soak needs --minutes/);
-        refusedImport('a soak on a simulator', { ...good, records: [], soaks: [{ ...soak, device: 'iPad Simulator' }] }, /simulator/);
+        assert.deepEqual(appends, [soakLedger], 'an export of soaks only appends to the soak ledger, once'); count += 1;
+        refusedImport('the same soak imported twice (its minutes would count twice)', { ...good, exportedAt: soakAt, records: [], soaks: [soak] }, /soak ledger already holds a soak on this device recorded at .*, after this export was made/);
+        refusedImport('a soak shorter than the recorder allows', { ...good, exportedAt: new Date().toISOString(), records: [], soaks: [{ ...soak, minutes: 5 }] }, /a soak needs --minutes/);
+        refusedImport('a soak on a simulator', { ...good, exportedAt: new Date().toISOString(), records: [], soaks: [{ ...soak, device: 'iPad Simulator' }] }, /simulator/);
         const before = snapshot();
         let error = null;
         let calls = 0;
-        try { importExport({ ...good, records: [good.records[0]], soaks: [soak] }, { ledger: importLedger, append: (path, data) => { calls += 1; if (calls === 2) throw new Error('EACCES: permission denied'); writeFileSync(path, data, { flag: 'a' }); } }); } catch (e) { error = e; }
-        ok(error && /nothing written/.test(error.message) && snapshot() === before, 'when the soaks cannot be written after the records were, the records are taken back out: nothing written');
-      } else {
-        refusedImport('a soak on a recorder that keeps none', { ...good, soaks: [soak] }, /soaks are not recorded by this checkout/);
+        try { importExport({ ...good, exportedAt: new Date().toISOString(), records: [good.records[0]], soaks: [{ ...soak, device: 'iPhone 16 Pro Max', os: 'iOS 26.1', pencil: undefined }] }, { ledger: importLedger, append: (path, data) => { calls += 1; if (calls === 2) { writeFileSync(path, data.subarray(0, 9), { flag: 'a' }); throw new Error('EACCES: permission denied'); } writeFileSync(path, data, { flag: 'a' }); } }); } catch (e) { error = e; }
+        ok(error && /nothing written/.test(error.message) && snapshot() === before, 'when the soaks cannot be written after the records were, both ledgers are put back: nothing written');
       }
       // The command line: one export file and --ledger <path>; any other option is refused before anything is read.
       assert.deepEqual(parseImportArgs(['x.json']), { file: 'x.json', ledger: DEFAULT_LEDGER }, 'one export file imports into the repository ledger'); count += 1;
       assert.deepEqual(parseImportArgs(['--ledger', 'L.jsonl', 'x.json']), { file: 'x.json', ledger: 'L.jsonl' }, '--ledger takes the next word as the ledger, never as the export'); count += 1;
       for (const [args, pattern] of [[['x.json', '--dry-run'], /unknown option --dry-run/], [['--ledger'], /needs a path/], [['--ledger', '--dry-run', 'x.json'], /needs a path/], [['a.json', 'b.json'], /one export file at a time/], [['--ledger', 'a', '--ledger', 'b', 'x.json'], /twice/], [[], /no export file/]]) ok(pattern.test(parseImportArgs(args).error || ''), `the importer refuses the arguments ${JSON.stringify(args)}`);
       const exportFile = join(exportDir, 'export.json');
-      writeFileSync(exportFile, JSON.stringify(good));
+      const fresh = { ...good, exportedAt: new Date().toISOString(), records: [{ ...good.records[0], case: appleCases[2].id }] };
+      writeFileSync(exportFile, JSON.stringify(fresh));
       const { spawnSync } = await import('node:child_process');
       const cliBefore = snapshot();
       const dry = spawnSync(process.execPath, [join(ROOT, 'tools', 'release-device-import.mjs'), exportFile, '--ledger', importLedger, '--dry-run'], { encoding: 'utf8' });
       ok(dry.status === 2 && /unknown option --dry-run/.test(dry.stderr) && snapshot() === cliBefore, 'an option the importer does not know exits 2 and writes nothing');
       const cliLedger = join(exportDir, 'cli', 'results.jsonl');
       const real = spawnSync(process.execPath, [join(ROOT, 'tools', 'release-device-import.mjs'), '--ledger', cliLedger, exportFile], { encoding: 'utf8' });
-      ok(real.status === 0 && readLedger(cliLedger).length === 2 && validateLedger(cliLedger).length === 0 && /DEVICE IMPORT: 2 record\(s\) written/.test(real.stdout), 'the command line imports an export, --ledger first');
+      if (IMPORT_READY) ok(real.status === 0 && readLedger(cliLedger).length === 1 && validateLedger(cliLedger).length === 0 && /DEVICE IMPORT: 1 record\(s\) written/.test(real.stdout), 'the command line imports an export, --ledger first');
+      else ok(real.status === 2 && /predates build kinds/.test(real.stderr) && !existsSync(cliLedger), 'on a recorder without build kinds the command line imports nothing');
+      // The release counts store-build rows against staging; a development build never stands in for the store build.
+      {
+        const kindsLedger = join(exportDir, 'kinds.jsonl');
+        const row = (kase, extra) => JSON.stringify({ recordedAt: new Date().toISOString(), case: kase.id, result: 'pass', device: kase.family === 'IPD' ? 'iPad Pro 11-inch (4th generation)' : 'iPhone 16 Pro Max', os: 'iOS 26.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: null, sha: SHA, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs', ...extra });
+        for (const [label, extra, expected] of [
+          ['rows from a recorder without build kinds (before #737)', {}, true],
+          ['TestFlight rows against staging', { buildKind: 'testflight', server: 'staging' }, true],
+          ['development-build rows', { buildKind: 'development', server: 'staging' }, false],
+          ['TestFlight rows against production (the short list after promotion)', { buildKind: 'testflight', server: 'production' }, false]
+        ]) {
+          writeFileSync(kindsLedger, `${CASES.map(kase => row(kase, extra)).join('\n')}\n`);
+          const all = deviceEvidence(SHA, { ledger: kindsLedger });
+          const apple = deviceEvidence(SHA, { ledger: kindsLedger, waivedFamilies: ['AND', 'ANT'] });
+          ok(all.ok === expected && apple.ok === expected && (expected || (/not counted: the release counts store-build rows against staging/.test(all.detail) && /not counted/.test(apple.detail))), `the release ${expected ? 'counts' : 'does not count'} ${label}, with or without the Android family waivers`);
+        }
+        ok(releaseDeviceRows([{ buildKind: 'play-internal', server: 'staging' }, { buildKind: null, server: 'staging' }, { buildKind: 'testflight', server: null }]).length === 1, 'a row with no build kind or no server, from a recorder that has them, is not counted');
+      }
     }
     ok(!(await run(world({ device: 'all-blocked' }))).ok, 'an all-blocked device matrix refuses the release stage (Q4 #696 counterexample)');
 

@@ -28,7 +28,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { CASES } from '../scripts/device-matrix-record.mjs';
-import { EXPORT_FORMAT, SOAKS_RECORDED, exportShape } from './release-device-import.mjs';
+import { EXPORT_FORMAT, exportShape } from './release-device-import.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const SCRIPT_JSON = join(ROOT, 'docs', 'release', 'owner-device-script.json');
@@ -38,7 +38,7 @@ export { EXPORT_FORMAT };
 const SIGNED_IN = 'Signed in to the adult test account on this device.';
 /** What the owner does for each matrix step id. Keyed by step, shared by both Apple families. */
 export const OWNER_STEPS = Object.freeze({
-  INSTALL: { precondition: 'The development build of the candidate SHA is installed from Xcode on this device (Part A), or the TestFlight build (Part B).', steps: ['Open the app.', 'Open its diagnostics and read the release SHA.'], evidence: ['The release SHA the diagnostics show (it must equal the candidate).'] },
+  INSTALL: { precondition: 'The TestFlight build of the candidate SHA is installed on this device. Part A runs it against staging (app.prilearning.com fronts staging until GO); Part B runs the same build against production after the promotion.', steps: ['Open the app.', 'Open its diagnostics and read the release SHA.'], evidence: ['The release SHA the diagnostics show (it must equal the candidate).'] },
   OTP: { precondition: 'The test mailbox is open on this device.', steps: ['Sign in to the adult test account with the email code.', 'Close the app fully, then reopen it.'], evidence: ['Whether you were still signed in after reopening.'] },
   GUARDIAN: { precondition: 'Signed out. The other device is to hand as "the parent\'s own device", with the parent mailbox.', steps: ['Create a child test account on this device.', 'On the OTHER device, open /guardian/consent in Safari and approve with the parent\'s code.', 'Watch this device.'], evidence: ['Whether questions and sync were refused before approval.', 'Whether the child screen moved on by itself after approval.'] },
   ISSUE: { precondition: SIGNED_IN, steps: ['Open Practice and get a question.', 'Turn on aeroplane mode, then turn it off.'], evidence: ['Whether the offline state showed and the question came back.'] },
@@ -48,7 +48,7 @@ export const OWNER_STEPS = Object.freeze({
   MARK: { precondition: SIGNED_IN, steps: ['Submit a wrong answer.', 'Submit the right answer.'], evidence: ['The mark shown (earned / possible) and its first-error feedback.', 'Whether the worked solution appeared after the right answer.'] },
   HISTORY: { precondition: 'Both devices signed in to the same adult test account.', steps: ['Close and reopen the app.', 'Open History on this device and on the other one.'], evidence: ['Whether every attempt is in History on both devices.'] },
   VOICEOVER: { precondition: 'Settings → Accessibility → Display & Text Size → Larger Text at the largest size; VoiceOver on.', steps: ['Sign in, open Practice, reach the answer box and the mode switch.', 'Press "Read my answer", listen to the transcript, submit, listen to the mark.', 'Turn VoiceOver off afterwards.'], evidence: ['Any control read without a name.', 'Whether the writing surface was announced.'] },
-  KEYBOARD: { precondition: 'A hardware keyboard attached; Settings → Accessibility → Keyboards → Full Keyboard Access on.', steps: ['Tab through the sign-in card and the question card.', 'Activate controls with Space or Return.'], evidence: ['Whether every control was reached in order with visible focus.', 'Any focus trap. With no hardware keyboard, record the case blocked.'] },
+  KEYBOARD: { precondition: 'A hardware keyboard attached; Settings → Accessibility → Keyboards → Full Keyboard Access on.', steps: ['Tab through the sign-in card and the question card.', 'Activate controls with Space or Return.'], evidence: ['Whether every control was reached in order with visible focus.', 'Any focus trap. With no hardware keyboard the case is blocked, and a blocked iPhone or iPad case blocks the release (D1): borrow a keyboard.'] },
   TEXTSIZE: { precondition: 'Larger Text at the largest size (run it together with the VoiceOver case).', steps: ['Walk the same path as the VoiceOver case.'], evidence: ['Anything clipped, or any sideways scroll.'] },
   ROTATE: { precondition: 'iPad: ink, a typed answer and a transcript on the page.', steps: ['Rotate the iPad.', 'Scroll, then write again.'], evidence: ['Whether all three were kept and the ink stayed on the ruled paper.'] },
   SPLITVIEW: { precondition: 'iPad: an attempt open.', steps: ['Put Pri in Split View at half the screen, then a third.', 'Write with the Pencil.'], evidence: ['Whether the card and the writing surface fit without sideways scroll.', 'Whether the ink lands where the pen touches.'] },
@@ -63,11 +63,11 @@ export const OWNER_STEPS = Object.freeze({
   // Matrix steps that #737 adds (96 cases): until it lands they are release-record items below.
   VOICEOVERTEXT: { precondition: 'Larger Text at the largest size (AX5) and VoiceOver on, together.', steps: ['Sign in, open a question and answer it by handwriting or typing.', 'Listen to the transcript and the mark, then find the attempt in History.', 'Turn VoiceOver off afterwards.'], evidence: ['Any control not reached, or not named, in order.', 'Whether the prompt naming OpenAI (D17) was read in full with both of its buttons reachable.', 'Anything clipped off the screen.'] },
   DELETE: { precondition: 'The last step on this device: every other case here is done.', steps: ['Settings → Account → Delete, confirming with a fresh email code, for each test account on this device.', 'Sign in again with the same address.', 'After sync, look at History on the other device.'], evidence: ['Whether the app went back to the sign-in card.', 'Whether signing in again started a new, empty account.', 'Whether the old History is gone on both devices.'] },
-  PURCHASE: { billingRequired: true, precondition: 'The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6), and a Sandbox Apple Account is signed in (Settings → App Store). Until then this case is BLOCKED.', steps: ['On the Premium screen, buy the monthly plan through the system sheet.', 'Once, cancel the sheet instead.'], evidence: ['The price the store sheet showed.', 'Whether Premium unlocked only after the server confirmed it (/v1/entitlements).', 'Whether cancelling changed nothing.'] },
+  PURCHASE: { billingRequired: true, precondition: 'The Paid Apps Agreement is active and both products are priced (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6), and a Sandbox Apple Account is signed in (Settings → App Store). Until then this case is BLOCKED.', steps: ['On the Premium screen, buy the monthly plan through the system sheet.', 'Once, cancel the sheet instead.'], evidence: ['The price the store sheet showed.', 'Whether Premium unlocked only after the server confirmed it (/v1/entitlements).', 'Whether cancelling changed nothing.', 'The other StoreKit scenarios are the release-record item REC-IPD-STOREKIT.'] },
   RESTOREPURCHASE: { billingRequired: true, precondition: 'The purchase case passed with the same sandbox account. Until billing is configured this case is BLOCKED.', steps: ['Delete and reinstall the app, sign in and press "Restore purchases".', 'On the other device, signed in to the same store account, press "Restore purchases".'], evidence: ['Whether Premium came back on both devices once the server confirmed it.', 'What a restore with no purchase said.'] }
 });
 
-/** Steps that are not matrix cases on a recorder without them: their results go to the release record, not the device ledger. Each names the matrix step that replaces it (#737). */
+/** Steps that are not matrix cases: their results go to the release record, not the device ledger. One with a matrixStep gives way to that matrix case where the recorder has it (#737). */
 export const RELEASE_RECORD_ITEMS = Object.freeze([
   ...APPLE_FAMILIES.map(family => ({
     id: `REC-${family}-DELETE`, kind: 'release-record', family, matrixStep: 'DELETE', title: 'In-app account deletion', billingRequired: false,
@@ -84,17 +84,25 @@ export const RELEASE_RECORD_ITEMS = Object.freeze([
     expected: 'Premium after the purchase and after the restore, confirmed by the server (/v1/entitlements).',
     evidence: ['The /v1/entitlements answer after each step.'],
     recordIn: 'the release record, ios/PriLearning.swiftpm/RELEASE.md §11 (docs/billing/storekit-certification.md step 4)'
+  },
+  {
+    id: 'REC-IPD-STOREKIT', kind: 'release-record', family: 'IPD', title: 'StoreKit sandbox certification', billingRequired: true,
+    precondition: 'Billing is configured (docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md A1–A6) and the sandbox purchase passed, on the TestFlight build against a server that allows Sandbox. Until then this item is BLOCKED.',
+    steps: ['With the Sandbox Apple Account on the iPad: let a renewal happen (the sandbox clock is fast), turn auto-renew off and let it expire, run a billing-retry and grace test, request a refund through the sandbox, upgrade and downgrade, and switch accounts on the same iPad.', 'After each one, note what the app shows and run the billing reconcile.'],
+    expected: 'After each scenario the server\'s entitlement (/v1/entitlements) matches the store\'s state, and the reconcile run is clean.',
+    evidence: ['For each scenario: what the device showed, the /v1/entitlements answer and the reconcile result.'],
+    recordIn: 'the release record, ios/PriLearning.swiftpm/RELEASE.md §11 (docs/billing/storekit-certification.md, external blocker 4)'
   }
 ]);
 
 /** The device soak (OWNER-DEVICE-SCRIPT.md A17 and B5), where the recorder keeps soak records (#737). */
 export const SOAK_ITEM = Object.freeze({
   id: 'SOAK', kind: 'soak', family: 'IPD', title: 'Soak: continuous use through the second sitting', billingRequired: false,
-  precondition: 'The second sitting (the TIMED, BACKGROUND, STORAGE, MEMORY, EXPORT and SHARE cases) run on the iPad in one go. Part B runs one more soak on the TestFlight build.',
+  precondition: 'The second sitting (the TIMED, BACKGROUND, STORAGE, MEMORY, EXPORT and SHARE cases) run on the iPad in one go, on the TestFlight build. Part B runs one more soak against production.',
   steps: ['Note the time the second sitting starts and the time it ends.', 'Note every crash, hang, lost piece of work or wrong mark in between.'],
   expected: 'No crash or lost work in 45 minutes or more.',
   evidence: ['The minutes of continuous use.', 'The number of failures, with a note on each.'],
-  recordIn: 'the export\'s soaks list, with the same SHA, tester, build kind and server as its records'
+  recordIn: 'the export\'s soaks list (with #737\'s recorder), with the same SHA, tester, build kind and server as its records'
 });
 
 /** The checklist, generated. Throws when a matrix step has no owner instructions. */
@@ -109,10 +117,10 @@ export function ownerDeviceScript(cases = CASES) {
       ...(kase.pencil ? { pencilRequired: true } : {})
     });
   }
-  if (SOAKS_RECORDED) items.push({ ...SOAK_ITEM, steps: [...SOAK_ITEM.steps], evidence: [...SOAK_ITEM.evidence] });
+  items.push({ ...SOAK_ITEM, steps: [...SOAK_ITEM.steps], evidence: [...SOAK_ITEM.evidence] });
   // A release-record item stays only while the matrix has no case for its step on that family.
   const inMatrix = (family, step) => cases.some(kase => kase.family === family && kase.step === step);
-  items.push(...RELEASE_RECORD_ITEMS.filter(item => !inMatrix(item.family, item.matrixStep)).map(({ matrixStep: _step, ...item }) => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
+  items.push(...RELEASE_RECORD_ITEMS.filter(item => !item.matrixStep || !inMatrix(item.family, item.matrixStep)).map(({ matrixStep: _step, ...item }) => ({ ...item, steps: [...item.steps], evidence: [...item.evidence] })));
   return {
     format: 'pri-owner-device-script', version: 1,
     generatedBy: 'node tools/release-owner-device-script.mjs --write',
@@ -122,7 +130,7 @@ export function ownerDeviceScript(cases = CASES) {
       format: EXPORT_FORMAT, version: 1,
       import: 'node tools/release-device-import.mjs <export.json>',
       shape: exportShape(),
-      rules: 'One export per sitting. Every value is what a person entered on the device: text (minutes and failures: whole numbers), never a <placeholder> from this shape, and only the fields the shape names. The importer checks every record by scripts/device-matrix-record.mjs\'s own rules and writes only through it. One bad record refuses the WHOLE file and nothing is written: a tester that names an agent, CI, a bot or a placeholder, or a simulator or emulator device (whatever the result), an unknown case, a short SHA, a duplicate case, a value that is not text, a placeholder, or a field the recorder does not record. release-record items are not imported: they go where their recordIn says.'
+      rules: 'One export per sitting and build, stamped with exportedAt when it is made, and imported soon after. Every value is what a person entered on the device: text (minutes and failures: whole numbers), never a <placeholder> from this shape. The importer needs the recorder of #737 and writes only through scripts/device-matrix-record.mjs, after its own rules. One bad record refuses the WHOLE file and nothing is written: a tester that names an agent, CI, a bot or a placeholder, a simulator or emulator device (whatever the result), a build kind or server the recorder does not know, an unknown case, a short SHA, a duplicate case or soak, a value that is not text, a placeholder, or an export older than a result the ledger already holds for one of its cases (an older export, or the same one twice, never replaces a newer result: export again). Record a case through the console or the recorder, not both. release-record items are not imported: they go where their recordIn says.'
     },
     matrixCases: items.filter(item => item.kind === 'device-matrix').length,
     items

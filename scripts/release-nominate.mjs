@@ -86,6 +86,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, readLedger, summarise } from './device-matrix-record.mjs';
+import * as deviceMatrix from './device-matrix-record.mjs';
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -293,13 +294,29 @@ export function promotionCommands(sha, { productionOrigin = PRODUCTION_ORIGIN, e
  * and only an authenticated public-release waiver (a founder-approved platform scope change) can
  * release without it, visibly.
  */
+/** The store builds whose rows certify a release: #737 runs the full matrix on the signed store build against staging (docs/release/device-matrix.md). */
+export const RELEASE_STORE_BUILD_KINDS = Object.freeze([...(deviceMatrix.STORE_BUILD_KINDS ?? ['testflight', 'play-internal', 'play-closed'])]);
+/**
+ * The ledger rows release-stage evidence counts. A row that carries a build kind counts only when it
+ * is a store build against staging: a development build never stands in for the store build, and the
+ * production short list comes after the promotion. Rows from a recorder without build kinds (before
+ * #737) count as they always have.
+ */
+export function releaseDeviceRows(records) {
+  return records.filter(row => row?.parseError || !row || !Object.hasOwn(row, 'buildKind') || (RELEASE_STORE_BUILD_KINDS.includes(row.buildKind) && row.server === 'staging'));
+}
+
 export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER, waivedFamilies = [] } = {}) {
   const waived = [...new Set(waivedFamilies)];
   for (const family of waived) {
     if (!Object.values(DEVICE_FAMILY_WAIVERS).includes(family)) throw new Error(`device family ${family} cannot be waived; only ${Object.values(DEVICE_FAMILY_WAIVERS).join(' and ')} can, never ${NEVER_WAIVED_FAMILIES.join(' or ')}`);
   }
-  const summary = summarise(readLedger(ledger), { sha });
+  const all = readLedger(ledger);
+  const counted = releaseDeviceRows(all);
+  const uncounted = all.filter(row => !counted.includes(row) && String(row?.sha || '').toLowerCase() === String(sha).toLowerCase()).length;
+  const summary = summarise(counted, { sha });
   const { counts, rows } = summary;
+  const scope = uncounted ? ` · ${uncounted} development or production row(s) not counted: the release counts store-build rows against staging` : '';
   const families = new Map();
   for (const row of rows) {
     const family = families.get(row.family) || { family: row.family, label: row.familyLabel, pass: 0, other: 0, total: 0 };
@@ -311,7 +328,7 @@ export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER, waivedFamilies = 
   if (!waived.length) {
     const ok = rows.length > 0 && counts.pass === rows.length;
     const detail = `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}`
-      + (ok ? ' · device-complete' : ` · not device-complete: ${incompleteFamilies.join(', ')} not all pass${counts.blocked ? ' (blocked is recorded, never acceptance)' : ''}`);
+      + (ok ? ' · device-complete' : ` · not device-complete: ${incompleteFamilies.join(', ')} not all pass${counts.blocked ? ' (blocked is recorded, never acceptance)' : ''}`) + scope;
     return { ok, counts, total: rows.length, summary, incompleteFamilies, waivedFamilies: [], detail };
   }
   // Family-scoped: every case of every family NOT waived must pass, and the families that can
@@ -322,7 +339,7 @@ export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER, waivedFamilies = 
   const familyState = family => { const f = families.get(family); return f ? `${family} pass ${f.pass} of ${f.total}` : `${family} has no cases`; };
   const detail = `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}`
     + (ok ? ` · every case passes in ${[...families.keys()].filter(family => !waived.includes(family)).join(', ')}` : ` · not complete in families that are not waived: ${requiredIncomplete.length ? requiredIncomplete.join(', ') + ' not all pass' : NEVER_WAIVED_FAMILIES.filter(family => !families.has(family)).join(', ') + ' missing'}`)
-    + ` · waived by family: ${waived.map(familyState).join(', ')}`;
+    + ` · waived by family: ${waived.map(familyState).join(', ')}` + scope;
   return { ok, counts, total: rows.length, summary, incompleteFamilies, waivedFamilies: waived, detail };
 }
 
