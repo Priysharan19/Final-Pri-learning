@@ -23,12 +23,16 @@ GitHub and refuses it unless:
 - it was posted **after the commit** it approves and has **never been edited** (open a new issue,
   or post a new comment, instead of editing one; an issue's edit is read from GitHub's
   `lastEditedAt`, a comment's from `updated_at`);
-- it contains, as a line of its own, exactly
+- an issue is **open and has never been closed**: closing an approval issue withdraws it;
+- its **first line** is exactly the line below (under other text, in an HTML comment or in a code
+  block it is refused), and it holds no other approval line, so one post approves one thing:
   - for a waiver: `Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted, comma-separated list>`
   - for the GO: `Pri-Release-GO: <sha> target=deploy/production`
   - for the production-data Yes: `Pri-Production-Data-YES: <sha> target=production-postgres`
 - for the GO: it was posted **after the soak ended and after the candidate was frozen** — a GO
-  given before the evidence existed is stale; for the data Yes: after the candidate was frozen.
+  given before the evidence existed is stale; for the data Yes: after the candidate was frozen and
+  no later than the data gate's sign-off (`gates.data.at`), because the Yes comes before the data
+  step that the sign-off follows.
 
 **Evidence class: GITHUB-ACCOUNT-AUTHENTICATED.** GitHub proves which account posted the comment,
 not which person: any process holding that account's token — including an AI agent working on the

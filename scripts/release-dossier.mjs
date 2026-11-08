@@ -21,12 +21,13 @@
 //     else NO-GO. The production-data gate is the owner's D27 Yes for the
 //     cutover window, so it is authenticated like the GO: gates.data.approval
 //     links a GitHub comment or issue by a repository admin, unedited, posted
-//     after the commit and the freeze, holding the line
+//     after the freeze and no later than the gate's own sign-off (gates.data.at:
+//     the Yes comes before the data step it authorises), whose first line is
 //     `Pri-Production-Data-YES: <sha> target=production-postgres`;
 //   · step 28 — the owner's GO, recorded in the record for exactly this SHA by
-//     a named human AND posted as a GitHub comment by a repository admin that
-//     contains the line `Pri-Release-GO: <sha> target=deploy/production`
-//     (go.approval links it, go.githubLogin names the account). The comment is
+//     a named human AND posted as a GitHub comment or issue by a repository
+//     admin whose first line is `Pri-Release-GO: <sha> target=deploy/production`
+//     (go.approval links it, go.githubLogin names the account). The post is
 //     the authority, not the file: it must be unedited and posted after the
 //     soak ended and after the candidate was frozen (a GO given before the
 //     evidence existed is stale). The generator never writes a GO; it verifies
@@ -260,14 +261,18 @@ export async function buildDossier({
     let evidenceClass = '';
     if (gate.id === 'data' && ok) {
       // D27: the owner's Yes for the irreversible data step, authenticated on GitHub, for this SHA,
-      // given after the candidate was frozen (a Yes before the freeze approved another window).
+      // given after the candidate was frozen (a Yes before the freeze approved another window) and no
+      // later than this gate's sign-off: the data step it authorises comes between the two.
       const auth = await verifyApproval({ approval: entry.approval, githubLogin: entry.githubLogin, sha: expected, marker: dataYesMarker(expected), repo, gh, ghGraphql, git, now });
       const premature = auth.ok && frozenAt !== null && auth.createdAt < frozenAt;
-      ok = auth.ok && !premature;
+      const late = auth.ok && auth.createdAt > at;
+      ok = auth.ok && !premature && !late;
       evidenceClass = APPROVAL_EVIDENCE_CLASS;
-      approvalNote = auth.ok
-        ? (premature ? ` · the owner's Yes (${new Date(auth.createdAt).toISOString()}) predates the candidate freeze; post a new one for this window` : ` · owner's Yes ${auth.url} by ${auth.login} at ${new Date(auth.createdAt).toISOString()}`)
-        : ` · the owner's D27 Yes does not hold: ${auth.problems.join('; ')}`;
+      const yesAt = auth.ok ? new Date(auth.createdAt).toISOString() : '';
+      approvalNote = !auth.ok ? ` · the owner's D27 Yes does not hold: ${auth.problems.join('; ')}`
+        : premature ? ` · the owner's Yes (${yesAt}) predates the candidate freeze; post a new one for this window`
+        : late ? ` · the owner's Yes (${yesAt}) came after the data gate was signed (${entry.at}); the Yes must come before the data step it authorises`
+        : ` · owner's Yes ${auth.url} by ${auth.login} at ${yesAt}`;
     }
     row(23, ok, gate.label, ok ? `PASS by ${by} at ${entry.at}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote}` : `${entry.status || 'NOT_RECORDED'}${entry.status === 'PASS' && !by ? ' (by does not name a human)' : ''}${entry.status === 'PASS' && at === null ? ' (at is not an ISO date-time)' : ''}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote} — ${gate.ref}`, { who: by || '', evidenceClass });
   }

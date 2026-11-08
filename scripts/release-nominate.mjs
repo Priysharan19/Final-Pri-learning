@@ -41,8 +41,8 @@
 //     row is a reminder any more: a
 //     missing one refuses the nomination unless a public-release override
 //     record (--override, format below) waives it by name AND links an
-//     approving GitHub comment by a repository admin that names this SHA and
-//     the waived requirements. The override is printed with the result and
+//     approving GitHub comment or issue by a repository admin that names this
+//     SHA and the waived requirements. The override is printed with the result and
 //     copied into the GO/NO-GO dossier (scripts/release-dossier.mjs).
 //     `--candidate` runs everything except the evidence rows, for §4.6 step 1
 //     before the TestFlight/Play build exists; it never prints the promotion.
@@ -62,10 +62,11 @@
 //
 // Override record (JSON): { "sha": "<40-hex>", "scope": "public-release" | "internal-test-track",
 //   "waives": ["device-matrix" | "reader-evidence", …], "by": "<named human>", "githubLogin": "<login>",
-//   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>", "at": "<ISO date-time>",
-//   "reason": "<why this release goes without it>" }
-// The JSON file is not the authority; the approval comment is. It must be written by `githubLogin`,
-// an admin of the repository, after the commit, never edited, and contain the exact line
+//   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>" or "https://github.com/<repo>/issues/<n>",
+//   "at": "<ISO date-time>", "reason": "<why this release goes without it>" }
+// The JSON file is not the authority; the approval (a comment, or an issue opened from a prefilled
+// link) is. It must be written by `githubLogin`, an admin of the repository, after the commit, never
+// edited (an issue also never closed), hold no other approval line, and its first line must be exactly
 //   Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted,comma list>
 // An `internal-test-track` exception (TestFlight / Play internal) never waives release-stage evidence.
 // Evidence class of such an approval: GITHUB-ACCOUNT-AUTHENTICATED. GitHub proves the account, not
@@ -97,10 +98,12 @@ export const OVERRIDE_SCOPES = Object.freeze(['public-release', 'internal-test-t
 export const RELEASE_TARGET = 'deploy/production';
 export const APPROVAL_EVIDENCE_CLASS = 'GITHUB-ACCOUNT-AUTHENTICATED';
 const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
-const APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/(\d+)#issuecomment-(\d+)$/;
+const APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/([1-9]\d*)#issuecomment-([1-9]\d*)$/;
 // An approval may also be the body of an issue opened from a prefilled link (one click: GitHub can
 // prefill a new issue, never a comment). Same checks; an edited body is read through GraphQL.
-const ISSUE_APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/issues\/(\d+)$/;
+const ISSUE_APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/issues\/([1-9]\d*)$/;
+/** Every approval line starts with one of these; a post that holds two approves nothing. */
+const APPROVAL_LINE = /Pri-(?:Release-GO|Production-Data-YES|Evidence-Waiver):/g;
 /** True for a link verifyApproval can read: an issue or PR comment, or an issue. */
 export function approvalLinkShape(url) { return APPROVAL_URL.test(String(url || '').trim()) || ISSUE_APPROVAL_URL.test(String(url || '').trim()); }
 
@@ -122,8 +125,11 @@ export function dataYesMarker(sha) {
  * The approval is either a comment (`…/issues/<n>#issuecomment-<id>`, on an issue or PR) or the body
  * of an issue (`…/issues/<n>`, so a prefilled new-issue link makes it one click). Either way: it is in
  * this repository; its author is `githubLogin`, a User (not a bot) with admin permission; it was
- * posted after the commit it approves and never edited; and it contains `marker` as a line of its
- * own. Returns { ok, problems, login, createdAt, url, kind: 'comment' | 'issue' }.
+ * posted after the commit it approves and never edited; its first non-blank line is exactly `marker`,
+ * where the post shows it first (never under other text, in an HTML comment or in a code block); and
+ * it holds no other approval line, so one post approves one thing. An issue must also be open and
+ * never have been closed: closing it withdraws the approval. Returns { ok, problems, login,
+ * createdAt, url, kind: 'comment' | 'issue' }.
  */
 export async function verifyApproval({ approval, githubLogin, sha, marker, repo = DEFAULT_REPO, gh = defaultGh, ghGraphql = defaultGhGraphql, git = defaultGit, now = Date.now() }) {
   const problems = [];
@@ -160,13 +166,16 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
       const data = await ghGraphql(ISSUE_QUERY, { owner, name, number: Number(number) });
       issue = data?.repository?.issue ?? null;
     } catch (error) { return { ok: false, problems: [`approval issue #${number} could not be read from GitHub: ${error?.message || error}`], login: null, createdAt: null, url, kind }; }
-    // GraphQL answers null for a number that is a pull request, so a PR body never stands in for an issue.
+    // For a number that is a pull request GraphQL answers a NOT_FOUND error (caught above) or null, so a PR body never stands in for an issue.
     if (!issue) return { ok: false, problems: [`#${number} is not an issue of ${repo} (a pull request or a missing issue cannot carry an approval in its body)`], login: null, createdAt: null, url, kind };
     author = String(issue.author?.login || '');
     type = issue.author?.__typename || '';
     createdText = issue.createdAt || '';
     edited = issue.lastEditedAt !== null && issue.lastEditedAt !== undefined;
     body = issue.body || '';
+    // Closing an approval issue withdraws it; one closed and reopened is not taken back either.
+    if (issue.state !== 'OPEN') problems.push(`approval issue #${number} is ${String(issue.state || 'in an unknown state').toLowerCase()}: closing an approval issue withdraws it; open a new one`);
+    else if (issue.timelineItems?.totalCount !== 0) problems.push(`approval issue #${number} was closed and reopened; a withdrawn approval is not taken back: open a new one`);
   }
   if (author.toLowerCase() !== login.toLowerCase()) problems.push(`${what} was written by ${author || '(unknown)'}, not ${login}`);
   if (type !== 'User') problems.push(`${what} author is a ${type || 'unknown'} account, not a person's User account`);
@@ -176,8 +185,10 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
     if (edited) problems.push(`${what} was edited after it was posted; post a new ${kind} rather than editing one`);
     if (created > now) problems.push(`${what} is dated in the future`);
   }
-  const lines = String(body).split(/\r?\n/).map(line => line.trim());
-  if (!lines.includes(marker)) problems.push(`${what} does not contain the exact line: ${marker}`);
+  const first = String(body).split(/\r?\n/).map(line => line.trim()).find(line => line !== '');
+  const approvalLines = (String(body).match(APPROVAL_LINE) || []).length;
+  if (first !== marker) problems.push(`${what} does not start with the exact line: ${marker}`);
+  if (approvalLines > 1) problems.push(`${what} holds ${approvalLines} approval lines; one post approves one thing`);
   try {
     const permission = await gh(`repos/${repo}/collaborators/${encodeURIComponent(author || login)}/permission`);
     if (permission?.permission !== 'admin') problems.push(`${author || login} has ${permission?.permission || 'no'} permission on ${repo}; a release approval needs a repository admin`);
@@ -189,7 +200,7 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
   } catch (error) { problems.push(`the commit time of ${sha} could not be read: ${error?.message || error}`); }
   return { ok: problems.length === 0, problems, login: author || null, createdAt: Number.isFinite(created) ? created : null, url, kind };
 }
-const ISSUE_QUERY = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){number author{login __typename} createdAt lastEditedAt body}}}';
+const ISSUE_QUERY = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){number author{login __typename} createdAt lastEditedAt state timelineItems(first:1,itemTypes:[CLOSED_EVENT,REOPENED_EVENT]){totalCount} body}}}';
 export const ENGINES = Object.freeze(['postgres', 'sqlite']);
 export const STAGES = Object.freeze(['candidate', 'release']);
 

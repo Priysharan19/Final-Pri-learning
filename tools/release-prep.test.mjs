@@ -247,8 +247,8 @@ const scratch = [];
       return approvalUrl(id);
     };
     // An approving ISSUE (opened from a prefilled link): GraphQL shape, lastEditedAt null unless edited.
-    w.approveIssue = (number, body, { login = APPROVER, type = 'User', created = '2026-11-01T09:00:00Z', edited = null } = {}) => {
-      w.issues.set(Number(number), { number: Number(number), author: login === null ? null : { login, __typename: type }, createdAt: created, lastEditedAt: edited, body });
+    w.approveIssue = (number, body, { login = APPROVER, type = 'User', created = '2026-11-01T09:00:00Z', edited = null, state = 'OPEN', closed = 0 } = {}) => {
+      w.issues.set(Number(number), { number: Number(number), author: login === null ? null : { login, __typename: type }, createdAt: created, lastEditedAt: edited, state, timelineItems: { totalCount: closed }, body });
       return issueUrl(number);
     };
     w.ghGraphql = async (query, variables) => {
@@ -398,7 +398,7 @@ const scratch = [];
     const onlyCandidate = await run(only, { stage: 'candidate' });
     ok(onlyCandidate.ok && onlyCandidate.promotion.length === 0, 'the candidate stage does not need the Release Candidate run, and prints no promotion');
     const waiveAll = world({ device: 'none', reader: 'none' }); waiveAll.runs = waiveAll.runs.filter(r => r.path !== RELEASE_CANDIDATE_WORKFLOW);
-    waiveAll.approve(1009, `Approved.\n${waiverMarker(SHA, ['device-matrix', 'reader-evidence'])}\n`);
+    waiveAll.approve(1009, `${waiverMarker(SHA, ['device-matrix', 'reader-evidence'])}\nApproved.\n`);
     const waiveAllReport = await run(waiveAll, { overridePath: overrideFile({ ...goodOverride, approval: approvalUrl(1009) }) });
     ok(!waiveAllReport.ok && failed(waiveAllReport).some(l => /strict Release Candidate gates/.test(l)), 'an approved waiver of both evidence rows never waives the strict Release Candidate gates');
     const bound = await run(world());
@@ -430,7 +430,7 @@ const scratch = [];
     ok(wf.includes('name: cloud-reader-eval-${{ steps.candidate.outputs.sha }}') && readerArtifactName(SHA) === `cloud-reader-eval-${SHA}`, 'the artifact nominate() binds a reader report to is the one release-candidate.yml uploads');
   }
   {
-    const approved = (w, override = goodOverride, id = 1001, options = {}) => { w.approve(id, `Approved.\n${waiverMarker(SHA, override.waives)}\n`, options); return w; };
+    const approved = (w, override = goodOverride, id = 1001, options = {}) => { w.approve(id, `${waiverMarker(SHA, override.waives)}\nApproved.\n`, options); return w; };
     const waivedWorld = approved(world({ device: 'none', reader: 'none' }));
     const waived = await run(waivedWorld, { overridePath: overrideFile(goodOverride) });
     ok(waived.ok && waived.overrides.length === 2 && waived.overrides.every(o => o.by === 'Priya Example' && o.githubLogin === APPROVER && o.evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED') && waived.promotion.length > 0, 'a public-release override approved on GitHub by a repository admin waives both requirements by name and the nomination says so');
@@ -454,12 +454,28 @@ const scratch = [];
       const issueOverride = { ...goodOverride, waives: ['device-matrix'], approval: issueUrl(1501) };
       eq(loadOverride(overrideFile(issueOverride), SHA).problems.length, 0, 'an override may link an approving issue');
       const w = world({ device: 'android-blocked' });
-      w.approveIssue(1501, `Approved.\n${waiverMarker(SHA, ['device-matrix'])}`);
+      w.approveIssue(1501, `${waiverMarker(SHA, ['device-matrix'])}\nApproved.`);
       const viaIssue = await run(w, { overridePath: overrideFile(issueOverride) });
       ok(viaIssue.ok && viaIssue.overrides.length === 1 && /issues\/1501$/.test(viaIssue.overrides[0].approval), 'a waiver approved by an admin\'s unedited issue waives what it names');
       const edited = world({ device: 'android-blocked' });
       edited.approveIssue(1501, waiverMarker(SHA, ['device-matrix']), { edited: '2026-11-02T00:00:00Z' });
       ok(!(await run(edited, { overridePath: overrideFile(issueOverride) })).ok, 'an edited waiver issue waives nothing');
+      // Review of 2c35946fe: the line must lead the post, one post approves one thing, and closing an issue withdraws it.
+      const waiverRefused = async (name, body, options = {}) => {
+        const x = world({ device: 'android-blocked' });
+        x.approveIssue(1501, body, options);
+        ok(!(await run(x, { overridePath: overrideFile(issueOverride) })).ok, `a waiver issue ${name} waives nothing`);
+      };
+      await waiverRefused('whose waiver line sits under other text', `Approved.\n${waiverMarker(SHA, ['device-matrix'])}`);
+      await waiverRefused('whose waiver line is hidden in an HTML comment', `<!--\n${waiverMarker(SHA, ['device-matrix'])}\n-->`);
+      await waiverRefused('whose waiver line is in a code block', `\`\`\`\n${waiverMarker(SHA, ['device-matrix'])}\n\`\`\``);
+      await waiverRefused('that also holds the GO line', `${waiverMarker(SHA, ['device-matrix'])}\n${goMarker(SHA)}`);
+      await waiverRefused('that was closed', waiverMarker(SHA, ['device-matrix']), { state: 'CLOSED', closed: 1 });
+      await waiverRefused('that was closed and reopened', waiverMarker(SHA, ['device-matrix']), { closed: 2 });
+      await waiverRefused('whose state GitHub did not report', waiverMarker(SHA, ['device-matrix']), { state: null });
+      const leading = world({ device: 'android-blocked' });
+      leading.approve(1001, `   \n\n${waiverMarker(SHA, ['device-matrix'])}\nApproved.`);
+      ok((await run(leading, { overridePath: overrideFile({ ...goodOverride, waives: ['device-matrix'] }) })).ok, 'blank lines before the waiver line are not text: the line still leads the post');
     }
     {
       const w = approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { login: 'someone-else' });
@@ -468,9 +484,9 @@ const scratch = [];
     await refusedWith('an override approved by a bot account', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { type: 'Bot' }), goodOverride, /Bot account/);
     await refusedWith('an override whose approving comment was edited', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { updated: '2026-11-02T09:00:00Z' }), goodOverride, /edited after it was posted/);
     await refusedWith('an override approved before the commit existed (stale approval)', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { created: '2026-10-16T00:00:00Z' }), goodOverride, /predates the commit/);
-    await refusedWith('an override whose comment approves another SHA', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(OTHER, goodOverride.waives)); return w; })(), goodOverride, /does not contain the exact line/);
-    await refusedWith('an override whose comment approves fewer waivers than the file claims', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, ['reader-evidence'])); return w; })(), goodOverride, /does not contain the exact line/);
-    await refusedWith('an override whose comment approves a different target', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, goodOverride.waives).replace('deploy/production', 'deploy/staging')); return w; })(), goodOverride, /does not contain the exact line/);
+    await refusedWith('an override whose comment approves another SHA', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(OTHER, goodOverride.waives)); return w; })(), goodOverride, /does not start with the exact line/);
+    await refusedWith('an override whose comment approves fewer waivers than the file claims', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, ['reader-evidence'])); return w; })(), goodOverride, /does not start with the exact line/);
+    await refusedWith('an override whose comment approves a different target', (() => { const w = world({ device: 'none', reader: 'none' }); w.approve(1001, waiverMarker(SHA, goodOverride.waives).replace('deploy/production', 'deploy/staging')); return w; })(), goodOverride, /does not start with the exact line/);
     await refusedWith('an override whose approval link points at another repository', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, approval: 'https://github.com/evil/fork/issues/1#issuecomment-1001' }, /is in evil\/fork, not/);
     await refusedWith('an override whose comment id belongs to another issue', approved(world({ device: 'none', reader: 'none' }), goodOverride, 1001, { issue: 999 }), goodOverride, /does not belong to #686/);
     await refusedWith('an internal test-track exception at the release stage', approved(world({ device: 'none', reader: 'none' })), { ...goodOverride, scope: 'internal-test-track' }, /never approval for a public production release/);
@@ -561,7 +577,7 @@ const scratch = [];
     return r;
   }
   const dossier = (w, record, extra = {}) => buildDossier({ sha: SHA, record, git: w.git, gh: w.gh, ghGraphql: w.ghGraphql, fetchImpl: w.fetchImpl, fetchOrigin: false, deviceLedger: w.ledger, readerEvalDir: w.readerDir, now: NOW, ...extra });
-  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; w.approve(2001, `GO.\n${goMarker(SHA)}`, { created: '2026-11-04T15:00:00Z' }); w.approveIssue(3001, `${dataYesMarker(SHA)}\nYes for the Step 24 window.`, { created: '2026-11-04T08:30:00Z' }); return w; };
+  const frozen = () => { const w = world(); w.tip = SHA; w.staging.health.releaseIdentity.buildTimestamp = '2026-11-03T09:40:00.000Z'; w.approve(2001, `${goMarker(SHA)}\nGO.`, { created: '2026-11-04T15:00:00Z' }); w.approveIssue(3001, `${dataYesMarker(SHA)}\nYes for the Step 24 window.`, { created: '2026-11-04T07:30:00Z' }); return w; };
   const ready = await dossier(frozen(), fullRecord());
   ok(ready.verdict === 'GO-READY' && ready.reasons.length === 0, `a frozen, soaked, evidenced, signed and GO-recorded SHA is GO-READY (reasons: ${ready.reasons.join('; ')})`);
   ok(ready.rows.find(r => r.step === 28).ok === true && /GO by Priya Example \(Priysharan19, https:\/\/github\.com\/.*issuecomment-2001/.test(ready.rows.find(r => r.step === 28).detail) && ready.rows.find(r => r.step === 28).evidenceClass === 'GITHUB-ACCOUNT-AUTHENTICATED', 'the owner GO row names the person, the approving GitHub comment and its evidence class, and quotes the statement');
@@ -612,14 +628,31 @@ const scratch = [];
     const DATA_GATE = /Production database at this commit/;
     await noGo('the D27 data Yes is missing (typed PASS only)', r => { r.gates.data.approval = ''; }, DATA_GATE);
     await noGo('the data Yes approval issue does not exist', r => { r.gates.data.approval = issueUrl(3999); }, DATA_GATE);
-    await noGo('the data Yes issue was edited after it was opened', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T08:30:00Z', edited: '2026-11-04T09:00:00Z' }); });
-    await noGo('the data Yes issue was opened by a bot account', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T08:30:00Z', type: 'Bot' }); });
-    await noGo('the data Yes issue was opened by a non-admin', r => { r.gates.data.githubLogin = 'someone-else'; }, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T08:30:00Z', login: 'someone-else' }); });
-    await noGo('the data Yes names another SHA', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(OTHER), { created: '2026-11-04T08:30:00Z' }); });
-    await noGo('the data Yes carries the GO line instead', () => {}, DATA_GATE, w => { w.approveIssue(3001, goMarker(SHA), { created: '2026-11-04T08:30:00Z' }); });
+    await noGo('the data Yes issue was edited after it was opened', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T07:30:00Z', edited: '2026-11-04T09:00:00Z' }); });
+    await noGo('the data Yes issue was opened by a bot account', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T07:30:00Z', type: 'Bot' }); });
+    await noGo('the data Yes issue was opened by a non-admin', r => { r.gates.data.githubLogin = 'someone-else'; }, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T07:30:00Z', login: 'someone-else' }); });
+    await noGo('the data Yes names another SHA', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(OTHER), { created: '2026-11-04T07:30:00Z' }); });
+    await noGo('the data Yes carries the GO line instead', () => {}, DATA_GATE, w => { w.approveIssue(3001, goMarker(SHA), { created: '2026-11-04T07:30:00Z' }); });
     await noGo('the data Yes predates the candidate freeze', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-03T08:00:00Z' }); });
     await noGo('the data Yes is a pull request body (GraphQL has no such issue)', r => { r.gates.data.approval = issueUrl(3002); }, DATA_GATE);
     await noGo('the data Yes links an issue in another repository', r => { r.gates.data.approval = 'https://github.com/someone/fork/issues/3001'; }, DATA_GATE);
+    // Review of 2c35946fe.
+    await noGo('the data Yes came after the data gate was signed, so after the step it authorises', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T09:00:00Z' }); });
+    await noGo('the data Yes issue was closed (withdrawn)', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T07:30:00Z', state: 'CLOSED', closed: 1 }); });
+    await noGo('the data Yes issue was closed and reopened', () => {}, DATA_GATE, w => { w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T07:30:00Z', closed: 2 }); });
+    await noGo('the data Yes line sits under other text', () => {}, DATA_GATE, w => { w.approveIssue(3001, `Yes for the window.\n${dataYesMarker(SHA)}`, { created: '2026-11-04T07:30:00Z' }); });
+    await noGo('the data Yes line is hidden in an HTML comment', () => {}, DATA_GATE, w => { w.approveIssue(3001, `<!--\n${dataYesMarker(SHA)}\n-->`, { created: '2026-11-04T07:30:00Z' }); });
+    await noGo('one issue holds the data Yes and the GO', () => {}, DATA_GATE, w => { w.approveIssue(3001, `${dataYesMarker(SHA)}\n${goMarker(SHA)}`, { created: '2026-11-04T07:30:00Z' }); });
+    await noGo('the data Yes hides a second approval inline', () => {}, DATA_GATE, w => { w.approveIssue(3001, `${dataYesMarker(SHA)}\nOK <!-- ${waiverMarker(SHA, ['device-matrix'])} -->`, { created: '2026-11-04T07:30:00Z' }); });
+    await noGo('the data Yes link has a leading zero', r => { r.gates.data.approval = r.gates.data.approval.replace('/issues/3001', '/issues/03001'); }, DATA_GATE);
+    await noGo('the GO comment buries its line under other text', () => {}, /owner GO for exactly this SHA/, w => { w.approve(2001, `GO.\n${goMarker(SHA)}`, { created: '2026-11-04T15:00:00Z' }); });
+    {
+      // The data Yes on the gate's own minute still holds: before the step means no later than the sign-off.
+      const w = frozen();
+      w.approveIssue(3001, dataYesMarker(SHA), { created: '2026-11-04T08:00:00Z' });
+      const onTheMinute = await dossier(w, fullRecord());
+      ok(onTheMinute.rows.find(row => DATA_GATE.test(row.label))?.ok === true, 'a data Yes posted at the minute the gate was signed still holds');
+    }
     {
       const viaIssue = frozen();
       viaIssue.approveIssue(3010, `${goMarker(SHA)}\nGO for exactly this SHA.`, { created: '2026-11-04T15:00:00Z' });
@@ -633,6 +666,7 @@ const scratch = [];
     await noGo('the GO issue was edited', r => { r.go.approval = issueUrl(3011); }, /owner GO for exactly this SHA/, w => { w.approveIssue(3011, goMarker(SHA), { created: '2026-11-04T15:00:00Z', edited: '2026-11-04T16:00:00Z' }); });
     await noGo('the GO issue was opened before the soak ended', r => { r.go.approval = issueUrl(3012); }, /owner GO for exactly this SHA/, w => { w.approveIssue(3012, goMarker(SHA), { created: '2026-11-04T10:00:00Z' }); });
     ok(approvalLinkShape(issueUrl(5)) && approvalLinkShape(approvalUrl(5)) && !approvalLinkShape(`https://github.com/${DEFAULT_REPO_FOR_TESTS}/pull/5`) && !approvalLinkShape('https://example.com/issues/5'), 'an approval links a comment or an issue of a GitHub repository, nothing else');
+    ok(!approvalLinkShape(`https://github.com/${DEFAULT_REPO_FOR_TESTS}/issues/0686`) && !approvalLinkShape(`https://github.com/${DEFAULT_REPO_FOR_TESTS}/issues/0`) && !approvalLinkShape(`https://github.com/${DEFAULT_REPO_FOR_TESTS}/issues/686#issuecomment-0123`), 'an approval link names its number the one way GitHub writes it (no leading zero)');
     eq(recordTemplate(SHA).gates.data.approval, '', 'the record template asks for the data Yes approval link');
     eq(dataYesMarker(SHA), `Pri-Production-Data-YES: ${SHA} target=production-postgres`, 'the data Yes line');
     // The owner's one-click links decode to exactly the lines the tools require.
