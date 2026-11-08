@@ -473,6 +473,20 @@ const scratch = [];
       await waiverRefused('that was closed', waiverMarker(SHA, ['device-matrix']), { state: 'CLOSED', closed: 1 });
       await waiverRefused('that was closed and reopened', waiverMarker(SHA, ['device-matrix']), { closed: 2 });
       await waiverRefused('whose state GitHub did not report', waiverMarker(SHA, ['device-matrix']), { state: null });
+      await waiverRefused('whose closings GitHub did not report', waiverMarker(SHA, ['device-matrix']), { closed: null });
+      await waiverRefused('whose waiver line is an indented code block', `    ${waiverMarker(SHA, ['device-matrix'])}`);
+      await waiverRefused('whose waiver line follows a tab', `\t${waiverMarker(SHA, ['device-matrix'])}`);
+      {
+        const x = world({ device: 'android-blocked' });
+        x.approveIssue(1501, waiverMarker(SHA, ['device-matrix']));
+        delete x.issues.get(1501).lastEditedAt;
+        ok(!(await run(x, { overridePath: overrideFile(issueOverride) })).ok, 'a waiver issue whose edit time GitHub did not report waives nothing (counted as edited)');
+      }
+      {
+        const x = world({ device: 'android-blocked' });
+        x.approveIssue(1501, `  ${waiverMarker(SHA, ['device-matrix'])}\nApproved.`);
+        ok((await run(x, { overridePath: overrideFile(issueOverride) })).ok, 'two spaces before the line are not a code block: the line still leads the post');
+      }
       const leading = world({ device: 'android-blocked' });
       leading.approve(1001, `   \n\n${waiverMarker(SHA, ['device-matrix'])}\nApproved.`);
       ok((await run(leading, { overridePath: overrideFile({ ...goodOverride, waives: ['device-matrix'] }) })).ok, 'blank lines before the waiver line are not text: the line still leads the post');

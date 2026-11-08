@@ -295,7 +295,7 @@ export async function buildDossier({
     go.decision === 'GO'
       ? (goOk ? `GO by ${goBy} (${goAuth.login}, ${goAuth.url} at ${new Date(approvedAt).toISOString()}): ${String(go.statement).trim()}`
         : `GO recorded but ${[String(go.sha || '').toLowerCase() !== expected ? `for sha ${go.sha || '(none)'}, not this one` : null, !goBy ? 'go.by does not name a human' : null, goAt === null ? 'go.at is not an ISO date-time' : null, goAt !== null && goAt > now ? 'go.at is in the future' : null, !String(go.statement || '').trim() ? 'go.statement is empty' : null, goAuth && !goAuth.ok ? `the GitHub approval does not hold: ${goAuth.problems.join('; ')}` : null, goPremature ? `the GitHub approval (${new Date(approvedAt).toISOString()}) predates ${soakEnd !== null && approvedAt < soakEnd ? 'the end of the soak' : 'the candidate freeze'}: a GO given before the evidence existed is stale` : null].filter(Boolean).join('; ')}`)
-      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file and as a GitHub comment, for this exact SHA',
+      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file and as a GitHub post (an issue from the prefilled link, or a comment), for this exact SHA',
     { who: goBy || '', evidenceClass: go.decision === 'GO' ? APPROVAL_EVIDENCE_CLASS : '' });
 
   // ── step 30: after the promotion, the pipeline works unaided ───────────────

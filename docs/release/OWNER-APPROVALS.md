@@ -22,8 +22,9 @@ them.
   new one; never edit;
 - for an issue: **open, and never closed**. Closing an approval issue withdraws the approval, and
   one that is closed and reopened is not taken back. Nobody but the owner closes an approval issue;
-- whose **first line** is the approval's line exactly (blank lines before it are fine). Under other
-  text, in an HTML comment or in a code block it is refused. A second line may say more, but **one
+- whose **first line** is the approval's line exactly, not indented (blank lines before it are
+  fine). Under other text, in an HTML comment, in a code block or indented by four spaces it is
+  refused. A second line may say more, but **one
   post approves one thing**: a post that holds two approval lines approves nothing.
 
 **Evidence class: GITHUB-ACCOUNT-AUTHENTICATED.** GitHub proves the account, not the person: an

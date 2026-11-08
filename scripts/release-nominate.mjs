@@ -108,7 +108,7 @@ const APPROVAL_LINE = /Pri-(?:Release-GO|Production-Data-YES|Evidence-Waiver):/g
 /** True for a link verifyApproval can read: an issue or PR comment, or an issue. */
 export function approvalLinkShape(url) { return APPROVAL_URL.test(String(url || '').trim()) || ISSUE_APPROVAL_URL.test(String(url || '').trim()); }
 
-/** The exact line an evidence waiver's approval comment must contain. */
+/** The exact line an evidence waiver's approval (a comment or an issue) must start with. */
 export function waiverMarker(sha, waives) {
   return `Pri-Evidence-Waiver: ${sha} scope=public-release target=${RELEASE_TARGET} waives=${[...new Set(waives.map(String))].sort().join(',')}`;
 }
@@ -172,11 +172,14 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
     author = String(issue.author?.login || '');
     type = issue.author?.__typename || '';
     createdText = issue.createdAt || '';
-    edited = issue.lastEditedAt !== null && issue.lastEditedAt !== undefined;
+    // An answer without lastEditedAt says nothing about edits, so it counts as edited.
+    edited = !Object.hasOwn(issue, 'lastEditedAt') || issue.lastEditedAt !== null;
     body = issue.body || '';
     // Closing an approval issue withdraws it; one closed and reopened is not taken back either.
+    const closings = issue.timelineItems?.totalCount;
     if (issue.state !== 'OPEN') problems.push(`approval issue #${number} is ${String(issue.state || 'in an unknown state').toLowerCase()}: closing an approval issue withdraws it; open a new one`);
-    else if (issue.timelineItems?.totalCount !== 0) problems.push(`approval issue #${number} was closed and reopened; a withdrawn approval is not taken back: open a new one`);
+    else if (!Number.isInteger(closings)) problems.push(`GitHub did not say whether approval issue #${number} was ever closed; it is refused`);
+    else if (closings !== 0) problems.push(`approval issue #${number} was closed and reopened; a withdrawn approval is not taken back: open a new one`);
   }
   if (author.toLowerCase() !== login.toLowerCase()) problems.push(`${what} was written by ${author || '(unknown)'}, not ${login}`);
   if (type !== 'User') problems.push(`${what} author is a ${type || 'unknown'} account, not a person's User account`);
@@ -186,7 +189,9 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
     if (edited) problems.push(`${what} was edited after it was posted; post a new ${kind} rather than editing one`);
     if (created > now) problems.push(`${what} is dated in the future`);
   }
-  const first = String(body).split(/\r?\n/).map(line => line.trim()).find(line => line !== '');
+  // The first line with text, as written: four spaces or a tab before it would make it a code block.
+  const firstRaw = String(body).split(/\r?\n/).find(line => line.trim() !== '');
+  const first = firstRaw !== undefined && !/^(?: {4}|\t)/.test(firstRaw) ? firstRaw.trim() : null;
   const approvalLines = (String(body).match(APPROVAL_LINE) || []).length;
   if (first !== marker) problems.push(`${what} does not start with the exact line: ${marker}`);
   if (approvalLines > 1) problems.push(`${what} holds ${approvalLines} approval lines; one post approves one thing`);

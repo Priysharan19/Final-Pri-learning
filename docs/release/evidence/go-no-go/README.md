@@ -7,7 +7,7 @@ dossier that close issue #686 steps 25, 27, 28 and 30 (`docs/operations/postgres
 | File | Written by | Holds |
 |---|---|---|
 | `<sha>.json` | people, starting from `node scripts/release-dossier.mjs template <sha>` | the facts only people supply: when the candidate was frozen and by whom, the soak window and who watched it, the staging-acceptance run and its tester, each external gate's sign-off (examiner, counsel, security, native build, store, production data) with the name and the evidence, and the owner's **GO** or **NO-GO** for exactly this SHA |
-| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub comment that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
+| `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub post (an issue or a comment) that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
 | `<sha>.md` | `node scripts/release-dossier.mjs <sha>` | the dossier: every machine check (nomination, Release Staging Proof on the SHA, merge freeze, staging build time), every evidence ledger row for the SHA (device matrix, reader evaluation), every gate with its person, and the verdict |
 
 ## Approvals are GitHub posts, not names in a file
@@ -24,8 +24,9 @@ GitHub and refuses it unless:
   or post a new comment, instead of editing one; an issue's edit is read from GitHub's
   `lastEditedAt`, a comment's from `updated_at`);
 - an issue is **open and has never been closed**: closing an approval issue withdraws it;
-- its **first line** is exactly the line below (under other text, in an HTML comment or in a code
-  block it is refused), and it holds no other approval line, so one post approves one thing:
+- its **first line** is exactly the line below (under other text, in an HTML comment, in a code
+  block or indented by four spaces it is refused), and it holds no other approval line, so one post
+  approves one thing:
   - for a waiver: `Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted, comma-separated list>`
   - for the GO: `Pri-Release-GO: <sha> target=deploy/production`
   - for the production-data Yes: `Pri-Production-Data-YES: <sha> target=production-postgres`
@@ -67,7 +68,7 @@ not a signed gate for the next (`PRI_V1_RELEASE_SCOPE.md` §21).
 - **real-human** — a cloud-reader evaluation against the live provider (`tools/ink-cloud-reader-eval.mjs`); a dry run is labelled synthetic and never counts. For a release it must clear Gate C's floors (≥ 20 test-split writers, ≥ 1,000 expressions, ≥ 98% exact with every provider error counted as a misread, ≥ 99.5% characters, ≥ 90% worst writer; `READER_FLOORS` in `scripts/release-nominate.mjs`, the same numbers `client/test/ink-release-evidence-gate.mjs` enforces) and be the `cloud-reader-eval-<sha>` artifact of the exact-SHA `Release Candidate` run, measured inside that run. The tool checks the artifact exists and the times agree; it cannot compare the file's bytes to the artifact, so the reviewer downloads it with `gh run download <run> -n cloud-reader-eval-<sha>` rather than accepting a file handed over.
 - **Release Candidate** — `release-candidate.yml`, run on exactly the nominated SHA: GitHub attributes the run to the SHA, the run is named `Release Candidate · <sha>` (the commit both jobs check out and verify), and both blocking jobs end `success`. A run dispatched with another `release_sha` is a diagnostic for that commit, never evidence for this one. No override waives it.
 - **person** — a sign-off, soak watch or acceptance run, each with the name recorded (a typed name: the generator checks it is not an agent or placeholder, it cannot prove who typed it). The generator verifies the record; it never supplies a name, a result or a decision.
-- **GITHUB-ACCOUNT-AUTHENTICATED** — the owner's GO and any evidence waiver, each a GitHub comment by a repository admin (above).
+- **GITHUB-ACCOUNT-AUTHENTICATED** — the owner's GO, the owner's production-data Yes and any evidence waiver, each a GitHub post (an issue or a comment) by a repository admin (above).
 
 Nothing here is a store submission, a legal opinion, an examiner result or a benchmark claim;
 the rows only record that such a result was given, by whom and where it lives.
