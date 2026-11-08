@@ -34,6 +34,7 @@ import {
 } from '../src/ink/readerPermission.js';
 import { readerBlock, readPhotoWithCloud, readWithCloud } from '../src/ink/cloudReader.js';
 import { identifyQuestionPhoto, PHOTO_STATES } from '../src/lib/questionPhoto.js';
+import { modalCoversInk, OFFSCREEN_CLIP } from '../src/ink/native.js';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 
@@ -273,6 +274,34 @@ for (const answer of [PROMPT_ANSWER.DECLINED, PROMPT_ANSWER.DISMISSED, PROMPT_AN
   ok(readNow.indexOf('askReaderPermission(') > 0 && readNow.indexOf('askReaderPermission(') < readNow.indexOf("setStatus({ kind: 'reading' })"),
     'InkAnswer asks before it says "Reading…"');
   ok(readNow.indexOf('const strokes = strokesRef.current;') > readNow.indexOf('askReaderPermission('), 'and reads the page as it stands after the answer, not as it stood when the prompt opened');
+}
+
+// ── 6 · The native surface steps out of the prompt's way ────────────────────
+// On iPhone and iPad the PencilKit surface is a native view ABOVE the web
+// page: a web dialog would sit under the student's ink and, with finger
+// drawing on, under their finger. While a modal dialog is open the surface is
+// clipped to a 1×1 rect outside the view (an EMPTY clip means "the whole view"
+// to InkBridge.placement), and it is laid out again when the prompt opens or
+// closes.
+{
+  const inkOutside = { closest: () => null };
+  const inkInside = { closest: sel => (sel === '[aria-modal="true"]' ? {} : null) };
+  const withModal = { querySelector: sel => (sel === '[aria-modal="true"]' ? {} : null) };
+  const withoutModal = { querySelector: () => null };
+  ok(modalCoversInk(inkOutside, withModal) === true, 'a modal dialog open over the writing area covers the native ink');
+  ok(modalCoversInk(inkOutside, withoutModal) === false, 'with no modal dialog open the native ink is where the page says');
+  ok(modalCoversInk(inkInside, withModal) === false, 'a writing area inside the dialog itself is not covered by it');
+  ok(modalCoversInk(inkOutside, null) === false, 'outside a browser nothing is covered');
+  ok(OFFSCREEN_CLIP.w > 0 && OFFSCREEN_CLIP.h > 0 && OFFSCREEN_CLIP.x + OFFSCREEN_CLIP.w <= 0 && OFFSCREEN_CLIP.y + OFFSCREEN_CLIP.h <= 0,
+    'the clip is not empty (an empty clip is the whole view to the shell) and lies wholly outside the view');
+  const bridge = read('ios/PriLearning.swiftpm/Ink/InkBridge.swift');
+  ok(/let clipPts = clip\.isEmpty \? viewBounds :/.test(bridge), 'the shell still reads an empty clip as the whole view — which is why the clip is 1×1, not 0×0');
+  const nativeSrc = read('client/src/ink/native.js');
+  ok(/clip: modalCoversInk\(element\) \? \{ \.\.\.OFFSCREEN_CLIP \}/.test(nativeSrc), 'every mount and layout the page reports uses that clip while a modal is open');
+  const canvas = read('client/src/ink/NativeInkCanvas.jsx');
+  const host = read('client/src/ink/ReaderPermission.jsx');
+  ok(/addEventListener\(MODAL_EVENT, schedule\)/.test(canvas) && /removeEventListener\(MODAL_EVENT, schedule\)/.test(canvas), 'the native canvas lays itself out again when a modal opens or closes');
+  ok(/dispatchEvent\(new Event\(MODAL_EVENT\)\)/.test(host) && /\}, \[open\]\);/.test(host), 'the prompt says so each time it opens and closes');
 }
 
 if (failures.length) {

@@ -43,6 +43,24 @@ if (typeof window !== 'undefined') priNative.ink.onMessage(receiveInk);
 
 const post = message => priNative.ink.post(message);
 
+/**
+ * A modal dialog is open on the page and the writing area is not inside it.
+ * The native PencilKit surface sits ABOVE the web view, so a dialog the page
+ * draws (the D17 permission prompt, the question peek) would sit under the
+ * student's ink and, with finger drawing on, under their finger too. While one
+ * is open the surface is clipped away (OFFSCREEN_CLIP) and the dialog is what
+ * the student sees and touches; the strokes are kept and come back with it.
+ */
+export function modalCoversInk(element, doc = typeof document === 'undefined' ? null : document) {
+  const modal = doc?.querySelector?.('[aria-modal="true"]');
+  if (!modal) return false;
+  return !(element?.closest?.('[aria-modal="true"]'));
+}
+
+// A 1×1 clip outside the view. Not an empty rect: the shell reads an empty
+// clip as "the whole view" (InkBridge.placement).
+export const OFFSCREEN_CLIP = Object.freeze({ x: -2, y: -2, w: 1, h: 1 });
+
 /** Where the writing area is, and how much of it the shell may draw in. */
 function geometryOf(element) {
   const rect = element.getBoundingClientRect();
@@ -74,7 +92,7 @@ function geometryOf(element) {
 
   return {
     frame: { x: rect.left, y: rect.top, w: rect.width, h: rect.height },
-    clip: { x: left, y: top, w: Math.max(0, right - left), h: Math.max(0, bottom - top) },
+    clip: modalCoversInk(element) ? { ...OFFSCREEN_CLIP } : { x: left, y: top, w: Math.max(0, right - left), h: Math.max(0, bottom - top) },
     scrollX: window.scrollX || 0,
     scrollY: window.scrollY || 0
   };

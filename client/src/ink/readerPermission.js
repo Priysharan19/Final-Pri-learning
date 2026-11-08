@@ -43,6 +43,13 @@ export const PROMPT_ANSWER = Object.freeze({
   UNAVAILABLE: 'unavailable'
 });
 
+/**
+ * Dispatched on window when the prompt opens or closes: the native PencilKit
+ * surface (drawn above the web view) is laid out again, out of the dialog's
+ * way while it is open (native.js modalCoversInk).
+ */
+export const MODAL_EVENT = 'pri:modal-change';
+
 /** What is being read, so the prompt can say it in the student's terms. */
 export const READ_KINDS = Object.freeze(['ink', 'photo', 'question-photo']);
 

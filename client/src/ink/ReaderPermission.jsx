@@ -22,7 +22,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
-import { PROMPT_ANSWER, setReaderPermissionPrompt } from './readerPermission.js';
+import { MODAL_EVENT, PROMPT_ANSWER, setReaderPermissionPrompt } from './readerPermission.js';
 
 const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
@@ -64,6 +64,12 @@ export default function ReaderPermissionHost() {
       .then(r => { if (r?.user && String(r.user.id) === String(userRef.current?.id)) setUser?.(r.user); })
       .catch(() => { /* the recorded decline already stops reading */ });
   }, [setUser]);
+
+  // The native PencilKit surface is drawn above the page: it steps out of the
+  // dialog's way while the dialog is open, and comes back when it closes.
+  useEffect(() => {
+    try { window.dispatchEvent(new Event(MODAL_EVENT)); } catch { /* no window */ }
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;

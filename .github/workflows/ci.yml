@@ -246,7 +246,7 @@ jobs:
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 71: client/src/ink/ReaderPermission.jsx, the D17 prompt before the first read (L4).
           grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 71 files scanned, 0 hard-coded strings' suites.log
-          grep -Fq 'READER PERMISSION (D17): PASS — 113/113 checks' suites.log
+          grep -Fq 'READER PERMISSION (D17): PASS — 122/122 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
