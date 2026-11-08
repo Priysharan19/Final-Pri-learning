@@ -56,6 +56,13 @@ const MUTATION = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // ends the caller's own sessions: each attempt needs a live session, so the
 // actor signs in again before every call (login has its own IP bucket).
 const SESSION_ENDING = new Set(['logout-all']);
+// The staging test mailbox's limiter is reachable only while the mailbox is on
+// (staging, or the test harness: NODE_ENV=test with no Railway variable) and
+// only for a reserved address; otherwise the route is /v1's ordinary 404 before
+// any limiter (server/platform/testMailbox.js). Its bucket alone is measured
+// with the harness switch on and a reserved address, both restored after.
+const QUERY = { 'test-mailbox': `?to=${encodeURIComponent('abuse.limit@e2e.prilearning.test')}` };
+const SCOPED_ENV = { 'test-mailbox': { NODE_ENV: 'test' } };
 
 try {
   // ── Every declared limiter bucket, exercised to its edge ─────────────────
@@ -77,6 +84,9 @@ try {
     await resetLimits();
     let firstLimited = null;
     let lastResponse = null;
+    const savedEnv = Object.fromEntries(Object.keys(SCOPED_ENV[key] || {}).map(name => [name, process.env[name]]));
+    Object.assign(process.env, SCOPED_ENV[key] || {});
+    try {
     for (let i = 1; i <= limit.limit + 1; i += 1) {
       const body = route.path === '/v1/account/login'
         ? { email: `nobody.${key}.${i}@example.test`, password: 'wrong-password' }
@@ -88,9 +98,12 @@ try {
         if (signedIn.status !== 200) throw new Error(`re-login for ${key}: ${signedIn.status}`);
         jar = fresh;
       }
-      const r = await h.request(concrete(route.path), { method: route.method, jar: { ...jar }, body });
+      const r = await h.request(concrete(route.path) + (QUERY[key] || ''), { method: route.method, jar: { ...jar }, body });
       lastResponse = r;
       if (r.status === 429 && r.data?.error?.code === 'RATE_LIMITED') { firstLimited = i; break; }
+    }
+    } finally {
+      for (const [name, value] of Object.entries(savedEnv)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
     }
     if (firstLimited !== limit.limit + 1) {
       failures.push(`${key} (${route.method} ${route.path}): declared ${limit.limit}/${limit.windowMs}ms, first RATE_LIMITED at ${firstLimited} (last ${lastResponse?.status} ${lastResponse?.data?.error?.code || ''})`);
