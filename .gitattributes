@@ -1,4 +1,4 @@
-# Pri Learning builds and tracked native web bundles must be byte-stable across OSes.
+# Pri Learning builds and the generated native web bundles must be byte-stable across OSes.
 * text=auto
 
 *.html text eol=lf

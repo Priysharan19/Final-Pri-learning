@@ -53,8 +53,9 @@ Keep it draft until it is retired/closed under a separately reviewed plan.
    workflow; a maintainer may also dispatch it on `main` for an exact SHA.
 3. Proof workflow uses read-only permissions, does not use release secrets, and
    checks out that SHA. It requires the candidate to be on `origin/main`.
-   It retries for up to roughly six minutes because Railway staging may
-   be rolling out independently. `tools/verify-deployment.mjs` requires
+   It retries every 30 seconds until 50 minutes have passed, inside the
+   job's 60-minute limit, because Railway staging rolls out independently and on 22 October 2026
+   the build landed 34 minutes after the merge. `tools/verify-deployment.mjs` requires
    server and web release identities to agree, healthy/readiness endpoints,
    PostgreSQL schema and billing versions to match that checkout, and email
    provider readiness. It fails on old/new mismatched SHA.
@@ -133,7 +134,8 @@ In a clean checkout, after all approvals have been independently recorded:
 
 ```bash
 git fetch origin main deploy/production
-node scripts/release-nominate.mjs <nominated-full-sha> --json
+node scripts/release-nominate.mjs <nominated-full-sha> --json      # release stage: exact-SHA Release Candidate run, device matrix and reader evidence for this SHA (an approved override waives an evidence row, never the Release Candidate gates)
+node scripts/release-dossier.mjs <nominated-full-sha>              # must print DOSSIER: GO-READY with the owner's GO for this SHA
 git merge-base --is-ancestor <nominated-full-sha> origin/main
 git merge-base --is-ancestor origin/deploy/production <nominated-full-sha>
 # RELEASE AUTHORIZATION REQUIRED HERE — no automatic push is configured.

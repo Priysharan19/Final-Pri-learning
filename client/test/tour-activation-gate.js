@@ -243,6 +243,10 @@ export const flow = {
 
       // a guardian's withdrawal relocks the app on the server's say-so
       platform.h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), minor.id);
+      // A synthetic event alone does not make a background WebKit tab visible:
+      // the app correctly rechecks only while document.visibilityState is visible.
+      // Exercise a real foreground transition before requesting the recheck.
+      await child.bringToFront();
       await child.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
       await child.locator(`${GATE}[data-activation-status="blocked"]`).waitFor({ timeout: 20000 }).catch(() => {});
       await check('a guardian\'s withdrawal, noticed on the next recheck, closes the app: the "needs attention" screen, nothing to tap around',

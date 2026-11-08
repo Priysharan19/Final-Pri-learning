@@ -335,7 +335,10 @@ const SECRET = [
   /PRI_CSRF_SECRET/, /RAZORPAY_KEY_SECRET/,
 ];
 const shellFiles = [
-  // The tracked web bundle under Resources/Web ships inside the app, so it is scanned too.
+  // The web bundle under Resources/Web ships inside the app. It is generated
+  // from client/dist and not tracked (decision D28), so it is scanned here
+  // whenever a sync has run; the CI build job scans client/dist itself, which
+  // check:ios proves byte-identical to both bundles.
   ...walk(at('ios'), n => /\.(swift|plist|entitlements|json|xcconfig|m|mm|h|strings|js|html|webmanifest)$/.test(n)),
   ...walk(at('android'), n => /\.(kt|java|xml|gradle|kts|properties|json)$/.test(n)),
 ];
