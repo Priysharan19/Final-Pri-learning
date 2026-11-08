@@ -45,7 +45,7 @@ import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
 

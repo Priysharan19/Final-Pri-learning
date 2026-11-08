@@ -449,8 +449,9 @@ let platformForWalk = null;
  * A student inside the app, made as a student makes one: the landing card,
  * the server's emailed code, name, age and agreement, class — then the gate
  * (support/verified-onboarding.mjs). On a device with saved profiles the
- * picker offers another Pri account through the same card. The NSW Year 10
- * syllabus the walk audits is chosen afterwards in Settings, by the fixture.
+ * picker offers another Pri account through the same card. The walk audits
+ * a CBSE Class 10 student, the class chosen on the card (V1 is India only,
+ * D2; the server issues no NSW bank, D15).
  */
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
@@ -458,7 +459,7 @@ async function signInToDemo(page, base) {
   await wait(page, 500);
   if (await page.locator('.shell').count()) return;
   const fromPicker = await page.getByTestId('picker-create-account').count() > 0;
-  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'nsw', fromPicker, landing: 'home' });
+  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'in', fromPicker, landing: 'home' });
   await wait(page, 900);
 }
 

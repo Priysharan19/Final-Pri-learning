@@ -25,7 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 12;
 
@@ -240,7 +240,10 @@ export const flow = {
     }
 
     // ── 7 · a question that comes with a diagram ─────────────────────────────
-    await page.goto(`${base}/practice?subtopic=y9-pythagoras`, { waitUntil: 'domcontentloaded' });
+    // CBSE Class X "Some Applications of Trigonometry": every form is a
+    // right-triangle heights-and-distances question drawn with its own figure
+    // (the India chapter that replaced NSW Year 9 Pythagoras here, D2/D15).
+    await page.goto(`${base}/practice?subtopic=c10-trig-applications`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     let figure = false;
     for (let i = 0; i < 6 && !figure; i++) {
@@ -251,7 +254,7 @@ export const flow = {
       await settle();
     }
     await check('a geometry question draws its own figure', figure,
-      'six Pythagoras questions and not one of them rendered an SVG figure');
+      'six heights-and-distances questions and not one of them rendered an SVG figure');
 
     // ── 8 · a connection lost mid-lesson never erases the open lesson ────────
     // Only the server lets a profile in (issue #477): an app OPENED offline is

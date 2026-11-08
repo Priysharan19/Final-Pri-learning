@@ -142,13 +142,11 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   const { createPlatformDb } = await import('../../../server/platform/db.js');
   const sms = await import('../../../server/platform/smsProvider.js');
   const db = createPlatformDb(join(dir, 'platform.sqlite'));
-  // D15: a production server never issues a bank outside the India covers
-  // (server/platform/indiaBanks.js; pinned by server/test/india-banks-check.mjs).
-  // The browser suites still sign their students up on the NSW course by
-  // default (support/verified-onboarding.mjs, course = 'nsw'), so the questions
-  // they open come from NSW banks. Until they move to the India course (L8),
-  // this harness says so here, in one place. Refused in production.
-  (await import('../../../server/platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
+  // D15: this platform is the production server, and it issues only the
+  // India covers' banks (server/platform/indiaBanks.js). The browser suites
+  // sign every student up on the India course (support/verified-onboarding.mjs),
+  // so nothing here allows another bank; tour-online-check.js proves an NSW
+  // bank is refused through this harness.
   const h = await harness.startApp({ db, dist });
 
   /**
