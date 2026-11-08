@@ -125,7 +125,7 @@ export async function queueAccountToken(db, accountId, destination, purpose, now
   return tokenId;
 }
 
-async function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
+export async function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
   await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND kind = ? AND delivered_at IS NULL', [accountId, purpose]);
   await db.run(`UPDATE account_tokens SET consumed_at = ?
     WHERE account_id = ? AND purpose = ? AND consumed_at IS NULL`, [now, accountId, purpose]);

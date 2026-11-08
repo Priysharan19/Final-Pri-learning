@@ -80,6 +80,9 @@ export const ENGINE_SUITES = [
   'password-set-check.mjs',
   'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // A parent who approves by email code is sent the long-lived withdrawal
+  // credential, as the link path does (otp.js /guardian/approve).
+  'guardian-code-approval-withdraw-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
