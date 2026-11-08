@@ -10,20 +10,25 @@ dossier that close issue #686 steps 25, 27, 28 and 30 (`docs/operations/postgres
 | `<sha>.override.json` | a named human, only when a **public** release goes without a piece of evidence (for the device matrix: a founder-approved platform scope change) | `{ "sha", "scope": "public-release", "waives": ["device-matrix" \| "reader-evidence"], "by", "githubLogin", "approval", "at", "reason" }` — read by `scripts/release-nominate.mjs --override` and copied into the dossier; never silent. The file is not the authority: `approval` links a GitHub comment that must hold (see below). An `"internal-test-track"` exception (TestFlight / Play internal) never waives release-stage evidence |
 | `<sha>.md` | `node scripts/release-dossier.mjs <sha>` | the dossier: every machine check (nomination, Release Staging Proof on the SHA, merge freeze, staging build time), every evidence ledger row for the SHA (device matrix, reader evaluation), every gate with its person, and the verdict |
 
-## Approvals are GitHub comments, not names in a file
+## Approvals are GitHub posts, not names in a file
 
-A waiver and the owner's GO each link one comment on an issue or PR of this repository
-(`…/issues/<n>#issuecomment-<id>`). The generator reads it from GitHub and refuses it unless:
+A waiver, the owner's GO and the owner's production-data Yes (D27, the `data` gate) each link one
+GitHub post in this repository: an issue (`…/issues/<n>`, which a prefilled link makes one click) or
+a comment on an issue or PR (`…/issues/<n>#issuecomment-<id>`). `docs/release/OWNER-APPROVALS.md`
+gives each one's exact line, link template and record fields. The generator reads the post from
+GitHub and refuses it unless:
 
 - its author is the `githubLogin` the record names, a **User** account (not a bot) with **admin**
   permission on the repository;
-- it was posted **after the commit** it approves and has **never been edited** (post a new
-  comment instead of editing one);
+- it was posted **after the commit** it approves and has **never been edited** (open a new issue,
+  or post a new comment, instead of editing one; an issue's edit is read from GitHub's
+  `lastEditedAt`, a comment's from `updated_at`);
 - it contains, as a line of its own, exactly
   - for a waiver: `Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted, comma-separated list>`
   - for the GO: `Pri-Release-GO: <sha> target=deploy/production`
-- for the GO only: it was posted **after the soak ended and after the candidate was frozen** — a GO
-  given before the evidence existed is stale.
+  - for the production-data Yes: `Pri-Production-Data-YES: <sha> target=production-postgres`
+- for the GO: it was posted **after the soak ended and after the candidate was frozen** — a GO
+  given before the evidence existed is stale; for the data Yes: after the candidate was frozen.
 
 **Evidence class: GITHUB-ACCOUNT-AUTHENTICATED.** GitHub proves which account posted the comment,
 not which person: any process holding that account's token — including an AI agent working on the

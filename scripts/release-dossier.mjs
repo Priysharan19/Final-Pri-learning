@@ -18,7 +18,11 @@
 //     BLOCKED-EXTERNAL) and the real-human reader evaluation naming the SHA;
 //   · step 23 — the gates only people can close (examiner, counsel, security,
 //     native build, store, production data), each PASS with a named person or
-//     else NO-GO;
+//     else NO-GO. The production-data gate is the owner's D27 Yes for the
+//     cutover window, so it is authenticated like the GO: gates.data.approval
+//     links a GitHub comment or issue by a repository admin, unedited, posted
+//     after the commit and the freeze, holding the line
+//     `Pri-Production-Data-YES: <sha> target=production-postgres`;
 //   · step 28 — the owner's GO, recorded in the record for exactly this SHA by
 //     a named human AND posted as a GitHub comment by a repository admin that
 //     contains the line `Pri-Release-GO: <sha> target=deploy/production`
@@ -55,7 +59,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
   APPROVAL_EVIDENCE_CLASS, DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, GREEN, PRODUCTION_ORIGIN, STAGING_ORIGIN,
-  deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
+  dataYesMarker, defaultGhGraphql, deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
 } from './release-nominate.mjs';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, reportMarkdown } from './device-matrix-record.mjs';
 
@@ -86,7 +90,7 @@ export function recordTemplate(sha) {
     stagingProof: { result: '', runUrl: '', at: '' },
     soak: { startedAt: '', endedAt: '', watchedBy: '', incidents: 'none', mergeFreezeDeclaredBy: '' },
     acceptance: { result: '', report: '', tester: '', at: '' },
-    gates: Object.fromEntries(EXTERNAL_GATES.map(g => [g.id, { ...gate }])),
+    gates: Object.fromEntries(EXTERNAL_GATES.map(g => [g.id, g.id === 'data' ? { ...gate, githubLogin: '', approval: '' } : { ...gate }])),
     overrides: null,
     reviews: [],
     go: { decision: null, by: '', githubLogin: '', approval: '', at: '', sha, statement: '' }
@@ -168,6 +172,7 @@ export async function buildDossier({
   fetchOrigin = true,
   git = defaultGit,
   gh = defaultGh,
+  ghGraphql = defaultGhGraphql,
   fetchImpl = globalThis.fetch,
   nominateImpl = nominate,
   now = Date.now()
@@ -190,7 +195,7 @@ export async function buildDossier({
 
   // ── nomination at the release stage ────────────────────────────────────────
   const overridePath = rec.overrides ? resolve(ROOT, String(rec.overrides)) : null;
-  const nomination = await nominateImpl({ sha: expected, stage: 'release', repo, stagingOrigin, productionOrigin, productionEngine, overridePath, deviceLedger, readerEvalDir, fetchOrigin, git, gh, fetchImpl, now });
+  const nomination = await nominateImpl({ sha: expected, stage: 'release', repo, stagingOrigin, productionOrigin, productionEngine, overridePath, deviceLedger, readerEvalDir, fetchOrigin, git, gh, ghGraphql, fetchImpl, now });
   row('nominate', nomination.ok, 'release-stage nomination passes (scripts/release-nominate.mjs)',
     `${nomination.results.filter(r => r.ok === true).length}/${nomination.results.filter(r => r.ok !== null).length} checks${nomination.ok ? '' : '; failed: ' + nomination.results.filter(r => r.ok === false).map(r => r.label).join('; ')}`);
 
@@ -250,8 +255,21 @@ export async function buildDossier({
   for (const gate of EXTERNAL_GATES) {
     const entry = rec.gates?.[gate.id] || {};
     const by = human(entry.by), at = iso(entry.at);
-    const ok = entry.status === 'PASS' && by !== null && at !== null && at <= now;
-    row(23, ok, gate.label, ok ? `PASS by ${by} at ${entry.at}${entry.evidence ? ' · ' + entry.evidence : ''}` : `${entry.status || 'NOT_RECORDED'}${entry.status === 'PASS' && !by ? ' (by does not name a human)' : ''}${entry.status === 'PASS' && at === null ? ' (at is not an ISO date-time)' : ''}${entry.evidence ? ' · ' + entry.evidence : ''} — ${gate.ref}`, { who: by || '' });
+    let ok = entry.status === 'PASS' && by !== null && at !== null && at <= now;
+    let approvalNote = '';
+    let evidenceClass = '';
+    if (gate.id === 'data' && ok) {
+      // D27: the owner's Yes for the irreversible data step, authenticated on GitHub, for this SHA,
+      // given after the candidate was frozen (a Yes before the freeze approved another window).
+      const auth = await verifyApproval({ approval: entry.approval, githubLogin: entry.githubLogin, sha: expected, marker: dataYesMarker(expected), repo, gh, ghGraphql, git, now });
+      const premature = auth.ok && frozenAt !== null && auth.createdAt < frozenAt;
+      ok = auth.ok && !premature;
+      evidenceClass = APPROVAL_EVIDENCE_CLASS;
+      approvalNote = auth.ok
+        ? (premature ? ` · the owner's Yes (${new Date(auth.createdAt).toISOString()}) predates the candidate freeze; post a new one for this window` : ` · owner's Yes ${auth.url} by ${auth.login} at ${new Date(auth.createdAt).toISOString()}`)
+        : ` · the owner's D27 Yes does not hold: ${auth.problems.join('; ')}`;
+    }
+    row(23, ok, gate.label, ok ? `PASS by ${by} at ${entry.at}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote}` : `${entry.status || 'NOT_RECORDED'}${entry.status === 'PASS' && !by ? ' (by does not name a human)' : ''}${entry.status === 'PASS' && at === null ? ' (at is not an ISO date-time)' : ''}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote} — ${gate.ref}`, { who: by || '', evidenceClass });
   }
 
   // ── step 26: no release controller; the promotion is an owner fast-forward ─
@@ -262,7 +280,7 @@ export async function buildDossier({
   const goBy = human(go.by), goAt = iso(go.at);
   const goRecorded = go.decision === 'GO' && String(go.sha || '').toLowerCase() === expected && goBy !== null && goAt !== null && goAt <= now && String(go.statement || '').trim().length > 0;
   let goAuth = null;
-  if (go.decision === 'GO') goAuth = await verifyApproval({ approval: go.approval, githubLogin: go.githubLogin, sha: expected, marker: goMarker(expected), repo, gh, git, now });
+  if (go.decision === 'GO') goAuth = await verifyApproval({ approval: go.approval, githubLogin: go.githubLogin, sha: expected, marker: goMarker(expected), repo, gh, ghGraphql, git, now });
   // A GO is an answer to the evidence: given before the soak ended or before the SHA was frozen,
   // it approved something that did not exist yet.
   const approvedAt = goAuth?.ok ? goAuth.createdAt : null;

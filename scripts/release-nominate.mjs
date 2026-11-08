@@ -98,48 +98,86 @@ export const RELEASE_TARGET = 'deploy/production';
 export const APPROVAL_EVIDENCE_CLASS = 'GITHUB-ACCOUNT-AUTHENTICATED';
 const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(?:issues|pull)\/(\d+)#issuecomment-(\d+)$/;
+// An approval may also be the body of an issue opened from a prefilled link (one click: GitHub can
+// prefill a new issue, never a comment). Same checks; an edited body is read through GraphQL.
+const ISSUE_APPROVAL_URL = /^https:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/issues\/(\d+)$/;
+/** True for a link verifyApproval can read: an issue or PR comment, or an issue. */
+export function approvalLinkShape(url) { return APPROVAL_URL.test(String(url || '').trim()) || ISSUE_APPROVAL_URL.test(String(url || '').trim()); }
 
 /** The exact line an evidence waiver's approval comment must contain. */
 export function waiverMarker(sha, waives) {
   return `Pri-Evidence-Waiver: ${sha} scope=public-release target=${RELEASE_TARGET} waives=${[...new Set(waives.map(String))].sort().join(',')}`;
 }
-/** The exact line the owner's GO comment must contain (scripts/release-dossier.mjs). */
+/** The exact line the owner's GO must contain (scripts/release-dossier.mjs). */
 export function goMarker(sha) {
   return `Pri-Release-GO: ${sha} target=${RELEASE_TARGET}`;
 }
+/** The exact line the owner's production-data Yes must contain (D27, Step 24; the dossier's data gate). */
+export function dataYesMarker(sha) {
+  return `Pri-Production-Data-YES: ${sha} target=production-postgres`;
+}
 
 /**
- * Authenticates a release approval through GitHub instead of trusting a name typed into a file:
- * the comment link is in this repository, its author is `githubLogin`, a User (not a bot) with
- * admin permission, it was posted after the commit it approves and never edited, and it contains
- * `marker` as a line of its own. Returns { ok, problems, login, createdAt, url }.
+ * Authenticates a release approval through GitHub instead of trusting a name typed into a file.
+ * The approval is either a comment (`…/issues/<n>#issuecomment-<id>`, on an issue or PR) or the body
+ * of an issue (`…/issues/<n>`, so a prefilled new-issue link makes it one click). Either way: it is in
+ * this repository; its author is `githubLogin`, a User (not a bot) with admin permission; it was
+ * posted after the commit it approves and never edited; and it contains `marker` as a line of its
+ * own. Returns { ok, problems, login, createdAt, url, kind: 'comment' | 'issue' }.
  */
-export async function verifyApproval({ approval, githubLogin, sha, marker, repo = DEFAULT_REPO, gh = defaultGh, git = defaultGit, now = Date.now() }) {
+export async function verifyApproval({ approval, githubLogin, sha, marker, repo = DEFAULT_REPO, gh = defaultGh, ghGraphql = defaultGhGraphql, git = defaultGit, now = Date.now() }) {
   const problems = [];
   const url = String(approval || '').trim();
-  const parsed = APPROVAL_URL.exec(url);
+  const asComment = APPROVAL_URL.exec(url);
+  const asIssue = asComment ? null : ISSUE_APPROVAL_URL.exec(url);
+  const parsed = asComment || asIssue;
+  const kind = asComment ? 'comment' : 'issue';
+  const what = asComment ? 'approval comment' : 'approval issue';
   const login = String(githubLogin || '').trim();
-  if (!parsed) problems.push(`approval must link the approving comment: https://github.com/${repo}/issues/<n>#issuecomment-<id>`);
-  else if (parsed[1].toLowerCase() !== String(repo).toLowerCase()) problems.push(`approval comment is in ${parsed[1]}, not ${repo}`);
+  if (!parsed) problems.push(`approval must link the approving comment (https://github.com/${repo}/issues/<n>#issuecomment-<id>) or issue (https://github.com/${repo}/issues/<n>)`);
+  else if (parsed[1].toLowerCase() !== String(repo).toLowerCase()) problems.push(`${what} is in ${parsed[1]}, not ${repo}`);
   if (!GITHUB_LOGIN.test(login)) problems.push('githubLogin must be the approver\'s GitHub login');
-  if (problems.length) return { ok: false, problems, login: null, createdAt: null, url };
-  const [, , number, id] = parsed;
-  let comment = null;
-  try { comment = await gh(`repos/${repo}/issues/comments/${id}`); }
-  catch (error) { return { ok: false, problems: [`approval comment ${id} could not be read from GitHub: ${error?.message || error}`], login: null, createdAt: null, url }; }
-  const author = String(comment?.user?.login || '');
-  if (author.toLowerCase() !== login.toLowerCase()) problems.push(`approval comment was written by ${author || '(unknown)'}, not ${login}`);
-  if (comment?.user?.type !== 'User') problems.push(`approval comment author is a ${comment?.user?.type || 'unknown'} account, not a person's User account`);
-  if (!String(comment?.issue_url || '').endsWith(`/issues/${number}`)) problems.push(`approval comment ${id} does not belong to #${number}`);
-  const created = Date.parse(comment?.created_at || '');
-  const updated = Date.parse(comment?.updated_at || comment?.created_at || '');
-  if (!Number.isFinite(created)) problems.push('approval comment has no creation time');
-  else {
-    if (Number.isFinite(updated) && updated !== created) problems.push('approval comment was edited after it was posted; post a new comment rather than editing one');
-    if (created > now) problems.push('approval comment is dated in the future');
+  if (problems.length) return { ok: false, problems, login: null, createdAt: null, url, kind };
+  let author = '', type = '', createdText = '', edited = false, body = '';
+  if (asComment) {
+    const [, , number, id] = asComment;
+    let comment = null;
+    try { comment = await gh(`repos/${repo}/issues/comments/${id}`); }
+    catch (error) { return { ok: false, problems: [`approval comment ${id} could not be read from GitHub: ${error?.message || error}`], login: null, createdAt: null, url, kind }; }
+    author = String(comment?.user?.login || '');
+    type = comment?.user?.type || '';
+    createdText = comment?.created_at || '';
+    const created = Date.parse(createdText);
+    const updated = Date.parse(comment?.updated_at || createdText);
+    edited = Number.isFinite(created) && Number.isFinite(updated) && updated !== created;
+    body = comment?.body || '';
+    if (!String(comment?.issue_url || '').endsWith(`/issues/${number}`)) problems.push(`approval comment ${id} does not belong to #${number}`);
+  } else {
+    const [, , number] = asIssue;
+    const [owner, name] = String(repo).split('/');
+    let issue = null;
+    try {
+      const data = await ghGraphql(ISSUE_QUERY, { owner, name, number: Number(number) });
+      issue = data?.repository?.issue ?? null;
+    } catch (error) { return { ok: false, problems: [`approval issue #${number} could not be read from GitHub: ${error?.message || error}`], login: null, createdAt: null, url, kind }; }
+    // GraphQL answers null for a number that is a pull request, so a PR body never stands in for an issue.
+    if (!issue) return { ok: false, problems: [`#${number} is not an issue of ${repo} (a pull request or a missing issue cannot carry an approval in its body)`], login: null, createdAt: null, url, kind };
+    author = String(issue.author?.login || '');
+    type = issue.author?.__typename || '';
+    createdText = issue.createdAt || '';
+    edited = issue.lastEditedAt !== null && issue.lastEditedAt !== undefined;
+    body = issue.body || '';
   }
-  const lines = String(comment?.body || '').split(/\r?\n/).map(line => line.trim());
-  if (!lines.includes(marker)) problems.push(`approval comment does not contain the exact line: ${marker}`);
+  if (author.toLowerCase() !== login.toLowerCase()) problems.push(`${what} was written by ${author || '(unknown)'}, not ${login}`);
+  if (type !== 'User') problems.push(`${what} author is a ${type || 'unknown'} account, not a person's User account`);
+  const created = Date.parse(createdText);
+  if (!Number.isFinite(created)) problems.push(`${what} has no creation time`);
+  else {
+    if (edited) problems.push(`${what} was edited after it was posted; post a new ${kind} rather than editing one`);
+    if (created > now) problems.push(`${what} is dated in the future`);
+  }
+  const lines = String(body).split(/\r?\n/).map(line => line.trim());
+  if (!lines.includes(marker)) problems.push(`${what} does not contain the exact line: ${marker}`);
   try {
     const permission = await gh(`repos/${repo}/collaborators/${encodeURIComponent(author || login)}/permission`);
     if (permission?.permission !== 'admin') problems.push(`${author || login} has ${permission?.permission || 'no'} permission on ${repo}; a release approval needs a repository admin`);
@@ -147,10 +185,11 @@ export async function verifyApproval({ approval, githubLogin, sha, marker, repo 
   try {
     const committed = Date.parse(String(await git(['show', '-s', '--format=%cI', sha])).trim());
     if (!Number.isFinite(committed)) problems.push(`the commit time of ${sha} could not be read`);
-    else if (Number.isFinite(created) && created < committed) problems.push(`approval comment (${comment.created_at}) predates the commit it approves; a stale approval cannot carry to a newer SHA`);
+    else if (Number.isFinite(created) && created < committed) problems.push(`${what} (${createdText}) predates the commit it approves; a stale approval cannot carry to a newer SHA`);
   } catch (error) { problems.push(`the commit time of ${sha} could not be read: ${error?.message || error}`); }
-  return { ok: problems.length === 0, problems, login: author || null, createdAt: Number.isFinite(created) ? created : null, url };
+  return { ok: problems.length === 0, problems, login: author || null, createdAt: Number.isFinite(created) ? created : null, url, kind };
 }
+const ISSUE_QUERY = 'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){issue(number:$number){number author{login __typename} createdAt lastEditedAt body}}}';
 export const ENGINES = Object.freeze(['postgres', 'sqlite']);
 export const STAGES = Object.freeze(['candidate', 'release']);
 
@@ -406,7 +445,7 @@ export function loadOverride(path, sha) {
   if (record) {
     if (!OVERRIDE_SCOPES.includes(scope)) problems.push(`override needs "scope": ${OVERRIDE_SCOPES.join(' or ')}`);
     if (!GITHUB_LOGIN.test(githubLogin)) problems.push('override needs "githubLogin": the approver\'s GitHub login');
-    if (!APPROVAL_URL.test(approval)) problems.push('override needs "approval": the link to the approving GitHub comment (…/issues/<n>#issuecomment-<id>)');
+    if (!approvalLinkShape(approval)) problems.push('override needs "approval": the link to the approving GitHub comment (…/issues/<n>#issuecomment-<id>) or issue (…/issues/<n>)');
     if (String(record.sha || '').toLowerCase() !== sha) problems.push(`override names sha ${record.sha || '(none)'}, not the nominated ${sha}`);
     if (!waives.length) problems.push('override waives nothing (waives: [])');
     for (const item of waives) if (!EVIDENCE_REQUIREMENTS.includes(item)) problems.push(`unknown evidence requirement ${JSON.stringify(item)}; known: ${EVIDENCE_REQUIREMENTS.join(', ')}`);
@@ -421,6 +460,16 @@ export function loadOverride(path, sha) {
 async function defaultGit(args) {
   const { stdout } = await execFileP('git', ['-C', ROOT, ...args], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
   return stdout;
+}
+
+/** One GraphQL query through the operator's own gh login (gh api graphql); returns `data`. */
+export async function defaultGhGraphql(query, variables = {}) {
+  const args = ['api', 'graphql', '-f', `query=${query}`];
+  for (const [key, value] of Object.entries(variables)) args.push(typeof value === 'number' ? '-F' : '-f', `${key}=${value}`);
+  const { stdout } = await execFileP('gh', args, { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+  const parsed = JSON.parse(stdout);
+  if (parsed?.errors?.length) throw new Error(parsed.errors.map(e => e?.message || 'GraphQL error').join('; '));
+  return parsed?.data;
 }
 
 async function defaultGh(path) {
@@ -473,6 +522,7 @@ export async function nominate({
   fetchOrigin = true,
   git = defaultGit,
   gh = defaultGh,
+  ghGraphql = defaultGhGraphql,
   fetchImpl = globalThis.fetch,
   now = Date.now()
 } = {}) {
@@ -665,7 +715,7 @@ export async function nominate({
         const publicScope = check(override.scope === 'public-release', 'evidence override is a public-release waiver',
           override.scope === 'public-release' ? 'scope public-release' : `scope ${override.scope}: an internal test-track exception is never approval for a public production release; it waives nothing here`);
         if (publicScope) {
-          const auth = await verifyApproval({ approval: override.approval, githubLogin: override.githubLogin, sha: expected, marker: waiverMarker(expected, override.waives), repo, gh, git, now });
+          const auth = await verifyApproval({ approval: override.approval, githubLogin: override.githubLogin, sha: expected, marker: waiverMarker(expected, override.waives), repo, gh, ghGraphql, git, now });
           override.verified = auth;
           overrideUsable = check(auth.ok, `evidence override approved on GitHub by a repository admin (${APPROVAL_EVIDENCE_CLASS})`,
             auth.ok ? `${auth.url} by ${auth.login} at ${new Date(auth.createdAt).toISOString()}` : auth.problems.join('; '));
