@@ -26,25 +26,29 @@ point at.
 
 ## Which server a device build talks to
 
-Two kinds of run, never merged into one verdict (the recorder refuses a row without `--build-kind`
-and `--server`, and `report --build-kind …` shows one kind at a time):
+**Every store build names exactly `https://app.prilearning.com`** (Director decision 9 Nov 2026 under owner
+default D5, "test what you ship"; `scripts/check-native-archive.mjs` refuses any other origin in an iOS
+archive, and `android/app/build.gradle.kts` in a signed Play bundle). Until GO that origin fronts the
+**staging** service at the candidate SHA; at promotion the owner re-points it to production. The binary is
+the same either way, so the matrix certifies the very build the store receives. The owner provisions the DNS
+record, TLS and the Railway custom domain.
 
-1. **Development build → staging, first.** An Xcode (or Gradle) run of the frozen SHA on the owner's
-   paired devices, DEBUG, pointed at staging through `PRI_CLOUD_ORIGIN`. This is the only build that may
-   talk to staging (`NativeCloudBridge.swift` accepts a staging origin in DEBUG only), and staging is the
-   only server that runs the candidate before promotion (`scripts/release-nominate.mjs` lists the
-   device matrix before promotion; production still serves an older SHA). The **full** matrix and the
-   soak run here: `--build-kind development --server staging`.
-2. **Store build → production, after promotion, release held.** The signed TestFlight / Play internal
-   build carries a production origin (`scripts/check-native-archive.mjs` refuses a staging one). Re-run
-   the short list — `INSTALL`, `OTP`, `ISSUE`, `WRITE`, `TRANSCRIPT`, `MARK`, `HISTORY`, `VOICEOVER` /
-   `TALKBACK`, `REINSTALL` — and one soak as `--build-kind testflight` (or `play-internal`) `--server
-   production` before the store release is approved.
+1. **Store build → `app.prilearning.com` → staging, before GO: the full matrix.** The signed TestFlight /
+   Play internal build of the frozen SHA. Record which service `app.prilearning.com` fronted when the session
+   ran: `npm run check:ios:archive -- <archive> --sha <sha> --probe --evidence <file>` writes its CNAME
+   chain, the service, the server's release and database, and the `/release.json` SHA. The **full** matrix
+   and the soak run here: `--build-kind testflight` (or `play-internal`) `--server staging`.
+2. **The same store build → `app.prilearning.com` → production, after promotion, store release held: the
+   short list.** `INSTALL`, `OTP`, `ISSUE`, `WRITE`, `TRANSCRIPT`, `MARK`, `HISTORY`, `VOICEOVER` /
+   `TALKBACK`, `REINSTALL`, and one soak, as `--build-kind testflight` (or `play-internal`) `--server
+   production`, after the post-promotion smoke test.
+3. **Development build → staging (optional, earlier).** An Xcode (or Gradle) DEBUG run pointed at staging
+   through `PRI_CLOUD_ORIGIN`, for finding defects before a store build exists. Its rows are
+   `--build-kind development --server staging`; they are never a substitute for store-build rows.
 
-A release needs the store-build rows against production with **zero open P0 and P1**
-(`V1_DECISIONS_2026-11-01.md` D6); the development-build rows are the evidence that the candidate was
-right before it was promoted, not a substitute. The recorder refuses a store build on staging and a
-development build on production.
+A release needs store-build rows with **zero open P0 and P1** (`V1_DECISIONS_2026-11-01.md` D6): the full
+matrix against staging before GO and the short list against production after it. The recorder refuses a
+development build on production; a report shows one build kind at a time.
 
 ## Defect severity (required on every fail)
 

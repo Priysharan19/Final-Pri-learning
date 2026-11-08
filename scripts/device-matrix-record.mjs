@@ -14,8 +14,10 @@
 // (VoiceOver / TalkBack, Full Keyboard Access, text size), ORIENTATION
 // (rotation, Split View, Stage Manager), RESTORE, EXAM, LIFECYCLE and EXPORT.
 // Every record names the device, its OS, the build SHA, the kind of build
-// (a development build pointed at staging, or the store build pointed at
-// production — the two are never mixed in a report), and the named human
+// (a development build pointed at staging, or the store build, which names
+// https://app.prilearning.com, with the service that origin fronted at the
+// time — staging before GO, production after; kinds are never mixed in a
+// report), and the named human
 // who ran it. A fail carries a severity from the taxonomy below. Simulator,
 // emulator and agent evidence is refused here by construction: it belongs to
 // CI, and AGENTS.md forbids fabricating physical-device or human evidence.
@@ -105,12 +107,15 @@ export const RESULTS = Object.freeze(['pass', 'fail', 'blocked']);
 export const EVIDENCE_CLASS = Object.freeze({ pass: 'PHYSICAL-HUMAN', fail: 'PHYSICAL-HUMAN', blocked: 'BLOCKED-EXTERNAL' });
 
 /**
- * Which build was on the device and which server it talked to. The first
- * full matrix runs on a DEVELOPMENT build (an Xcode / Gradle run of the frozen
- * SHA, DEBUG, pointed at staging, the only build that may talk to staging);
- * the store build (TestFlight / Play internal) talks to production only
- * (scripts/check-native-archive.mjs refuses a staging origin) and is re-run
- * after promotion with store release held. A report never mixes the two.
+ * Which build was on the device and which server it talked to. Every store
+ * build (TestFlight / Play) names exactly https://app.prilearning.com
+ * (scripts/check-native-archive.mjs; Director decision 9 Nov 2026 under D5,
+ * "test what you ship"): until GO that origin fronts STAGING at the candidate
+ * SHA, so the full matrix runs on the very binary the store receives, with
+ * --server staging; after promotion it fronts production and the short list
+ * re-runs on the same binary with --server production. A DEVELOPMENT build
+ * (Xcode / Gradle, DEBUG) may be pointed at staging, never at production. A
+ * report never mixes build kinds.
  */
 export const BUILD_KINDS = Object.freeze(['development', 'testflight', 'play-internal', 'play-closed']);
 export const SERVERS = Object.freeze(['staging', 'production']);
@@ -156,8 +161,7 @@ function humanAndHardwareProblems(record, what) {
   if (String(record?.os || '').trim().length < 3) problems.push(`a ${what} needs --os "<OS name and version as the device shows it>"`);
   if (!BUILD_KINDS.includes(record?.buildKind)) problems.push(`a ${what} needs --build-kind ${BUILD_KINDS.join('|')}: a development build and a store build are different evidence and are never mixed`);
   if (!SERVERS.includes(record?.server)) problems.push(`a ${what} needs --server ${SERVERS.join('|')}: which server the build talked to`);
-  if (STORE_BUILD_KINDS.includes(record?.buildKind) && record?.server === 'staging') problems.push(`a ${record.buildKind} build cannot have talked to staging (the signed build carries a production origin; scripts/check-native-archive.mjs refuses a staging one)`);
-  if (record?.buildKind === 'development' && record?.server === 'production') problems.push('a development build is not run against production: the first matrix runs on staging, the store build re-runs on production (docs/release/device-matrix.md "Which server a device build talks to")');
+  if (record?.buildKind === 'development' && record?.server === 'production') problems.push('a development build is not run against production: the store build, through https://app.prilearning.com, is the only build that ever talks to production (docs/release/device-matrix.md "Which server a device build talks to")');
   return problems;
 }
 

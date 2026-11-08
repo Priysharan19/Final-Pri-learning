@@ -1214,7 +1214,9 @@ const scratch = [];
   ok(/PHYSICAL-HUMAN/.test(doc) && /never written into this matrix/.test(doc), 'the doc states the evidence class and the simulator rule');
   ok(/PRI_V1_RELEASE_SCOPE\.md.*§22\.2/.test(doc), 'the doc cites the §22.2 journey');
   ok(/results\.jsonl/.test(doc) && /soak\.jsonl/.test(doc) && /device-matrix-record\.mjs/.test(doc), 'the doc names both ledgers and the recorder');
-  ok(/## Which server a device build talks to/.test(doc) && /Development build → staging, first/.test(doc) && /Store build → production, after promotion, release held/.test(doc) && /refuses a store build on staging and a\s+development build on production/.test(doc), 'the doc settles which server each build kind tests against and keeps the two kinds distinct');
+  ok(/## Which server a device build talks to/.test(doc) && /Every store build names exactly `https:\/\/app\.prilearning\.com`/.test(doc) && /Store build → `app\.prilearning\.com` → staging, before GO: the full matrix/.test(doc) &&
+    /The same store build → `app\.prilearning\.com` → production, after promotion, store release held: the\s+short list/.test(doc) && /refuses a\s+development build on production/.test(doc),
+    'the doc settles which server each build kind tests against (D5: the store build names app.prilearning.com, staging before GO, production after) and keeps the kinds distinct');
   ok(/## Defect severity \(required on every fail\)/.test(doc) && /`P0`/.test(doc) && /`P3`/.test(doc), 'the doc carries the severity taxonomy');
   ok(/## Soak record/.test(doc) && /at least 30 minutes/.test(doc), 'the doc carries the soak record');
   ok(/VoiceOver/.test(doc) && /Full Keyboard Access/.test(doc) && /Stage Manager/.test(doc) && /Split View/.test(doc) && /RESTORE/.test(doc) && /EXAM/.test(doc) && /LIFECYCLE/.test(doc) && /EXPORT/.test(doc), 'the doc names the accessibility, orientation, restore, exam, lifecycle and export groups');
@@ -1246,7 +1248,6 @@ const scratch = [];
       ['a fail without a tester', { ...base, result: 'fail', tester: null, severity: 'P1', notes: 'the code never arrived' }, /named human/],
       ['a pass without a build kind', { ...base, buildKind: undefined }, /needs --build-kind/],
       ['a pass without a server', { ...base, server: undefined }, /needs --server/],
-      ['a store build on staging', { ...base, buildKind: 'testflight' }, /cannot have talked to staging/],
       ['a development build on production', { ...base, server: 'production' }, /development build is not run against production/],
       ['a fail without a severity', { ...base, result: 'fail', notes: 'the code arrived but the field did not autofill' }, /needs --severity P0\|P1\|P2\|P3/],
       ['a fail with an unknown severity', { ...base, result: 'fail', severity: 'P9', notes: 'the code arrived but the field did not autofill' }, /needs --severity/],
@@ -1257,6 +1258,9 @@ const scratch = [];
       assert.throws(() => recordResult(input, { ledger }), error => error.exitCode === 2 && error.problems.some(p => pattern.test(p)), `refuses ${name}`); count += 1;
     }
     eq(readLedger(ledger).length, 1, 'a refusal writes nothing');
+    // D5: the store build names app.prilearning.com, which fronts staging before GO and production after.
+    eq(problemsWith({ ...base, buildKind: 'testflight', build: 'TestFlight 1.0 (3)' }).length, 0, 'a store build against staging (app.prilearning.com before GO) is accepted: the full matrix runs on the binary the store receives');
+    eq(problemsWith({ ...base, buildKind: 'play-internal', server: 'production', device: 'Pixel 8', os: 'Android 15', case: 'DM-AND-02-OTP' }).length, 0, 'the same kind of build against production (after promotion) is accepted too');
     const pencil = recordResult({ ...base, case: 'DM-IPD-05-WRITE', device: 'iPad Pro 11-inch (4th generation)', os: 'iPadOS 26.0.1', pencil: 'Apple Pencil Pro' }, { ledger, now: Date.parse('2026-11-02T01:01:00Z') });
     ok(pencil.pencil === 'Apple Pencil Pro', 'the Pencil case records the Pencil model');
     const blocked = recordResult({ case: 'DM-AND-01-INSTALL', result: 'blocked', sha: SHA, notes: 'no Android device available' }, { ledger, now: Date.parse('2026-11-02T01:02:00Z') });
@@ -1289,7 +1293,7 @@ const scratch = [];
       ['a soak with failures and no notes', { ...soakBase, failures: '2', notes: '' }, /with failures needs --notes/],
       ['a soak by an agent', { ...soakBase, tester: 'QA bot' }, /does not name a human/],
       ['a soak on a simulator', { ...soakBase, device: 'iPad Pro (M4) Simulator' }, /simulator\/emulator/],
-      ['a soak on a store build against staging', { ...soakBase, buildKind: 'play-internal' }, /cannot have talked to staging/],
+      ['a soak on a development build against production', { ...soakBase, server: 'production' }, /development build is not run against production/],
       ['a soak with no build kind', { ...soakBase, buildKind: undefined }, /needs --build-kind/]
     ];
     for (const [name, input, pattern] of soakRefusals) {
