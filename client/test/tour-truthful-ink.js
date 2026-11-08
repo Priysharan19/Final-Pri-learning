@@ -30,10 +30,10 @@ import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 import { inkLineVerdicts, workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import EN from '../src/i18n/strings.en.js';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 // Plain arithmetic: the server has no step meta for these, so it can check the
 // final answer and nothing else — the conditions of the staging report.
-const ARITHMETIC = 'y7-integers';
+const ARITHMETIC = 'c7-integer-operations-current';
 const WHOLE = /^-?\d{1,4}$/;
 const SUBMIT = { name: 'Submit Answer' };
 const TAG = '[SYNTHETIC-READER EVIDENCE]';

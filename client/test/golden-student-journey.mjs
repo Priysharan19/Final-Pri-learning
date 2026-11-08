@@ -23,7 +23,7 @@ import { ensureBuild } from './e2e.mjs';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const TOPIC_NAME = 'Linear Equations';
 const WRONG_A = '-987654';
 const WRONG_B = '-987655';
@@ -49,8 +49,8 @@ async function waitApp(page) {
 async function createFreshStudent(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   // The landing card and the gate (support/verified-onboarding.mjs): a
-  // verified adult account, Class 7 on the card, then NSW Year 7 in Settings.
-  await createVerifiedProfile(page, platform, { name: 'PRI-02 Golden Student', year: 7, course: 'nsw' });
+  // verified adult account, CBSE Class 7 on the card (V1 is India only, D2).
+  await createVerifiedProfile(page, platform, { name: 'PRI-02 Golden Student', year: 7, course: 'in' });
 }
 
 

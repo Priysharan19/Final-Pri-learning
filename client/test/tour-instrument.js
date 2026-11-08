@@ -262,7 +262,7 @@ export const writeFlow = {
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await check('server reading is on for this profile', await turnOnServerReading(page, base));
 
-    await page.goto(`${base}/practice?subtopic=y7-integers`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${base}/practice?subtopic=c7-integer-operations-current`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
     let right = null;
@@ -547,10 +547,10 @@ export const writeFlow = {
     if (reply) {
       await page.goto(`${base}/map`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-map-chapter]', { timeout: 15000 }).catch(() => {});
-      const node = page.locator('[data-map-chapter="y7-integers"]');
+      const node = page.locator('[data-map-chapter="c7-integer-operations-current"]');
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
-        const shownMarks = await page.locator('[data-map-card="y7-integers"] [data-map-marks]').getAttribute('data-map-marks');
+        const shownMarks = await page.locator('[data-map-card="c7-integer-operations-current"] [data-map-marks]').getAttribute('data-map-marks');
         await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} / ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
         await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
