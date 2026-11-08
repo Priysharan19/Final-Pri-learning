@@ -1,50 +1,21 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
+import { resolveHomeRecommendation } from '../home/recommendation.js';
 import { cacheAssignments, cachedAssignments } from '../home/homeCache.js';
-import TopicGenerator from '../home/TopicGenerator.jsx';
-import Icon from '../components/Icon.jsx';
-import { useApp } from '../App.jsx';
 import { dayKey, formatWeekday } from '../lib/locale.js';
-import { useT, useTx } from '../i18n/index.js';
+import { useT } from '../i18n/index.js';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
 
 
-// The "This week" plan card is loaded after Home has painted. The planner and
-// the reminder scheduler are not needed for the first paint, so their code
-// stays out of the install (vite.config.js budgets the entry) and arrives as
-// its own warm chunk. A chunk that fails to arrive — a first run offline before
-// the warm pass — leaves Home without the card rather than without Home: the
-// failure is caught here instead of thrown at the route's error boundary.
-function LazyPlanCard(props) {
-  const [Card, setCard] = useState(null);
-  useEffect(() => {
-    let live = true;
-    import('../home/PlanCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
-    return () => { live = false; };
-  }, []);
-  return Card ? <Card {...props} /> : null;
-}
-
-// The per-dot-point review card, lazily like the plan card.
-function LazyReviewQueueCard(props) {
-  const [Card, setCard] = useState(null);
-  useEffect(() => {
-    let live = true;
-    import('../home/ReviewQueueCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
-    return () => { live = false; };
-  }, []);
-  return Card ? <Card {...props} /> : null;
-}
-
-// ── The home decision, shared by both homes ──────────────────────────────────
-// The Instrument's Index (the home every build ships, client/interface.config.mjs)
-// and this page read the same recommendation, the same placement offer and the
-// same week from here, so the Index carries everything the v1.0 Home offered
-// and one resolver decides the student's next action for both.
+// ── The home decision ─────────────────────────────────────────────────────────
+// What the student's home shows besides the chapters: the next action from the
+// one resolver (home/recommendation.js), the placement offer and the week. The
+// home itself is the Instrument's Index (instrument/IndexPage.jsx), the one
+// interface every build ships (client/interface.config.mjs); the v1.0 Home page
+// that used to live in this file is gone, and this module keeps only the parts
+// the Index renders.
 export function useHomeDecision(user, dueCount) {
   const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
@@ -130,57 +101,6 @@ export function usePlacement(user) {
   return [placement, skip];
 }
 
-export default function Home() {
-  const { user, dueCount } = useApp();
-  const nav = useNavigate();
-  const t = useT();
-  const tx = useTx();
-  const { local, stats, curriculum, assignments, online, homeDecision, alternatives, topicName } = useHomeDecision(user, dueCount);
-  const [placement, skipPlacement] = usePlacement(user);
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? t('home.goodMorning') : hour < 18 ? t('home.goodAfternoon') : t('home.goodEvening');
-  const firstName = user.name.split(' ')[0];
-
-  return (
-    <div className="home-wrap">
-      <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
-
-      <HomeAction primary action={homeDecision.primary} nav={nav} topicName={topicName} resume={local?.resume} />
-      {assignments === false && (
-        <div className="notice offline home-cloud-note" role="status">
-          {t('home.cloudUnavailable')}
-        </div>
-      )}
-
-      <section className="home-section" aria-labelledby="home-manual-title">
-        <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
-        <PlacementCard placement={placement} onGo={path => nav(path)} onSkip={skipPlacement} />
-        <LazyReviewQueueCard user={user} />
-        <LazyPlanCard user={user} stats={stats} />
-        {alternatives.length > 0 && (
-          <ul className="home-alts">
-            {alternatives.map(item => (
-              <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} topicName={topicName} resume={local?.resume} online={online} />
-            ))}
-          </ul>
-        )}
-
-        <button className="btn btn-ghost btn-sm home-photo-entry" data-home-photo-practise onClick={() => nav('/practise-photo')}>
-          {t('snap.entry')}
-        </button>
-
-        <TopicGenerator user={user} curriculum={curriculum} />
-      </section>
-
-      <section className="home-section" aria-labelledby="home-week-title">
-        <h2 className="home-section-title" id="home-week-title">{t('home.thisWeek')}</h2>
-        <GoalCard user={user} activity={stats?.activity || []} />
-      </section>
-    </div>
-  );
-}
-
 const WORK_REASONS = {
   overdue: 'home.reason.overdue', due: 'home.reason.due', started: 'home.reason.started',
   returned: 'home.reason.returned', ready: 'home.reason.ready'
@@ -228,53 +148,6 @@ export function actionCopy(action, user, t, topicName, resume) {
     title, kicker: t(kicker), cta: t(cta), meta,
     reason: t(reason, { ...d, topic: adaptiveTopic || d.topic || '', date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' })
   };
-}
-
-function HomeAction({ action, nav, primary, topicName, resume, online = true }) {
-  const { user } = useApp();
-  const t = useT();
-  if (!primary && !action) return null;
-  if (primary && !action) {
-    // Known content first: the greeting is already on screen, and this region
-    // holds its place quietly while the recommendation is worked out.
-    return (
-      <section className="home-next" data-loading="true" aria-busy="true" aria-labelledby="home-next-title">
-        <div className="home-next-kicker">{t('home.kicker.next')}</div>
-        <h2 className="home-next-title" id="home-next-title">{t('home.next.working')}</h2>
-        <div className="skeleton" style={{ height: 16, width: '60%' }} />
-      </section>
-    );
-  }
-  const copy = actionCopy(action, user, t, topicName, resume);
-  if (!primary) {
-    const key = String(action.kind + '-' + action.id).replace(/[^A-Za-z0-9_-]/g, '-');
-    // Offline, an alternative that needs the network says so and stays shut
-    // rather than opening onto a failure.
-    const openable = actionOpenable(action, { online });
-    return (
-      <li className="home-alt" data-home-alt>
-        <button type="button" disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
-          onClick={() => { if (openable) nav(action.destination); }} aria-describedby={`home-alt-${key}`}>
-          <span className="home-alt-title">{copy.title}</span>
-          <span className="home-alt-reason" id={`home-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</span>
-          <span className="home-alt-go" aria-hidden="true"><Icon name="next" /></span>
-        </button>
-      </li>
-    );
-  }
-  const reasonId = 'home-primary-reason';
-  return (
-    <section className="home-next" data-home-primary data-kind={action.kind} aria-labelledby="home-next-title">
-      <div className="home-next-kicker">{copy.kicker}</div>
-      <h2 className="home-next-title" id="home-next-title">{copy.title}</h2>
-      <p className="home-next-reason" id={reasonId}>{copy.reason}</p>
-      {copy.meta && <p className="home-next-meta">{copy.meta}</p>}
-      <div className="home-next-cta">
-        <button className="btn btn-primary btn-lg" data-home-primary-cta aria-describedby={reasonId}
-          onClick={() => nav(action.destination)}>{copy.cta}</button>
-      </div>
-    </section>
-  );
 }
 
 export function GoalCard({ user, activity }) {

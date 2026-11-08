@@ -30,7 +30,11 @@ check('student Tasks is in My work', has(app, "{ to: '/tasks', key: 'nav.tasks'"
 check('student Exams is in My work', has(app, "{ to: '/exams', key: 'nav.exams'"));
 check('student Classes is in My work', has(app, "{ to: '/classes', key: 'nav.classes'"));
 check('student Progress is canonical', has(app, "{ to: '/progress', key: 'nav.progress'"));
-check('student Review enters wrong-answer revision', has(app, "{ to: '/review?filter=wrong', key: 'nav.review'"));
+// Scripts (every script) is the navigation entry; wrong-answer revision is its
+// "Wrong" filter, and the old /mistakes link lands there.
+check('student Review enters wrong-answer revision',
+  has(app, "{ to: '/review', key: 'inst.tabScripts'") && has(app, '<Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />')
+    && /\['wrong', 'history\.filterWrong'\]/.test(read('client/src/pages/History.jsx')));
 check('Rush remains secondary practice mode', has(app, "{ to: '/rush', key: 'nav.rush'"));
 check('Match remains secondary practice mode', has(app, "{ to: '/match', key: 'nav.match'"));
 check('Settings remains canonical', has(app, "{ to: '/settings', key: 'nav.settings'"));
@@ -90,12 +94,14 @@ check('the Classes route lands on the role landing without the flag', has(app, "
 check('a production build with the flag off never emits the Classes chunk', has(app, "const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));"));
 // The instrument build's phone bar has the Map (the v1.0 bar has Tasks there);
 // its shell lists the Map and Scripts so every surface shares one list.
-check('the instrument phone bar carries the Map', has(app, "new Set(INSTRUMENT_ON ? ['/', '/practice', '/map', '/progress'] : ['/', '/practice', '/tasks', '/progress'])"));
+check('the instrument phone bar carries the Map', has(app, "const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/map', '/progress']);"));
 check('the instrument shell lists the Map and Scripts', has(app, "{ to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review }"));
 check('the instrument bar offers every non-tab destination as a visible More menu', /navItems\.filter\(item => !inTabs\(item\.to\)\)/.test(read('client/src/instrument/InstrumentBar.jsx')) && /role="menu"/.test(read('client/src/instrument/InstrumentBar.jsx')));
 check('mobile More restores trigger focus', has(app, 'moreButtonRef.current?.focus()'));
 check('teacher account menu points to workspace', has(app, "label: t('nav.teacherWorkspace'), run: () => nav('/teach')"));
-check('teacher sidebar hides student recent history', has(app, "user.role !== 'teacher' && <SidebarHistory"));
+// The v1.0 rail and its recent-history panel are gone for every role (the
+// Instrument is the only shell): nothing renders student history in the shell.
+check('teacher sidebar hides student recent history', !/SidebarHistory|className="sidebar/.test(app));
 
 console.log(`\nKALP-02 NAVIGATION SOURCE CHECK — ${pass}/${pass + fail} checks`);
 if (fail) process.exit(1);

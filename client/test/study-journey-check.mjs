@@ -27,9 +27,11 @@ check('unexpected learning mode not accepted',studyHref({subtopic:chapter.id,vie
 check('CBSE D4 not silently preserved',selectedStudyContext(chapter,new URLSearchParams('track=cbse&difficulty=4')).difficulty===null);
 check('invalid dotpoint not silently selected',selectedStudyContext(chapter,new URLSearchParams('dotpoint=999')).dotpoint===null);
 // The study choices live in the exact-topic generator (home/TopicGenerator.jsx),
-// which Home and the instrument Index both render.
+// which the instrument Index (the one home) renders.
 const home=read('home/TopicGenerator.jsx'), notes=read('pages/Notes.jsx'), content=read('notes/data/notes-class11.js');
-check('both homes render the generator that exposes the choices', read('pages/Home.jsx').includes('<TopicGenerator') && read('instrument/IndexPage.jsx').includes('<TopicGenerator'));
+// The home is the Instrument's Index (the v1.0 Home page is gone; pages/Home.jsx
+// keeps only the shared decision and renders no generator of its own).
+check('both homes render the generator that exposes the choices', read('instrument/IndexPage.jsx').includes('<TopicGenerator') && !read('pages/Home.jsx').includes('<TopicGenerator'));
 check('Home exposes all three choices', ['data-study-notes','data-study-examples','data-study-practice'].every(s=>home.includes(s)));
 check('Home checks verified availability', home.includes('notes?.[selSub.id]?.examples?.length'));
 check('Home preserves chosen difficulty and dotpoint',home.includes('dotpoint, difficulty: chosenDifficulty'));

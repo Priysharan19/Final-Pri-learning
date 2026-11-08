@@ -85,21 +85,14 @@ export default {
   'app.skipToMain': 'Skip to main content',
   'app.logoHome': 'Pri Learning — go to Home',
   'app.dayStreak': 'Day streak',
-  'app.themeToDark': 'Switch to dark theme',
-  'app.themeToLight': 'Switch to light theme',
   'app.account': 'Account',
   'app.accountSettings': 'Account settings',
   'app.myProgress': 'My progress',
   'app.switchProfile': 'Switch profile',
   'app.profileOnDevice': 'Profile stored on this device',
   'app.dataStaysHere': 'Your data is stored on this device. Nothing is sent anywhere unless you sign in to a cloud account, which also reads your handwriting and photos on the server unless you turn that off.',
-  'app.questionHistory': 'Question History',
-  'app.noQuestionsYet': 'No questions yet',
-  'app.viewAll': 'View all →',
   'app.correct': 'Correct',
   'app.incorrect': 'Incorrect',
-  'app.notMarkedYet': 'Not marked yet',
-  'app.difficultyIs': 'Difficulty: {level}',
 
   // ── Words the whole app shares ─────────────────────────────────────────────
   'common.save': 'Save',
@@ -133,10 +126,6 @@ export default {
   'difficulty.4': 'Extension',
 
   // ── Home ───────────────────────────────────────────────────────────────────
-  'home.goodMorning': 'Good morning',
-  'home.goodAfternoon': 'Good afternoon',
-  'home.goodEvening': 'Good evening',
-  'home.greeting': '{greeting}, {name}.',
   'home.reason.examExpired': 'Time ran out on this paper. Open it to see it marked from what was saved.',
   'home.reason.assignmentCached': 'Saved from your last sync. Connect to the internet to open it.',
   'home.next.examResult': 'See result',
@@ -1093,7 +1082,6 @@ export default {
   // Home recommendation and practice session
   'home.cloudUnavailable': "Class assignments are unavailable right now. You can still open questions and keep working on this device.",
   'home.chooseElse': "Choose something else",
-  'home.thisWeek': "This week",
   'home.todayCount': "{done} of {goal} today",
   'home.weekSummary': { one: "Studied on {n} of the last 7 days", other: "Studied on {n} of the last 7 days" },
   'home.reviewDue': { one: 'You have {n} topic due for spaced review.', other: 'You have {n} topics due for spaced review.' },
@@ -1103,7 +1091,6 @@ export default {
   'home.kicker.assigned': "Assigned work",
   'home.kicker.review': "Review",
   'home.kicker.start': "Start here",
-  'home.next.working': "Finding your next step…",
   'home.next.exam': "Your unfinished paper",
   'home.next.resumePractice': "Resume where you left off",
   'home.next.reviews': { one: "{n} topic is due for review", other: "{n} topics are due for review" },

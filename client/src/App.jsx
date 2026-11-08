@@ -1,17 +1,15 @@
 import { featureEnabled } from './platform/features.js';
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import PageLink from './components/PageLink.jsx';
-import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
-import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
+import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
-import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
@@ -78,7 +76,7 @@ const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.js
 const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportHead.jsx')) : null;
 // The routes name `Home` and `Progress`; in the instrument build those are the
 // Index and the Report (the Report's summary above the same Progress page).
-const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
+const Home = IndexPage;
 const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
   // Optional chaining: server-side renders and test harnesses may hand the
@@ -120,7 +118,7 @@ const STUDENT_NAV = [
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, ...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])] },
   { label: 'nav.groupUnderstand', items: [
     { to: '/progress', key: 'nav.progress', ico: I.progress },
-    ...(INSTRUMENT_ON ? [{ to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review }] : [{ to: '/review?filter=wrong', key: 'nav.review', ico: I.review }])
+    { to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review }
   ] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
@@ -140,7 +138,7 @@ const TEACHER_NAV = [
 // The phone bar's four destinations (More holds the rest). The instrument
 // build puts the Map where v1.0 put Tasks: it is a tab of that interface and
 // had no phone entry at all before (audit-interface item 2).
-const STUDENT_MOBILE_PRIMARY = new Set(INSTRUMENT_ON ? ['/', '/practice', '/map', '/progress'] : ['/', '/practice', '/tasks', '/progress']);
+const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/map', '/progress']);
 const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
 
 // In the instrument build the phone bar and the More sheet call these places
@@ -587,34 +585,14 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
-        {INSTRUMENT_ON ? (
-          <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
-            <InstrumentBar user={user} setUser={setUser} navItems={navItems}
-              accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
-          </React.Suspense>
-        ) : (
-          <header className="topbar">
-            <Logo onClick={() => nav('/', { replace: isCurrentUrl('/') })} />
-            <div className="top-stats">
-              <ThemeToggle />
-              <AccountMenu user={user} onSwitch={switchProfile} />
-            </div>
-          </header>
-        )}
+        {/* The one shell bar (the v1.0 top bar and rail are gone with the
+            v1.0 interface; client/interface.config.mjs). */}
+        <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
+          <InstrumentBar user={user} setUser={setUser} navItems={navItems}
+            accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
+        </React.Suspense>
 
         <div className="body-row">
-          {!INSTRUMENT_ON && <aside className="sidebar no-print">
-            <div className="sidebar-inner">
-              {navSections.map(section => (
-                <div className="nav-section" key={section.label}>
-                  <div className="nav-section-label">{t(section.label)}</div>
-                  {section.items.map(item => destinationLink(item, 'nav-item'))}
-                </div>
-              ))}
-              <div className="nav-spacer" />
-              {user.role !== 'teacher' && <SidebarHistory recent={recent} />}
-            </div>
-          </aside>}
 
           <div className="main">
             {activated?.offline && (
@@ -635,7 +613,7 @@ export default function App() {
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
-                    <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
+                    <Route path="/map" element={studentOnly(<MapPage />)} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
@@ -674,7 +652,7 @@ export default function App() {
           return (
             <PageLink key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
-              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_ON ? INSTRUMENT_TAB_KEYS[item.to] || item.key : item.key)}</span>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_TAB_KEYS[item.to] || item.key)}</span>
             </PageLink>
           );
         })}
@@ -700,7 +678,7 @@ export default function App() {
               return (
                 <PageLink key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
                   aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
-                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_ON ? INSTRUMENT_TAB_KEYS[item.to] || item.key : item.key)}</span>
+                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_TAB_KEYS[item.to] || item.key)}</span>
                 </PageLink>
               );
             })}
@@ -712,43 +690,6 @@ export default function App() {
   );
 }
 
-function SidebarHistory({ recent }) {
-  const nav = useNavigate();
-  const t = useT();
-  if (!recent.length) {
-    return (
-      <div className="nav-hist">
-        <div className="nav-hist-title">{t('app.questionHistory')}</div>
-        <div className="muted" style={{ fontSize: 12 }}>{t('app.noQuestionsYet')}</div>
-      </div>
-    );
-  }
-  return (
-    <div className="nav-hist">
-      <div className="nav-hist-title">{t('app.questionHistory')}</div>
-      {recent.slice(0, 3).map(it => {
-        const cls = it.correct === true ? 'g' : it.correct === false ? 'b' : 'w';
-        return (
-          <button key={it.id} className="hist-mini" onClick={() => nav('/review')}>
-            <div className="hist-mini-top">
-              <span className="hist-mini-name">{it.subtopicName}</span>
-              <span className={`hist-mini-pct ${cls}`}
-                aria-label={it.correct === true ? t('app.correct') : it.correct === false ? t('app.incorrect') : t('app.notMarkedYet')}>
-                {it.correct === true ? <Icon name="check" size={14} /> : it.correct === false ? <Icon name="correction" size={14} /> : '—'}
-              </span>
-            </div>
-            <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
-            <div className="hist-mini-tags">
-              <span className="tag" style={{ fontSize: 10.5 }}>{it.mode === 'practice' ? t('history.modePractice') : it.mode}</span>
-              <span className="tag" style={{ fontSize: 10.5 }}>{t('app.difficultyIs', { level: it.difficulty })}</span>
-            </div>
-          </button>
-        );
-      })}
-      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/review')}>{t('app.viewAll')}</button>
-    </div>
-  );
-}
 
 function initials(name = '') {
   return name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PL';
@@ -854,38 +795,7 @@ function AccountMenu({ user, onSwitch }) {
   );
 }
 
-function stripTex(s = '') {
-  return s.replace(/\$[^$]*\$/g, m => m.slice(1, -1).replace(/\\[a-zA-Z]+/g, '').replace(/[{}^_]/g, '')).slice(0, 80);
-}
 
-/** The theme actually on screen for a preference; re-renders when the device flips. */
-function useResolvedTheme(pref) {
-  return useSyncExternalStore(
-    notify => followSystemTheme(pref, notify),
-    () => resolveTheme(pref),
-    () => (cleanThemePref(pref) === 'dark' ? 'dark' : 'light')
-  );
-}
-
-function ThemeToggle() {
-  const { user, setUser } = useApp();
-  const t = useT();
-  // What is on screen decides the direction, so a profile following the device
-  // still flips to the other paper in one press (and then stops following).
-  const shown = useResolvedTheme(user.theme);
-  const flip = async () => {
-    const theme = shown === 'dark' ? 'light' : 'dark';
-    setUser({ ...user, theme });
-    try { await api.patch('/me', { theme }); } catch { }
-  };
-  return (
-    <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={shown === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
-      style={{ minWidth: 44, minHeight: 44, padding: 0 }}>
-      <Icon name={shown === 'dark' ? 'sun' : 'moon'} size={17} />
-    </button>
-  );
-}
 
 function ToastLayer({ toasts }) {
   // Always mounted, so a screen reader hears each toast as it arrives.
