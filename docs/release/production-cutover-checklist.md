@@ -155,8 +155,9 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
       verification email, sign in, sync between two devices, teacher class + assignment, account
       export, account deletion. Test accounts only; record results as synthetic evidence.
       Scripted part: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"`
-      runs steps 0 and A–E (one-time-code sign-in with a real mailbox, guardian confirmation,
-      handwriting and photo read + server mark with SYNTHETIC pictures, the A/B isolation probe) and
+      runs steps S0–S7 (one-time-code sign-in with a real mailbox, guardian confirmation and
+      withdrawal, handwriting and photo read + server mark with SYNTHETIC pictures, the returning
+      student's History, the student A / B2 isolation probe; S8 is cleanup) and
       prints a `HUMAN STEP` line for every code a person must read. Device steps are
       `docs/release/device-matrix.md`.
 - [ ] 24 hours with no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 (§4.5).

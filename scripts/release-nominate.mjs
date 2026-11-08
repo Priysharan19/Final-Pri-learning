@@ -716,7 +716,7 @@ async function main() {
     if (report.ok && report.stage === 'candidate') {
       console.log(`${title}: PASS — ${report.sha} — ${passed}/${counted} checks (release evidence not yet required)`);
       console.log('');
-      console.log('This tool pushed nothing and printed no promotion. Next: staging acceptance A–D, the device matrix on the TestFlight / Play build of this SHA, the 24 h soak,');
+      console.log('This tool pushed nothing and printed no promotion. Next: staging acceptance S0–S8, the device matrix on the TestFlight / Play build of this SHA, the 24 h soak,');
       console.log('then `node scripts/release-nominate.mjs <sha>` without --candidate and `node scripts/release-dossier.mjs <sha>` (postgres-cutover.md §4.6).');
     } else if (report.ok) {
       console.log(`${title}: PASS — ${report.sha} — ${passed}/${counted} checks`);
@@ -727,7 +727,7 @@ async function main() {
       }
       console.log('');
       console.log(`This tool pushed nothing. The verify command below takes the engine production serves (${report.engine}); a Postgres cutover is never inferred from a promotion (postgres-cutover.md §4.6 step 6).`);
-      console.log('Before promoting: the 24 h clean staging soak (§4.5) under a merge freeze, acceptance A–D on staging (tools/acceptance/staging-acceptance.mjs),');
+      console.log('Before promoting: the 24 h clean staging soak (§4.5) under a merge freeze, acceptance S0–S8 on staging (tools/acceptance/staging-acceptance.mjs),');
       console.log('the GO/NO-GO dossier for this exact SHA (scripts/release-dossier.mjs) and the approval the release record names (ios/PriLearning.swiftpm/RELEASE.md §11). Then, by hand:');
       console.log('');
       for (const line of report.promotion) console.log(`  ${line}`);

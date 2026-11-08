@@ -47,7 +47,7 @@ cases" gate and nothing else.
    test track (TestFlight; Play internal testing). Write down the SHA the app's diagnostics show — it is
    recorded with every case and must equal the nominated one.
 2. The server side of the same journey already passed on staging without a device:
-   `node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<name>"` (steps 0, A–E).
+   `node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<name>"` (steps S0–S7).
    A device case that fails where the staging acceptance passed is a shell or input defect; one that
    fails in both is a server defect.
 3. You have: a real mailbox on the device (step 02), a second mailbox or phone for the parent (step 03,
