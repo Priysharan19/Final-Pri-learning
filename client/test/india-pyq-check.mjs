@@ -27,6 +27,11 @@
 import { installBrowserEnv } from './backend-check.mjs';
 
 installBrowserEnv();
+// This suite certifies the archive itself. Past papers are OFF for students by
+// default (engine/pastPapers.js, decision D23) and past-papers-flag-check.mjs
+// pins that default; here the switch is on, for this process and the
+// in-process server alike, so the archive stays proven while it waits.
+process.env.PRI_PAST_PAPERS = '1';
 // Papers are issued and marked by the server (owner decision 2026-10-10), so
 // the section that sits a paper runs against the real /v1 app, in-process, as
 // real verified accounts (support/online-authority.mjs).

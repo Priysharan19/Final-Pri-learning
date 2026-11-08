@@ -4,6 +4,7 @@ import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { featureEnabled } from '../platform/features.js';
+import { pastPapersEnabled } from '../engine/pastPapers.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import {
@@ -56,6 +57,10 @@ function ProfilePractice() {
   // the chapter the request is refused with a reason rather than quietly
   // serving an authored one, so the label on the card is always true.
   const pyqOnly = params.get('pyq') === '1';
+  // The filter is offered only while past papers are switched on (decision
+  // D23: off until a rights opinion exists). An old link with pyq=1 is still
+  // read, and the server's refusal then explains itself.
+  const pastPapersOn = pastPapersEnabled();
   const assignmentClassId = params.get('classId');
   const assignmentId = params.get('assignment');
   const assignmentMode = !!assignmentClassId && !!assignmentId;
@@ -464,7 +469,7 @@ function ProfilePractice() {
           </span>
         </div>
         <div className="ws-bar-end">
-          {user.course === 'in' && !assignmentMode && !taskId && (
+          {pastPapersOn && user.course === 'in' && !assignmentMode && !taskId && (
             <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
               title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
               {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
@@ -520,7 +525,7 @@ function ProfilePractice() {
             India-only. */}
         {((user.course === 'in' && !assignmentMode && !taskId) || subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
           <div className="row ws-filter-inline" style={{ gap: 8 }}>
-            {user.course === 'in' && !assignmentMode && !taskId && (
+            {pastPapersOn && user.course === 'in' && !assignmentMode && !taskId && (
               <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
                 title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
                 {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
