@@ -1581,6 +1581,8 @@ async function run() {
     const darkErr = await rejects('with the tutor off, a help request is refused', POST(`/practice/${dark.question.id}/tutor`, { level: 1 }), { status: 404 });
     eq('— as disabled', darkErr?.code, 'TUTOR_DISABLED');
     await rejects('and so are captions', POST(`/practice/${dark.question.id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 404 });
+    const darkDiag = await rejects('and so is "What went wrong?"', POST(`/practice/${dark.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] } }), { status: 404 });
+    eq('— as disabled', darkDiag?.code, 'TUTOR_DISABLED');
     eq('the bridge itself refuses to call out', (await requestTutorHelp({ level: 'nudge' })).error?.code, 'TUTOR_DISABLED');
     eq('nothing reached /v1/tutor', tutorCalls.length, 0);
     eq('and nothing was charged to the question', (await idb.get('questions', dark.question.id)).tutorLevel || 0, 0);
@@ -1679,6 +1681,29 @@ async function run() {
     const caps = await POST(`/practice/${wid}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
     eq('rephrased captions come back by id, the rest deterministic', caps.captions.map(c => [c.id, c.source]), [['solution-0', 'tutor'], ['solution-1', 'deterministic']]);
     eq('the walkthrough request carries the captions', tutorCalls.at(-1)?.level, 'walkthrough');
+
+    // "What went wrong?" — explains the engine's verdict, never changes it.
+    reply = () => ({ tutor: { source: 'model', level: 'diagnose', diagnosis: { didRight: 'You set it up.', wentWrong: 'You skipped a step.', nextStep: 'Find it first.', wentWrongLine: 0 } } });
+    const rowBeforeDiag = await idb.get('questions', wid);
+    const diagResolved = await POST(`/practice/${wid}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong', locale: 'en' });
+    eq('a resolved question can be diagnosed by the tutor', [diagResolved.source, diagResolved.diagnosis?.wentWrong, diagResolved.diagnosis?.nextStep], ['tutor', 'You skipped a step.', 'Find it first.']);
+    const diagSent = tutorCalls.at(-1) || {};
+    eq('as a diagnosis of a resolved question, with the engine’s final-answer status', [diagSent.level, diagSent.resolved, diagSent.studentWork?.finalAnswer], ['diagnose', true, 'wrong']);
+    ok('with a per-line verdict for each line', Array.isArray(diagSent.studentWork?.lineStatus) && diagSent.studentWork.lineStatus.length === 1, show(diagSent.studentWork));
+    eq('naming the issued question and sending none of its solution', ['question', 'prompt', 'steps', 'answer', 'hints', 'solution'].filter(k => k in diagSent), []);
+    const rowAfterDiag = await idb.get('questions', wid);
+    eq('a resolved diagnosis charges nothing and moves no mark', [rowAfterDiag.tutorLevel, rowAfterDiag.answered, rowAfterDiag.resolution?.correct],
+      [rowBeforeDiag.tutorLevel, rowBeforeDiag.answered, rowBeforeDiag.resolution?.correct]);
+    const openDiag = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
+    eq('an open attempt’s diagnosis is sent as open', tutorCalls.at(-1)?.resolved, false);
+    eq('and is charged like the first tutor level', (await idb.get('questions', openDiag.question.id)).tutorLevel, 1);
+    reply = () => ({ error: { code: 'TUTOR_UNAVAILABLE', status: 503 } });
+    const diagDown = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
+    eq('an outage gives no diagnosis and says why', [diagDown.source, diagDown.code, diagDown.diagnosis], ['deterministic', 'TUTOR_UNAVAILABLE', null]);
+    eq('and charges nothing more', (await idb.get('questions', openDiag.question.id)).tutorLevel, 1);
+    const emptyDiag = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: [] } });
+    eq('with nothing written there is nothing to diagnose', emptyDiag.code, 'TUTOR_NOTHING_TO_DIAGNOSE');
 
     // Offline: the real bridge with no cloud configured.
     setTutorTransportForTests(null);
@@ -1932,6 +1957,7 @@ async function run() {
       await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
       await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
       await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
+      await locked(`a ${label} active exam question cannot be diagnosed by the tutor`, POST(`/practice/${id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' }));
       await locked(`a ${label} active exam question cannot be asked about in the tutor conversation`, POST(`/practice/${id}/tutor/ask`, { message: 'what is the answer?' }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
       await locked(`a ${label} active exam question cannot be marked through practice`,

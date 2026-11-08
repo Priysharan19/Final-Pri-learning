@@ -245,6 +245,53 @@ const fakeStream = events => async (body, { onEvent }) => { for (const [event, d
   ok(/tutorStream: \(body, \{ onEvent, signal = null, timeoutMs = 45000 \} = \{\}\) =>\s*cloudStreamRequest\('\/v1\/tutor\/stream'/.test(transport), 'the stream goes through the audited transport boundary');
 }
 
+// ── 6 · "What went wrong?" — only with the tutor on, only on a wrong result ───
+{
+  const { showDiagnoseButton, finalAnswerStatus } = await import('../src/tutor/diagnoseGate.js');
+  const wrong = { correct: false };
+  ok(showDiagnoseButton({ tutorEnabled: true, resolved: true, res: wrong }), 'with the tutor on, a resolved wrong answer offers "What went wrong?"');
+  ok(showDiagnoseButton({ tutorEnabled: true, resolved: false, res: wrong, gradedRetry: true }), 'and so does a graded wrong first try');
+  ok(!showDiagnoseButton({ tutorEnabled: false, resolved: true, res: wrong }), 'with the tutor OFF the button does not exist');
+  ok(!showDiagnoseButton({ resolved: true, res: wrong }), 'nor when the flag is unknown');
+  ok(!showDiagnoseButton({ tutorEnabled: true, resolved: true, res: { correct: true } }), 'never on a right answer');
+  ok(!showDiagnoseButton({ tutorEnabled: true, resolved: true, res: { correct: false, revealed: true } }), 'never after Reveal — no work of theirs was judged');
+  ok(!showDiagnoseButton({ tutorEnabled: true, resolved: true, res: { correct: false, invalid: true } }), 'never on an entry the engine could not read');
+  ok(!showDiagnoseButton({ tutorEnabled: true, diagnostic: true, resolved: true, res: wrong }), 'never on a placement check');
+  ok(!showDiagnoseButton({ tutorEnabled: true, resolved: false, res: wrong, gradedRetry: false }), 'never before anything was judged');
+  eq([finalAnswerStatus(wrong), finalAnswerStatus({ correct: true }), finalAnswerStatus(null)], ['wrong', 'correct', 'unknown'], "the final-answer status is the engine's");
+
+  const card = read('src/components/QuestionCard.jsx');
+  const gate = card.indexOf('showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry })');
+  const button = card.indexOf('data-tutor-diagnose');
+  ok(gate > 0 && button > gate && button - gate < 1500, 'QuestionCard renders the button only inside the tutor-enabled gate');
+  ok(card.split('data-tutor-diagnose').length === 2, 'and nowhere else');
+  ok(/const MistakeDiagnosis = TUTOR_BUILT_OUT \? null : React\.lazy/.test(card), 'the diagnosis panel is a lazy chunk, not built when the tutor is built out');
+  const panel = read('src/tutor/MistakeDiagnosis.jsx');
+  ok(/\/practice\/\$\{questionId\}\/tutor\/diagnose/.test(panel) && !/steps|answerText|solution/.test(panel.replace(/\/\/.*$/gm, '')), 'the panel asks through the local backend and never handles the solution itself');
+  ok(!/sparkle|glow|✨|gradient/i.test(panel), 'plain instrument styling: no sparkles, no glow');
+  for (const key of ['tutor.diagnose.button', 'tutor.diagnose.title', 'tutor.diagnose.close', 'tutor.diagnose.asking', 'tutor.diagnose.unavailable', 'tutor.diagnose.fromTutor', 'tutor.diagnose.fromChecker', 'tutor.diagnose.right', 'tutor.diagnose.wrong', 'tutor.diagnose.next', 'tutor.diagnose.markNote']) {
+    ok(typeof en[key] === 'string' && typeof hi[key] === 'string' && en[key] !== hi[key], `${key} is in both catalogues`);
+  }
+  eq(en['tutor.diagnose.button'], 'What went wrong?', 'the button says what it does');
+  const backend = read('src/local/backend.js');
+  const routeAt = backend.indexOf("'POST /practice/:id/tutor/diagnose'");
+  const route = backend.slice(routeAt, backend.indexOf("'POST /practice/:id/tutor/ask'", routeAt));
+  ok(/if \(!tutorFeatureEnabled\(\)\) throw tutorDisabledError\(\);/.test(route) && /assertPracticeRow\(row\);/.test(route), 'the local route refuses with the tutor off and refuses an exam row');
+  ok(!/row\.(correct|answered|score|marks?)\s*=/.test(route), 'and never writes a mark or a verdict');
+
+  // The bridge: off means nothing is sent; a diagnosis may ask for longer.
+  const { requestTutorHelp, setTutorTransportForTests } = await import('../src/local/tutorBridge.js');
+  let seen = null;
+  setTutorTransportForTests(async (body, opts) => { seen = opts; return { tutor: { level: body.level } }; });
+  globalThis.__PRI_TUTOR_OVERRIDE__ = false;
+  eq((await requestTutorHelp({ level: 'diagnose' })).error?.code, 'TUTOR_DISABLED', 'with the tutor off the bridge sends nothing');
+  eq(seen, null, 'and the transport is never called');
+  globalThis.__PRI_TUTOR_OVERRIDE__ = true;
+  await requestTutorHelp({ level: 'diagnose' }, { timeoutMs: 58_000 });
+  eq(seen?.timeoutMs, 58_000, 'a diagnosis is given its longer timeout');
+  setTutorTransportForTests(null);
+}
+
 console.log(failures.length
   ? `TUTOR UI: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `TUTOR UI: PASS — ${pass}/${pass} checks — streamed through the audited transport, falls back to the request route, grounded by the local backend, 44px targets and a live transcript.`);

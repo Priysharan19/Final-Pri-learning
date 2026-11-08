@@ -3771,6 +3771,59 @@ const routes = {
       code: outcome?.error?.code || null
     };
   },
+  // "What went wrong?" — a diagnosis of working the deterministic engine has
+  // already judged. It explains the verdict and never changes it: nothing here
+  // touches the mark. Asked while the attempt is still open it is help, so it is
+  // charged like the first tutor level (once); asked after the question is
+  // resolved it costs nothing, because the mark is already decided. The
+  // server grounds a server-issued question in its own escrow and decides for
+  // itself whether that question is resolved; it never takes the device's word.
+  'POST /practice/:id/tutor/diagnose': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    const q = row.payload;
+    const resolvedRow = !!row.answered;
+    const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+    if (!resolvedRow && used < 1) {
+      row.tutorLevel = 1;
+      await put('questions', row);
+    }
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
+          solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const work = tutorWork(q, body?.work);
+    if (!work.lines.length && !work.typedAnswer) {
+      return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: Number(row.tutorLevel) || 0 };
+    }
+    const finalAnswer = ['correct', 'wrong'].includes(body?.finalAnswer) ? body.finalAnswer : 'unknown';
+    const request = tutorRequest(p, row, q, solution, {
+      level: 'diagnose', locale: body?.locale,
+      work: { ...work, lineStatus: work.lines.map((_, i) => (i === work.firstBreak ? 'break' : i < work.verifiedLines && (work.firstBreak < 0 || i < work.firstBreak) ? 'ok' : 'unknown')), finalAnswer },
+      resolved: resolvedRow
+    });
+    // A diagnosis waits for a high-effort model: longer than the ladder's 25 s.
+    const outcome = request ? await requestTutorHelp(request, { timeoutMs: 58_000 }) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const d = outcome?.tutor?.diagnosis;
+    const clean = d && typeof d === 'object' ? {
+      didRight: sanitizeText(d.didRight, 400) || '',
+      wentWrong: sanitizeText(d.wentWrong, 400) || '',
+      nextStep: sanitizeText(d.nextStep, 400) || '',
+      wentWrongLine: Number.isInteger(d.wentWrongLine) ? d.wentWrongLine : -1
+    } : null;
+    return {
+      diagnosis: clean && clean.wentWrong ? clean : null,
+      source: outcome?.tutor?.source === 'model' ? 'tutor' : 'deterministic',
+      code: outcome?.tutor?.source === 'model' ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
+      tutorLevel: Number(row.tutorLevel) || 0
+    };
+  },
+
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
   // The route module (and the conversation and streaming code behind it) is
@@ -5418,7 +5471,10 @@ function tutorWork(q, raw) {
 }
 
 /** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
-function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+function tutorRequest(p, row, q, solution, { level, locale, work, captions, resolved }) {
+  // `resolved` belongs to a diagnosis only (the server refuses it elsewhere);
+  // for a server-issued question the server decides it from its own records.
+  const diagnosis = level === 'diagnose' ? { resolved: resolved === true } : {};
   if (row.serverQuestionId) {
     // Server-issued: name the question, send the student's own work, and
     // nothing else. No prompt, step, answer or hint leaves the device for it —
@@ -5431,7 +5487,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       locale: lang === 'hi' ? 'hi' : 'en',
       serverQuestionId: String(row.serverQuestionId),
       studentWork: work,
-      ...(captions ? { captions } : {})
+      ...(captions ? { captions } : {}),
+      ...diagnosis
     };
   }
   if (!solution) return null;
@@ -5454,7 +5511,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       hints: (Array.isArray(q.hints) ? q.hints : []).slice(0, 6).map(h => String(h).slice(0, 500))
     },
     studentWork: work,
-    ...(captions ? { captions } : {})
+    ...(captions ? { captions } : {}),
+    ...diagnosis
   };
 }
 
