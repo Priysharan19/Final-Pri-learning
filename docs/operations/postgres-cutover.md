@@ -38,13 +38,13 @@ printed):
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | **Session mode only:** not Supavisor's transaction port **6543** (authority, `?port=` or `PGPORT`), no `pgbouncer=` (other than `false`), no `pool_mode=transaction`/`statement` | `config.js assertSessionModeUrl` (from `postgresConnectionSettings`, before any pool exists) | `PLATFORM_DB_TRANSACTION_POOLER` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = **13** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = **14** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
 ### Schema versions and the migrations that set them
 
-`server/platform/schemaVersions.js` is the authority; this table is its reading at schema **13** /
+`server/platform/schemaVersions.js` is the authority; this table is its reading at schema **14** /
 billing **6**. A deployed build boots only against a database at exactly these numbers
 (`PLATFORM_DB_SCHEMA_MISMATCH` otherwise), so a schema-changing merge and its migration are one
 back-to-back operation (§2.6).
@@ -62,8 +62,9 @@ back-to-back operation (§2.6).
 | schema 11 | `20261007000000_security_hardening.sql` | staff MFA, guardian-withdraw credential, append-only `audit_log`, per-account RLS on the sync tables | owner-approved, written at the time |
 | schema 12 | `20261016000000_rls_fail_closed.sql` (#522) | RLS deny-by-default: every `pri` table requires a declared `pri.scope` (`system` or `account`); the 19 account-owned tables admit only system scope or their own account; the store declares the scope on every statement | `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql` |
 | **schema 13** | `20261019000000_rls_account_coverage.sql` (train 10, security P2) | **account RLS on every account-bearing table**: `accounts`, the class/teacher tables, issue reports, the nullable-account billing ledgers, OTP challenges, the audit trail, content authorship, teacher invites and feature-flag provenance get a RESTRICTIVE `pri_account_scope` (system scope, or account scope on the row's own owner column); no row changes | `docs/release/rollback/20261019000000_rls_account_coverage.rollback.sql` |
+| **schema 14** | `20261022000000_parent_report.sql` (parent weekly report) | `parent_report_links` (a parent's double-opt-in address, its state and sealed unsubscribe credential) and `parent_report_sends` (one row per account and week); both account-scoped under RLS (`pri_scope_required` + RESTRICTIVE `pri_account_scope`), cascade with the account | `docs/release/rollback/20261022000000_parent_report.rollback.sql` (drops both tables: deletes the links and the send ledger) |
 
-Applied on staging: all ten up to schema 12, in this order (schema 12 on 2026-10-18 by §2.5); schema 13 is applied right after train 10 merges. Applied on
+Applied on staging: all ten up to schema 12, in this order (schema 12 on 2026-10-18 by §2.5); schema 13 is applied right after train 10 merges; schema 14 (parent report) right after its PR merges. Applied on
 production: none.
 
 ### Connection: session mode only (mandatory, enforced at boot)
@@ -168,7 +169,8 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261007000000_security_hardening.sql           (schema 11: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
 #        20261016000000_rls_fail_closed.sql              (schema 12: every table requires a declared pri.scope; 19 account-owned tables fail closed)
 #        20261019000000_rls_account_coverage.sql         (schema 13: account RLS on the 15 other account-bearing tables)
-#      The list must end at the versions schemaVersions.js states (schema 13 / billing 6);
+#        20261022000000_parent_report.sql                (schema 14: parent weekly report link + send ledger, account-scoped RLS)
+#      The list must end at the versions schemaVersions.js states (schema 14 / billing 6);
 #      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
@@ -430,7 +432,7 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 13 / 6; a build from before
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 14 / 6; a build from before
   schema 12 declares no `pri.scope`, so under deny-by-default RLS it reads nothing even where it
   boots). Builds with the
   version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only
@@ -445,7 +447,8 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first: `20261019000000_rls_account_coverage` (schema 13; rollback
+off newest first: `20261022000000_parent_report` (schema 14; rollback
+`docs/release/rollback/20261022000000_parent_report.rollback.sql`, which deletes the report links and send ledger), `20261019000000_rls_account_coverage` (schema 13; rollback
 `docs/release/rollback/20261019000000_rls_account_coverage.rollback.sql`), `20261016000000_rls_fail_closed` (schema 12; its reviewed rollback is
 `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql`, owner-approved only),
 `20261007000000_security_hardening` (schema 11), `20261006000000_otp_sign_in` (schema 10),

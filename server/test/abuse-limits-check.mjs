@@ -27,7 +27,9 @@ const { LOCKOUT_MAX_FAILURES } = await import('../platform/loginLockout.js');
 const { RESET_MAILBOX_LIMIT } = await import('../platform/accounts.js');
 
 const c = checks();
-const h = await startApp({ engine: requestedEngine() });
+// The parent report is off by default (D22); its declared limits are proved
+// like every other route's, so it is switched on here.
+const h = await startApp({ engine: requestedEngine(), parentReport: { enabled: true } });
 const db = h.db;
 const inventory = loadInventory();
 const resetLimits = () => db.run('DELETE FROM rate_limits');

@@ -135,7 +135,7 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1', PRI_FEATURE_PARENT_REPORT: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -1121,6 +1121,12 @@ async function run() {
       await goTo(page, BASE, '/plan');
       await page.waitForSelector('[data-plan-day]', { timeout: 20000 });
       await wait(page, 800);
+    });
+
+    await step('for parents · the weekly report (or its premium/consent answer)', '/parent-report', async () => {
+      await goTo(page, BASE, '/parent-report');
+      await page.waitForSelector('[data-parent-report], [data-parent-error]', { timeout: 20000 });
+      await wait(page, 600);
     });
 
     await step('notes · index and chapter map', '/notes', async () => {

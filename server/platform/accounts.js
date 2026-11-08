@@ -792,6 +792,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
+    // The parent weekly report: who it goes to (masked, as the guardian's
+    // address is) and when each week's report was sent. Never the tokens.
+    const parentLink = await db.get('SELECT recipient_email,status,requested_at,confirmed_at,stopped_at,stopped_by FROM parent_report_links WHERE account_id=?', [accountId]);
+    const parentSends = await db.all('SELECT week_start,status,skip_reason,sent_at FROM parent_report_sends WHERE account_id=? ORDER BY week_start', [accountId]);
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -835,7 +839,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null,
           guardianPhone: consent.row?.guardian_phone ? maskPhone(consent.row.guardian_phone) : null,
           method: consent.row?.method || null, noticeVersion: consent.row?.notice_version || null }
-        : null
+        : null,
+      parentReport: {
+        link: parentLink ? { recipient: maskEmail(parentLink.recipient_email), status: parentLink.status,
+          requestedAt: Number(parentLink.requested_at), confirmedAt: parentLink.confirmed_at == null ? null : Number(parentLink.confirmed_at),
+          stoppedAt: parentLink.stopped_at == null ? null : Number(parentLink.stopped_at), stoppedBy: parentLink.stopped_by || null } : null,
+        sends: parentSends.map(row => ({ weekStart: Number(row.week_start), status: row.status, skipReason: row.skip_reason || null,
+          sentAt: row.sent_at == null ? null : Number(row.sent_at) }))
+      }
     });
   });
 
