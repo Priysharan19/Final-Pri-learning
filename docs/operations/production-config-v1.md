@@ -125,6 +125,11 @@ not tool faults, and each is a production step to get right:
 | `provider-sign-in-off` | a Google web client id is set on staging | none on production (D3): do not copy staging's Google sign-in variables |
 | public origin | `fetch failed`: `app.prilearning.com` does not answer yet | the custom domain (owner checklist item 2, note 7) |
 
+**Again on `63deeb757`, later on 9 Nov, with row 11's probe added: `FAIL — 23/27`.** `app.prilearning.com`
+now answers with staging's release (the domain is attached to staging, as note 7 plans), so the
+public-origin row passes, as does `test-mailbox-off` (the field does not exist yet). The four billing
+and sign-in rows above still fail, for the same staging reasons.
+
 ## 3. The human checks (what no public request can see)
 
 Variable checks read **names and non-secret values only**, in Railway → production → `/v1` service →
