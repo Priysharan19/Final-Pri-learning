@@ -701,3 +701,5 @@ if (failures.length) process.exit(1);
 // workflows or lowering the existing exact NCERT case-count assertion.
 await import('./marker-adversarial-corpus-check.mjs');
 await import('./marker-exact-bounds-check.mjs');
+// The independent R4 review of #723: its four regressions, pinned.
+await import('./marker-step14-review-check.mjs');

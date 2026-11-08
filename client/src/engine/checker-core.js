@@ -18,7 +18,7 @@ import {
   parseVectorInput, sameVector,
   parseComplexInput, sameComplex
 } from './answer-forms.js';
-import { unitContradicts, withoutUnit, writtenUnit, unitsNamed, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
+import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
 import { exactValue, fraction } from './exact.js';
 
@@ -135,10 +135,16 @@ const GIVEN_PERCENT = /(?:\$[^$]*\d[^$]*\$|\\\([^)]*\d[^)]*\\\)|\d[\d.,/]*)\s*pe
 // whatever the prompt mentions on the way; otherwise a prompt that talks in
 // paise ("How many paise are there in half a rupee?") asks in paise.
 const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+/** A box that counts rupees in a scale word: crore, lakh, million, thousand… */
+const RUPEE_SCALE = /^(?:crores?|lakhs?|lacs?|millions?|billions?|thousands?|hundreds?|arabs?)(?:\s+(?:of\s+)?rupees)?$/i;
 /** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
 function moneyQuestion(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
   if (RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || /paise/i.test(suffix)) return true;
+  // A box that counts rupees in crores, lakhs or millions asks for money when
+  // the prompt is priced in rupees: "₹98.1" beside "crore" is ₹98.1 crore
+  // (#723 review P1 — c7-place-value-systems-reasoning).
+  if (RUPEE_SCALE.test(suffix.trim())) return RUPEE_MARK.test(prompt);
   // An answer box with any other unit beside it (%, km, students) asks for
   // something that is not money, whatever the prompt is priced in: 2000 paise
   // is not a 20% profit (#518).
@@ -261,6 +267,38 @@ function askedFor(question) {
   }
   return { math, nouns, vertices };
 }
+// The dimension an asked noun names, by its head word. Anything else — a
+// price, a root, a rate of change, a count — has no dimension a written unit
+// could match, so a unit on it is left unread.
+const NOUN_DIMENSIONS = [
+  [/(?:perimeter|length|height|width|breadth|side|radius|diameter|distance|circumference|altitude|depth|thickness|rectum|chord)$/, ['length']],
+  [/area$/, ['length²']],
+  [/(?:volume|capacity)$/, ['length³', 'volume']],
+  [/(?:speed|velocity)$/, ['rate:length/time']],
+  [/(?:time|duration)$/, ['time']],
+  [/(?:mass|weight)$/, ['mass']]
+];
+/** The dimensions the asked quantity can be written in, or an empty set. */
+function askedDimensions(question) {
+  const found = new Set();
+  for (const noun of askedFor(question).nouns) {
+    for (const [pattern, dims] of NOUN_DIMENSIONS) if (pattern.test(noun)) { dims.forEach(d => found.add(d)); break; }
+  }
+  // The asking sentence can name the unit itself: "How many metres are
+  // left?", "Find the total mass in kg.", "… its area in cm²?"
+  const sentences = String(question?.prompt ?? '').replace(/\$/g, ' ').replace(/\\(?:text|mathrm)\s*\{([^{}]*)\}/g, ' $1 ')
+    .split(/(?<=[.?!])\s+(?=[A-Z])/);
+  const asking = sentences[sentences.length - 1] || '';
+  for (const named of [asking.match(/\bhow\s+many\s+([a-z]+(?:\s+per\s+[a-z]+)?)/i)?.[1],
+    asking.match(/\bin\s+((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°]+(?:\s*(?:\^?[23]|[²³]))?(?:\s*(?:\/|per)\s*[a-zA-Z]+)?)\s*[.?!]?\s*$/i)?.[1]]) {
+    const unit = named ? canonicalUnit(named) : null;
+    const dim = unit && !/^units/.test(unit) ? unitDimension(unit) : null;
+    if (dim) found.add(dim);
+  }
+  // Two different kinds of quantity asked at once: no single dimension is asked.
+  const kinds = new Set([...found].map(d => (d === 'volume' ? 'length³' : d)));
+  return kinds.size === 1 ? found : new Set();
+}
 const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;
 /**
  * Read a label off the answer when it names what the question asks for.
@@ -293,6 +331,9 @@ export function readAnswerLabel(question, raw) {
     for (const g of promptText.matchAll(new RegExp(`(^|[\\s,(;])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?!\\s*:\\s*-?\\d)(?=[\\s,.;)]|$)`, 'g'))) {
       const before = promptText.slice(0, g.index + g[1].length).replace(/\s+$/, '');
       if (/[+\-*/^=<>·×÷\d)]$/.test(before) || /\\(?:angle|vec|hat|bar|overline|overrightarrow)$/.test(before)) continue;
+      // "h = 13 + 3.5w" is a model whose subject is h, not a given value of h
+      // (#723 review — ms12-bivariate): the number goes on into an expression.
+      if (/^\s*(?:[+\-−–*/^·×÷]|\\(?:times|cdot|div)\b)/.test(promptText.slice(g.index + g[0].length))) continue;
       given = true;
       break;
     }
@@ -326,6 +367,19 @@ export function readAnswerLabel(question, raw) {
   const head = quantityKey(headWords.join(' '));
   const bareKey = quantityKey(bare);
   if ([key, bareKey, head].some(k => k && (math.includes(k) || nouns.includes(k)))) return { input: m[2], asked };
+  // "Profit % = 20", "Loss % = 12", "% profit = 20": a percentage sign in the
+  // label says the value is a percentage of the asked quantity (#723 review).
+  // Matched with the percentage words taken off both sides, the value is read
+  // with its sign, and the percent rule below decides whether a percentage was asked.
+  if (/%|\bper\s?cent(?:age)?\b/i.test(label)) {
+    const unPct = k => String(k).replace(/%|percentage|percent|percent/g, '');
+    const stripped = unPct(bareKey);
+    if (stripped && nouns.some(n => unPct(n) === stripped)) return { input: /%\s*$/.test(m[2]) ? m[2] : `${m[2]}%`, asked };
+    // A percentage label this reader cannot match to the ask ("Loss % = 12"
+    // on "By what percentage did the price fall?") is left unread: no try is
+    // spent on how the answer was labelled.
+    return { unread: 'Write the percentage on its own — like 12%.', asked };
+  }
   return { input: raw, asked };
 }
 
@@ -657,6 +711,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         // names a different quantity on the same letter is refused.
         const labelled = readAnswerLabel(question, rawInput);
         if (labelled.refuse) return { correct: false, feedback: labelled.refuse };
+        if (labelled.unread) return { correct: false, invalid: true, feedback: labelled.unread };
         rawInput = labelled.input;
         // A percentage is written once, at the end: "65%", "65 percent", "(65%)".
         // Any other % — "(6500%)" read as 65, "6500%%", "6500% + 0" — is a
@@ -706,14 +761,24 @@ function checkAnswerWithinBudget(question, rawInput) {
         if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) rawInput = withoutUnit(rawInput);
         // With no unit beside the answer box, a unit the student writes is
         // checked, not stripped and ignored: "24 kg" is not a length of 24
-        // (#680, Q1 round 3). It is read only when the question itself names
-        // that unit ("8 cm by 4 cm … perimeter": 24 cm), or is the generic
-        // "units". Otherwise the answer is returned unread — no credit and no
-        // try spent — since the dimension is not guessed from the wording.
+        // (#680, Q1 round 3). It is read only when its dimension is the asked
+        // quantity's (a perimeter is a length, an area a length², a volume a
+        // length³ or litres) AND the question states a quantity in that unit
+        // ("8 cm by 4 cm … perimeter": 24 cm) — or, for the generic "units",
+        // when the dimension matches. "24 square units" is not a length, and
+        // "g" in g(x) states no grams (#723 review P2). Otherwise the answer
+        // is returned unread — no credit and no try spent — since the
+        // dimension is never guessed.
         if (!question.answerSuffix && !angleUnit && typeof rawInput === 'string') {
           const got = writtenUnit(rawInput);
           if (got && got !== '°' && got !== 'rad') {
-            if (!/^units/.test(got) && !unitsNamed(question.prompt).has(got)) {
+            const wanted = askedDimensions(question);
+            // Stated in the same unit, at any power: an area asked from lengths
+            // in cm is in cm²; a rate must be stated whole.
+            const base = u => (u.includes('/') ? u : u.replace(/[²³]$/, ''));
+            const stated = [...unitsStated(question.prompt)].map(base);
+            const fits = wanted.has(unitDimension(got)) && (/^units/.test(got) || stated.includes(base(got)));
+            if (!fits) {
               // A number written wrongly ("1, 234 cm") is told how a number is written first.
               try { parseNumericInput(rawInput); } catch (err) { if (err?.message === 'Not a single number') throw err; }
               return { correct: false, invalid: true, feedback: `This question does not ask for an answer in ${got}. Write the number on its own, or with the unit the question uses.` };
