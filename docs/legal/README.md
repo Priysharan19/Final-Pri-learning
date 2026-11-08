@@ -27,6 +27,15 @@ and `counsel/README.md` says how the owner sends them:
   `npm run test:legal`) fails if a quote or a location drifts from the tree.
 - `counsel/COUNSEL-INFORMATION-PACK.md` — the background and all 35 questions.
 
+## Status, 9 November 2026
+
+- The privacy notice's D18 sentences (EN + HI) now say what the accounts
+  stream's code does (#736): an unconfirmed or withdrawn child account is
+  closed 30 days after creation or withdrawal and erased 7 days later, and a
+  guardian's request closes it at once and erases it 7 days later. The
+  nomination gate recognises that code's names and prints
+  `PRI_CHILD_ERASURE=enforce` as a production setting the notice depends on.
+
 ## Status, 8 November 2026
 
 - The terms no longer say the app "follows the NCERT syllabus": they use the

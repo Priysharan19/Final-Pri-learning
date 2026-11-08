@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { legalPromiseGaps } from './legal-promises.mjs';
+import { legalPromiseGaps, legalPromiseSettings } from './legal-promises.mjs';
 import { nominate } from '../scripts/release-nominate.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,7 +15,8 @@ const SHA = 'a'.repeat(40);
 let count = 0;
 const ok = (value, message) => { assert.ok(value, message); count += 1; };
 
-const PROMISE = 'or if they withdraw, the account and everything it holds are deleted\n30 days after that.';
+const PROMISE = 'closed: it stops working and every sign-in on it ends. Everything it holds is\nerased 7 days later.';
+const OLD_PROMISE = 'or if they withdraw, the account and everything it holds are deleted\n30 days after that.';
 const reader = files => async path => {
   if (path in files) return files[path];
   throw new Error(`${path} is not at this commit`);
@@ -35,6 +36,24 @@ const noJob = await legalPromiseGaps(reader({ ...notice, ...route }));
 ok(noJob.length === 1 && /housekeeping job/.test(noJob[0]), 'a route without the job is a gap');
 ok((await legalPromiseGaps(reader({ 'docs/legal/privacy.md': 'No such promise.' }))).length === 0,
   'a notice that does not make the promise is not held to it');
+ok((await legalPromiseGaps(reader({ 'docs/legal/privacy.md': OLD_PROMISE }))).length === 2,
+  'the earlier wording ("deleted 30 days after that") is held to the same code');
+
+// The accounts stream's own names (#736): runChildErasure( in housekeeping and
+// POST /guardian/erase in accounts.js, beside /guardian/withdraw.
+const accountsStream = {
+  ...notice,
+  'server/platform/housekeeping.js': "import { runChildErasure } from './childErasure.js';\n    childErasure = await runChildErasure(db, {",
+  'server/platform/accounts.js': "router.post('/guardian/withdraw', handler);\n  router.post('/guardian/erase', rateLimit(db, 'guardian-erase', { limit: 20 }), async (req, res) => {"
+};
+ok((await legalPromiseGaps(reader(accountsStream))).length === 0, 'the accounts stream\'s runChildErasure( and POST /guardian/erase close both gaps');
+ok((await legalPromiseGaps(reader({ ...accountsStream, 'server/platform/accounts.js': "router.post('/guardian/withdraw', handler);" }))).length === 1,
+  'accounts.js with only /guardian/withdraw is still the route gap');
+
+// A promise that holds only where production sets a variable says so.
+const settings = await legalPromiseSettings(reader(accountsStream));
+ok(settings.length === 1 && /^PRI_CHILD_ERASURE=enforce on production/.test(settings[0]), 'the D18 promise names PRI_CHILD_ERASURE=enforce as a production setting');
+ok((await legalPromiseSettings(reader({ 'docs/legal/privacy.md': 'No such promise.' }))).length === 0, 'a notice without the promise needs no setting');
 const unreadable = await legalPromiseGaps(reader({}));
 ok(unreadable.length === 1 && /could not be read/.test(unreadable[0]), 'a notice that cannot be read at the commit fails closed');
 
@@ -72,8 +91,11 @@ const report = async files => nominate({
 const ROW = 'the notices promise nothing this commit does not do';
 const gapRow = (await report({ ...notice })).results.find(row => row.label === ROW);
 ok(gapRow?.ok === false && /housekeeping job/.test(gapRow.detail), 'nomination fails at a commit whose notice runs ahead of its code, and says why');
-const cleanRow = (await report({ ...notice, ...housekeeping, ...route })).results.find(row => row.label === ROW);
+const cleanReport = await report({ ...notice, ...housekeeping, ...route });
+const cleanRow = cleanReport.results.find(row => row.label === ROW);
 ok(cleanRow?.ok === true, 'nomination passes that row once the code is at the commit');
+const settingRow = cleanReport.results.find(row => /production settings the notices depend on/.test(row.label));
+ok(settingRow?.ok === null && /PRI_CHILD_ERASURE=enforce/.test(settingRow.detail || ''), 'and prints PRI_CHILD_ERASURE=enforce for the operator to confirm, without claiming it is set');
 const source = readFileSync(join(ROOT, 'scripts/release-nominate.mjs'), 'utf8');
 ok(/legalPromiseGaps\(path => git\(\['show', `\$\{expected\}:\$\{path\}`\]\)\)/.test(source),
   'the nomination asks about the nominated commit, not the working tree');

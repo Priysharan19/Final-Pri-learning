@@ -260,27 +260,60 @@ exists. The privacy notice already promises both. A production nomination is ref
 notice promises them and the nominated commit lacks them, so the promise cannot reach production
 ahead of the code.
 
+**What the accounts stream builds (pull request #736, lane L2, not merged):**
+
+- **Who:** only a student account recorded as a child at creation. "Never confirmed" counts from
+  the account's creation (asking again does not restart the clock); "withdrawn" counts from the
+  withdrawal. Adults, older accounts with no age on record, staff, and a child whose guardian
+  confirmed an older notice are never selected.
+- **Two steps.** On day 30 the account is closed: it can no longer sign in, its sessions end, its
+  links and codes are spent and its unsent mail is dropped. Seven days later (`ERASURE_GRACE_MS`)
+  it is erased through the same deletion transaction as an account holder's own deletion. The
+  seven days are an operator's window to see the counts and restore an account closed by mistake;
+  a guardian confirming during them does not reopen it.
+- **The switch.** Because D18 is provisional and the period is yours to set, the automatic 30-day
+  rule acts only where the operator sets `PRI_CHILD_ERASURE=enforce`; otherwise it only counts the
+  accounts it would close. A guardian's own erasure request is honoured in every mode: the account
+  stops working at once and is erased seven days later.
+- **The guardian's route:** `POST /v1/account/guardian/erase`, reached from a second link in the
+  withdrawal email (the confirmation link works too).
+- The notice now says what that code does ("closed", then "erased 7 days later"). The nomination
+  prints `PRI_CHILD_ERASURE=enforce` as a production setting the notice depends on, for the
+  operator to confirm; code cannot see production's settings.
+
 **Current text** · `docs/legal/privacy.md`
 
-> **If no parent or guardian confirms within 30 days** of the account being
-> created, or if they withdraw, the account and everything it holds are deleted
-> 30 days after that. A parent or guardian can also ask us to delete the account
+> **If no parent or guardian has confirmed the account 30 days after it was
+> created**, or 30 days after a parent or guardian withdraws, the account is
+> closed: it stops working and every sign-in on it ends. Everything it holds is
+> erased 7 days later. A parent or guardian can also ask us to erase the account
 > without the child's login, from the link in our email or by writing to the
-> address under Your rights.
+> address under Your rights; it then stops working at once and is erased 7 days
+> later.
 
 **Lives in** · `tools/legal-promises.mjs` · `PROMISES`
+**Lives in** · `tools/legal-promises.mjs` · `PRI_CHILD_ERASURE=enforce`
 **Lives in** · `scripts/release-nominate.mjs` · `legalPromiseGaps`
 
-**Not yet in the code:** the housekeeping job that erases those accounts and the guardian's
-erasure route. Lane L2 (accounts) builds them; the nomination gate names what it looks for.
+**Not yet in the code:** the erasure job (`runChildErasure` in `server/platform/childErasure.js`,
+run by housekeeping every six hours, with `UNCONSENTED_CHILD_RETENTION_MS` = 30 days and
+`ERASURE_GRACE_MS` = 7 days) and the guardian's route. Both are in #736; this section names their
+files once it merges.
 
 **For counsel:**
 
-1. Is 30 days, then 30 more, the right period, and from which event should each run? (Q10)
-2. May a guardian request erasure without the child's login on the strength of the withdrawal link
-   or an email to the grievance officer, given that the confirmation does not establish who the
-   guardian is? (Q10)
-3. Must erasure reach backups within a stated period, and must the notice give that period? (Q23)
+1. Is 30 days the right period, counted from creation for an account no guardian confirmed and
+   from the withdrawal for one a guardian withdrew? (Q10)
+2. Is a seven-day window between closing the account and erasing it acceptable, for the automatic
+   rule and for a guardian's own request? Must the notice say what happens during it?
+3. May the app launch with the automatic rule switched off (counting only) until you set the
+   period, given that the notice promises it? Engineering's position is that the notice is true
+   only where `PRI_CHILD_ERASURE=enforce` is set, so production must set it or the notice must
+   change first.
+4. May a guardian request erasure without the child's login on the strength of the withdrawal or
+   confirmation link, or an email to the grievance officer, given that the confirmation does not
+   establish who the guardian is? (Q10)
+5. Must erasure reach backups within a stated period, and must the notice give that period? (Q23)
 
 ## 6. Email to parents about minors [D22]
 

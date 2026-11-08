@@ -1,6 +1,6 @@
 # Privacy notice
 
-**Last updated: 2 November 2026**
+**Last updated: 9 November 2026**
 
 This notice explains what Pri Learning collects, why, and what you can ask us to
 do about it. It is written for students and parents in India, and it is meant to
@@ -144,11 +144,13 @@ subscribe, or use either server setting. The same email lets them withdraw at
 any time, which stops all of that at once — marking, reading, exams and sync; a
 withdrawn confirmation cannot be given again with the same link.
 
-**If no parent or guardian confirms within 30 days** of the account being
-created, or if they withdraw, the account and everything it holds are deleted
-30 days after that. A parent or guardian can also ask us to delete the account
+**If no parent or guardian has confirmed the account 30 days after it was
+created**, or 30 days after a parent or guardian withdraws, the account is
+closed: it stops working and every sign-in on it ends. Everything it holds is
+erased 7 days later. A parent or guardian can also ask us to erase the account
 without the child's login, from the link in our email or by writing to the
-address under Your rights.
+address under Your rights; it then stops working at once and is erased 7 days
+later.
 
 **What that confirmation proves, and what it does not.** It shows that someone
 who can read that email inbox followed the link or entered the code. It does
@@ -206,9 +208,9 @@ We do not sell your data. We do not share it for advertising.
   to five years, or until you delete your account, whichever comes first.
 - Telemetry, including crash reports, is limited to an allow-list of fields and
   is deleted after 90 days.
-- An account of someone under 18 whose parent or guardian has not confirmed it
-  within 30 days, or has withdrawn, is deleted 30 days after that, as described
-  under Children.
+- An account of someone under 18 that no parent or guardian has confirmed 30
+  days after it was created, or 30 days after a parent or guardian withdrew, is
+  closed then and erased 7 days later, as described under Children.
 - When you delete your account it is deleted at once — there is no waiting
   period. That removes your profile, your sign-in details and every session,
   your synced work and answer records, your exam papers, your class memberships

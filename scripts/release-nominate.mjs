@@ -82,7 +82,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, readLedger, summarise } from './device-matrix-record.mjs';
-import { legalPromiseGaps } from '../tools/legal-promises.mjs';
+import { legalPromiseGaps, legalPromiseSettings } from '../tools/legal-promises.mjs';
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -520,6 +520,8 @@ export async function nominate({
   if (commitKnown) {
     const gaps = await legalPromiseGaps(path => git(['show', `${expected}:${path}`]));
     check(gaps.length === 0, 'the notices promise nothing this commit does not do', gaps.join('; ') || undefined);
+    const settings = await legalPromiseSettings(path => git(['show', `${expected}:${path}`]));
+    if (settings.length) info('production settings the notices depend on (confirm them on production; not visible from here)', settings.join('; '));
   }
 
   // ── GitHub Actions on exactly this SHA ─────────────────────────────────────

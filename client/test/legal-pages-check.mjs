@@ -436,8 +436,10 @@ for (const [event, label] of [[gradedEvent, 'the graded-attempt event'], [synced
 ok(/Exam papers[^.]*up to five years/i.test(privacy), 'and the five-year life of exam records');
 ok(/crash reports?/i.test(privacy) && /Never the error message/i.test(privacy),
   'and discloses coded crash reports, saying what they never contain');
-ok(/deleted 30 days after that/i.test(privacy) && /without the child's login/i.test(privacy),
-  'and promises the 30-day erasure of an unconfirmed or withdrawn child account and a guardian’s right to ask for erasure (D18, built in the accounts stream)');
+ok(/30 days after it was\s+created/i.test(privacy) && /is\s+closed/i.test(privacy) && /erased 7 days later/i.test(privacy) && /without the child's login/i.test(privacy),
+  'and promises D18 as the accounts stream builds it (#736): closed 30 days after creation or withdrawal, erased 7 days later, and a guardian may ask for erasure without the child’s login');
+ok(!/deleted\s+30\s+days\s+after\s+that/i.test(privacy),
+  'and no longer says "deleted 30 days after that", which the code does not do (it closes the account, then erases it 7 days later)');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),
   'the notice admits that a profile without a password is not encrypted');
 
