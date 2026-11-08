@@ -568,8 +568,12 @@ enum JourneySelfCheck {
     // end to end on the deployed service — the D17 prompt, a reading, a
     // server mark, History — not that any answer is right. It ends by
     // deleting the test account it made.
-    private static let staging = helpers + cardHelpers + oracleHelpers + cloudHelpers.replacingOccurrences(of: helpers, with: "") + #"""
+    private static let staging = helpers + cardHelpers + oracleHelpers + #"""
     let inkId = null;
+    async function openSettings() {
+      history.pushState({}, '', '/settings'); dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => q('#cloud-account-title'), 30000);
+    }
     await step('stagingCardOnboarding', async () => cardOnboard(email));
     await step('stagingInkRead', async () => {
       at = 'practice'; await route('/practice'); await waitFor(() => q('.q-prompt') && qid(), 60000); await sleep(800);
@@ -619,7 +623,7 @@ enum JourneySelfCheck {
       return 'History holds the handwritten attempt';
     });
     await step('stagingDeleteAccount', async () => {
-      at = 'settings'; await settings();
+      at = 'settings'; await openSettings();
       at = 'phrase'; setValue(await waitFor(() => q('#cloud-delete-phrase'), 30000), 'DELETE'); await sleep(150);
       at = 'send'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-send-code]'); return b && !b.disabled && b; })).click();
       at = 'code box'; await waitFor(() => q('#cloud-delete-code-0'), 60000);
