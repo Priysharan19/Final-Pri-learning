@@ -29,6 +29,12 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
+// What a button says: its text without markup, and without the aria-hidden
+// shortcut hint (<kbd aria-hidden>) the Instrument draws beside the label.
+const buttonText = inner => inner.replace(/<kbd[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/kbd>/g, '').replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<[^>]+>/g, '').trim();
+// The action bar's primary button (the in-card sign-in button is primary too).
+const primaryLabel = html => { const bar = /<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || ''; const m = /<button[^>]*class="btn btn-primary"[^>]*>([\s\S]*?)<\/button>/.exec(bar); return m ? buttonText(m[1]) : null; };
+
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
@@ -344,7 +350,9 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
       ok(button && button[1] === en['check.signInAction'] && !/\sdisabled(=""|\s|>)/.test(button[0]), `${mode}: with the sign-in in the card, enabled`);
       ok(!/href="\/settings"/.test(block) && !/Account settings/.test(block), `${mode}: never a link to Settings`);
       ok(html.indexOf('data-check-needs-account') < html.indexOf('ws-actions') && html.indexOf('data-check-needs-account') > html.indexOf('ws-tools'), `${mode}: placed with the work, directly above the Submit bar`);
-      ok(new RegExp(`<button[^>]*class="btn btn-primary"[^>]*>${en['verdict.submit']}</button>`).test(html), `${mode}: Submit is still the primary action`);
+      // The Instrument's primary button carries its scan glyph and an
+      // aria-hidden shortcut hint around the label: the label is what it says.
+      ok(primaryLabel(html) === en['verdict.submit'], `${mode}: Submit is still the primary action (${JSON.stringify(primaryLabel(html))})`);
       ok(!/eval-card|verdict-title|data-outcome|solution-panel|eval-marks/.test(html), `${mode}: no verdict, marks or solution on an unchecked question`);
       ok(/data-phase="answering"/.test(html), `${mode}: the card is open for work`);
       const linked = card(signedIn, mode);
@@ -461,7 +469,7 @@ ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count tow
       return renderToStaticMarkup(React.createElement(AppCtx.Provider, { value: { user, celebrate: noop, refreshUser: noop, refreshDue: noop, refreshRecent: noop, toast: noop } },
         React.createElement(QuestionCard, { question, onNext: noop, onReplace: noop })));
     };
-    const buttons = html => [...(/<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || '').matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(m => m[1]);
+    const buttons = html => [...(/<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || '').matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map(m => buttonText(m[1]));
     for (const user of [{ id: 'p', cloudLinked: false }, { id: 'p', cloudLinked: true }]) {
       for (const mode of ['type', 'write', 'photo']) {
         const html = card(user, { ...base, checkState: 'draft' }, mode);
