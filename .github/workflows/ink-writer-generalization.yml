@@ -29,6 +29,13 @@ on:
       - 'handwriting/v17/**'
       - '.github/workflows/ink-writer-generalization.yml'
 
+concurrency:
+  # Pull-request runs share one group per branch, so a newer push supersedes the
+  # queued or running check. Every other run (main, schedule, manual dispatch)
+  # gets its own group, so it is never cancelled or replaced while pending.
+  group: ink-writer-generalization-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
