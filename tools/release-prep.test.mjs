@@ -119,12 +119,12 @@ const scratch = [];
         const sha = device === 'other-sha' ? OTHER : SHA;
         const blocked = device === 'all-blocked' || (device === 'android-blocked' && android);
         if (!blocked && android) {
-          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', buildKind: 'play-internal', server: 'production', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
           continue;
         }
         lines.push(JSON.stringify(blocked
           ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no device of this family available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
-          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', buildKind: 'testflight', server: 'production', severity: failing ? 'P1' : null, sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
       }
       if (device === 'one-missing') lines.pop();
     }
@@ -139,16 +139,18 @@ const scratch = [];
     }
     return { dir, ledger, readerDir };
   }
+  // Every case of the two Apple families (the matrix grows by group; the counts follow CASES).
+  const APPLE_CASES = CASES.filter(c => c.family === 'IPH' || c.family === 'IPD').length;
   {
     const full = evidence();
     eq(validateLedger(full.ledger).length, 0, 'the complete device fixture passes the recorder\'s own validation (it is what a real ledger would hold)');
     const dev = deviceEvidence(SHA, { ledger: full.ledger });
-    ok(dev.ok && dev.counts.pass === 36 && dev.counts.blocked === 0 && /device-complete/.test(dev.detail), 'deviceEvidence: every case of all four families passed on real hardware is device-complete');
+    ok(dev.ok && dev.counts.pass === CASES.length && dev.counts.blocked === 0 && /device-complete/.test(dev.detail), 'deviceEvidence: every case of all four families passed on real hardware is device-complete');
     const androidBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'android-blocked' }).ledger });
-    ok(!androidBlocked.ok && androidBlocked.counts.pass === 18 && androidBlocked.counts.blocked === 18 && androidBlocked.incompleteFamilies.join(',') === 'AND,ANT' && /never acceptance/.test(androidBlocked.detail),
+    ok(!androidBlocked.ok && androidBlocked.counts.pass === APPLE_CASES && androidBlocked.counts.blocked === CASES.length - APPLE_CASES && androidBlocked.incompleteFamilies.join(',') === 'AND,ANT' && /never acceptance/.test(androidBlocked.detail),
       'deviceEvidence: Android families blocked for lack of hardware are reported by name and are NOT device-complete (V1 scope §22.1: each device class)');
     const allBlocked = deviceEvidence(SHA, { ledger: evidence({ device: 'all-blocked' }).ledger });
-    ok(!allBlocked.ok && allBlocked.counts.pass === 0 && allBlocked.counts.blocked === 36, 'deviceEvidence: a matrix of 36 blocked rows and no physical pass is not acceptance (Q4 #696 counterexample)');
+    ok(!allBlocked.ok && allBlocked.counts.pass === 0 && allBlocked.counts.blocked === CASES.length, `deviceEvidence: a matrix of ${CASES.length} blocked rows and no physical pass is not acceptance (Q4 #696 counterexample)`);
     ok(!deviceEvidence(OTHER, { ledger: full.ledger }).ok, 'deviceEvidence: another SHA has no evidence of its own');
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-fail' }).ledger }).ok, 'deviceEvidence: one fail is incomplete');
     ok(!deviceEvidence(SHA, { ledger: evidence({ device: 'one-missing' }).ledger }).ok, 'deviceEvidence: one not-run case is incomplete');
@@ -640,7 +642,7 @@ const scratch = [];
     // The device-matrix table the dossier embeds holds tester-typed text too.
     const matrix = reportMarkdown({ sha: 'a'.repeat(40), counts: { pass: 1, fail: 0, blocked: 0, 'not run': 0 }, rows: [{ id: 'DM-IPH-01-INSTALL', latest: { result: 'pass', device: 'iPhone | forged', os: 'iOS 26', pencil: null, sha: 'a'.repeat(40), tester: 'Priya\rExample', recordedAt: '2026-10-19T01:00:00Z', notes: String.raw`ok\| PASS |` + '\r\r# GO CERTIFIED (matrix)' } }] });
     const matrixRow = normalise(matrix).split('\n').find(l => l.includes('DM-IPH-01-INSTALL')) || '';
-    ok(!/\r/.test(matrix) && !forgedHeading(matrix) && [...matrixRow.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 10, `a device-matrix note cannot add a row, a column or a heading to the matrix table (${matrixRow})`);
+    ok(!/\r/.test(matrix) && !forgedHeading(matrix) && [...matrixRow.matchAll(/(?<!\\)(?:\\\\)*\|/g)].length === 14, `a device-matrix note cannot add a row, a column or a heading to the 13-column matrix table (${matrixRow})`);
   }
   const dossierSource = read('scripts/release-dossier.mjs');
   ok(!/\[\s*'push'/.test(dossierSource) && !/railway|update_ref|deploy\/production'\]/.test(dossierSource.replace(/\/\/.*$/gm, '')), 'the dossier source never pushes, deploys or moves the pointer');

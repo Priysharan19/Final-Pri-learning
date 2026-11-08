@@ -327,11 +327,15 @@ export function casesMarkdown() {
 function mdCell(text) { return String(text ?? '').replace(/\r\n|[\r\n\u000b\u000c\u0085\u2028\u2029]/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|'); }
 
 export function reportMarkdown(summary, soak = { soaks: [], minutes: 0, failures: 0 }) {
+  // A summary built by hand (the dossier's own tests, an older caller) may
+  // lack the severity and build-kind tallies: they read as zero, never crash.
+  const bySeverity = { P0: 0, P1: 0, P2: 0, P3: 0, ...(summary.bySeverity || {}) };
+  const byBuildKind = Object.fromEntries(BUILD_KINDS.map(k => [k, { pass: 0, fail: 0, blocked: 0, ...(summary.byBuildKind?.[k] || {}) }]));
   const scope = `${summary.sha ? `build ${summary.sha}` : 'all builds'}${summary.buildKind ? ` · ${summary.buildKind} builds` : ' · every build kind (development and store rows are listed, never merged into one verdict)'}`;
   const lines = [
-    `Physical-device matrix — ${scope} — pass ${summary.counts.pass} · fail ${summary.counts.fail} · blocked ${summary.counts.blocked} · not run ${summary.counts['not run']} of ${summary.rows.length} — open defects P0 ${summary.bySeverity.P0} · P1 ${summary.bySeverity.P1} · P2 ${summary.bySeverity.P2} · P3 ${summary.bySeverity.P3}${summary.releaseBlocking ? ` — ${summary.releaseBlocking} RELEASE-BLOCKING` : ''}`,
+    `Physical-device matrix — ${scope} — pass ${summary.counts.pass} · fail ${summary.counts.fail} · blocked ${summary.counts.blocked} · not run ${summary.counts['not run']} of ${summary.rows.length} — open defects P0 ${bySeverity.P0} · P1 ${bySeverity.P1} · P2 ${bySeverity.P2} · P3 ${bySeverity.P3}${summary.releaseBlocking ? ` — ${summary.releaseBlocking} RELEASE-BLOCKING` : ''}`,
     '',
-    `Rows by build kind: ${BUILD_KINDS.map(k => `${k} pass ${summary.byBuildKind[k].pass} / fail ${summary.byBuildKind[k].fail} / blocked ${summary.byBuildKind[k].blocked}`).join(' · ')}`,
+    `Rows by build kind: ${BUILD_KINDS.map(k => `${k} pass ${byBuildKind[k].pass} / fail ${byBuildKind[k].fail} / blocked ${byBuildKind[k].blocked}`).join(' · ')}`,
     `Soak: ${soak.soaks.length} record(s), ${soak.minutes} min in total, ${soak.failures} failure(s)${soak.soaks.length ? ` — ${soak.soaks.map(s => `${mdCell(s.device)} (${mdCell(s.os)}, ${mdCell(s.buildKind)} → ${mdCell(s.server)}) ${mdCell(s.minutes)} min by ${mdCell(s.tester)}, ${mdCell(s.failures)} failure(s)`).join('; ')}` : ''}`,
     '',
     '| Case | Group | Result | Severity | Device | OS | Pencil | Build | Server | Build SHA | Tester | Recorded | Notes |',
