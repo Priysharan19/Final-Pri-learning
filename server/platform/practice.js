@@ -44,6 +44,8 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
+// D15: only the India curriculum's banks are issued (indiaBanks.js).
+import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -325,6 +327,7 @@ function readQuestionRequest(body, fields) {
   if (body.curriculum !== 'in' || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
     return { error: [400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored question and difficulty 1–4.'] };
   }
+  if (!indiaBank(generator)) return { error: [BANK_OUTSIDE_INDIA.status, BANK_OUTSIDE_INDIA.code, BANK_OUTSIDE_INDIA.message] };
   const mode = body.mode ?? 'practice';
   if (!PRACTICE_MODES.includes(mode)) return { error: [400, 'PRACTICE_MODE_INVALID', 'Invalid practice mode.'] };
   const avoid = body.avoid === undefined ? [] : body.avoid;
@@ -358,6 +361,8 @@ function readQuestionRequest(body, fields) {
  */
 function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null,
   { draw = () => randomInt(0x80000000), tries = seekBudget(avoid?.size || 0) } = {}) {
+  // D15: a bank outside the India covers is never drawn from, by any route (a twin included).
+  if (!indiaBank(generator)) throw Object.assign(new Error(BANK_OUTSIDE_INDIA.message), { code: BANK_OUTSIDE_INDIA.code });
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
@@ -408,7 +413,7 @@ function readPrepared(token) {
   if (typeof token !== 'string' || token.length > 2000) return null;
   try {
     const v = JSON.parse(decryptDeliveryToken(token, PREPARED_CONTEXT));
-    if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
+    if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !indiaBank(v.g) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
         !PRACTICE_MODES.includes(v.m) || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
     return v;
   } catch { return null; }

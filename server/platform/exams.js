@@ -156,6 +156,7 @@ import {
   MARKING_BUSY, BUSY_MESSAGE, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } from './markerPool.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
+import { practicePapersAllowed } from './indiaBanks.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
 import { indiaExamPaperSpec, markObjective } from '../../client/src/engine/indiaExams.js';
@@ -512,6 +513,11 @@ function readPracticeSpec(body) {
 
 function readSpec(body) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
+  // D15: the practice paper is the NSW course's, built from banks outside the
+  // India curriculum's covers, so it is refused (indiaBanks.js).
+  if (body.kind === 'practice-paper' && !practicePapersAllowed()) {
+    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of the India curriculum.');
+  }
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
   // The title of a certified paper is the server's, from the blueprint. A

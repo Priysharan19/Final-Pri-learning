@@ -190,6 +190,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
+          grep -Fq 'INDIA BANKS (D15): PASS — 122/122 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
