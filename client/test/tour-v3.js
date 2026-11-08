@@ -26,6 +26,9 @@
 import { pathToFileURL } from 'node:url';
 
 const TOPIC = 'c7-finding-unknown-current';
+// The chapter's own name, as the card, History and the review print it
+// (CBSE Class 7; it replaced NSW Year 7 "Linear Equations", D2/D15).
+const TOPIC_NAME = 'Finding the Unknown';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 12;
 
@@ -48,7 +51,7 @@ export const flow = {
     await check('a question renders with a prompt', !!firstPrompt && firstPrompt.length > 8,
       `prompt reads ${JSON.stringify(firstPrompt)}`);
     await check('the card names the topic it came from',
-      (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
+      (await page.locator('.q-topmeta').innerText()).includes(TOPIC_NAME),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
     // Practice is deliberately untimed on screen: time on task is still
     // recorded with the attempt, but a running clock is pressure, not help.
@@ -198,13 +201,13 @@ export const flow = {
       scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
-      scores.every(t => t.includes('Linear Equations')),
+      scores.every(t => t.includes(TOPIC_NAME)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     // Each row names the real chapter (never a demo, generator or device label)
     // and dates it the India way: day then month ("22 Oct"), not "Oct 22".
     const names = await page.locator('.hist-row .hist-name').allInnerTexts();
     await check('each History row names the chapter, not a demo, generator or device',
-      names.length === 2 && names.every(n => /Linear Equations/.test(n)) && !names.some(n => /Pri demo|generator|iPad/i.test(n)),
+      names.length === 2 && names.every(n => n.includes(TOPIC_NAME)) && !names.some(n => /Pri demo|generator|iPad/i.test(n)),
       `names read ${JSON.stringify(names)}`);
     // The Scripts ledger groups rows under day headings; each row also states
     // its own date (data-history-date, and a spoken prefix), which is read here.
