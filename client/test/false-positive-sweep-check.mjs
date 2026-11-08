@@ -459,7 +459,13 @@ const expect = (name, cond) => { totals.regressions = (totals.regressions || 0) 
   const six = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 6 } };
   expect('list: "2, (3)" is not 6', !verdict(six, '2, (3)').correct);
   const sum = { answerType: 'numeric', prompt: 'Find the sum.', answer: { value: -15 } };
-  expect('a counting call keeps its argument commas: sum(k, k, -5, -1) is -15', verdict(sum, 'sum(k, k, -5, -1)').correct);
+  // The commas stay the call's arguments, never a list: the evaluator reads -15.
+  // As a numeric answer the sum is still to take, so D13 refuses it (unread, no try).
+  expect('a counting call keeps its argument commas: sum(k, k, -5, -1) reads as -15', evaluate(parse('sum(k, k, -5, -1)')) === -15);
+  expect('and as a numeric answer it is refused as unevaluated (D13), never credited or read as a list', (() => {
+    const r = verdict(sum, 'sum(k, k, -5, -1)');
+    return r.correct === false && r.invalid === true && /Work it out first/.test(r.feedback || '');
+  })());
   expect('a trailing comma separates nothing: "-2," is -2', verdict(neg, '-2,').correct);
   const big = { answerType: 'numeric', prompt: 'Find the number.', answer: { value: -1234 } };
   expect('list: grouped -1,234 is still one number', verdict(big, '-1,234').correct);
