@@ -1,8 +1,10 @@
 # Storyboard — "The Tangent" (36 s master, 1080×1920, 60 fps)
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 **Creative platform:** A student who understands can solve a problem they have never seen; a student who memorised cannot.
 
-**The one idea:** The whole film is a single mathematical object — the tangent line — seen four ways: as a formula memorised without meaning (Act I), as an idea genuinely understood (Act II), as the same mathematics at four pressures from Class 7 to Olympiad (Act III), and as an invitation (Close). Every shot either serves that idea or was cut.
+**The one idea:** The whole film is a single mathematical object — the tangent line — seen four ways: as a formula memorised without meaning (Act I), as an idea genuinely understood (Act II), as the same mathematics at four pressures from Class 7 to JEE Advanced (Act III), and as an invitation (Close). Every shot either serves that idea or was cut.
 
 **Grid:** 120 BPM. One beat = 0.5 s = 30 frames. Every cut lands on a beat. 36.00 s = 2160 frames.
 
@@ -79,33 +81,33 @@ through a depth corridor, each crossing the focal plane on a beat
 (20.5 · 21.5 · 22.5 · 23.5 · 24.5 · 25.5), sharpening as they cross, dying
 before they crowd the frame:
 
-1. **Question bank** — the counter rolls to 3,44,798 (en-IN; the measured figure the shipped marketing quotes).
-2. **Knowledge map** — the constellation draws itself: every topic, one web.
+1. **Question bank** — the counter rolls to 77 chapters (en-IN; the measured figure the shipped marketing quotes).
+2. **Knowledge map** — the constellation draws itself: chapters, one web.
 3. **Priorities** — the anti-factory feature, in the app's own voice: "Not quite. You keep flipping the sign when terms move." → misconception traced.
-4. **Predicted percentile** — 96.4 (illustrative) with the launch reel's disclaimer: "estimate from your practice data — not a guarantee of results."
+4. **Chapters practised** — 96.4 (illustrative) with the launch reel's disclaimer: "estimate from your practice data — not a guarantee of results."
 5. **Match Mode** — three race lanes, You in cream with the ♛ (rivals illustrative).
 6. **Full mocks** — a criteria fragment ✓2 ✓2 ✗1 → "4 / 5 · method marks kept."
 
-Then the run's punchline, set alone as the corridor empties: **"All of it offline."**
+Then the run's punchline, set alone as the corridor empties: **"Sign in. Connect. Practise."**
 
 - Audio: the film's forward gear — eighth-note bass groove with off-beat hats,
-  a whoosh + soft hit on every crossing, full strip-back under the offline line,
+  a whoosh + soft hit on every crossing, full strip-back under the sign-in line,
   riser into the ladder.
 
 ### S5 — THE LADDER · 26.50–33.00 (frames 1590–1980)
 One continuous upward camera move — not four products, one ladder. Five stations rise
 past, each the *same motif* (a line touching a curve) at a different pressure
-(station rhythm escalates: Class 7 and Olympiad breathe, the middle compresses;
+(station rhythm escalates: Class 7 and JEE Advanced breathe, the middle compresses;
 moves at 27.7 · 28.8 · 29.9 · 31.1):
 
 1. **Class 7** — proportion: y = 2x, y always double of x.
 2. **Class 10** — a tangent to a circle, radius ⊥ tangent at the point of contact.
 3. **Class 12** — the derivative: f′(x) = 2x (the card, finally understood).
 4. **JEE** — tangent to y² = 4x at (1, 2): x − y + 1 = 0.
-5. **Olympiad** — the tangent-line trick: eˣ ≥ 1 + x — *the seize question, now a
+5. **JEE Advanced** — the tangent-line trick: eˣ ≥ 1 + x — *the seize question, now a
    two-line proof.* The film answers its own opening wound.
 
-Caption, held across the move: **"Class 7 to Olympiad. The same mathematics, at
+Caption, held across the move: **"Class 7 to JEE Advanced. The same mathematics, at
 different pressures."**
 
 - Audio: rising figure, one step per station, building but understated; a riser into the close.

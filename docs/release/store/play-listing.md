@@ -65,8 +65,10 @@ production-ready claims.
 > and type your answers instead. You can delete your account in the app or at
 > <PRI_PUBLIC_ORIGIN>/account/delete-request.
 >
-> Pri Learning follows the NCERT syllabus and public examination patterns. It is not endorsed by,
-> affiliated with or approved by NCERT, CBSE, the NTA or any examination authority.
+> Pri Learning offers maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced:
+> 77 chapters. Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list, and Class 8
+> follows the earlier NCERT book. Marking is automatic and can be wrong. Pri Learning is not endorsed
+> by, affiliated with or approved by NCERT, CBSE, the NTA or any examination authority.
 
 Play metadata policy: no emoji-only lines, no ALL-CAPS beyond section labels, no "best", "#1",
 "top", "free" in the title, no testimonials, no ranking or price-promotion claims in the title or
