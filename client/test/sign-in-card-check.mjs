@@ -143,6 +143,10 @@ ok(/\.signup-social \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(signupC
 ok(/\.brand-wordmark \{[^}]*max-width: 100%/.test(instrumentCss),
   'the outlined wordmark itself contracts at 200% text zoom to avoid horizontal overflow');
 const login = read('pages/Login.jsx');
+ok(/className="muted auth-privacy">\{t\('login\.heroPrivacy'\)\}/.test(login)
+  && /className="sr-only">\{t\('login\.heroSub'\)\}/.test(login)
+  && !/<p className="muted"[^>]*>\{t\('login\.heroSub'\)\}<\/p>/.test(login),
+  'the welcome screen keeps the full explanation for assistive tech without duplicate visible footer paragraphs');
 const refusal = read('components/CheckRefusal.jsx');
 const gate = read('components/AccountActivationGate.jsx');
 const question = read('components/QuestionCard.jsx');

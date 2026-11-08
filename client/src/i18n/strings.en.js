@@ -2792,7 +2792,7 @@ export default {
 
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to Pri Learning",
-  'login.welcomeSub': "Your mathematics journey starts here.",
+  'login.welcomeSub': "Write your working. Get each step checked.",
   'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",

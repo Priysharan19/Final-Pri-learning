@@ -793,6 +793,7 @@ html.ui-instrument .auth-col > p.muted {
   max-width: 440px; font-size: 12.5px !important; line-height: 1.55;
   color: var(--in-tx-3); overflow-wrap: anywhere;
 }
+html.ui-instrument .auth-col > .auth-privacy { margin-top: 26px; text-align: left; }
 html.ui-instrument .signup-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
 html.ui-instrument .signin-landing .input, html.ui-instrument .auth-card .input {
   min-height: 48px; height: auto; border-radius: 6px; padding: 12px 14px;
