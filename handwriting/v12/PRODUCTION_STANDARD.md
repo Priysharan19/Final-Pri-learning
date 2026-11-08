@@ -21,6 +21,7 @@ A high character score cannot compensate for a structural error. `x^3` becoming 
 - Reading is answer-blind: the reader receives the picture and nothing else. No question, expected answer, solution, mark scheme or profile reaches it (`client/test/ink-answer-blind-static-check.mjs`).
 - Ambiguous recognition is not auto-marked; when the server says it is unsure the product asks for confirmation before marking.
 - A read happens only when the student asks for one, and nothing is marked without the student's confirmation of what was read.
+- Nothing is sent to be read until the student has accepted the one-time prompt that names OpenAI (default D17): declining, closing the prompt or a page with no prompt to ask with sends nothing, and declining keeps the student on typed answers (`client/src/ink/readerPermission.js`; `client/test/ink-reader-permission-check.mjs`, `client/test/tour-ink-reader-permission.js`). The prompt's wording is pending counsel and lives in the string catalogue under `readerPermission.*`.
 - Training, validation, test and final-holdout writers are disjoint.
 - The real-Pencil collector's displayed prompts and stored targets are contract-tested before collection; a ground-truth typo is a release-blocking data defect.
 
@@ -31,9 +32,11 @@ Required for every relevant release:
 - native Swift build succeeds on the pinned Xcode and iOS simulator runtime (the lane names them; a runner-image change cannot move a gate silently);
 - canonical and legacy SwiftPM packages are source-identical;
 - PencilKit ↔ JavaScript bridge: the surface mounts and positions where the page said, every stroke placed on it comes back through the bridge with **every point, its timing, pressure, azimuth and altitude intact** (`InkSelfCheck.swift`, scored by `scripts/ink-native-check.mjs`): **100% of strokes and points**, no coordinate moved by more than the codec's own sampling step;
-- the student journey passes on an iPhone and an iPad simulator (`scripts/iphone-journey.mjs`): strokes on the surface, hardware-correct ink facts, a sealed draft, a server-marked handwritten answer through the real `/v1` server with a scripted reader, History after a relaunch.
+- the student journey passes on an iPhone and an iPad simulator (`scripts/iphone-journey.mjs`): strokes on the surface, hardware-correct ink facts, a sealed draft, the D17 prompt before the first read, a server-marked handwritten answer through the real `/v1` server with a scripted reader, History after a relaunch;
+- on Android (D1: all Android software is finished; launch is iPhone and iPad first) the shared web canvas is the surface: on the emulator lane (`android-shell.yml`, `InkInputTest`) a finger arrives as touch, a stylus as pen with pressure, the stylus eraser end erases, rotation keeps the strokes, and the first read meets the D17 prompt before the server reading lands;
+- in the browser (`client/test/tour-ink-reader-permission.js`, phone and tablet viewports, a finger through Chromium's touch input): the prompt before anything is sent, declining then a typed answer marked by the server, accepting then a corrected transcript marked by the server on the same picture that was read, and ink written offline kept and read on return.
 
-This is a regression gate for capture and the journey. It says nothing about recognition accuracy, and it is simulator evidence, never device evidence.
+This is a regression gate for capture and the journey. It says nothing about recognition accuracy, and it is simulator, emulator and browser evidence, never device evidence.
 
 ## Gate B — reader contract and regression
 
