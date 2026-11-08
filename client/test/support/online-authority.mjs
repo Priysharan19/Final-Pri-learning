@@ -132,7 +132,12 @@ export const nextSubmissionId = (prefix = 'sub_suite') =>
 let current = null;
 export const currentOnlineAuthority = () => current;
 
-export async function startOnlineAuthority({ label = 'suite', keepRateLimits = false, ink = false, env = {} } = {}) {
+// `nswBanks: true` — D15: a production server never issues a bank outside the
+// India covers (server/platform/indiaBanks.js). A suite that drives the legacy
+// NSW flows (Year 7–12 subtopics, the practice paper) as its vehicle says so
+// here, at its own call; server/test/india-banks-check.mjs pins the refusal.
+export async function startOnlineAuthority({ label = 'suite', keepRateLimits = false, ink = false, env = {}, nswBanks = false } = {}) {
+  if (nswBanks) (await import('../../../server/platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
   const prior = Object.fromEntries([...ENV_NAMES, ...Object.keys(env)].map(name => [name, process.env[name]]));
   const scratch = mkdtempSync(join(tmpdir(), `pri-online-${label}-`));
   process.env.NODE_ENV = 'test';

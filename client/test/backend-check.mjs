@@ -622,7 +622,7 @@ async function run() {
   // submits, reveals or starts an exam does it against the real /v1 app, as a
   // real verified account linked to the local profile.
   const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
-  const online = await startOnlineAuthority({ label: 'backend', ink: true });
+  const online = await startOnlineAuthority({ label: 'backend', ink: true, nswBanks: true });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);

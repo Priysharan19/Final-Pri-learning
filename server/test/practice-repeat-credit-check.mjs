@@ -14,6 +14,10 @@ import { join } from 'node:path';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-repeat-credit-'));
 process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because it uses NSW banks (y7-equations, y10-stats, a practice paper) as the vehicle for repeat credit;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 // D12: method marks are off by default — production marks the final answer only
 // until an examiner signs (#499). This suite pins the method rubric itself, so it
 // turns the server switch on; marking-policy-check.mjs pins the default.

@@ -434,7 +434,7 @@ async function run() {
   // a solution or start an exam do it as a real verified account against the
   // real /v1 app, and the last group attacks that authority from the device.
   const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
-  const online = await startOnlineAuthority({ label: 'security' });
+  const online = await startOnlineAuthority({ label: 'security', nswBanks: true });
   const { sanitizeFigure, sanitizeText } = await import(`${SRC}lib/sanitize.js`);
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);

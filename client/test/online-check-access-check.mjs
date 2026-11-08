@@ -217,7 +217,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 // be marked: that refusal offers the next question instead.
 {
   const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-  const online = await startOnlineAuthority({ label: 'online-check-access' });
+  const online = await startOnlineAuthority({ label: 'online-check-access', nswBanks: true });
   const { api } = await import('../src/api.js');
   const idb = await import('../src/local/idb.js');
   const recovery = await import('../src/components/practiceRecovery.js');
