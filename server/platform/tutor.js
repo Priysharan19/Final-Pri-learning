@@ -136,6 +136,7 @@ export const DIAGNOSIS_TEXT = Object.freeze({
     wrongAt: 'Your working first goes wrong at line {n}: {line}. It does not follow from the line before it.',
     wrongFinal: 'Each line the checker could judge holds, but your final answer does not match.',
     wrongUnplaced: 'The checker has not placed a break in these lines.',
+    unchecked: 'Couldn’t check your working this time — try again.',
     nextStep: 'Next: {step}.',
     nextGeneric: 'Next: go back to the last line that checks out and redo the step after it.'
   }),
@@ -145,6 +146,7 @@ export const DIAGNOSIS_TEXT = Object.freeze({
     wrongAt: 'आपके हल में पहली गलती पंक्ति {n} में है: {line}। यह पिछली पंक्ति से नहीं निकलती।',
     wrongFinal: 'जाँची गई हर पंक्ति सही है, पर आपका अंतिम उत्तर मेल नहीं खाता।',
     wrongUnplaced: 'जाँचकर्ता ने इन पंक्तियों में कोई गलती चिह्नित नहीं की है।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
     nextStep: 'अगला क़दम: {step}।',
     nextGeneric: 'अगला क़दम: आख़िरी सही पंक्ति पर लौटें और उसके बाद का क़दम फिर से करें।'
   })
@@ -227,7 +229,9 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
         ...(diagnose ? {
           lineStatus: issued.resolved ? lineStatusFrom(request.studentWork.lines.length, evidence) : request.studentWork.lines.map(() => 'unknown'),
           finalAnswer: 'unknown',
-          lostMarks: []
+          lostMarks: [],
+          // The Step Check did not run (cooldown, busy, deadline): said plainly.
+          ...(issued.resolved && evidence.unchecked ? { unchecked: true } : {})
         } : {})
       }
     }
@@ -513,7 +517,7 @@ export function deterministicDiagnosis(request) {
   const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
   const asMath = line => `$${String(line).replace(/\$/g, '')}$`;
   const didRight = lastOk >= 0 ? fill(copy.rightLines, { line: asMath(lines[lastOk]) }) : copy.rightNone;
-  const wentWrong = firstBreak >= 0 && firstBreak < lines.length
+  const wentWrong = request.studentWork.unchecked ? copy.unchecked : firstBreak >= 0 && firstBreak < lines.length
     ? fill(copy.wrongAt, { n: firstBreak + 1, line: asMath(lines[firstBreak]) })
     // Only a resolved question's final-answer status is spoken; an open attempt
     // is told nothing about correctness that the engine did not place (F3).
@@ -777,6 +781,10 @@ export function createTutorRouter(db, {
           source: 'fallback', guarded: false, reason, model: null, resolved: !!request.resolved, cached: false
         } });
       };
+
+      // A resolved diagnosis whose Step Check did not run says so, and asks no
+      // model: with no verdict to explain, a model would invent one.
+      if (diagnosing && request.studentWork.unchecked) return deterministicOnly('STEP_CHECK_UNAVAILABLE');
 
       if (!providerConfig(env).configured) {
         if (diagnosing) return deterministicOnly('TUTOR_NOT_CONFIGURED');

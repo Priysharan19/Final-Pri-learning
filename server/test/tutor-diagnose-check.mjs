@@ -173,6 +173,15 @@ const d1 = deterministicDiagnosis(resolvedReq);
 ok(/12/.test(d1.nextStep) && /4/.test(d1.nextStep), 'once resolved, the fallback gives the whole verified step');
 ok(/आपके हल में पहली गलती पंक्ति 2/.test(deterministicDiagnosis(validateTutorRequest(body({ locale: 'hi' })).request).wentWrong), 'the fallback has Hindi copy');
 
+// Regression (owner, staging): a Step Check that timed out or was in cooldown
+// must be SAID, never shown as nothing or as "no break found".
+{
+  const silentCheck = { ...resolvedReq, studentWork: { ...resolvedReq.studentWork, firstBreak: -1, verifiedLines: 0, lineStatus: ['unknown', 'unknown'], unchecked: true } };
+  const du = deterministicDiagnosis(silentCheck);
+  eq(du.wentWrong, 'Couldn’t check your working this time — try again.', 'a Step Check that did not run is said plainly');
+  ok(!/not placed a break/.test(du.wentWrong), 'and is never presented as "no break found"');
+}
+
 // ── 5 · The route ─────────────────────────────────────────────────────────────
 const engine = requestedEngine();
 const test = await openTestStore(engine, { label: 'tutor-diagnose' });
