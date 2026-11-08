@@ -291,6 +291,17 @@ export const flow = {
         const a = await page.evaluate(AUDIT);
         await check(`${tag}: every control has an accessible name`, a.unnamed.length === 0, JSON.stringify(a.unnamed.slice(0, 6)));
         if (size.phone && chromium) await check(`${tag}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+        // iPad portrait: the spine kept no gutter (the greeting and resume
+        // card ran into the edge) and the plate's figures clipped "Covered".
+        if (size.id === 'tablet') {
+          const fit = await page.evaluate(() => {
+            const g = document.querySelector('.in-greet')?.getBoundingClientRect();
+            const boxes = [...document.querySelectorAll('.in-kpis, .in-kpis > div')];
+            return { left: g ? Math.round(g.left) : null, clipped: boxes.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.textContent.trim().slice(0, 30)) };
+          });
+          await check(`${tag}: the spine keeps a gutter (greeting ${fit.left}px from the edge)`, fit.left !== null && fit.left >= 12, JSON.stringify(fit));
+          await check(`${tag}: no figure on the plate is clipped`, fit.clipped.length === 0, JSON.stringify(fit.clipped));
+        }
         writeFileSync(join(outDir, `index-${size.id}-${scheme}.png`), await page.screenshot({ animations: 'disabled' }));
       }
     }
@@ -758,12 +769,12 @@ export const welcomeFlow = {
     }).filter(x => x.w < 43.5 || x.h < 43.5));
     await check('every legal link on the welcome screen is a 44×44 touch target', small.length === 0, JSON.stringify(small));
     await check('in English the screen adds no language note', await page.locator('[data-lang-note]').count() === 0);
-    await page.locator('.signin-landing button[lang="hi"]').first().click();
+    await page.locator('button[lang="hi"][aria-pressed]').first().click();
     await page.waitForSelector('[data-lang-note]', { timeout: 15000 }).catch(() => {});
     await settle();
     const note = await page.locator('[data-lang-note]').first().innerText().catch(() => '');
     await check('choosing Hindi says, in Hindi, that questions and worked solutions stay in English', /अंग्रेज़ी/.test(note), JSON.stringify(note));
-    await page.locator('.signin-landing button[lang="en"]').first().click();
+    await page.locator('button[lang="en"][aria-pressed]').first().click();
     await settle();
     await check('and back in English the note goes again', await page.locator('[data-lang-note]').count() === 0);
   }

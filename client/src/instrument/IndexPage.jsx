@@ -11,6 +11,7 @@ import TermGloss from '../components/TermGloss.jsx';
 import Glyph from './Glyph.jsx';
 import TopicGenerator from '../home/TopicGenerator.jsx';
 import { actionOpenable } from '../home/recommendation.js';
+import { featureEnabled } from '../platform/features.js';
 import { useHomeDecision, usePlacement, actionCopy, PlacementCard, GoalCard } from '../pages/Home.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 
@@ -69,8 +70,15 @@ function Ring({ value, colourVar }) {
 // chapter, with its marks — is the primary action when there is one; a
 // student with no history gets the resolver's first-practice action.
 const URGENT = 80;
+const CLASSROOM_ON = featureEnabled('extendedTracks');
+// A title that is a chapter or topic name is curriculum content, which stays
+// in English (D11), so it is marked lang="en" on a Hindi screen as the chapter
+// list is. Other titles are interface strings in the reader's language, or a
+// name a teacher typed (an exam or task title), left unmarked.
+const topicLang = (action, topicName, resume) => (
+  (action.kind === 'practice-resume' && topicName(resume?.subtopic)) || (action.kind === 'adaptive' && action.data?.topic) ? 'en' : undefined);
 
-function NextAction({ action, copy, online, nav }) {
+function NextAction({ action, copy, online, nav, lang }) {
   const t = useT();
   const openable = actionOpenable(action, { online });
   const reasonId = 'home-primary-reason';
@@ -78,7 +86,7 @@ function NextAction({ action, copy, online, nav }) {
     <div className="in-resume in-nextact" data-home-primary data-kind={action.kind}>
       <div>
         <small className="in-nextact-k">{copy.kicker}</small>
-        <b>{copy.title}</b>
+        <b lang={lang}>{copy.title}</b>
         <small id={reasonId}>{openable ? copy.reason : t('home.needsConnection')}</small>
       </div>
       <button type="button" className="in-btn is-primary" data-home-primary-cta aria-describedby={reasonId}
@@ -173,11 +181,13 @@ export default function IndexPage() {
         {(() => {
           const primary = homeDecision.primary;
           if (primary && (primary.priority >= URGENT || recent === null)) {
-            return <NextAction action={primary} copy={actionCopy(primary, user, t, topicName, local?.resume)} online={online} nav={nav} />;
+            return <NextAction action={primary} copy={actionCopy(primary, user, t, topicName, local?.resume)} online={online} nav={nav} lang={topicLang(primary, topicName, local?.resume)} />;
           }
           return null;
         })()}
-        {assignments === false && (
+        {/* Teacher-set assignments are the classroom product, hidden from
+            students in V1 (D10): only where it is on does their absence matter. */}
+        {assignments === false && CLASSROOM_ON && (
           <p className="in-note in-cloud-note" role="status">{t('home.cloudUnavailable')}</p>
         )}
         {recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT) && (
@@ -333,7 +343,7 @@ export default function IndexPage() {
                 <li key={item.kind + ':' + item.id} data-home-alt>
                   <button type="button" className="in-also-link" disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
                     onClick={() => { if (openable) nav(item.destination); }} aria-describedby={`in-alt-${key}`}>
-                    <span className="in-also-text"><b>{copy.title}</b><small id={`in-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</small></span>
+                    <span className="in-also-text"><b lang={topicLang(item, topicName, local?.resume)}>{copy.title}</b><small id={`in-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</small></span>
                   </button>
                 </li>
               );

@@ -209,6 +209,9 @@ html.ui-instrument .shell.is-focus .in-bar { display: none; }
    material as the entries above. A card that needs the cloud while offline is
    shown and stays shut, saying why (home.needsConnection). */
 .in-alts { margin-bottom: 12px; }
+/* An alternative is a button (it runs the resolver's destination), drawn as
+   the same list entry as the links: no default button face. */
+button.in-also-link { width: 100%; border: 0; font: inherit; text-align: left; justify-content: flex-start; }
 .in-also-link:disabled { cursor: default; opacity: 0.6; }
 .in-also .home-card .btn { border-radius: 4px; }
 /* The week, as the v1.0 Home gave it: today's count against the goal and the
@@ -817,6 +820,17 @@ html.ui-instrument .nt-lede { font-size: 16px; }
   html.ui-instrument .in-plate-head { flex-wrap: nowrap; }
   html.ui-instrument .in-plate { grid-template-rows: auto minmax(240px, 520px) auto auto; }
   html.ui-instrument .in-kpis div { min-width: 72px; padding: 10px 12px; }
+}
+
+/* iPad portrait (761–980 px): the two columns stay, but the single-column
+   rule above took the spine's gutter and rule away, so the greeting and the
+   resume card ran into the screen edge; and the plate is too narrow for its
+   title and three figures on one line, which clipped "Covered". */
+@media (min-width: 761px) and (max-width: 980px) {
+  html.ui-instrument .in-spine { border-right: 1px solid var(--in-edge); padding: 16px 16px 24px 16px; }
+  html.ui-instrument .in-plate-head { flex-wrap: wrap; }
+  html.ui-instrument .in-kpis { width: 100%; }
+  html.ui-instrument .in-kpis div { flex: 1; min-width: 0; }
 }
 
 /* The plate's dot points: the design's exercise row, each one a way in. */
