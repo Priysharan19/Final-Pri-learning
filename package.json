@@ -170,7 +170,7 @@
     "test:india:identity": "node client/test/india-identity-check.mjs",
     "test:plot": "node client/test/plot-check.mjs",
     "test:readme": "node client/test/readme-truth-check.mjs",
-    "test:content:honesty": "node client/test/content-honesty-check.mjs && node client/test/marketing-claims-check.mjs",
+    "test:content:honesty": "node client/test/content-honesty-check.mjs && node client/test/marketing-claims-check.mjs && node client/test/worked-steps-typesetting-check.mjs",
     "test:platform:export": "node server/test/sqlite-to-postgres-export-check.mjs",
     "test:entitlements": "node client/test/entitlement-enforcement-check.mjs && node client/test/server-daily-cap-client-check.mjs",
     "test:jee:gate": "node client/test/jee-advanced-gate-check.mjs",

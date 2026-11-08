@@ -13,8 +13,11 @@
 // every answer exact. Where a figure genuinely is not a whole number it is keyed
 // as an exact fraction, never as a rounded decimal.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, Frac, mcq } from '../qhelpers.js';
+import { ri, rc, nz, Frac, mcq, sgn } from '../qhelpers.js';
 import { formulaPlan, ANGLE_ALIASES } from './workingRubrics.js';
+
+// A negative value written inside a subtraction keeps its own brackets: 6 - (-1).
+const sub = v => (v < 0 ? `(${v})` : `${v}`);
 
 const PI_N = 22, PI_D = 7;
 /** Area of a circle of radius r with π = 22/7, exactly. */
@@ -211,7 +214,7 @@ export const indiaClass10 = {
         ],
         steps: [
           { h: 'nth term formula', d: '$a_n = a + (n-1)d$' },
-          { h: 'Substitute', d: `$= ${a} + (${n} - 1)(${d}) = ${a} + ${(n - 1) * d}$` },
+          { h: 'Substitute', d: `$= ${a} + (${n} - 1)(${d}) = ${a} ${sgn((n - 1) * d)}$` },
           { h: 'Answer', d: `$${term}$` }
         ]
       };
@@ -241,7 +244,7 @@ export const indiaClass10 = {
         ],
         steps: [
           { h: 'Sum formula', d: '$S_n = \\dfrac{n}{2}\\left(2a + (n-1)d\\right)$' },
-          { h: 'Substitute', d: `$= \\dfrac{${n}}{2}\\left(${2 * a} + ${(n - 1) * d}\\right)$` },
+          { h: 'Substitute', d: `$= \\dfrac{${n}}{2}\\left(${2 * a} ${sgn((n - 1) * d)}\\right)$` },
           { h: 'Answer', d: `$= ${sum}$` }
         ]
       };
@@ -359,11 +362,11 @@ export const indiaClass10 = {
         traps: [{ value: Math.abs(twice), why: 'That is twice the area — the formula carries a factor of one half.' }].filter(t => t.value !== area.value),
         hints: [
           'Area $= \\dfrac{1}{2}\\left|x_1(y_2-y_3) + x_2(y_3-y_1) + x_3(y_1-y_2)\\right|$.',
-          `$${x1}(${y2} - ${y3}) + ${x2}(${y3} - ${y1}) + ${x3}(${y1} - ${y2})$.`,
+          `$${x1}(${y2} - ${sub(y3)}) ${sgn(x2)}(${y3} - ${sub(y1)}) ${sgn(x3)}(${y1} - ${sub(y2)})$.`,
           'Take the absolute value, then halve it.'
         ],
         steps: [
-          { h: 'Apply the formula', d: `$\\dfrac{1}{2}\\left|${x1}(${y2 - y3}) + ${x2}(${y3 - y1}) + ${x3}(${y1 - y2})\\right|$` },
+          { h: 'Apply the formula', d: `$\\dfrac{1}{2}\\left|${x1}(${y2 - y3}) ${sgn(x2)}(${y3 - y1}) ${sgn(x3)}(${y1 - y2})\\right|$` },
           { h: 'Inside the modulus', d: `$= ${twice}$` },
           { h: 'Answer', d: `$\\dfrac{1}{2}\\left|${twice}\\right| = ${area.latex()}$ square units` }
         ]
@@ -383,12 +386,13 @@ export const indiaClass10 = {
       hints: [
         'Three points are collinear exactly when the triangle they form has zero area.',
         'Equivalently, the gradient from the first to the second equals the gradient from the first to the third.',
-        `The x-step tripled from $${dx}$ to $${k * dx}$ — do the same to the y-step.`
+        // The multiplier is k (2, 3 or 4), so the hint names k rather than "tripled".
+        `The x-step is $${k}$ times as big, from $${dx}$ to $${k * dx}$ — do the same to the y-step.`
       ],
       steps: [
-        { h: 'Equal gradients', d: `$\\dfrac{${y2} - ${y1}}{${x2} - ${x1}} = \\dfrac{y - ${y1}}{${x3} - ${x1}}$` },
-        { h: 'Scale the y-step the same way', d: `the x-step is $${k}$ times as big, so $${k} \\times ${dy} = ${k * dy}$` },
-        { h: 'Answer', d: `$y = ${y1} + ${k * dy} = ${y3}$` }
+        { h: 'Equal gradients', d: `$\\dfrac{${y2} - ${sub(y1)}}{${x2} - ${sub(x1)}} = \\dfrac{y - ${sub(y1)}}{${x3} - ${sub(x1)}}$` },
+        { h: 'Scale the y-step the same way', d: `the x-step is $${k}$ times as big, so $${k} \\times ${sub(dy)} = ${k * dy}$` },
+        { h: 'Answer', d: `$y = ${y1} ${sgn(k * dy)} = ${y3}$` }
       ]
     };
   },

@@ -233,6 +233,8 @@ jobs:
           grep -Fq 'CONTENT HONESTY: PASS' suites.log
           grep -Fq 'MARKETING CLAIMS: PASS' suites.log
           grep -Fq 'PAST PAPERS SWITCH: PASS' suites.log
+          # Hints and worked steps carry no double sign, unit/zero coefficient or algebraic +0 term (#700's follow-up).
+          grep -Fq 'WORKED STEPS TYPESETTING: PASS' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established

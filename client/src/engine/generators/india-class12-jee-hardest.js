@@ -249,7 +249,7 @@ function inverseTrigEvaluateReasoning(rng) {
         ],
         steps: [
           { h: 'Double angle', d: `$\\tan 2A = \\dfrac{2 \\cdot ${argTex(a)}}{1 - \\left(${argTex(a)}\\right)^2} = ${rTex(T)}$` },
-          { h: 'Compound angle', d: `$\\tan(2A ${minus ? '-' : '+'} B) = \\dfrac{${rTex(T)} ${minus ? '-' : '+'} \\left(${argTex(b)}\\right)}{1 ${minus ? '+' : '-'} ${rTex(T)} \\cdot \\left(${argTex(b)}\\right)}$` },
+          { h: 'Compound angle', d: `$\\tan(2A ${minus ? '-' : '+'} B) = \\dfrac{${rTex(T)} ${minus ? '-' : '+'} \\left(${argTex(b)}\\right)}{1 ${minus ? '+' : '-'} ${T.n < 0 ? `\\left(${rTex(T)}\\right)` : rTex(T)} \\cdot \\left(${argTex(b)}\\right)}$` },
           { h: 'Answer', d: `$${rTex(v)}$` }
         ],
         reasoning: 'double-angle-inverse'
@@ -356,7 +356,7 @@ function continuityTestReasoning(rng) {
         'For the right-hand side use the standard limit of $\\dfrac{\\tan t}{t}$ as $t \\to 0$.'
       ],
       steps: [
-        { h: 'Left-hand limit', d: `$\\lim_{x \\to 0^-} \\dfrac{2\\sin^2(${fracTex(p, 2)}x)}{x^2} = ${rTex(a)}$, so $a = ${rTex(a)}$` },
+        { h: 'Left-hand limit', d: `$\\lim_{x \\to 0^-} \\dfrac{2\\sin^2(${p === 2 ? '' : fracTex(p, 2)}x)}{x^2} = ${rTex(a)}$, so $a = ${rTex(a)}$` },
         { h: 'Right-hand limit', d: `$\\lim_{x \\to 0^+} \\dfrac{\\tan ${qTex}}{x} = ${q}$, so $${q} + b = ${rTex(a)}$ and $b = ${rTex(b)}$` },
         { h: 'Answer', d: `$${rTex(v)}$` }
       ],
@@ -495,7 +495,8 @@ function monotonicTangentReasoning(rng) {
       steps: [
         { h: 'Point', d: `$(${x0}, ${y0})$` },
         { h: 'Slope', d: `$\\dfrac{dy}{dx} = ${linTex(2, b)} = ${m}$ at $x = ${x0}$` },
-        { h: normal ? 'Normal' : 'Tangent', d: normal ? `$y - ${y0 < 0 ? `(${y0})` : y0} = ${fracTex(-1, m)}(x - ${x0 < 0 ? `(${x0})` : x0})$; at $x = 0$` : `$y - ${y0 < 0 ? `(${y0})` : y0} = ${m}(x - ${x0 < 0 ? `(${x0})` : x0})$; at $y = 0$` },
+        // y - 0 is written y, (x - 0) is written x, and a slope of ±1 is not written as a 1.
+        { h: normal ? 'Normal' : 'Tangent', d: `$${y0 === 0 ? 'y' : `y - ${y0 < 0 ? `(${y0})` : y0}`} = ${normal ? (m === 1 ? '-' : m === -1 ? '' : fracTex(-1, m)) : (m === 1 ? '' : m === -1 ? '-' : m)}${x0 === 0 ? 'x' : `(x - ${x0 < 0 ? `(${x0})` : x0})`}$; at $${normal ? 'x' : 'y'} = 0$` },
         { h: 'Answer', d: `$${rTex(v)}$` }
       ],
       reasoning: normal ? 'normal-intercept' : 'tangent-intercept'
