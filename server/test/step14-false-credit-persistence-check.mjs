@@ -3,7 +3,7 @@ import {mkdtempSync,rmSync} from 'node:fs';import {tmpdir} from 'node:os';import
 const dir=mkdtempSync(join(tmpdir(),'q1-persist-'));const keys=['NODE_ENV','PRI_PLATFORM_DB','PRI_AUTH_DELIVERY_KEY','PRI_PUBLIC_ORIGIN'];const saved=Object.fromEntries(keys.map(k=>[k,process.env[k]]));
 Object.assign(process.env,{NODE_ENV:'test',PRI_PLATFORM_DB:join(dir,'db.sqlite'),PRI_AUTH_DELIVERY_KEY:'d6'.repeat(32)});delete process.env.PRI_PUBLIC_ORIGIN;
 const {startApp,registerAccount,verifyEmail}=await import('./support/app-harness.mjs');
-const h=await startApp({engine:process.env.PRI_TEST_PG_ADMIN_URL?'postgres':'sqlite'});
+const h=await startApp({engine:(await import('./support/engine.mjs')).requestedEngine()});console.log('engine: '+h.engine);
 const cases=[
  {id:'exact-integer',generator:'c8-exponents-ncert-mastery',d:4,s:1,answer:'3840000000000.001',good:'3840000000000'},
  {id:'malformed-point',generator:'c8-plotting-reasoning',d:1,s:7,answer:'(-10,,6)',good:'(-10,6)'},
@@ -32,7 +32,7 @@ try {
   const event=await h.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt'",[a.account.id,qid]);
   const row=await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt' LIMIT 1",[a.account.id,qid]);
   const foreign=await h.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt'",[b.account.id,qid]);
-  let data=null;try{data=typeof row?.payload_json==='string'?JSON.parse(row.payload_json):row?.payload_json}catch{}
+  let data=null;try{data=typeof row?.payload_json==='string'?JSON.parse(row.payload_json):row?.payload_json;}catch{}
   const wrongCredit=grade.data?.authoritative===true&&grade.data?.correct===true&&grade.data?.marksEarned===grade.data?.marksPossible;
   if(wrongCredit)defects++;
   const integrity=blocked.status===404&&grade.status===200&&grade.data?.correct===false&&grade.data?.marksEarned===0

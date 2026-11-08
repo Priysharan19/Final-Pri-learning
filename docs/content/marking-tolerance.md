@@ -12,11 +12,15 @@ Two invariants hold everywhere:
 
 | Target | Band | Why |
 |---|---|---|
-| Whole number (`12`, `0`, `−3`) | exact, within floating-point noise (`max(1e-9, |t|·1e-9)`, capped at 0.25) | 12 m² is 120000 cm², not 120012; no other whole number can fall inside the band |
-| Non-integer (`3.14159`, `2 − √3`) | **relative 1e-4** (`max(1e-9, |t|·1e-4)`) — about five significant figures, never wider than half a unit of the last place of a one- or two-decimal target (floating-point noise such as `1357.9500000000003` still counts as two places), nor than half a unit of the last place the student wrote (#518) | forgives the student's final rounding of a real calculation without admitting a neighbouring value or a wrong rounding; `0.26795` passes for `2 − √3`, `0.268` does not; `141.42` passes for `100√2`, `141.43` and `3.1413` (for `3.14159`) do not; `0` is not `3e-7` |
+| Whole number (`12`, `0`, `−3`) | **exact.** The band only absorbs binary64 noise (`max(1e-9, |t|·2ε)`), and an answer written only in numbers is compared by its exact value: any decimal that is not the whole number is wrong, at every size, with one allowance — a calculator's display of the whole number within 10⁻⁹ of it (`11.9999999999` for `12`) (#680; Step 14, #723) | 12 m² is 120000 cm², not 120012; `3840000000000.001` is not `3840000000000`; `21149700.019` is not `21149700` |
+| Non-integer (`3.14159`, `2 − √3`) | **relative 1e-4** (`max(1e-9, |t|·1e-4)`) — about five significant figures, never wider than half a unit of the last place of a one- or two-decimal target (floating-point noise such as `1357.9500000000003` still counts as two places), nor than half a unit of the last place the student wrote (#518), and never narrower than four units of the target's last binary place (an evaluated exact form such as `17496√2` is its own key) | forgives the student's final rounding of a real calculation without admitting a neighbouring value or a wrong rounding; `0.26795` passes for `2 − √3`, `0.268` does not; `141.42` passes for `100√2`, `141.43` and `3.1413` (for `3.14159`) do not; `0` is not `3e-7` |
 | Authored `tol` | `|given − target| ≤ tol` | the question states how its answer is measured or rounded ("to one decimal place" authors `tol: 0.05`); an authored `tol` always wins over every default |
 
 Equivalent exact forms (`1/2`, `0.5`, `2/4`, `√8`, `2√2`, `2 1/2`) are all read to their value first, so the band applies to the value, not the spelling.
+
+**What counts as a value (owner default D13, interim until the examiner rules on #499).** A numeric box takes a single value — a number (in standard form too, `a × 10ⁿ` or `10ⁿ`), a fraction of whole numbers (simplified or not, unless the question asks for lowest terms), a mixed number, a surd `k√n` or `k∛n` whose root is not whole, a rational multiple of π, `e`, or the logarithm of a whole number — or a sum of such terms with no two alike (`2 + √3`, `(1 + √5)/2`). Anything with an operation left to do (`2 + 3`, `3² − 4`, `√25`, `2 × 2.5`, `8!/7!`, `⁵C₂`, `sum(…)`, `sin(π/6)`, `π + π`, `+ 0`) is refused whatever it equals, from its written form alone: it is returned unread, with no try spent. Sets and points keep their own forms (`2 ± 3`) until the examiner rules on lists.
+
+**Units and currency (owner default D14, interim).** A bare number passes where the box shows the unit; the right unit in any spelling passes (`cm`, `cms`, `centimetres`; `km/h`, `kmph`; `cm²`, `sq cm`, `sq.cm`; `cm³`, `cc`; `₹500`, `Rs. 500/-`); a contradicting unit is wrong. With no unit beside the box, a written unit is credited only when its dimension is the asked quantity's (a perimeter or height is a length, an area a length², a volume a length³ or litres, and so on, or the unit the asking sentence names) and the question states a quantity in that unit at any power; anything else is left unread. A currency other than the rupee (`$12`, `€500`, `500 dollars`) contradicts every question; only a bank priced in dollars reads `$`.
 
 ## 2. Form-sensitive numeric answers
 
@@ -50,7 +54,11 @@ Where a reviewed record carries no `rounding` and no `tol`, the default band of 
 
 ## 6. Non-numeric answer types
 
-Interval, set, matrix, vector, point and ratio answers compare each component with the default band (or the authored `tol`); endpoint inclusion, direction of an inequality, order of coordinates, the transpose of a matrix and the sign of a vector are compared exactly and the near miss is named.
+Set, matrix, vector and point answers compare each component with the default band (or the authored `tol`), and a whole-number component exactly; each component is first held to the numeric box's percent, unit and currency rules (no `%`, currency or unit the question does not ask for; #723 review). Endpoint inclusion, direction of an inequality, order of coordinates, the transpose of a matrix and the sign of a vector are compared exactly and the near miss is named.
+
+Interval endpoints have **no rounding band**: two endpoints are the same only when both are exact rationals or rational sums of square roots and are equal exactly (`√8/2`, `2/√2` and `√2` are one endpoint; the decimal `1.4142135623730951` is not `√2`), or — when one side has no exact form (`sin(π/6)`, a key authored as the number `1/3`) — when they agree to four units of the last binary place. Exact endpoints are ordered exactly, so an intersection does not depend on the order it is written in. A bound is one number: `x > 1 2`, `x > 1,2`, `x > 1200%` are unread. An authored `tol` is the only approximate bound.
+
+Ratio answers are compared exactly as fractions (`1 : 2.0000000001` is not `1 : 2`); where the question asks for the ratio simplified, its two parts must be whole numbers with no common factor (`0.2 : 0.6` and `2 : 6` are right in proportion but not simplified).
 
 ## Evidence status
 
@@ -58,4 +66,4 @@ Every band above is pinned by deterministic, authored test cases against the eng
 
 ## Paise
 
-"975 paise" on a question asked in rupees is ₹9.75. A question is money only when a rupee mark or paise sits beside the answer box, or, with no unit beside the box, when the prompt names rupees or paise. Any other unit beside the box (`%`, `pens`, `km`) makes it not money, whatever the prompt is priced in, so `2000 paise` is never a 20% profit (#518).
+"975 paise" on a question asked in rupees is ₹9.75. A question is money only when a rupee mark or paise sits beside the answer box, or, with no unit beside the box, when the prompt names rupees or paise. Any other unit beside the box (`%`, `pens`, `km`) makes it not money, whatever the prompt is priced in, so `2000 paise` is never a 20% profit (#518). A box that counts rupees in a scale word (`crore`, `lakh`, `million`, `thousand`) is money when the prompt is priced in rupees, so `₹98.1` beside `crore` is ₹98.1 crore (#723 review).
