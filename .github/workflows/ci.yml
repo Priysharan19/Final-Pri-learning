@@ -557,7 +557,12 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 64: sign-in (the one-time-code card contract and lifecycle) and the
+          # guardian-consent state machine and gate, on Postgres as well as SQLite.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 64/64 suites' platform-postgres.log
+          grep -Fq '✓ otp-sign-in-check.mjs' platform-postgres.log
+          grep -Fq '✓ otp-lifecycle-check.mjs' platform-postgres.log
+          grep -Fq '✓ guardian-consent-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
