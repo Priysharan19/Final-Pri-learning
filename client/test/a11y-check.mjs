@@ -66,6 +66,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
+import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -550,6 +551,9 @@ async function run() {
 
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    // D17: the walk's reads accept the one-time prompt naming OpenAI when it
+    // appears (the prompt's own flow is tour-ink-reader-permission.js).
+    await ctx.addInitScript(acceptReaderPermissionOnSight);
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));

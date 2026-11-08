@@ -21,6 +21,9 @@
 //   4. A read happens only when the student presses "Read my answer", and its
 //      round trip is measured by InkAnswer (readMs) so the physical evidence
 //      can record the latency the student actually waited.
+//   5. Nothing is sent until the student has accepted the one-time prompt
+//      that names OpenAI (D17, readerPermission.js). Declining, closing the
+//      prompt, or a page with no prompt to ask with sends nothing.
 //
 // The picture is drawn from the student's own strokes by cloudRaster.js. This
 // module adds nothing to it, and sends nothing beside it.
@@ -31,6 +34,7 @@ import { onCloudSessionChange, onEntitlementChange } from '../platform/cloudSess
 import { preparePhoto } from './photoRaster.js';
 import { confidenceFloorOf } from './readingCorrection.js';
 import { classifyReaderFailure, READER_FAILURE } from './readerFailure.js';
+import { askReaderPermission, notPermittedOutcome, PROMPT_ANSWER } from './readerPermission.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -445,9 +449,13 @@ export async function readWithCloud(strokes, {
   readiness = cloudHandwritingReadiness,
   // True on the first read after the account changed (signed in, verified,
   // consented): the server is asked again however fresh the cached answer is.
-  freshReadiness = false
+  freshReadiness = false,
+  // D17: the student's own yes, asked once, before anything is sent.
+  permission = askReaderPermission
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  const permitted = await permission(user, { kind: 'ink' });
+  if (permitted !== PROMPT_ANSWER.ACCEPTED) return notPermittedOutcome(permitted);
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   if (readerPaused()) return pausedOutcome(readerPaused());
@@ -557,9 +565,13 @@ export async function readPhotoWithCloud(dataUrl, {
   transport = cloud,
   prepare = preparePhoto,
   available = cloudAvailable,
-  readiness = cloudHandwritingReadiness
+  readiness = cloudHandwritingReadiness,
+  // D17: the student's own yes, asked once, before anything is sent.
+  permission = askReaderPermission
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  const permitted = await permission(user, { kind: 'photo' });
+  if (permitted !== PROMPT_ANSWER.ACCEPTED) return notPermittedOutcome(permitted);
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   if (readerPaused()) return pausedOutcome(readerPaused());
@@ -638,6 +650,11 @@ const browserOnline = () => typeof navigator === 'undefined' || navigator.onLine
 export function readerBlock(user, { outcome = null, online = browserOnline, available = cloudAvailable, now = Date.now() } = {}) {
   const fixed = (kind, action, key, inkKey, more = {}) => Object.freeze({ kind, action, key, inkKey, autoRetry: false, manualRetry: false, retryAt: null, ...more });
   if (cloudReadingChoice(user) === 'off') return fixed('turned-off', 'settings', 'verdict.photoReadingTurnedOff', 'ink.waitingTurnedOff');
+  // D17: the student said no to sending their writing to OpenAI just now (the
+  // profile's Settings choice turns off with it), or closed the prompt
+  // without choosing. Nothing was sent, and typing is the way on.
+  if (outcome?.reason === 'declined') return fixed('declined', 'settings', 'verdict.photoReadingDeclined', 'ink.waitingDeclined');
+  if (outcome?.reason === 'not-permitted') return fixed('not-permitted', 'type', 'verdict.photoReadingNotPermitted', 'ink.waitingNotPermitted', { manualRetry: true });
   let configured = false;
   try { configured = available() === true; } catch { configured = false; }
   if (!configured) return fixed(READER_FAILURE.NOT_AVAILABLE, 'type', 'verdict.photoReadingNotOnThisInstall', 'ink.waitingNotOnThisInstall');

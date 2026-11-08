@@ -480,13 +480,27 @@ enum JourneySelfCheck {
         at = 'unread'; await sleep(1500);
         if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
         at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
+        // D17: the first read of a profile meets the one-time prompt naming
+        // OpenAI. Nothing is read while it is open; the accept is the go-ahead.
+        at = 'permission';
+        let permission = 'accepted earlier on this device';
+        let kept = {};
+        try { kept = JSON.parse(localStorage.getItem('pri-reader-permission-v1') || '{}') || {}; } catch (e) { kept = {}; }
+        if (!Object.values(kept).some(r => r && r.choice === 'accepted' && r.version === 1)) {
+          const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
+          if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
+          await sleep(1000);
+          if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+          q('[data-reader-permission="accept"]').click();
+          permission = 'asked first, naming OpenAI (D17), and accepted';
+        }
         at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
         const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
         if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
         if (!lines[0].low || !q('.ink-line .ink-correct-btn')) throw new Error('a doubtful line is not editable');
         assertUnmarked('reading');
         inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink' });
-        return echoed + ' strokes read by the server (synthetic reader): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
+        return echoed + ' strokes read by the server (synthetic reader) after the permission prompt (' + permission + '): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
       }
       throw new Error('no handwriting question with a statable numeric answer in 12: ' + passed.join(','));
     });
