@@ -484,6 +484,12 @@ const scratch = [];
       }
       {
         const x = world({ device: 'android-blocked' });
+        x.approveIssue(1501, waiverMarker(SHA, ['device-matrix']), { closed: null });
+        const unsaid = await verifyApproval({ approval: issueUrl(1501), githubLogin: APPROVER, sha: SHA, marker: waiverMarker(SHA, ['device-matrix']), repo: DEFAULT_REPO_FOR_TESTS, gh: x.gh, ghGraphql: x.ghGraphql, git: x.git });
+        ok(!unsaid.ok && unsaid.problems.some(p => /did not say whether approval issue #1501 was ever closed/.test(p)) && !unsaid.problems.some(p => /closed and reopened/.test(p)), 'an issue whose closings GitHub left out is refused as unknown, not called reopened');
+      }
+      {
+        const x = world({ device: 'android-blocked' });
         x.approveIssue(1501, `  ${waiverMarker(SHA, ['device-matrix'])}\nApproved.`);
         ok((await run(x, { overridePath: overrideFile(issueOverride) })).ok, 'two spaces before the line are not a code block: the line still leads the post');
       }
