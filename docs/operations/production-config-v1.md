@@ -103,6 +103,22 @@ anonymous caller can already see; a change to a value above changes it here in t
 ```
 <!-- pri-expected-public-config:end -->
 
+### Rehearsal on staging, 9 Nov 2026 (read-only GETs)
+
+`node tools/verify-deployment.mjs --origin https://pri-learning-staging-staging.up.railway.app --sha 1d3829103eccaf470621de7124ec1755370c460e --engine postgres --auth-email-proven --require-handwriting --expect-config docs/operations/production-config-v1.md`
+→ `DEPLOYMENT VERIFIED: FAIL — 21/26`. The 14 standard rows and the handwriting row pass, and so do
+`tutor-dark`, `web-build-tutor-off`, `parent-report-dark`, `paid-ceiling-set`, `auth-email-sender`
+(sender `unknown`: a sending-only key) and `sign-in-channels`. The five failures are staging facts,
+not tool faults, and each is a production step to get right:
+
+| Row | Staging answered | What production needs |
+|---|---|---|
+| `apple-products` | both product ids `null` | the Apple variables of row 8 |
+| `display-prices` | both prices `null` | `PRI_DISPLAY_MONTHLY_PRICE=199`, `PRI_DISPLAY_ANNUAL_PRICE=1499` |
+| `billing-provider-complete` | `not_configured` | Apple trust and App ID with the products (row 8) |
+| `provider-sign-in-off` | a Google web client id is set on staging | none on production (D3): do not copy staging's Google sign-in variables |
+| public origin | `fetch failed`: `app.prilearning.com` does not answer yet | the custom domain (owner checklist item 2, note 7) |
+
 ## 3. The human checks (what no public request can see)
 
 Variable checks read **names and non-secret values only**, in Railway → production → `/v1` service →
