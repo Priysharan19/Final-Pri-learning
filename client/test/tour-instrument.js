@@ -56,6 +56,23 @@ const AUDIT = () => {
   return { count: controls.length, unnamed, small };
 };
 
+// The native shells' accessibility smoke, as android/app/src/androidTest/…/
+// WebViewAccessibilityTest.kt writes it: every visible button or link has a
+// name (aria-hidden subtrees included), and every visible .btn and phone-bar
+// control is at least 43.5 px tall by its own box.
+const SHELL_AUDIT = () => {
+  const visible = el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+  const nameOf = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim();
+  const out = [];
+  for (const el of document.querySelectorAll('button, a[href], [role=button]')) if (visible(el) && !nameOf(el)) out.push(`unnamed ${el.tagName}.${el.className}`);
+  for (const el of document.querySelectorAll('.btn, .mobilenav button, .mobilenav a')) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height < 43.5) out.push(`small target ${Math.round(r.height)}px ${nameOf(el).slice(0, 20)}`);
+  }
+  return out;
+};
+
 export const flow = {
   id: 'instrument',
   name: 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift',
@@ -291,6 +308,10 @@ export const flow = {
         const a = await page.evaluate(AUDIT);
         await check(`${tag}: every control has an accessible name`, a.unnamed.length === 0, JSON.stringify(a.unnamed.slice(0, 6)));
         if (size.phone && chromium) await check(`${tag}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+        if (size.phone) {
+          const unnamed = (await page.evaluate(SHELL_AUDIT)).filter(x => x.startsWith('unnamed'));
+          await check(`${tag}: no button is unnamed, not even in the aria-hidden chapter strip (the shells' audit)`, unnamed.length === 0, JSON.stringify(unnamed.slice(0, 6)));
+        }
         // iPad portrait: the spine kept no gutter (the greeting and resume
         // card ran into the edge) and the plate's figures clipped "Covered".
         if (size.id === 'tablet') {
@@ -317,6 +338,12 @@ export const flow = {
         await settle();
         const a = await page.evaluate(AUDIT);
         await check(`${route}@ipad: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 30)));
+        // The shells' own audits (android WebViewAccessibilityTest, the iPhone
+        // journey's a11yAudit) measure each control's box and do not skip an
+        // aria-hidden subtree, so neither may this: on CI they found 22 px
+        // Settings switches and the phone Index's unnamed chapter strip.
+        const shell = await page.evaluate(SHELL_AUDIT);
+        await check(`${route}@ipad: every .btn box is ≥ 44 px tall and every button has a name, as the native shells measure them`, shell.length === 0, JSON.stringify(shell.slice(0, 10)));
       }
     }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });

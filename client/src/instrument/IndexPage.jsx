@@ -218,6 +218,7 @@ export default function IndexPage() {
             <div className="in-strip" aria-hidden="true">
               {chapters.map(c => (
                 <button key={c.row.id} type="button" tabIndex={-1} style={{ '--cc': `var(${c.colour})` }}
+                  aria-label={c.row.name}
                   className={c.evidence.attempts ? undefined : 'is-new'}
                   aria-current={current.row.id === c.row.id ? 'true' : undefined} onClick={() => setPick(c.row.id)} />
               ))}

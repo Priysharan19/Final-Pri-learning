@@ -87,7 +87,11 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   // only through ⌘K search (audit-interface item 2). The More menu beside the
   // tabs is their visible entry there.
   const tabs = useMemo(() => tabsFor(user, navItems), [user, navItems]);
-  const more = useMemo(() => navItems.filter(item => !tabs.some(tab => tab.to === item.to || (!hashOf(item.to) && !hashOf(tab.to) && pathOf(tab.to) === pathOf(item.to)))), [navItems, tabs]);
+  // A destination is in the tabs when a tab names it exactly, or names the
+  // same page with neither carrying a hash (the teacher's sections differ by hash).
+  const inTabs = to => tabs.some(tab => tab.to === to || (!hashOf(to) && !hashOf(tab.to) && pathOf(tab.to) === pathOf(to)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const more = useMemo(() => navItems.filter(item => !inTabs(item.to)), [navItems, tabs]);
 
   return (
     <>
