@@ -132,6 +132,16 @@ const serverNotice = /CONSENT_NOTICE_VERSION = '([^']+)'/.exec(readFileSync(file
 eq(GUARDIAN_NOTICE_VERSION, serverNotice, 'the notice version the parent page sends is the server\'s current one');
 
 // ── 4 · where the one card is mounted ────────────────────────────────────────
+// The standalone authentication form must not inherit the old 304px
+// desktop column or 2-column social provider layout.
+const instrumentCss = read('instrument/instrument.css');
+const signupCss = read('components/SignUpFlow.css');
+ok(/\.auth-col > \.signin-landing \{[\s\S]*?max-width: 440px/.test(instrumentCss) && !/\.auth-col > \.signin-landing[^}]*max-width: 304px/.test(instrumentCss),
+  'the sign-in form is a readable 440px column rather than the old 304px cap');
+ok(/\.signup-social \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(signupCss),
+  'one configured Google or Apple provider spans the full form, rather than half a two-column grid');
+ok(/\.brand-wordmark \{[^}]*max-width: 100%/.test(instrumentCss),
+  'the outlined wordmark itself contracts at 200% text zoom to avoid horizontal overflow');
 const login = read('pages/Login.jsx');
 const refusal = read('components/CheckRefusal.jsx');
 const gate = read('components/AccountActivationGate.jsx');
