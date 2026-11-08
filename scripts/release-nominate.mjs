@@ -62,11 +62,12 @@
 //
 // Override record (JSON): { "sha": "<40-hex>", "scope": "public-release" | "internal-test-track",
 //   "waives": ["device-matrix" | "reader-evidence", …], "by": "<named human>", "githubLogin": "<login>",
-//   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>" or "https://github.com/<repo>/issues/<n>",
-//   "at": "<ISO date-time>", "reason": "<why this release goes without it>" }
-// The JSON file is not the authority; the approval (a comment, or an issue opened from a prefilled
-// link) is. It must be written by `githubLogin`, an admin of the repository, after the commit, never
-// edited (an issue also never closed), hold no other approval line, and its first line must be exactly
+//   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>", "at": "<ISO date-time>",
+//   "reason": "<why this release goes without it>" }
+// The JSON file is not the authority; the approval is: that comment, or an issue opened from a
+// prefilled link ("approval": "https://github.com/<repo>/issues/<n>"). It must be written by
+// `githubLogin`, an admin of the repository, after the commit, never edited (an issue also never
+// closed), hold no other approval line, and its first line must be exactly
 //   Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted,comma list>
 // An `internal-test-track` exception (TestFlight / Play internal) never waives release-stage evidence.
 // Evidence class of such an approval: GITHUB-ACCOUNT-AUTHENTICATED. GitHub proves the account, not
