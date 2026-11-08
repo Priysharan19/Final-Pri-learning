@@ -77,7 +77,7 @@ html.ui-instrument.skin-aurora .in-also-link { box-shadow: inset 0 1px 0 var(--a
    sit behind drop their own backdrop; every surface that holds mathematics
    stays opaque (the Index plate gets the desk colour as its own). Transform
    and opacity only; still under Reduce Motion; none in forced colours. */
-html.ui-instrument.skin-aurora .a-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--in-base); contain: strict; }
+html.ui-instrument.skin-aurora .a-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; overflow: clip; pointer-events: none; background: var(--in-base); contain: strict; }
 html.ui-instrument:not(.skin-aurora) .a-aurora { display: none; }
 html.ui-instrument.skin-aurora .a-aurora i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; will-change: transform; animation: au-drift 38s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate; }
 html.ui-instrument.skin-aurora .a-aurora i:nth-child(1) { left: -22vmax; top: -32vmax; background: radial-gradient(closest-side, var(--au-pool-1), transparent); }
