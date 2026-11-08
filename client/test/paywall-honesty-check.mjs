@@ -90,7 +90,7 @@ ok('a close button that works from the first frame', /data-paywall-close onClick
 ok('Restore purchases is on the screen in both stores', /data-paywall-restore/.test(paywall) && /\(apple \|\| google\) && \(\s*<div[^>]*>\s*<button[^>]*data-paywall-restore/.test(paywall));
 ok('the disclosure for the device\'s own store is shown with the plans', /t\(apple \? 'paywall\.disclosureApple' : 'paywall\.disclosureGoogle'\)/.test(paywall));
 ok('Terms, Privacy and Refunds are linked', /to="\/terms"/.test(paywall) && /to="\/privacy"/.test(paywall) && /to="\/refund-policy"/.test(paywall));
-ok('a subscriber can reach the store\'s own management page', /data-paywall-manage/.test(paywall) && /apps\.apple\.com\/account\/subscriptions/.test(paywall) && /play\.manageUrl/.test(paywall));
+ok('a subscriber can reach the store\'s own management page', paywall.includes('data-paywall-manage') && paywall.includes("const APPLE_MANAGE_URL = 'https://apps.apple.com/account/subscriptions';") && paywall.includes('play.manageUrl'));
 for (const [lang, cat] of [['en', en], ['hi', hi]]) {
   ok(`Apple disclosure (${lang}) names the 24-hour auto-renew rule and where to cancel`, /24/.test(cat['paywall.disclosureApple']) && /auto-renew/.test(cat['paywall.disclosureApple']) && /App Store/.test(cat['paywall.disclosureApple']));
   ok(`Google disclosure (${lang}) names Google Play, Subscriptions and what cancelling does`, /Google Play/.test(cat['paywall.disclosureGoogle']) && /Subscriptions/.test(cat['paywall.disclosureGoogle']));
