@@ -21,7 +21,16 @@ const TABS = [
   { to: '/notes', key: 'nav.notes', match: p => p.startsWith('/notes') }
 ];
 const pathOf = to => to.split(/[?#]/)[0];
-const inTabs = to => TABS.some(tab => tab.to === pathOf(to));
+const hashOf = to => (to.includes('#') ? to.slice(to.indexOf('#')) : '');
+// A teacher's tabs are the workspace's own sections (App.jsx TEACHER_NAV): the
+// Instrument is the only shell, so it carries the teacher's navigation too,
+// rather than student tabs that would only redirect. The workspace is one page;
+// a tab is current when its hash is (the bare /teach when there is none).
+const teacherTabs = navItems => navItems.filter(item => pathOf(item.to) === '/teach').map(item => ({
+  to: item.to, key: item.key,
+  match: (p, h) => p === '/teach' && (hashOf(item.to) ? h === hashOf(item.to) : !h)
+}));
+const tabsFor = (user, navItems) => (user?.role === 'teacher' ? teacherTabs(navItems) : TABS);
 
 const subscribeOnline = notify => {
   window.addEventListener('online', notify); window.addEventListener('offline', notify);
@@ -77,7 +86,8 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
   // on an iPad or the web, where that sheet is not drawn, they were reachable
   // only through ⌘K search (audit-interface item 2). The More menu beside the
   // tabs is their visible entry there.
-  const more = useMemo(() => navItems.filter(item => !inTabs(item.to)), [navItems]);
+  const tabs = useMemo(() => tabsFor(user, navItems), [user, navItems]);
+  const more = useMemo(() => navItems.filter(item => !tabs.some(tab => tab.to === item.to || (!hashOf(item.to) && !hashOf(tab.to) && pathOf(tab.to) === pathOf(item.to)))), [navItems, tabs]);
 
   return (
     <>
@@ -86,8 +96,8 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
           <span className="in-mark-glyph" aria-hidden="true">P<em>′</em></span>Pri
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')}>
-          {TABS.map(tab => (
-            <PageLink key={tab.to} to={tab.to} className="in-tab" aria-current={tab.match(loc.pathname) ? 'page' : undefined}>{t(tab.key)}</PageLink>
+          {tabs.map(tab => (
+            <PageLink key={tab.to} to={tab.to} className="in-tab" aria-current={tab.match(loc.pathname, loc.hash) ? 'page' : undefined}>{t(tab.key)}</PageLink>
           ))}
         </nav>
         {more.length > 0 && <MoreMenu items={more} />}

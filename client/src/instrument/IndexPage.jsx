@@ -86,7 +86,7 @@ function NextAction({ action, copy, online, nav, lang }) {
     <div className="in-resume in-nextact" data-home-primary data-kind={action.kind}>
       <div>
         <small className="in-nextact-k">{copy.kicker}</small>
-        <b lang={lang}>{copy.title}</b>
+        <b id="home-next-title" lang={lang}>{copy.title}</b>
         <small id={reasonId}>{openable ? copy.reason : t('home.needsConnection')}</small>
       </div>
       <button type="button" className="in-btn is-primary" data-home-primary-cta aria-describedby={reasonId}

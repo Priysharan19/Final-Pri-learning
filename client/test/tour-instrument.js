@@ -708,7 +708,7 @@ export const offlineFlow = {
   id: 'instrument-offline',
   name: 'Instrument · Map, Report and Scripts open on a first visit offline',
   online: true,
-  async run({ page, check, goto, settle, createProfile, online }) {
+  async run({ page, check, goto, settle, createProfile, online, note, browserName = 'chromium' }) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await goto('/');
     await createProfile({ name: 'Diya Instrument', year: 10, course: 'in' });
@@ -740,11 +740,35 @@ export const offlineFlow = {
     await banner.locator('summary').click().catch(() => {});
     await check('and "What still works" opens to list scripts, the report and notes opened before, with the work kept on the device',
       /Your scripts/.test(await banner.innerText()) && /Your report/.test(await banner.innerText()) && /kept on this device/.test(await banner.innerText()));
+    // Playwright's WebKit offline mode also stops WebKit's service worker from
+    // answering: even a plain fetch() of a file the worker has just reported
+    // holding fails ("WebKit encountered an internal error"). That is a limit
+    // of the harness, not of the app (the same one tour-activation-gate notes
+    // for an offline reload), so in WebKit the network is cut at the network
+    // layer instead: every request that reaches it is aborted, and only what
+    // the worker answers from its cache can load. The negative control below
+    // records the limitation on every run, so it is visible if it changes.
+    // Neither method is evidence about Safari or WKWebView on a device.
+    const heldChunk = await page.evaluate(async () => {
+      const name = (await caches.keys()).find(k => k.startsWith('pri-'));
+      const keys = name ? await (await caches.open(name)).keys() : [];
+      return keys.map(r => new URL(r.url).pathname).find(p => /\/MapPage-[^/]+\.js$/.test(p)) || null;
+    });
+    if (browserName === 'webkit') {
+      const underEmulation = await page.evaluate(async url => { try { return (await fetch(url)).status; } catch (e) { return `failed: ${e.message}`; } }, heldChunk);
+      note(`WebKit negative control: under Playwright's offline mode a fetch of ${heldChunk} (held by the worker) gives ${JSON.stringify(underEmulation)}; the tabs are therefore opened with the network cut by aborting every request that reaches it`);
+      await page.context().setOffline(false);
+      await page.context().route('**/*', route => route.abort('internetdisconnected'));
+      const throughWorker = await page.evaluate(async url => { try { return (await fetch(url)).status; } catch (e) { return `failed: ${e.message}`; } }, heldChunk);
+      await check('WebKit, network cut: the service worker answers a held tab chunk from its cache', throughWorker === 200, `${heldChunk}: ${JSON.stringify(throughWorker)}`);
+    }
     for (const [name, href, ready] of [['the Map', '/map', '[data-map-chapter]'], ['the Report', '/progress', '[data-instrument-report]'], ['Scripts', '/review', '.in-led-bar, [data-state="empty"]']]) {
       await page.locator(`.in-tab[href="${href}"]`).click();
       const painted = await page.waitForSelector(ready, { timeout: 30000 }).then(() => true, () => false);
-      await check(`offline, ${name} opens on its first visit`, painted && new URL(page.url()).pathname === href, page.url());
+      const crashed = await page.locator('text=This page stopped mid-render').count() > 0;
+      await check(`offline, ${name} opens on its first visit`, painted && !crashed && new URL(page.url()).pathname === href, page.url());
     }
+    if (browserName === 'webkit') await page.context().unroute('**/*');
     await page.context().setOffline(false);
   }
 };
