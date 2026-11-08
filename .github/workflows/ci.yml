@@ -188,13 +188,16 @@ jobs:
           # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
-          grep -Fq 'STEP14 REVIEW FIXES: PASS — 36783/36783 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 36787/36787 checks' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
           grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
           grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
+          # The opposite direction: every right answer to every India question (the key, the box's unit in every
+          # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29277 right answers over 11002 India questions (566 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
