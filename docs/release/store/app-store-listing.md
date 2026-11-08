@@ -77,8 +77,10 @@ account), it is marked **OWNER**.
 > sends the image to an outside AI reading service (OpenAI); it is never sent with the question,
 > the answer or your name, and Pri keeps no copy of the image. If you turn on the optional
 > working check, the lines of your working and the text of the question are also sent to the
-> same service to find where a mistake is. You can switch server reading off
-> in Settings and type your answers instead. You can delete your account in the app at any time.
+> same service to find where a mistake is. Before anything is read the first time, the app asks
+> your permission, naming OpenAI, and nothing is sent until you agree. You can say no, or switch
+> server reading off later in Settings, and type your answers instead. You can delete your
+> account in the app at any time.
 >
 > Pri Learning offers maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced:
 > 77 chapters. Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list, and Class 8
@@ -97,9 +99,8 @@ account), it is marked **OWNER**.
 
 **Do not publish this description until:** (a) the prices are set in App Store Connect and match;
 (b) the Premium feature list is checked against the paywall on the release build; (c) the **19 October revised** privacy notice at `/privacy` is tested against live providers/data flows and receives counsel approval; the 18 October counsel pack's assertion that it still describes on-device marking is historically stale; (d) if an introductory offer or free trial is
-configured, its terms are added to the subscription paragraph; (e) the D17 one-time prompt naming
-OpenAI is in the release build, and the PRIVACY paragraph is rewritten to describe it (today it
-describes reading as on for a signed-in account and switchable off, which is what the code does);
+configured, its terms are added to the subscription paragraph; (e) the release build includes the
+D17 prompt (#737), and counsel has approved its wording;
 (f) `https://prilearning.com/privacy`, `/terms` and `/support` are live (the site in `site/` is not
 deployed and DNS is untouched, D5).
 
@@ -201,9 +202,7 @@ children, and India's DPDP Act defines a child as under 18 (counsel to confirm b
 Settings → Account), that sign-in offers email code and password only (D3: Sign in with Apple and
 Google arrive together in an update, so Guideline 4.8 is not engaged by this submission), that the
 D17 prompt appears before the first read or photo and that declining it leaves typed answers
-working, and that restore works in the sandbox. If the D17 prompt is not in the build, rewrite the
-handwriting paragraph of these notes to say reading is on for a signed-in account and can be
-switched off in Settings → Handwriting.
+working, and that restore works in the sandbox.
 
 ## 7. Screenshot shot list
 
@@ -264,6 +263,7 @@ claims.
 | Under-18 guardian confirmation by link or code (email only while SMS is off, D3) | `guardianConsent.js`, `otp.js` `channels` |
 | Coverage sentences (77 chapters; Class 8 earlier NCERT book; Class 9 8 of 15) | D24 approved wording (owner audit `audit-content`). 77 is the chapter count `client/test/notes-content-check.mjs` measures ("77/77 chapters", pinned in `.github/workflows/ci.yml`); the Class 8 and Class 9 labels are lane L5's to keep true (`client/src/engine/indiaProductionMeta.js`) |
 | Server reading can be switched off | `client/src/ink/cloudReader.js`; `settings.cloudHandwritingCopy` |
+| Asked once, naming OpenAI, before the first read; nothing sent until the student agrees (D17) | `client/src/ink/readerPermission.js`, `ReaderPermission.jsx`, `readerPermission.*` (#737) |
 | In-app deletion | `CloudAccountSecurity.jsx` → `DELETE /v1/account` |
 | No ads / tracking | `PrivacyInfo.xcprivacy`; `tools/check-client-network-boundary.mjs` |
 
@@ -277,7 +277,7 @@ claims.
 | 4 | Content rights cited official paper material approved for use | D23: past papers are off for students until a rights opinion exists |
 | 5 | "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only; nothing says complete, every chapter, syllabus-aligned, official or accurate |
 | 6 | "No third-party analytics" with no word about the server's own telemetry | Says what is true: no third-party analytics or crash SDK; Pri's server keeps operational telemetry and coded crash reports, which App Privacy declares |
-| 7 | The description and notes did not say what changes when D17 lands | Publication gates (e) and (f) in §2 and the pre-submission check in §6 |
+| 7 | The description and notes did not say what changes when D17 lands | The PRIVACY paragraph describes the prompt (#737); publication gates (e) and (f) in §2 and the pre-submission check in §6 |
 
 D18 (an unconfirmed or withdrawn under-18 account is erased after 30 days; a guardian can ask for
 erasure without the child's login) is in the privacy notice and not yet in the code; a production

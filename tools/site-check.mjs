@@ -132,8 +132,11 @@ const TRACKING = /googletagmanager|google-analytics|gtag\(|analytics\.js|fbq\(|f
 export const NOTICE_PREMISES = [
   { page: 'index.html', says: /on for a signed-in account/, notice: 'privacy', requires: /on by default for a signed-in account/,
     why: 'says reading is on for a signed-in account, but privacy.md no longer says it is on by default' },
-  { page: 'index.html', says: /after you (have )?agree|until you (have )?agree|before you agree|once you (have )?agree|nothing is sent until|nothing leaves the device until/i, notice: 'privacy', forbids: /on by default for a signed-in account/,
-    why: 'says reading waits for your agreement, but privacy.md still says it is on by default for a signed-in account (D17 has not landed)' },
+  // D17 (#737): the prompt is described only while privacy.md describes it.
+  { page: 'index.html', says: /after you (have )?agree|until you (have )?agree|before you agree|once you (have )?agree|nothing is sent until|nothing leaves the device until/i, notice: 'privacy', requires: /Nothing is sent until you agree/,
+    why: 'says reading waits for your agreement, but privacy.md does not say "Nothing is sent until you agree" (the D17 prompt)' },
+  { page: 'index.html', says: /asks (your|for your) permission|naming OpenAI/i, notice: 'privacy', requires: /asks your permission once, naming OpenAI/,
+    why: 'describes a permission prompt naming OpenAI, which privacy.md no longer describes' },
   { page: 'index.html', says: /not the question, not the expected answer, not your name/, notice: 'privacy', requires: /not the question, not the expected answer, not your name/,
     why: 'repeats the stroke-image guarantee, which privacy.md no longer states in those words' },
   { page: 'index.html', says: /whatever is in the frame is sent|sends whatever is in the frame/, notice: 'privacy', requires: /whatever is in the frame is sent/,

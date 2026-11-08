@@ -136,9 +136,10 @@ for (const p of NOTICE_PREMISES) {
   else assert.ok(!p.says.test(text), `forbidden paraphrase is absent — ${p.page} ${p.says}`);
   checks++;
 }
-// D17 has not landed: "after you agree" fails while privacy.md says on by default…
-expectFailure('consent-first wording before D17 (marking cell)', run(mutate('index.html', s => s.replace('This is on for a signed-in account, and you can turn it off at any time', 'Nothing is sent until you have agreed to this, once, and you can turn it off at any time'))), /index\.html: says reading waits for your agreement, but privacy\.md still says it is on by default for a signed-in account \(D17 has not landed\)/);
-expectFailure('consent-first wording before D17 (plain section)', run(mutate('index.html', s => s.replace('read by OpenAI while you are signed in. You can turn it off.', 'read by OpenAI, after you agree.'))), /D17 has not landed/);
+// D17 (#737): the home page may say nothing is sent until you agree only while
+// privacy.md says so; drop it from the notice and the home page fails…
+expectFailure('consent-first wording without the notice (marking cell and plain section)', run(clone(), vercel, withNotice('privacy', s => s.replace('**Nothing is sent until you agree.**', '**Reading.**'))), /index\.html: says reading waits for your agreement, but privacy\.md does not say "Nothing is sent until you agree"/);
+expectFailure('the prompt described without the notice', run(clone(), vercel, withNotice('privacy', s => s.replace(/asks your permission once, naming OpenAI/g, 'asks once'))), /index\.html: describes a permission prompt naming OpenAI, which privacy\.md no longer describes/);
 // …and once privacy.md drops "on by default", today's wording fails until it is rewritten.
 expectFailure('on-by-default wording after the notice drops it', run(clone(), vercel, withNotice('privacy', s => s.replace(/on by default for a signed-in account/g, 'asked for once, before the first read,'))), /index\.html: says reading is on for a signed-in account, but privacy\.md no longer says it is on by default/);
 // The stroke-image guarantee may not be stretched over photographs.
