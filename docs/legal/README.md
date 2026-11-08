@@ -14,10 +14,25 @@ when a person records a lawyer's review in `review-status.json` (below).
 | `grievance.md` | `/grievance` | The DPDP Act's requirement to publish a grievance contact |
 | `third-party/NOTICES.md` | `/third-party-notices` | The licences of the open-source software the app ships; **generated**, see below |
 
-The counsel pack (`counsel/COUNSEL-INFORMATION-PACK.md`) is not a public page.
-It sits in a subdirectory because `tools/legal-status.mjs` treats every
-Markdown file directly in this directory as a public notice that must have a
-Hindi twin.
+The counsel pack (`counsel/`) is not a public page. It sits in a subdirectory
+because `tools/legal-status.mjs` treats every Markdown file directly in this
+directory as a public notice that must have a Hindi twin. It has two documents,
+and `counsel/README.md` says how the owner sends them:
+
+- `counsel/QUESTIONS-FOR-COUNSEL.md` — the short sheet to send: each question
+  only Indian counsel can answer (the operator, the DPDP notices, consent and
+  the guardian flow, the D17 OpenAI prompt, the D18 erasure period, D22 parent
+  email about minors, D23 past-paper rights), with the exact current text and
+  where it lives in the code. `tools/counsel-pack-check.mjs` (in
+  `npm run test:legal`) fails if a quote or a location drifts from the tree.
+- `counsel/COUNSEL-INFORMATION-PACK.md` — the background and all 35 questions.
+
+## Status, 8 November 2026
+
+- The terms no longer say the app "follows the NCERT syllabus": they use the
+  D24 wording only, in both languages, and `client/test/legal-pages-check.mjs`
+  refuses the coverage claims D24 forbids in all eight notices.
+- The counsel question sheet was added (above).
 
 ## Status, 2 November 2026
 

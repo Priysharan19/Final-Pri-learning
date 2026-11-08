@@ -8,6 +8,12 @@ provision, it does so to frame a question for counsel, not to state how the prov
 Every factual statement cites the code or document it comes from so counsel can ask for it to be
 checked.
 
+**Re-checked on 2026-11-08** against `main` at `1d3829103`: nothing that leaves the device changed.
+The terms' content sentence was corrected (§8.2 row 6). The short sheet to send first is
+`QUESTIONS-FOR-COUNSEL.md` beside this file: the operator, the DPDP notices, consent, D17, D18, D22
+and D23, each with the exact current text and where it lives in the code, held to the tree by
+`tools/counsel-pack-check.mjs`.
+
 (This file sits in `docs/legal/counsel/` rather than `docs/legal/` because `tools/legal-status.mjs`
 treats every Markdown file directly in `docs/legal/` as a public notice that must have a Hindi
 twin.)
@@ -278,7 +284,7 @@ must be made to both languages in the same change.
 | 3 | Handwriting and photos are read by an outside service (OpenAI); the mark is never decided by it | — |
 | 4 | Does not predict a percentile, rank or admission; describes the estimate the progress screen shows | — |
 | 5 | Subscriptions sold only through the App Store and Google Play; renew automatically; price and period shown by the store; Apple or Google handles billing, renewals and refunds; cancel in the store; account deletion does not cancel; a parent or guardian must make or approve a minor's purchase | Q28–Q30 (E-Commerce Rules; minors' purchases; whether Apple's standard EULA or custom terms apply) |
-| 6 | Not endorsed by NCERT, CBSE or the NTA; past papers are off for students until a rights opinion exists (D23) | Q31 |
+| 6 | "Pri Learning is maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced", not endorsed by NCERT, CBSE or the NTA (until 2026-11-08 it said the app "follows the NCERT syllabus", which the D24 wording rule forbids). The terms say nothing about past papers; D23 keeps them off for students until a rights opinion exists, through a switch not yet on `main` (`QUESTIONS-FOR-COUNSEL.md` §7) | Q31 |
 
 ### 8.3 `docs/legal/refund-policy.md` (and `refund-policy.hi.md`)
 
