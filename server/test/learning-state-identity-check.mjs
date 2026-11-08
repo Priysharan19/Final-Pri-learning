@@ -490,7 +490,11 @@ try {
   const p1 = paperOf('exam-1', [caseStudy, single, base]);
   const r1 = await finalise(A, p1, answersFor(p1), T + 30 * DAY);
   eq([r1.score, r1.total, r1.detail.map(d => d.repeat ?? false), r1.attempts.filter(a => a.repeat).length], [3 + 4 + 4, 11, [false, false, false], 0], 'a first paper: full marks, nothing on it a repeat');
-  eq((await rowsOf(A)).filter(r => r.key.startsWith('seen-c2:')).length >= 7, true, 'finalising it recorded each item, alternative and part under a canonical key');
+  {
+    const expected = [...new Set(p1.questions.flatMap(sq => examItemsOf(sq.payload)).map(seenKeyOf))];
+    const held = new Set((await rowsOf(A)).map(r => r.key));
+    eq([expected.length >= 6, expected.every(key => held.has(key))], [true, true], 'finalising it recorded each item, alternative and part under its canonical key');
+  }
   eq((await rowsOf(A)).filter(r => !r.key.startsWith('seen-c2:') && Number(r.created_at) === T + 30 * DAY).length, 0, 'and no legacy key');
   // The same paper again, with the multiple-correct item dealt differently.
   const p2 = paperOf('exam-2', [caseStudy, single, shuffled]);
@@ -511,6 +515,39 @@ try {
   const p4 = paperOf('exam-4', [otherAlt]);
   const r4 = await finalise(A, p4, answersFor(p4), T + 33 * DAY);
   eq([r4.detail[0].repeat, r4.detail[0].parts.map(part => part.repeat ?? false), r4.detail[0].repeatEvidence ?? null], [true, [true, true], null], 'with its main parts answered again every part is a repeat and so is the whole, on canonical evidence');
+  // An internal-choice ("OR") item: its main question is the same question as
+  // its practice copy, in both directions; the alternative is its own unit.
+  // (Review of #731, P1: v2 folded item.alt into the main question's key.)
+  {
+    // An alternative is a different question: the next seed whose question differs.
+    const otherThan = (q, from) => { for (let seed = from; seed < from + 200; seed++) { const x = generateQuestion('c8-linear-equations-both-sides', 2, seed); if (seenKeyOf(x) !== seenKeyOf(q)) return { ...x, key: undefined }; } throw new Error('no different question'); };
+    const plain = generateQuestion('c8-linear-equations-both-sides', 2, 7);
+    const orBeside = otherThan(plain, 8);
+    eq(seenKeyOf({ ...plain, alt: orBeside }), seenKeyOf(plain), 'the main question\'s seen key does not depend on the alternative printed beside it');
+    eq(triedKeyOf({ ...plain, alt: orBeside }), triedKeyOf(plain), 'nor does its try key');
+    ok(seenKeyOf(orBeside) !== seenKeyOf(plain), 'the alternative keeps a key of its own');
+    // practice → exam: seen in practice, then met as the main question of an OR item.
+    await inScope(A, () => markSeen(db, A, [seenKeyOf(plain)], T + 36 * DAY));
+    const pOr = paperOf('exam-or-1', [{ ...plain, alt: orBeside }]);
+    const rOr = await finalise(A, pOr, answersFor(pOr), T + 37 * DAY);
+    eq([rOr.detail[0].repeat ?? false, rOr.detail[0].repeatEvidence ?? null], [true, null], 'practice → exam: the OR item\'s main question is a repeat of its practice copy, on canonical evidence');
+    // exam → practice: an OR item finalised first; its practice copies are repeats.
+    const plain2 = generateQuestion('c8-linear-equations-both-sides', 2, 9);
+    const orBeside2 = otherThan(plain2, 10);
+    const pOr2 = paperOf('exam-or-2', [{ ...plain2, alt: orBeside2 }]);
+    await finalise(A, pOr2, answersFor(pOr2), T + 38 * DAY);
+    const known = await inScope(A, () => seenAmong(db, A, [...seenKeysOf(plain2), ...seenKeysOf(orBeside2)], T + 38 * DAY));
+    const back = repeatEvidenceOf(plain2, known);
+    eq([!!back, back?.legacy ?? null], [true, false], 'exam → practice: the practice copy of the OR item\'s main question is a repeat, on canonical evidence');
+    eq(!!repeatEvidenceOf(orBeside2, known), true, 'and so is the practice copy of its alternative');
+    // The alternative taken on the paper: the alternative is a repeat of its practice copy.
+    const plain3 = generateQuestion('c8-linear-equations-both-sides', 2, 11);
+    const orBeside3 = otherThan(plain3, 12);
+    await inScope(A, () => markSeen(db, A, [seenKeyOf(orBeside3)], T + 39 * DAY));
+    const pOr3 = paperOf('exam-or-3', [{ ...plain3, alt: orBeside3 }]);
+    const rOr3 = await finalise(A, pOr3, answersFor(pOr3, { alt: ['*'] }), T + 40 * DAY);
+    eq(rOr3.detail[0].repeat ?? false, true, 'the alternative, taken on the paper, is a repeat of its own practice copy');
+  }
   // Legacy rows on the examination path: honoured, reported where ambiguous.
   const legacyCase = { ...caseStudy, stem: 'A circular pond has radius 3 m.' };
   await inScope(B, () => markSeen(db, B, ['seen-c' + legacyContentIdentityOf(legacyCase)], T));

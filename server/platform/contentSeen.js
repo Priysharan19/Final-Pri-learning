@@ -223,10 +223,26 @@ export function contentIdentityOf(item) {
   return keyed(`identity:v${IDENTITY_VERSION}:` + JSON.stringify(unitSubstance(item))).digest('hex').slice(0, 32);
 }
 
+/**
+ * A unit as a seen/try record knows it: the question itself, without the
+ * internal-choice alternative printed beside it (its own `alt`; a case-study
+ * part is a unit of its own, keyed the same way, and the whole case study
+ * keeps its parts' alternatives). A CBSE "OR" item is two questions a student may answer one of; the
+ * main question is the same question whether or not an alternative is printed
+ * beside it, so its practice copy and its exam copy share one seen/try key in
+ * both directions. The alternative is a unit of its own (examItemsOf), keyed
+ * the same way. contentIdentityOf still covers the alternative: it names the
+ * whole item.
+ */
+function withoutChoice(item) {
+  if (!item || typeof item !== 'object' || !('alt' in item)) return item;
+  const { alt: _alt, ...rest } = item;
+  return rest;
+}
 /** The one key a new seen-record of this item is written under. */
-export const seenKeyOf = item => 'seen-c2:' + contentIdentityOf(item);
+export const seenKeyOf = item => 'seen-c2:' + contentIdentityOf(withoutChoice(item));
 /** The one key a new spent-try record of this item is written under. */
-export const triedKeyOf = item => 'tried-c2:' + contentIdentityOf(item);
+export const triedKeyOf = item => 'tried-c2:' + contentIdentityOf(withoutChoice(item));
 
 // ── Version 1 and the engine-hash keys: read for records that predate v2 ────
 

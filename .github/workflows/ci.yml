@@ -431,7 +431,7 @@ jobs:
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           # Learning-state identity (v2), exact legacy lookups and monotonic expiry (#689, #690, #691) on SQLite; Postgres below.
           node server/test/learning-state-identity-check.mjs 2>&1 | tee -a practice-http.log
-          grep -Fq 'LEARNING STATE IDENTITY: PASS — 172/172 checks' practice-http.log
+          grep -Fq 'LEARNING STATE IDENTITY: PASS — 179/179 checks' practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log

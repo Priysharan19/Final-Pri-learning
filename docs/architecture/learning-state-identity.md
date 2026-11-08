@@ -61,3 +61,7 @@ Tested on both engines, in account-scoped transactions as the `pri_server` role 
 - No new write of a legacy key. No lookup that enumerates candidate keys.
 - Any new student-visible field on a question (a new label, a new kind of part) belongs in the version-2 substance **and** in `legacyIdentityAmbiguous` if version 1 did not see it; a field added to the substance without bumping `IDENTITY_VERSION` changes every canonical key, which is a reset, so bump the version and extend the legacy readers instead.
 - `expires_at` must stay monotonic on both engines; `learning-state-identity-check.mjs` runs on SQLite in CI's platform job and on Postgres through `run-platform-postgres.mjs`.
+
+## Internal-choice ("OR") items (review of #731)
+
+A seen or try key names one unit **without its own internal-choice alternative** (`seenKeyOf` / `triedKeyOf` drop the unit's `alt`). The main question of a CBSE "OR" item is the same question as its practice copy, in both directions; its alternative is a unit of its own (`examItemsOf`), keyed the same way. A case study's whole-item key keeps its parts' alternatives, and each part is keyed without its own. `contentIdentityOf` still names the whole item, alternatives included.
