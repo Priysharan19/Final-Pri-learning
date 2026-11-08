@@ -48,7 +48,7 @@ html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-p
 @supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
   html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav) { background: color-mix(in srgb, var(--in-base) 84%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
   html.ui-instrument.skin-aurora :is(.in-tabs, .in-cmd, .in-more) { background: color-mix(in srgb, var(--in-l1) 70%, transparent); }
-  html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: color-mix(in srgb, var(--in-l1) 88%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+  html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: color-mix(in srgb, var(--in-l1) 92%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
 }
 
 /* ── The current place and focus, on chrome: the one violet ─────────────── */
