@@ -20,7 +20,7 @@ import {
 } from './answer-forms.js';
 import { unitContradicts, withoutUnit, writtenUnit, unitsNamed, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
-import { exactValue, fraction, wholeFraction, sameFraction } from './exact.js';
+import { exactValue, fraction } from './exact.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 

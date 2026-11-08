@@ -32,7 +32,7 @@ try {
   const event=await h.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt'",[a.account.id,qid]);
   const row=await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt' LIMIT 1",[a.account.id,qid]);
   const foreign=await h.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt'",[b.account.id,qid]);
-  let data=null;try{data=typeof row?.payload_json==='string'?JSON.parse(row.payload_json):row?.payload_json}catch{}
+  let data=null;try{data=typeof row?.payload_json==='string'?JSON.parse(row.payload_json):row?.payload_json;}catch{}
   const wrongCredit=grade.data?.authoritative===true&&grade.data?.correct===true&&grade.data?.marksEarned===grade.data?.marksPossible;
   if(wrongCredit)defects++;
   const integrity=blocked.status===404&&grade.status===200&&grade.data?.correct===false&&grade.data?.marksEarned===0
