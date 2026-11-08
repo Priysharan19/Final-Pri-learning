@@ -730,7 +730,38 @@ export const offlineFlow = {
   }
 };
 
+// The first screen on a touch phone. #487 measured the welcome footer's legal
+// links at 15 px tall; on a coarse pointer each is a 44 px target now. V1
+// decision D11: the language switch stays, and choosing Hindi says at once
+// that questions and worked solutions stay in English.
+export const welcomeFlow = {
+  id: 'instrument-welcome',
+  name: 'Instrument · the welcome screen on a touch phone: 44px legal links, the language note (D11)',
+  async run({ page, check, goto, settle }) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await goto('/');
+    await page.waitForSelector('.login-legal a', { timeout: 30000 });
+    const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    await check('the phone context is a coarse pointer, as a phone is', coarse);
+    const small = await page.locator('.login-legal a').evaluateAll(els => els.map(el => {
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { link: el.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) };
+    }).filter(x => x.w < 43.5 || x.h < 43.5));
+    await check('every legal link on the welcome screen is a 44×44 touch target', small.length === 0, JSON.stringify(small));
+    await check('in English the screen adds no language note', await page.locator('[data-lang-note]').count() === 0);
+    await page.locator('.signin-landing button[lang="hi"]').first().click();
+    await page.waitForSelector('[data-lang-note]', { timeout: 15000 }).catch(() => {});
+    await settle();
+    const note = await page.locator('[data-lang-note]').first().innerText().catch(() => '');
+    await check('choosing Hindi says, in Hindi, that questions and worked solutions stay in English', /अंग्रेज़ी/.test(note), JSON.stringify(note));
+    await page.locator('.signin-landing button[lang="en"]').first().click();
+    await settle();
+    await check('and back in English the note goes again', await page.locator('[data-lang-note]').count() === 0);
+  }
+};
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');
-  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow]) ? 1 : 0);
+  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow, welcomeFlow]) ? 1 : 0);
 }

@@ -1290,5 +1290,5 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
    each is a 44 px target; the separators stay in the running text. */
 @media (pointer: coarse) {
   html.ui-instrument .login-legal { line-height: 1.2; }
-  html.ui-instrument .login-legal a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; }
+  html.ui-instrument .login-legal a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 8px; }
 }
