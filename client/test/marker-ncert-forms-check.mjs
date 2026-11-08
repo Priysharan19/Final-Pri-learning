@@ -703,3 +703,5 @@ await import('./marker-adversarial-corpus-check.mjs');
 await import('./marker-exact-bounds-check.mjs');
 // The independent R4 review of #723: its four regressions, pinned.
 await import('./marker-step14-review-check.mjs');
+// #680's own comments: the cases they preserve (not the lost original 197).
+await import('./marker-680-sourced-check.mjs');
