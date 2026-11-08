@@ -578,6 +578,23 @@ const scratch = [];
   await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance A–D/);
   await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance A–D/);
   await noGo('the candidate was never frozen', r => { r.candidate = { frozenAt: '', by: '' }; }, /candidate SHA frozen/);
+  await noGo('the merge freeze was declared by an agent', r => { r.candidate.by = 'L9 agent (Claude Code)'; }, /candidate SHA frozen/);
+  {
+    // The step-21 row says which half is wrong (found by the 9 Nov 2026 freeze rehearsal on
+    // 1d3829103: an agent name read "not recorded", which sends the operator looking for a
+    // field that is there).
+    const frozenDetail = async mutate => {
+      const record = fullRecord(); mutate(record);
+      const row = (await dossier(frozen(), record)).rows.find(r => r.step === 21);
+      return [row.ok, row.detail];
+    };
+    assert.deepEqual(await frozenDetail(() => {}), [true, '2026-11-03T09:00:00Z by Priya Example'], 'a freeze declared by a named person at a past time passes and names them'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.by = 'L9 agent (Claude Code)'; }), [false, 'candidate.by "L9 agent (Claude Code)" does not name a human (an agent, CI or placeholder name is refused)'], 'an agent declaring the freeze is refused by name, not reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.by = ''; }), [false, 'candidate.by not recorded'], 'a missing declarer is reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = ''; }), [false, 'candidate.frozenAt not recorded'], 'a missing freeze time is reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = 'Monday morning'; }), [false, 'candidate.frozenAt is not an ISO date-time'], 'a freeze time that is not a date is named as such'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = '2026-11-06T00:00:00Z'; }), [false, 'candidate.frozenAt 2026-11-06T00:00:00Z is in the future'], 'a freeze dated after the dossier run is refused, with the reason'); count += 1;
+  }
   await noGo('the device evidence is missing (the nomination fails)', () => {}, /release-stage nomination/, w => { writeFileSync(w.ledger, ''); });
   await noGo('the record is for another SHA', r => { r.sha = OTHER; }, /operator record/);
   {

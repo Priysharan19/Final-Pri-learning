@@ -185,8 +185,15 @@ export async function buildDossier({
 
   // ── step 21: candidate frozen ──────────────────────────────────────────────
   const frozenAt = iso(rec.candidate?.frozenAt), frozenBy = human(rec.candidate?.by);
-  row(21, frozenAt !== null && frozenBy !== null && frozenAt <= now, 'candidate SHA frozen and the merge freeze declared by a named person',
-    frozenAt !== null && frozenBy ? `${rec.candidate.frozenAt} by ${frozenBy}` : 'candidate.frozenAt / candidate.by not recorded', { who: frozenBy || '' });
+  // Say which half is wrong: a typed agent name is refused, not "not recorded".
+  const typedBy = String(rec.candidate?.by || '').trim();
+  const frozenProblems = [
+    frozenAt === null ? (String(rec.candidate?.frozenAt || '').trim() ? 'candidate.frozenAt is not an ISO date-time' : 'candidate.frozenAt not recorded') : null,
+    frozenAt !== null && frozenAt > now ? `candidate.frozenAt ${rec.candidate.frozenAt} is in the future` : null,
+    frozenBy === null ? (typedBy ? `candidate.by ${JSON.stringify(typedBy)} does not name a human (an agent, CI or placeholder name is refused)` : 'candidate.by not recorded') : null
+  ].filter(Boolean);
+  row(21, frozenProblems.length === 0, 'candidate SHA frozen and the merge freeze declared by a named person',
+    frozenProblems.length ? frozenProblems.join('; ') : `${rec.candidate.frozenAt} by ${frozenBy}`, { who: frozenBy || '' });
 
   // ── nomination at the release stage ────────────────────────────────────────
   const overridePath = rec.overrides ? resolve(ROOT, String(rec.overrides)) : null;
