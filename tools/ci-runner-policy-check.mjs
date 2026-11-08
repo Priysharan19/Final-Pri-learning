@@ -102,6 +102,9 @@ export function prSupersededOnlyProblems(source, prefix) {
   if (block.filter(line => line === cancel).length !== 1) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
   const comment = block.filter(line => /^  # /.test(line)).map(line => line.slice(4)).join(' ');
   if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
+  // A local reusable workflow brings its own concurrency, outside this file's guard (and its
+  // github.workflow is this workflow's name): the pinned workflows call none.
+  if (/^\s*-?\s*["']?uses["']?\s*:\s*["']?\.\//m.test(source)) problems.push('a pinned workflow must not call a local reusable workflow (uses: ./…): its concurrency would escape this check');
   // A merged pull request's `closed` run has github.ref = refs/heads/main: it would share one group
   // with every other such run. The pattern holds only with GitHub's default pull_request types.
   if ([...source.matchAll(TYPES_KEY)].length) problems.push('the triggers must keep GitHub\'s default pull_request types (no types: key): a closed pull request runs with github.ref = refs/heads/main');
@@ -121,9 +124,12 @@ export function groupLiterals(source) {
   const quotedName = nameText.match(/^(["'])(.*?)\1/);
   const name = quotedName ? quotedName[2] : nameText.replace(/\s+#.*$/, '').trim();
   const EXPR = /^\$\{\{\s*github\.workflow\s*\}\}/;
+  // In a reusable workflow, github.workflow is the CALLING workflow's name: it cannot be read here.
+  const reusable = /(^|[{,\s])["']?workflow_call["']?\s*:|^on:\s*\[?[^\n]*\bworkflow_call\b/m.test(source);
   const readable = value => value && !/^[>|{&!*]/.test(value) && !/\bformat\s*\(/.test(value)
     // A group that starts with an expression is readable only when it is github.workflow and the name is.
-    && (!/^\$\{\{/.test(value) || (EXPR.test(value) && name && !/^[>|&!*]/.test(name)));
+    && (!/^\$\{\{/.test(value) || (EXPR.test(value) && name && !/^[>|&!*]/.test(name) && !reusable))
+    && !(reusable && /\$\{\{\s*github\.workflow\s*\}\}/.test(value));
   const values = [];
   const take = raw => {
     const value = String(raw || '').trim().replace(/^(["'])(.*)\1$/, '$2').replace(/^["']/, '');
@@ -160,9 +166,27 @@ export function groupLiterals(source) {
 export function prefixCollision(source, prefixes) {
   const { values, unreadable } = groupLiterals(source);
   if (unreadable.length) return { prefix: '(unreadable)', literal: unreadable[0] };
-  for (const literal of values) {
-    const hit = prefixes.find(prefix => literal.startsWith(`${prefix.toLowerCase()}-`));
-    if (hit) return { prefix: hit, literal };
+  for (const value of values) {
+    const hit = prefixes.find(prefix => value.startsWith(`${prefix.toLowerCase()}-`));
+    if (hit) return { prefix: hit, literal: value };
+    // The literal text may be a shorter piece of a pinned "<prefix>-" that the first expression
+    // completes (ink-${{ matrix.lane }}-… can become ink-physical-evidence-…). Only an expression
+    // whose expansion is known can rule that out: github.ref starts "refs/", run ids are digits,
+    // SHAs are hex. Anything else (matrix, inputs, vars, head_ref…) fails closed.
+    const at = value.indexOf('${{');
+    if (at < 0) continue;
+    const head = value.slice(0, at);
+    const expr = (value.slice(at).match(/^\$\{\{\s*([^}]*?)\s*\}\}/) || [])[1] || '';
+    for (const prefix of prefixes) {
+      const pinned = `${prefix.toLowerCase()}-`;
+      if (!pinned.startsWith(head) || pinned === head) continue;
+      const next = pinned.slice(head.length);
+      const known = /^github\.ref$/.test(expr) ? next.startsWith('refs/') || 'refs/'.startsWith(next)
+        : /^github\.(run_id|run_number|run_attempt)$/.test(expr) ? /^[0-9]/.test(next)
+          : /^(github\.sha|inputs\.\w*sha|github\.event\.workflow_run\.head_sha)(\s*\|\|\s*(github\.sha|inputs\.\w*sha))*$/.test(expr) ? /^[0-9a-f]/.test(next)
+            : null;
+      if (known === null || known === true) return { prefix, literal: value, completes: true };
+    }
   }
   return null;
 }
@@ -180,7 +204,9 @@ export function prefixCollision(source, prefixes) {
     const hit = prefixCollision(read(name), prefixes);
     assert.equal(hit, null, hit?.prefix === '(unreadable)'
       ? `${name}: its concurrency group "${hit.literal}" cannot be read; write it as a plain one-line value so it can be checked against the pull-request-only prefixes`
-      : `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
+      : hit?.completes
+        ? `${name}: its concurrency group "${hit.literal}" could expand into the group of the pull-request-only workflow "${hit.prefix}" (an expression completes its prefix); start the group with text no pinned prefix begins with`
+        : `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
   }
   // Mutation controls: the dangerous variants are refused, not merely absent today.
   const good = read(PR_SUPERSEDED_ONLY[6][0]); // ink-physical-evidence.yml: it also runs on push to main
@@ -208,7 +234,8 @@ export function prefixCollision(source, prefixes) {
     ['a job-level block with an anchor', s => job(s, `    concurrency: &jc\n      group: ${prefix}-\${{ github.ref }}\n`)],
     ['a job-level quoted key', s => job(s, `    "concurrency":\n      group: ${prefix}-\${{ github.ref }}\n`)],
     ['a top-level key with a trailing comment', s => s.replace(/^concurrency:$/m, 'concurrency: # pinned')],
-    ['a top-level one-line form instead of the block', s => s.replace(/^concurrency:\n(?:  .*\n)+/m, `concurrency: ${prefix}-\${{ github.ref }}\n`)]
+    ['a top-level one-line form instead of the block', s => s.replace(/^concurrency:\n(?:  .*\n)+/m, `concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job that calls a local reusable workflow', s => job(s, `    uses: ./.github/workflows/shared.yml\n`)]
   ]) {
     const mutated = mutate(good);
     assert.notEqual(mutated, good, `the mutation "${name}" applies`);
@@ -244,11 +271,25 @@ export function prefixCollision(source, prefixes) {
     ['a group built with format()', `name: Other\nconcurrency:\n  group: \${{ format('{0}-{1}', '${prefix}', github.ref) }}\n`],
     ['a github.workflow group with an unreadable name', `name: >-\n  ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
     ['a group starting with another expression', `name: Other\nconcurrency:\n  group: \${{ matrix.lane }}-\${{ github.ref }}\n`],
+    ['a quoted group starting with another expression', `name: Other\nconcurrency:\n  group: '\${{ matrix.lane }}-\${{ github.ref }}'\n`],
+    ['a github.workflow group in a reusable workflow (the caller names it)', `name: Shared\non:\n  workflow_call:\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
     ['a concurrency key with nothing under it', `name: Other\nconcurrency:\njobs: {}\n`]
   ]) {
     assert.equal(prefixCollision(other, prefixes)?.prefix, '(unreadable)', `a group the check cannot read fails closed: ${name}`);
   }
   assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${prefix}x-\${{ github.ref }}\n`, prefixes), null, 'a different prefix that merely starts the same is not a collision');
+  // An expression that can complete a pinned prefix fails closed; a known expansion that cannot does not.
+  for (const [name, group] of [
+    ['a matrix value completing ink-physical-evidence', 'ink-${{ matrix.lane }}-${{ github.ref }}'],
+    ['an input completing a kalp gate', 'kalp-${{ inputs.gate }}-${{ github.ref }}'],
+    ['a variable completing pri-reason', 'pri-${{ vars.lane }}-${{ github.ref }}'],
+    ['github.head_ref after a piece of a prefix', 'promo${{ github.head_ref }}']
+  ]) assert.ok(prefixCollision(`name: Other\nconcurrency:\n  group: ${group}\n`, prefixes)?.completes === true, `another workflow cannot reach a pinned group through ${name}`);
+  for (const [name, group] of [
+    ['ink-structural-v4-${{ github.ref }} (a real workflow: refs/ never completes -candidate-)', 'ink-structural-v4-${{ github.ref }}'],
+    ['a run id after a piece of a prefix', 'ink-physical-${{ github.run_id }}'],
+    ['a SHA after a piece of a prefix', 'pri-${{ github.sha }}']
+  ]) assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${group}\n`, prefixes), null, `a known expansion that cannot complete a pinned prefix passes: ${name}`);
 }
 
 assert.match(hybrid, /pull_request:\s*\n\s+paths:/,
