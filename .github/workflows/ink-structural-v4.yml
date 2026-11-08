@@ -13,7 +13,6 @@ on:
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
   pull_request:
     paths:
@@ -27,7 +26,6 @@ on:
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
 
 permissions:
