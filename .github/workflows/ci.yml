@@ -282,7 +282,7 @@ jobs:
           grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
           # The Aurora skin stays on chrome: scope, no content tokens, glass
           # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
-          grep -Fq 'AURORA SKIN: PASS — 27/27 checks' suites.log
+          grep -Fq 'AURORA SKIN: PASS — 28/28 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused

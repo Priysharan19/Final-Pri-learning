@@ -51,6 +51,13 @@ html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-p
   html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: color-mix(in srgb, var(--in-l1) 92%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
 }
 
+/* On a phone the top bar runs under the status bar: that strip stays exactly
+   the page colour (tour-iphone-layout), so the top bar is opaque there; the
+   bottom bar keeps its glass. */
+@media (max-width: 760px) {
+  html.ui-instrument.skin-aurora .in-bar { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
 /* ── The current place and focus, on chrome: the one violet ─────────────── */
 html.ui-instrument.skin-aurora .in-tab[aria-current="page"] { background: var(--au-violet-soft); color: var(--au-violet); box-shadow: inset 0 0 0 1px var(--au-violet-line); }
 html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--au-violet); box-shadow: inset 2px 0 0 var(--au-violet); }

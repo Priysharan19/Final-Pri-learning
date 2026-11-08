@@ -91,6 +91,8 @@ const glass = all.filter(r => /backdrop-filter:\s*blur/.test(r.body));
 ok(glass.length >= 2, `glass is used (${glass.length} rules)`);
 ok(glass.every(r => split(r.selector).every(s => CHROME_GLASS.test(s))), `glass only on the bars, the tab well, ⌘K, More, the menus, the sheet and the palette: ${JSON.stringify(glass.map(r => r.selector))}`);
 ok(!all.some(r => /\.(ws-bar|ws-qpeek|ws-actions)/.test(r.selector)), 'the practice bars over a question are never restyled (they stay opaque, dream-interface-check)');
+ok(all.some(r => r.ctx.some(c => c.includes('max-width: 760px')) && r.selector === 'html.ui-instrument.skin-aurora .in-bar' && /background:\s*var\(--in-base\)/.test(r.body) && /backdrop-filter:\s*none/.test(r.body)),
+  'on a phone the top bar is opaque, so the status-bar strip is exactly the page colour');
 // A glow is a blurred, unoffset shadow (the token, or a literal of 12 px and
 // more), as design-system-check defines it; declaring the token is not one.
 const uses = body => body.replace(/--[a-z0-9-]+\s*:[^;]*;/g, '');

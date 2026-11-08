@@ -51,7 +51,12 @@ async function contrast(page) {
     };
     const style = getComputedStyle(document.body);
     const fg = parse(style.color);
-    const bg = parse(style.backgroundColor);
+    // The background the text actually sits on: the body's, or — where the
+    // body is transparent (the Aurora skin's light pools show through it) —
+    // the document's, which is what paints behind it. A transparent colour
+    // read as its first three numbers would be black.
+    const opaque = v => !/rgba\([^)]*,\s*0\)|transparent/.test(String(v));
+    const bg = parse(opaque(style.backgroundColor) ? style.backgroundColor : getComputedStyle(document.documentElement).backgroundColor);
     if (!fg || !bg) return null;
     const l1 = luminance(fg);
     const l2 = luminance(bg);
