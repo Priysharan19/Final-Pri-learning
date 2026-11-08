@@ -14,8 +14,8 @@ on:
 
 concurrency:
   # Pull-request runs share one group per pull request, so a newer push supersedes the
-  # queued or running check. Every other run (a push, a manual dispatch)
-  # gets its own group, so it is never cancelled or replaced while pending.
+  # queued or running check. Every other run gets its own group, keyed by its run id,
+  # so it is never cancelled or replaced while pending.
   group: kalp-01-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 

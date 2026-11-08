@@ -58,9 +58,11 @@ assert.match(appHealth, /cancel-in-progress:\s*\$\{\{ github\.ref != 'refs\/head
 // manual dispatch) is keyed by its own run id. A pull-request group can therefore
 // never cancel, or replace while pending, a run on main, and main runs never
 // replace each other. The block must be the file's ONLY concurrency key in any
-// YAML form (a job-level one keyed on github.ref would bring the hazard back), and
-// concurrency groups are repository-wide and case-insensitive, so no other
-// workflow may produce a group with one of these prefixes.
+// literal form (a job-level one keyed on github.ref would bring the hazard back);
+// the triggers keep GitHub's default pull_request types (a merged pull request's
+// `closed` run has github.ref = refs/heads/main); and concurrency groups are
+// repository-wide and case-insensitive, so no other workflow may produce a group
+// with one of these prefixes, and a group this check cannot read fails closed.
 export const PR_SUPERSEDED_ONLY = Object.freeze([
   ['kalp-01-design-system.yml', 'kalp-01'],
   ['kalp-02-information-architecture.yml', 'kalp-02'],
@@ -76,8 +78,10 @@ export const PR_SUPERSEDED_ONLY = Object.freeze([
   ['ink-structural-v4-group-relations.yml', 'ink-structural-v4-group-relations'],
   ['ink-writer-generalization.yml', 'ink-writer-generalization']
 ]);
-// Any mention of a concurrency key: block or one-line, quoted or not, in a flow mapping too.
-const CONCURRENCY_KEY = /(^|[{,\s])["']?concurrency["']?\s*:/gm;
+// Any mention of a key, block or one-line, quoted or not, in a flow mapping too.
+const yamlKey = name => new RegExp(`(^|[{,\\s])["']?${name}["']?\\s*:`, 'gm');
+const CONCURRENCY_KEY = yamlKey('concurrency');
+const TYPES_KEY = yamlKey('types');
 /** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
 export function prSupersededOnlyProblems(source, prefix) {
   if (source.includes('\r')) return ['the workflow must use LF line endings'];
@@ -98,22 +102,50 @@ export function prSupersededOnlyProblems(source, prefix) {
   if (block.filter(line => line === cancel).length !== 1) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
   const comment = block.filter(line => /^  # /.test(line)).map(line => line.slice(4)).join(' ');
   if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
-  // A closed pull request's run has a different github.ref; the pattern holds while the trigger keeps its default types.
-  if (/^\s*types:.*\bclosed\b|^\s*-\s*closed\s*$/m.test(source)) problems.push('a pull_request trigger with type closed breaks "one group per pull request"');
+  // A merged pull request's `closed` run has github.ref = refs/heads/main: it would share one group
+  // with every other such run. The pattern holds only with GitHub's default pull_request types.
+  if ([...source.matchAll(TYPES_KEY)].length) problems.push('the triggers must keep GitHub\'s default pull_request types (no types: key): a closed pull request runs with github.ref = refs/heads/main');
   return problems;
 }
-/** Every concurrency group expression a workflow can produce, lower-cased with quotes removed and github.workflow resolved. */
+/**
+ * Every concurrency group a workflow can produce, lower-cased with quotes removed and
+ * ${{ github.workflow }} resolved from name:. A group this cannot read as a plain one-line
+ * value (a block scalar, an anchor, alias or tag, a value on the next line, format()) is
+ * returned as `unreadable` rather than guessed at.
+ */
 export function groupLiterals(source) {
-  const name = (source.match(/^name:\s*["']?([^"'\n]+?)["']?\s*$/m) || [])[1] || '';
-  const values = [
-    ...[...source.matchAll(/^[ \t]*["']?group["']?[ \t]*:[ \t]*(\S[^\n]*)$/gm)].map(m => m[1]),
-    ...[...source.matchAll(/(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*([^\s#{&][^\n#]*)$/gm)].map(m => m[1])
-  ];
-  return values.map(value => value.trim().replace(/^["']|["']$/g, '').replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
+  const unreadable = [];
+  const nameLine = (source.match(/^name:[ \t]*(.*)$/m) || [])[1];
+  const name = nameLine === undefined ? '' : nameLine.trim().replace(/^(["'])(.*)\1$/, '$2');
+  const readable = value => value && !/^[>|{&!*]/.test(value) && !/\bformat\s*\(/.test(value)
+    && (!/\$\{\{\s*github\.workflow\s*\}\}/.test(value) || (name && !/^[>|&!*]/.test(name)));
+  const values = [];
+  const take = raw => {
+    const value = String(raw || '').trim();
+    // A flow sequence is never a concurrency group (GitHub needs a string): it is a
+    // matrix key that happens to be called group (ci.yml's browser groups).
+    if (value.startsWith('[')) return;
+    if (!readable(value)) { unreadable.push(value || '(empty)'); return; }
+    // Only the start of a group decides a prefix collision, so quotes come off each end on their own
+    // (a flow mapping's value is cut at the first } of its own ${{ … }}).
+    values.push(value.replace(/^["']/, '').replace(/["']$/, '').replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
+  };
+  for (const m of source.matchAll(/^[ \t]*["']?group["']?[ \t]*:[ \t]*([^\n#]*)/gm)) take(m[1]);
+  // A group inside a flow mapping, wherever the mapping starts (same line as its key or the next).
+  for (const m of source.matchAll(/[{,][ \t]*["']?group["']?[ \t]*:[ \t]*([^,}\n]*)/g)) take(m[1]);
+  for (const m of source.matchAll(/(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*([^\n#]*)$/gm)) {
+    const value = m[1].trim();
+    if (!value) continue; // a block: its group: line is read above
+    if (value.startsWith('{')) continue; // its group is read by the flow-mapping pass above
+    take(value);
+  }
+  return { values, unreadable };
 }
-/** The pinned prefix another workflow's group could collide with, or null. */
+/** The pinned prefix another workflow's group could collide with ({ prefix, literal }), or null. */
 export function prefixCollision(source, prefixes) {
-  for (const literal of groupLiterals(source)) {
+  const { values, unreadable } = groupLiterals(source);
+  if (unreadable.length) return { prefix: '(unreadable)', literal: unreadable[0] };
+  for (const literal of values) {
     const hit = prefixes.find(prefix => literal.startsWith(`${prefix.toLowerCase()}-`));
     if (hit) return { prefix: hit, literal };
   }
@@ -131,7 +163,9 @@ export function prefixCollision(source, prefixes) {
   const pinned = new Set(PR_SUPERSEDED_ONLY.map(([file]) => file));
   for (const name of readdirSync(workflowDir).filter(n => /\.ya?ml$/.test(n) && !pinned.has(n))) {
     const hit = prefixCollision(read(name), prefixes);
-    assert.equal(hit, null, `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
+    assert.equal(hit, null, hit?.prefix === '(unreadable)'
+      ? `${name}: its concurrency group "${hit.literal}" cannot be read; write it as a plain one-line value so it can be checked against the pull-request-only prefixes`
+      : `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
   }
   // Mutation controls: the dangerous variants are refused, not merely absent today.
   const good = read(PR_SUPERSEDED_ONLY[6][0]); // ink-physical-evidence.yml: it also runs on push to main
@@ -146,6 +180,11 @@ export function prefixCollision(source, prefixes) {
     ['a third setting in the block', s => s.replace(/(  cancel-in-progress: .*\n)/, '$1  queue: max\n')],
     ['a continuation line in the block', s => s.replace(/(  group: .*)\n/, '$1\n    || true\n')],
     ['a pull_request trigger with type closed', s => s.replace(/pull_request:\n/, 'pull_request:\n    types: [opened, synchronize, closed]\n')],
+    ['a types list with a commented closed item', s => s.replace(/pull_request:\n/, 'pull_request:\n    types:\n      - closed  # post-merge\n')],
+    ['a quoted closed type', s => s.replace(/pull_request:\n/, "pull_request:\n    types:\n      - 'closed'\n")],
+    ['a types flow list split over lines', s => s.replace(/pull_request:\n/, 'pull_request:\n    types: [opened,\n      closed]\n')],
+    ['a types flow list on the next line', s => s.replace(/pull_request:\n/, 'pull_request:\n    types:\n      [closed]\n')],
+    ['a pull_request flow mapping with types', s => s.replace(/  pull_request:\n/, '  pull_request: { types: [closed] }\n  pull_request_review:\n')],
     ['CRLF line endings', s => s.replace(/\n/g, '\r\n')],
     ['a job-level block', s => job(s, `    concurrency:\n      group: ${prefix}-\${{ github.ref }}\n`)],
     ['a job-level one-line form', s => job(s, `    concurrency: ${prefix}-\${{ github.ref }}\n`)],
@@ -167,9 +206,24 @@ export function prefixCollision(source, prefixes) {
     ['a group differing only in case', `name: Other\nconcurrency:\n  group: ${prefix.toUpperCase()}-\${{ github.ref }}\n`],
     ['a one-line concurrency', `name: Other\nconcurrency: ${prefix}-\${{ github.ref }}\n`],
     ['a job-level one-line concurrency', `name: Other\njobs:\n  a:\n    concurrency: ${prefix}-\${{ github.ref }}\n`],
-    ['a group built from github.workflow', `name: ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
+    ['a group built from github.workflow', `name: ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a group built from a quoted github.workflow name', `name: "${prefix}"\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a flow-mapping concurrency', `name: Other\nconcurrency: { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`],
+    ['a job-level flow-mapping concurrency', `name: Other\njobs:\n  a:\n    concurrency: { group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['a flow mapping on the line after its key', `name: Other\nconcurrency:\n  { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`]
   ]) {
     assert.ok(prefixCollision(other, prefixes)?.prefix === prefix, `another workflow cannot share a pinned group through ${name}`);
+  }
+  for (const [name, other] of [
+    ['a folded block-scalar group', `name: Other\nconcurrency:\n  group: >-\n    ${prefix}-\${{ github.ref }}\n`],
+    ['a literal block-scalar group', `name: Other\nconcurrency:\n  group: |-\n    ${prefix}-\${{ github.ref }}\n`],
+    ['a group value on the next line', `name: Other\nconcurrency:\n  group:\n    ${prefix}-\${{ github.ref }}\n`],
+    ['an anchored group', `name: Other\nconcurrency:\n  group: &g ${prefix}-\${{ github.ref }}\n`],
+    ['a tagged group', `name: Other\nconcurrency:\n  group: !!str ${prefix}-\${{ github.ref }}\n`],
+    ['a group built with format()', `name: Other\nconcurrency:\n  group: \${{ format('{0}-{1}', '${prefix}', github.ref) }}\n`],
+    ['a github.workflow group with an unreadable name', `name: >-\n  ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
+  ]) {
+    assert.equal(prefixCollision(other, prefixes)?.prefix, '(unreadable)', `a group the check cannot read fails closed: ${name}`);
   }
   assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${prefix}x-\${{ github.ref }}\n`, prefixes), null, 'a different prefix that merely starts the same is not a collision');
 }
