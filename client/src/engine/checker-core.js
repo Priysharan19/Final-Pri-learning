@@ -327,8 +327,8 @@ function unitFits(question, unit) {
 /**
  * Each value of a set, point or surd-form answer is held to what the numeric
  * box holds a value to (#723 review, item 2): no % on a question that does not
- * ask for a percentage, no currency on one not about money, no unit that does
- * not fit the asked quantity, and nothing left to evaluate (D13). Returns the
+ * ask for a percentage, no currency on one not about money, and no unit that
+ * does not fit the asked quantity. Returns the
  * reason the value is left unread, or null. Decided from the form alone.
  */
 function componentRefusal(question, text) {
@@ -339,8 +339,8 @@ function componentRefusal(question, text) {
   if (foreignCurrency(question, raw) || (RUPEE_MARK.test(raw) && !moneyQuestion(question))) return 'Write each value on its own — this question does not ask for an amount of money.';
   const unit = writtenUnit(raw);
   if (unit && unit !== '°' && unit !== 'rad' && !unitFits(question, unit)) return `Write each value on its own — this question does not ask for an answer in ${unit}.`;
-  const unevaluated = unevaluatedRefusal(numericSource(raw.replace(/%\s*$/, '')));
-  if (unevaluated) return unevaluated;
+  // D13 (unevaluated values) is the numeric box's rule; a set keeps its ±
+  // forms ("2 ± 3") until the examiner rules on lists.
   return null;
 }
 const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;

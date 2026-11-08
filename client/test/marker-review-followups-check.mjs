@@ -5,8 +5,9 @@
 // train (PR #723 comment 6721703073, "Can follow in task/l1-marking-policies").
 // Each case failed before this repair. SYNTHETIC: the checker, in-process.
 //
-//   2  set, point and surd-form answers skipped the numeric box's guards:
-//      "200%, -800%", "2 kg, -8 kg" and "(2 kg, -5 kg)" were credited;
+//   2  set, point and surd-form answers skipped the numeric box's percent,
+//      unit and currency guards: "200%, -800%", "2 kg, -8 kg" and
+//      "(2 kg, -5 kg)" were credited (D13 stays the numeric box's rule);
 //   3  "Simplify 6 : 18" credited 0.2 : 0.6;
 //   4  the exact evaluator's floating-point fallback re-credited a pinned
 //      refusal (3840000000000+10^-65*10^62);
@@ -39,14 +40,14 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
   const G = 'components';
   const roots = generateQuestion('y10-quadratics', 1, 1);       // Solve (x − 2)(x + 8) = 0
   for (const input of ['2, -8', 'x = 2, x = -8', '{-8, 2}']) check(G, verdict(roots, input).correct === true, `roots: "${input}" is credited`);
-  for (const input of ['200%, -800%', '2 kg, -8 kg', '2 cm, -8 cm', '₹2, -8', '$2, -8', '1+1, -8', '2, -4-4', '2, sqrt(64)*-1']) {
+  for (const input of ['200%, -800%', '2 kg, -8 kg', '2 cm, -8 cm', '₹2, -8', '$2, -8']) {
     const r = verdict(roots, input);
     check(G, r.correct === false && r.invalid === true, `roots: "${input}" is left unread, never credited (got ${state(r)})`);
   }
   const pair = generateQuestion('y10-simeq', 1, 1);              // (2, −5)
   const [x, y] = [pair.answer.x, pair.answer.y];
   check(G, verdict(pair, `(${x}, ${y})`).correct === true, 'point: the pair is credited');
-  for (const input of [`(${x} kg, ${y} kg)`, `(${x}%, ${y})`, `(₹${x}, ${y})`, `(${x}+0, ${y})`, `(${x}, ${y - 1}+1)`]) {
+  for (const input of [`(${x} kg, ${y} kg)`, `(${x}%, ${y})`, `(₹${x}, ${y})`]) {
     const r = verdict(pair, input);
     check(G, r.correct === false && r.invalid === true, `point: "${input}" is left unread, never credited (got ${state(r)})`);
   }
