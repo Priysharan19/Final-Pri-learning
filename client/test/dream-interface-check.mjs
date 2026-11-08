@@ -217,18 +217,23 @@ check('every component that calls t() first obtains it from useT() (the Diagnosi
   assert.deepEqual(offenders, []);
 });
 
+// The home every build ships is the Instrument's Index (client/interface.config.mjs);
+// the v1.0 Home page is gone and pages/Home.jsx keeps only the shared decision.
+const indexPage = readFileSync(join(ROOT, 'src/instrument/IndexPage.jsx'), 'utf8');
 check('Home consumes one central recommendation resolver and one primary action', () => {
   assert.match(home, /resolveHomeRecommendation/);
   assert.match(home, /api\.get\('\/practice\/resume'\)/);
-  assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
-  assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
-  // The exact-topic generator is a shared component now (home/TopicGenerator.jsx,
-  // rendered by Home and by the instrument Index); it still sits below the
-  // primary action on Home.
-  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('<TopicGenerator'));
+  assert.doesNotMatch(home, /export default function Home\b|function HomeAction\b/, 'the v1.0 Home page and its action card are gone');
+  assert.match(indexPage, /useHomeDecision\(user, dueCount\)/);
+  // Two places can hold the primary action and the render conditions exclude
+  // each other (kalp04-home-check proves the exclusion), each with one CTA.
+  assert.equal((indexPage.match(/data-home-primary(?!-)/g) || []).length, 2);
+  assert.equal((indexPage.match(/data-home-primary-cta/g) || []).length, 2);
+  // The exact-topic generator (home/TopicGenerator.jsx) sits below the primary action.
+  assert.ok(indexPage.indexOf('data-home-primary') < indexPage.indexOf('<TopicGenerator'));
   assert.match(readFileSync(join(ROOT, 'src/home/TopicGenerator.jsx'), 'utf8'), /className="genbar"/);
-  assert.match(home, /assignments === false/);
-  assert.doesNotMatch(home, /TAGLINES|Tagline|DiamondTrack|adaptiveOn/);
+  assert.match(indexPage, /assignments === false/);
+  assert.doesNotMatch(home + indexPage, /TAGLINES|Tagline|DiamondTrack|adaptiveOn/);
 });
 
 check('practice is a thinking-mode route: no navigation furniture while working', () => {
@@ -243,10 +248,13 @@ check('the action bar holds exactly one primary action', () => {
 });
 
 check('Home offers one primary next action (#487)', () => {
-  // The "what next" card's CTA is the one primary button; filters, study,
-  // placement and the rest are secondary, so the eye has one place to go.
-  assert.equal((home.match(/btn-primary/g) || []).length, 1);
-  assert.match(home, /className="btn btn-primary btn-lg" data-home-primary-cta/);
+  // On the Index the primary action is the one filled button: the resolver's
+  // next action or the resume card, never both (render conditions exclude
+  // each other); filters, study, placement and the rest are secondary.
+  assert.equal((indexPage.match(/is-primary/g) || []).length, 2);
+  assert.equal((indexPage.match(/className="in-btn is-primary"[^>]*data-home-primary-cta/g) || []).length, 2, 'and each of the two is the CTA of its primary region');
+  assert.doesNotMatch(indexPage, /btn-primary/);
+  assert.doesNotMatch(home, /btn-primary/);
 });
 
 check('status only claims what the device actually knows', () => {
@@ -487,7 +495,11 @@ check('a symbol correction never outlives the strokes it was made on, and finger
 
 check('no bar over scrolling content is blurred', () => {
   // The exam head's rule lives with the exam room's styles (workspace.css).
-  assert.match(themeCss, /\.topbar \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
+  // The v1.0 top bar is gone; the Instrument's bar is opaque in the plain skin.
+  // (The Aurora skin's glass on chrome is V1 decision D9, held by
+  // aurora-skin-check, which also keeps it off the practice bars below.)
+  assert.doesNotMatch(themeCss, /\.topbar\b/, 'no rule styles the retired v1.0 top bar');
+  assert.match(readFileSync(join(ROOT, 'src/instrument/instrument.css'), 'utf8'), /\.in-bar \{[^}]*background: var\(--in-base\);/);
   assert.match(themeCss, /\.exam-head \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   assert.match(themeCss, /\.mobilenav \{ background: var\(--page\); -webkit-backdrop-filter: none; backdrop-filter: none; \}/);
   for (const bar of ['ws-bar', 'ws-qpeek', 'ws-actions']) {

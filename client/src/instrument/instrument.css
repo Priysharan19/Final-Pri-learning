@@ -122,7 +122,6 @@ html.ui-instrument[data-theme="dark"] {
 }
 
 html.ui-instrument body { font-family: var(--in-ui); font-feature-settings: 'ss01'; background: var(--in-base); color: var(--in-tx); }
-html.ui-instrument .sidebar, html.ui-instrument .topbar { display: none; }
 html.ui-instrument .btn-primary {
   background: var(--in-action); color: var(--in-on-action); border-color: var(--in-action);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); font-weight: 600;
