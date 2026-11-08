@@ -59,6 +59,14 @@ const BUILT = {
   instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true
 };
 
+// The student interface as a build constant (client/interface.config.mjs).
+// Written so a production build folds it to a literal: Vite replaces the
+// global with true, the conditional collapses, and the bundler can then drop
+// every branch written for the v1.0 shell along with whatever only it imports.
+// featureEnabled('instrument') is a runtime call the bundler cannot see
+// through, so shared pages read this instead.
+export const INSTRUMENT_UI = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true;
+
 const productionBuild = () => {
   try { return import.meta.env?.PROD === true; } catch { return false; }
 };

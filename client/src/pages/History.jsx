@@ -15,14 +15,14 @@ import Icon from '../components/Icon.jsx';
 import ErrorNotebook from '../components/ErrorNotebook.jsx';
 import { createHistoryLoadGate, historyListKey, historyListRequest, historyRowsFor } from './historyLoadLifecycle.js';
 import { transcriptIsAnswer } from '../components/attemptEvidence.js';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
 import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
-const INSTRUMENT_STRIP = featureEnabled('instrument');
+const INSTRUMENT_STRIP = INSTRUMENT_UI;
 // The ledger's styles are part of the boot stylesheet (main.jsx), so Scripts
 // opened for the first time offline needs no stylesheet fetched then (#658).
 

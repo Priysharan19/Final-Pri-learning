@@ -13,12 +13,12 @@ import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
 import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
 import Glyph from '../instrument/Glyph.jsx';
 
 // The instrument build draws a glyph beside each section name (s9); the
 // flag-off build renders exactly what it did.
-const INSTRUMENT = featureEnabled('instrument');
+const INSTRUMENT = INSTRUMENT_UI;
 const SECTION_GLYPH = { plan: 'plan', profile: 'user', security: 'lock', handwriting: 'pen', language: 'globe', appearance: 'sun', courses: 'book', data: 'box', help: 'help' };
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];

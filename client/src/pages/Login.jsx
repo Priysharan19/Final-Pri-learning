@@ -14,14 +14,14 @@ import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
-import { featureEnabled } from '../platform/features.js';
+import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
-const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
