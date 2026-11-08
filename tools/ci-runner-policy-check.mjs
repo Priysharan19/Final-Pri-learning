@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8');
 
@@ -51,6 +51,74 @@ assert.match(appHealth, /group:\s*pri-app-health-\$\{\{ github\.ref \}\}/,
   'Pri App Health Agent must group runs by ref');
 assert.match(appHealth, /cancel-in-progress:\s*\$\{\{ github\.ref != 'refs\/heads\/main' \}\}/,
   'Pri App Health Agent must not cancel an in-progress run on main');
+
+// Thirteen workflows that had no concurrency group (#748) now give pull-request
+// runs one group per pull request (github.ref is refs/pull/<n>/merge there), so a
+// newer push supersedes the queued or running check; every other run (a push to
+// main, a schedule, a manual dispatch) is keyed by its own run id. A pull-request
+// group can therefore never cancel, or replace while pending, a main, scheduled or
+// evidence run, and main runs never replace each other. Concurrency groups are
+// repository-wide, so each prefix is also unique across every workflow.
+export const PR_SUPERSEDED_ONLY = Object.freeze([
+  ['kalp-01-design-system.yml', 'kalp-01'],
+  ['kalp-02-information-architecture.yml', 'kalp-02'],
+  ['kalp-03-onboarding-profile.yml', 'kalp-03'],
+  ['kalp-04-home-command-centre.yml', 'kalp-04'],
+  ['pri-reason.yml', 'pri-reason'],
+  ['promotions.yml', 'promotions'],
+  ['ink-physical-evidence.yml', 'ink-physical-evidence'],
+  ['ink-physical-study.yml', 'ink-physical-study'],
+  ['ink-production-evidence-capture.yml', 'ink-production-evidence-capture'],
+  ['ink-structural-v4-candidate.yml', 'ink-structural-v4-candidate'],
+  ['ink-structural-v4-contextual-glyphs.yml', 'ink-structural-v4-contextual-glyphs'],
+  ['ink-structural-v4-group-relations.yml', 'ink-structural-v4-group-relations'],
+  ['ink-writer-generalization.yml', 'ink-writer-generalization']
+]);
+/** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
+export function prSupersededOnlyProblems(source, prefix) {
+  const problems = [];
+  const blocks = [...source.matchAll(/^([ \t]*)concurrency:[ \t]*\n((?:\1  .*\n)+)/gm)];
+  if (blocks.length !== 1 || blocks[0][1] !== '') return [`needs exactly one top-level concurrency block (found ${blocks.length}${blocks.some(b => b[1] !== '') ? ', one of them job-level' : ''})`];
+  const body = blocks[0][2];
+  const settings = body.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
+  const comment = body.split('\n').filter(line => line.trim().startsWith('#')).map(line => line.trim().replace(/^#\s?/, '')).join(' ');
+  const group = `  group: ${prefix}-\${{ github.event_name == 'pull_request' && github.ref || github.run_id }}`;
+  const cancel = "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}";
+  if (settings.length !== 2 || settings[0] !== group) problems.push(`group must be exactly "${group.trim()}": only a pull_request run is keyed by its ref; every other run by its own run id`);
+  if (settings[1] !== cancel) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
+  if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
+  return problems;
+}
+{
+  const prefixes = PR_SUPERSEDED_ONLY.map(([, prefix]) => prefix);
+  assert.equal(new Set(prefixes).size, prefixes.length, 'the pull-request-only concurrency prefixes are distinct');
+  for (const [file, prefix] of PR_SUPERSEDED_ONLY) {
+    assert.deepEqual(prSupersededOnlyProblems(read(file), prefix), [], `${file}: pull-request runs share one group per pull request; main, scheduled and dispatched runs are never cancelled or replaced`);
+  }
+  // Repository-wide groups: no other workflow's group expression starts with one of these prefixes.
+  const workflowDir = new URL('../.github/workflows/', import.meta.url);
+  const pinned = new Set(PR_SUPERSEDED_ONLY.map(([file]) => file));
+  for (const name of readdirSync(workflowDir).filter(n => /\.ya?ml$/.test(n) && !pinned.has(n))) {
+    for (const [, literal] of read(name).matchAll(/^\s*group:\s*([^$\n]*)\$\{\{/gm)) {
+      assert.ok(!prefixes.some(prefix => literal === `${prefix}-`), `${name}: its concurrency group "${literal}…" would share a group with a pull-request-only workflow`);
+    }
+  }
+  // Mutation controls: the dangerous variants are refused, not merely absent today.
+  const good = read(PR_SUPERSEDED_ONLY[0][0]);
+  const prefix = PR_SUPERSEDED_ONLY[0][1];
+  for (const [name, mutate] of [
+    ['a group keyed on github.ref for every event (a pending main run would be replaced by the next)', s => s.replace(/group: .*\n/, `group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a group keyed on the branch name (github.head_ref)', s => s.replace(/group: .*\n/, `group: ${prefix}-\${{ github.head_ref || github.run_id }}\n`)],
+    ['cancel-in-progress for every event', s => s.replace(/cancel-in-progress: .*\n/, 'cancel-in-progress: true\n')],
+    ['no run-id fallback', s => s.replace(/ \|\| github\.run_id/, '')],
+    ['the "one group per branch" wording', s => s.replace('one group per pull request', 'one group per branch')],
+    ['a second, job-level concurrency block', s => s.replace(/\njobs:\n(  [a-z0-9-]+:\n)/, '\njobs:\n$1    concurrency:\n      group: x\n')]
+  ]) {
+    const mutated = mutate(good);
+    assert.notEqual(mutated, good, `the mutation "${name}" applies`);
+    assert.ok(prSupersededOnlyProblems(mutated, prefix).length > 0, `the policy refuses ${name}`);
+  }
+}
 
 assert.match(hybrid, /pull_request:\s*\n\s+paths:/,
   'Ink Hybrid must be path-scoped on pull requests');
