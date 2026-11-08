@@ -64,15 +64,6 @@ const ALLOW = new Map([
   ['progress.honesty', 'says Pri does NOT predict a percentile or a rank'],
   ['progress.noPercentile', 'the heading of that denial']
 ]);
-// Captions set in client/src/engine/curriculum-in.js, which lane L1 (marking)
-// holds for wave 1 (#686 lock map). Their honest wording — Class 9 "8 of the
-// 15 chapters in the CBSE 2026–27 list", Class 10 "mapping checked by software,
-// not yet by an examiner" — is the held L5 commit that lands after L1's train,
-// and that commit deletes this map. Each entry pins today's exact text, so any
-// other edit to a held caption fails here instead of passing unseen.
-const HELD_CAPTIONS = new Map([
-  [10, 'CBSE/NCERT Class X Mathematics 2026–27 — current rationalised outcomes with source-reviewed production coverage']
-]);
 
 const { indiaProductSections, cbseProductLabel } = await import('../src/engine/indiaProduct.js');
 const { IN_CURRICULUM } = await import('../src/engine/curriculum-in.js');
@@ -109,9 +100,7 @@ for (const [name, catalogue] of [['strings.en.js', en], ['strings.hi.js', hi]]) 
   const product = indiaProductSections();
   const surfaces = [];
   for (const section of [...product.years, ...product.streams]) {
-    const heldCaption = section.track === 'cbse' && HELD_CAPTIONS.get(section.year) === section.caption;
-    surfaces.push([`${section.key} label`, section.label], [`${section.key} title`, section.title]);
-    if (!heldCaption) surfaces.push([`${section.key} caption`, section.caption]);
+    surfaces.push([`${section.key} label`, section.label], [`${section.key} caption`, section.caption], [`${section.key} title`, section.title]);
     // The olympiad entry is outside V1 (flagged off for new profiles) and
     // carries no production record; its wording is still checked above.
     if (!section.production) continue;
@@ -137,17 +126,12 @@ for (const [name, catalogue] of [['strings.en.js', en], ['strings.hi.js', hi]]) 
   const grade8 = product.years.find(s => s.year === 8);
   const grade9 = product.years.find(s => s.year === 9);
   ok(/earlier NCERT book/.test(grade8.caption), `Class 8 caption says it follows the earlier NCERT book (${grade8.caption})`);
-  // The Class 9 caption ("8 of the 15 chapters") is held with curriculum-in.js;
-  // the chapter count it will state is already pinned.
-  ok(grade9.chapters.length === 8, `Class 9 has 8 live chapters (${grade9.chapters.length}), the count its held caption states`);
+  ok(/8 of the 15 chapters/.test(grade9.caption), `Class 9 caption says 8 of the 15 chapters are live (${grade9.caption})`);
+  ok(grade9.chapters.length === 8, `Class 9 really has 8 live chapters (${grade9.chapters.length}), so the caption is true`);
 }
 
 // ── 3. The curriculum captions and the provenance module ────────────────────
 for (const group of IN_CURRICULUM) {
-  if (HELD_CAPTIONS.has(group.grade)) {
-    ok(group.caption === HELD_CAPTIONS.get(group.grade), `Class ${group.grade} caption is the held text exactly (${group.caption}); fix it in the held commit and delete HELD_CAPTIONS`);
-    continue;
-  }
   for (const [pattern, label] of [...REVIEW_CLAIMS, ...COVERAGE_CLAIMS]) {
     ok(!pattern.test(group.caption || ''), `Class ${group.grade} caption does not claim "${label}"`);
   }
@@ -188,10 +172,36 @@ for (const rel of [
   }
 }
 
+// ── 6. Served Class 8 prompts carry no textbook numbering ───────────────────
+{
+  const { makeRng } = await import('../src/engine/qhelpers.js');
+  const { NCERT_CLASS8_RATIONAL_GENERATORS } = await import('../src/engine/ncert/class8-rational-numbers.js');
+  const { NCERT_CLASS8_LINEAR_GENERATORS, NCERT_CLASS8_LINEAR_EXERCISES } = await import('../src/engine/ncert/class8-linear-equations.js');
+  const numbering = /\bNCERT\s+(?:Exercise|Example|Try These)\b|\bExercise\s+\d+\.\d+\s*Q\s*\d+|\bTry These\b/i;
+  const textbook = new Set(NCERT_CLASS8_LINEAR_EXERCISES.map(item => item.prompt.replace(/\s+/g, '')));
+  let drawn = 0, numbered = 0, reproduced = 0;
+  for (const bank of [NCERT_CLASS8_RATIONAL_GENERATORS, NCERT_CLASS8_LINEAR_GENERATORS]) {
+    for (const [id, gen] of Object.entries(bank)) {
+      for (let d = 1; d <= 4; d++) {
+        for (let i = 0; i < 60; i++) {
+          const q = gen(makeRng(0x8c600000 + d * 1000 + i), d);
+          drawn++;
+          const shown = [q.prompt, q.stem, ...(q.mcqOptions || []), ...(q.hints || []), ...(q.steps || []).flatMap(s => [s.h, s.d])].filter(Boolean).join('\n');
+          if (numbering.test(shown)) { numbered++; if (numbered <= 3) failures.push(`${id}@D${d} carries textbook numbering: ${q.prompt.slice(0, 90)}`); }
+          if (textbook.has(String(q.prompt).replace(/\s+/g, ''))) { reproduced++; if (reproduced <= 3) failures.push(`${id}@D${d} reproduces a textbook exercise: ${q.prompt}`); }
+        }
+      }
+    }
+  }
+  ok(drawn === 15 * 4 * 60, `drew every Class 8 Chapter 1–2 cell 60 times (${drawn})`);
+  ok(numbered === 0, `no served Class 8 question carries an NCERT exercise, example or Try These number (${numbered} of ${drawn})`);
+  ok(reproduced === 0, `no served Class 8 question is a textbook exercise verbatim (${reproduced} of ${drawn})`);
+}
+
 const total = pass + failures.length;
 if (failures.length) {
   for (const f of failures) console.log(`FAIL ${f}`);
   console.log(`CONTENT HONESTY: FAIL — ${pass}/${total} checks`);
   process.exit(1);
 }
-console.log(`CONTENT HONESTY: PASS — ${pass}/${total} checks — no student surface claims a review a human never did; Class 8 carries its coverage label; ${HELD_CAPTIONS.size} caption held with curriculum-in.js`);
+console.log(`CONTENT HONESTY: PASS — ${pass}/${total} checks — no student surface claims a review a human never did; Classes 8 and 9 carry their coverage labels; served Class 8 questions carry no textbook numbering`);

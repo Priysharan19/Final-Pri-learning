@@ -41,7 +41,7 @@ export const indiaCoordinate = {
       const h = nz(rng, -6, 6), k = nz(rng, -6, 6), r = ri(rng, 2, 9);
       const c = h * h + k * k - r * r;
       return {
-        prompt: `Find the radius of the circle $x^2 + y^2 ${follow(-2 * h, 'x')} ${follow(-2 * k, 'y')} ${signed(c)} = 0$.`,
+        prompt: `Find the radius of the circle $x^2 + y^2 ${follow(-2 * h, 'x')} ${follow(-2 * k, 'y')} ${c === 0 ? '' : signed(c)} = 0$.`,
         answerType: 'numeric', answer: { value: r },
         traps: [
           { value: r * r, why: `Completing the square leaves $(x ${signed(-h)})^2 + (y ${signed(-k)})^2 = ${r * r}$ — that is $r^2$, so take the square root.` },
@@ -286,7 +286,7 @@ export const indiaCoordinate = {
       const signedNum = a * px + b * py + c * pz + d;
       const f = new Frac(Math.abs(signedNum), len);
       return {
-        prompt: `Find the distance from the point $(${px}, ${py}, ${pz})$ to the plane $${lead(a, 'x')} ${follow(b, 'y')} ${follow(c, 'z')} ${signed(d)} = 0$.`,
+        prompt: `Find the distance from the point $(${px}, ${py}, ${pz})$ to the plane $${lead(a, 'x')} ${follow(b, 'y')} ${follow(c, 'z')} ${d === 0 ? '' : signed(d)} = 0$.`,
         answerType: 'numeric',
         answer: f.d === 1 ? { value: f.value } : { value: f.value, simplestFraction: { n: f.n, d: f.d } },
         answerSuffix: 'units',
@@ -311,7 +311,7 @@ export const indiaCoordinate = {
     const signedNum = a * px + b * py + c * pz + d;
     const f = new Frac(Math.abs(signedNum), len);
     return {
-      prompt: `Find the distance from the origin to the plane $${lead(a, 'x')} ${follow(b, 'y')} ${follow(c, 'z')} ${signed(d)} = 0$.`,
+      prompt: `Find the distance from the origin to the plane $${lead(a, 'x')} ${follow(b, 'y')} ${follow(c, 'z')} ${d === 0 ? '' : signed(d)} = 0$.`,
       answerType: 'numeric',
       answer: new Frac(Math.abs(d), len).d === 1 ? { value: Math.abs(d) / len } : { value: new Frac(Math.abs(d), len).value, simplestFraction: { n: new Frac(Math.abs(d), len).n, d: new Frac(Math.abs(d), len).d } },
       answerSuffix: 'units',
@@ -406,7 +406,7 @@ export const indiaCoordinate = {
     const worst = Math.min(...zs);
     const at = pts[zs.indexOf(worst)];
     return {
-      prompt: `The feasible region has corner points $${pts.map(([x, y]) => `(${x}, ${y})`).join(', ')}$. Find the minimum value of $Z = ${p}x ${signed(q)}y$.`,
+      prompt: `The feasible region has corner points $${pts.map(([x, y]) => `(${x}, ${y})`).join(', ')}$. Find the minimum value of $Z = ${lead(p, 'x')} ${follow(q, 'y')}$.`,
       answerType: 'numeric', answer: { value: worst },
       traps: [{ value: Math.max(...zs), why: 'That is the maximum. Read which one the question asks for — with a negative coefficient the two are easy to swap.' }].filter(t => t.value !== worst),
       hints: [

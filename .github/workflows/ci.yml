@@ -187,7 +187,7 @@ jobs:
           # #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic
           # form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
@@ -207,7 +207,7 @@ jobs:
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406703 wrong answers marked correct across 18072 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
           grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29829 right answers over 11282 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
