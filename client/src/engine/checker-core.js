@@ -135,6 +135,19 @@ const GIVEN_PERCENT = /(?:\$[^$]*\d[^$]*\$|\\\([^)]*\d[^)]*\\\)|\d[\d.,/]*)\s*pe
 // whatever the prompt mentions on the way; otherwise a prompt that talks in
 // paise ("How many paise are there in half a rupee?") asks in paise.
 const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+/**
+ * The answer with the answer box's own word read off its end: beside a box
+ * that says "crore", "years", "runs" or "°C", "98.1 crore", "12 years" and
+ * "-5 °C" are 98.1, 12 and −5 (the correct-answer sweep). The word must follow
+ * the number; its singular and plural are the same word.
+ */
+function withoutBoxWord(question, text) {
+  const box = String(question?.answerSuffix ?? '').trim();
+  if (!box || typeof text !== 'string' || !/[A-Za-z°]/.test(box)) return text;
+  const escape = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const forms = [...new Set([box, box.replace(/(?<=[A-Za-z])s$/i, ''), `${box}s`])];
+  return text.replace(new RegExp(`(?<=[\\d)π]|pi)\\s*(?:${forms.map(escape).join('|')})\\.?\\s*$`, 'i'), '');
+}
 /** A box that counts rupees in a scale word: crore, lakh, million, thousand… */
 const RUPEE_SCALE = /^(?:crores?|lakhs?|lacs?|millions?|billions?|thousands?|hundreds?|arabs?)(?:\s+(?:of\s+)?rupees)?$/i;
 /** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
@@ -757,8 +770,19 @@ function checkAnswerWithinBudget(question, rawInput) {
           angleRead = angleUnitWritten(rawInput, { implicitPi: angleUnit === 'rad' });
           if (angleRead) rawInput = withoutAngleUnit(rawInput);
         }
-        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
-        if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) rawInput = withoutUnit(rawInput);
+        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first,
+        // and so is the box's own word written out ("98.1 crore", "12 years", "-5 °C")
+        if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) {
+          rawInput = withoutBoxWord(question, rawInput);
+          // Beside a box whose word is not a unit (crore, students, %), a unit
+          // the student writes is a different quantity: "98.1 kg" is not 98.1 crore.
+          const box = String(question.answerSuffix).trim();
+          const got = writtenUnit(rawInput);
+          if (got && !canonicalUnit(box) && !angleUnitOfSuffix(box)) {
+            return { correct: false, feedback: `Check the unit — this question asks for the answer in ${box}.` };
+          }
+          rawInput = withoutUnit(rawInput);
+        }
         // With no unit beside the answer box, a unit the student writes is
         // checked, not stripped and ignored: "24 kg" is not a length of 24
         // (#680, Q1 round 3). It is read only when its dimension is the asked
