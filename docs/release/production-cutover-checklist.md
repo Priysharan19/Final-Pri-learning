@@ -164,8 +164,11 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
 ## 5. Production prerequisites — OWNER
 
 - [ ] Production Supabase project in `ap-south-1`, separate from staging; daily backups and
-      Point-in-Time Recovery enabled.
-- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6).
+      Point-in-Time Recovery enabled (the owner's click-list: `postgres-cutover.md` §6.1).
+- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6.2–§6.3;
+      `pri_server` is created in the scratch project before the schema dump is restored).
+- [ ] The rollback stages of `postgres-cutover.md` §5.5 are read before the window, and the
+      Step 24 log (§7a) is copied for this window and filled as it runs.
 - [ ] Production login role `pri_app_production` with its own password (never the staging one).
 - [ ] Production variables: same list as §2 with production values, plus §3's database pair.
       Fresh `PRI_CSRF_SECRET` and `PRI_AUTH_DELIVERY_KEY`.
