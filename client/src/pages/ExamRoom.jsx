@@ -37,6 +37,7 @@ import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
+import { MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { CheckSignIn } from '../components/CheckRefusal.jsx';
@@ -588,7 +589,9 @@ export default function ExamRoom() {
   // Handwriting in a timed exam is behind PRI_FEATURE_EXAM_HANDWRITING (off by
   // default). With it off every written answer is typed: there is no writing
   // surface on a paper, so no handwriting can be left unread on one.
-  const inkAllowed = featureEnabled('examHandwriting');
+  // A board mock (D22) is a typed paper whatever the flag says; the server
+  // refuses handwriting on it (server/platform/exams.js readResponses).
+  const inkAllowed = featureEnabled('examHandwriting') && exam?.mock !== true;
   function modeFor(key, item) {
     if (!writtenItem(item)) return 'native';
     if (!inkAllowed) return 'type';
@@ -704,6 +707,7 @@ export default function ExamRoom() {
         <h1 className="sr-only">{t('examRoom.markedHeading', { title: exam.title })}</h1>
         <div className="card" style={{ textAlign: 'center', padding: 34 }}>
           <div className="card-title">{exam.title}</div>
+          {exam.mock && <p className="muted" data-exam-mock-label>{t('mock.resultNote', { label: MOCK_LABEL })}</p>}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
@@ -1034,6 +1038,7 @@ export default function ExamRoom() {
         <button type="button" className="icon-btn" onClick={() => nav('/exams')} aria-label={t('exam.leaveSaved')}><Icon name="back" /></button>
         <div className="exam-head-title">
           <b>{exam.title}</b>
+          {exam.mock && <span className="muted" data-exam-mock-label style={{ fontSize: 12.5 }}>{t('mock.notOfficial', { label: MOCK_LABEL })} {t('mock.typed')}</span>}
           <span className="muted" style={{ fontSize: 12.5 }}>
             {t('examRoom.answeredProgress', { answered: answeredCount, total: exam.questions.length })}
             {resumed && ` ${t('examRoom.resumedNote')}`}

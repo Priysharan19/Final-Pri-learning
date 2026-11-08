@@ -149,7 +149,7 @@
     "test:reason:v3": "node client/test/pri-reason-v3-check.mjs",
     "test:reason:v4": "node client/test/pri-reason-v4-check.mjs",
     "test:reason:curriculum": "node client/test/pri-reason-curriculum-check.mjs",
-    "test:india:exams": "node client/test/india-exam-flow-check.mjs",
+    "test:india:exams": "node client/test/india-exam-flow-check.mjs && node client/test/board-mock-check.mjs",
     "test:exam:session": "node client/test/exam-session-check.mjs",
     "test:exam:handwriting": "node client/test/exam-unread-handwriting-check.mjs",
     "test:platform:exam-handwriting": "node server/test/exam-handwriting-check.mjs",

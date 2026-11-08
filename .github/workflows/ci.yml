@@ -215,6 +215,7 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
+          grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
@@ -530,6 +531,11 @@ jobs:
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
           grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
+      - name: Board mock papers — typed, labelled, one timed paper in 30 days free (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
+          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -557,7 +563,9 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 62 (L6): typed board mocks on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
