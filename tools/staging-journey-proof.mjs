@@ -44,14 +44,25 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(join(ROOT, 'client', 'package.json'));
 const STAGING = 'https://pri-learning-staging-staging.up.railway.app';
 const ALLOWED_ORIGINS = new Set([STAGING]);
+// The phone runs in WebKit, the engine of the shipped iOS shell (WKWebView);
+// the tablet runs in Chromium (the Android shell's WebView engine).
 const SIZES = [
-  { id: 'phone', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
-  { id: 'tablet', viewport: { width: 820, height: 1180 }, isMobile: false, hasTouch: true }
+  { id: 'phone', engine: 'webkit', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true },
+  { id: 'tablet', engine: 'chromium', viewport: { width: 820, height: 1180 }, isMobile: false, hasTouch: true }
 ];
+// Step 0 waits this long for the handwriting reader's probe to report ok.
+const READER_WAIT_MS = 3 * 60 * 1000;
+// Per-run budgets, inside staging's own limits per client identity:
+// register 8/h, OTP request 20/h, login 12 per 15 min. A train run must leave
+// room for a second run in the same hour; `full` uses the rest.
+export const PROFILES = {
+  train: { register: 3, otpRequest: 9, login: 5 },
+  full: { register: 4, otpRequest: 16, login: 9 }
+};
 const SECRET_KEY = /token|code|password|secret|cookie|nonce|challenge|session|csrf|otp|hash/i;
 
 export function parseArgs(argv) {
-  const args = { origin: STAGING, sha: null, accounts: false, out: null, headed: false, cleanup: null };
+  const args = { origin: STAGING, sha: null, accounts: false, out: null, headed: false, cleanup: null, profile: 'train' };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     if (flag === '--accounts') args.accounts = true;
@@ -60,8 +71,10 @@ export function parseArgs(argv) {
     else if (flag === '--sha') args.sha = String(argv[++i] || '');
     else if (flag === '--out') args.out = String(argv[++i] || '');
     else if (flag === '--cleanup') args.cleanup = String(argv[++i] || '');
+    else if (flag === '--profile') args.profile = String(argv[++i] || '');
     else throw new Error(`Unknown argument: ${flag}`);
   }
+  if (!PROFILES[args.profile]) throw new Error(`--profile must be ${Object.keys(PROFILES).join(' or ')}`);
   if (!ALLOWED_ORIGINS.has(args.origin)) throw new Error(`refused: ${args.origin} is not the staging origin (${STAGING}); this harness never touches production`);
   if (!args.cleanup && !/^[0-9a-f]{40}$/.test(args.sha || '')) throw new Error('--sha <40-hex main SHA> is required: the run proves one exact release');
   return args;
@@ -88,12 +101,12 @@ const now = () => new Date().toISOString();
 const tag = () => randomBytes(3).toString('hex');
 
 export async function runJourney(args) {
-  const { chromium } = require('playwright');
+  const { chromium, webkit } = require('playwright');
   const sha = args.sha;
   const out = args.out || join(ROOT, 'docs', 'release', 'evidence', 'staging-journeys', sha);
   mkdirSync(out, { recursive: true });
-  const run = { origin: args.origin, sha, startedAt: now(), accounts: args.accounts, steps: [], created: [], deleted: [], notDeleted: [] };
-  const browser = await chromium.launch({ headless: !args.headed });
+  const run = { origin: args.origin, sha, profile: args.profile, startedAt: now(), accounts: args.accounts, steps: [], created: [], deleted: [], notDeleted: [] };
+  const browsers = { chromium: await chromium.launch({ headless: !args.headed }), webkit: await webkit.launch({ headless: !args.headed }) };
   const runTag = tag();
   let shotN = 0;
   // The run's one synthetic password lives outside the repo, readable only by
@@ -134,7 +147,7 @@ export async function runJourney(args) {
   // A context records its /v1 traffic into whichever step is current.
   let current = null;
   async function newContext(size, label) {
-    const ctx = await browser.newContext({ viewport: size.viewport, isMobile: size.isMobile, hasTouch: size.hasTouch, deviceScaleFactor: 2, serviceWorkers: 'allow' });
+    const ctx = await browsers[size.engine].newContext({ viewport: size.viewport, isMobile: size.isMobile, hasTouch: size.hasTouch, deviceScaleFactor: 2, serviceWorkers: 'allow' });
     const page = await ctx.newPage();
     page.on('pageerror', err => current?.notes.push(`${label}: uncaught page error: ${String(err.message || err).slice(0, 200)}`));
     page.on('response', async response => {
@@ -178,7 +191,18 @@ export async function runJourney(args) {
       run.deployed = { web: web.data?.releaseSha, server: health.data?.releaseIdentity?.releaseSha, ready: ready.data?.releaseSha, buildTimestamp: web.data?.buildTimestamp, engine: health.data?.database?.engine };
       const same = check(current, 'web, server and readiness all report the nominated SHA', [web.data?.releaseSha, health.data?.releaseIdentity?.releaseSha, ready.data?.releaseSha].every(v => v === sha), JSON.stringify(run.deployed));
       check(current, '/v1/ready says the replica can serve', ready.data?.ready === true, ready.data?.state);
-      finish(current, same && ready.data?.ready === true ? 'PASS' : 'FAIL');
+      // The reader probes its provider after a deploy; a journey that writes
+      // must not start while it still says 'probing'. Wait up to 3 minutes.
+      let reader = ready.data?.checks?.handwriting?.state;
+      const started = Date.now();
+      while (reader !== 'ok' && Date.now() - started < READER_WAIT_MS) {
+        await new Promise(r => setTimeout(r, 10000));
+        reader = (await get('/v1/ready')).data?.checks?.handwriting?.state;
+      }
+      run.deployed.handwriting = reader;
+      const readerOk = check(current, `/v1/ready reports the handwriting reader ok (waited ${Math.round((Date.now() - started) / 1000)} s)`, reader === 'ok', String(reader));
+      if (!readerOk) current.defects.push({ what: `the handwriting reader is '${reader}' 3 minutes after the deploy`, where: '/v1/ready checks.handwriting', repro: `GET ${args.origin}/v1/ready`, lane: 'L4 (reader) / owner (provider key)' });
+      finish(current, same && ready.data?.ready === true && readerOk ? 'PASS' : 'FAIL');
       if (!same) current.defects.push({ what: 'staging is not serving the nominated SHA', where: 'deployment', repro: `GET ${args.origin}/release.json`, lane: 'L8 (deploy)' });
     }
 
@@ -267,7 +291,6 @@ export async function runJourney(args) {
       const made = await newContext(SIZES[0], 'phone');
       await made.page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
       const reg = await api(made.page, 'POST', '/v1/account/register', { name: adult.name, email: adult.email, password, deviceId: `staging-proof-${runTag}`, isAdult: true, year: 10 });
-      current.evidence.push({ context: 'phone', method: 'POST', path: '/v1/account/register', status: reg.status, request: redact({ name: adult.name, email: adult.email, password, isAdult: true, year: 10 }), response: redact(reg.data) });
       const regOk = check(current, 'a password account is registered (POST /v1/account/register, as Settings → Cloud account does)', reg.status === 201 || reg.status === 200, `${reg.status} ${JSON.stringify(redact(reg.data)).slice(0, 300)}`);
       if (regOk) { adult.id = reg.data?.account?.id; run.created.push({ role: 'adult', email: adult.email, id: adult.id }); remember(); }
       await made.ctx.close();
@@ -328,14 +351,11 @@ export async function runJourney(args) {
       const { ctx, page } = await newContext(SIZES[1], 'tablet-child');
       await page.goto(args.origin + '/', { waitUntil: 'domcontentloaded' });
       const reg = await api(page, 'POST', '/v1/account/register', { name: child.name, email: child.email, password, deviceId: `staging-proof-${runTag}-child`, isAdult: false, year: 8, guardianName: 'Staging Proof Guardian', guardianEmail: child.guardian });
-      current.evidence.push({ context: 'tablet-child', method: 'POST', path: '/v1/account/register', status: reg.status, request: redact({ name: child.name, email: child.email, password, isAdult: false, year: 8, guardianName: 'Staging Proof Guardian', guardianEmail: child.guardian }), response: redact(reg.data) });
       const made = check(current, 'a Class 8 account names its guardian and is registered', reg.status === 201 || reg.status === 200, `${reg.status} ${JSON.stringify(redact(reg.data)).slice(0, 300)}`);
       if (made) { child.id = reg.data?.account?.id; run.created.push({ role: 'child', email: child.email, id: child.id }); remember(); }
       const state = await api(page, 'GET', '/v1/account/guardian/state');
-      current.evidence.push({ context: 'tablet-child', method: 'GET', path: '/v1/account/guardian/state', status: state.status, response: redact(state.data) });
       const pending = check(current, 'the server holds the account pending guardian consent', state.status === 200 && state.data?.required === true && state.data?.state !== 'given', JSON.stringify(redact(state.data)));
       const practice = await api(page, 'POST', '/v1/practice/issue', { generator: 'c8-rational-numbers', difficulty: 1, curriculum: 'in' });
-      current.evidence.push({ context: 'tablet-child', method: 'POST', path: '/v1/practice/issue', status: practice.status, response: redact(practice.data) });
       check(current, `practice is refused to it before consent (403 ${practice.data?.error?.code || '?'}; the gate that answers first is recorded, not assumed)`, practice.status === 403, `${practice.status} ${practice.data?.error?.code}`);
       // What the student sees: sign in on the card in a fresh browser.
       await ctx.close();
@@ -421,7 +441,6 @@ export async function runJourney(args) {
     {
       const { page } = adultCtxA;
       const issue = await api(page, 'POST', '/v1/practice/issue', { generator: 'c8-rational-numbers', difficulty: 1, curriculum: 'in' });
-      current.evidence.push({ context: 'phone-A', method: 'POST', path: '/v1/practice/issue', status: issue.status, response: redact(issue.data) });
       check(current, 'the server refuses an unverified account a question (EMAIL_UNVERIFIED), as designed', issue.status === 403 && issue.data?.error?.code === 'EMAIL_UNVERIFIED', `${issue.status} ${issue.data?.error?.code}`);
       let told = true;
       if (run.entered) {
@@ -603,11 +622,20 @@ export async function runJourney(args) {
         finally { await C.ctx.close().catch(() => {}); }
       }
     }
-    await browser.close().catch(() => {});
+    for (const b of Object.values(browsers)) await b.close().catch(() => {});
     if (args.accounts) {
       if (run.notDeleted.length) run.recoveryFile = recovery;   // kept: `--cleanup <file>` finishes the job
       else rmSync(recovery, { force: true });
     }
+    // What this run spent against staging's limits, from its own evidence.
+    const calls = run.steps.flatMap(st => st.evidence).filter(e => e.method === 'POST');
+    run.usage = {
+      register: calls.filter(e => e.path === '/v1/account/register').length,
+      otpRequest: calls.filter(e => /^\/v1\/account\/otp\/(request|reauth-request|delete-request|guardian\/request)$/.test(e.path)).length,
+      login: calls.filter(e => e.path === '/v1/account/login').length
+    };
+    run.budget = PROFILES[args.profile];
+    run.overBudget = Object.keys(run.budget).filter(k => run.usage[k] > run.budget[k]);
     run.finishedAt = now();
     writeFileSync(join(out, 'results.json'), redactAddress(JSON.stringify(run, null, 2), inboxAddress) + '\n');
     writeFileSync(join(out, 'report.md'), redactAddress(report(run), inboxAddress));
@@ -620,10 +648,11 @@ export function report(run) {
   const steps = [...run.steps].sort((a, b) => order(a) - order(b));
   const lines = [];
   lines.push(`# Staging journey proof · ${run.sha.slice(0, 9)}`, '');
+  lines.push(`**Verdict: ${verdictOf(run).verdict}** (profile ${run.profile || 'train'}). PROVEN only when every step passed; INCOMPLETE when a step is BLOCKED; FAIL when a step failed.`, '');
   lines.push(`Origin \`${run.origin}\` · started ${run.startedAt} · finished ${run.finishedAt || '—'} · accounts ${run.accounts ? 'made and deleted by this run' : 'not made (no --accounts)'}.`);
   lines.push(`Mailbox: ${run.mailbox || 'not checked (no --accounts)'}.`);
   lines.push(`Deployed: web \`${run.deployed?.web || '?'}\`, server \`${run.deployed?.server || '?'}\`, readiness \`${run.deployed?.ready || '?'}\`, built ${run.deployed?.buildTimestamp || '?'}, database ${run.deployed?.engine || '?'}.`, '');
-  lines.push('Real deployed product, real browser (Playwright Chromium, headless), nothing stubbed. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is device, human or examiner evidence.', '');
+  lines.push('Real deployed product, real browsers (Playwright: the phone in WebKit, the engine of the iOS shell; the tablet in Chromium; headless), nothing stubbed. Drawn ink and rendered photos are SYNTHETIC inputs; nothing here is device, human or examiner evidence.', '');
   lines.push('| Step | Status | What was proved or found |', '|---|---|---|');
   for (const s of steps) {
     const passed = s.checks.filter(c => c.ok).length;
@@ -641,12 +670,21 @@ export function report(run) {
     if (s.evidence.length) lines.push(`- /v1 evidence: ${s.evidence.length} request(s) in results.json (step ${s.id})`);
     lines.push('');
   }
+  if (run.usage) lines.push(`Staging limits spent: register ${run.usage.register}/${run.budget.register}, OTP requests ${run.usage.otpRequest}/${run.budget.otpRequest}, logins ${run.usage.login}/${run.budget.login} (profile budget)${run.overBudget?.length ? ` — **OVER BUDGET: ${run.overBudget.join(', ')}**` : ''}.`, '');
   lines.push('## Test accounts', '');
   lines.push(`Made: ${run.created.length ? run.created.map(a => `${a.role} ${a.email}`).join(', ') : 'none'}.`);
   lines.push(`Deleted: ${run.deleted.length ? run.deleted.map(a => `${a.role} (${a.via})`).join(', ') : 'none'}.`);
   lines.push(`**Not deleted: ${run.notDeleted.length ? run.notDeleted.map(a => `${a.role} ${a.email} — ${a.why}`).join('; ') : 'none'}.**`, '');
   if (run.recoveryFile) lines.push('The run kept a local recovery file outside the repository (owner-readable only); `node tools/staging-journey-proof.mjs --cleanup <that file>` deletes the accounts above.', '');
   return lines.join('\n') + '\n';
+}
+
+/** PROVEN (0) only when every step passed; INCOMPLETE (3) when none failed but one is BLOCKED; FAIL (1) otherwise. */
+export function verdictOf(run) {
+  const statuses = run.steps.map(s => s.status);
+  if (!statuses.length || statuses.some(s => s === 'FAIL' || s === 'PENDING')) return { verdict: 'FAIL', exit: 1 };
+  if (statuses.some(s => s !== 'PASS' && s !== 'SYNTHETIC-PASS')) return { verdict: 'INCOMPLETE', exit: 3 };
+  return { verdict: 'PROVEN', exit: 0 };
 }
 
 /** Delete every account a recovery file lists: sign in with its password, DELETE /v1/account. */
@@ -688,7 +726,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const run = await runJourney(args);
   for (const s of [...run.steps].sort((a, b) => Number(a.id) - Number(b.id))) console.log(`  ${s.id.padStart(2)} ${s.status.padEnd(14)} ${s.name}`);
   console.log(`  accounts made ${run.created.length}, deleted ${run.deleted.length}, NOT deleted ${run.notDeleted.length}`);
-  const failed = run.steps.filter(s => s.status === 'FAIL').length;
-  console.log(`STAGING JOURNEY: ${failed ? 'FAIL' : 'NO FAILURES'} — ${run.steps.filter(s => s.status === 'PASS' || s.status === 'SYNTHETIC-PASS').length} passed, ${failed} failed, ${run.steps.filter(s => s.status === 'BLOCKED').length} blocked · ${run.sha}`);
-  process.exit(failed ? 1 : 0);
+  const { verdict, exit } = verdictOf(run);
+  console.log(`STAGING JOURNEY: ${verdict} — ${run.steps.filter(s => s.status === 'PASS' || s.status === 'SYNTHETIC-PASS').length} passed, ${run.steps.filter(s => s.status === 'FAIL').length} failed, ${run.steps.filter(s => s.status === 'BLOCKED').length} blocked · ${run.sha}`);
+  process.exit(exit);
 }

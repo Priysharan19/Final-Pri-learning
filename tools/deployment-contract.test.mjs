@@ -8,7 +8,7 @@
 //    and fails on each single drift.
 import assert from 'node:assert/strict';
 // The staging journey proof (2b below): staging only, one release, no secrets in its evidence.
-import { parseArgs as journeyArgs, redact as journeyRedact, report as journeyReport } from './staging-journey-proof.mjs';
+import { PROFILES as journeyProfiles, parseArgs as journeyArgs, redact as journeyRedact, report as journeyReport, verdictOf as journeyVerdict } from './staging-journey-proof.mjs';
 import { codeFromSubject, imapSession, loadInbox, mailboxOver, redactAddress, tagAddress } from './staging-inbox.mjs';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -78,6 +78,14 @@ ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(en
   assert.throws(() => journeyArgs(['--sha', SHA40, '--origin', 'https://final-pri-learning-production.up.railway.app']), /refused/); count += 1;
   assert.throws(() => journeyArgs([]), /--sha/); count += 1;
   ok(journeyArgs(['--sha', SHA40, '--accounts']).accounts === true && journeyArgs(['--sha', SHA40]).accounts === false, 'accounts are made only with an explicit --accounts');
+
+  const steps = list => ({ steps: list.map((status, i) => ({ id: String(i), status })) });
+  ok(journeyVerdict(steps(['PASS', 'SYNTHETIC-PASS'])).exit === 0 && journeyVerdict(steps(['PASS', 'BLOCKED'])).verdict === 'INCOMPLETE'
+    && journeyVerdict(steps(['PASS', 'BLOCKED'])).exit === 3 && journeyVerdict(steps(['BLOCKED', 'FAIL'])).exit === 1 && journeyVerdict(steps([])).exit === 1,
+    'the journey is PROVEN (0) only when every step passed, INCOMPLETE (3) when one is blocked, FAIL (1) otherwise');
+  ok(Object.values(journeyProfiles).every(b => b.register <= 4 && b.otpRequest <= 16 && b.login <= 9) && journeyProfiles.train.otpRequest * 2 <= 20 && journeyArgs(['--sha', SHA40]).profile === 'train',
+    'every profile stays inside staging\'s limits (register 8/h, OTP 20/h, login 12/15 min); two train runs fit in an hour');
+  assert.throws(() => journeyArgs(['--sha', SHA40, '--profile', 'everything']), /profile/); count += 1;
   const red = journeyRedact({ email: 'delivered+x@resend.dev', password: 'Pri-secret-staging', challengeId: 'abc', token: 't', nested: { sessionToken: 's', blockerCode: null, error: { code: 'EMAIL_UNVERIFIED' } }, blockerCode: 'GUARDIAN_CONSENT_PENDING', eligible: false });
   const flat = JSON.stringify(red);
   ok(!/Pri-secret|"abc"|"t"|"s"/.test(flat) && red.password === '[redacted]' && red.challengeId === '[redacted]', 'evidence redacts passwords, challenge ids and tokens');
