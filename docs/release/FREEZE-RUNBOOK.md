@@ -27,11 +27,12 @@ the person behind a gated row.
 | Soak watcher | **a named human** | watches staging for 24 h at the candidate SHA and records any incident | `soak.startedAt`, `.endedAt`, `.watchedBy`, `.incidents` |
 | Device testers | **named humans on real hardware** | run `docs/release/OWNER-DEVICE-SCRIPT.md` on the TestFlight build of the candidate SHA (iPhone; iPad with Pencil) | one ledger row per case through `scripts/device-matrix-record.mjs` |
 | Gate signers | **named humans**: examiner (#499), counsel, security reviewer, native release, store, owner for data | each closes one step-23 gate | `gates.<id>.status = PASS`, `.by`, `.at`, `.evidence` |
-| Owner | **the owner, in the GitHub web UI** | posts the GO comment after the soak and after the freeze; gives the data Yes for the cutover; fast-forwards `deploy/production` | `go.*`, plus the GitHub comment the dossier verifies |
+| Owner | **the owner, in the GitHub web UI** | posts the data Yes before the production database steps (F14); posts the GO after the soak, the freeze and the data gate (F15); fast-forwards `deploy/production` (F16) | `go.*` and `gates.data.approval`, plus the GitHub posts the dossier verifies |
 
-Approvals are GitHub comments by a repository admin (evidence class
-GITHUB-ACCOUNT-AUTHENTICATED). An agent on the owner's machine could post as that account, so the
-owner posts every approval personally in the web UI.
+Approvals are GitHub posts by a repository admin: an issue opened from a prefilled link, or a
+comment, whose first line is the approval's one line (`docs/release/OWNER-APPROVALS.md`, with #763;
+evidence class GITHUB-ACCOUNT-AUTHENTICATED). An agent on the owner's machine could post as that
+account, so the owner posts every approval personally in the web UI.
 
 ## 2. Before the freeze
 
@@ -77,12 +78,12 @@ the operator. `SHA` is the full 40-hex commit.
 | F8 | **Acceptance A–D** (during the soak) | `node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<Full Name>"`. Record `acceptance` = { `result: "PASS"`, `report`: the report path, `tester`, `at` } | acceptance tester | `STAGING ACCEPTANCE: PASS` |
 | F9 | **Devices** (during the soak) | Part A of `docs/release/OWNER-DEVICE-SCRIPT.md`: the full Apple matrix on the development build of the SHA against staging, as #737's `device-matrix.md` requires. Each case is recorded through `scripts/device-matrix-record.mjs record … --sha $SHA --tester "<Full Name>"`. The Android families stay `blocked` (D1) and take the family waivers of §4. Part B (the TestFlight build against production) follows F16, before the store release | device testers | `node scripts/device-matrix-record.mjs report --sha $SHA`: every iPhone and iPad case `pass` |
 | F10 | **Reader evidence** | `gh run download <F6 run id> -n cloud-reader-eval-$SHA -D handwriting/v17/cloud-reader-eval/` (untracked during the freeze) | Director | the report clears Gate C's floors (`READER_FLOORS`), or a waiver names `reader-evidence` |
-| F11 | **Human gates** | Each signer records `gates.<id>` = { `status: "PASS"`, `by`, `at`, `evidence` }. The `data` gate also needs the owner's authenticated D27 Yes, `gates.data.githubLogin` and `gates.data.approval` (`docs/release/OWNER-APPROVALS.md` §2, with #763) | gate signers; the owner for the data Yes | the six step-23 rows PASS |
+| F11 | **Human gates** (all but `data`) | Each signer records `gates.<id>` = { `status: "PASS"`, `by`, `at`, `evidence` } for `examiner`, `counsel`, `security`, `native` and `store`. The `data` gate is signed in F14, inside the cutover window | gate signers | five of the six step-23 rows PASS |
 | F12 | **End the soak** | At least 24 h after F7: record `soak.endedAt` and `soak.incidents` (`"none"`, or a list). An incident restarts the soak after the fix, on a new SHA | soak watcher | a window of 24 h or more, no incident |
 | F13 | **Release-stage nomination** | `node scripts/release-nominate.mjs $SHA [--override docs/release/evidence/go-no-go/$SHA.override.json] [--production-engine postgres]` | Director | `NOMINATION: PASS`, with the promotion commands printed and not run |
-| F14 | **Dossier** | `node scripts/release-dossier.mjs $SHA` | Director | `DOSSIER: NO-GO` with exactly one reason left: the owner's GO |
-| F15 | **GO** | The owner posts, in the GitHub web UI, an issue opened from the prefilled link (`OWNER-APPROVALS.md` §1, with #763) or a comment, whose own line reads `Pri-Release-GO: <SHA> target=deploy/production`. It must come **after** `soak.endedAt` and `candidate.frozenAt`, and must never be edited. Record `go` = { `decision: "GO"`, `by`, `githubLogin`, `approval`: the comment URL, `at`, `sha`, `statement` }. Then run F14 again | owner | `DOSSIER: GO-READY` |
-| F16 | Cutover and promotion | `postgres-cutover.md` §4.6 steps 6–9, then `docs/operations/production-config-v1.md` §2 against production. With the release held, run Part B of `OWNER-DEVICE-SCRIPT.md` on the TestFlight build against production | owner (D27) | the production manifest check passes; H2–H9 are recorded; the Part B rows pass |
+| F14 | **Cutover window, then the dossier** | Back to back, in this order: (1) the owner posts the D27 data Yes (`docs/release/OWNER-APPROVALS.md` §2, with #763); (2) `postgres-cutover.md` §5.5 stages 1–3 (production frozen and backed up, migrations, the import if "migrate") and §4.6 step 6's `verify:platform:pg-target` against production; (3) the data signer records `gates.data` = { `status: "PASS"`, `by`, `at`, `evidence`, `githubLogin`, `approval` }, linking the Yes (a Yes posted after `gates.data.at` is refused); (4) `node scripts/release-dossier.mjs $SHA`. Production stays scaled to 0 from stage 1 until F16, so run F14 to F16 without a break; if the owner then says no, stage 1's way back applies (§5.5) | owner (Yes), operator, data signer, Director | `POSTGRES TARGET: PASS` against production; `DOSSIER: NO-GO` with exactly one reason left: the owner's GO |
+| F15 | **GO** | The owner posts, in the GitHub web UI, an issue opened from the prefilled link (`OWNER-APPROVALS.md` §1, with #763) or a comment, whose first line is `Pri-Release-GO: <SHA> target=deploy/production`. It must come **after** `soak.endedAt` and `candidate.frozenAt`, and must never be edited (an issue never closed). Record `go` = { `decision: "GO"`, `by`, `githubLogin`, `approval`: the issue or comment URL, `at`, `sha`, `statement` }. Then run the dossier again | owner | `DOSSIER: GO-READY` |
+| F16 | Promotion | `postgres-cutover.md` §5.5 stage 4: the production variables deployed **with** the fast-forward of `deploy/production` (`docs/release/OWNER-CLICK-LIST-APPLE-RAILWAY.md` Part B, with #752), which is §4.6 step 7's push; then §4.6 steps 8–9 and `docs/operations/production-config-v1.md` §2 against production. With the release held, run Part B of `OWNER-DEVICE-SCRIPT.md` on the TestFlight build against production | owner (D27) | the production manifest check passes; H2–H9 are recorded; the Part B rows pass |
 | F17 | Lift the freeze | Commit the record, the dossier and any override in one PR **after** the promotion. The Director resumes the trains. After the next merge, run F14 again for step 30 | Director | step 30 `CERTIFIED` once a later merge reaches staging on its own |
 
 ## 4. What must be green
@@ -100,7 +101,8 @@ the operator. `SHA` is the full 40-hex commit.
 | dossier 25: Release Staging Proof on the SHA | it concluded `success` on the SHA (`skipped` does not count). It runs only after Main Integrity passes on the merge (§2 item 2) | the Director, who keeps train heads free of cancelled runs |
 | dossier 25: soak ≥ 24 h, watched, no incident, staging built before the soak, `main` still at the SHA | F7, F12, and no merge during the freeze | soak watcher; Director keeps the freeze |
 | dossier: acceptance A–D | F8 | acceptance tester |
-| dossier 23: examiner, counsel, security, native, store, data | F11 | gate signers |
+| dossier 23: examiner, counsel, security, native, store | F11 | gate signers |
+| dossier 23: data, with the owner's authenticated Yes posted before the database steps and no later than the sign-off | F14 | owner, data signer |
 | dossier 28: owner GO | F15 | owner |
 
 ## 5. Traps
@@ -150,7 +152,7 @@ step of §3:
 | release-stage nomination (20/24) | Production Container; no `Release Candidate · <SHA>` run; device matrix 0 of 36; no real-human reader report | F3, F6, F9, F10 |
 | 25 soak window, watcher, staging built before the soak | nothing recorded | F7, F12 |
 | acceptance A–D | nothing recorded | F8 |
-| 23 examiner, counsel, security, native, store, data | all `NOT_RECORDED` | F11 |
+| 23 examiner, counsel, security, native, store, data | all `NOT_RECORDED` | F11; data in F14 |
 | 28 owner GO | none | F15 |
 
 Rows that already held: `Release Staging Proof` concluded success on the SHA (run
