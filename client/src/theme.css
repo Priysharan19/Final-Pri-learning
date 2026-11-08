@@ -2306,6 +2306,10 @@ html { background-color: var(--page); }
   .ws-actions-btns { flex-wrap: wrap; }
   .ws-actions .btn-primary, .ws-actions-btns .btn { min-width: 0; flex: 1 1 100%; }
   .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  /* A tag beside a heading (the chapter shells, assignment cards) wraps its
+     words instead of holding the row at its one-line width. */
+  .spread > .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+  .spread > :first-child { min-width: 0; }
   .ws-actions .status-line > .ws-read-by { white-space: normal; }
   .answer-row .answer-input { min-width: 0; flex: 1 1 96px; }
   .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
