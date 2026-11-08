@@ -855,6 +855,9 @@ jobs:
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
             node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
+            # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
+            node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -869,6 +872,7 @@ jobs:
             node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -1029,6 +1033,8 @@ jobs:
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           # The v1.1 instrument tour ran (Chromium, flag-on build).
           test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
+          # Maths at 200% text ran in both engines (its count follows the sample).
+          test "$(grep -Fc 'Maths at 200% text: superscripted formulas wrap or scroll in their own box, nothing cut' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Preserve evidence that the interface tour ran in both engines.
           # Their measured coverage counts differ, so verify each separately.
