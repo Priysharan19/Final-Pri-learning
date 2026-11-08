@@ -372,6 +372,11 @@ jobs:
           set -o pipefail
           node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
           grep -Fq 'RLS FAIL-CLOSED: PASS — 141/141 checks' rls-fail-closed.log
+          # D18: a child's account no guardian stands behind is soft-deleted after 30
+          # days (enforce mode only), erased after a 7-day grace, and a guardian can ask
+          # for erasure without the child's login. Also on Postgres below.
+          node server/test/child-erasure-check.mjs | tee child-erasure.log
+          grep -Fq 'CHILD ERASURE: PASS — 101/101 checks' child-erasure.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -557,7 +562,9 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 62 (D18): the child-account erasure, as pri_server under RLS.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq '✓ child-erasure-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

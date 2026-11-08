@@ -119,12 +119,26 @@ export function authEmailMessage(kind, actionUrl) {
     };
   }
   if (kind === 'guardian-withdraw') {
+    // The same bearer opens a second, single-purpose page that asks for the
+    // account to be erased (decision D18): /account-action#action=guardian-erase.
+    const eraseUrl = (() => {
+      try {
+        const link = new URL(url);
+        const params = new URLSearchParams(link.hash.replace(/^#/, ''));
+        params.set('action', 'guardian-erase');
+        link.hash = params.toString();
+        return link.toString();
+      } catch { return null; }
+    })();
+    const eraseText = eraseUrl ? `\n\nIf you want their Pri Learning account and what it holds erased, open this link instead:\n\n${eraseUrl}\n\nThe account stops working at once and is erased a week later. This cannot be undone.` : '';
+    const eraseHtml = eraseUrl ? `<p>If you want their Pri Learning account and what it holds erased, open this link instead: <a href="${escapeHtml(eraseUrl)}">Erase their account</a>. The account stops working at once and is erased a week later. This cannot be undone.</p>` : '';
     // Sent once a guardian has confirmed. The link does not expire and can only
-    // ever withdraw; it is revoked by the withdrawal it performs.
+    // ever reduce permission: withdraw, or ask for the account to be erased
+    // (decision D18, POST /v1/account/guardian/erase); either revokes it.
     return {
       subject: 'Your child’s Pri Learning account is confirmed — keep this email',
-      text: `Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.\n\nKeep this email. If you ever want to withdraw your consent, open this link:\n\n${url}\n\nIt does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.`,
-      html: `<p>Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.</p><p>Keep this email. If you ever want to withdraw your consent, open this link:</p><p><a href="${escapeHtml(url)}">Withdraw consent</a></p><p>It does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.</p>`
+      text: `Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.\n\nKeep this email. If you ever want to withdraw your consent, open this link:\n\n${url}\n\nIt does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once.${eraseText}\n\nTheir work on their own device stays there either way.`,
+      html: `<p>Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.</p><p>Keep this email. If you ever want to withdraw your consent, open this link:</p><p><a href="${escapeHtml(url)}">Withdraw consent</a></p><p>It does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once.</p>${eraseHtml}<p>Their work on their own device stays there either way.</p>`
     };
   }
   throw new Error('Unsupported auth delivery kind');

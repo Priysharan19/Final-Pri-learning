@@ -84,6 +84,7 @@ const OPTIONAL = [
   { name: 'PRI_HANDWRITING_API_KEY', what: 'Turns on server-side handwriting reading and step checking. Without it both routes report themselves unavailable and the settings hide themselves.' },
   { name: 'PRI_AUTH_EMAIL_PROVIDER', what: 'Set to "resend" with PRI_RESEND_API_KEY and PRI_AUTH_EMAIL_FROM to actually send verification email. Without it accounts cannot verify, and verified email gates the reading and marking routes.' },
   { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' },
+  { name: 'PRI_CHILD_ERASURE', what: 'Set to "enforce" to erase the accounts of under-18s whose guardian never confirmed, or withdrew, 30 days on (decision D18; a 7-day grace before the erasure). Unset, housekeeping only counts them. A guardian\'s own erasure request is honoured either way. Set it only once the owner has confirmed D18 and counsel has set the period.' },
   { name: 'PRI_DISPLAY_MONTHLY_PRICE', what: 'What the account panel shows, with PRI_DISPLAY_ANNUAL_PRICE. Until both are set the panel tells visitors that pricing has not been configured for this deployment, which is true and is not what a paying visitor should read.' }
 ];
 

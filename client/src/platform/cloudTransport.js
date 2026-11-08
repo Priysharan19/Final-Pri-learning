@@ -522,6 +522,8 @@ export const cloud = Object.freeze({
   // rest and expires in an hour.
   guardianConfirm: (token, noticeVersion) => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token, approve: true, noticeVersion } }),
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
+  // Decision D18: the same bearer asks for the child's account to be erased.
+  guardianErase: token => cloudRequest('/v1/account/guardian/erase', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   // Staff second factor (server/platform/mfa.js). The secret and the recovery
   // codes pass through here once, to the panel, and are never persisted.
