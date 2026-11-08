@@ -235,7 +235,7 @@
     "test:practice:state": "node client/test/practice-state-invariants-check.mjs",
     "test:golden-journey": "node client/test/golden-student-journey.mjs",
     "verify:deployment": "node tools/verify-deployment.mjs",
-    "test:deploy": "node tools/deployment-contract.test.mjs",
+    "test:deploy": "node tools/deployment-contract.test.mjs && node tools/verify-deployment.test.mjs",
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",
     "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate && node tools/governance-text.test.mjs && node client/test/q4-release-negative-controls.mjs && node client/test/release-source-policy-consistency-check.mjs",
     "engine:benchmark": "node scripts/engine-benchmark.mjs"
