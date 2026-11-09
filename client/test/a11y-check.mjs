@@ -1073,8 +1073,9 @@ async function run() {
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
-      // The released India paper is the JEE Main simulation (D2).
-      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click({ timeout: 30000 });
+      // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
+      // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
+      await page.locator('[data-exam-board-mock]').click({ timeout: 30000 });
       await wait(page, SETTLE);
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
         throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
