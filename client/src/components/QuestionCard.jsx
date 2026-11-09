@@ -56,12 +56,12 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { asksForInequality } from '../ink/relationSwap.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
-const INSTRUMENT = featureEnabled('instrument');
+const INSTRUMENT = INSTRUMENT_UI;
 // Both chords work (the handler takes Meta or Control), so the chip names both
 // rather than guessing the keyboard from the device.
 const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
