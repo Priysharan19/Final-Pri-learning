@@ -212,7 +212,8 @@ check('Home exposes exactly one semantic primary recommendation region and CTA',
 // one primary action, and keep the cloud-failure note.
 check('the Index takes its next action from the shared resolver', () => {
   assert.match(home, /export function useHomeDecision\(/);
-  assert.match(index, /useHomeDecision\(user, dueCount\)/);
+  // dueUnit too, so a dot-point review count is titled as one (#806).
+  assert.match(index, /useHomeDecision\(user, dueCount, dueUnit\)/);
   assert.match(index, /actionCopy\(primary, user, t, topicName/);
   assert.match(index, /primary\.priority >= URGENT/);
 });
