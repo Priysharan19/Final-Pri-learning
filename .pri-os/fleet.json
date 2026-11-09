@@ -94,6 +94,10 @@
     {"pattern":"client/src/components/AssignmentInboxPanel.jsx","primary":"teacher","reviewers":["student-experience","security","qa-release"],"risk":"R3"},
     {"pattern":"client/src/components/StaffOperationsPanel.jsx","primary":"teacher","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":"client/src/components/CloudAccountPanel.jsx","primary":"commercial","reviewers":["platform","security","qa-release"],"risk":"R4"},
+    {"pattern":"client/src/instrument/**","primary":"student-experience","reviewers":["math-reasoning","security","qa-release"],"risk":"R2"},
+    {"pattern":"client/src/App.jsx","primary":"student-experience","reviewers":["platform","security","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/theme.css","primary":"student-experience","reviewers":["qa-release"],"risk":"R1"},
+    {"pattern":"client/vite.config.js","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
     {"pattern":"client/src/pages/**","primary":"student-experience","reviewers":["security","qa-release"],"risk":"R2"},
     {"pattern":"client/src/components/**","primary":"student-experience","reviewers":["security","qa-release"],"risk":"R2"},
     {"pattern":"client/src/styles/**","primary":"student-experience","reviewers":["qa-release"],"risk":"R1"},
@@ -114,6 +118,7 @@
     {"pattern":".github/codeql/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":"marketing/**","primary":"growth","reviewers":["security","qa-release"],"risk":"R2"},
     {"pattern":"promotions/**","primary":"growth","reviewers":["commercial","security","qa-release"],"risk":"R3"},
+    {"pattern":"site/**","primary":"growth","reviewers":["commercial","security","qa-release"],"risk":"R3"},
     {"pattern":"ad/**","primary":"growth","reviewers":["qa-release"],"risk":"R1"},
     {"pattern":"docs/**","primary":"qa-release","reviewers":[],"risk":"R1"},
     {"pattern":"package.json","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"}

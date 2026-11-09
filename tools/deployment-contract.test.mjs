@@ -34,13 +34,60 @@ ok(railway.deploy?.restartPolicyType === 'ON_FAILURE', 'a crashed process is res
 const containerWorkflow = readFileSync(join(ROOT, '.github', 'workflows', 'deployment-image.yml'), 'utf8');
 ok(containerWorkflow.includes("'railway.json'"), 'the container workflow runs when railway.json changes');
 
+// ── 1b · the SERVER_DOWN backstop watches both hosts and stays read-only ───
+{
+  const uptime = readFileSync(join(ROOT, '.github', 'workflows', 'staging-uptime.yml'), 'utf8');
+  const { STAGING_ORIGIN, PRODUCTION_ORIGIN } = await import('../scripts/release-nominate.mjs');
+  ok(uptime.includes(`base_url: ${STAGING_ORIGIN}`) && uptime.includes(`base_url: ${PRODUCTION_ORIGIN}`), 'the SERVER_DOWN backstop probes both the staging and the production origin the release tools use');
+  ok(/fail-fast: false/.test(uptime), 'one host being down never cancels the probe of the other');
+  ok(/^permissions:\n  contents: read\n\n/m.test(uptime) && !/secrets\./.test(uptime) && !/actions\/checkout/.test(uptime), 'the backstop is read-only: contents:read, no secrets, no checkout');
+  ok(!/curl[^\n]*(-X|--request|--data|-d )/.test(uptime) && /\/v1\/health \/v1\/ready/.test(uptime), 'the backstop only GETs /v1/health and /v1/ready');
+  ok(/BACKSTOP, not paging/.test(uptime) && /best-effort/.test(uptime), 'the workflow says it is a best-effort backstop, not the 1-minute SERVER_DOWN page');
+  {
+    // A hanging host must FAIL the job, not let it be cancelled at timeout-minutes (a cancelled
+    // scheduled run emails nobody): the worst-case probe time must fit inside the job bound.
+    const num = re => Number((uptime.match(re) || [])[1]);
+    const maxTime = num(/--max-time (\d+)/), retries = num(/--retry (\d+)/), retryDelay = num(/--retry-delay (\d+)/), pause = num(/^\s*sleep (\d+)$/m);
+    const paths = ((uptime.match(/for path in ([^;]+);/) || [])[1] || '').trim().split(/\s+/).length;
+    const attempts = ((uptime.match(/for attempt in ([^;]+);/) || [])[1] || '').trim().split(/\s+/).length;
+    const worst = paths * attempts * ((retries + 1) * maxTime + retries * retryDelay + pause);
+    const bound = num(/timeout-minutes: (\d+)/) * 60;
+    ok(Number.isFinite(worst) && worst > 0 && worst + 60 <= bound, `a hanging host fails the backstop before GitHub cancels it (worst case ${worst} s + 60 s setup within ${bound} s)`);
+  }
+  const alertsDoc = readFileSync(join(ROOT, 'docs', 'operations', 'alerts.md'), 'utf8');
+  ok(/SERVER_DOWN` external \*\*backstop\*\*/.test(alertsDoc) && !/probes staging `\/v1\/health` and `\/v1\/ready` every 5 minutes/.test(alertsDoc), 'alerts.md does not claim a 5-minute check GitHub does not deliver');
+}
+
 // ── 2 · preflight agrees with the server about which database is required ──
 const preflight = env => execFileSync(process.execPath, [join(ROOT, 'tools', 'production-preflight.mjs')], { env: { PATH: process.env.PATH, ...env }, encoding: 'utf8' });
 ok(/^  PRI_PLATFORM_DB$/m.test(preflight({})), 'preflight asks for PRI_PLATFORM_DB on SQLite');
 ok(!/^  PRI_PLATFORM_DB$/m.test(preflight({ PRI_DATABASE_URL: 'postgresql://role@db.example/postgres?sslmode=verify-full' })),
   'preflight does not ask for PRI_PLATFORM_DB once PRI_DATABASE_URL selects Postgres');
 const envExample = readFileSync(join(ROOT, '.env.production.example'), 'utf8');
+// #218: production refuses to start with no mail transport, so preflight must
+// list the three auth-email variables as required, not optional.
+const bare = preflight({});
+for (const name of ['PRI_AUTH_EMAIL_PROVIDER', 'PRI_RESEND_API_KEY', 'PRI_AUTH_EMAIL_FROM']) {
+  ok(new RegExp(`^  ${name}$`, 'm').test(bare), `preflight asks for ${name} as a required variable`);
+}
+ok(!/'re_[A-Za-z0-9]/.test(bare), 'preflight never prints anything shaped like a Resend key');
+const email = from => preflight({ PRI_AUTH_EMAIL_PROVIDER: 'resend', PRI_RESEND_API_KEY: 'set', PRI_AUTH_EMAIL_FROM: from });
+ok(!/^  PRI_AUTH_EMAIL_FROM$/m.test(email('Pri Learning <verify@mail.prilearning.com>')) && !/Auth email will not reach/.test(email('Pri Learning <verify@mail.prilearning.com>')),
+  'a readable sender on a real domain is accepted without a warning');
+ok(/Resend's test sender/.test(email('Pri <onboarding@resend.dev>')), 'preflight warns that the resend.dev test sender reaches nobody but the account owner');
+ok(/example domain/.test(email('Pri Learning <noreply@example.com>')), 'preflight warns when the template\'s example sender was pasted unchanged');
+ok(/not an address the server can read/.test(email('Pri Learning')), 'preflight warns about a sender with no address');
+ok(/only provider the server supports/.test(preflight({ PRI_AUTH_EMAIL_PROVIDER: 'smtp' })), 'preflight warns about an unsupported provider');
 ok(/PRI_DATABASE_URL=/.test(envExample) && /PRI_DATABASE_SSL_ROOT_CERT=/.test(envExample), '.env.production.example documents the Postgres variables');
+// D3: launch signs in with an email code and a password. SMS, Apple and Google
+// stay off, so the template leaves them unset and preflight flags a leftover.
+ok(!/^PRI_SMS_PROVIDER=\S/m.test(envExample) && !/^PRI_(GOOGLE|APPLE)_(WEB_CLIENT_ID|CLIENT_IDS)=\S/m.test(envExample),
+  '.env.production.example leaves SMS, Google and Apple sign-in off (D3)');
+ok(!/launch keeps off/.test(bare), 'preflight raises no sign-in warning when SMS, Google and Apple are unset');
+ok(/PRI_SMS_PROVIDER is set/.test(preflight({ PRI_SMS_PROVIDER: 'msg91' })), 'preflight warns that a set PRI_SMS_PROVIDER offers phone codes at launch (D3)');
+ok(/PRI_GOOGLE_CLIENT_IDS is set/.test(preflight({ PRI_GOOGLE_CLIENT_IDS: 'id.apps.googleusercontent.com' }))
+  && /PRI_APPLE_CLIENT_IDS, PRI_APPLE_WEB_CLIENT_ID are set/.test(preflight({ PRI_APPLE_CLIENT_IDS: 'com.example', PRI_APPLE_WEB_CLIENT_ID: 'com.example.web' })),
+  'preflight warns that Google or Apple sign-in would show at launch (D3)');
 
 // ── 3 · verify-deployment ───────────────────────────────────────────────────
 const SHA = 'a'.repeat(40);

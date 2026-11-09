@@ -53,7 +53,7 @@ Critical categories preempt normal feature work in this order:
 
 ### Specialist writer
 
-Exactly one specialist holds the writer lease. New autonomous branches must be:
+Each mission has exactly one primary writer. A bounded pool of missions may write at once: at most `lease.max_writers` in `.pri-os/mission-control.json` (2 today, falling back to 1), and only when `node scripts/pri-mission-control.mjs can-run-concurrently` proves them disjoint (distinct owners, the same base SHA, no overlapping or serial path, no shared derived root or sensitive class). New autonomous branches must be:
 
 `agent/mission/<agent-id>/<mission-id>`
 
@@ -77,13 +77,15 @@ The writer may not declare its own work release-ready.
 
 GitHub Issues are the durable mission ledger. A managed issue contains the canonical markers defined in `.pri-os/mission-control.json`, including mission ID, status, agent, branch, risk, base SHA, attempt count and failure fingerprint.
 
-Only one mission may be in a writer-holding state at a time. The lease expires after 12 hours without progress and must then be released/retriaged rather than silently remaining locked forever.
+`.pri-os/mission-control.json` is the single source of truth for the writer pool and the state sets. `scripts/pri-mission-control.mjs` reads them from it, and `tools/governance-text.test.mjs` (run by `npm run test:release:prep`) fails when this file, the control file and the script disagree.
 
-Writer-holding states are:
+- **Writer-holding states** (`lease.writer_holding_states`): `ACTIVE`, `IMPLEMENTING`, `TESTING`, `REPAIR`. A mission in one of these occupies a writer slot and must carry a fresh progress heartbeat: `Pri-Lease-Heartbeat-At` inside the TTL, `Pri-Lease-Heartbeat-Ref` equal to the exact PR head, `Pri-Lease-Heartbeat-By` equal to the agent.
+- **Review states** (`lease.review_states`): `REVIEW`, `CI`, `MERGE_READY`, `REPAIR_PENDING`. A mission in one of these holds no writer slot; it must pin `Pri-Review-Head` to the exact PR head under review.
+- **Writer pool**: at most `lease.max_writers` (2) missions may be in a writer-holding state at once, and only when they are provably disjoint; `fallback_max_writers` is 1. A lease expires after `lease.ttl_hours` (12) without a heartbeat and must then be released/retriaged rather than silently remaining locked forever.
 
-`ACTIVE`, `IMPLEMENTING`, `TESTING`, `REVIEW`, `CI`, `REPAIR`, `MERGE_READY`.
+Autonomous PR governance (`.github/workflows/pri-agent-governance.yml`, `validate-ledger`) verifies that the PR's mission is an open managed issue in a writer-holding or review state, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, that its heartbeat reference or review head equals the exact PR head, and that the writer pool is within its cap. Every call passes the exact head SHA as the sixth argument.
 
-Future autonomous PR governance verifies that exactly one active managed issue exists, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, and that the issue has been updated inside the configured lease TTL.
+The signed-admission programme (`admit`, the `pri-writer-admissions` rulesets, `scripts/pri-admission-*.mjs`, `scripts/pri-trusted-*.mjs`) stays dormant (owner default D26, 1 November 2026): `admit` denies every candidate by design, no GitHub App or control store is provisioned, and the branches that would activate it (#626, #647, #681) do not merge. The governance that applies is the smallest one: a `task/*`, `feature/*` or `agent/mission/*` branch, a pull request into `main`, the four required CI contexts with strict up-to-date checking and conversation resolution, a recorded independent review on the exact head of every R4 change, one serial merger, and production promoted only by the owner's fast-forward of `deploy/production` (`docs/release/release-policy.md`).
 
 ## Failure handling
 
