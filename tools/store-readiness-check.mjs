@@ -222,6 +222,9 @@ const mainJsx = read('client/src/main.jsx');
 const appRoutes = D5.appPaths.filter(path => mainJsx.includes(`'${path}'`));
 const urlProblems = storeUrlProblems(storeDocs, appRoutes);
 check(urlProblems.length === 0, `every store URL is on a D5 host, the console fields carry the D5 value, and no listing offers SMS (${urlProblems.join('; ') || 'they do'})`);
+const d18Stale = Object.entries(storeDocs).filter(([, text]) => /erased after 30 days|after 30 days\)/.test(text)).map(([file]) => file);
+check(d18Stale.length === 0 && ['docs/release/play-data-safety.md', 'docs/release/app-store-privacy-labels.md', 'docs/release/store/app-store-listing.md', 'docs/release/store/play-listing.md'].every(f => /erased 7 days after closing/.test(storeDocs[f])),
+  `the store drafts state D18 as the notice does, erased 7 days after closing (${d18Stale.join(', ') || 'they do'})`);
 const withDoc = (file, edit) => ({ ...storeDocs, [file]: edit(storeDocs[file]) });
 const URL_BREAKAGES = {
   'the <PRI_PUBLIC_ORIGIN> stand-in back in a listing': () => withDoc('docs/release/store/play-listing.md', t => t.replace('https://prilearning.com/privacy', '<PRI_PUBLIC_ORIGIN>/privacy')),
