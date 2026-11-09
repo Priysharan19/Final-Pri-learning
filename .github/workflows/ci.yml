@@ -192,7 +192,7 @@ jobs:
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
           grep -Fq 'STEP14 REVIEW FIXES: PASS — 39315/39315 checks' suites.log
-          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 397/397 checks' suites.log
+          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 414/414 checks' suites.log
           grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
           grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
@@ -428,7 +428,7 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 860/860 checks' photo-pipeline.log
+          grep -Fq 'PHOTO PIPELINE: PASS — 885/885 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs

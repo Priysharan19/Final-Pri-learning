@@ -134,6 +134,22 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
   }
 }
 
+// ── 8 · the asked division typed back is a division still to do ─────────────
+{
+  const G = 'division-echo';
+  const q = { answerType: 'numeric', prompt: 'Find $(-56) \\div (-8)$.', answer: { value: 7 } };
+  for (const input of ['(-56)÷(-8)', '-56÷-8', '56÷8', '(-56)/(-8)', '-56/-8', '-56/(-8)', '56/8', '14/2', '7/1']) {
+    const r = verdict(q, input);
+    check(G, r.correct === false && r.invalid === true && /Work it out first/.test(r.feedback || ''), `"${input}" is refused under D13 with guidance, never credited (got ${state(r)})`);
+  }
+  check(G, verdict(q, '7').correct === true, '"7" is credited');
+  const half = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 2.5 } };
+  for (const input of ['5/2', '10/4', '2 1/2', '2.5']) check(G, verdict(half, input).correct === true, `"${input}" is a fraction as one is written, and credited`);
+  const neg = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: -2.5 } };
+  for (const input of ['-5/2', '(-5)/2']) check(G, verdict(neg, input).correct === true, `"${input}" is credited`);
+  check(G, verdict(neg, '5/-2').correct !== true, '"5/-2" is not credited');
+}
+
 const pass = Object.values(groups).reduce((n, g) => n + g.pass, 0);
 const total = Object.values(groups).reduce((n, g) => n + g.total, 0);
 const summary = Object.entries(groups).map(([g, x]) => `${g} ${x.pass}/${x.total}`).join(' · ');

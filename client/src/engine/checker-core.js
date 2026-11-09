@@ -652,7 +652,13 @@ function evaluatedTerm(node) {
     // a whole number over a surd (1/√2) — each is one term.
     if (isWholeLiteral(den)) {
       if (Number(den.s ?? den.v) === 0) return null;
+      // A signed denominator ("−56/−8", "(−56)/(−8)") is the asked division
+      // typed back, not a fraction as one is written (#739 review P1).
+      if (den !== node.r && !(node.r?.t === 'group' && node.r.v === den)) return null;
       const top = unsign(node.l);
+      // A whole number over a whole number that divides it ("56/8", "14/2",
+      // "7/1") is a whole number still to work out, not a fraction.
+      if (isWholeLiteral(top) && BigInt(String(top.s ?? top.v)) % BigInt(String(den.s ?? den.v)) === 0n) return null;
       // "2.5/5" divides a decimal: not a fraction of whole numbers.
       if (num.coefficients && !num.surd && !num.pi && !isWholeLiteral(top)) return null;
       return num.coefficients > 1 ? null : { ...num, coefficients: Math.max(1, num.coefficients) };
@@ -716,6 +722,8 @@ export function unevaluatedRefusal(cleaned) {
   // what it is written on is the value judged.
   const s = String(cleaned ?? '').trim().replace(/\s*%$/, '');
   if (!s || D13_MIXED.test(s)) return null;
+  // A division sign is an operation, never how a fraction is written: "56 ÷ 8".
+  if (/÷|\\div\b/.test(s)) return D13_REFUSAL;
   let ast;
   try { ast = parse(s); } catch { return null; }
   if (ast.t === 'equation') return null;
