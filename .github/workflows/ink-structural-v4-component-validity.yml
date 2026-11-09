@@ -17,7 +17,6 @@ on:
       - 'tools/ink-foundation/generate_structural_synthetic.mjs'
       - 'scripts/ink-structural-component-validity-dev.sh'
       - '.github/workflows/ink-structural-v4-component-validity.yml'
-      - 'package.json'
   pull_request:
     paths:
       - 'tools/ink-foundation/structural_component_validity.py'
@@ -34,7 +33,6 @@ on:
       - 'tools/ink-foundation/generate_structural_synthetic.mjs'
       - 'scripts/ink-structural-component-validity-dev.sh'
       - '.github/workflows/ink-structural-v4-component-validity.yml'
-      - 'package.json'
 
 permissions:
   contents: read
