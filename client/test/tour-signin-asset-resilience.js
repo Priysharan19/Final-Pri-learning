@@ -13,7 +13,7 @@ const manifest = (source, kind) => {
 export const flow = {
   id: 'signin-illustration-asset-failure',
   name: 'Sign-in visual cannot break offline account entry',
-  async run({ page, goto, check }) {
+  async run({ page, ctx, base, goto, check }) {
     const sw = worker();
     const warm = [...manifest(sw, 'PRECACHE'), ...manifest(sw, 'WARM')];
     await check('sign-in graph is not an upfront install or warm asset',
@@ -38,6 +38,55 @@ export const flow = {
     await check('fatal error boundary never replaced sign-in', await page.locator('.crash-card').count() === 0);
     await check('offline visual failure causes no horizontal document overflow',
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+
+
+    // A delayed but successful visual chunk must not move the account form.
+    // The two pieces render independently; neither can move the other once
+    // the form becomes actionable. This is checked in a fresh page so the
+    // aborted import above cannot poison the React.lazy module cache.
+    const delayedPage = await ctx.newPage();
+    await delayedPage.setViewportSize({width:390,height:844});
+    const delayed = [];
+    const pageErrors = [];
+    delayedPage.on('pageerror', error => pageErrors.push(error.message));
+    await delayedPage.route('**/assets/SignInPlot-*.js', async route => {
+      delayed.push(route.request().url());
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await route.continue();
+    });
+    await delayedPage.goto(base + '/', {waitUntil:'domcontentloaded',timeout:15000});
+    await delayedPage.locator('#signup-destination').waitFor({state:'visible',timeout:15000});
+    const geometry = () => delayedPage.evaluate(() => {
+      const rect = selector => {
+        const el = document.querySelector(selector);
+        const r = el?.getBoundingClientRect();
+        return r ? {x:r.x,y:r.y,width:r.width,height:r.height} : null;
+      };
+      return {
+        email:rect('#signup-destination'),
+        primary:rect('.signup-next'),
+        heading:rect('.hero-title'),
+        column:rect('.auth-col'),
+        background:getComputedStyle(document.querySelector('.auth-col')).backgroundColor,
+        overflow:document.documentElement.scrollWidth-innerWidth
+      };
+    });
+    const first = await geometry();
+    await delayedPage.locator('.pri-plot-viewport canvas').waitFor({state:'visible',timeout:10000});
+    await delayedPage.waitForTimeout(120);
+    const last = await geometry();
+    const aligned = (a,b) => !!a && !!b && Math.abs(a.x-b.x) < 2 &&
+      Math.abs(a.y-b.y) < 2 && Math.abs(a.width-b.width) < 2;
+    await check('the test delayed the actual optional visual chunk', delayed.length > 0);
+    await check('the email field does not move when the plot appears', aligned(first.email,last.email));
+    await check('the primary action does not jump', aligned(first.primary,last.primary));
+    await check('the heading retains its original position', aligned(first.heading,last.heading));
+    await check('the form column stays at the same width', aligned(first.column,last.column));
+    await check('dark materials paint before the visual chunk', first.background === last.background,
+      first.background + ' / ' + last.background);
+    await check('delayed load does not create page errors', pageErrors.length === 0, pageErrors.join(','));
+    await check('delayed load stays within the viewport', first.overflow <= 0 && last.overflow <= 0);
+    await delayedPage.close();
   }
 };
 
