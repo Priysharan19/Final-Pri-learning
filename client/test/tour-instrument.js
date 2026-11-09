@@ -904,6 +904,12 @@ export const auroraFlow = {
     await check('with motion allowed the pools drift', await poolAnim() === 'au-drift', await poolAnim());
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await check('under Reduce Motion they stand still', await poolAnim() === 'none', await poolAnim());
+    // The iOS shell's Reduce Transparency class (WebShell.swift): WebKit does not
+    // answer the media query, so the class alone must make the chrome opaque.
+    await page.evaluate(() => document.documentElement.classList.add('a11y-reduce-transparency'));
+    await check('with the shell\'s Reduce Transparency class the bar is opaque and no pool is drawn', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+    await page.evaluate(() => document.documentElement.classList.remove('a11y-reduce-transparency'));
+    await check('and without it the glass and the pools return', /blur/.test(await barGlass()) && await poolShown(), `${await barGlass()} / pools ${await poolShown()}`);
     if (chromium) {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });

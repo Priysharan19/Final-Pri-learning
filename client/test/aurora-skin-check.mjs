@@ -118,6 +118,14 @@ const inMedia = q => all.filter(r => r.ctx.some(c => c.includes(q)));
 const rt = inMedia('prefers-reduced-transparency: reduce');
 ok(rt.some(r => /backdrop-filter:\s*none/.test(r.body) && /\.in-bar/.test(r.selector)) && rt.some(r => /backdrop-filter:\s*none/.test(r.body) && /\.in-pal/.test(r.selector)), 'Reduce Transparency: the bars, menus and palette are opaque');
 ok(rt.some(r => /\.a-aurora/.test(r.selector) && /display:\s*none/.test(r.body)), 'Reduce Transparency: no pools');
+// iOS WebKit leaves prefers-reduced-transparency unanswered, so the shell
+// states UIAccessibility.isReduceTransparencyEnabled as a class on <html>, kept
+// current on change, and the same opaque fallback keys on that class. Android
+// exposes no Reduce Transparency setting to apps, so it has nothing to pass.
+const rtc = all.filter(r => /\.a11y-reduce-transparency/.test(r.selector) && !r.ctx.length);
+ok(rtc.some(r => /\.in-bar/.test(r.selector) && /backdrop-filter:\s*none/.test(r.body)) && rtc.some(r => /\.in-pal/.test(r.selector) && /backdrop-filter:\s*none/.test(r.body)) && rtc.some(r => /\.a-aurora/.test(r.selector) && /display:\s*none/.test(r.body)), 'the shell\'s Reduce Transparency class makes the same rules opaque as the media query (bars, menus, palette, no pools)');
+const shell = read('ios/PriLearning.swiftpm/WebShell.swift');
+ok(/reduceTransparencyScript\(UIAccessibility\.isReduceTransparencyEnabled\)/.test(shell) && /injectionTime: \.atDocumentStart/.test(shell.slice(shell.indexOf('reduceTransparencyScript(UIAccessibility'))) && /UIAccessibility\.reduceTransparencyStatusDidChangeNotification/.test(shell) && /classList\.toggle\('a11y-reduce-transparency'/.test(shell), 'the iOS shell sets that class from the first paint and on every change of the setting');
 const fc = inMedia('forced-colors: active');
 ok(fc.some(r => /\.a-aurora/.test(r.selector) && /display:\s*none/.test(r.body)) && fc.some(r => /backdrop-filter:\s*none/.test(r.body)), 'forced colours: no pools, no glass');
 ok(inMedia('prefers-reduced-motion: reduce').some(r => /\.a-aurora i/.test(r.selector) && /animation:\s*none/.test(r.body)), 'Reduce Motion: the pools stand still');

@@ -102,6 +102,14 @@ html.ui-instrument.skin-aurora[data-aurora-pools] .in-plate { background: var(--
   html.ui-instrument.skin-aurora .a-aurora { display: none; }
   html.ui-instrument.skin-aurora[data-aurora-pools] body { background: var(--in-base); }
 }
+/* iOS WebKit does not answer prefers-reduced-transparency, so the shell states
+   the device's Reduce Transparency setting as a class on <html> (WebShell.swift
+   applyReduceTransparency, kept current on change); the same opaque fallback
+   keys on it. */
+html.ui-instrument.skin-aurora.a11y-reduce-transparency :is(.in-bar, .mobilenav) { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency :is(.in-tabs, .in-cmd, .in-more, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: var(--in-l1); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency .a-aurora { display: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency[data-aurora-pools] body { background: var(--in-base); }
 @media (forced-colors: active) {
   html.ui-instrument.skin-aurora .a-aurora { display: none; }
   html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav, .in-tabs, .in-cmd, .in-more, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
