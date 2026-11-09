@@ -1,9 +1,11 @@
 # Terms of use
 
-**Last updated: 19 October 2026**
+**Last updated: 8 November 2026**
 
 These terms are an agreement between you and Priysharan Tripathi,
-5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning.
+5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning on
+the web, on iPhone and iPad, and on Android. They have not yet been reviewed by
+a lawyer; the app says so above them.
 
 ## Using Pri Learning
 
@@ -14,14 +16,20 @@ If you are under 18, a parent or guardian must agree to these terms for you.
 
 ## Your account
 
-You are responsible for keeping your password. Tell us at impriysharan@icloud.com if
-you think someone else has used your account. We may suspend an account that is
-being used to attack the service or to harm other users.
+You are responsible for keeping your password and the sign-in codes sent to
+your email address. Tell us at impriysharan@icloud.com if you think someone else
+has used your account. We may suspend an account that is being used to attack
+the service or to harm other users.
 
 ## What the app is, and is not
 
 Pri Learning generates practice questions, reads handwriting, marks working and
 estimates progress. It is a practice tool.
+
+Handwriting and photos are read by an outside service, OpenAI, as the
+[privacy notice](/privacy) describes. The mark is always decided by our own
+marking engine, never by that service, and you can correct what it read before
+the answer counts.
 
 **It does not predict a percentile, a rank or an admission**, and it never
 converts practice into a CBSE percentage. What it does show, on the progress
@@ -39,23 +47,30 @@ no standing outside it.
 
 The free plan includes a daily allowance of practice questions and a periodic
 exam simulation; the app tells you what it is and when it resets. A paid
-subscription removes those limits and unlocks the features listed at the point
-of purchase.
+subscription, Pri Learning Premium, removes those limits and unlocks the
+features listed at the point of purchase.
 
-Subscriptions renew automatically until cancelled. Prices are shown before you
-pay. Cancel any time; see the [refund policy](/refund-policy).
+Subscriptions are sold only through Apple's App Store, on iPhone and iPad, and
+through Google Play, on Android. There is no purchase on the website. The
+price, the billing period and what is included are shown by the store before
+you pay. A subscription renews automatically until it is cancelled.
 
-If you subscribe through Apple, Apple handles billing, renewals and refunds
-under its own terms, and you manage the subscription in your Apple account.
+Apple or Google takes the payment and handles renewals and refunds under its
+own terms, and you manage or cancel the subscription in your Apple account or
+your Google account, not inside Pri Learning. Cancelling stops the next
+renewal; see the [refund policy](/refund-policy). Deleting your Pri Learning
+account does not cancel a subscription in the store.
+
+If you are under 18, a parent or guardian must make or approve the purchase.
 
 ## Content
 
 Questions, solutions and explanations are ours. Your work is yours: what you
 write and answer belongs to you, and we claim no ownership of it.
 
-Pri Learning follows the NCERT syllabus and public examination patterns. It is
-not endorsed by, affiliated with or approved by NCERT, CBSE, the NTA or any
-examination authority.
+Pri Learning is maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and
+JEE Advanced. It is not endorsed by, affiliated with or approved by NCERT, CBSE,
+the NTA or any examination authority.
 
 ## Availability
 

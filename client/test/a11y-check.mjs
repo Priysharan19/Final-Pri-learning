@@ -1208,7 +1208,8 @@ async function run() {
     // ── the documents a store, a payment provider and the DPDP Act require ──
     // A parent reading a privacy notice on a phone with a screen reader is
     // exactly the reader these pages have to work for.
-    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance']) {
+    // /third-party-notices fetches its licence texts by import() on first open.
+    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance', '/third-party-notices']) {
       await step(`legal · ${path.slice(1)}`, path, async () => {
         await goTo(page, BASE, path);
         await wait(page, 500);
