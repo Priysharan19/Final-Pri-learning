@@ -113,6 +113,10 @@ export const ENGINE_SUITES = [
   // platform_meta and read back, every other address sent — as pri_server.
   'test-mailbox-check.mjs',
   'guardian-notice-version-check.mjs',
+  // D18: a child's account no guardian stands behind is soft-deleted and, after
+  // the grace, erased through the one deletion transaction; a guardian's own
+  // request — on Postgres as pri_server, the erasure in system scope under RLS.
+  'child-erasure-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

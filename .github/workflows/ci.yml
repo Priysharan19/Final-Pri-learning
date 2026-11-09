@@ -398,6 +398,11 @@ jobs:
           # @e2e.prilearning.test; every other address is sent; off, the route is a 404.
           node server/test/test-mailbox-check.mjs | tee test-mailbox.log
           grep -Fq 'TEST MAILBOX: PASS — 94/94 checks' test-mailbox.log
+          # D18: a child's account no guardian stands behind is soft-deleted after 30
+          # days (enforce mode only), erased after a 7-day grace, and a guardian can ask
+          # for erasure without the child's login. Also on Postgres below.
+          node server/test/child-erasure-check.mjs | tee child-erasure.log
+          grep -Fq 'CHILD ERASURE: PASS — 107/107 checks' child-erasure.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -610,7 +615,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 73/73 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 74/74 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -630,6 +635,8 @@ jobs:
           grep -Fq '✓ guardian-consent-check.mjs' platform-postgres.log
           # 61 → 62: the staging test mailbox, kept and read back as pri_server.
           grep -Fq '✓ test-mailbox-check.mjs' platform-postgres.log
+          # 61 → 62 (D18): the child-account erasure, as pri_server under RLS.
+          grep -Fq '✓ child-erasure-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

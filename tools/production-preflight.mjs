@@ -109,6 +109,7 @@ const OPTIONAL = [
   { name: 'PRI_DATABASE_URL', what: 'Runs /v1 on Supabase Postgres instead of the SQLite volume (ADR-0001). Session-mode pooler or direct host only, never port 6543, with sslmode=verify-full or sslmode=require plus PRI_DATABASE_SSL_ROOT_CERT. Mark it sealed on Railway. See docs/operations/postgres-cutover.md before setting it.' },
   { name: 'PRI_HANDWRITING_API_KEY', what: 'Turns on server-side handwriting reading and step checking. Without it both routes report themselves unavailable and the settings hide themselves.' },
   { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' },
+  { name: 'PRI_CHILD_ERASURE', what: 'Set to "enforce" to erase the accounts of under-18s whose guardian never confirmed, or withdrew, 30 days on (decision D18; a 7-day grace before the erasure). Unset, housekeeping only counts them. A guardian\'s own erasure request is honoured either way. Set it only once the owner has confirmed D18 and counsel has set the period.' },
   { name: 'PRI_DISPLAY_MONTHLY_PRICE', what: 'What the account panel shows, with PRI_DISPLAY_ANNUAL_PRICE. Until both are set the panel tells visitors that pricing has not been configured for this deployment, which is true and is not what a paying visitor should read.' }
 ];
 

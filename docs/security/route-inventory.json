@@ -242,6 +242,27 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/account/guardian/erase",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "guardian-withdraw credential only (issued solely when a guardian confirms), unconsumed, unexpired, and issued at or after the current confirmation (a superseded guardian's credential and any consent link are refused); acts only on the token's account and only when it is recorded as a child (age_basis 'child'); withdraws consent, revokes the credential, cancels a charging web subscription and soft-deletes the account (no sign-in, sessions revoked, links spent) in one request; the erasure itself runs a grace period later in housekeeping (childErasure.js, decision D18)",
+      "rateLimits": [
+        {
+          "key": "guardian-erase",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/account/guardian/state",
       "auth": "session",
