@@ -208,7 +208,8 @@ jobs:
           grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
-          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
+          # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10855/10855 checks' suites.log
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
@@ -293,7 +294,8 @@ jobs:
           # 65 → 73 (#196): the camera file (and its EXIF/GPS) is never what is sent; every photo is
           # redrawn and the canvas encoding is sent, with no fall back to the original.
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
-          grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          # 114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
+          grep -Fq 'TUTOR UI: PASS — 114/114 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
@@ -329,7 +331,8 @@ jobs:
           grep -Fq 'INK PDF RESOURCE — PASS: pre-parser bytes, raster allocation, timeouts and cleanup bounded' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
-          grep -Eq 'INSTALL BUDGET: PASS — 68/68 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          # 68 → 70 (Train 6, re-derived by a full local shard run on the merged tree); ceilings unchanged.
+          grep -Eq 'INSTALL BUDGET: PASS — 70/70 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
