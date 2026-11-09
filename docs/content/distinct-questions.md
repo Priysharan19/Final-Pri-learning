@@ -9,7 +9,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 7 | 103 | ≥ 2.98×10^8 | 2 | 74 | met |
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
 | Class 9 | 32 | 8.26×10^7 | 0 | 9 | not met |
-| Class 10 | 92 | 3.61×10^7 | 0 | 69 | not met |
+| Class 10 | 95 | 4.18×10^7 | 0 | 71 | not met |
 | Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
 | Class 12 | 93 | ≥ 3.83×10^8 | 2 | 69 | met |
 
@@ -232,6 +232,7 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-irrationality-proofs` | 2 | 2000 | 72 | 72 |
 | `c10-irrationality-proofs` | 3 | 2000 | 72 | 72 |
 | `c10-triangles-current` | 3 | 2000 | 72 | 72 |
+| `c10-quadratic-triangle-competency` | 3 | 2000 | 80 | 80 |
 | `c10-quadratic-context` | 4 | 2000 | 81 | 81 |
 | `c10-quadratic-roots` | 3 | 2000 | 121 | 121 |
 | `c10-triangles-current` | 4 | 2000 | 126 | 126 |
@@ -262,6 +263,7 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-quadratic-roots` | 2 | 2000 | 1000 | 1251 |
 | `c10-linear-pair-methods` | 1 | 2000 | 1023 | 1278 |
 | `c10-probability-classical` | 1 | 2000 | 1020 | 1313 |
+| `c10-ap-inverse-competency` | 3 | 2000 | 1174 | 1577 |
 | `c10-triangles-current` | 2 | 2000 | 1234 | 1912 |
 | `c10-quadratic-factorisation-reasoning` | 3 | 2000 | 941 | 1967 |
 | `c10-tangent-length-reasoning` | 3 | 2000 | 989 | 2252 |
