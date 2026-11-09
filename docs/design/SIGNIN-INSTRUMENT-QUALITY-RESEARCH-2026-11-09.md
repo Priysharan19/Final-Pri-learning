@@ -22,7 +22,7 @@ The founder explicitly requested a futuristic Pri Learning sign-in **without the
 - **Material:** graphite black with restrained lilac for the primary action/focus. The interactive function is warm amber: a mathematical series rather than a random LED strip. No backdrop blur, particle effect, neon flare, pseudo-terminal metrics or fake progress.
 - **Hierarchy:** brand → what Pri does → email → primary action → available identity alternatives → recovery/guardian → truthful privacy/legal text. The latter two are not removed or falsely minimized.
 - **Cross-screen:** desktop gets a full graph; iPad portrait gets a bounded graph viewport instead of a vertically distorted plot; phones retain a compact curve but prioritize form entry and the keyboard. At 200%-equivalent viewport width, document overflow must remain zero.
-- **Before CSS finishes:** critical entry material tokens paint in the already-loaded instrument stylesheet; the rest of the sign-in appearance stays code-split with the existing lazy visual. Prevent a flash of light theme on a dark entry.
+- **Before CSS finishes:** critical entry material tokens paint in the already-loaded instrument stylesheet; the small sign-in stylesheet loads with initial CSS, while the computational plot itself remains lazy. This removes visual restyling shifts and prevents a flash of light theme.
 - **Localisation:** retain actual EN/HI strings and brand layout. Do not replace Hindi with fallback English.
 - **Authentication integrity:** visuals do not change OTP, password, Google/Apple, age, guardian, account restoration, activation, session or authority logic. Pri's real server remains the only verifier.
 

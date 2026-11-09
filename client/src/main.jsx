@@ -19,6 +19,7 @@ import './instrument/ledger.css';
 // The Aurora skin (chrome only), scoped to html.skin-aurora so the setting's
 // 'instrument' value leaves the plain tokens untouched.
 import './instrument/aurora.css';
+import './instrument/signin-instrument.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { discoverCloudOrigin } from './platform/cloudTransport.js';

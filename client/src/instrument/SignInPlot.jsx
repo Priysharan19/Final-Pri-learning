@@ -1,4 +1,3 @@
-import './signin-instrument.css';
 import React, { useEffect, useRef } from 'react';
 import { useT } from '../i18n/index.js';
 

@@ -129,3 +129,9 @@ html.ui-instrument.skin-aurora .pri-auth .signup-next:disabled {
   background:#464151; border-color:#5b556b; color:#dcd9e8;
   opacity:1; cursor:not-allowed; box-shadow:none;
 }
+
+/* Do not slide the login form across the page on first paint. Keep animated
+   transitions into the code, password and guardian steps intact. */
+html.ui-instrument.skin-aurora .pri-auth .signup-flow[data-signup-step="method"] .signup-step {
+  animation:none; opacity:1; transform:none;
+}
