@@ -1,23 +1,23 @@
 {
  "summary": {
-  "contentVersion": "2026.11.3",
+  "contentVersion": "2026.11.4",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
   "pastPapers": {
    "enabled": false,
    "reason": "rights-opinion-pending",
-   "paths": 61,
+   "paths": 63,
    "advertised": 0
   },
-  "paths": 807,
+  "paths": 809,
   "advertisedPaths": 746,
-  "passed": 807,
+  "passed": 809,
   "failed": 0,
   "questionsServed": 80880,
   "questionsFailed": 0,
   "emptyAdvertisedPaths": 0,
-  "unadvertisedEmptyPaths": 61,
+  "unadvertisedEmptyPaths": 63,
   "difficultySnapped": 10080,
   "difficultyBelowWindow": 0,
   "difficultyMismatch": 0,
@@ -83,14 +83,14 @@
     "chapters": 27
    },
    "jee-advanced · Class 11": {
-    "paths": 129,
-    "passed": 129,
+    "paths": 130,
+    "passed": 130,
     "served": 8640,
     "chapters": 27
    },
    "jee-advanced · Class 12": {
-    "paths": 129,
-    "passed": 129,
+    "paths": 130,
+    "passed": 130,
     "served": 8640,
     "chapters": 27
    }
@@ -843,6 +843,7 @@
   ["jee-advanced/11/c11-probability#1", "jee-advanced", 11, 80, 0, 0, 76, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-probability#2", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-probability#3", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/11/c11-probability?pyq", "jee-advanced", 11, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-relations-functions", "jee-advanced", 11, 80, 0, 0, 75, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-relations-functions#1", "jee-advanced", 11, 80, 0, 0, 11, 0, 0, 0, 0, 68, true],
   ["jee-advanced/11/c12-relations-functions#2", "jee-advanced", 11, 80, 0, 0, 69, 0, 0, 0, 0, 0, true],
@@ -972,6 +973,7 @@
   ["jee-advanced/12/c11-probability#1", "jee-advanced", 12, 80, 0, 0, 77, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-probability#2", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-probability#3", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/12/c11-probability?pyq", "jee-advanced", 12, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-relations-functions", "jee-advanced", 12, 80, 0, 0, 74, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-relations-functions#1", "jee-advanced", 12, 80, 0, 0, 11, 0, 0, 0, 0, 68, true],
   ["jee-advanced/12/c12-relations-functions#2", "jee-advanced", 12, 80, 0, 0, 70, 0, 0, 0, 0, 0, true],
