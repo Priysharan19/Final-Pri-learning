@@ -4071,7 +4071,9 @@ const routes = {
     const p = await requireProfile();
     const linked = await profileCloudAccountId(p.id).catch(() => null);
     if (!linked) throw checkUnavailable('sign-in');
-    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    // A twin counts toward the free day and JEE Advanced stays Premium (D19):
+    // the server's refusal is explained by the one paywall, like a repeat's.
+    const out = await viaServer(() => cloud.notebookTwin(params.id)).catch(cause => { throw serverGateRefusal(cause) || cause; });
     const q = out?.question;
     if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
     const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;

@@ -130,6 +130,17 @@ for (const capability of Object.values(ENTITLEMENTS)) {
     /consumeAiAllowance\(db, \{ accountId, kind: 'handwriting'/.test(src('server/platform/recognitionOps.js')) &&
     !/accountId: req\.body/.test(src('server/platform/handwriting.js')) &&
     /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
+  // D19: JEE Advanced "which the server enforces" — the track's own papers and
+  // question banks are refused on the server from its own record, and the
+  // practice rule is the one definition the server imports.
+  ok('jee-advanced-content names its server enforcement points (papers and the track\'s own banks) as well as the device gate',
+    /^server · .*exams\.js.*practiceAllowance\.js PREMIUM_PRACTICE_CONTENT.*local backend/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.JEE_ADVANCED]) &&
+    /premiumCapabilityForGenerator/.test(src('server/platform/practiceAllowance.js')) &&
+    /PREMIUM_PRACTICE_CONTENT/.test(src('client/src/engine/practiceAllowance.js')) &&
+    (src('server/platform/practice.js').match(/premiumContentRefusal\(db, \{ accountId, generator/g) || []).length === 4);
+  ok('a notebook twin counts toward the free day on the server (D19)',
+    /notebook\/:attemptId\/twin/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.UNLIMITED_PRACTICE]) &&
+    /router\.post\('\/notebook\/:attemptId\/twin'[\s\S]*?practiceAllowanceVerdict\(db[\s\S]*?recordPracticeIssue\(db/.test(src('server/platform/practice.js')));
 }
 
 // ── B · India profile: 20 a day, reset on the Kolkata calendar ───────────────

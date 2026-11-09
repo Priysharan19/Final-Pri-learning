@@ -66,6 +66,9 @@ export const ENGINE_SUITES = [
   // An account's questions pass over content it has resolved, read from its
   // own records on whichever engine holds them (not the device's avoid list).
   'practice-seen-aware-pick-check.mjs',
+  // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
+  // question of the free day — decided under the same lock and RLS scope.
+  'premium-practice-content-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.

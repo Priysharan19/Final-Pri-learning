@@ -84,6 +84,12 @@ Object.assign(process.env, {
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_SERVER_TIMING']) delete process.env[name];
+// This suite is about dedupe and round trips, not the per-account allowance
+// (D20 defaults: 5 reads a day free), which premium-authority-check.mjs proves
+// at its defaults. Raised by configuration, as marking suites raise the cap.
+const RAISED_AI_ALLOWANCE = '100000';
+process.env.PRI_AI_DAILY_FREE = RAISED_AI_ALLOWANCE;
+process.env.PRI_AI_DAILY_PREMIUM = RAISED_AI_ALLOWANCE;
 
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
