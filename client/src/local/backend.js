@@ -627,7 +627,14 @@ const safeFigure = (v) => sanitizeFigure(typeof v === 'string' ? v : '') || null
 // is escaped by the renderer that shows it.
 const safeLabel = (v, max) => sanitizeText(String(primitive(v) ?? '').replace(/<[^>]*>?/g, ' ').replace(/\s+/g, ' '), max);
 const safeSteps = (v) => (Array.isArray(v) ? v : []).slice(0, 40)
-  .map(s => ({ h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) }));
+  .map(s => {
+    const step = { h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) };
+    // A worked-solution step may carry a figure (SVG); it goes through the
+    // same figure sanitiser as a question's figure, or is dropped.
+    const figure = typeof s?.figure === 'string' ? safeFigure(s.figure) : null;
+    if (figure) step.figure = figure;
+    return step;
+  });
 const safeOptions = (v) => (Array.isArray(v) ? v : []).slice(0, 6).map(o => sanitizeText(o, 200));
 const safeStrokes = (v, max) => (Array.isArray(v) ? v : []).slice(0, max)
   .map(st => ({ points: (Array.isArray(st?.points) ? st.points : []).slice(0, 4000).map(pt => ({

@@ -44,6 +44,24 @@ function fail(rec, why) {
   throw new Error(`PYQ record ${rec?.id || '<unknown>'}: ${why}`);
 }
 
+/**
+ * Figures are SVG drawn for Pri Learning from the mathematics (a question's
+ * own diagram redrawn, or a graph/region for a worked step) — never an image
+ * copied from a book or a paper. The archive admits one only if it is a single
+ * inline <svg> with no script, event handler, external reference or foreign
+ * object; every surface then still passes it through sanitizeFigure.
+ */
+export const PYQ_FIGURE_MAX = 60000;
+const FIGURE_FORBIDDEN = /<\s*(script|foreignObject|iframe|object|embed|image|use)\b|\bon[a-z]+\s*=|(?:href|src)\s*=\s*["']?\s*(?:https?:|data:|javascript:|\/\/)/i;
+
+function checkFigure(rec, figure, where) {
+  if (typeof figure !== 'string' || !figure.trim()) fail(rec, `gives ${where} a figure that is not SVG text.`);
+  const svg = figure.trim();
+  if (svg.length > PYQ_FIGURE_MAX) fail(rec, `gives ${where} a figure longer than ${PYQ_FIGURE_MAX} characters.`);
+  if (!/^<svg[\s>]/i.test(svg) || !/<\/svg>$/i.test(svg)) fail(rec, `gives ${where} a figure that is not a single inline <svg> element.`);
+  if (FIGURE_FORBIDDEN.test(svg)) fail(rec, `gives ${where} a figure with script, an event handler, an external reference or an embedded object.`);
+}
+
 function checkSources(rec, field) {
   const ids = asList(rec[field]);
   if (!ids.length) fail(rec, `names no ${field}. A past-paper question must say which document its ${field === 'promptSource' ? 'prompt' : 'answer'} was read from.`);
@@ -94,7 +112,9 @@ export function validatePyqRecord(rec) {
   if (!Array.isArray(rec.steps) || !rec.steps.length) fail(rec, 'has no worked steps. A PYQ a student gets wrong with no explanation is worse than no PYQ.');
   for (const step of rec.steps) {
     if (!isText(step?.h) || !isText(step?.d)) fail(rec, 'has a worked step missing its heading or its detail.');
+    if (step.figure !== undefined) checkFigure(rec, step.figure, 'a worked step');
   }
+  if (rec.figure !== undefined) checkFigure(rec, rec.figure, 'its question');
 
   if (!PYQ_ANSWER_TYPES.includes(rec.answerType)) {
     fail(rec, `has answerType ${JSON.stringify(rec.answerType)}; this archive carries ${PYQ_ANSWER_TYPES.join(' and ')} only, because those are the contracts it can prove checker.js marks.`);
@@ -183,7 +203,7 @@ export function pyqPayload(rec) {
     difficulty: rec.difficulty,
     prompt: rec.prompt,
     hints: Array.isArray(rec.hints) ? rec.hints.map(String) : [],
-    steps: rec.steps.map(s => ({ h: String(s.h), d: String(s.d) })),
+    steps: rec.steps.map(s => (s.figure ? { h: String(s.h), d: String(s.d), figure: String(s.figure) } : { h: String(s.h), d: String(s.d) })),
     pyq: true,
     pyqId: rec.id,
     pyqExam: rec.examId,
@@ -192,6 +212,7 @@ export function pyqPayload(rec) {
     pyqSource: pyqLabel(rec),
     archive: archiveMeta(rec)
   };
+  if (rec.figure) base.figure = String(rec.figure);
   if (rec.answerType === 'mcq') {
     return { ...base, answerType: 'mcq', mcqOptions: rec.mcqOptions.map(String), answer: { correctIndex: rec.answer.correctIndex } };
   }

@@ -243,7 +243,11 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     mode: q._practiceMode || 'practice',
     version: String(q.contentVersion || q.version || 1),
     prompt: String(q.prompt || ''),
-    steps: (q.steps || []).map(step => ({ h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
+    // A step figure is SVG authored with the question; the client sanitises it
+    // (sanitizeFigure) before it is ever rendered.
+    steps: (q.steps || []).map(step => (typeof step?.figure === 'string' && step.figure
+      ? { h: String(step?.h ?? ''), d: String(step?.d ?? ''), figure: step.figure.slice(0, 60000) }
+      : { h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
     answerText: String(answerTextFor(q) ?? ''),
     hints: Array.isArray(q.hints) ? q.hints.filter(h => typeof h === 'string') : [],
     // Runs in the marker pool, never on this thread. A Step Check that is cut
