@@ -14,14 +14,14 @@ import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
-import { featureEnabled } from '../platform/features.js';
+import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
-const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -245,16 +245,22 @@ function fmtWait(ms, t) {
 function LanguagePicker() {
   const { chosen, t } = useLanguage();
   const pick = (id) => { rememberSignInLanguage(id); setLanguage(id); };
+  // V1 decision D11: the switch stays, and the app says plainly that
+  // questions and worked solutions remain in English — here, on the first
+  // screen, the moment another language is chosen, as Settings already does.
   return (
-    <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
-      role="group" aria-label={t('login.chooseLanguage')}>
-      {LANGUAGES.map(l => (
-        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
-          lang={l.htmlLang} aria-pressed={chosen === l.id}
-          aria-label={t('lang.switchTo', { language: l.english })}
-          onClick={() => pick(l.id)}>{l.label}</button>
-      ))}
-    </div>
+    <>
+      <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
+        role="group" aria-label={t('login.chooseLanguage')}>
+        {LANGUAGES.map(l => (
+          <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+            lang={l.htmlLang} aria-pressed={chosen === l.id}
+            aria-label={t('lang.switchTo', { language: l.english })}
+            onClick={() => pick(l.id)}>{l.label}</button>
+        ))}
+      </div>
+      {chosen !== 'en' && <p className="muted lang-note" data-lang-note role="note">{t('lang.help')}</p>}
+    </>
   );
 }
 
@@ -592,7 +598,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
-              <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+              <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
                 <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
                 <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink>
               </p>

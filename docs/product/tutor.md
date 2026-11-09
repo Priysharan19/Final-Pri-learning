@@ -123,4 +123,67 @@ the history is trimmed to the last six turns on the server whatever the client s
 - `client/src/platform/cloudTransport.js` — `tutorStream`, the one streamed request the audited
   boundary makes.
 - Tests: `server/test/tutor-help-check.mjs`, `server/test/tutor-stream-check.mjs`,
-  `client/test/tutor-ui-check.mjs`.
+  `client/test/tutor-ui-check.mjs`, `server/test/tutor-why-check.mjs`, `server/test/tutor-diagnose-check.mjs`.
+
+## "Why this step?" (F11)
+
+After a question is resolved, every step of the verified solution has a **Why this step?**
+control. It opens a short, grounded dialogue about that one step. The first turn asks why
+the step is done this way, and the student may follow up in their own words.
+
+- **Server:** `/v1/tutor/help`, level `why`, with `stepIndex` and an optional follow-up
+  `message`/`history`. Device: `POST /practice/:id/tutor/why` in `client/src/local/backend.js`.
+  Panel: `client/src/tutor/WhyStep.jsx`, a lazy chunk built out with the tutor.
+- **Resolved only.** A server-issued question counts as resolved only by the server's own
+  completion record. Anything else gets 409 `TUTOR_LEVEL_ORDER`.
+- **Grounded.**
+  - Every `$…$` span in a reply must be copied from the verified solution, the question or
+    the student's lines. Prose may carry no digits, number words or operators. If not, the
+    verified step itself is shown.
+  - The prompt forbids marks and companion talk (no feelings, no personal details: V7-39).
+- **Misconception (audit D1).** For a resolved server-issued question, the server's own Step
+  Check misconception id is passed to the model, for both `why` and `diagnose`. The device's
+  word is never taken.
+- **Premium, server-side.**
+  - The account's entitlement snapshot must carry `additional-ai-usage`.
+  - A free account gets `PRI_TUTOR_WHY_FREE_PER_DAY` taster calls a day (default 3; `0` means
+    none). After that: 402 `TUTOR_PREMIUM_REQUIRED`, before the allowance, the ceiling or the
+    provider.
+  - A reply already given is served from the per-account cache.
+- **Spending cap.**
+  - The per-account daily tutor allowance (`PRI_TUTOR_CALLS_PER_ACCOUNT_DAY`, `_PREMIUM`) and
+    the deployment paid-call ceiling (`PRI_PAID_CALLS_PER_HOUR`, `PRI_PAID_CALLS_PER_DAY`)
+    both apply.
+  - The `PAID_CEILING_HIGH` alert (docs/operations/alerts.md) fires when either window reaches
+    80%. With `PRI_ALERT_EMAIL` set, it is emailed to the operator.
+- **No model** (unconfigured or failing): the verified step itself, never an error, never a
+  spend.
+
+## Turning the tutor on in production (owner's switch)
+
+The tutor is off in every production build and on no production server until the owner
+decides. Turning it on is **one variable, set in two places**:
+
+1. **Server runtime:** `PRI_FEATURE_TUTOR=1` on the production server service. Without it,
+   every `/v1/tutor/*` path is the ordinary 404.
+2. **Client build:** the same `PRI_FEATURE_TUTOR=1` in the production client build
+   environment. `client/vite.config.js` compiles `__PRI_FEATURE_TUTOR__` from it.
+   Without it, the tutor UI, "What went wrong?" and "Why this step?" are not even built
+   (`TUTOR_BUILT_OUT`).
+
+Already required before step 1, or the server refuses to start: `PRI_HANDWRITING_API_KEY`,
+`PRI_PAID_CALLS_PER_HOUR` and `PRI_PAID_CALLS_PER_DAY`. Recommended alongside: `PRI_ALERT_EMAIL`,
+so the 80% alert reaches someone.
+
+Optional tuning:
+
+| Variable | Sets | Default |
+|---|---|---|
+| `PRI_TUTOR_WHY_FREE_PER_DAY` | free "Why this step?" taster calls a day | 3 |
+| `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY` / `_PREMIUM` | per-account daily tutor allowance | 40 / 120 |
+| `PRI_TUTOR_DIAGNOSE_REASONING_EFFORT` | diagnosis reasoning effort | high |
+| `PRI_TUTOR_REASONING_EFFORT` | reasoning effort for the other levels | low |
+| `PRI_TUTOR_MODEL` | model | `gpt-5.6-terra` |
+
+"Check this line so far" stays off on its own switch, `PRI_FEATURE_LINE_CHECK`. To turn it
+off again, unset `PRI_FEATURE_TUTOR` on the server; the next client build removes the UI.

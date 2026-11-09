@@ -1,7 +1,7 @@
 // Naming the kind of slip (audit #6, #3) and the term that changed (#10).
 // While open: the kind only, never a value of the answer.
 // Run: node client/test/slips-check.mjs   [SYNTHETIC: direct engine]
-import { classifySlip, slipFeedback, slipReason, changedTerm, SLIP_FEEDBACK, involvesPowers, printedNumbers } from '../src/engine/slips.js';
+import { classifySlip, slipReason, changedTerm, SLIP_FEEDBACK, involvesPowers, printedNumbers } from '../src/engine/slips.js';
 import { checkAnswer, stepCheck } from '../src/engine/checker.js';
 
 let pass = 0, fail = 0;

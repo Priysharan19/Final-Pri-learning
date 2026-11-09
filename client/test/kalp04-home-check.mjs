@@ -1,6 +1,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HOME_RECOMMENDATION_POLICY, resolveHomeRecommendation } from '../src/home/recommendation.js';
@@ -168,9 +169,11 @@ check('unfinished task question keeps resume priority', () => {
   assert.equal(row.destination, '/practice?task=task-resume');
 });
 
-const [backend, home, app, en, hi, theme] = await Promise.all([
+const [backend, home, index, generator, app, en, hi, theme] = await Promise.all([
   read('src/local/backend.js'),
   read('src/pages/Home.jsx'),
+  read('src/instrument/IndexPage.jsx'),
+  read('src/home/TopicGenerator.jsx'),
   read('src/App.jsx'),
   read('src/i18n/strings.en.js'),
   read('src/i18n/strings.hi.js'),
@@ -195,19 +198,54 @@ check('Home uses profile authority for India copy before curriculum loads', () =
   assert.doesNotMatch(home, /const india = curriculum\?\.country === 'in';/);
 });
 
+// The home every build ships is the Index; the v1.0 Home page is gone and
+// pages/Home.jsx keeps only the shared decision (the resolver, the placement
+// offer, the week).
 check('Home exposes exactly one semantic primary recommendation region and CTA', () => {
-  assert.equal((home.match(/data-home-primary(?!-)/g) || []).length, 1);
-  assert.equal((home.match(/data-home-primary-cta/g) || []).length, 1);
-  assert.match(home, /aria-describedby=\{reasonId\}/);
+  assert.doesNotMatch(home, /data-home-primary|export default function Home\b/, 'the v1.0 Home page and its primary region are gone');
+  // The Index: the resolver's action names its reason for assistive tech.
+  assert.match(index, /<button type="button" className="in-btn is-primary" data-home-primary-cta aria-describedby=\{reasonId\}/);
+});
+
+// Every build ships the Instrument (client/interface.config.mjs), whose Index is
+// the home: it must take its next action from the same resolver, show exactly
+// one primary action, and keep the cloud-failure note.
+check('the Index takes its next action from the shared resolver', () => {
+  assert.match(home, /export function useHomeDecision\(/);
+  // dueUnit too, so a dot-point review count is titled as one (#806).
+  assert.match(index, /useHomeDecision\(user, dueCount, dueUnit\)/);
+  assert.match(index, /actionCopy\(primary, user, t, topicName/);
+  assert.match(index, /primary\.priority >= URGENT/);
+});
+
+check('the Index renders one primary action at a time, each with one CTA', () => {
+  // Two places can be the primary action (the resolver's NextAction, or the
+  // resume card for the last chapter), and the render conditions exclude each
+  // other: urgent work wins, else the resume card when there is a last chapter.
+  assert.equal((index.match(/data-home-primary(?!-)/g) || []).length, 2);
+  assert.equal((index.match(/data-home-primary-cta/g) || []).length, 2);
+  assert.match(index, /primary && \(primary\.priority >= URGENT \|\| recent === null\)/);
+  assert.match(index, /recent && !\(homeDecision\.primary && homeDecision\.primary\.priority >= URGENT\)/);
+  assert.ok(index.indexOf('data-home-primary') < index.indexOf('<TopicGenerator'));
+});
+
+check('the Index keeps the cloud-failure note, the placement offer and the week', () => {
+  assert.match(index, /assignments === false/);
+  assert.match(index, /home\.cloudUnavailable/);
+  assert.match(index, /<PlacementCard /);
+  assert.match(index, /<GoalCard /);
 });
 
 check('primary recommendation appears before manual generator in source order', () => {
-  assert.ok(home.indexOf('<HomeAction primary') < home.indexOf('className="genbar"'));
+  // The generator is home/TopicGenerator.jsx; the Index renders it below the
+  // primary action.
+  assert.ok(index.indexOf('data-home-primary') > 0 && index.indexOf('data-home-primary') < index.indexOf('<TopicGenerator'));
+  assert.match(generator, /className="genbar"/);
 });
 
 check('cloud failure is bounded and local learning remains rendered', () => {
-  assert.match(home, /assignments === false/);
-  assert.match(home, /home\.cloudUnavailable/);
+  assert.match(index, /assignments === false/);
+  assert.match(index, /home\.cloudUnavailable/);
 });
 
 check('teacher routing remains outside student Home', () => {
@@ -222,10 +260,15 @@ check('English and Hindi include command-centre copy', () => {
 });
 
 check('KALP-04 command-centre CSS has responsive and reduced-motion rules', () => {
-  // The instrument redesign recomposes the KALP-04 region as .home-next,
-  // with the phone breakpoint shared by the rest of the app.
-  assert.match(theme, /\.home-next \{/);
-  assert.match(theme, /@media \(max-width: 760px\)[\s\S]*\.home-next-cta \.btn-primary \{ width: 100%; \}/);
+  // The Index's primary action is the resume card (.in-resume, .in-nextact),
+  // placed by the phone breakpoint shared by the rest of the app; the v1.0
+  // .home-next region has no rule left.
+  const instrumentCss = readFileSync(new URL('../src/instrument/instrument.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(theme, /\.home-next\b/);
+  assert.match(instrumentCss, /\.in-resume \{/);
+  assert.match(instrumentCss, /\.in-nextact /);
+  assert.match(instrumentCss, /@media \(max-width: 760px\) \{[\s\S]*?\.in-resume \{ order: 4; margin: 14px 0 0; \}/);
+  assert.match(instrumentCss, /prefers-reduced-motion: reduce/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
 });
 

@@ -5,9 +5,10 @@ import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import PageLink from '../components/PageLink.jsx';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
-import { featureEnabled } from '../platform/features.js';
+import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { blueprintLabel } from '../lib/blueprintKeys.js';
 
 function scopeFor(curriculum, user) {
@@ -75,7 +76,7 @@ export default function IndiaProgress() {
           hairlines; the paper estimate is the only sheet on the page. */}
       <header className="pg-head">
         {/* Under the instrument the Report above carries the page's h1. */}
-        {featureEnabled('instrument') ? <h2 className="pg-title">{t('progress.title', { track: trackName })}</h2> : <h1>{t('progress.title', { track: trackName })}</h1>}
+        {INSTRUMENT_UI ? <h2 className="pg-title">{t('progress.title', { track: trackName })}</h2> : <h1>{t('progress.title', { track: trackName })}</h1>}
         <p className="sub">{t('progress.evidenceSub')}</p>
       </header>
 
@@ -121,6 +122,8 @@ export default function IndiaProgress() {
               {prediction.unseenMarks > 0 && t('progress.marksUntouched', { n: prediction.unseenMarks })}
             </div>
           </div>
+
+          <p className="pg-coverage-note"><PageLink to="/insights" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }} data-insights-link>{t('insights.open')} →</PageLink></p>
 
           {prediction.priorities.length > 0 && (
             <div className="pg-priorities">

@@ -95,21 +95,27 @@ export const flow = {
       // therefore measured on Home, and Practice is asserted to be free of it.
       await goto('/');
       await settle();
+      // The v1.0 shell is a top bar with a rail; the instrument build
+      // (PRI_FEATURE_INSTRUMENT, html.ui-instrument) is one bar of tabs with
+      // no rail at any width. Both keep the phone's bottom bar.
       const shell = await page.evaluate(() => ({
         ff: document.documentElement.dataset.ff,
         short: document.documentElement.dataset.short,
+        instrument: document.documentElement.classList.contains('ui-instrument'),
         bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
         side: !!document.querySelector('.sidebar') && getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
+        tabs: !!document.querySelector('[data-instrument-bar]') && getComputedStyle(document.querySelector('[data-instrument-bar]')).display !== 'none',
       }));
       await check(`${tag}: classified ${vp.ff}${vp.short ? ' + short' : ''}`,
         shell.ff === vp.ff && shell.short === String(!!vp.short), JSON.stringify(shell));
       const phoneNav = vp.width <= 760;
-      await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : 'sidebar, no bottom bar'}`,
-        phoneNav ? shell.bar && !shell.side : shell.side && !shell.bar, JSON.stringify(shell));
-      // The top bar and sidebar line up (measured where the shell exists).
+      await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : shell.instrument ? 'the tab bar, no rail, no bottom bar' : 'sidebar, no bottom bar'}`,
+        phoneNav ? shell.bar && !shell.side : shell.instrument ? shell.tabs && !shell.side && !shell.bar : shell.side && !shell.bar, JSON.stringify(shell));
+      // The top bar and sidebar line up (measured where the shell exists); in
+      // the instrument build the content starts below the one bar.
       const align = vp.width > 760 ? await page.evaluate(() => {
-        const t = document.querySelector('.topbar')?.getBoundingClientRect();
-        const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
+        const t = (document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]'))?.getBoundingClientRect();
+        const sb = (document.querySelector('.sidebar') || document.querySelector('#main'))?.getBoundingClientRect();
         return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
       }) : null;
 
@@ -305,7 +311,7 @@ export const flow = {
 
       // ── iPad composition: the top bar and sidebar line up ─────────────────
       if (vp.width > 760) {
-        await check(`${tag}: the sidebar starts below the top bar`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
+        await check(`${tag}: ${shell.instrument ? 'the content starts below the tab bar' : 'the sidebar starts below the top bar'}`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
       } else {
         await check(`${tag}: (sidebar alignment applies above 760px)`, true);
       }

@@ -311,10 +311,14 @@ jobs:
           # redrawn and the canvas encoding is sent, with no fall back to the original.
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
           # 114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
-          grep -Fq 'TUTOR UI: PASS — 114/114 checks' suites.log
+          # 114 → 127 (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'TUTOR UI: PASS — 127/127 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
-          grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
+          grep -Fq 'ONBOARDING SCOPE: PASS — 60/60 checks' suites.log
+          # No student-facing text says Pri learns a hand (the count follows the
+          # string catalogues, so only the verdict is pinned here).
+          grep -Fq 'HANDWRITING CLAIMS: PASS — ' suites.log
           # 211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
           grep -Fq 'STUDY PLAN: PASS — 215/215 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
@@ -322,7 +326,8 @@ jobs:
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt).
           # 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770).
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 75 files scanned, 0 hard-coded strings' suites.log
+          # 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 77 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -342,15 +347,30 @@ jobs:
           # 42 → 53 (#196): the predicted mark stays display-only — imported only by the progress
           # summary and page, never by the server or a marking module, and a pure read of the evidence.
           grep -Fq 'MARK PREDICTOR: PASS — 53/53 checks' suites.log
+          # The server's own readiness estimate equals the device's on a fixture set, and only the read-only forecast route reaches it.
+          grep -Fq 'FORECAST PARITY: PASS — 63/63 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           # #196: the hostile-PDF bounds of #204 (pre-parser size, canvas allocation, parse/render
           # timeouts with cleanup) had a regression suite that no script or workflow ran.
           grep -Fq 'INK PDF RESOURCE — PASS: pre-parser bytes, raster allocation, timeouts and cleanup bounded' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
-          # 68 → 70 (Train 6, re-derived by a full local shard run on the merged tree); ceilings unchanged.
-          grep -Eq 'INSTALL BUDGET: PASS — 70/70 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
-          grep -Fq 'nothing emitted left uncovered.' suites.log
+          # npm run test:budget measures the one production build: every build
+          # ships the Instrument from client/interface.config.mjs (D7), whose
+          # Map, Report and Scripts tabs are held in the warm pass (#658),
+          # together with every file those tabs import statically; 63 → 65: no
+          # tab carries a stylesheet of its own (they are in the boot one).
+          grep -Eq 'INSTALL BUDGET: PASS — 67/67 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
+          # The V1 interface decisions in source: one interface from one
+          # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
+          # language switch says questions stay in English (D11).
+          # 34 → 39: the Aurora skin is the default on chrome (D7) and the D8
+          # fallback is one line of the setting, covered.
+          grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
+          # The Aurora skin stays on chrome: scope, no content tokens, glass
+          # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
+          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
@@ -377,7 +397,9 @@ jobs:
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
+          grep -Fq 'INSIGHTS VIEW: PASS — 38/38 checks' suites.log
+          grep -Fq 'IOS BUNDLE FLAG POLICY: PASS — 8/8 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 174/174 checks' suites.log
           # The committed certification report describes the content in the tree (version, digest, scope, result).
           grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
@@ -499,6 +521,14 @@ jobs:
           node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/tutor-guard-complexity-check.mjs
+          # Line check / live coach: a final-answer attempt is decided by form alone, never by value (#831).
+          # Each pinned by count, so a loosened probe set cannot pass vacuously.
+          node server/test/tutor-diagnose-check.mjs | tee tutor-diagnose.log
+          grep -Fq 'TUTOR DIAGNOSE: PASS — 152/152 checks' tutor-diagnose.log
+          node server/test/line-check-constant-pin-check.mjs | tee line-check-constant-pin.log
+          grep -Fq 'LINE CHECK CONSTANT PIN: PASS — 191/191 checks' line-check-constant-pin.log
+          node server/test/final-attempt-oracle-sweep-check.mjs | tee final-attempt-sweep.log
+          grep -Fq 'FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes' final-attempt-sweep.log
           node server/test/spend-ceiling-check.mjs
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
@@ -555,10 +585,14 @@ jobs:
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
+          grep -Fq 'READINESS FORECAST: PASS — 29/29 checks' practice-http.log
+          grep -Fq 'MISTAKE DNA: PASS — 16/16 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
@@ -674,6 +708,11 @@ jobs:
           set -o pipefail
           node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
           grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
+      - name: Where the time went on a timed paper — measured per question, Premium on read (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/exam-time-check.mjs 2>&1 | tee exam-time.log
+          grep -Fq 'EXAM TIME: PASS — 23/23 checks' exam-time.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -702,7 +741,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 83/83 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 84/84 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -730,6 +769,8 @@ jobs:
           grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
           # 61 → 62 (L6): typed board mocks on Postgres.
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
+          # 83 → 84 (L6, plan F10): where the time went, on Postgres.
+          grep -Fq '✓ exam-time-check.mjs' platform-postgres.log
           # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
@@ -1064,9 +1105,13 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
-            # v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): builds with the
-            # flag on, so it runs last in this group.
-            node client/test/tour-instrument.js 2>&1 | tee -a browser.log
+            # The Instrument's own shell, Index, command bar and first-offline
+            # tabs (#658). Every build ships it (client/interface.config.mjs),
+            # so it runs on this group's build like the tours above.
+            node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
+            # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
+            node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -1081,6 +1126,7 @@ jobs:
             node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -1145,10 +1191,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
+          # 429 across 12 flows: main's 438/13, less cal-smoke (the v1.0 calibration
+          # flow, retired with that interface), plus the Instrument's phone destinations.
           # tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40).
           # 438 → 440: tour-exam-india checks the marks-lost headline and the Practise links.
           # 440 → 441 (Train 9): #805's tour-ink check that a line without a relation offers no swaps (438 → 439 on its own).
-          grep -Eq 'E2E SUITE.*441/441.*13 flows' browser.log
+          # On this branch: 429 + those 3 = 432 across 12 flows (re-derived by running e2e.mjs on the merged tree).
+          grep -Eq 'E2E SUITE.*432/432.*12 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -1251,6 +1300,8 @@ jobs:
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           # The v1.1 instrument tour ran (Chromium, flag-on build).
           test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
+          # Maths at 200% text ran in both engines (its count follows the sample).
+          test "$(grep -Fc 'Maths at 200% text: superscripted formulas wrap or scroll in their own box, nothing cut' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Chromium's interface-quality tour runs exactly 209 checks. Practice
           # shows a pinned written question (seeded test server), so its
@@ -1303,13 +1354,15 @@ jobs:
         run: npm run check:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
-      - name: Generated iOS bundles are flag-off production builds
+      - name: Generated iOS bundles are flag-off production builds of the one interface
         # The exact count moved here with the suite (it no longer runs in the
         # sharded npm test): a check that silently ran fewer cases fails.
         run: |
           set -euo pipefail
           node client/test/ios-bundle-features-check.mjs | tee ios-bundle-features.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' ios-bundle-features.log
+          # 20 → 24: each bundle also records the one student interface and its
+          # skin from client/interface.config.mjs (V1 decision D7).
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 24/24 checks' ios-bundle-features.log
       - name: Generated iOS bundle pages need no inline script under the shell CSP
         run: node client/test/native-shell-csp-check.mjs --require-generated
       # After the build, so the scan reads the bytes that ship: every tracked
