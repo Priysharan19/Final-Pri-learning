@@ -66,6 +66,14 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-09-07',
     note: 'The authority publishes the questions and the final answer on the same page of this document; both were read from it.'
   }),
+  'jeeadv-2026-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2026 · Paper 2 · question paper with final answers',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    retrieved: '2026-11-09',
+    note: 'The authority prints each question and its final answer on the same page of this document; both were read from it (sha256 1cbf4be256594129810ba247681a4b7a96df7344c428a8194c77684d98094e38 on retrieval).'
+  }),
   'jeeadv-2025-p1-answers': Object.freeze({
     authority: 'Joint Admission Board · JEE (Advanced)',
     title: 'JEE (Advanced) 2025 · Paper 1 · Final Answer Key (question paper with answers)',
@@ -75,6 +83,94 @@ export const PYQ_SOURCES = Object.freeze({
     // cited through the Internet Archive capture that still holds it.
     archivedAt: 'https://web.archive.org/web/20250702013727/https://www.jeeadv.ac.in/documents/p1_solutions_final.pdf',
     retrieved: '2026-09-07'
+  }),
+  'jeeadv-2025-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2025 · Paper 2 · Final Answer Key (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    archivedAt: 'https://web.archive.org/web/20251024035400/https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    retrieved: '2026-11-09',
+    note: 'jeeadv.ac.in now serves the 2026 sitting at that path; the 2025 file was read from the Internet Archive capture (sha256 bdc7e174f608718a8e409e52bdfee43b22b74be8a01b6291761fdc0adf930bac).'
+  }),
+  'jeeadv-2024-p1-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2024 · Paper 1 · question paper with final answer key (English)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper1_English_2024_With_Final_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20240917002941/https://jeeadv.ac.in/documents/Paper1_English_2024_With_Final_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 3bb874b9ed6830388a5067d553c5065ef30aca51634f4092b0465757928c5572); the authority prints each question with its final answer.'
+  }),
+  'jeeadv-2024-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2024 · Paper 2 · question paper with final answer key (English)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper2_English_2024_With_Final_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20240917002948/https://jeeadv.ac.in/documents/Paper2_English_2024_With_Final_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 05159c8d51acbfcb39d46ccb1933a7f3aa1e986c754e90231d3d76431c770767); the authority prints each question with its final answer.'
+  }),
+  'jeeadv-2023-p1-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2023 · Paper 1 · Final Answer Keys (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper1_Final_Answer_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20230620190303/https://jeeadv.ac.in/documents/Paper1_Final_Answer_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 5d27f94c2df2fd00491ba536f47c35bf31ae9b8e95625eda05c5fe9f9f1b82d3); the authority prints each question with its final answer.'
+  }),
+  'jeeadv-2023-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2023 · Paper 2 · Final Answer Keys (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper2_Final_Answer_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20230620151251/https://jeeadv.ac.in/documents/Paper2_Final_Answer_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 3f4261ee5c514046c56b59b6b7c0ee277451d3946be6800b0a1667eb05dfbb21); the authority prints each question with its final answer.'
+  }),
+  'jeeadv-2022-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2022 · Papers 1 and 2 · final answer keys (question papers with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/jeeadv-2022-final-answer-keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20220911075501/https://jeeadv.ac.in/documents/jeeadv-2022-final-answer-keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 c946fea3ed506f78ee6b58ae0a2a6160d1822e710c066cd6507c891b4a0164f5); one document carries both papers, each question printed with its final answer.'
+  }),
+  'jeeadv-2019-p1-questions': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 1 · question paper (English)',
+    kind: 'official-question-paper',
+    url: 'https://jeeadv.ac.in/past_qps/2019_1_English.pdf',
+    retrieved: '2026-11-09',
+    note: 'Scanned page images, read from the rendered page (sha256 c93299dddcdb2f0d90b86888e0143cbdefbbcc5aa48caa66d8568003df499ee5, matching tools/jee-question-department/official-sources.json).'
+  }),
+  'jeeadv-2019-p1-key': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 1 · final answer key',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P1.pdf',
+    archivedAt: 'https://web.archive.org/web/20190713224429/https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P1.pdf',
+    retrieved: '2026-11-09',
+    note: 'sha256 e38a64f8323d1e34d34b17ce78567c9a2c3469231bef41278ba9c71be3a8adb3, matching tools/jee-question-department/official-sources.json.'
+  }),
+  'jeeadv-2019-p2-questions': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 2 · question paper (English)',
+    kind: 'official-question-paper',
+    url: 'https://jeeadv.ac.in/past_qps/2019_2_English.pdf',
+    retrieved: '2026-11-09',
+    note: 'Scanned page images, read from the rendered page (sha256 6082e197772b7b715c1dc7e063e8b3f23797c07f9479f9bd695bd3d31752ae16, matching tools/jee-question-department/official-sources.json).'
+  }),
+  'jeeadv-2019-p2-key': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 2 · final answer key',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P2.pdf',
+    archivedAt: 'https://web.archive.org/web/20190713011044/https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P2.pdf',
+    retrieved: '2026-11-09',
+    note: 'sha256 0868049ac0ee4a8ffdd9566d75620d0cb8d0da4fe172caab84f8734bfcb493fe, matching tools/jee-question-department/official-sources.json.'
   }),
   'cbse-2025-xii-65-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
