@@ -41,7 +41,8 @@ import { readLines, turnOnServerReading } from './fakeServerReader.js';
 import { TEMPLATES } from '../src/ink/templates.js';
 import EN from '../src/i18n/strings.en.js';
 
-const TOPIC = 'y7-equations';
+// Class 7 NCERT numeric equations: D15 refuses NSW y7-equations on India accounts.
+const TOPIC = 'c7-finding-unknown-current';
 const WHOLE = /^\d{1,3}$/;
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
 const PHONE = { width: 390, height: 844 };
@@ -156,7 +157,7 @@ export const flow = {
     // ══ PHONE · a finger, the first read, and "No, I'll type" ═══════════════
     await page.setViewportSize(PHONE);
     await goto('/');
-    await createProfile({ name: 'Anaya Finger', year: 9 });
+    await createProfile({ name: 'Anaya Finger', year: 7 });
     await online.signIn({ name: 'Anaya Finger' });
     await quiet();
     const first = await openFresh();
@@ -308,7 +309,7 @@ export const photoAndOffline = {
     const readsSent = async () => (await online.practiceCalls(READS)).length;
     await page.setViewportSize(PHONE);
     await goto('/');
-    await createProfile({ name: 'Kabir Photo', year: 10 });
+    await createProfile({ name: 'Kabir Photo', year: 7 });
     await online.signIn({ name: 'Kabir Photo' });
     await quiet();
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
