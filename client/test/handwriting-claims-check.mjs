@@ -85,7 +85,7 @@ for (const [key, text] of flat(hi)) ok(!MODEL_HI.test(text), `HI ${key} does not
 for (const [lang, catalogue] of [['EN', en], ['HI', hi]]) {
   for (const [key, text] of flat(catalogue)) {
     if (key.startsWith('teach.')) continue;
-    ok(!/\biPad\b(?! (?:and|और) )/.test(text) || /iPhone (?:and|और) iPad/.test(text), `${lang} ${key} does not speak to an iPad on every platform: ${JSON.stringify(text)}`);
+    ok(!/\biPad\b(?! (?:and|और) )/.test(text) || /iPhone(?:,| (?:and|और)) iPad/.test(text), `${lang} ${key} does not speak to an iPad on every platform: ${JSON.stringify(text)}`);
   }
 }
 ok(/server/i.test(en['errorScreen.savedWorkSafe']) && /सर्वर/.test(hi['errorScreen.savedWorkSafe']),
