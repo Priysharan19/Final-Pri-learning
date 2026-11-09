@@ -27,7 +27,7 @@
 // forms instead of NCERT-numbered items; typesetting defects (double signs,
 // unit coefficients, +0 terms) fixed across 16 generators; past papers behind
 // a default-off switch (content honesty stream, Nov 2026).
-export const CONTENT_VERSION = '2026.11.0';
+export const CONTENT_VERSION = '2026.11.6';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
