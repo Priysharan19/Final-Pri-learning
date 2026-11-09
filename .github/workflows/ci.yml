@@ -269,7 +269,7 @@ jobs:
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 70 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 71 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
@@ -298,6 +298,8 @@ jobs:
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
+          grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
+          grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -490,9 +492,11 @@ jobs:
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
+          grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
@@ -653,7 +657,10 @@ jobs:
           # 61 → 62 (D18): the child-account erasure, as pri_server under RLS.
           grep -Fq '✓ child-erasure-check.mjs' platform-postgres.log
           # 61 → 62 (L6): JEE Advanced's own content and notebook twins under the free day, on Postgres.
+          # 62 → 63 (L6): the mistake notebook on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 63/63 suites' platform-postgres.log
           grep -Fq '✓ premium-practice-content-check.mjs' platform-postgres.log
+          grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

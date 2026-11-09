@@ -39,6 +39,7 @@ const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
+const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
@@ -608,6 +609,7 @@ export default function App() {
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
+                    <Route path="/premium" element={studentOnly(<Paywall />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
