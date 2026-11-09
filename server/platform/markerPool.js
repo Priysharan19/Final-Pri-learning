@@ -32,7 +32,8 @@
 //   • DEADLINE_MS 1500 — one answer plus its working. Ordinary marking takes
 //     single-digit milliseconds. The engine bounds a page of working by size
 //     and by counted work, never by the clock (checker.js WORKING_LIMITS: 200
-//     characters a line, 100 lines, a fixed work budget), so the same page gets
+//     characters a line, 100 lines, a fixed work budget, and expr.js's one evaluation budget, which exact.js's
+//     BigInt steps are also charged to), so the same page gets
 //     the same verdict under any load; honest work within those bounds finishes
 //     with room to spare, and 1.5 s is the longest any one operation can hold
 //     one worker. This deadline is the only clock, and it never yields a verdict.
