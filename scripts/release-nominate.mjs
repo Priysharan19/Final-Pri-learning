@@ -63,13 +63,19 @@
 //     [--repo Priysharan19/Final-Pri-learning]
 //
 // Override record (JSON): { "sha": "<40-hex>", "scope": "public-release" | "internal-test-track",
-//   "waives": ["device-matrix" | "reader-evidence", …], "by": "<named human>", "githubLogin": "<login>",
+//   "waives": ["device-matrix" | "device-matrix:AND" | "device-matrix:ANT" | "reader-evidence", …],
+//   "by": "<named human>", "githubLogin": "<login>",
 //   "approval": "https://github.com/<repo>/issues/<n>#issuecomment-<id>", "at": "<ISO date-time>",
 //   "reason": "<why this release goes without it>" }
 // The JSON file is not the authority; the approval comment is. It must be written by `githubLogin`,
 // an admin of the repository, after the commit, never edited, and contain the exact line
 //   Pri-Evidence-Waiver: <sha> scope=public-release target=deploy/production waives=<sorted,comma list>
 // An `internal-test-track` exception (TestFlight / Play internal) never waives release-stage evidence.
+// `device-matrix:AND` and `device-matrix:ANT` waive one Android family each (owner default D1: iPhone
+// and iPad launch first). A family waiver can never waive an iPhone or iPad case: with family waivers,
+// every case of the IPH and IPD families must still be `pass`. (The whole-matrix `device-matrix`
+// waiver is unchanged: it waives every family, Apple included, as an explicit scope change.) A record
+// waives the whole matrix or named families, never both, and names each requirement once.
 // Evidence class of such an approval: GITHUB-ACCOUNT-AUTHENTICATED. GitHub proves the account, not
 // the person: anything holding that account's token can post as it, so the owner posts it in the
 // GitHub web UI themself, and the dossier never calls it more than that.
@@ -83,6 +89,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, readLedger, summarise } from './device-matrix-record.mjs';
 import { legalPromiseGaps, legalPromiseSettings } from '../tools/legal-promises.mjs';
+import * as deviceMatrix from './device-matrix-record.mjs';
 
 const execFileP = promisify(execFile);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -95,7 +102,16 @@ export const PRODUCTION_ORIGIN = 'https://final-pri-learning-production.up.railw
 /** Where tools/ink-cloud-reader-eval.mjs writes real-human evaluations of the server reader. */
 export const DEFAULT_READER_EVAL_DIR = join(ROOT, 'handwriting', 'v17', 'cloud-reader-eval');
 /** The evidence a release-stage nomination requires; each may be waived only by a recorded override naming it. */
-export const EVIDENCE_REQUIREMENTS = Object.freeze(['device-matrix', 'reader-evidence']);
+export const EVIDENCE_REQUIREMENTS = Object.freeze(['device-matrix', 'device-matrix:AND', 'device-matrix:ANT', 'reader-evidence']);
+/**
+ * Family-scoped device-matrix waivers (owner default D1, V1_DECISIONS_2026-11-01.md: the public
+ * launch is iPhone and iPad first, Android after Google's closed test). Each names one Android
+ * family; no family waiver names an Apple family, so a family waiver can never waive an iPhone or
+ * iPad case. The whole-matrix `device-matrix` waiver is unchanged and still waives every family.
+ */
+export const DEVICE_FAMILY_WAIVERS = Object.freeze({ 'device-matrix:AND': 'AND', 'device-matrix:ANT': 'ANT' });
+/** The families every release must pass case by case when Android is waived by family. */
+export const NEVER_WAIVED_FAMILIES = Object.freeze(['IPH', 'IPD']);
 export const OVERRIDE_SCOPES = Object.freeze(['public-release', 'internal-test-track']);
 export const RELEASE_TARGET = 'deploy/production';
 export const APPROVAL_EVIDENCE_CLASS = 'GITHUB-ACCOUNT-AUTHENTICATED';
@@ -281,20 +297,53 @@ export function promotionCommands(sha, { productionOrigin = PRODUCTION_ORIGIN, e
  * and only an authenticated public-release waiver (a founder-approved platform scope change) can
  * release without it, visibly.
  */
-export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER } = {}) {
-  const summary = summarise(readLedger(ledger), { sha });
+/** The store builds whose rows certify a release: #737 runs the full matrix on the signed store build against staging (docs/release/device-matrix.md). */
+export const RELEASE_STORE_BUILD_KINDS = Object.freeze([...(deviceMatrix.STORE_BUILD_KINDS ?? ['testflight', 'play-internal', 'play-closed'])]);
+/**
+ * The ledger rows release-stage evidence counts. A row that carries a build kind counts only when it
+ * is a store build against staging: a development build never stands in for the store build, and the
+ * production short list comes after the promotion. Rows from a recorder without build kinds (before
+ * #737) count as they always have.
+ */
+export function releaseDeviceRows(records) {
+  return records.filter(row => row?.parseError || !row || !Object.hasOwn(row, 'buildKind') || (RELEASE_STORE_BUILD_KINDS.includes(row.buildKind) && row.server === 'staging'));
+}
+
+export function deviceEvidence(sha, { ledger = DEFAULT_LEDGER, waivedFamilies = [] } = {}) {
+  const waived = [...new Set(waivedFamilies)];
+  for (const family of waived) {
+    if (!Object.values(DEVICE_FAMILY_WAIVERS).includes(family)) throw new Error(`device family ${family} cannot be waived; only ${Object.values(DEVICE_FAMILY_WAIVERS).join(' and ')} can, never ${NEVER_WAIVED_FAMILIES.join(' or ')}`);
+  }
+  const all = readLedger(ledger);
+  const counted = releaseDeviceRows(all);
+  const uncounted = all.filter(row => !counted.includes(row) && String(row?.sha || '').toLowerCase() === String(sha).toLowerCase()).length;
+  const summary = summarise(counted, { sha });
   const { counts, rows } = summary;
+  const scope = uncounted ? ` · ${uncounted} development or production row(s) not counted: the release counts store-build rows against staging` : '';
   const families = new Map();
   for (const row of rows) {
-    const family = families.get(row.family) || { family: row.family, label: row.familyLabel, pass: 0, other: 0 };
+    const family = families.get(row.family) || { family: row.family, label: row.familyLabel, pass: 0, other: 0, total: 0 };
     if (row.latest?.result === 'pass') family.pass += 1; else family.other += 1;
+    family.total += 1;
     families.set(row.family, family);
   }
   const incompleteFamilies = [...families.values()].filter(f => f.other > 0).map(f => f.family);
-  const ok = rows.length > 0 && counts.pass === rows.length;
+  if (!waived.length) {
+    const ok = rows.length > 0 && counts.pass === rows.length;
+    const detail = `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}`
+      + (ok ? ' · device-complete' : ` · not device-complete: ${incompleteFamilies.join(', ')} not all pass${counts.blocked ? ' (blocked is recorded, never acceptance)' : ''}`) + scope;
+    return { ok, counts, total: rows.length, summary, incompleteFamilies, waivedFamilies: [], detail };
+  }
+  // Family-scoped: every case of every family NOT waived must pass, and the families that can
+  // never be waived must be present (a matrix without iPhone or iPad cases proves nothing).
+  const required = rows.filter(row => !waived.includes(row.family));
+  const requiredIncomplete = incompleteFamilies.filter(family => !waived.includes(family));
+  const ok = NEVER_WAIVED_FAMILIES.every(family => families.has(family)) && required.length > 0 && requiredIncomplete.length === 0;
+  const familyState = family => { const f = families.get(family); return f ? `${family} pass ${f.pass} of ${f.total}` : `${family} has no cases`; };
   const detail = `pass ${counts.pass} · fail ${counts.fail} · blocked ${counts.blocked} · not run ${counts['not run']} of ${rows.length}`
-    + (ok ? ' · device-complete' : ` · not device-complete: ${incompleteFamilies.join(', ')} not all pass${counts.blocked ? ' (blocked is recorded, never acceptance)' : ''}`);
-  return { ok, counts, total: rows.length, summary, incompleteFamilies, detail };
+    + (ok ? ` · every case passes in ${[...families.keys()].filter(family => !waived.includes(family)).join(', ')}` : ` · not complete in families that are not waived: ${requiredIncomplete.length ? requiredIncomplete.join(', ') + ' not all pass' : NEVER_WAIVED_FAMILIES.filter(family => !families.has(family)).join(', ') + ' missing'}`)
+    + ` · waived by family: ${waived.map(familyState).join(', ')}` + scope;
+  return { ok, counts, total: rows.length, summary, incompleteFamilies, waivedFamilies: waived, detail };
 }
 
 /**
@@ -412,7 +461,13 @@ export function loadOverride(path, sha) {
     if (!APPROVAL_URL.test(approval)) problems.push('override needs "approval": the link to the approving GitHub comment (…/issues/<n>#issuecomment-<id>)');
     if (String(record.sha || '').toLowerCase() !== sha) problems.push(`override names sha ${record.sha || '(none)'}, not the nominated ${sha}`);
     if (!waives.length) problems.push('override waives nothing (waives: [])');
-    for (const item of waives) if (!EVIDENCE_REQUIREMENTS.includes(item)) problems.push(`unknown evidence requirement ${JSON.stringify(item)}; known: ${EVIDENCE_REQUIREMENTS.join(', ')}`);
+    for (const item of waives) {
+      if (/^device-matrix:/i.test(item) && !DEVICE_FAMILY_WAIVERS[item] && NEVER_WAIVED_FAMILIES.some(family => item.toUpperCase().endsWith(`:${family}`))) {
+        problems.push(`${JSON.stringify(item)}: no family waiver covers an iPhone or iPad case; D1 launches on them, so with family waivers every Apple case must pass`);
+      } else if (!EVIDENCE_REQUIREMENTS.includes(item)) problems.push(`unknown evidence requirement ${JSON.stringify(item)}; known: ${EVIDENCE_REQUIREMENTS.join(', ')}`);
+    }
+    if (waives.includes('device-matrix') && waives.some(item => DEVICE_FAMILY_WAIVERS[item])) problems.push('waive the whole device matrix or named Android families, not both');
+    if (new Set(waives).size !== waives.length) problems.push('waives names a requirement more than once');
     if (!by) problems.push('override needs "by": the named human who accepts the release without this evidence');
     else if (NOT_A_HUMAN.test(by)) problems.push(`"by" ${JSON.stringify(by)} does not name a human (the word ${JSON.stringify(by.match(NOT_A_HUMAN)[0])} marks an agent, CI or placeholder)`);
     if (!Number.isFinite(Date.parse(at))) problems.push('override needs "at": an ISO date-time');
@@ -691,7 +746,31 @@ export async function nominate({
       }
       check(false, label, `${evidence.detail}; ${requirement === 'device-matrix' ? 'record every case as pass with scripts/device-matrix-record.mjs (blocked rows are recorded, never acceptance)' : 'measure the cloud reader in the Release Candidate run of this SHA (measure_cloud_reader) and use its artifact'}, or waive it by name in an --override record`);
     };
-    requirementRow('device-matrix', 'device matrix complete for this SHA (every case pass on real hardware)', deviceEvidence(expected, { ledger: deviceLedger }));
+    const deviceLabel = 'device matrix complete for this SHA (every case pass on real hardware)';
+    const fullDevice = deviceEvidence(expected, { ledger: deviceLedger });
+    const familyWaivers = overrideUsable ? override.waives.filter(item => DEVICE_FAMILY_WAIVERS[item]) : [];
+    if (fullDevice.ok || !familyWaivers.length) {
+      requirementRow('device-matrix', deviceLabel, fullDevice);
+      if (fullDevice.ok && familyWaivers.length) info('device matrix family waivers not needed', `every case passes; ${familyWaivers.join(', ')} waive nothing here`);
+    } else {
+      // D1: Android families waived by name. The Apple families are still required, case by case.
+      const scoped = deviceEvidence(expected, { ledger: deviceLedger, waivedFamilies: familyWaivers.map(item => DEVICE_FAMILY_WAIVERS[item]) });
+      if (!check(scoped.ok, 'device matrix complete for this SHA on every family not waived (every iPhone and iPad case pass on real hardware)',
+        scoped.ok ? scoped.detail : `${scoped.detail}; a family waiver (${familyWaivers.join(', ')}) never waives an iPhone or iPad case: record every Apple case as pass with scripts/device-matrix-record.mjs`)) {
+        // nothing is waived when the Apple families are not complete
+      } else {
+        for (const requirement of familyWaivers) {
+          const family = DEVICE_FAMILY_WAIVERS[requirement];
+          const rows = fullDevice.summary.rows.filter(row => row.family === family);
+          const tally = { pass: 0, fail: 0, blocked: 0, 'not run': 0 };
+          for (const row of rows) tally[row.latest ? row.latest.result : 'not run'] += 1;
+          if (tally.pass === rows.length) { info(`device matrix family ${family}: every case passes`, `${requirement} waives nothing`); continue; }
+          const state = `${family}: pass ${tally.pass} · fail ${tally.fail} · blocked ${tally.blocked} · not run ${tally['not run']} of ${rows.length}`;
+          overrides.push({ requirement, by: override.by, githubLogin: override.verified.login, approval: override.verified.url, approvedAt: new Date(override.verified.createdAt).toISOString(), evidenceClass: APPROVAL_EVIDENCE_CLASS, at: override.at, reason: override.reason, path: override.path, state });
+          info(`device matrix family ${family} — WAIVED by recorded override`, `${state}; by ${override.by} (${override.verified.login}, ${override.verified.url}) at ${override.at}: ${override.reason}`);
+        }
+      }
+    }
     requirementRow('reader-evidence', 'real-human reader evaluation recorded for this SHA', boundReader(readerEvidence(expected, { dir: readerEvalDir })));
   }
 
