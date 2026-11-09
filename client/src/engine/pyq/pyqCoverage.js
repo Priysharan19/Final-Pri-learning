@@ -48,23 +48,25 @@ export const PYQ_COVERAGE = Object.freeze({
   'pyq-cbse-c12-matrices': Object.freeze({ track: 'cbse', chapterId: 'c12-matrices', exams: Object.freeze(['cbse-class-12']), difficulties: Object.freeze([2]), years: Object.freeze([2025]), records: 3 }),
   'pyq-cbse-c12-probability': Object.freeze({ track: 'cbse', chapterId: 'c12-probability', exams: Object.freeze(['cbse-class-12']), difficulties: Object.freeze([2]), years: Object.freeze([2025]), records: 1 }),
   'pyq-cbse-c12-vector-algebra': Object.freeze({ track: 'cbse', chapterId: 'c12-vector-algebra', exams: Object.freeze(['cbse-class-12']), difficulties: Object.freeze([2]), years: Object.freeze([2025]), records: 2 }),
-  'pyq-jee-advanced-c11-conic-sections': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-conic-sections', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2026]), records: 4 }),
-  'pyq-jee-advanced-c11-limits-derivatives': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-limits-derivatives', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025]), records: 1 }),
+  'pyq-jee-advanced-c11-binomial-theorem': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-binomial-theorem', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3]), years: Object.freeze([2025]), records: 1 }),
+  'pyq-jee-advanced-c11-complex-numbers': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-complex-numbers', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3]), years: Object.freeze([2025]), records: 1 }),
+  'pyq-jee-advanced-c11-conic-sections': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-conic-sections', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 5 }),
+  'pyq-jee-advanced-c11-limits-derivatives': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-limits-derivatives', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025]), records: 2 }),
   'pyq-jee-advanced-c11-permutations-combinations': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-permutations-combinations', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025, 2026]), records: 2 }),
   'pyq-jee-advanced-c11-relations-functions': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-relations-functions', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025]), records: 1 }),
   'pyq-jee-advanced-c11-sequences-series': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-sequences-series', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025]), records: 1 }),
-  'pyq-jee-advanced-c11-statistics': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-statistics', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
-  'pyq-jee-advanced-c11-trig-functions': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-trig-functions', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2026]), records: 2 }),
-  'pyq-jee-advanced-c12-applications-derivatives': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-applications-derivatives', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2026]), records: 1 }),
-  'pyq-jee-advanced-c12-applications-integrals': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-applications-integrals', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2026]), records: 2 }),
-  'pyq-jee-advanced-c12-continuity-differentiability': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-continuity-differentiability', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2026]), records: 2 }),
-  'pyq-jee-advanced-c12-differential-equations': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-differential-equations', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025, 2026]), records: 2 }),
-  'pyq-jee-advanced-c12-integrals': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-integrals', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
-  'pyq-jee-advanced-c12-inverse-trigonometric': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-inverse-trigonometric', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-advanced-c11-statistics': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-statistics', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3]), years: Object.freeze([2025, 2026]), records: 2 }),
+  'pyq-jee-advanced-c11-trig-functions': Object.freeze({ track: 'jee-advanced', chapterId: 'c11-trig-functions', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 3 }),
+  'pyq-jee-advanced-c12-applications-derivatives': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-applications-derivatives', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025, 2026]), records: 2 }),
+  'pyq-jee-advanced-c12-applications-integrals': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-applications-integrals', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 3 }),
+  'pyq-jee-advanced-c12-continuity-differentiability': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-continuity-differentiability', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 4 }),
+  'pyq-jee-advanced-c12-differential-equations': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-differential-equations', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 3 }),
+  'pyq-jee-advanced-c12-integrals': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-integrals', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 2 }),
+  'pyq-jee-advanced-c12-inverse-trigonometric': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-inverse-trigonometric', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([4]), years: Object.freeze([2025, 2026]), records: 2 }),
   'pyq-jee-advanced-c12-matrices': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-matrices', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 2 }),
-  'pyq-jee-advanced-c12-probability': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-probability', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 2 }),
+  'pyq-jee-advanced-c12-probability': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-probability', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([2, 3, 4]), years: Object.freeze([2025, 2026]), records: 3 }),
   'pyq-jee-advanced-c12-relations-functions': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-relations-functions', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 3 }),
-  'pyq-jee-advanced-c12-vector-algebra': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-vector-algebra', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 2 })
+  'pyq-jee-advanced-c12-vector-algebra': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-vector-algebra', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2025, 2026]), records: 4 })
 });
 
 /**
@@ -76,9 +78,10 @@ export const PYQ_MANIFEST = Object.freeze({
   records: Object.values(PYQ_COVERAGE).reduce((n, row) => n + row.records, 0),
   generators: Object.keys(PYQ_COVERAGE).length,
   papers: Object.freeze([
+    Object.freeze({ exam: 'jee-advanced', year: 2025, paper: '2', section: 'Mathematics', records: 12 }),
     Object.freeze({ exam: 'jee-advanced', year: 2026, paper: '2', section: 'Mathematics', records: 13 }),
     Object.freeze({ exam: 'jee-advanced', year: 2026, paper: '1', section: 'Mathematics', records: 8 }),
-    Object.freeze({ exam: 'jee-advanced', year: 2025, paper: '1', section: 'Mathematics', records: 9 }),
+    Object.freeze({ exam: 'jee-advanced', year: 2025, paper: '1', section: 'Mathematics', records: 13 }),
     Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/1/1', section: 'Section A', records: 16 }),
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/1/1', section: 'Section A', records: 12 })
   ])

@@ -84,6 +84,15 @@ export const PYQ_SOURCES = Object.freeze({
     archivedAt: 'https://web.archive.org/web/20250702013727/https://www.jeeadv.ac.in/documents/p1_solutions_final.pdf',
     retrieved: '2026-09-07'
   }),
+  'jeeadv-2025-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2025 · Paper 2 · Final Answer Key (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    archivedAt: 'https://web.archive.org/web/20251024035400/https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    retrieved: '2026-11-09',
+    note: 'jeeadv.ac.in now serves the 2026 sitting at that path; the 2025 file was read from the Internet Archive capture (sha256 bdc7e174f608718a8e409e52bdfee43b22b74be8a01b6291761fdc0adf930bac).'
+  }),
   'cbse-2025-xii-65-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
     title: 'CBSE Senior School Certificate Examination 2025 · Mathematics (041) · question paper 65/1/1',
