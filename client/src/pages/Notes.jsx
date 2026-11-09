@@ -404,6 +404,7 @@ function snippetFor(notes, terms) {
 // ── One chapter ──────────────────────────────────────────────────────────────
 function ChapterNotes({ chapterId }) {
   const t = useT();
+  const { user } = useApp() || {};
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
   const grade = gradeOfChapter(chapterId);
