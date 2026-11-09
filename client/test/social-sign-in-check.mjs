@@ -154,6 +154,31 @@ const stateOf = url => new URL(url).searchParams.get('state');
   await rejectsWith('Cancel ends the wait', () => pending, 'SOCIAL_CANCELLED');
   ok('and closes the popup', b.popup.closed);
 }
+// Cancelling *before* the nonce arrives closes the window immediately and
+// forbids late navigation to a provider. This is a real race on slow networks.
+{
+  const originalFetch = globalThis.fetch;
+  let deliverNonce = null;
+  try {
+    globalThis.fetch = (url, options) => {
+      if (new URL(url).pathname === '/v1/account/identity/nonce') {
+        return new Promise(resolve => { deliverNonce = resolve; });
+      }
+      return originalFetch(url, options);
+    };
+    const controller = new AbortController();
+    const b = fakeBrowser();
+    const pending = requestIdentityToken('google', { clientId: 'pri-web.apps.googleusercontent.com' },
+      { env: b.env, signal: controller.signal });
+    await settle();
+    ok('delayed nonce request started', typeof deliverNonce === 'function');
+    controller.abort();
+    ok('Cancel closes popup synchronously during nonce wait', b.popup.closed);
+    deliverNonce(json({ nonce: 'late-nonce', expiresAt: Date.now() + 600000 }, 201));
+    await rejectsWith('late nonce is still cancelled', () => pending, 'SOCIAL_CANCELLED');
+    ok('late nonce cannot navigate cancelled popup', !b.events.some(event => event[0] === 'navigate'));
+  } finally { globalThis.fetch = originalFetch; }
+}
 {
   const b = fakeBrowser();
   await rejectsWith('a popup that never answers times out', () => requestIdentityToken('google', { clientId: 'pri-web.apps.googleusercontent.com' }, { env: b.env, timeoutMs: 20 }), 'SOCIAL_TIMEOUT');
