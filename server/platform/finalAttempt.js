@@ -29,7 +29,7 @@
 // FAIL CLOSED: a line (or the answer) the engine cannot read is an attempt.
 // Pure: plain data in, plain data out; it runs in the marker pool.
 // ─────────────────────────────────────────────────────────────────────────────
-import { parse, normalize, variablesOf } from '../../client/src/engine/expr.js';
+import { evaluate, parse, normalize, variablesOf } from '../../client/src/engine/expr.js';
 import { parseRelation } from '../../client/src/engine/reason-v2.js';
 import { WORKING_LIMITS } from '../../client/src/engine/checker.js';
 
@@ -112,13 +112,79 @@ export function answerForm({ answerText = '', variable = null, prefix = '' } = {
     // A bare value under an asked unknown ("11" for "t =") is the claim "t = 11".
     if (c.shape === 'expr') for (const u of unknowns) forms.push({ shape: 'eq', symbols: new Set([...c.symbols, u]) });
   }
-  return { forms, unknowns };
+  const valueSymbols = answerValueSymbols(answerText, unknowns);
+  if (!valueSymbols) return null;
+  return { forms, unknowns, valueSymbols };
+}
+
+function readTree(text) {
+  try { return parse(normalize(clean(text))); } catch { return null; }
+}
+
+// ── Value-side form (review of #780) ─────────────────────────────────────────
+// A side's EFFECTIVE symbols: the letters its value actually depends on, read
+// case-insensitively, with cancelling terms ("z - z") simplified away by
+// probing the engine's evaluator at fixed points. Never compares a value with
+// the answer's — only which letters a side depends on. Unreadable → null.
+const PROBES = [[0.37, 1.91], [1.53, -0.71], [-1.29, 2.47]];
+export function effectiveSymbols(node) {
+  const names = vars(node);
+  const env = (shift = null) => Object.fromEntries(names.map((n, i) => [n, PROBES[i % 3][0] + i * 0.113 + (shift === n ? 0.731 : 0)]));
+  try {
+    const base = evaluate(node, env());
+    if (!Number.isFinite(base)) return null;
+    const out = new Set();
+    for (const n of names) {
+      const moved = evaluate(node, env(n));
+      if (!Number.isFinite(moved)) return null;
+      if (Math.abs(moved - base) > 1e-9 * Math.max(1, Math.abs(base))) out.add(n.toLowerCase());
+    }
+    return out;
+  } catch { return null; }
+}
+
+/**
+ * The answer's VALUE sides: for an equation or inequality, every side that is
+ * not a lone asked unknown; for a bare expression, the expression. Their
+ * effective symbol sets, case-folded. null when any cannot be read.
+ */
+function answerValueSymbols(answerText, unknowns) {
+  const out = [];
+  for (const p of parts(clean(answerText))) {
+    const src = clean(p);
+    let rel = null;
+    let ast;
+    try { rel = parseRelation(src); ast = rel && INEQUALITY.has(rel.op) ? null : parse(normalize(src)); } catch { return null; }
+    const sides = rel && INEQUALITY.has(rel.op) ? [rel.l, rel.r] : ast?.t === 'equation' ? [ast.l, ast.r] : [ast];
+    const value = sides.length === 1 ? sides : sides.filter(s => !(lone(s) && unknowns.has(lone(s))));
+    for (const s of (value.length ? value : sides)) {
+      const eff = effectiveSymbols(s);
+      if (!eff) return null;
+      out.push(eff);
+    }
+  }
+  // A purely numeric value side ("11") is left to the PIN rule: matching it here
+  // would also stop every arithmetic working line ("7 + 4 = 11") from being judged.
+  return out.filter(s => s.size > 0);
 }
 
 /** Is this one claim a final-answer attempt, by form alone? Unreadable → yes. */
 function claimIsAttempt(text, form) {
   const c = readClaimForm(text);
   if (!c) return true;
+  // VALUE SIDE: any side of the line (or the line itself) that depends on
+  // exactly the letters the answer's value side depends on — case-folded,
+  // cancelling terms removed — is the answer's expression in another dress:
+  // "Y = 2x+1", "y+z-z = 2x+1", "f(x) = 2x+1", "(x+1)^2 = x^2+2x+1".
+  if (form.valueSymbols) {
+    const sides = c.sides || [readTree(text)];
+    for (const s of sides) {
+      if (!s) return true;
+      const eff = effectiveSymbols(s);
+      if (!eff) return true;
+      if (form.valueSymbols.some(v => sameSet(v, eff))) return true;
+    }
+  }
   if (form.forms.some(f => f.shape === c.shape && sameSet(f.symbols, c.symbols))) return true;
   if (!form.unknowns.size) return false;
   const freeOfUnknowns = node => !vars(node).some(v => form.unknowns.has(v));

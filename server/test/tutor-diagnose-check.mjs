@@ -375,6 +375,16 @@ try {
     eq([firstFinalAttempt(['m = 2', 'c = 1'], yForm), firstFinalAttempt(['y - 1 = 2x'], yForm), firstFinalAttempt(['@@'], yForm)], [-1, 0, 0],
       'gradient and intercept are judged; any relation of x and y is an attempt; unreadable fails closed');
     eq(firstFinalAttempt(['m = 2'], answerForm({ answerText: '@@' })), 0, 'an answer the engine cannot read makes every line an attempt');
+    // Re-review of #780: the answer's expression in another dress is an attempt, right or wrong.
+    for (const [right, wrong, why] of [
+      ['Y = 2x+1', 'Y = 3x+1', 'a case change'],
+      ['y+z-z = 2x+1', 'y+z-z = 3x+1', 'cancelling symbols'],
+      ['f(x) = 2x+1', 'f(x) = 3x+1', 'a function-of-the-unknown left side'],
+      ['y = 2x+1+z-z', 'y = 3x+1+z-z', 'cancelling symbols on the value side']
+    ]) eq([firstFinalAttempt([right], yForm), firstFinalAttempt([wrong], yForm)], [0, 0], `${why}: "${right}" and "${wrong}" are both attempts`);
+    const expandForm = answerForm({ answerText: 'x^2+2x+1' });
+    eq([firstFinalAttempt(['(x+1)^2 = x^2+2x+1'], expandForm), firstFinalAttempt(['(x+1)^2 = x^2+3x+1'], expandForm)], [0, 0],
+      'an expand question: "(x+1)^2 = x^2+2x+1" and a wrong expansion are both attempts');
     const plan = { prompt: 'p', stepcheck: { kind: 'plan', stages: [{ kind: 'x' }, { kind: 'y' }] } };
     ok(lineCheckEvidence(plan, ['zz'], '').attemptAt === 0, 'unreadable answer form on a plan question fails closed');
     const QID2 = '22222222-2222-4222-8222-222222222222';
