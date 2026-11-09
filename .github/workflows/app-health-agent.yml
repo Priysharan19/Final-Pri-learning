@@ -98,8 +98,13 @@ jobs:
   native:
     name: Native iPad shell health
     if: github.event_name != 'pull_request'
-    runs-on: macos-15
+    # Pinned like native-ink.yml: the hosted macos-26 image, Xcode 26.6, the
+    # iOS 26.5 simulator runtime. The harness refuses to run unpinned on CI.
+    runs-on: macos-26
     timeout-minutes: 35
+    env:
+      PRI_SIM_RUNTIME: '26.5'
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     outputs:
       blocking: ${{ steps.health.outputs.blocking }}
       verdict: ${{ steps.health.outputs.verdict }}

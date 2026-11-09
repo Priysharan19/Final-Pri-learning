@@ -16,6 +16,7 @@ import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
+import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home and Practice are the screens a first run reaches: the profile
@@ -689,6 +690,8 @@ export default function App() {
           </div>
         </>
       )}
+      {/* D17: asks once, before the first handwriting or photo read. */}
+      <ReaderPermissionHost />
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>
   );

@@ -187,8 +187,11 @@ jobs:
           release = Path('tools/ink-foundation/evaluate_release.py').read_text()
           export = Path('tools/ink-foundation/export_coreml.py').read_text()
           bootstrap = Path('tools/ink-foundation/bootstrap.py').read_text()
-          runtime = Path('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
-          legacy_runtime = Path('ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift').read_text()
+          # D16 (V1_DECISIONS_2026-11-01.md): the on-device reader left the
+          # shipping target. The training tooling is kept; what the app ships
+          # is pinned the other way round — no package carries the runtime.
+          shipped_runtime = [p for p in ('ios/PriLearning.swiftpm/Ink/InkFoundationRuntime.swift',
+                                         'ios/PriLearning 2.swiftpm/Ink/InkFoundationRuntime.swift') if Path(p).exists()]
           low_bootstrap = bootstrap.lower()
           replay_boundary = (
               'personal synthetic replay' in low_bootstrap and
@@ -203,8 +206,7 @@ jobs:
               'production export requires finetune stage': 'ckpt.get("stage") != "finetune"' in export,
               'export writes promotion metadata': 'pri.productionReady' in export,
               'export identifies V3': 'ink-foundation-v3' in export and 'pri.architectureVersion' in export,
-              'runtime requires promoted V3 in release': 'ink-foundation-v3' in runtime and 'pri.architectureVersion' in runtime and 'pri.productionReady' in runtime,
-              'canonical and legacy runtime stay identical': runtime == legacy_runtime,
+              'no shipped package carries the on-device foundation runtime (D16)': not shipped_runtime,
               'bootstrap labels itself development only': 'releaseEligible' in bootstrap and 'NOT generalisation evidence' in bootstrap,
               'bootstrap checkpoint stage is distinct': '"stage": "bootstrap"' in bootstrap,
               'personal replay exists but is excluded from real evidence': replay_boundary,

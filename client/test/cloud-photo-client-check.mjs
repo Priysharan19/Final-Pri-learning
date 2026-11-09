@@ -11,6 +11,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { MAX_PHOTO_BYTES, dataUrlBytes, isSupportedPhoto, photoDimensions, preparePhoto } from '../src/ink/photoRaster.js';
 import { cloudReadingWanted, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../src/ink/cloudReader.js';
+import { setReaderPermissionPrompt } from '../src/ink/readerPermission.js';
+// D17: every read below is of a student who accepted the one-time prompt naming
+// OpenAI. The prompt itself, and that nothing is sent without it, is
+// client/test/ink-reader-permission-check.mjs.
+setReaderPermissionPrompt(async () => 'accepted');
 
 let pass = 0;
 const failures = [];
