@@ -111,7 +111,8 @@ export const SYSTEM_INSTRUCTIONS = [
   'Write `text` as plain linear mathematics a parser can read: use <= >= != for the relations, / for division, ^ for powers, and ordinary commas between listed values. Write ordinary English words as words.',
   'Write `latex` as a faithful display-only transcription of the same line; when the line has nothing display-worthy, set `latex` to an empty string.',
   '`confidence` is how certain you are that the transcription matches the marks on the page, not whether the mathematics is correct.',
-  'Read every relation sign from its strokes. A "greater than" with a bar under it, even a short, slanted or detached bar, is >= ; without a bar it is > . The same for <= and < . A double-shafted arrow is => , a single arrow is -> , and neither is an equals sign. Tell a minus sign from a dash, a hyphen and a fraction bar; a raised digit (a power) from a digit on the line; and round brackets from set braces and square brackets.',
+  'Read every relation sign from its strokes. A "greater than" with a bar under it, even a short, slanted, doubled or detached bar, is >= ; without a bar it is > . The same for <= and < . Handwritten >= is often drawn like ≥, ⩾ or a ≽-like shape; all of these are >= . != is an equals sign with a single slash drawn through both of its bars; an opening angle (> or <) with a bar beneath it is never != , so when the strokes show an angle that opens with a bar beneath, prefer >= or <= . ',
+  'Write the "therefore" and "because" marks as the symbols ∴ and ∵ at the start of the line, never as the words or as LaTeX commands in `text`. A double-shafted arrow is => , a single arrow is -> , and neither is an equals sign. Tell a minus sign from a dash, a hyphen and a fraction bar; a raised digit (a power) from a digit on the line; and round brackets from set braces and square brackets.',
   'Handwritten letters and digits that look alike (x and n, u and v, z and 2, l and 1, O and 0, s and 5, b and 6, q and 9, t and +) are decided from the strokes on the page, and the same handwritten shape is transcribed the same way every time it recurs. A cursive x drawn as two curves back to back is easily mistaken for n, and the reverse: when a letter could be either, that is a doubt to report, not to settle.',
   'Never choose a symbol because it would make the mathematics true or tidy. You do not know the question, and a student may have written something false.',
   'When you cannot tell which of two symbols was written, do not settle it silently: write the more likely one, set `uncertain` to true for that line, and name both readings in `doubt` as "A or B" (for example ">= or >", "x or n", "- or ="). Otherwise set `uncertain` to false and `doubt` to an empty string.',
@@ -322,11 +323,32 @@ export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   return { mime: `image/${match[1]}`, bytes };
 }
 
+// The reader sometimes spells the "therefore" / "because" marks as a word or
+// as a LaTeX command ("therefore -6", "\\therefore -6") instead of the symbol
+// the student drew. Left as a word, the line renders as italic prose and a
+// parser can read "therefore - 6" as a subtraction. Only a leading mark is
+// rewritten, to the symbol itself; nothing after it is touched, so this is a
+// change of spelling, never a re-reading of the student's mathematics.
+const LEAD_CONNECTIVES = Object.freeze([
+  [/^(?:\\therefore\b|therefore\b|\u2234)\s*/iu, '\u2234'],
+  [/^(?:\\because\b|because\b|\u2235)\s*/iu, '\u2235']
+]);
+export function normalizeLeadConnective(text) {
+  const value = String(text ?? '');
+  for (const [pattern, symbol] of LEAD_CONNECTIVES) {
+    const match = value.match(pattern);
+    if (!match) continue;
+    const rest = value.slice(match[0].length);
+    return rest ? `${symbol} ${rest}` : symbol;
+  }
+  return value;
+}
+
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
     .map(line => ({
-      text: String(line?.text ?? '').slice(0, 400).trim(),
+      text: normalizeLeadConnective(String(line?.text ?? '').slice(0, 400).trim()),
       latex: line?.latex ? String(line.latex).slice(0, 600).trim() : null,
       confidence: Number.isFinite(Number(line?.confidence))
         ? Math.min(1, Math.max(0, Number(line.confidence)))
