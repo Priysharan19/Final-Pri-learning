@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { markGraphSketch, readFeatureSet } from '../../client/src/engine/graphFeatures.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -118,6 +119,18 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
       partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
       outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'graph-sketch') {
+    // Each assessed feature earns its scheme marks; review features earn nothing until a person marks them.
+    const g = q.answer?.graph, set = readFeatureSet(given);
+    let r = null;
+    if (set && g?.spec && g?.scheme) { try { r = markGraphSketch(g.spec, set, g.scheme, g.tol); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This sketch could not be read.' : r.needsReview ? 'Part of this sketch needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the features that match.' } : null, features: r?.features || null,
+      needsReview: !!r?.needsReview, markingScheme: 'graph-features', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
