@@ -251,6 +251,13 @@ export async function confirmConsent(db, accountId, noticeVersion, now = Date.no
     WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL
       AND EXISTS (SELECT 1 FROM accounts WHERE accounts.id = guardian_consents.account_id AND accounts.deleted_at IS NULL)`,
   [now, noticeVersion, accountId])).changes;
+  // The fact that a guardian confirmed outlives the row's confirmed_at, which
+  // a renewal request clears: childErasure.js never treats an account a
+  // guardian once confirmed as "never confirmed" (review of #736, P1).
+  if (changed > 0) {
+    await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
+      [null, 'guardian.confirm', 'account', accountId, JSON.stringify({ noticeVersion }), now]);
+  }
   return changed > 0;
 }
 

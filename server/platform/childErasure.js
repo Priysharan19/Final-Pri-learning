@@ -82,7 +82,8 @@ const CANDIDATES_SQL = `SELECT a.id AS account_id,
   WHERE a.deleted_at IS NULL AND a.age_basis = 'child' AND a.role = 'student'
     AND (
       (g.withdrawn_at IS NOT NULL AND g.withdrawn_at <= ?)
-      OR (g.withdrawn_at IS NULL AND g.confirmed_at IS NULL AND a.created_at <= ?)
+      OR (g.withdrawn_at IS NULL AND g.confirmed_at IS NULL AND a.created_at <= ?
+        AND NOT EXISTS (SELECT 1 FROM audit_log l WHERE l.action = 'guardian.confirm' AND l.target_kind = 'account' AND l.target_id = a.id))
     )
   ORDER BY a.created_at, a.id
   LIMIT ?`;
@@ -108,6 +109,11 @@ async function retentionReason(db, account, now) {
   // Any recorded confirmation, current or for an older notice, means a
   // guardian did confirm: never "never confirmed".
   if (state.row?.confirmed_at != null) return null;
+  // A renewal request clears confirmed_at; the confirmation itself is kept in
+  // the audit trail, and an account a guardian once confirmed is never
+  // "never confirmed".
+  const confirmedOnce = await db.get("SELECT 1 AS yes FROM audit_log WHERE action = 'guardian.confirm' AND target_kind = 'account' AND target_id = ? LIMIT 1", [account.id]);
+  if (confirmedOnce) return null;
   return Number(account.created_at) <= cutoff ? ERASURE_REASONS.neverConfirmed : null;
 }
 

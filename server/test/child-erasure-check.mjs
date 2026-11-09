@@ -258,38 +258,57 @@ try {
 
   // ── 6 · a guardian asks, without the child's login ─────────────────────────
   const asked = await registerChild('asked');
-  const askToken = await bearer(asked.id, 'guardian-consent');
+  const askConsent = await bearer(asked.id, 'guardian-consent');
   let r = await post('/v1/account/guardian/erase', { token: 'not-a-real-token' });
   c.deq({ status: r.status, code: r.data?.error?.code }, { status: 400, code: 'TOKEN_INVALID' }, 'an invalid link is refused');
-  c.eq((await account(asked.id)).deleted_at, null, 'and changes nothing');
+  r = await post('/v1/account/guardian/erase', { token: askConsent });
+  c.deq({ status: r.status, code: r.data?.error?.code }, { status: 400, code: 'TOKEN_INVALID' },
+    'a consent link cannot erase: a child\'s own session can send one to any address (review of #736)');
+  c.eq((await account(asked.id)).deleted_at, null, 'and nothing changes');
+  await post('/v1/account/guardian/confirm', { token: askConsent, approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
+  const askToken = await bearer(asked.id, 'guardian-withdraw');
   r = await post('/v1/account/guardian/erase', { token: askToken });
-  c.deq({ status: r.status, erasure: r.data?.erasure }, { status: 200, erasure: 'scheduled' }, 'the confirmation link asks for erasure (report mode: a request is always honoured)');
+  c.deq({ status: r.status, erasure: r.data?.erasure }, { status: 200, erasure: 'scheduled' }, 'the confirming guardian\'s withdrawal credential asks for erasure (report mode: a request is always honoured)');
   c.ok(Math.abs(Number(r.data.eraseAfter) - (Date.now() + ERASURE_GRACE_MS)) < 60_000, 'and says when it will be erased');
   c.ok((await account(asked.id)).deleted_at != null, 'the account is soft-deleted at once');
   c.ok((await consent(asked.id)).withdrawn_at != null, 'consent is withdrawn with it');
   c.eq((await login(asked)).status, 401, 'the child can no longer sign in');
   c.eq((await me(asked)).status, 401, 'and the child\'s session is gone');
   c.deq(JSON.parse((await h.db.get("SELECT metadata_json FROM audit_log WHERE action = 'guardian.erase-request' AND target_id = ?", [asked.id])).metadata_json),
-    { via: 'guardian-consent', withdrawn: true, scheduled: true }, 'the request is audited: which bearer, what it did');
+    { via: 'guardian-withdraw', withdrawn: true, scheduled: true }, 'the request is audited: which bearer, what it did');
   c.eq(JSON.parse((await audits(asked.id, 'account.erasure.scheduled'))[0].metadata_json).reason, ERASURE_REASONS.guardianRequest, 'scheduled as a guardian request');
   r = await post('/v1/account/guardian/erase', { token: askToken });
-  c.deq({ status: r.status, already: r.data?.alreadyScheduled }, { status: 200, already: true }, 'a second click answers the same, and changes nothing');
+  c.eq(r.status, 400, 'the credential is spent by the request it made');
   c.eq((await audits(asked.id, 'account.erasure.scheduled')).length, 1, 'nothing is scheduled twice');
 
-  // The long-lived withdrawal credential asks too.
+  // A superseded guardian's credential cannot erase (review of #736).
+  const moved = await registerChild('moved');
+  await post('/v1/account/guardian/confirm', { token: await bearer(moved.id, 'guardian-consent'), approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
+  const oldToken = await bearer(moved.id, 'guardian-withdraw');
+  // The notice changes, so the confirmation needs renewal; the child asks a new guardian.
+  await h.db.run("UPDATE guardian_consents SET notice_version = '2026-01-01' WHERE account_id = ?", [moved.id]);
+  await freshLimits();
+  r = await post('/v1/account/otp/guardian/request', { guardianName: 'New Parent', channel: 'email', destination: `new.parent.${serial}@home.example` }, moved.jar);
+  c.eq(r.status, 202, 'the child asks a different guardian (a renewal: confirmed_at is cleared)');
+  r = await post('/v1/account/guardian/erase', { token: oldToken });
+  c.deq({ status: r.status, code: r.data?.error?.code }, { status: 400, code: 'TOKEN_INVALID' }, 'the superseded guardian\'s credential cannot erase the child');
+  c.eq((await account(moved.id)).deleted_at, null, 'and nothing changes');
+  // A child confirmed once, then renewed, is never "never confirmed" (review of #736).
+  await setCreated(moved.id, NOW - 45 * DAY);
+  c.ok(!(await retentionCandidates(h.db, { now: NOW })).some(row => row.account_id === moved.id), 'a confirmed child whose renewal cleared confirmed_at is not selected by the 30-day rule');
+  c.deq(await scheduleErasure(h.db, moved.id, { now: NOW }), { scheduled: false, eraseAfter: null, reason: null }, 'and the schedule re-check agrees');
+
+  // The long-lived withdrawal credential, a second account.
   const keeper = await registerChild('keeper');
   await post('/v1/account/guardian/confirm', { token: await bearer(keeper.id, 'guardian-consent'), approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
   const keepToken = await bearer(keeper.id, 'guardian-withdraw');
-  c.ok(keepToken, 'a confirming guardian holds the withdrawal credential');
   r = await post('/v1/account/guardian/erase', { token: keepToken });
-  c.deq({ status: r.status, erasure: r.data?.erasure }, { status: 200, erasure: 'scheduled' }, 'the withdrawal credential asks for erasure');
-  c.ok((await consent(keeper.id)).withdrawn_at != null && (await account(keeper.id)).deleted_at != null, 'withdrawn and soft-deleted');
-  r = await post('/v1/account/guardian/erase', { token: keepToken });
-  c.eq(r.status, 400, 'the credential is spent by the request it made');
+  c.deq({ status: r.status, erasure: r.data?.erasure }, { status: 200, erasure: 'scheduled' }, 'another guardian\'s withdrawal credential asks for erasure');
 
   // Not for an account no longer recorded as a child's.
   const corrected = await registerChild('corrected');
-  const correctedToken = await bearer(corrected.id, 'guardian-consent');
+  await post('/v1/account/guardian/confirm', { token: await bearer(corrected.id, 'guardian-consent'), approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
+  const correctedToken = await bearer(corrected.id, 'guardian-withdraw');
   await h.db.run("UPDATE accounts SET age_basis = 'adult' WHERE id = ?", [corrected.id]);
   r = await post('/v1/account/guardian/erase', { token: correctedToken });
   c.deq({ status: r.status, code: r.data?.error?.code }, { status: 409, code: 'GUARDIAN_ERASURE_NOT_AVAILABLE' }, 'a child credential cannot erase an account since recorded as an adult\'s');

@@ -566,10 +566,19 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.post('/guardian/erase', rateLimit(db, 'guardian-erase', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
+    // Only the long-lived withdrawal credential, which is issued solely when
+    // a guardian themself confirms, and only the one issued for the current
+    // confirmation. A consent link is not enough: a child's own session can
+    // send one to any address it types (otp.js /guardian/request), and a
+    // link to a guardian since superseded must not erase (review of #736).
     const token = raw ? await db.get(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND (purpose = 'guardian-consent'
-        OR (purpose = 'guardian-withdraw' AND consumed_at IS NULL AND expires_at > ?))`, [sha256(raw), now]) : null;
+      WHERE token_hash = ? AND purpose = 'guardian-withdraw' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
+    const consentRow = await db.get('SELECT requested_at, confirmed_at FROM guardian_consents WHERE account_id = ?', [token.account_id]);
+    if (!consentRow || consentRow.confirmed_at == null || Number(token.created_at) < Number(consentRow.confirmed_at)
+      || Number(consentRow.requested_at) > Number(token.created_at)) {
+      return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
+    }
     const account = await db.get('SELECT age_basis, deleted_at FROM accounts WHERE id = ?', [token.account_id]);
     if (!account) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
     // Already scheduled (a second click, or the retention rule got there

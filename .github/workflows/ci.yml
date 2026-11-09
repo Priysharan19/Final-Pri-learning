@@ -376,7 +376,7 @@ jobs:
           # days (enforce mode only), erased after a 7-day grace, and a guardian can ask
           # for erasure without the child's login. Also on Postgres below.
           node server/test/child-erasure-check.mjs | tee child-erasure.log
-          grep -Fq 'CHILD ERASURE: PASS — 101/101 checks' child-erasure.log
+          grep -Fq 'CHILD ERASURE: PASS — 104/104 checks' child-erasure.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
