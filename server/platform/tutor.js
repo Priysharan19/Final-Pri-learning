@@ -85,8 +85,9 @@ import { issuedQuestionForTutor } from './practice.js';
 import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
-  TUTOR_TURN_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
+  TUTOR_TURN_LEVEL, TUTOR_WHY_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
 } from './tutorProvider.js';
+import { serverEntitlementCapabilities } from './entitlements.js';
 
 export const TUTOR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 export const MAX_TUTOR_BODY_BYTES = 48 * 1024;
@@ -185,6 +186,9 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
   if (!request.serverQuestionId) return { ok: true, request };
   const issued = await issuedQuestionForTutor(db, accountId, request.serverQuestionId, at);
   if (!issued) return invalid('This question does not belong to this account.', 'TUTOR_QUESTION_NOT_FOUND', 404);
+  if (request.level === TUTOR_WHY_LEVEL && !issued.resolved) {
+    return invalid('"Why this step?" follows the reveal of a server-issued question.', 'TUTOR_LEVEL_ORDER', 409);
+  }
   if (request.level === 'walkthrough' && !issued.resolved) {
     return invalid('The walkthrough follows the reveal of a server-issued question.', 'TUTOR_LEVEL_ORDER', 409);
   }
@@ -214,7 +218,7 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
       questionVersion: issued.version.slice(0, 60),
       question: checked.question,
       // A diagnosis's open/resolved state is the server's, never the device's.
-      ...(diagnose ? { resolved: !!issued.resolved } : {}),
+      ...(diagnose || request.level === TUTOR_WHY_LEVEL ? { resolved: !!issued.resolved } : {}),
       studentWork: {
         ...request.studentWork,
         // Which line is the first mistake is a verdict on the student's working.
@@ -222,7 +226,9 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
         // whether a guessed line is right, so it is withheld with the rest.
         firstBreak: issued.resolved ? evidence.firstBreak : -1,
         verifiedLines: issued.resolved ? evidence.verifiedLines : 0,
-        misconception: null,
+        // The engine's own misconception id (the server's Step Check), once the
+        // question is resolved; the device's word for it is never taken (D1).
+        misconception: issued.resolved && typeof evidence.misconception === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(evidence.misconception) ? evidence.misconception : null,
         // The per-line verdict for a diagnosis is re-derived from the server's
         // own Step Check, and withheld like the rest until resolution. The final
         // answer's status is not in the escrow, so the device's word is dropped.
@@ -307,15 +313,24 @@ export function validateTutorRequest(body) {
   if (body.context === 'exam' || body.mode === 'exam' || body.examId !== undefined) {
     return invalid('Help is not available during an exam.', 'TUTOR_EXAM_LOCKED', 403);
   }
-  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history', 'resolved']);
+  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history', 'resolved', 'stepIndex']);
   if (unknown.length) return invalid(`Unexpected field: ${unknown.join(', ')}.`);
   if (body.context !== 'practice') return invalid('The tutor helps with practice questions only; send context "practice".', 'TUTOR_CONTEXT_REQUIRED');
   if (!TUTOR_REQUEST_LEVELS.includes(body.level)) return invalid(`level must be one of ${TUTOR_REQUEST_LEVELS.join(', ')}.`);
-  const asking = body.level === TUTOR_TURN_LEVEL;
+  const why = body.level === TUTOR_WHY_LEVEL;
+  // "Why this step?" is a dialogue too: an optional follow-up message and history.
+  const asking = body.level === TUTOR_TURN_LEVEL || (why && body.message !== undefined);
   const diagnosing = body.level === TUTOR_DIAGNOSE_LEVEL;
-  if (!diagnosing && body.resolved !== undefined) return invalid('resolved is only sent with level "diagnose".');
+  if (!diagnosing && !why && body.resolved !== undefined) return invalid('resolved is only sent with level "diagnose" or "why".');
+  if (!why && body.stepIndex !== undefined) return invalid('stepIndex is only sent with level "why".');
+  if (why && !(Number.isInteger(body.stepIndex) && body.stepIndex >= 0 && body.stepIndex < LIMITS.steps)) return invalid('stepIndex names a step of the verified solution.');
+  if (why && body.history !== undefined && body.message === undefined) return invalid('history is sent with a follow-up message.');
+  // A device question's solution is on the device already; the dialogue is
+  // offered once the question is resolved, and the body says so. A server-
+  // issued question's resolution is the server's own record (groundIssued).
+  if (why && body.serverQuestionId === undefined && body.resolved !== true) return invalid('"Why this step?" follows the reveal of the question.', 'TUTOR_LEVEL_ORDER', 409);
   if (diagnosing && body.resolved !== undefined && typeof body.resolved !== 'boolean') return invalid('resolved is true or false.');
-  if (!asking && (body.message !== undefined || body.history !== undefined)) return invalid('message and history are only sent with level "ask".');
+  if (!asking && !why && (body.message !== undefined || body.history !== undefined)) return invalid('message and history are only sent with level "ask" or "why".');
   const locale = body.locale === undefined ? 'en' : body.locale;
   if (!TUTOR_LOCALES.includes(locale)) return invalid(`locale must be one of ${TUTOR_LOCALES.join(', ')}.`);
   // A server-issued question is named, never described: the server grounds the
@@ -422,6 +437,7 @@ export function validateTutorRequest(body) {
       level: body.level,
       ...(asking ? { message, history } : {}),
       ...(diagnosing ? { resolved: body.resolved === true } : {}),
+      ...(why ? { resolved: body.resolved === true, stepIndex: body.stepIndex } : {}),
       locale,
       questionId: issued ? body.serverQuestionId : body.questionId,
       questionVersion: body.questionVersion || '1',
@@ -449,14 +465,15 @@ export function validateTutorRequest(body) {
  * student typed is cached for that account alone.
  */
 export function tutorCacheKey(request, scope = null) {
-  const asking = request.level === TUTOR_TURN_LEVEL;
+  const asking = request.level === TUTOR_TURN_LEVEL || request.level === TUTOR_WHY_LEVEL;
   if (asking && !scope) throw new Error('a conversational turn is cached per account: scope is required');
   const material = JSON.stringify([
     'pri-tutor-v1', request.level, request.locale, request.questionId, request.questionVersion,
     request.question.prompt, request.question.steps, request.question.answer, request.question.hints,
     request.studentWork.lines, request.studentWork.typedAnswer, request.studentWork.firstBreak,
     request.studentWork.verifiedLines, request.studentWork.misconception, request.captions,
-    ...(asking ? [scope, request.message, request.history] : []),
+    ...(asking ? [scope, request.message || '', request.history || []] : []),
+    ...(request.level === TUTOR_WHY_LEVEL ? [request.stepIndex, !!request.resolved] : []),
     // A diagnosis's key also covers the verdict it explains and whether the
     // attempt is open — an open attempt's reply is guarded, a resolved one's is not.
     ...(request.level === TUTOR_DIAGNOSE_LEVEL
@@ -656,6 +673,38 @@ export function lineCheckFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_LINE_CHECK || '').trim() === '1';
 }
 
+export const WHY_FREE_PER_DAY_DEFAULT = 3;
+
+/**
+ * May this account ask "Why this step?" now? Premium (the server's own
+ * entitlement snapshot carries `additional-ai-usage`) always may; a free
+ * account has PRI_TUTOR_WHY_FREE_PER_DAY taster calls a day (default 3;
+ * "0" means none), counted per account. Never the client's word.
+ */
+export async function whyAccess(db, accountId, env = process.env, at = Date.now()) {
+  const row = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id = ?', [accountId]);
+  if (row && serverEntitlementCapabilities(row, at).includes('additional-ai-usage')) return { allowed: true, plan: 'premium', tasterLeft: null };
+  const raw = String(env.PRI_TUTOR_WHY_FREE_PER_DAY ?? '').trim();
+  const limit = raw === '' ? WHY_FREE_PER_DAY_DEFAULT : (Number.isInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : WHY_FREE_PER_DAY_DEFAULT);
+  const windowMs = 24 * 60 * 60 * 1000;
+  if (limit === 0) return { allowed: false, plan: 'free', tasterLeft: 0, resetAt: at + windowMs };
+  const taster = await consumeRateLimit(db, `tutor-why-taster:${sha256(accountId).slice(0, 24)}`, { limit, windowMs }, at);
+  return taster.allowed
+    ? { allowed: true, plan: 'free', tasterLeft: taster.remaining }
+    : { allowed: false, plan: 'free', tasterLeft: 0, resetAt: taster.resetAt };
+}
+
+/** The verified step itself, as the "why" reply when no model can (or may) speak. */
+export function whyFallback(request) {
+  const step = request.question.steps[request.stepIndex] || {};
+  const lead = request.locale === 'hi' ? 'यह क़दम' : 'This step';
+  return {
+    level: TUTOR_WHY_LEVEL, stepIndex: request.stepIndex, referencesStepIndex: request.stepIndex,
+    message: `${lead}: ${[step.h, step.d].filter(Boolean).join(' — ')}`.slice(0, 1200),
+    source: 'fallback', guarded: true, model: null
+  };
+}
+
 /** The tutor ships dark: the route exists only where PRI_FEATURE_TUTOR=1. */
 export function tutorFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
@@ -782,6 +831,66 @@ export function createTutorRouter(db, {
     };
   }
 
+  /**
+   * "Why this step?" (F11). Order, every refusal before any spend:
+   *   1. the step exists in the grounded solution and the question is resolved
+   *      (a server-issued question's resolution is the server's own record);
+   *   2. cache — a per-account reply for this exact step and dialogue is free;
+   *   3. Premium (`additional-ai-usage`, server-side), or one of the free
+   *      taster calls a day (PRI_TUTOR_WHY_FREE_PER_DAY, default 3) — 402 after;
+   *   4. the per-account daily tutor allowance, then the deployment's
+   *      paid-call ceiling (which raises PAID_CEILING_HIGH at 80%);
+   *   5. one model call; its maths must be copied from the solution, question
+   *      or the student's lines, or the step itself is shown instead.
+   * Model unconfigured or failing: the verified step itself, never an error.
+   */
+  async function whyThisStep(req, res, request, at) {
+    const accountId = req.platformSession.account_id;
+    if (!(request.stepIndex < request.question.steps.length)) {
+      return res.status(400).json({ error: { code: 'TUTOR_BODY_INVALID', message: 'stepIndex names a step of the verified solution.' } });
+    }
+    if (!request.resolved) return res.status(409).json({ error: { code: 'TUTOR_LEVEL_ORDER', message: '"Why this step?" follows the reveal of the question.' } });
+    const key = tutorCacheKey(request, cacheScope(accountId));
+    const hit = await cached(key, at);
+    if (hit) return res.json({ tutor: { ...hit, cached: true } });
+
+    const fallback = reason => res.json({ tutor: { ...whyFallback(request), reason, cached: false } });
+    if (!providerConfig(env).configured) return fallback('TUTOR_NOT_CONFIGURED');
+
+    const access = await whyAccess(db, accountId, env, at);
+    if (!access.allowed) {
+      res.set('RateLimit-Reset', String(Math.ceil(access.resetAt / 1000)));
+      return res.status(402).json({ error: { code: 'TUTOR_PREMIUM_REQUIRED', message: '"Why this step?" is part of Premium. Today\'s free tries are used.', resetAt: access.resetAt } });
+    }
+    const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+      { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+    if (!daily.allowed) {
+      res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
+      return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help.", retryable: true } });
+    }
+    const overBudget = await consumePaidCall(db, { env });
+    if (overBudget) return refusePaidCall(res, overBudget);
+
+    let reply;
+    try { reply = await ask(request, { env }); } catch (error) {
+      return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
+    }
+    const issues = reply?.message
+      ? diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines })
+      : ['empty'];
+    if (issues.length) {
+      const tutor = { ...whyFallback(request), reason: 'TUTOR_GROUNDING_GUARD', model: reply?.model || null };
+      await remember(key, tutor, at);
+      return res.json({ tutor: { ...tutor, cached: false } });
+    }
+    const tutor = {
+      level: TUTOR_WHY_LEVEL, stepIndex: request.stepIndex, message: reply.message, referencesStepIndex: request.stepIndex,
+      source: 'model', guarded: false, model: reply.model || null, plan: access.plan, tasterLeft: access.tasterLeft
+    };
+    await remember(key, { ...tutor, tasterLeft: undefined }, at);
+    return res.json({ tutor: { ...tutor, cached: false } });
+  }
+
   async function walkthrough(request) {
     const overBudget = await consumePaidCall(db, { env });
     if (overBudget) return { refusal: overBudget };
@@ -830,6 +939,7 @@ export function createTutorRouter(db, {
       // correct: only on the engine's verdict (withheld until resolution for a
       // server-issued question) and the verified plan.
       if (diagnosing && !request.resolved) return res.json({ tutor: openDiagnosis(request) });
+      if (request.level === TUTOR_WHY_LEVEL) return whyThisStep(req, res, request, at);
 
       const key = tutorCacheKey(request, cacheScope(req.platformSession.account_id));
       const hit = await cached(key, at);

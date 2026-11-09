@@ -3880,6 +3880,34 @@ const routes = {
     };
   },
 
+  // "Why this step?" — a grounded dialogue about one step of a RESOLVED
+  // question's verified solution. Writes nothing to the row (no charge: the
+  // mark is decided; Premium and the free taster are the server's to enforce).
+  'POST /practice/:id/tutor/why': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (!row.answered) throw Object.assign(new Error('"Why this step?" follows the answer.'), { status: 409, code: 'TUTOR_LEVEL_ORDER' });
+    const q = row.payload;
+    const stepIndex = Number(body?.stepIndex);
+    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex > 23) throw Object.assign(new Error('Choose a step of the solution.'), { status: 400, code: 'TUTOR_BODY_INVALID' });
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText, solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const base = tutorRequest(p, row, q, solution, { level: 'why', locale: body?.locale, work: tutorWork(q, body?.work), resolved: true });
+    if (!base) return { message: null, source: 'deterministic', code: 'TUTOR_UNGROUNDED' };
+    const message = typeof body?.message === 'string' ? sanitizeText(body.message, 600) : '';
+    const history = (Array.isArray(body?.history) ? body.history : []).slice(-6)
+      .map(turn => ({ role: turn?.role === 'tutor' ? 'tutor' : 'student', text: sanitizeText(turn?.text, 600) })).filter(turn => turn.text);
+    const outcome = await requestTutorHelp({ ...base, stepIndex, ...(message ? { message, history } : {}) });
+    const tutor = outcome?.tutor;
+    if (!tutor || typeof tutor.message !== 'string') return { message: null, source: 'deterministic', code: outcome?.error?.code || 'TUTOR_FAILED' };
+    return { message: sanitizeText(tutor.message, 1200), source: tutor.source === 'model' ? 'tutor' : 'deterministic', code: tutor.source === 'model' ? null : (tutor.reason || null) };
+  },
+
   // "Check this line so far": the server's Step Check of the lines on an OPEN
   // server-issued question. It names a step of the method, never a value, and
   // never marks. It is help, so it is charged like a tutor level (one level
@@ -5614,7 +5642,7 @@ function tutorWork(q, raw) {
 function tutorRequest(p, row, q, solution, { level, locale, work, captions, resolved }) {
   // `resolved` belongs to a diagnosis only (the server refuses it elsewhere);
   // for a server-issued question the server decides it from its own records.
-  const diagnosis = level === 'diagnose' ? { resolved: resolved === true } : {};
+  const diagnosis = level === 'diagnose' || level === 'why' ? { resolved: resolved === true } : {};
   if (row.serverQuestionId) {
     // Server-issued: name the question, send the student's own work, and
     // nothing else. No prompt, step, answer or hint leaves the device for it —

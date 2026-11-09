@@ -125,6 +125,8 @@ export const SR_ONLY = {
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
 // "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
+// "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
+const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -329,6 +331,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showTutor, setShowTutor] = useState(false);
   // The diagnosis panel is keyed by the attempt it explains; a new attempt closes it.
   const [diagnoseFor, setDiagnoseFor] = useState(null);
+  const [whyStep, setWhyStep] = useState(null);
   const [lineCheck, setLineCheck] = useState(null);
   const [lineCheckBusy, setLineCheckBusy] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
@@ -464,7 +467,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
-    setShowTutor(false); setDiagnoseFor(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
+    setShowTutor(false); setDiagnoseFor(null); setWhyStep(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     // An old photo must never follow the student into a new question.
@@ -2192,6 +2195,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div>
               <div className="step-h"><MathText text={s.h} /></div>
               <div className="step-d"><MathText text={s.d} /></div>
+              {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
+              {WhyStep && tutorEnabled && !diagnostic && resolved && (
+                <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}
+                  onClick={() => setWhyStep(v => (v === i ? null : i))}>{t('tutor.why.button')}</button>
+              )}
+              {WhyStep && whyStep === i && tutorEnabled && resolved && (
+                <TutorBoundary fallback={t('tutor.unavailable')}>
+                  <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.why.asking')}</div>}>
+                    <WhyStep questionId={question.id} stepIndex={i} locale={language === 'hi' ? 'hi' : 'en'} onClose={() => setWhyStep(null)} />
+                  </React.Suspense>
+                </TutorBoundary>
+              )}
             </div>
           </div>
         ))}
