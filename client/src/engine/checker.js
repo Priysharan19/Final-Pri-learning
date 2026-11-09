@@ -140,14 +140,14 @@ export function assessSystemLine({ text, meta = null } = {}) {
     const assessed = assessPointLine({ text: src, meta: { kind: 'point', x: env[vars[0]], y: env[vars[1]] } });
     if (assessed.status !== 'note') return assessed;
   }
-  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Skipped — this line makes no claim Pri can test against the solution.' };
+  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Not checked — this line makes no claim this question’s check can test.' };
 
   // "x = 2, y = 3" / "x = 2 and y = 3" — every part must hold
   const parts = src.split(/,|;|\band\b/i).map(p => p.trim()).filter(Boolean);
   if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this line safely.' };
   for (const part of parts) {
     let ast;
-    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Skipped — I couldn’t parse this line as maths.' }; }
+    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Not checked — this question’s check covers the lines that lead to the answer.' }; }
     if (ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
     const h = holds(ast);
     if (!h) return { status: 'note', trusted: false, note: 'Skipped — this line could not be evaluated at the solution.' };
@@ -814,7 +814,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       }
     } catch {
       status = 'note';
-      note = 'Skipped — I couldn’t parse this line as maths.';
+      note = 'Not checked — this question’s check covers the lines that lead to the answer.';
     }
 
     if (status === 'break' && firstBreak === -1) firstBreak = i;
@@ -1586,7 +1586,7 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
 const TEX_MATH = /\$([^$]+)\$/g;
 
 /** A KaTeX span reduced to what the expression engine reads; null when it cannot be. */
-function plainTex(tex) {
+export function plainTex(tex) {
   let s = String(tex || '');
   for (let guard = 0; guard < 6 && /\\d?frac/.test(s); guard++) {
     s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) =>

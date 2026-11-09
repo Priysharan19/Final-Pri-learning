@@ -19,6 +19,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
+import { annotateMilestones, milestoneOnlyReport } from '../../client/src/engine/milestones.js';
 import { answerForm, firstFinalAttempt } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -89,6 +90,9 @@ export function stepEvidence(q, answer, steps, result) {
       if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
     } catch { partial = null; }
   }
+  // Feedback only, after the mark is computed: a correct intermediate line
+  // that matches a step of the worked solution is ticked (milestones.js).
+  try { report = report ? annotateMilestones(q, report) : (steps && !meta ? milestoneOnlyReport(q, steps) : null); } catch { /* the report stands */ }
   return { stepReport: report, partial };
 }
 
