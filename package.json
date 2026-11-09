@@ -253,6 +253,7 @@
     "test:ink:permission": "node client/test/ink-reader-permission-check.mjs",
     "test:ink:gate-c-tools": "node client/test/ink-writer-session-protocol-check.mjs && node client/test/ink-photo-reader-eval-check.mjs",
     "test:native:staging-journey": "node client/test/native-journey-staging-check.mjs",
-    "test:photo:no-device-ocr": "node client/test/photo-ocr-retired-check.mjs"
+    "test:photo:no-device-ocr": "node client/test/photo-ocr-retired-check.mjs",
+    "test:ink:graph-sketch": "node client/test/ink-graph-sketch-check.mjs"
   }
 }
