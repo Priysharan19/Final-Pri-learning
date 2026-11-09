@@ -24,7 +24,7 @@ import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
 const TOPIC = 'c7-finding-unknown-current';
-const TOPIC_NAME = 'Linear Equations';
+const TOPIC_NAME = 'Finding the Unknown';
 const WRONG_A = '-987654';
 const WRONG_B = '-987655';
 const DRAFT = '12345';
@@ -77,7 +77,7 @@ async function typedQuestion(page, origin, options = {}) {
     await page.locator('.ctx-next').click();
     await page.waitForSelector('.q-prompt');
   }
-  throw new Error('No typed Linear Equations question was served within 12 explicit safe skips.');
+  throw new Error('No typed Finding the Unknown question was served within 12 explicit safe skips.');
 }
 
 async function resolveWrong(page, options = {}) {
@@ -126,7 +126,7 @@ async function snapshot(page, origin) {
   await waitApp(page);
   await page.waitForSelector('.syl-table');
   const row = page.locator('.syl-table tbody tr').filter({ hasText: TOPIC_NAME }).first();
-  assert.equal(await row.count(), 1, 'Progress must contain the practised Linear Equations row');
+  assert.equal(await row.count(), 1, 'Progress must contain the practised Finding the Unknown row');
   const progressText = clean(await row.textContent());
   const attemptMatch = progressText.match(/(\d+) attempt(?:s)?/i);
   const masteryMatch = progressText.match(/(\d+)% mastery/i);
