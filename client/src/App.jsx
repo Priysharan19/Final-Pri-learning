@@ -56,6 +56,7 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
+const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 // The parent weekly report's screen: off in a production build until counsel
@@ -640,6 +641,7 @@ export default function App() {
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     <Route path="/premium" element={studentOnly(<Paywall />)} />
+                    <Route path="/insights" element={studentOnly(<Insights />)} />
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={studentOnly(<MapPage />)} />
