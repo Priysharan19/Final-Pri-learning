@@ -16,14 +16,14 @@ assert.ok(view.includes("t('notes.showMoreExamples')"), 'Incremental diagrams mu
 assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'"), 'diagram rendering module not wired');
 assert.ok(view.includes('<StudyDiagram figure={ex.figure} />'), 'diagram not in the problem statement');
 assert.ok(view.includes('const [shown, setShown] = useState(0)'), 'revealed solution step before student sees figure');
-assert.ok(view.includes('const [visibleExamples, setVisibleExamples] = useState(6)'), 'visual examples must mount incrementally');
+assert.ok(view.includes('const [visibleExamples, setVisibleExamples] = useState(3)'), 'visual examples must mount incrementally');
 assert.ok(view.includes('const [visualOnly, setVisualOnly] = useState(false)'), 'illustrated-study filter missing');
 assert.ok(view.includes('notes?.examples || []).filter(ex => ex.figure)'), 'diagram-only mode must use source-authored figure data');
 assert.ok(view.includes('key={chapterId +'), 'filter transitions must use stable question identities');
 assert.ok(view.includes('selectedExamples.slice(0, visibleExamples)'), 'unbounded SVG mount detected');
-assert.ok(view.includes('Math.min(v + 6, selectedExamples.length)'), 'load-more action must never overshoot lesson length');
+assert.ok(view.includes('Math.min(v + 3, selectedExamples.length)'), 'load-more action must never overshoot lesson length');
 assert.ok(view.includes('useReveal(root, [chapterId, notes, visibleExamples, visualOnly])'), 'newly mounted examples must be observable');
-assert.ok(view.includes('setVisibleExamples(6)'), 'chapter navigation must reset visible example count');
+assert.ok(view.includes('setVisibleExamples(3)'), 'chapter navigation must reset visible example count');
 
 assert.ok(!view.includes('dangerouslySetInnerHTML'), 'SVG must not permit raw HTML injection');
 assert.equal(STUDY_RESOURCE_LINKS.length, 23, 'unexpected source register count');

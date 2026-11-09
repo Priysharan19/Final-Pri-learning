@@ -179,7 +179,6 @@ function NotesIndex() {
           <>
             {failed && <LoadFailed retry={retry} />}
             {!failed && !notes && <p className="nt-status" role="status">{t('notes.loading')}</p>}
-            {notes && group && <ChapterMap group={group} notes={notes} key={grade} />}
             <section className="nt-index" aria-labelledby="nt-index-h">
               <div className="nt-index-head">
                 <h2 id="nt-index-h">{t('notes.chapters')}</h2>
@@ -215,6 +214,15 @@ function NotesIndex() {
                 })}
               </ol>
             </section>
+            {notes && group && (
+              <details className="nt-map-disclosure" key={grade}>
+                <summary>
+                  <span>{t('notes.mapTitle')}</span>
+                  <span className="nt-map-disclosure-hint">{t('notes.mapHint')}</span>
+                </summary>
+                <ChapterMap group={group} notes={notes} />
+              </details>
+            )}
           </>
         )}
     </div>
@@ -268,11 +276,7 @@ function ChapterMap({ group, notes }) {
   const focused = group.chapters.find(c => c.id === focus);
 
   return (
-    <section className="nt-map nt-reveal" aria-labelledby="nt-map-h">
-      <div className="nt-map-head">
-        <h2 id="nt-map-h">{t('notes.mapTitle')}</h2>
-        <p className="nt-quiet">{t('notes.mapHint')}</p>
-      </div>
+    <section className="nt-map" aria-label={t('notes.mapTitle')}>
       <div className="nt-map-frame">
         <ul className="nt-map-strands" aria-hidden="true">
           {strands.map((s, i) => <li key={s} style={{ top: `${((top + i * rowH) / H) * 100}%` }}>{s}</li>)}
@@ -393,7 +397,7 @@ function ChapterNotes({ chapterId }) {
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
-  const [visibleExamples, setVisibleExamples] = useState(6);
+  const [visibleExamples, setVisibleExamples] = useState(3);
   const [visualOnly, setVisualOnly] = useState(false);
   const notes = all?.[chapterId];
   const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
@@ -414,7 +418,7 @@ function ChapterNotes({ chapterId }) {
 
   const root = useRef(null);
   useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
-  useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
+  useEffect(() => { setVisibleExamples(3); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -480,8 +484,20 @@ function ChapterNotes({ chapterId }) {
       {all && !notes && <p className="nt-quiet">{t('notes.notFound')}</p>}
 
       {notes && (
-        <div className="nt-sheet">
-          <Section id="ideas" title={t('notes.sectionIdeas')}>
+        <div className="nt-study-layout">
+          <nav className="nt-toc" aria-label={t('study.choosePath')}>
+            <p className="nt-toc-label">{t('study.choosePath')}</p>
+            <a href="#ideas">{t('notes.sectionIdeas')}</a>
+            <a href="#definitions">{t('notes.sectionDefinitions')}</a>
+            <a href="#formulas">{t('notes.sectionFormulas')}</a>
+            <a href="#points">{t('notes.sectionPoints')}</a>
+            <a href="#mistakes">{t('notes.sectionMistakes')}</a>
+            <a href="#examples">{t('notes.sectionExamples')}</a>
+            {linkedResources.length > 0 && <a href="#resources">{t('notes.sectionResources')}</a>}
+            <button type="button" onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
+          </nav>
+          <div className="nt-sheet">
+            <Section id="ideas" title={t('notes.sectionIdeas')}>
             <Concepts concepts={notes.concepts} />
           </Section>
 
@@ -530,7 +546,7 @@ function ChapterNotes({ chapterId }) {
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
                   aria-pressed={visualOnly}
-                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(3); }}>
                   {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
                 </button>
               </div>
@@ -539,9 +555,9 @@ function ChapterNotes({ chapterId }) {
             {selectedExamples.length > visibleExamples && (
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
-                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
+                  onClick={() => setVisibleExamples(v => Math.min(v + 3, selectedExamples.length))}
                   aria-label={t('notes.showMoreExamples')}>
-                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
+                  {t('nav.more')} ({Math.min(visibleExamples + 3, selectedExamples.length)}/{selectedExamples.length})
                 </button>
               </div>
             )}
@@ -570,6 +586,7 @@ function ChapterNotes({ chapterId }) {
           <div className="nt-end nt-reveal">
             <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
+          </div>
           </div>
         </div>
       )}
@@ -681,6 +698,12 @@ function Example({ ex, n }) {
     <div className="nt-example nt-reveal">
       <p className="nt-example-n">{t('notes.exampleNumber', { n })}</p>
       <MathText block className="nt-example-q" text={ex.question} />
+      <div className="nt-example-progress" aria-label={t('notes.nextStep')}>
+        <span className="nt-example-progress-bar" aria-hidden="true">
+          <span style={{ width: `${(shown / ex.steps.length) * 100}%` }} />
+        </span>
+        <span>{shown} / {ex.steps.length}</span>
+      </div>
       {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">

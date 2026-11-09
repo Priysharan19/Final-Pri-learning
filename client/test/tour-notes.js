@@ -70,10 +70,19 @@ try {
   await check('it opens on Class 10, the student’s class',
     await page.locator('[role="tab"][aria-selected="true"]').innerText() === 'Class 10');
   await check('every Class 10 chapter is listed', await page.locator('[data-testid="notes-chapter"]').count() === 14);
+  await check('chapter list is presented before the optional concept map',
+    await page.locator('.nt-index').evaluate(el => {
+      const map = document.querySelector('.nt-map-disclosure');
+      return map && el.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING;
+    }));
+  await check('the chapter map is collapsed until requested',
+    await page.locator('.nt-map-disclosure').evaluate(el => !el.open));
+  await shot(page, 'index');
+  await page.locator('.nt-map-disclosure summary').click();
   await page.waitForSelector('.nt-map-node');
   await check('the chapter map draws a node per chapter', await page.locator('.nt-map-node').count() === 14);
   await page.waitForTimeout(1400);
-  await shot(page, 'index');
+  await shot(page, 'map-open');
 
   // Arrow keys move between classes like any tablist.
   await page.locator('[role="tab"][aria-selected="true"]').focus();
@@ -87,6 +96,12 @@ try {
   await page.locator(`a[href="/notes/${CHAPTER}"]`).first().click();
   await page.waitForSelector('.nt-formula');
   await check('the chapter opens with its title', (await page.locator('h1').innerText()).includes('Quadratic Equations'));
+  await check('the chapter provides accessible direct section navigation',
+    await page.locator('.nt-toc a[href^="#"]').count() >= 6);
+  await check('the first lesson section is readable before any scroll animation',
+    await page.locator('.nt-section').first().evaluate(el => getComputedStyle(el.querySelector('.nt-section-h')).opacity === '1'));
+  await check('only three worked examples mount initially to prioritise learning',
+    await page.locator('.nt-example').count() === 3);
   for (const h of ['Key ideas', 'Definitions', 'Formulas', 'Important points', 'Common mistakes', 'Worked examples']) {
     await check(`the chapter has a “${h}” section`, await page.getByRole('heading', { name: h, exact: true }).count() === 1);
   }
