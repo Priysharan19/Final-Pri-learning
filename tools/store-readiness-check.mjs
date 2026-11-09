@@ -225,6 +225,10 @@ check(urlProblems.length === 0, `every store URL is on a D5 host, the console fi
 const d18Stale = Object.entries(storeDocs).filter(([, text]) => /erased after 30 days|after 30 days\)/.test(text)).map(([file]) => file);
 check(d18Stale.length === 0 && ['docs/release/play-data-safety.md', 'docs/release/app-store-privacy-labels.md', 'docs/release/store/app-store-listing.md', 'docs/release/store/play-listing.md'].every(f => /erased 7 days after closing/.test(storeDocs[f])),
   `the store drafts state D18 as the notice does, erased 7 days after closing (${d18Stale.join(', ') || 'they do'})`);
+const d18Status = ['docs/release/play-data-safety.md', 'docs/release/app-store-privacy-labels.md', 'docs/release/store/app-store-listing.md', 'docs/release/store/play-listing.md'];
+check(d18Status.every(f => /\*\*built\*\* \(#736[^)]*\) \*\*and off until enabled\*\*/.test(storeDocs[f]) && /PRI_CHILD_ERASURE=enforce/.test(storeDocs[f]))
+  && !Object.values(storeDocs).some(t => /(D18|erasure)[^|\n]{0,200}not yet in the code|not yet in the code[^|\n]{0,80}(D18|erasure)/.test(t)),
+  'the store drafts say D18 erasure is built (#736) and off until PRI_CHILD_ERASURE=enforce, never "not yet in the code"');
 const withDoc = (file, edit) => ({ ...storeDocs, [file]: edit(storeDocs[file]) });
 const URL_BREAKAGES = {
   'the <PRI_PUBLIC_ORIGIN> stand-in back in a listing': () => withDoc('docs/release/store/play-listing.md', t => t.replace('https://prilearning.com/privacy', '<PRI_PUBLIC_ORIGIN>/privacy')),
