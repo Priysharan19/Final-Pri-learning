@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
 import { pastPapersEnabled } from '../engine/pastPapers.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -429,7 +429,7 @@ function ProfilePractice() {
 
   const exitBar = (
     <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
-      <Icon name="back" /><span>{t(featureEnabled('instrument') ? 'inst.tabIndex' : 'nav.home')}</span>
+      <Icon name="back" /><span>{t(INSTRUMENT_UI ? 'inst.tabIndex' : 'nav.home')}</span>
     </button>
   );
 

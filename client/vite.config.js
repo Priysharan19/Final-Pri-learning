@@ -5,6 +5,7 @@ import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
+import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -124,9 +125,19 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-// The instrument build (PRI_FEATURE_INSTRUMENT=1) changes what is warmed: see
-// the instrument rules in ON_DEMAND and BOOT_FONTS.
-const INSTRUMENT_BUILD = process.env.PRI_FEATURE_INSTRUMENT === '1';
+// The student interface comes from the one setting, client/interface.config.mjs
+// (V1 decision D7), never from a build variable: web, iOS and Android all run
+// this build and so all ship the same interface. It changes what is warmed:
+// see the instrument rules in ON_DEMAND and BOOT_FONTS.
+if (!STUDENT_INTERFACES.includes(STUDENT_INTERFACE)) throw new Error(`client/interface.config.mjs: unknown STUDENT_INTERFACE ${JSON.stringify(STUDENT_INTERFACE)}`);
+if (!INTERFACE_SKINS.includes(INTERFACE_SKIN)) throw new Error(`client/interface.config.mjs: unknown INTERFACE_SKIN ${JSON.stringify(INTERFACE_SKIN)}`);
+export const INSTRUMENT_BUILD = STUDENT_INTERFACE === 'instrument';
+// PRI_FEATURE_INSTRUMENT used to choose the interface per build. It is retired:
+// a build variable left set on Railway or a laptop changes nothing, and the
+// build says so rather than silently disagreeing with what it was asked for.
+if (process.env.PRI_FEATURE_INSTRUMENT !== undefined && process.env.PRI_FEATURE_INSTRUMENT !== (INSTRUMENT_BUILD ? '1' : '0')) {
+  console.warn(`[pri] PRI_FEATURE_INSTRUMENT=${process.env.PRI_FEATURE_INSTRUMENT} is ignored: the student interface is set in client/interface.config.mjs (${STUDENT_INTERFACE}).`);
+}
 
 export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
@@ -200,17 +211,10 @@ export const ON_DEMAND = [
   // nothing, never a crash, if one cannot be fetched.
   [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
 
-  // The v1.1 instrument interface is behind the opt-in PRI_FEATURE_INSTRUMENT
-  // build flag (OPT_IN_FLAGS below). A build made with it off never imports
-  // these chunks: App.jsx and Login.jsx reach them only through import() calls
-  // guarded by featureEnabled('instrument'), which is false for the whole
-  // build. Warming them would spend the install on code no student of that
-  // build can run. A build made with the flag on warms them as usual, so the
-  // instrument stays offline-ready where it is the interface.
-  //
-  // A build made with the flag on is the opposite case, and it pays for its
-  // own interface by not warming what that interface leaves unpainted or
-  // reaches only by an explicit visit:
+  // The Instrument interface (client/interface.config.mjs) pays for itself by
+  // not warming what it leaves unpainted or reaches only by an explicit visit.
+  // (The branch below for a build without it is kept only so the rules stay
+  // correct if the setting ever names another interface; no build makes one.)
   //   · Inter. Once instrument.css has loaded, every interface token (--font,
   //     --font-display) is remapped to Instrument Sans. Before that, the boot
   //     theme.css still names 'Inter Variable', so the moment between first
@@ -222,16 +226,15 @@ export const ON_DEMAND = [
   //     keeps it.
   //   · Instrument Sans's Latin Extended subset, by the Inter script-subset
   //     argument above: fetched only when a glyph in its range appears.
-  //   · The Map, the Report (ReportHead with the Progress page under it) and
-  //     Scripts (the History page, at /review).
-  //     Each is one tab a student opens deliberately, after the Index; the
-  //     first open online keeps it offline from then on, and a first open
-  //     offline shows the route's ordinary chunk-load failure — the same
-  //     promise the placement check and the archive already make.
+  // The Map, the Report (ReportHead with the Progress page under it) and
+  // Scripts (the History page, at /review) are NOT on demand: they are three
+  // of the interface's six tabs, and a student who opened the app online and
+  // then lost the connection expects a tab to open (issue #658). They ride in
+  // the warm pass like every other tab, and install-budget-check.mjs
+  // --instrument holds them there against the unchanged ceiling.
   ...(INSTRUMENT_BUILD ? [
     [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
-    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset'],
-    [/(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/, 'instrument Map, Report and Scripts tabs, fetched when opened']
+    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset']
   ] : [
     [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
   ]),
@@ -289,7 +292,16 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+  // The instrument build is the exception for the prerequisite graph itself:
+  // its Map (MapPage.jsx) imports engine/prerequisites.js statically to draw
+  // each chapter's strand and "needs" line, so in that build the graph is part
+  // of a warmed tab, not of the placement check. Leaving it on demand there
+  // made the Map crash on a first visit offline ("Failed to fetch dynamically
+  // imported module"). install-budget-check.mjs --instrument now holds every
+  // file a tab chunk statically imports to the install or the warm pass.
+  [INSTRUMENT_BUILD
+    ? /(^|\/)(Placement|placement|prerequisiteSkillsHi)-[^/]*\.js$/
+    : /(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
 
   // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
   // Only a JEE student opening a chapter that has reviewed past papers ever
@@ -439,20 +451,22 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 //   "Write by hand"). Off: a paper offers Type only, so no path can leave
 //   unread handwriting on a paper. On: the frozen-page / pending / Retry
 //   checking flow of server/platform/exams.js applies.
-// INSTRUMENT (v1.1 interface) is opt-in everywhere, the dev server included,
-// so the interface production ships stays the one developers see by default.
+// The interface is not a flag any more: `instrument` is recorded beside the
+// flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
+// to it, but its value comes from client/interface.config.mjs in every build and
+// on the development server alike.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
 //   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
 //   emailed confirm/stop page). Off until counsel has reviewed email about
 //   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT', 'PAST_PAPERS', 'PARENT_REPORT']);
-const OPT_IN_FLAGS = new Set(['INSTRUMENT', 'PAST_PAPERS']);
+const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
+  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);

@@ -10,7 +10,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkBundles, expectedFlags } from './ios-bundle-features-check.mjs';
-import { FEATURE_FLAGS, SHIPPABLE_FEATURE_FLAGS } from '../vite.config.js';
+import { FEATURE_FLAGS, INSTRUMENT_BUILD, SHIPPABLE_FEATURE_FLAGS } from '../vite.config.js';
+import { INTERFACE_SKIN } from '../interface.config.mjs';
 
 let pass = 0;
 const failures = [];
@@ -23,8 +24,8 @@ const bundle = (name, flags) => {
   writeFileSync(join(web, 'assets', 'index-abc.js'), 'globalThis.__PRI_BUILD_FEATURES__={}');
   return [[`${name} A`, web], [`${name} B`, web]];
 };
-const off = Object.fromEntries(FEATURE_FLAGS.map(f => [f.toLowerCase(), false]));
-const PER = 2 * (4 + 2 * FEATURE_FLAGS.length);
+const off = { ...Object.fromEntries(FEATURE_FLAGS.map(f => [f.toLowerCase(), false])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
+const PER = 2 * (6 + 2 * FEATURE_FLAGS.length);
 
 try {
   ok('only TUTOR is shippable', SHIPPABLE_FEATURE_FLAGS.length === 1 && SHIPPABLE_FEATURE_FLAGS[0] === 'TUTOR', SHIPPABLE_FEATURE_FLAGS.join(','));

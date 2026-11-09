@@ -19,12 +19,18 @@
 // release build passes, and a tutor-on test build synced into a flag-off
 // release still fails.
 //
+// The student interface is not a flag: client/interface.config.mjs sets it for
+// every build (V1 decision D7). Each bundle must record exactly that interface
+// and skin, so the iPhone and iPad apps ship what the web and Android builds
+// ship.
+//
 // Usage: npm run build && npm run sync:ios && node client/test/ios-bundle-features-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { FEATURE_FLAGS, SHIPPABLE_FEATURE_FLAGS } from '../vite.config.js';
+import { FEATURE_FLAGS, INSTRUMENT_BUILD, SHIPPABLE_FEATURE_FLAGS } from '../vite.config.js';
+import { STUDENT_INTERFACE, INTERFACE_SKIN } from '../interface.config.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const BUNDLES = ['PriLearning.swiftpm', 'PriLearning 2.swiftpm'].map(b => [b, join(ROOT, 'ios', b, 'Resources', 'Web')]);
@@ -53,6 +59,8 @@ export function checkBundles(bundles = BUNDLES, env = process.env) {
       ok(on ? `${label}: ${name} is on, as this release build asked (PRI_FEATURE_${name.toUpperCase()}=1)` : `${label}: ${name} is off in the shipped bundle`,
         flags[name] === on, JSON.stringify(flags));
     }
+    ok(`${label}: ships the one student interface (${STUDENT_INTERFACE})`, flags.instrument === INSTRUMENT_BUILD, JSON.stringify(flags));
+    ok(`${label}: wears the skin the setting names (${INTERFACE_SKIN})`, flags.skin === INTERFACE_SKIN, JSON.stringify(flags));
     const assets = join(web, 'assets');
     const entry = existsSync(assets) ? readdirSync(assets).filter(f => /^index-[^/]*\.js$/.test(f)) : [];
     ok(`${label}: has one entry chunk`, entry.length === 1, entry.join(','));
@@ -71,5 +79,5 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     console.log(`IOS BUNDLE FEATURES: FAIL — ${pass}/${pass + failures.length} checks. Rebuild without PRI_FEATURE_* set (npm run build), or with only the shippable flags the release asks for, then npm run sync:ios; the bundles are generated, never committed.`);
     process.exit(1);
   }
-  console.log(`IOS BUNDLE FEATURES: PASS — ${pass}/${pass} checks — both generated iPad bundles are ${on.length ? `production builds with only ${on.join(', ')} on, as the release asked` : 'flag-off production builds'}.`);
+  console.log(`IOS BUNDLE FEATURES: PASS — ${pass}/${pass} checks — both generated iPad bundles are ${on.length ? `production builds with only ${on.join(', ')} on, as the release asked` : `flag-off production builds of the ${STUDENT_INTERFACE} interface`}.`);
 }

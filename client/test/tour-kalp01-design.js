@@ -166,9 +166,11 @@ export const flow = {
     await check('a student profile created through the product reaches Home', await page.locator('.home-greet').isVisible());
     await snap(page, '02-home-tablet-dark');
 
+    // The Instrument's tablet navigation is its bar of labelled tabs (the one
+    // student interface, client/interface.config.mjs): always drawn, no hover.
     const tabletNav = await page.evaluate(() => {
-      const bar = document.querySelector('.sidebar');
-      const labels = [...document.querySelectorAll('.nav-label')];
+      const bar = document.querySelector('[data-instrument-bar] .in-tabs');
+      const labels = [...document.querySelectorAll('[data-instrument-bar] .in-tab')];
       if (!bar) return null;
       const r = bar.getBoundingClientRect();
       return {
@@ -235,10 +237,17 @@ export const flow = {
     await check('Home has no overflow on desktop', box.over <= 1, JSON.stringify(box));
     await snap(page, '06-home-desktop-dark');
 
-    const toggle = page.locator('header .btn[aria-label*="light" i], header .btn[aria-label*="theme" i]').first();
-    await check('theme toggle is present', await toggle.count() === 1);
-    if (await toggle.count()) {
-      await toggle.click();
+    // The Instrument sets the theme from its command bar (and Settings): the
+    // same account preference, reached through the control it ships.
+    const commandBar = page.locator('[data-instrument-bar] .in-cmd');
+    const setTheme = async (label) => {
+      await commandBar.click();
+      await page.waitForSelector('.in-pal [role="option"]', { timeout: 10000 });
+      await page.getByRole('option', { name: label }).click();
+    };
+    await check('theme toggle is present', await commandBar.count() === 1);
+    if (await commandBar.count()) {
+      await setTheme(/Use night/);
       await page.waitForTimeout(250);
       // Paper is the default identity; the toggle moves the account to the
       // same notebook at night, and both must read.
@@ -247,7 +256,7 @@ export const flow = {
       const ratio = await contrast(page);
       await check('night theme body text has readable contrast', ratio === null || ratio >= 4.5, `ratio=${ratio}`);
       await snap(page, '07-home-desktop-night');
-      await toggle.click();
+      await setTheme(/Use day/);
       await page.waitForTimeout(250);
       await check('paper theme restores through the same preference',
         await page.evaluate(() => document.documentElement.dataset.theme === 'light'));
