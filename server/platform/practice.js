@@ -45,6 +45,8 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { practiceAllowanceVerdict, practiceModeCounted, premiumContentRefusal, recordPracticeIssue, refusePracticeCap, refusePremiumContent } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
+// D15: only the India curriculum's banks are issued (indiaBanks.js).
+import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -251,13 +253,31 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     // evidence", exactly as when the engine threw.
     async workEvidence(lines) {
       const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      // Silence because the check did not RUN (cooldown, busy pool, deadline)
+      // is marked `unchecked`, so a caller can say "couldn't check your working
+      // this time" instead of showing nothing — or, worse, implying the lines
+      // were checked and held. It is still no evidence about any line.
+      const unchecked = { ...silent, unchecked: true };
       if (!stepMetaFor(q) || !Array.isArray(lines) || !lines.length) return silent;
-      if (await markerCooldownUntil(db, accountId)) return silent;
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
       let outcome;
-      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return silent; }
+      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return unchecked; }
       if (outcome.ok) return outcome.value.evidence;
       if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
-      return silent;
+      return unchecked;
+    },
+    // "Check this line so far": the marker pool decides, by form and never by
+    // value, where the first final-answer attempt is, and Step Checks the lines
+    // only when there is none. Did not run → `unchecked`, for any lines.
+    async lineCheckEvidence(lines) {
+      const unchecked = { firstBreak: -1, verifiedLines: 0, misconception: null, attemptAt: -1, unchecked: true };
+      if (!Array.isArray(lines) || !lines.length) return { ...unchecked, unchecked: false, attemptAt: 0 };
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
+      let outcome;
+      try { outcome = await markerPool().run('lineCheck', { q, lines, answerText: String(answerTextFor(q) ?? '') }, { key: accountId }); } catch { return unchecked; }
+      if (outcome.ok) return outcome.value;
+      if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      return unchecked;
     }
   };
 }
@@ -326,6 +346,7 @@ function readQuestionRequest(body, fields) {
   if (body.curriculum !== 'in' || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
     return { error: [400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored question and difficulty 1–4.'] };
   }
+  if (!indiaBank(generator)) return { error: [BANK_OUTSIDE_INDIA.status, BANK_OUTSIDE_INDIA.code, BANK_OUTSIDE_INDIA.message] };
   const mode = body.mode ?? 'practice';
   if (!PRACTICE_MODES.includes(mode)) return { error: [400, 'PRACTICE_MODE_INVALID', 'Invalid practice mode.'] };
   const avoid = body.avoid === undefined ? [] : body.avoid;
@@ -403,6 +424,8 @@ function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), tra
  */
 function chooseQuestion(request, seed = null, { draw = () => randomInt(0x80000000), tries } = {}) {
   const { generator, difficulty, dotpoint, trap } = request;
+  // D15: a bank outside the India covers is never drawn from, by any route (a twin included).
+  if (!indiaBank(generator)) throw Object.assign(new Error(BANK_OUTSIDE_INDIA.message), { code: BANK_OUTSIDE_INDIA.code });
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
@@ -430,6 +453,8 @@ const ACCOUNT_SEEK_BATCHES = [8, 32, 96];
  * one, as before. Reads only; the verdict is still decided where it was.
  */
 async function chooseQuestionFor(db, accountId, request, now, { draw = () => randomInt(0x80000000), tries } = {}) {
+  // D15: a bank outside the India covers is never drawn from, by any route (a twin included).
+  if (!indiaBank(request.generator)) throw Object.assign(new Error(BANK_OUTSIDE_INDIA.message), { code: BANK_OUTSIDE_INDIA.code });
   const seek = seekQuestion(request, { draw, tries, batches: ACCOUNT_SEEK_BATCHES });
   let step = seek.next();
   while (!step.done) {
@@ -475,7 +500,7 @@ function readPrepared(token) {
   if (typeof token !== 'string' || token.length > 2000) return null;
   try {
     const v = JSON.parse(decryptDeliveryToken(token, PREPARED_CONTEXT));
-    if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
+    if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !indiaBank(v.g) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
         !PRACTICE_MODES.includes(v.m) || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
     return v;
   } catch { return null; }

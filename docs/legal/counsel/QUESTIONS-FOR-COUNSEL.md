@@ -402,11 +402,12 @@ here when it merges, before the flag is turned on.
 every chapter without them." (The second sentence is the owner's internal planning note, not public
 wording; public copy never says "every chapter", D24.)
 
-**What the code does at `1d3829103`:** two archives of transcribed past papers are in the client
-bundle: a source-cited archive of NTA, JAB and CBSE papers and a reviewed JEE catalogue. Nothing on
-`main` keeps them from students. Lane L5's default-off switch, which keeps both from every student
-route and timed paper until `PRI_PAST_PAPERS=1` on the server or `PRI_FEATURE_PAST_PAPERS=1` in the
-client build, is on its branch and not yet merged. No written rights record exists for any row.
+**What the code does at Train 4 (#775, which merges L5's #730):** two archives of transcribed past
+papers are in the client bundle: a source-cited archive of NTA, JAB and CBSE papers and a reviewed
+JEE catalogue. A default-off switch keeps both from every student route, the "past papers only"
+filter and timed papers until `PRI_PAST_PAPERS=1` is set on the server or
+`PRI_FEATURE_PAST_PAPERS=1` in the client build; no deployment should set either until you answer.
+Before Train 4, `main` served them. No written rights record exists for any row.
 
 **Current text** · `docs/legal/terms.md`
 
@@ -423,8 +424,7 @@ client build, is on its branch and not yet merged. No written rights record exis
 **Lives in** · `client/src/engine/generators/jee-pyq-runtime.js` · `export`
 **Lives in** · `docs/release/store/app-store-listing.md` · `Past papers are **off for students**`
 
-**Not yet in the code:** the default-off switch (lane L5, `client/src/engine/pastPapers.js` on its
-branch).
+**Lives in** · `client/src/engine/pastPapers.js` · `PAST_PAPERS_OFF_REASON`
 
 **For counsel:**
 

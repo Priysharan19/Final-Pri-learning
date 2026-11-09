@@ -279,7 +279,7 @@ claims.
 | 6 | "No third-party analytics" with no word about the server's own telemetry | Says what is true: no third-party analytics or crash SDK; Pri's server keeps operational telemetry and coded crash reports, which App Privacy declares |
 | 7 | The description and notes did not say what changes when D17 lands | The PRIVACY paragraph describes the prompt (#737); publication gates (e) and (f) in §2 and the pre-submission check in §6 |
 
-D18 (an unconfirmed or withdrawn under-18 account is erased after 30 days; a guardian can ask for
-erasure without the child's login) is in the privacy notice and not yet in the code; a production
-nomination is refused until it is (`tools/legal-promises.mjs`). The listing makes no D18 statement
+D18 (an unconfirmed or withdrawn under-18 account is closed after 30 days and erased 7 days after closing; a guardian can ask for
+erasure without the child's login) is in the privacy notice and is
+**built** (#736, in Train 4: `server/platform/childErasure.js`) **and off until enabled**: the automatic 30-day rule runs only where production sets `PRI_CHILD_ERASURE=enforce` (default: report only); a guardian's own erasure request is honoured in every mode. The listing makes no D18 statement
 of its own.

@@ -13,7 +13,7 @@
 // questions were left in the pool (C3 on #695; the golden journey's
 // "Progress 4 ≠ 5").
 //
-// A cell with seven distinct questions (c7-symmetry, D1). The account resolves
+// A cell with seven distinct questions (c10-circles, D1 — an India bank, D15). The account resolves
 // six of them; then, with an EMPTY avoid list, every issue must be the seventh
 // until it too is resolved. Before the fix each such issue was a resolved one
 // with probability 6/7. Then:
@@ -47,7 +47,7 @@ let count = 0;
 const eq = (a, b, name) => { assert.deepEqual(a, b, name); count++; };
 const ok = (cond, name) => { assert.ok(cond, name); count++; };
 
-const CELL = { generator: 'c7-symmetry', difficulty: 1, curriculum: 'in', mode: 'practice' };
+const CELL = { generator: 'c10-circles', difficulty: 1, curriculum: 'in', mode: 'practice' };
 const PASSWORD = 'correct-horse-battery';
 const post = (path, body, jar, headers = {}) => h.request(path, { method: 'POST', jar, body, headers });
 const issue = (jar, extra = {}) => post('/v1/practice/issue', { ...CELL, ...extra }, jar);

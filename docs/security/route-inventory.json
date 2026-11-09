@@ -1670,6 +1670,27 @@
     },
     {
       "method": "POST",
+      "path": "/v1/tutor/line-check",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "404 (before any session lookup) unless PRI_FEATURE_LINE_CHECK=1 — and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1. Closed body { context, serverQuestionId, lines, locale }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) judges only the lines before the first final-answer attempt (engine-decided by form, never by value; unreadable fails closed); with none left the reply is the one generic 'Press Check to mark your answer.' and nothing is charged. Reply names a step heading only, never a value or a mark; no model call. Two checks per issued question per account (bucket line-check:sha256(account:id), 30-day window, peeked before and taken after the check ran; a third is 409 LINE_CHECK_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run (cooldown, busy, deadline) spends neither.",
+      "rateLimits": [
+        {
+          "key": "tutor-line-check",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/telemetry/",
       "auth": "session",
       "roles": null,

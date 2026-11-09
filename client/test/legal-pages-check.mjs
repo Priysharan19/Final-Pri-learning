@@ -107,6 +107,40 @@ ok(/export const LEGAL_REVIEWED = review\.reviewed === true;/.test(page),
   'and treats only an explicit `reviewed: true` as reviewed — a missing or truthy-but-not-true value is unreviewed');
 ok(/\{!LEGAL_REVIEWED && \(\s*<div className="notice error" role="alert"[^>]*data-legal-unreviewed="true">/.test(page),
   'the page shows the unreviewed banner whenever the switch is off');
+// Line patterns cannot see a condition wrapped around the banner on other
+// lines (#727 review, P2). Walk the JSX from the component's `return (` to the
+// banner and collect every `{ … && (` / `{ … ? ` expression still open at the
+// banner: the only one allowed is `!LEGAL_REVIEWED`, and the banner element
+// itself may not carry `hidden`.
+function bannerConditions(source) {
+  const at = source.indexOf('data-legal-unreviewed="true"');
+  if (at < 0) return null;
+  const start = source.lastIndexOf('return (', at);
+  const stack = [];
+  for (let i = start; i < at; i += 1) {
+    const ch = source[i];
+    if (ch === '{') stack.push(i);
+    else if (ch === '}') stack.pop();
+  }
+  const open = stack.map(i => source.slice(i + 1, at).split(/\(\s*<|<|\n\s*\(/)[0].replace(/\s+/g, ' ').trim())
+    .filter(text => /&&|\?/.test(text) || /^[!A-Za-z_]/.test(text));
+  const element = source.slice(source.lastIndexOf('<', at), source.indexOf('>', at) + 1);
+  return { open, hidden: /\shidden\b/.test(element) };
+}
+function bannerProblems(source) {
+  const found = bannerConditions(source);
+  if (!found) return ['no banner element'];
+  const problems = [];
+  const conditions = found.open.filter(text => /&&|\?/.test(text));
+  if (conditions.length !== 1 || !/^!LEGAL_REVIEWED &&$/.test(conditions[0])) problems.push(`banner conditions: ${JSON.stringify(conditions)}`);
+  if (found.hidden) problems.push('banner is hidden');
+  return problems;
+}
+ok(bannerProblems(page).length === 0, `the banner's only enclosing condition is !LEGAL_REVIEWED, and it is never hidden (${bannerProblems(page).join('; ') || 'it is'})`);
+const bannerOpen = page.indexOf('{!LEGAL_REVIEWED && (');
+const wrapped = page.slice(0, bannerOpen) + '{unfilled.length > 0 && (\n        <>\n      ' + page.slice(bannerOpen).replace(/(data-legal-unreviewed="true">[\s\S]*?<\/div>\s*\)\})/, '$1\n        </>\n      )}');
+ok(bannerProblems(wrapped).length > 0, 'the banner check catches the banner wrapped, across lines, in the placeholder count (the review\'s mutation)');
+ok(bannerProblems(page.replace('data-legal-unreviewed="true">', 'data-legal-unreviewed="true" hidden>')).length > 0, 'and catches a hidden banner');
 ok(!/LEGAL_REVIEWED[^\n]*unfilled|unfilled[^\n]*LEGAL_REVIEWED/.test(page),
   'and never conditions that banner on the placeholder count — filling the templates is not a legal review');
 ok(/\{unfilled\.length > 0 && \(\s*<div className="notice error" role="alert"[^>]*data-legal-draft="true">/.test(page),
@@ -452,6 +486,12 @@ ok(/crash reports?/i.test(privacy) && /Never the error message/i.test(privacy),
   'and discloses coded crash reports, saying what they never contain');
 ok(/30 days after it was\s+created/i.test(privacy) && /is\s+closed/i.test(privacy) && /erased 7 days later/i.test(privacy) && /without the child's login/i.test(privacy),
   'and promises D18 as the accounts stream builds it (#736): closed 30 days after creation or withdrawal, erased 7 days later, and a guardian may ask for erasure without the child’s login');
+const privacyHiFlat = readDoc('privacy', 'hi').replace(/\s+/g, ' ');
+ok(/"Practise this" is separate/.test(privacy) && /the Handwriting setting does not cover it/.test(privacy)
+  && /"इसका अभ्यास करें" अलग है/.test(privacyHiFlat) && /सेटिंग उस पर लागू नहीं होती/.test(privacyHiFlat),
+  'both notices disclose that a "Practise this" question photo goes to OpenAI and is not governed by the Handwriting setting (questionPhoto.js asks only the D17 permission; #727 review P2)');
+ok(/7 दिन बाद मिटा दिया जाता है/.test(privacyHiFlat) && !/उसके 30 दिन बाद खाता और उसमें रखा सब/.test(privacyHiFlat),
+  'the Hindi notice carries the D18 wording too (closed, then erased 7 days later), not the old "deleted 30 days after that"');
 ok(!/deleted\s+30\s+days\s+after\s+that/i.test(privacy),
   'and no longer says "deleted 30 days after that", which the code does not do (it closes the account, then erases it 7 days later)');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),

@@ -54,6 +54,7 @@ import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
+import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
@@ -122,6 +123,8 @@ export const SR_ONLY = {
 // In a production build with the tutor off the panel is unreachable
 // (tutorEnabled below is false on every device), so it is not built at all.
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
+// "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
+const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -324,6 +327,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
   const [showTutor, setShowTutor] = useState(false);
+  // The diagnosis panel is keyed by the attempt it explains; a new attempt closes it.
+  const [diagnoseFor, setDiagnoseFor] = useState(null);
+  const [lineCheck, setLineCheck] = useState(null);
+  const [lineCheckBusy, setLineCheckBusy] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
   // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
@@ -457,7 +464,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
-    setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
+    setShowTutor(false); setDiagnoseFor(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     // An old photo must never follow the student into a new question.
@@ -2802,6 +2809,42 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </TutorBoundary>
         )}
 
+        {/* "What went wrong?" — where a wrong line or answer is shown, and only
+            with the tutor on. It explains the engine's verdict; the mark above
+            is the engine's and does not move (src/tutor/diagnoseGate.js). */}
+        {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+          const attemptKey = String(attempt?.submissionId || judged?.revision || question.id);
+          const judgedLines = (attempt?.lines?.length ? attempt.lines : judged?.lines) || [];
+          const lines = (judgedLines.length ? judgedLines : (working ? working.split('\n') : []))
+            .map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400));
+          const open = diagnoseFor === attemptKey;
+          return (
+            <>
+              <div className="tutor-launch-row no-print">
+                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
+                  aria-expanded={open} data-tutor-diagnose
+                  onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
+                  {t('tutor.diagnose.button')}
+                </button>
+              </div>
+              {open && (
+                <TutorBoundary fallback={t('tutor.unavailable')}>
+                  <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.diagnose.asking')}</div>}>
+                    <MistakeDiagnosis
+                      questionId={question.id}
+                      work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
+                      finalAnswer={finalAnswerStatus(state.res)}
+                      locale={language === 'hi' ? 'hi' : 'en'}
+                      onUsed={level => setTutorUsed(u => Math.max(u, level))}
+                      onClose={() => setDiagnoseFor(null)}
+                    />
+                  </React.Suspense>
+                </TutorBoundary>
+              )}
+            </>
+          );
+        })()}
+
         <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
 
         {/* ── Feedback, attached to the work ── */}
@@ -3093,6 +3136,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </span>
           {INSTRUMENT && writeMode && !resolved && (
             <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote', { key: CHECK_KEY_GLYPH })}</span>
+          )}
+          {/* "Check this line so far": the server's Step Check of the lines read,
+              naming a step of the method — never a value, never a mark. Help,
+              charged like a tutor level; two per question; tutor on only. */}
+          {showLineCheckButton({ tutorEnabled, diagnostic, writeMode, resolved, hasLines: !!inkResult?.lines?.length && !inkStale, checksLeft: lineCheck?.checksLeft ?? 2 }) && (
+            <span className="ws-line-check no-print">
+              <button type="button" className="btn btn-ghost btn-sm" data-line-check disabled={lineCheckBusy}
+                onClick={async () => {
+                  setLineCheckBusy(true);
+                  try {
+                    const lines = (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40);
+                    const r = await api.post(`/practice/${question.id}/tutor/line-check`, { lines, locale: language === 'hi' ? 'hi' : 'en' });
+                    if (Number.isInteger(r?.tutorLevel)) setTutorUsed(u => Math.max(u, r.tutorLevel));
+                    setLineCheck({ message: r?.lineCheck?.message || null, key: 'tutor.lineCheck.unavailable', status: r?.lineCheck?.status || 'none', checksLeft: r?.checksLeft ?? lineCheck?.checksLeft ?? 2 });
+                  } catch (e) {
+                    setLineCheck({ message: null, key: e?.code === 'LINE_CHECK_LIMIT' ? 'tutor.lineCheck.limit' : 'tutor.lineCheck.unavailable', status: 'none', checksLeft: e?.code === 'LINE_CHECK_LIMIT' ? 0 : (lineCheck?.checksLeft ?? 2) });
+                  } finally { setLineCheckBusy(false); }
+                }}>
+                {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
+              </button>
+            </span>
+          )}
+          {writeMode && !resolved && (lineCheck?.message || lineCheck?.key) && (
+            <span className="ws-line-check-result muted" role="status" data-line-check-status={lineCheck.status}>{lineCheck.message || t(lineCheck.key)}</span>
           )}
           {submitReasonKey && (
             <span className="ws-submit-reason muted" id={`submit-reason-${question.id}`} role="status" data-submit-reason={submitReasonKey}>{t(submitReasonKey)}</span>

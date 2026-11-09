@@ -9,7 +9,7 @@
 // rounded — the area between y = x² and y = 4x really is 32/3, and a chapter
 // about exactness should not be marked against 10.67.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, Frac } from '../qhelpers.js';
+import { ri, rc, nz, Frac, sgn } from '../qhelpers.js';
 import { areaPlan } from '../reason-area.js';
 
 const dydx = '\\dfrac{dy}{dx}';
@@ -74,8 +74,9 @@ export const indiaCalculus = {
       const degree = ri(rng, 2, 4);
       const top = order === 1 ? dydx : d2;
       const k = ri(rng, 2, 7);
+      const ky = ri(rng, 1, 9);
       return {
-        prompt: `Find the degree of the differential equation $\\left(${top}\\right)^{${degree}} + ${k}\\left(${dydx}\\right)^{${degree + 2}} = ${ri(rng, 1, 9)}y$.`,
+        prompt: `Find the degree of the differential equation $\\left(${top}\\right)^{${degree}} + ${k}\\left(${dydx}\\right)^{${degree + 2}} = ${ky === 1 ? '' : ky}y$.`,
         answerType: 'numeric', answer: { value: order === 1 ? Math.max(degree, degree + 2) : degree },
         traps: [{ value: order, why: 'That is the order — the number of times y is differentiated. The degree is the power of the highest-order derivative once the equation is a polynomial in its derivatives.' }].filter(t => t.value !== (order === 1 ? degree + 2 : degree)),
         hints: [
@@ -110,13 +111,13 @@ export const indiaCalculus = {
         ].filter(t => t.value !== y1),
         hints: [
           'The variables are already separated — integrate both sides.',
-          `$y = \\dfrac{${k}}{${n + 1}}x^{${n + 1}} + C = ${kBase}x^{${n + 1}} + C$.`,
+          `$y = \\dfrac{${k}}{${n + 1}}x^{${n + 1}} + C = ${kBase === 1 ? '' : kBase}x^{${n + 1}} + C$.`,
           `Use $y = ${y0}$ at $x = ${x0}$ to find $C$, then substitute $x = ${x1}$.`
         ],
         steps: [
-          { h: 'Integrate', d: `$y = ${kBase}x^{${n + 1}} + C$` },
+          { h: 'Integrate', d: `$y = ${kBase === 1 ? '' : kBase}x^{${n + 1}} + C$` },
           { h: 'Apply the condition', d: `$${y0} = ${kBase}(${x0})^{${n + 1}} + C \\Rightarrow C = ${y0 - F(x0)}$` },
-          { h: 'Evaluate', d: `$y(${x1}) = ${kBase}(${x1})^{${n + 1}} + ${y0 - F(x0)} = ${y1}$` }
+          { h: 'Evaluate', d: `$y(${x1}) = ${kBase}(${x1})^{${n + 1}}${y0 - F(x0) === 0 ? '' : ` ${sgn(y0 - F(x0))}`} = ${y1}$` }
         ]
       };
     }

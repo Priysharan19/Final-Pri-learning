@@ -253,9 +253,11 @@ const findingUnknown = (rng, diff) => {
   }
   if (diff === 3) {
     const x = ri(rng, -6, 12), a = ri(rng, 3, 8), c = ri(rng, 1, a - 1), b = ri(rng, -8, 8), d = (a - c) * x + b;
-    return numeric(`Solve $${a}x${b >= 0 ? '+' : ''}${b}=${c}x${d >= 0 ? '+' : ''}${d}$.`, x, 2,
+    // "x" not "1x", and no "+0" constant.
+    const side = (k, m) => `${k === 1 ? '' : k}x${m === 0 ? '' : m > 0 ? `+${m}` : m}`;
+    return numeric(`Solve $${side(a, b)}=${side(c, d)}$.`, x, 2,
       ['Collect the unknown terms on one side and constants on the other.'],
-      [{ h: 'Collect x terms', d: `$${a - c}x=${d - b}$` }, { h: 'Divide', d: `$x=${x}$` }]);
+      [{ h: 'Collect x terms', d: `$${a - c === 1 ? '' : a - c}x=${d - b}$` }, { h: 'Divide', d: `$x=${x}$` }]);
   }
   const n = ri(rng, 5, 45), target = 2 * n + 1;
   return numeric(`A matchstick pattern uses $2n+1$ sticks at position $n$. Which position uses exactly $${target}$ sticks?`, n, 3,
