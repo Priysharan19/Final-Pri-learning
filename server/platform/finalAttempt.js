@@ -23,8 +23,13 @@
 //   2. PIN — it sets an asked unknown on its own against a side free of every
 //      asked unknown ("t = 1.1e1", "11 = t"), or it is a bare expression free
 //      of the asked unknowns where the answer pins one (a lone "11");
-//   3. STAGE — the engine's Step Check places it at the final stage of an
-//      authored plan, whatever its verdict there.
+//   3. CONSTANT — the answer is a bare constant once its units are stripped
+//      ("462 cm²") and the line states a constant or relates only ONE letter
+//      ("A = 462", "n*n = 19*n").
+//
+// No Step Check verdict or stage is consulted (it once was: a plan's checker
+// tagged a WRONG final value with the last stage and left a right one
+// untagged, so "A = 462" was judged while "A = 461" was not).
 //
 // FAIL CLOSED: a line (or the answer) the engine cannot read is an attempt.
 // Pure: plain data in, plain data out; it runs in the marker pool.
@@ -228,15 +233,16 @@ function claimIsAttempt(text, form) {
 }
 
 /**
- * Index of the first final-answer attempt in `lines`, or -1. `stages` is the
- * engine's per-line stage index from a plan Step Check and `finalStage` that
- * plan's last stage (both optional). Decided without the answer's value.
+ * Index of the first final-answer attempt in `lines`, or -1. Decided from the
+ * lines' shape and symbols and the answer's form, without any value.
  */
-export function firstFinalAttempt(lines, form, { stages = [], finalStage = -1 } = {}) {
+export function firstFinalAttempt(lines, form) {
+  // Shape and symbols only. No Step Check verdict or stage may enter here: a
+  // checker tags a line differently when it is right and when it is wrong, so
+  // anything it says would make this decision depend on the value.
   if (!Array.isArray(lines)) return 0;
   for (let i = 0; i < lines.length; i += 1) {
     if (!form) return i;
-    if (finalStage >= 0 && stages[i] === finalStage) return i;
     const claims = parts(clean(lines[i]));
     if (!claims.length || claims.some(p => claimIsAttempt(p, form))) return i;
   }
