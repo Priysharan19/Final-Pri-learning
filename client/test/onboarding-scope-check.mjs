@@ -51,6 +51,11 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
   // lazy chunk of its own with a stylesheet the bundler will not take; it is
   // not what these checks render, so it is stubbed too.
   writeFileSync(join(dir, 'signup-stub.jsx'), "import React from 'react';\nexport default function SignUpFlow() { return null; }\n");
+  // This suite renders the create/profile stages, never the login-only visual.
+  // Standalone Rolldown deliberately has no CSS pipeline, unlike Vite, so the
+  // lazy SignInPlot chunk (with its CSS) must be stubbed here as well. Its real
+  // behavior is covered in the browser by tour-signin-asset-resilience.js.
+  writeFileSync(join(dir, 'plot-stub.jsx'), "import React from 'react';\nexport default function SignInPlot() { return null; }\n");
   writeFileSync(join(dir, 'entry.jsx'), [
     "import React from 'react';",
     "import { renderToStaticMarkup } from 'react-dom/server';",
@@ -80,7 +85,7 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
     },
     resolve: {
       modules: [join(CLIENT, 'node_modules')],
-      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx') }
+      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx'), '../instrument/SignInPlot.jsx': join(dir, 'plot-stub.jsx') }
     }
   });
   const { output } = await bundle.generate({ format: 'esm' });
