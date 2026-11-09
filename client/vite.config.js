@@ -423,6 +423,12 @@ function releaseIdentityManifest(identity) {
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
 export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+// The FEATURE_FLAGS a shipping build may turn on at an owner's GO, by building
+// with PRI_FEATURE_<NAME>=1. The generated iPad bundles must then carry exactly
+// what that build asked for: on only when the release environment says =1, off
+// otherwise. Every other FEATURE_FLAG is still required off. TUTOR: the owner
+// decides at GO (premium plan F11); the server keeps its own PRI_FEATURE_TUTOR.
+export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // Flags built and recorded in features.json like the ones above, but not yet
 // asserted off in the generated iPad bundles (client/test/ios-bundle-features-
 // check.mjs, run by the CI build job right after `npm run sync:ios`). Move a
