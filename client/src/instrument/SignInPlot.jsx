@@ -64,6 +64,21 @@ export default function SignInPlot() {
   return (
     <div className="in-signin-plot" aria-hidden="true">
       <canvas ref={ref} />
+      {/* Illustrative mathematics, never a real graded result or a network call.
+          The label distinguishes this static example from student answers. */}
+      <div className="in-signin-example">
+        <div className="in-signin-example-top">
+          <span>{t('login.exampleLabel')}</span>
+          <span className="in-signin-example-mark">✓</span>
+        </div>
+        <p className="in-signin-example-prompt">{t('login.examplePrompt')}</p>
+        <div className="in-signin-equation">2x + 7 = 19</div>
+        <div className="in-signin-example-steps">
+          <div><span>01</span><strong>2x = 12</strong><span className="in-signin-step-tick">✓</span></div>
+          <div><span>02</span><strong>x = 6</strong><span className="in-signin-step-tick">✓</span></div>
+        </div>
+        <p className="in-signin-example-foot">{t('login.exampleFoot')}</p>
+      </div>
       <p className="in-signin-line">{t('login.instrumentHeadline')}</p>
     </div>
   );

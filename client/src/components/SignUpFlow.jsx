@@ -122,6 +122,8 @@ export default function SignUpFlow({
   const [invalid, setInvalid] = useState(false);
   const [providers, setProviders] = useState({ google: null, apple: null });
   const [channels, setChannels] = useState({ email: true, sms: false });
+  const [socialPopupWaiting, setSocialPopupWaiting] = useState(false);
+  const socialAbortRef = useRef(null);
   const headingRef = useRef(null);
   const firstRender = useRef(true);
   // Synchronous guards: React state is too late to stop a double tap, an
@@ -135,6 +137,8 @@ export default function SignUpFlow({
   const newAccount = !!ticket || !!pendingSocial;
 
   useEffect(() => { onStep?.(step); }, [step, onStep]);
+  // A signed-out page change must not leave a provider popup hanging.
+  useEffect(() => () => socialAbortRef.current?.abort(), []);
   useEffect(() => {
     // The landing screen keeps its own focus on first paint; every later step
     // moves focus to its heading so a screen reader hears where it is.
@@ -369,9 +373,16 @@ export default function SignUpFlow({
   // anything awaits, or the browser would block it.
   async function social(provider) {
     if (!providers[provider] || busy) return;
+    const controller = new AbortController();
+    socialAbortRef.current = controller;
+    setSocialPopupWaiting(true);
     setBusy(`social-${provider}`); setError(''); setNotice('');
     try {
-      const token = await requestIdentityToken(provider, providers[provider]);
+      // The popup is opened before requestIdentityToken's first await.
+      // A learner can cancel while Google or Apple is on screen.
+      const token = await requestIdentityToken(provider, providers[provider], { signal: controller.signal });
+      setSocialPopupWaiting(false);
+      socialAbortRef.current = null;
       const deviceId = await cloudDeviceId();
       try {
         // Sign in first. A provider identity with no account is told so, and
@@ -390,6 +401,9 @@ export default function SignUpFlow({
     } catch (err) {
       if (err?.code === 'SOCIAL_CANCELLED') { setBusy(''); setNotice(tLater('cloud.socialCancelled')); }
       else fail(err);
+    } finally {
+      setSocialPopupWaiting(false);
+      if (socialAbortRef.current === controller) socialAbortRef.current = null;
     }
   }
 
@@ -521,6 +535,7 @@ export default function SignUpFlow({
               aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
               onChange={e => { setDestination(e.target.value); setError(''); }} />
           </div>
+          {!isSms && <p className="signup-method-hint">{t('signup.methodHint')}</p>}
           <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
             {busy === 'send' ? t('signup.sending') : t(isSms ? 'signup.continuePhone' : 'signup.continueEmail')}
           </button>
@@ -535,6 +550,13 @@ export default function SignUpFlow({
                 {busy === 'social-apple' ? t('cloud.socialWaiting') : t('signup.withApple')}</button>}
             </div>
           </>
+        )}
+        {socialPopupWaiting && (
+          <div className="signup-social-wait">
+            <p role="status">{t('signup.socialWindowHint')}</p>
+            <button type="button" className="linklike" data-testid="signup-cancel-social"
+              onClick={() => socialAbortRef.current?.abort()}>{t('signup.cancelSocial')}</button>
+          </div>
         )}
         <div className="signup-alt">
           <button type="button" className="linklike" data-testid="signup-use-password" disabled={!!busy}
