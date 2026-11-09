@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_AUTH_EMAIL_PROVIDER'];
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
@@ -145,7 +146,7 @@ try {
   const result = done.data.result ?? done.data;
   eq([result.mock, result.label, result.total, result.detail.length], [true, MOCK_LABEL, 80, 38], 'the result is labelled a mock and covers the whole paper');
   ok(!result.handwriting?.pages || !Object.keys(result.handwriting.pages).length, 'with no handwriting page to read');
-  const read = await h.request(`/v1/exams/${exam.id}/handwriting`, { method: 'POST', jar: free.jar, body: { key: written.id, image: 'data:image/png;base64,' + Buffer.from('x'.repeat(200)).toString('base64') } });
+  const read = await h.request(`/v1/exams/${exam.id}/handwriting`, { method: 'POST', jar: free.jar, body: { key: written.id, image: pngDataUrl('x'.repeat(200)) } });
   eq([read.status, read.data?.error?.code], [409, 'EXAM_HANDWRITING_NOT_PENDING'], 'and no page can be read on it');
   const event = await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='exam-result' AND entity_id=?", [free.account.id, exam.id]);
   ok(JSON.parse(event.payload_json).mock === true, 'the exam-result event says it was a mock');
