@@ -502,6 +502,14 @@ jobs:
           node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/tutor-guard-complexity-check.mjs
+          # Line check / live coach: a final-answer attempt is decided by form alone, never by value (#831).
+          # Each pinned by count, so a loosened probe set cannot pass vacuously.
+          node server/test/tutor-diagnose-check.mjs | tee tutor-diagnose.log
+          grep -Fq 'TUTOR DIAGNOSE: PASS — 152/152 checks' tutor-diagnose.log
+          node server/test/line-check-constant-pin-check.mjs | tee line-check-constant-pin.log
+          grep -Fq 'LINE CHECK CONSTANT PIN: PASS — 191/191 checks' line-check-constant-pin.log
+          node server/test/final-attempt-oracle-sweep-check.mjs | tee final-attempt-sweep.log
+          grep -Fq 'FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes' final-attempt-sweep.log
           node server/test/spend-ceiling-check.mjs
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
