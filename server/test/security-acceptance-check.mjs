@@ -873,6 +873,14 @@ try {
     c.deq([exam.status, exam.data?.error?.code], [403, 'TUTOR_EXAM_LOCKED'], 'tutor: an exam context is locked');
     const essay = await help(first, body({ question: { ...Q, prompt: 'Write an essay about the French Revolution please' } }));
     c.deq([essay.status, essay.data?.error?.code], [400, 'TUTOR_NOT_MATHS'], 'tutor: a non-maths body is not proxied to the model');
+    // "Why this step?" (level why): resolved-only, step-bounded, exam-locked, premium/taster-gated server-side.
+    const why = (over = {}) => body({ level: 'why', stepIndex: 0, resolved: true, ...over });
+    c.deq([(await help(first, why({ resolved: undefined }))).data?.error?.code], ['TUTOR_LEVEL_ORDER'], 'why: an open question is refused');
+    c.deq([(await help(first, why({ context: 'exam' }))).status], [403], 'why: an exam context is locked');
+    c.deq([(await help(first, why({ stepIndex: 23 }))).data?.error?.code], ['TUTOR_BODY_INVALID'], 'why: a step outside the solution is refused');
+    c.deq([(await help(first, { ...why(), serverQuestionId: '00000000-0000-4000-8000-000000000000', question: undefined, questionId: undefined })).status], [404], "why: another account's (or no) issued question is 404");
+    const anonWhy = await h.request('/v1/tutor/help', { method: 'POST', body: why() });
+    c.eq(anonWhy.status, 401, 'why: never anonymous');
     const named = await help(first, body({ email: first.email }));
     c.eq(named.status, 400, 'tutor: a body carrying an identifier is refused');
     const huge = await help(first, body({ question: { ...Q, prompt: `Solve ${'x + '.repeat(15000)}1` } }));
