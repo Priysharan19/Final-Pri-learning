@@ -34,6 +34,11 @@ const TOPIC = 'c7-finding-unknown-current';
 // Plain arithmetic: the server has no step meta for these, so it can check the
 // final answer and nothing else — the conditions of the staging report.
 const ARITHMETIC = 'c7-integer-operations-current';
+// A method the server CAN check: it needs step meta (an "x =" answer). No
+// Class 7 India form carries one ("Solve $2x=12$." has no answer prefix), so
+// the checked-method case uses the Class 10 pair of linear equations, whose
+// D1/D2 forms ask for x (or y) by name.
+const STEP_CHECKED = 'c10-linear-pair-methods';
 const WHOLE = /^-?\d{1,4}$/;
 const SUBMIT = { name: 'Submit Answer' };
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
@@ -229,7 +234,7 @@ export const flow = {
     {
       // The page says the question's working can be step-checked only when the
       // server has step meta for it; the lines below are then checked by it.
-      const made = await openFresh();
+      const made = await openFresh({ topic: STEP_CHECKED });
       if (await check('checked method: a numeric question is on the card', !!made)) {
         const { right, box } = made;
         const lines = [String(right.text), String(right.text)];
