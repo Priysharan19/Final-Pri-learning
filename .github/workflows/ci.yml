@@ -379,7 +379,8 @@ jobs:
           set -o pipefail
           node server/test/provider-answer-blind-check.mjs 2>&1 | tee blind.log
           node server/test/handwriting-latency-budget-check.mjs 2>&1 | tee -a blind.log
-          grep -Fq 'PROVIDER ANSWER-BLIND: PASS — 132/132 checks' blind.log
+          # 132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks).
+          grep -Fq 'PROVIDER ANSWER-BLIND: PASS — 150/150 checks' blind.log
           grep -Fq 'HANDWRITING LATENCY BUDGET: PASS' blind.log
       - name: Cloud reader evaluation tool self-test (fake provider, no spend)
         run: npm run test:ink:cloud-eval

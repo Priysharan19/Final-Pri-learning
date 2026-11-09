@@ -23,12 +23,13 @@ import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import { createHandwritingRouter, validateRequestBody, FORBIDDEN_FIELDS } from '../platform/handwriting.js';
 import {
-  SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, normalizeResult, providerConfig,
+  SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, normalizeResult, normalizeLeadConnective, providerConfig,
   providerStaticStatus, probeHandwritingProvider, transcribeHandwriting,
   validateImage, HandwritingProviderError
 } from '../platform/handwritingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 import { serverReleaseIdentity } from '../platform/releaseIdentity.js';
+import { proposeFinalAnswer } from '../../client/src/photo/finalAnswer.js';
 
 let pass = 0;
 const failures = [];
@@ -72,6 +73,42 @@ try { validateImage('data:image/png;base64,' + 'A'.repeat(6_000_000)); } catch (
 ok(tooBig, 'an oversized image is refused by size, before the request');
 
 // ── 4 · Confidence is never inflated above the worst line ────────────────────
+// ── Relation signs and the therefore mark (staging report: least value of
+// (x+7)^2 - 6, where >= was read as != and "∴ -6" came back as "therefore - 6").
+// Synthetic reader replies only; no provider is called.
+ok(/single slash/i.test(SYSTEM_INSTRUCTIONS) && /!=/.test(SYSTEM_INSTRUCTIONS),
+  'the reader is told != is an equals sign with a single slash');
+ok(/slanted, doubled or detached bar/i.test(SYSTEM_INSTRUCTIONS) && /⩾/.test(SYSTEM_INSTRUCTIONS),
+  'the reader is told >= is often written with a slanted or doubled bar (≥, ⩾)');
+ok(/prefer >= or <=/i.test(SYSTEM_INSTRUCTIONS), 'an angle opening with a bar beneath is preferred as >= or <=');
+ok(/∴ and ∵/.test(SYSTEM_INSTRUCTIONS), 'the reader is told to write the therefore/because marks as symbols');
+for (const raw of ['\\therefore -6', 'therefore -6', 'Therefore -6', '∴-6', '∴ -6']) {
+  eq(normalizeLeadConnective(raw), '∴ -6', `"${raw}" normalises to "∴ -6"`);
+}
+eq(normalizeLeadConnective('\\because x+7 = 0'), '∵ x+7 = 0', '"\\because" normalises to ∵');
+eq(normalizeLeadConnective('because x+7 = 0'), '∵ x+7 = 0', '"because" normalises to ∵');
+eq(normalizeLeadConnective('thereforex'), 'thereforex', 'a word that merely starts with "therefore" is left alone');
+eq(normalizeLeadConnective('x = 2 therefore'), 'x = 2 therefore', 'only a leading mark is rewritten');
+{
+  const page = normalizeResult({
+    lines: [
+      { text: '(-7,-6)', latex: '(-7,-6)', confidence: 0.95, uncertain: false },
+      { text: '(x+7)^2 >= 0', latex: '(x+7)^2 \\geq 0', confidence: 0.95, uncertain: false },
+      { text: '(x+7)^2 - 6 >= -6', latex: '(x+7)^2 - 6 \\geq -6', confidence: 0.95, uncertain: false },
+      { text: '\\therefore -6', latex: '\\therefore -6', confidence: 0.95, uncertain: false }
+    ],
+    confidence: 0.95,
+    needs_confirmation: false
+  }, { model: 'm', confidenceFloor: 0.8 });
+  eq(page.lines[3].text, '∴ -6', 'the recorded reply\'s last line is "∴ -6", not "therefore -6"');
+  eq(page.lines[1].text, '(x+7)^2 >= 0', 'relation lines are passed through untouched');
+  ok(page.confidence === 0.95 && page.needsConfirmation === false, 'normalisation changes no confidence or gate');
+  const proposal = proposeFinalAnswer(page.lines.map(l => l.text), { answerType: 'numeric' });
+  eq({ status: proposal.status, answer: proposal.answer, line: proposal.line }, { status: 'proposed', answer: '-6', line: 3 }, 'the final-answer extraction still takes -6 from the therefore line');
+  const wordy = proposeFinalAnswer(['(-7,-6)', '(x+7)^2 >= 0', '(x+7)^2 - 6 >= -6', normalizeLeadConnective('therefore -6')], { answerType: 'numeric' });
+  eq(JSON.stringify(wordy), JSON.stringify(proposal), 'a word-form therefore reply proposes the same answer once normalised');
+}
+
 const mixed = normalizeResult(
   { lines: [{ text: '2x + 8', confidence: 0.99, uncertain: false, doubt: '', gap_before: false }, { text: 'x = 4', confidence: 0.41, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false },
   { model: 'test', confidenceFloor: 0.82 }
@@ -777,8 +814,11 @@ try {
   const boundaryApp = express();
   boundaryApp.use(express.json({ limit: '2mb' }));
   boundaryApp.use(cookieParser());
+  // This block is about reply-shape refusals through the route, not the per-account
+  // allowance (D20 defaults: 5 reads a day free), which premium-authority-check.mjs
+  // proves at its defaults. Raised by configuration, as recognition-dedupe-check does.
   boundaryApp.use('/handwriting', createHandwritingRouter(db, {
-    env,
+    env: { ...env, PRI_AI_DAILY_FREE: '100000', PRI_AI_DAILY_PREMIUM: '100000' },
     transcribe: (image, options) => transcribeHandwriting(image, { ...options, env, fetchImpl: hostileReader })
   }));
   const boundaryServer = await new Promise(resolve => { const s = boundaryApp.listen(0, '127.0.0.1', () => resolve(s)); });
