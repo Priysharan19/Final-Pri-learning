@@ -245,7 +245,9 @@ jobs:
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
           grep -Fq 'TRUTHFUL FEEDBACK: PASS — 101/101 checks' suites.log
-          grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
+          # 23 + 5 (#705): the e2e harness blocks service workers for inspectNetwork
+          # flows, and stale-cloud / photo-practise each opt in, with a negative control.
+          grep -Fq 'BROWSER RUN FIXES: PASS — 28/28 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           # 65 → 73 (#196): the camera file (and its EXIF/GPS) is never what is sent; every photo is
           # redrawn and the canvas encoding is sent, with no fall back to the original.
