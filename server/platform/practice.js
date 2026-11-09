@@ -47,7 +47,7 @@ import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
 // D15: only the India curriculum's banks are issued (indiaBanks.js).
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
-import { figureHasExternalRef } from '../../client/src/lib/figureRefs.js';
+import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;

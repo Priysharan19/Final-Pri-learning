@@ -114,8 +114,15 @@ ok(sanitizeFigure(SVG).includes('<path'), 'the figure sanitiser keeps a clean fi
 ok(!/script/i.test(sanitizeFigure(SVG.replace('</svg>', '<script>alert(1)</script></svg>'))), 'the figure sanitiser strips a script');
 const backend = readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
 ok(/const safeSteps[\s\S]{0,400}safeFigure\(s\.figure\)/.test(backend), 'the client step sanitiser passes step figures through safeFigure');
+// The server ships its own copy of the rule (the runtime image carries no
+// client/ files); the two copies must stay byte-identical.
+const clientRule = readFileSync(new URL('../src/lib/figureRefs.js', import.meta.url), 'utf8');
+const serverRule = readFileSync(new URL('../../server/platform/figureRefs.js', import.meta.url), 'utf8');
+ok(clientRule === serverRule, 'server/platform/figureRefs.js is byte-identical to client/src/lib/figureRefs.js');
+const serverRefs = await import('../../server/platform/figureRefs.js');
+ok([LOCAL, ...Object.values(carriers).flatMap(make => external.map(make))].every(svg => serverRefs.figureHasExternalRef(svg) === figureHasExternalRef(svg)), 'the server copy decides every fixture the same way');
 const practice = readFileSync(new URL('../../server/platform/practice.js', import.meta.url), 'utf8');
 ok(/steps: \(q\.steps \|\| \[\]\)\.map\(step => \(typeof step\?\.figure === 'string'/.test(practice), 'the server returns a step figure with the solution steps');
-ok(/!figureHasExternalRef\(step\.figure\)/.test(practice), 'the server drops a step figure that references anything outside itself');
+ok(/from '\.\/figureRefs\.js'/.test(practice) && !/client\/src\/lib\/figureRefs/.test(practice) && /!figureHasExternalRef\(step\.figure\)/.test(practice), 'the server drops a step figure that references anything outside itself');
 
 console.log(`PYQ FIGURES: PASS — ${pass}/${pass} checks — inline SVG only (no script, handler, embedded object, or any url()/href except #local — fill, stroke, filter, mask, marker-*, style) on questions and worked steps; payload, Pri Explain and step sanitiser carry them; a storyboard cannot invent one.`);
