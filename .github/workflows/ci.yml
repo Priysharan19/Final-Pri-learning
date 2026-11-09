@@ -339,7 +339,8 @@ jobs:
           # Map, Report and Scripts tabs are held in the warm pass (#658),
           # together with every file those tabs import statically; 63 → 65: no
           # tab carries a stylesheet of its own (they are in the boot one).
-          grep -Eq 'INSTALL BUDGET: PASS — 65/65 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          # 65 → 67 (Train 7, re-derived by a full local run of the 4 suite shards on the merged tree); ceilings unchanged.
+          grep -Eq 'INSTALL BUDGET: PASS — 67/67 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
           # The V1 interface decisions in source: one interface from one
           # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
@@ -349,7 +350,8 @@ jobs:
           grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
           # The Aurora skin stays on chrome: scope, no content tokens, glass
           # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
-          grep -Fq 'AURORA SKIN: PASS — 28/28 checks' suites.log
+          # 32 (Train 7, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
