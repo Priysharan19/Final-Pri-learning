@@ -1453,3 +1453,18 @@ html.ui-instrument.skin-aurora .auth-wrap.pri-auth > .auth-col {
     min-height:calc(100dvh - 124px);padding:23px 20px 30px;
   }
 }
+/* Keep the form anchored during the dynamic visual CSS fetch. These values
+   mirror the stable authored form geometry, so the input does not jump. */
+html.ui-instrument.skin-aurora .auth-wrap.pri-auth > .auth-col > :is(
+  .logo,.hero-kicker,.hero-title,.hero-sub,.signin-landing,.auth-privacy,p.muted,.login-legal
+) { width:100%;max-width:430px;min-width:0;text-align:left; }
+html.ui-instrument.skin-aurora .auth-wrap.pri-auth > .auth-col > .signin-landing {
+  margin:28px 0 0;padding:0;max-width:430px;border:0;border-radius:0;
+  background:transparent;box-shadow:none;
+}
+html.ui-instrument.skin-aurora .auth-wrap.pri-auth > .auth-col > .logo {
+  display:flex;justify-content:flex-start;margin:0 0 30px;
+}
+html.ui-instrument.skin-aurora .auth-wrap.pri-auth .brand-wordmark {
+  max-width:100%;width:min(215px,100%);height:auto;
+}
