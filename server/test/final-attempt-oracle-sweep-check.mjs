@@ -39,10 +39,16 @@ const SHAPES = [
   v => [`${v}`],
   v => [`A = ${v} cm²`],
   v => [`A = ${v} cm^2`],
+  v => [`A = ${v} square units`],
+  v => [`A = ${v} sq. units`],
+  v => [`V = ${v} cubic units`],
+  v => [`A = ${v} square metres`],
   v => [`2*A = 2*${v}`],
   v => [`A = l * b`, `A = ${v}`],
   v => [`A = l * b`, `A = ${v}`, `A + l = ${v} + l`]
 ];
+
+const SPELLED_UNITS = ['square units', 'sq units', 'sq. units', 'cubic units', 'units', 'square metres', 'sq. cm', 'cubic centimetres'];
 
 let planQuestions = 0;
 let constantAnswers = 0;
@@ -62,10 +68,14 @@ for (const id of Object.keys(GENERATORS)) {
       const right = Number(stripUnits(answerText).replace(/,/g, ''));
       if (!Number.isFinite(right)) continue;
       const values = [right, right + 1, right * 1.1 + 0.37, right === 400 ? 401 : 400].map(fmt);
-      for (const [s, shape] of SHAPES.entries()) {
-        const replies = values.map(v => JSON.stringify(lineCheckEvidence(q, shape(v), answerText)));
-        ok(replies.every(r => r === replies[0]),
-          `${id} D${diff} seed ${seed} (answer "${answerText}") shape ${s} ${JSON.stringify(shape('v'))}: right and wrong values differ — ${[...new Set(replies)].join(' | ')}`);
+      // The escrow's own answer text, and the same value with each spelled-out unit (#831 review).
+      const answers = [answerText, ...SPELLED_UNITS.map(u => `${fmt(right)} ${u}`)];
+      for (const answer of answers) {
+        for (const [s, shape] of SHAPES.entries()) {
+          const replies = values.map(v => JSON.stringify(lineCheckEvidence(q, shape(v), answer)));
+          ok(replies.every(r => r === replies[0]),
+            `${id} D${diff} seed ${seed} (answer "${answer}") shape ${s} ${JSON.stringify(shape('v'))}: right and wrong values differ — ${[...new Set(replies)].join(' | ')}`);
+        }
       }
     }
   }

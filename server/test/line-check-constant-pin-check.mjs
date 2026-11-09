@@ -31,6 +31,17 @@ await loadAllBanks?.();
 
 // ── 1 · Units and constant answers ───────────────────────────────────────────
 eq(['36036 cm³', '₹ 450', '12.5 %', '7 m/s', '24 sq cm'].map(stripUnits), ['36036', '450', '12.5', '7', '24'], 'units and currency are stripped from a number');
+// Spelled-out units (#831 review): every one is stripped, and each such answer is a constant.
+const SPELLED = ['48 square units', '48 sq units', '48 sq. units', '48 cubic units', '48 cu units', '48 units', '48 unit',
+  '48 square metres', '48 square meters', '48 sq. cm', '48 sq cm', '48 sq.m', '48 square centimetres', '48 cubic centimetres',
+  '48 metres', '48 kilometres', '48 litres', '48 millilitres', '48 grams', '48 kilograms', '48 rupees', '48 seconds', '48 minutes',
+  '48 cm²', '48 m^2', '48 cubic cm'];
+for (const s of SPELLED) {
+  eq(stripUnits(s), '48', `"${s}" is stripped to its number`);
+  ok(isConstantAnswer(s), `"${s}" is a constant answer`);
+  eq(firstFinalAttempt(['A = 48'], answerForm({ answerText: s })), 0, `with "${s}" as the answer, "A = 48" is an attempt`);
+}
+eq(stripUnits('area = l b'), 'area = l b', 'words that are not after a number are left alone');
 eq(stripUnits('m = 2'), 'm = 2', 'a variable named like a unit is never stripped');
 ok(['36036 cm³', '₹ 450', '56/65', '-3'].every(isConstantAnswer), 'a bare constant answer is recognised through its unit');
 ok(!['y = 2x + 1', 'x^2 + 2x + 1'].some(isConstantAnswer), 'an answer with a symbol is not a constant');

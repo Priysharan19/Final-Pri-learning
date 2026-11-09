@@ -91,7 +91,10 @@ export function readClaimForm(text) {
 
 // Units a school answer may carry after its number. Stripped only when they
 // FOLLOW a number, so a variable named m or g elsewhere is never touched.
-const UNIT = String.raw`(?:sq\.?\s*|cu\.?\s*)?(?:cm|mm|km|m|kg|mg|g|ml|l|litres?|liters?|s|sec|min|h|hrs?|hours?|days?|years?|rs\.?|rupees?|paise|degrees?|deg|units?|°|%)(?:\s*\^?\s*[23]|[²³])?`;
+// A unit may be spelled out ("square units", "sq. units", "cubic units",
+// "square metres", "sq. cm", "cubic centimetres", "units") or abbreviated.
+// The longer words are tried before their prefixes ("metres" before "m").
+const UNIT = String.raw`(?:(?:square|sq\.?|cubic|cu\.?)\s*)?(?:(?:centi|milli|kilo)?(?:metres?|meters?)|(?:kilo|milli)?grams?|(?:milli)?litres?|(?:milli)?liters?|seconds?|minutes?|hours?|hrs?|days?|weeks?|months?|years?|units?|rupees?|paise|degrees?|deg|cm|mm|km|kg|mg|ml|sec|min|rs\.?|m|g|l|s|h|°|%)(?:\s*\^?\s*[23]|[²³])?`;
 // The number must stand on its own — at the start, or after "=" or a space —
 // so "r^2 h" (an exponent, then a variable) is never read as "2 hours".
 const TRAILING_UNITS = new RegExp(String.raw`((?:^|[=\s])[-−]?\d[\d.,]*)\s*(?:${UNIT})(?:\s*(?:\/|per)\s*(?:${UNIT}))?\s*\.?\s*$`, 'i');
