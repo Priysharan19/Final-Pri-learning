@@ -30,13 +30,15 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 import {
-  createTutorRouter, deterministicDiagnosis, diagnosisIssues, isFinalAnswerAttempt, judgeableLines, lineCheckReply, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
+  createTutorRouter, deterministicDiagnosis, diagnosisIssues, lineCheckReply, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
 } from '../platform/tutor.js';
 import {
   DIAGNOSIS_SCHEMA, MAX_TIMEOUT_MS, TutorProviderError, askTutorModel, providerBody, providerConfig, systemInstructions, userMessage
 } from '../platform/tutorProvider.js';
 import { buildGuard, diagnosisGroundingIssues, leakedExpressions } from '../platform/tutorGuard.js';
 import { openTestStore, requestedEngine } from './support/engine.mjs';
+import { answerForm, firstFinalAttempt } from '../platform/finalAttempt.js';
+import { lineCheckEvidence } from '../platform/markerOps.js';
 
 let pass = 0;
 const failures = [];
@@ -325,40 +327,68 @@ try {
 
     // G1 — a seeded issued question: a right and a wrong final value are indistinguishable.
     const QID = '11111111-1111-4111-8111-111111111111';
-    const sealed = { prompt: 'Solve $t - 4 = 7$.', steps: [{ h: 'Add four to both sides', d: '$t = 11$' }], answer: '11', hints: [] };
+    const sealed = { prompt: 'Solve $t - 4 = 7$.', steps: [{ h: 'Add four to both sides', d: '$t = 11$' }], answerType: 'numeric', answerPrefix: 't =', answer: { value: 11 }, hints: [] };
     await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
       ['acct-b', QID, JSON.stringify(sealed), 'seed', now, now + 86400000]);
+    // A final answer that relates two variables — the guess oracle the symbol count left open.
+    const QLINE = '33333333-3333-4333-8333-333333333333';
+    const line = { prompt: 'Find the equation of the line through $(0, 1)$ and $(2, 5)$.', steps: [{ h: 'Find the gradient', d: '$m = 2$' }, { h: 'Find the intercept', d: '$c = 1$' }, { h: 'Write the equation', d: '$y = 2x + 1$' }],
+      answerType: 'expression', answerPrefix: 'y =', answer: { expr: '2x + 1' }, hints: [] };
+    await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
+      ['acct-b', QLINE, JSON.stringify(line), 'seed', now, now + 86400000]);
     const lcFull = async (lines, qid = QID) => {
       const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-b` }, body: JSON.stringify({ context: 'practice', serverQuestionId: qid, lines }) });
-      return { status: r.status, json: await r.json().catch(() => null) };
+      return { status: r.status, text: await r.text() };
     };
-    // The re-review's probes: every right/wrong pair must be byte-identical.
-    for (const [r, w] of [['11 = t', '12 = t'], ['0 = t - 11', '0 = t - 12'], ['t = 1.1e1', 't = 1.2e1'], ['t = 11 + t - t', 't = 12 + t - t'], ['t = 11', 't = 12']]) {
-      const a = await lcFull([r]);
-      const z = await lcFull([w]);
-      eq(JSON.stringify(a.json), JSON.stringify(z.json), `line check probe: "${r}" and "${w}" get identical replies`);
-      eq(a.json?.lineCheck?.status, 'final', `— "${r}" is a final-answer attempt, never judged`);
+    const FINAL = JSON.stringify({ lineCheck: { status: 'final', message: 'Press Check to mark your answer.' } });
+    // Every right/wrong pair — single lines and multi-line work — must be byte-identical, and the generic reply.
+    const PROBES = [
+      [QLINE, ['y = 2x + 1'], ['y = 3x - 4']],
+      [QLINE, ['2x + 1 = y'], ['5x = y']],
+      [QLINE, ['2x + 1'], ['3x - 4']],
+      [QLINE, ['m = 2', 'c = 1', 'y = 2x + 1'], ['m = 2', 'c = 1', 'y = 3x - 4']],
+      [QLINE, ['y = 2x + 1', 'm = 2'], ['y = 3x', 'm = 2']],
+      [QID, ['11 = t'], ['12 = t']],
+      [QID, ['0 = t - 11'], ['0 = t - 12']],
+      [QID, ['t = 1.1e1'], ['t = 1.2e1']],
+      [QID, ['1.1e1'], ['1.2e1']],
+      [QID, ['t = 11 + t - t'], ['t = 12 + t - t']],
+      [QID, ['t = 11'], ['t = 12']],
+      [QID, ['t - 4 = 7', 't = 11'], ['t - 4 = 7', 't = 12']],
+      [QID, ['t - u = 7 + 4 - u', 't = 11', 't + u = 11 + u'], ['t - u = 7 + 4 - u', 't = 12', 't + u = 12 + u']],
+      [QID, ['@@ junk'], ['## junk']]
+    ];
+    for (const [qid, r, w] of PROBES) {
+      const a = await lcFull(r, qid);
+      const z = await lcFull(w, qid);
+      eq([a.status, a.text], [200, z.text], `line check probe: ${JSON.stringify(r)} and ${JSON.stringify(w)} get byte-identical replies`);
+      eq(a.text, FINAL, `— ${JSON.stringify(r)} is a final-answer attempt: the generic reply, nothing judged, nothing charged`);
     }
-    // Multi-line: a final attempt and everything after it are never judged.
-    const mRight = await lcFull(['t - u = 7 + 4 - u', 't = 11', 't + u = 11 + u']);
-    const mWrong = await lcFull(['t - u = 7 + 4 - u', 't = 12', 't + u = 12 + u']);
-    eq(JSON.stringify(mRight.json?.lineCheck?.message), JSON.stringify(mWrong.json?.lineCheck?.message), 'line check: multi-line work with a right and a wrong final value reads the same');
-    eq([isFinalAnswerAttempt('f\'(x) = 6x + 1'), isFinalAnswerAttempt('sin(A+B) = sinA cosB + cosA sinB'), isFinalAnswerAttempt('= 16'), isFinalAnswerAttempt('@@ junk')], [false, false, true, true],
-      'a relation of two symbols is judged; a value, a bare result or unreadable text fails closed');
-    eq(judgeableLines(['a + b = c', 't = 11', 'a = b']), ['a + b = c'], 'only the lines before the first final attempt are judged');
+    // Genuine intermediate lines are still judged by the engine.
+    const mid = await lcFull(['m = 2'], QLINE);
+    ok(mid.status === 200 && ['ok', 'unplaced', 'break'].includes(JSON.parse(mid.text)?.lineCheck?.status), `line check: an intermediate line ("m = 2") is still judged — got ${mid.text}`);
+    // The classifier, directly: by form only.
+    const tForm = answerForm({ answerText: 't = 11', variable: 't' });
+    const yForm = answerForm({ answerText: 'y = 2x + 1' });
+    eq([firstFinalAttempt(['t - u = 7 + 4 - u'], tForm), firstFinalAttempt(['7 + 4 = 11'], tForm), firstFinalAttempt(['a + b = c', 't = 11', 'a = b'], tForm)], [-1, -1, 1],
+      'a relation of other symbols or plain arithmetic is judged; the first attempt is found');
+    eq([firstFinalAttempt(['m = 2', 'c = 1'], yForm), firstFinalAttempt(['y - 1 = 2x'], yForm), firstFinalAttempt(['@@'], yForm)], [-1, 0, 0],
+      'gradient and intercept are judged; any relation of x and y is an attempt; unreadable fails closed');
+    eq(firstFinalAttempt(['m = 2'], answerForm({ answerText: '@@' })), 0, 'an answer the engine cannot read makes every line an attempt');
+    const plan = { prompt: 'p', stepcheck: { kind: 'plan', stages: [{ kind: 'x' }, { kind: 'y' }] } };
+    ok(lineCheckEvidence(plan, ['zz'], '').attemptAt === 0, 'unreadable answer form on a plan question fails closed');
     const QID2 = '22222222-2222-4222-8222-222222222222';
     await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)", ['acct-b', QID2, JSON.stringify(sealed), 'seed', now, now + 86400000]);
-    const right = await lcFull(['t - 4 = 7', 't = 11']);
-    const wrong = await lcFull(['t - 4 = 7', 't = 12']);
-    eq(JSON.stringify(right.json), JSON.stringify(wrong.json), 'line check: a RIGHT and a WRONG final value get byte-identical replies');
-    eq(right.json?.lineCheck?.message, 'Press Check to mark your answer.', '— both told to press Check');
-    ok(!/11|12|match|break/i.test(JSON.stringify(right.json)), '— with no value and no verdict');
+    const right = await lcFull(['t - 4 = 7', 't = 11'], QID2);
+    const wrong = await lcFull(['t - 4 = 7', 't = 12'], QID2);
+    eq(right.text, wrong.text, 'line check: a RIGHT and a WRONG final value get byte-identical replies');
+    ok(!/11|12|match|break/i.test(right.text), '— with no value and no verdict');
     // Server-side cap: two checks per issued question per account; the third is refused.
     const c1 = await lcFull(['t - u = 7 + 4 - u'], QID2);
     const c2 = await lcFull(['t - u = 7 + 4 - u'], QID2);
     const c3 = await lcFull(['t - u = 7 + 4 - u'], QID2);
-    eq([c1.status, c2.status, c3.status, c3.json?.error?.code], [200, 200, 409, 'LINE_CHECK_LIMIT'], 'line check: the server refuses a third check on the same question');
-    ok(!('checksLeft' in (right.json?.lineCheck || {})), 'final-value replies spend no check');
+    eq([c1.status, c2.status, c3.status, JSON.parse(c3.text)?.error?.code], [200, 200, 409, 'LINE_CHECK_LIMIT'], 'line check: the server refuses a third check on the same question');
+    ok(!/checksLeft/.test(right.text), 'final-value replies spend no check');
   }
   // Line check ships OFF: with PRI_FEATURE_LINE_CHECK unset (tutor on) the route is the ordinary 404.
   {

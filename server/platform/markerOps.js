@@ -19,6 +19,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
+import { answerForm, firstFinalAttempt } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -216,8 +217,35 @@ export const MARKER_OPS = Object.freeze({
   },
   tutor({ q, lines }) {
     return { evidence: tutorEvidence(q, lines) };
+  },
+  /**
+   * "Check this line so far": where the first final-answer attempt is (by
+   * form, never by value — finalAttempt.js), and the Step Check of the lines
+   * only when there is none. `answerText` is the escrow's display answer.
+   */
+  lineCheck({ q, lines, answerText }) {
+    return lineCheckEvidence(q, lines, answerText);
   }
 });
+
+/** The line check's evidence: { attemptAt, firstBreak, verifiedLines, misconception }. */
+export function lineCheckEvidence(q, lines, answerText) {
+  const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+  const meta = stepMetaFor(q);
+  const form = answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix });
+  let stages = [];
+  let finalStage = -1;
+  if (meta?.kind === 'plan' && Array.isArray(meta.stages) && meta.stages.length && Array.isArray(lines) && lines.length) {
+    finalStage = meta.stages.filter(Boolean).length - 1;
+    try {
+      const rows = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
+      stages = lines.map((_, i) => (Number.isInteger(rows[i]?.stage) ? rows[i].stage : -1));
+    } catch { return { ...silent, attemptAt: 0 }; }   // unreadable: fail closed
+  }
+  const attemptAt = firstFinalAttempt(lines, form, { stages, finalStage });
+  if (attemptAt >= 0) return { ...silent, attemptAt };
+  return { ...tutorEvidence(q, lines), attemptAt: -1 };
+}
 
 /**
  * Serve operations on a worker's message port. One request at a time: the

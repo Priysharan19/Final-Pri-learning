@@ -515,47 +515,6 @@ export function stepAfterLastReached(request) {
 }
 
 /**
- * A line that could be the student's final answer: its right-hand side (after
- * the last "=") carries a digit and no letter, once LaTeX commands are
- * stripped. Decided by FORM only — never by whether it is right — so a right
- * and a wrong final value are treated identically (G1).
- */
-export function looksLikeFinalValue(line) {
-  return isFinalAnswerAttempt(line);
-}
-
-const FUNCTION_NAMES = /\\?(?:arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|cosec|log|ln|exp|sqrt|frac|dfrac|tfrac|lim|max|min|det|left|right|cdot|times|div|pi|theta|infty|to|mathrm|text|operatorname|displaystyle)\b/gi;
-
-/**
- * Could this line pin an unknown to a value — a final-answer attempt? FAIL
- * CLOSED: true unless the line plainly relates two or more free symbols.
- * After function names, LaTeX commands and scientific-notation exponents are
- * removed, a line with at most one distinct free letter ("11 = t",
- * "0 = t - 11", "t = 1.1e1", "t = 11 + t - t", "= 16") pins a single unknown
- * (or nothing) to a constant and is never judged; neither is a line that
- * cannot be read at all. Decided by the line's symbols, never by whether it
- * is right, so a right and a wrong value always get the same reply (G1).
- * The cost: some legitimate one-variable working lines are not judged either.
- */
-export function isFinalAnswerAttempt(line) {
-  const raw = String(line ?? '').trim();
-  if (!raw) return true;
-  if (raw.length > 400 || /[^\p{L}\p{N}\s=+\-−*/^().,'′{}\[\]|\\_<>≤≥√π²³·×÷!]/u.test(raw)) return true;
-  const s = raw
-    .replace(/(\d)(?:\.\d+)?[eE][+-]?\d+/g, '$1')          // 1.1e1 → a number
-    .replace(FUNCTION_NAMES, ' ')
-    .replace(/\\[a-z]+/gi, ' ');
-  const symbols = new Set((s.match(/\p{L}/gu) || []).map(c => c.toLowerCase()));
-  return symbols.size <= 1;
-}
-
-/** The lines the line check may judge: those BEFORE the first final-answer attempt. */
-export function judgeableLines(lines) {
-  const cut = lines.findIndex(isFinalAnswerAttempt);
-  return cut < 0 ? lines : lines.slice(0, cut);
-}
-
-/**
  * The diagnosis with no model: the engine's first break, the lines it verified,
  * and the verified solution's next step. While the attempt is open the next
  * step is its heading only, and only if the answer guard passes it; once the
@@ -940,9 +899,9 @@ export function createTutorRouter(db, {
   // like a tutor level and allows at most LINE_CHECKS_PER_QUESTION per question,
   // and here it spends one unit of the per-account daily allowance. No model.
   router.post('/line-check',
-    // Off unless PRI_FEATURE_LINE_CHECK=1 (Director decision): two-variable
-    // final answers can still be told right from wrong until final-answer
-    // detection is engine-based. Off, it is the platform's ordinary 404,
+    // Off unless PRI_FEATURE_LINE_CHECK=1 (Director decision). Final-answer
+    // detection is now engine-based (finalAttempt.js); the switch stays off
+    // until the owner turns it on. Off, it is the platform's ordinary 404,
     // before any session lookup — exactly as the tutor itself is when dark.
     (req, res, next) => (lineCheckFeatureEnabled(env) ? next()
       : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } })),
@@ -964,24 +923,24 @@ export function createTutorRouter(db, {
       const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
       if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
       if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
-      // G1: a line that could be the final answer is never judged here. Decided
-      // by form alone, so a right and a wrong final value get the same reply,
-      // and nothing is run or charged for it. The answer is marked by Check.
-      // Only the lines BEFORE the first final-answer attempt are judged; if none
-      // are left, the generic reply — identical for every value (G1).
-      const judged = judgeableLines(lines);
-      if (!judged.length) {
-        return res.json({ lineCheck: { status: 'final', message: (LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en).final } });
-      }
       // G1: two checks per issued question per account, held HERE, not only on
-      // the device. Peeked before the check runs, taken only after it ran.
+      // the device. Peeked before anything runs, taken only after a check ran.
       const capBucket = `line-check:${sha256(`${accountId}:${b.serverQuestionId}`).slice(0, 32)}`;
       const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
       if (capRow && Number(capRow.count) >= LINE_CHECKS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
         return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
       }
-      const evidence = await issued.workEvidence(judged);
-      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, judged, evidence, locale);
+      // G1: a final-answer attempt is never judged here. The engine decides,
+      // in the marker pool, by FORM — the answer's relation shape and free
+      // symbols, a pinned unknown, the plan's final stage — and never by
+      // value (finalAttempt.js). From the first attempt onward the reply is
+      // the one generic line, identical for a right and a wrong answer, and
+      // nothing is charged. Unreadable lines fail closed into that reply.
+      const evidence = await issued.lineCheckEvidence(lines);
+      if (!evidence.unchecked && evidence.attemptAt >= 0) {
+        return res.json({ lineCheck: { status: 'final', message: (LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en).final } });
+      }
+      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale);
       // G2: a check that did not run costs nothing — no cap, no allowance.
       if (reply.status === 'unchecked') return res.json({ lineCheck: reply });
       const cap = await consumeRateLimit(db, capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
