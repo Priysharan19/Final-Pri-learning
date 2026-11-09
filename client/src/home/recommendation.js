@@ -1,3 +1,5 @@
+import { practiceHref } from '../lib/practiceLinks.js';
+
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
@@ -70,6 +72,28 @@ function task(row, now) {
   );
 }
 
+// The engine's own pick, with its reason and its target kept: the card says
+// why (a repeated slip, a due review, a weak spot) and opens that chapter at
+// that dot point and difficulty, not generic practice. Only fields the engine
+// set are carried; a pick without a chapter id falls back to /practice.
+const ADAPTIVE_REASONS = new Set(['review-due', 'weak-spot', 'misconception', 'new-ground', 'interleave']);
+function adaptiveItem(adaptive) {
+  const subtopic = typeof adaptive.subtopic === 'string' && adaptive.subtopic ? adaptive.subtopic : null;
+  const dp = Number.isInteger(adaptive.dotpoint) && adaptive.dotpoint >= 0 ? adaptive.dotpoint : null;
+  const diff = Number.isInteger(adaptive.difficulty) && adaptive.difficulty >= 1 && adaptive.difficulty <= 4 ? adaptive.difficulty : null;
+  const reasonTag = ADAPTIVE_REASONS.has(adaptive.reasonTag) ? adaptive.reasonTag : null;
+  const misconception = reasonTag === 'misconception' && typeof adaptive.misconception === 'string' && adaptive.misconception.trim()
+    ? adaptive.misconception.trim() : null;
+  const data = {
+    topic: adaptive.name || '', reasonTag, misconception,
+    dotpoint: dp, dotpointN: dp == null ? null : dp + 1,
+    dotpointText: dp != null && typeof adaptive.dotpointText === 'string' ? adaptive.dotpointText : null,
+    difficulty: diff
+  };
+  const destination = subtopic ? practiceHref({ subtopic, dotpoint: dp, difficulty: diff }) : '/practice';
+  return item('adaptive', 60, subtopic || adaptive.id || 'adaptive', data, destination);
+}
+
 export function resolveHomeRecommendation({
   user, stats = null, dueCount = 0, tasks = [], exams = [], resume = null,
   assignments = [], cachedAssignments = [], online = true, cloudReady = true, now = Date.now()
@@ -121,7 +145,7 @@ export function resolveHomeRecommendation({
   if (done > 0 && done < goal) { const n = goal - done; rows.push(item('daily-goal', 70, 'daily-goal', { done, goal, remaining: n, n, count: n })); }
 
   const adaptive = stats?.recommendation || stats?.priorities?.[0];
-  if (adaptive && hasHistory) rows.push(item('adaptive', 60, adaptive.subtopic || adaptive.id || 'adaptive', { topic: adaptive.name || '' }));
+  if (adaptive && hasHistory) rows.push(adaptiveItem(adaptive));
 
   if (!hasHistory) rows.push(item('first-practice', 55, 'first-practice', { year: user.year }, '/practice', null, !online));
 

@@ -494,6 +494,19 @@ const WORK_REASONS = {
   returned: 'home.reason.returned', ready: 'home.reason.ready'
 };
 
+// The engine's specific reason for its pick. A misconception reason names the
+// slip only when the engine named one; a dot point is named only when the pick
+// targets one. Anything else keeps the general sentence.
+function adaptiveReasonKey(d) {
+  const tag = d.reasonTag;
+  if (tag === 'misconception') return d.misconception ? 'home.reason.adaptiveSlipNamed' : 'home.reason.adaptiveSlip';
+  if (tag === 'review-due') return d.dotpointN ? 'home.reason.adaptiveReviewDp' : 'home.reason.adaptiveReview';
+  if (tag === 'weak-spot') return d.dotpointN ? 'home.reason.adaptiveWeakDp' : 'home.reason.adaptiveWeak';
+  if (tag === 'new-ground') return 'home.reason.adaptiveNew';
+  if (tag === 'interleave') return 'home.reason.adaptiveInterleave';
+  return 'home.reason.adaptive';
+}
+
 /** The words for one recommendation. Every claim comes from the action's own data. */
 function actionCopy(action, user, t, topicName, resume) {
   const d = action.data || {};
@@ -516,7 +529,7 @@ function actionCopy(action, user, t, topicName, resume) {
       : action.kind.endsWith('resume') ? 'home.reason.resume'
         : action.kind === 'reviews' ? 'home.reviewDue'
           : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
-            : action.kind === 'adaptive' ? 'home.reason.adaptive'
+            : action.kind === 'adaptive' ? adaptiveReasonKey(d)
               : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')
                 : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
   const kicker = action.kind === 'exam' || action.kind === 'exam-expired' ? 'home.kicker.exam'

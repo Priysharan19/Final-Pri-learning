@@ -229,6 +229,33 @@ check('KALP-04 command-centre CSS has responsive and reduced-motion rules', () =
   assert.match(theme, /prefers-reduced-motion: reduce/);
 });
 
+check('adaptive pick keeps its reason and opens its chapter, dot point and difficulty (audit #8)', () => {
+  const row = selected({ stats: { totals: { attempts: 12 }, recommendation: {
+    subtopic: 'in-10-quadratic', name: 'Quadratic Equations', reasonTag: 'misconception',
+    misconception: 'dropping the ±', dotpoint: 2, dotpointText: 'Roots by formula', difficulty: 2 } } });
+  assert.equal(row.kind, 'adaptive');
+  assert.equal(row.destination, '/practice?subtopic=in-10-quadratic&dotpoint=2&difficulty=2');
+  assert.equal(row.data.reasonTag, 'misconception');
+  assert.equal(row.data.misconception, 'dropping the ±');
+  assert.equal(row.data.dotpointN, 3);
+});
+
+check('adaptive pick without a chapter id or with junk fields falls back safely', () => {
+  const row = selected({ stats: { totals: { attempts: 12 }, priorities: [{ id: 'algebra', name: 'Algebra', reasonTag: 'bogus', dotpoint: -1, difficulty: 9 }] } });
+  assert.equal(row.destination, '/practice');
+  assert.equal(row.data.reasonTag, null);
+  assert.equal(row.data.dotpoint, null);
+  assert.equal(row.data.difficulty, null);
+});
+
+check('Home words each adaptive reason from its own key, in English and Hindi', () => {
+  assert.match(home, /adaptiveReasonKey\(d\)/);
+  for (const [file, s] of [['en', en], ['hi', hi]]) {
+    for (const k of ['adaptiveSlipNamed', 'adaptiveSlip', 'adaptiveReviewDp', 'adaptiveReview', 'adaptiveWeakDp', 'adaptiveWeak', 'adaptiveNew', 'adaptiveInterleave'])
+      assert.match(s, new RegExp("'home\\.reason\\." + k + "'"), file + ' ' + k);
+  }
+});
+
 console.log('');
 console.log('KALP-04 HOME SCENARIO CHECK — ' + passed + '/' + (passed + failures.length) + ' checks');
 if (failures.length) {
