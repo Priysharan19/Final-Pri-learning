@@ -33,6 +33,12 @@ import { metrics, metricsAccess, recordDatabaseError, recordServerError } from '
 import { captureError } from './errorSink.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
 
+/** 'staging' | 'production' | another short [a-z0-9-] token | null, from the deployment's own environment. */
+export function deploymentEnvironment(env = process.env) {
+  const raw = String(env.PRI_DEPLOYMENT_ENVIRONMENT || env.RAILWAY_ENVIRONMENT_NAME || env.RAILWAY_ENVIRONMENT || '').trim().toLowerCase();
+  return /^[a-z0-9-]{1,32}$/.test(raw) ? raw : null;
+}
+
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
 export const HEALTH_DB_TIMEOUT_MS = 1_500;
 
@@ -123,6 +129,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       billingSchemaVersion,
       // Which driver serves /v1 — never the URL, host, user or file path.
       database: { engine: db.dialect, reachable },
+      // Which deployment this is, as it declares itself (Railway sets the name),
+      // so a native archive's release evidence can tell staging from
+      // production behind https://app.prilearning.com. A short token, never a URL.
+      environment: deploymentEnvironment(),
       // The per-account storage cap every device is held to: two numbers a
       // client may show, never a per-account figure.
       syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },

@@ -358,7 +358,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         fetchImpl: dryRun ? fakeFetchFor(s, i) : globalThis.fetch
       });
       rows.push({
-        writer: s.writer, file: s.file, index: s.index,
+        writer: s.writer, file: s.file, index: s.index, pen: s.pen,
         want: normalize(s.target), got: normalize(result.text),
         confidence: Number(result.confidence) || 0,
         needsConfirmation: result.needsConfirmation === true,
@@ -393,6 +393,15 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     results: summary,
     misreads,
     errors,
+    // Every scored read, so the release gate (client/test/ink-release-evidence-gate.mjs)
+    // can re-derive exact, character, worst-writer, critical-structure and
+    // safe-auto figures from the record instead of trusting this summary.
+    // Prompt transcriptions and the reader's text only; no student identity.
+    rows: rows.map(r => ({
+      writer: r.writer, file: r.file ?? null, index: r.index ?? null, pen: r.pen === true,
+      want: r.want, got: r.got, confidence: r.confidence, needsConfirmation: r.needsConfirmation === true,
+      engine: r.engine ?? null, latencyMs: r.latencyMs ?? null, error: r.error ?? null
+    })),
     durationMs: Date.now() - started,
     notes: [
       `${writers} writer(s) ${writers < 8 ? 'is too few for a product accuracy claim (Gate C: >= 20 writer-disjoint test writers, >= 1,000 expressions)' : ''}`.trim(),

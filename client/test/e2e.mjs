@@ -40,6 +40,7 @@ import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 import { watchBoot, bootFailure, bootRecovery, recordFlight } from './support/boot-diagnostics.mjs';
+import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -305,6 +306,9 @@ async function runFlow(flow, { browser, opts }) {
     // Playwright, not intercepted first by a service worker (WebKit too).
     ...(flow.inspectNetwork ? { serviceWorkers: 'block' } : {})
   });
+  // D17: a reading flow accepts the one-time prompt naming OpenAI when it
+  // appears (fakeServerReader.js); the flow about that prompt asks instead.
+  if (flow.readerPermission !== 'ask') await ctx.addInitScript(acceptReaderPermissionOnSight);
   const page = await ctx.newPage();
   const crashes = [];
   // WebKit, tearing a page down for a navigation, cancels its in-flight

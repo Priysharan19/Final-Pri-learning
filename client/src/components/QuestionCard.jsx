@@ -17,6 +17,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
+import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -1348,7 +1349,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (String(given).trim() === '') return;
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
     }
-    const sourceMode = viaInk ? 'ink' : (mode === 'photo' && photo ? 'photo' : 'typed');
+    // D17: a photo the student did not allow to be read (declined, or never
+    // asked) never leaves the device with the answer — "Type instead" sends
+    // the typed answer alone.
+    const sentPhoto = photo && readerPermission(user) === READER_PERMISSION.ACCEPTED ? photo : undefined;
+    const sourceMode = viaInk ? 'ink' : (mode === 'photo' && sentPhoto ? 'photo' : 'typed');
     // The same answer through a different input authority is NOT a replay of
     // the same request. Never reuse a Photo idempotency key as a typed grade.
     const contentKey = submissionContentKey(given, steps);
@@ -1393,7 +1398,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, ...(photo && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**

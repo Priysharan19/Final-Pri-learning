@@ -242,7 +242,8 @@ jobs:
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
-          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
+          # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -291,7 +292,9 @@ jobs:
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 74 files scanned, 0 hard-coded strings' suites.log
+          # 75 (Train 4, re-derived by running): main 71 + src/parent (2) + tutor/MistakeDiagnosis.jsx + ink/ReaderPermission.jsx (#737, the D17 prompt).
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 75 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
@@ -994,6 +997,8 @@ jobs:
             node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-write-sign-in.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
+            # D17 (L4): asked once, naming OpenAI, before the first read — phone finger, tablet, photo, offline ink.
+            node client/test/tour-ink-reader-permission.js --no-build 2>&1 | tee -a browser.log
             # Task 02: mounted server-authoritative method credit and stale receipt rejection.
             node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
@@ -1166,6 +1171,10 @@ jobs:
           # when the SESSION ENDS mid-work or at a start, offline inside the
           # app, and a prepared question taken up elsewhere. tour-activation-
           # gate.js proves the gate itself.
+          # D17 (L4): asked once, naming OpenAI, before the first read; nothing sent before an accept.
+          grep -Fq 'D17 · asked once before anything is read — phone finger, tablet, decline, accept, same-revision grade' browser.log
+          grep -Fq 'D17 · a photo is asked about first; ink written offline is kept and read on return' browser.log
+          grep -Fq 'E2E SUITE PASSED — 38/38 checks across 2 flows' browser.log
           grep -Fq 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
           grep -Fq 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry' browser.log
           grep -Fq 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked' browser.log
