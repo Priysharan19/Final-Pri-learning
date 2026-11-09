@@ -138,6 +138,40 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-11-09',
     note: 'Read from the Internet Archive capture (sha256 c946fea3ed506f78ee6b58ae0a2a6160d1822e710c066cd6507c891b4a0164f5); one document carries both papers, each question printed with its final answer.'
   }),
+  'jeeadv-2019-p1-questions': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 1 · question paper (English)',
+    kind: 'official-question-paper',
+    url: 'https://jeeadv.ac.in/past_qps/2019_1_English.pdf',
+    retrieved: '2026-11-09',
+    note: 'Scanned page images, read from the rendered page (sha256 c93299dddcdb2f0d90b86888e0143cbdefbbcc5aa48caa66d8568003df499ee5, matching tools/jee-question-department/official-sources.json).'
+  }),
+  'jeeadv-2019-p1-key': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 1 · final answer key',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P1.pdf',
+    archivedAt: 'https://web.archive.org/web/20190713224429/https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P1.pdf',
+    retrieved: '2026-11-09',
+    note: 'sha256 e38a64f8323d1e34d34b17ce78567c9a2c3469231bef41278ba9c71be3a8adb3, matching tools/jee-question-department/official-sources.json.'
+  }),
+  'jeeadv-2019-p2-questions': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 2 · question paper (English)',
+    kind: 'official-question-paper',
+    url: 'https://jeeadv.ac.in/past_qps/2019_2_English.pdf',
+    retrieved: '2026-11-09',
+    note: 'Scanned page images, read from the rendered page (sha256 6082e197772b7b715c1dc7e063e8b3f23797c07f9479f9bd695bd3d31752ae16, matching tools/jee-question-department/official-sources.json).'
+  }),
+  'jeeadv-2019-p2-key': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2019 · Paper 2 · final answer key',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P2.pdf',
+    archivedAt: 'https://web.archive.org/web/20190713011044/https://jeeadv.ac.in/documents/KEY-2019-Final-13.06.2019-P2.pdf',
+    retrieved: '2026-11-09',
+    note: 'sha256 0868049ac0ee4a8ffdd9566d75620d0cb8d0da4fe172caab84f8734bfcb493fe, matching tools/jee-question-department/official-sources.json.'
+  }),
   'cbse-2025-xii-65-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
     title: 'CBSE Senior School Certificate Examination 2025 · Mathematics (041) · question paper 65/1/1',
