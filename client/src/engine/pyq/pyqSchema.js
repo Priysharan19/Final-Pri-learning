@@ -25,6 +25,7 @@
 
 import { IN_CHAPTER_BY_ID } from '../curriculum-in.js';
 import { PYQ_PROVENANCE, PYQ_PUBLISHABLE, pyqExam, pyqSource } from './pyqSources.js';
+import { figureHasExternalRef } from '../../lib/figureRefs.js';
 
 /** Answer contracts the archive can carry, and checker.js can mark. */
 export const PYQ_ANSWER_TYPES = Object.freeze(['mcq', 'numeric']);
@@ -60,6 +61,7 @@ function checkFigure(rec, figure, where) {
   if (svg.length > PYQ_FIGURE_MAX) fail(rec, `gives ${where} a figure longer than ${PYQ_FIGURE_MAX} characters.`);
   if (!/^<svg[\s>]/i.test(svg) || !/<\/svg>$/i.test(svg)) fail(rec, `gives ${where} a figure that is not a single inline <svg> element.`);
   if (FIGURE_FORBIDDEN.test(svg)) fail(rec, `gives ${where} a figure with script, an event handler, an external reference or an embedded object.`);
+  if (figureHasExternalRef(svg)) fail(rec, `gives ${where} a figure that references something outside itself; only url(#localId) and href="#localId" are allowed.`);
 }
 
 function checkSources(rec, field) {

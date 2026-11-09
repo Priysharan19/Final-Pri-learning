@@ -30,7 +30,11 @@ const ALLOWED_STYLE_PROPS = new Set(['max-width', 'width', 'height', 'display'])
 
 // Second belt on the values that do survive: no scheme, no protocol-relative
 // reference, no markup smuggled back in through an attribute.
+import { hasNonLocalUrlRef } from './figureRefs.js';
+export { hasNonLocalUrlRef };
+
 const UNSAFE_VALUE = /(?:javascript|vbscript|data|blob|file)\s*:|^\s*\/\/|[<>]/i;
+
 
 const MAX_FIGURE = 20000;
 const MAX_DEPTH = 8;
@@ -60,7 +64,7 @@ function safeAttr(rawName, rawValue) {
   const name = String(rawName).toLowerCase();
   if (name.startsWith('on') || name.includes(':') || !ALLOWED_ATTRS.has(name)) return '';
   let value = String(rawValue);
-  if (UNSAFE_VALUE.test(value)) return '';
+  if (UNSAFE_VALUE.test(value) || hasNonLocalUrlRef(value)) return '';
   if (name === 'style') {
     value = safeStyle(value);
     if (!value) return '';
