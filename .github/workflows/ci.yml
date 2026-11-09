@@ -674,6 +674,11 @@ jobs:
           set -o pipefail
           node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
           grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
+      - name: Where the time went on a timed paper — measured per question, Premium on read (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/exam-time-check.mjs 2>&1 | tee exam-time.log
+          grep -Fq 'EXAM TIME: PASS — 23/23 checks' exam-time.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -702,7 +707,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 83/83 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 84/84 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -730,6 +735,8 @@ jobs:
           grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
           # 61 → 62 (L6): typed board mocks on Postgres.
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
+          # 83 → 84 (L6, plan F10): where the time went, on Postgres.
+          grep -Fq '✓ exam-time-check.mjs' platform-postgres.log
           # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log

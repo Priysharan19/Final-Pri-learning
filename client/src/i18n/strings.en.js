@@ -1738,6 +1738,15 @@ export default {
   'examAnalysis.practise': 'Practise {label}',
   'examAnalysis.weakItem': '{label} — {awarded} of {marks} marks ({lost} lost, {wrong} wrong, {unattempted} unattempted)',
   'examAnalysis.untimed': 'Time per section was not measured for this paper.',
+  'sectionTime.title': 'Where your time went',
+  'sectionTime.summary': 'Time measured on this paper: {time}. Marks: {awarded} of {marks}.',
+  'sectionTime.ruleTime': 'Time',
+  'sectionTime.ruleMarks': 'Marks',
+  'sectionTime.line': '{time} here ({timeShare} of the time) for a section worth {marks} marks ({marksShare} of the paper). Earned {awarded}, {perMinute} marks a minute. Reached {reached} of {questions} questions.',
+  'sectionTime.lastLost': 'The last question you reached here, question {order}, lost {lost} of the {sectionLost} marks lost in this section.',
+  'sectionTime.note': 'This describes this one sitting. Time is measured while a question is on screen; it is not a judgement of how you should split your time.',
+  'sectionTime.offer': 'After each timed paper, Premium shows where your time went, section by section.',
+  'sectionTime.offerLink': 'See Premium',
   'examAnalysis.stepMarks': { one: 'Step marks: method marks were earned on {count} question ({earned} marks); {lost} more were lost on it. Marks lost on attempted questions: {lostOnAttempted}; left on unattempted questions: {unattempted}.', other: 'Step marks: method marks were earned on {count} questions ({earned} marks); {lost} more were lost on those questions. Marks lost on attempted questions: {lostOnAttempted}; left on unattempted questions: {unattempted}.' },
 
   // ── Progress (Australian course branch) ───────────────────────────────────────
