@@ -340,6 +340,8 @@ jobs:
           # 42 → 53 (#196): the predicted mark stays display-only — imported only by the progress
           # summary and page, never by the server or a marking module, and a pure read of the evidence.
           grep -Fq 'MARK PREDICTOR: PASS — 53/53 checks' suites.log
+          # The server's own readiness estimate equals the device's on a fixture set, and only the read-only forecast route reaches it.
+          grep -Fq 'FORECAST PARITY: PASS — 63/63 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           # #196: the hostile-PDF bounds of #204 (pre-parser size, canvas allocation, parse/render
           # timeouts with cleanup) had a regression suite that no script or workflow ran.

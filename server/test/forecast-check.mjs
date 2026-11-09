@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the server's exam-readiness forecast (server/platform/forecast.js)
 //
-//   1 · parity: the server's estimate is the device's markPredictor over rows
+//   1 · the forecast is the server's own estimate (readinessEstimate.js) over rows
 //       replayed from the grader's own events; paper answers, revealed answers
 //       and client-written events are not evidence;
 //   2 · the trend only uses evidence that existed at each week's end;
@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { backtest, chapterRows, forecastAt, forecastTrend, practiceEvidence, selectionOf } from '../platform/forecast.js';
-import { predictExamMark } from '../../client/src/engine/markPredictor.js';
+import { estimateExamMarks } from '../platform/readinessEstimate.js';
 import { updateRating, START_RATING } from '../../client/src/engine/adaptive.js';
 import { checks, registerAccount, startApp, verifyEmail } from './support/app-harness.mjs';
 import { requestedEngine } from './support/engine.mjs';
@@ -42,7 +42,7 @@ c.eq(practiceEvidence({ subtopic: 'c10-circles', at: NOW }), null, 'an attempt w
   c.deq(rows.x, { attempts: 2, correct: 1, rating: r, last_at: 2 }, 'rows are replayed in time order with the device\'s Elo update');
 }
 const server = forecastAt(CBSE10, evidence, NOW);
-c.deq(server, predictExamMark(CBSE10, chapterRows(evidence, NOW), { nowMs: NOW }), 'the server estimate is markPredictor over the replayed rows');
+c.deq(server, estimateExamMarks(CBSE10, chapterRows(evidence, NOW), { nowMs: NOW }), 'the forecast is the server estimate over the replayed rows');
 c.ok(server.show && server.low <= server.expected && server.expected <= server.high, 'with most of the paper practised it shows an interval around the estimate');
 c.ok(server.unseenMarks > 0 && server.expected <= server.coveredMarks, 'untouched marks stay outside the estimate');
 

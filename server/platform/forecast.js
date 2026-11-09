@@ -3,14 +3,14 @@
 //
 // GET /v1/forecast?track=cbse&grade=10&variant=standard
 //
-// The server's own copy of the device's estimate (engine/markPredictor.js),
+// The server's own copy of the device's estimate (the device's mark predictor),
 // built only from THIS account's server-marked practice: the grader's
 // `graded-attempt` events. Client-written events never count, so nothing a
 // device publishes can move the estimate.
 //
 // What it answers, and what it refuses to:
 //
-//   · `forecast` — markPredictor over the paper's blueprint: an interval on the
+//   · `forecast` — the server's own estimate (readinessEstimate.js, kept in parity with the device's) over the paper's blueprint: an interval on the
 //     marks the student has practised, never scaled to the untouched rest, and
 //     no headline below the coverage floor. Same function as the device.
 //   · `trend` — the same estimate as it stood at the end of each of the last
@@ -35,7 +35,7 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireRole, requireSession, requireVerifiedEmail } from './security.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
-import { predictExamMark } from '../../client/src/engine/markPredictor.js';
+import { estimateExamMarks } from './readinessEstimate.js';
 import { START_RATING, updateRating } from '../../client/src/engine/adaptive.js';
 import { indiaExamBlueprint } from '../../client/src/engine/indiaExams.js';
 
@@ -77,7 +77,7 @@ export function chapterRows(evidence, before = Infinity) {
 }
 
 export function forecastAt(blueprint, evidence, at) {
-  return predictExamMark(blueprint, chapterRows(evidence, at), { nowMs: at });
+  return estimateExamMarks(blueprint, chapterRows(evidence, at), { nowMs: at });
 }
 
 /** The estimate at the end of each of the last `weeks` weeks, oldest first. Only weeks with practice behind them. */
