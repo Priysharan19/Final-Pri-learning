@@ -213,7 +213,7 @@ const AUDIT = () => {
     .filter(el => visible(el) && !el.closest('[aria-hidden="true"], [inert]'));
   const unnamed = controls.filter(el => !nameOf(el)).map(el => `${el.tagName}.${String(el.className).slice(0, 40)}`);
   // The hit area, not the drawn box: small glyph controls keep their size and
-  // get a 44px area underneath on touch screens (theme-legacy.css). Probe the
+  // get a 44px area underneath on touch screens (theme.css). Probe the
   // points 21px either side of the centre; each must land on the control.
   const small = controls.filter(el => {
     // Inline text links (WCAG 2.5.8 inline exception): a link sitting in a run
