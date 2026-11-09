@@ -174,9 +174,13 @@ const stateOf = url => new URL(url).searchParams.get('state');
     ok('delayed nonce request started', typeof deliverNonce === 'function');
     controller.abort();
     ok('Cancel closes popup synchronously during nonce wait', b.popup.closed);
+    // Cancellation must release the learner immediately, without depending
+    // on the nonce fetch resolving. The mock deliberately ignores abort.
+    await rejectsWith('Cancel settles before the nonce returns', () => pending, 'SOCIAL_CANCELLED');
+    ok('late nonce has not navigated a provider popup', !b.events.some(event => event[0] === 'navigate'));
     deliverNonce(json({ nonce: 'late-nonce', expiresAt: Date.now() + 600000 }, 201));
-    await rejectsWith('late nonce is still cancelled', () => pending, 'SOCIAL_CANCELLED');
-    ok('late nonce cannot navigate cancelled popup', !b.events.some(event => event[0] === 'navigate'));
+    await settle();
+    ok('a late response still cannot navigate the cancelled popup', !b.events.some(event => event[0] === 'navigate'));
   } finally { globalThis.fetch = originalFetch; }
 }
 {

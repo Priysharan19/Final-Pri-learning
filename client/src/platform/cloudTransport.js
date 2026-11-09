@@ -608,7 +608,7 @@ export const cloud = Object.freeze({
   // and issues the nonce the provider token must carry back; it is stored
   // hashed, accepted once and expires.
   identityProviders: () => cloudRequest('/v1/account/identity/providers'),
-  identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
+  identityNonce: ({ signal = null } = {}) => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {}, signal }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),

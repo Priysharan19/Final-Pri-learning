@@ -142,7 +142,16 @@ export async function requestIdentityToken(provider, { clientId } = {}, { env = 
   // Settled below either way; this keeps an early failure from going unhandled.
   answer.catch(() => {});
   try {
-    const { nonce } = await cloud.identityNonce();
+    // Do not keep the sign-in form busy waiting for a nonce request after
+    // cancellation. A fetch/transport may ignore AbortSignal (or stall before
+    // the response), so race the request with this attempt's already-wired
+    // cancellation/timeout outcome. An early provider token cannot count
+    // as a nonce; only the server's nonce response can authorize navigation.
+    const cancelledOrTimedOut = answer.then(
+      () => new Promise(() => {}),
+      error => { throw error; }
+    );
+    const { nonce } = await Promise.race([cloud.identityNonce({ signal }), cancelledOrTimedOut]);
     if (signal?.aborted) throw failure('SOCIAL_CANCELLED', 'Sign-in was cancelled.');
     if (!nonce) throw failure('SOCIAL_PROVIDER_ERROR', 'The server did not issue a sign-in nonce.');
     popup.location.href = authorizeUrl(provider, { clientId, nonce, state, origin: env.location.origin });
