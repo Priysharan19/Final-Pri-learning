@@ -299,7 +299,10 @@ export function fullyVerifiedWorking(report) {
   if (lines.length < 2) return false;
   if (Number.isInteger(report?.firstBreak) && report.firstBreak !== -1) return false;
   if (report?.diagnosis) return false;
-  return lines.every(l => l && l.status === 'ok');
+  // A tick for matching a worked-solution step (milestones.js) is feedback:
+  // no transition was checked, so it never counts as verified working.
+  if (report?.source === 'milestones') return false;
+  return lines.every(l => l && l.status === 'ok' && !l.milestone);
 }
 
 /**
