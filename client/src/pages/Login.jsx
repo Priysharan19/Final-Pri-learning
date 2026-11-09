@@ -298,12 +298,28 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // The graph is illustrative and stays outside the offline install. Do not
+  // even request its lazy JS/CSS when the device is offline: the boot guard
+  // would correctly report those missed assets, despite the form surviving.
+  const [visualOnline, setVisualOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine !== false
+  );
   const stepHeadingRef = useRef(null);
   const createPendingRef = useRef(false);
   const accountProfileRef = useRef(null);
 
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const update = () => setVisualOnline(navigator.onLine !== false);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    update();
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
 
   // Returning users open on their saved profiles — once, when the list arrives.
   // After that the picker's "Create another Pri account" may show the card.
@@ -574,7 +590,9 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     return (
       <div className="auth-wrap pri-auth">
         <MathField />
-        {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
+        {SignInPlot && visualOnline
+          ? <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>
+          : <div className="in-signin-plot" aria-hidden="true" />}
         <div className="auth-col fade-in">
           <Logo large />
           {atStart && (
