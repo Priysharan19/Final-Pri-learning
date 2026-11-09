@@ -46,6 +46,7 @@ const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${S
 await loadAllBanks();
 const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
 const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
+const { CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS, CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE } = await import(`${SRC}engine/curriculum-in-competency-covers.js`);
 const BASE_SOURCE = (await import('node:fs')).readFileSync(new URL('../src/engine/curriculum-in-base.js', import.meta.url), 'utf8');
 const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_COVERS, INDIA_JEE_REPLACEMENT_PROVENANCE, INDIA_RETIRED_RUNGS } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
 const { SOLVE_JEE_C11 } = await import('./india-hardest-solvers-jee-c11.mjs');
@@ -739,6 +740,28 @@ const TRANCHES = [
 const entries = TRANCHES.flatMap(t => Object.entries(t.table).flatMap(([chapterId, covers]) => covers.map(c => ({ chapterId, tranche: t, ...c }))));
 const ids = entries.map(e => e.gen);
 const rungOf = Object.fromEntries(entries.map(e => [e.gen, e.tranche.rung]));
+// This historical suite proves the FIRST D3 forms closed real 2026 syllabus
+// gaps. Later original additions must not retroactively falsify that history.
+// Only explicitly declared, independently checked supplemental forms may be
+// excluded when reconstructing the original before-tranche D3 state.
+const laterOriginals = Object.entries(CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS)
+  .flatMap(([chapterId, covers]) => covers.map(c => ({ chapterId, ...c })));
+const laterIds = laterOriginals.map(c => c.gen);
+ok('later original D3 forms are distinct from all historical tranche forms',
+  new Set([...ids, ...laterIds]).size === ids.length + laterIds.length);
+ok('later original forms retain PENDING independent mathematics review',
+  CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.mathReviewStatus === 'pending-independent' &&
+  CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.humanMathApproved === false &&
+  CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.boardApproved === false);
+for (const e of laterOriginals) {
+  const ch = IN_CHAPTER_BY_ID[e.chapterId];
+  ok(`later original ${e.gen} is live at its declared Class X D3 outcome`,
+    !!ch && indiaChapterGrade(ch) === 10 &&
+    JSON.stringify(e.diff) === '[3]' && e.dp.length === 1 &&
+    ch.covers.some(c => c.gen === e.gen && JSON.stringify(c.dp) === JSON.stringify(e.dp) &&
+      JSON.stringify(c.diff) === '[3]') &&
+    typeof GENERATORS[e.gen] === 'function');
+}
 for (const t of TRANCHES) {
   const n = entries.filter(e => e.tranche === t).length;
   ok(`${t.name} names ${t.count} dot points`, n === t.count, String(n));
@@ -761,9 +784,17 @@ for (const e of entries) {
   ok(`${e.gen} is registered`, typeof GENERATORS[e.gen] === 'function');
   ok(`${e.gen} resolves to its class bank`, bankOf(e.gen) === (rung === 3 ? BANK_FOR_GRADE[grade] : `india-class${grade}`), String(bankOf(e.gen)));
   ok(`${where} names exactly one dot point at exactly D${rung}`, e.dp.length === 1 && JSON.stringify(e.diff) === `[${rung}]`, JSON.stringify(e));
-  // The gap was real: nothing else in the chapter reaches this dot point at the rung.
-  const others = chapter.covers.filter(c => !ids.includes(c.gen) && c.dp.includes(e.dp[0]) && c.diff.includes(rung));
-  ok(`${where} had no D${rung} form before this table`, others.length === 0, others.map(c => c.gen).join(', '));
+  // Reconstruct the historical pre-tranche state. Original competency forms
+  // added AFTER this table are checked above and by the independent prompt
+  // oracle; they were not present when the 2026 D3 gaps were identified.
+  const explicitlyLater = new Set(laterOriginals
+    .filter(c => c.chapterId === e.chapterId && c.dp.includes(e.dp[0]) && c.diff.includes(rung))
+    .map(c => c.gen));
+  const others = chapter.covers.filter(c =>
+    !ids.includes(c.gen) && !explicitlyLater.has(c.gen) &&
+    c.dp.includes(e.dp[0]) && c.diff.includes(rung));
+  ok(`${where} had no D${rung} form before this table`, others.length === 0,
+    others.map(c => c.gen).join(', '));
   ok(`${where} carries the new cover on the live chapter`, chapter.covers.some(c => c.gen === e.gen && c.dp[0] === e.dp[0] && c.diff.includes(rung)));
   for (const track of e.tranche.tracks) {
     const { ceiling } = indiaDifficultyWindow(track, grade);
