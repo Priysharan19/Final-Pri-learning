@@ -19,25 +19,43 @@ import { plainTex } from './checker.js';
 const TEX_SPAN = /\$([^$]+)\$/g;
 // A label is a named quantity, not an expression: a letter (Greek Δ allowed),
 // optional primes, an optional subscript, an optional argument.
-const LABEL = /^(?:Δ|[A-Za-z])(?:'{1,2})?(?:_[A-Za-z0-9]+)?(?:\([^()=]{1,12}\))?$/;
+const LABEL = /^(?:Δ|[A-Za-z])(?:'{1,2})?(?:_[A-Za-z0-9]+)?(?:\(-?[A-Za-z0-9.]{1,4}(?:,-?[A-Za-z0-9.]{1,4})?\))?$/;
 
 const tidyLabel = s => String(s).replace(/\\Delta/g, 'Δ').replace(/\\prime/g, "'").replace(/[′’]/g, "'")
   .replace(/[{}\s]/g, '').replace(/\\left|\\right/g, '');
 
 /**
- * One TeX span may hold several statements: `a = 11, \\quad d = 7` or
- * `u = x^3; v = 3x + 4`. Split at a comma, semicolon or TeX space that is
- * followed by another `LABEL =`, so each label keeps its own value.
+ * Words and TeX tokens that join two statements in one span: an implication,
+ * a line break, a connective, a separator. A span is cut at every one of them
+ * (at bracket depth 0 for , and ;) so a label never keeps another statement's value.
  */
-function statements(span) {
-  const pieces = String(span).split(/\s*(?:,|;|\\qquad|\\quad|\\;|\\,|\\text\{\s*and\s*\})\s*(?:\\qquad|\\quad|\\;|\\,)?\s*/);
-  const out = [];
-  for (const p of pieces) {
-    const head = tidyLabel(p.split(/(?<![<>!])=(?!=)/)[0] ?? '');
-    if (out.length && !(p.includes('=') && LABEL.test(head))) out[out.length - 1] += `, ${p}`;
-    else out.push(p);
+export const JOINERS = /\\(?:Rightarrow|Longrightarrow|implies|iff|Leftrightarrow|to|therefore|because|qquad|quad|;|,|:|\s)|\\\\|\\(?:text|mathrm|textrm)\{\s*(?:so|gives|then|hence|and|or|i\.e\.|thus|therefore|which gives|giving)\s*,?\s*\}|⇒|→|∴|\b(?:so|gives|then|hence|and)\b/g;
+
+/**
+ * The statements of one span. A piece with no `=` (the "2" of `x = 1, 2`) is
+ * glued to the statement before it, whose value then has a top-level comma
+ * and so is dropped whole. A piece with its own `=` but no label is its own
+ * statement and yields nothing; it is never glued to a label.
+ */
+export function statements(span) {
+  const marked = String(span).replace(JOINERS, '\u0000');
+  const pieces = [];
+  let depth = 0, cur = '';
+  for (const c of marked) {
+    if ('([{'.includes(c)) depth += 1;
+    else if (')]}'.includes(c)) depth -= 1;
+    if (c === '\u0000' || (depth === 0 && (c === ',' || c === ';'))) { pieces.push(cur); cur = ''; continue; }
+    cur += c;
   }
-  return out;
+  pieces.push(cur);
+  const out = [];
+  for (const raw of pieces) {
+    const p = raw.trim();
+    if (!p) continue;
+    if (!p.includes('=') && out.length) { out[out.length - 1] = { text: `${out[out.length - 1].text}, ${p}`, glued: true }; continue; }
+    out.push({ text: p, glued: false });
+  }
+  return out.filter(x => !x.glued).map(x => x.text);
 }
 function topLevelComma(v) {
   let depth = 0;

@@ -70,6 +70,53 @@ ok(mo.lines.every(l => l.status === 'ok') && fullyVerifiedWorking(mo) === false,
 ok(fullyVerifiedWorking(annotateMilestones(q, stepCheck(meta, "f'(x)=6x+1\n6x+1=0\nx=-1/6"))) === false, 'an annotated tick never counts as verified working');
 ok(fullyVerifiedWorking(stepCheck(meta, '6x+1=0\nx=-1/6')) === true, 'checked working still counts');
 
+
+// ── Group 3c: every joiner (delta review of #813) ──
+const tick = (span, line) => stepEvidence({ prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [{ h: 'S', d: `$${span}$` }] }, '0', line, { correct: true }).stepReport?.lines[0].status === 'ok';
+for (const [span, wrong, right] of [
+  ['a = 11, \\quad d + 1 = 8', 'a = 8', 'a = 11'], ['a = 11, \\quad 2d = 14', 'a = 14', 'a = 11'],
+  ['x = 2,\\ y = 3', 'x = 3', 'x = 2'], ['x = 2 \\\\ y = 3', 'x = 3', 'x = 2'],
+  ['x = 2 \\Rightarrow y = 5', 'x = 5', 'x = 2'], ['x = 2 \\implies y = 5', 'x = 5', 'x = 2'], ['x = 2 \\text{ so } y = 5', 'x = 5', 'x = 2'],
+  ['x = 3 \\to y = 4', 'x = 4', 'x = 3'], ['x = 3 \\therefore y = 4', 'x = 4', 'x = 3'], ['x = 3 \\text{ gives } y = 4', 'x = 4', 'x = 3']]) {
+  ok(!tick(span, wrong) && tick(span, right), `joiner: ${span}: ${wrong} not ticked, ${right} ticked`);
+}
+const JOINS = ['\\Rightarrow', '\\Longrightarrow', '\\implies', '\\iff', '\\Leftrightarrow', '\\to', '\\therefore', '\\because', '\\quad', '\\qquad', '\\;', '\\,', '\\:', '\\ ', '\\\\', ',', ';', ', \\quad', ',\\ ', '\\text{ so }', '\\text{ gives }', '\\text{ then }', '\\text{ hence }', '\\text{ and }', '\\text{ i.e. }', '\\text{ thus }', '\\mathrm{ and }', '⇒', '→', '∴'];
+let fuzz = 0, fuzzBad = 0;
+for (const j of JOINS) for (const [l, r, wrong, right] of [['x = 2', 'y = 5', 'x = 5', 'x = 2'], ['a = 11', '2d = 14', 'a = 14', 'a = 11'], ['m = 3', 'y - 1 = 3(x - 2)', 'm = 3(x-2)', 'm = 3'], ['T_n = 7', 'n + 1 = 9', 'T_n = 9', 'T_n = 7']]) {
+  fuzz += 1;
+  if (tick(`${l} ${j} ${r}`, wrong) || !tick(`${l} ${j} ${r}`, right)) { fuzzBad += 1; console.error('joiner fuzz', j, l, r); }
+}
+ok(fuzzBad === 0, `joiner fuzz: ${fuzzBad} wrong of ${fuzz}`);
+// Real draws the delta review named.
+for (const [gen, d, seeds, line] of [['c11-domain-range-reasoning', 1, [1, 1009, 7919, 16847], 'y(x^2+2x+2) = 0'], ['mex-mechanics', 1, [1], 'x = 8'], ['c12-bijection-reasoning', 1, [7], 'y(5x-2) = (2y+4)/(5y+6)']]) for (const seed of seeds) {
+  let g; try { g = generateQuestion(gen, d, seed); } catch { g = null; }
+  if (!g) continue;
+  ok(stepEvidence({ ...g, stepcheck: undefined, answerType: 'mcq', answer: { correctIndex: 0 } }, '0', line, { correct: true }).stepReport?.lines?.[0]?.status !== 'ok', `${gen} d${d} s${seed}: ${line} not ticked`);
+}
+// Catalogue: in a span with several labelled statements, one label's line
+// carrying another statement's (different) value is never ticked.
+let cross = 0, crossBad = 0, spans = 0;
+for (const gen of Object.keys(GENERATORS)) for (let d = 1; d <= 4; d += 1) for (const seed of [1, 7, 7919, 15838, 23757, 104729]) {
+  let g; try { g = generateQuestion(gen, d, seed); } catch { continue; }
+  for (const st of g?.steps || []) for (const sp of String(st.d || '').matchAll(/\$([^$]+)\$/g)) {
+    const ms = milestonesOf({ steps: [{ h: 'S', d: `$${sp[1]}$` }] });
+    spans += 1;
+    for (const a of ms) for (const b of ms) {
+      if (a === b) continue;
+      const own = a.values[a.values.length - 1], v = b.values[b.values.length - 1];
+      let same = false;
+      try { same = exprEquivalent(v, own, {}); } catch { same = false; }
+      if (same) continue;
+      cross += 1;
+      if (matchMilestone(ms.filter(m => m.label === a.label), `${a.label} = ${v}`) && !ms.some(m => m.label === a.label && m !== a && (() => { try { return exprEquivalent(m.values[m.values.length - 1], v, {}); } catch { return false; } })())) {
+        crossBad += 1; if (crossBad < 6) console.error('cross', gen, d, seed, sp[1]);
+      }
+    }
+  }
+}
+ok(crossBad === 0 && cross > 0, `catalogue cross-pairing: ${crossBad} of ${cross} pairings ticked, over ${spans} spans`);
+console.log(`joiners: ${fuzzBad}/${fuzz} fuzz failures; cross-pairing ${crossBad}/${cross} over ${spans} spans [SYNTHETIC]`);
+
 // ── Group 4: every milestone in the India catalogue, and its corruptions ──
 const cells = new Map();
 for (const ch of IN_CHAPTERS) for (const c of ch.covers || []) if (GENERATORS[c.gen]) for (const d of c.diff || [1, 2, 3, 4]) cells.set(`${c.gen}|${d}`, { gen: c.gen, d });
