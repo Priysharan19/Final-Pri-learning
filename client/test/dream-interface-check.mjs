@@ -224,7 +224,7 @@ check('Home consumes one central recommendation resolver and one primary action'
   assert.match(home, /resolveHomeRecommendation/);
   assert.match(home, /api\.get\('\/practice\/resume'\)/);
   assert.doesNotMatch(home, /export default function Home\b|function HomeAction\b/, 'the v1.0 Home page and its action card are gone');
-  assert.match(indexPage, /useHomeDecision\(user, dueCount\)/);
+  assert.match(indexPage, /useHomeDecision\(user, dueCount, dueUnit\)/); // dueUnit: the dot-point review wording (#806)
   // Two places can hold the primary action and the render conditions exclude
   // each other (kalp04-home-check proves the exclusion), each with one CTA.
   assert.equal((indexPage.match(/data-home-primary(?!-)/g) || []).length, 2);
