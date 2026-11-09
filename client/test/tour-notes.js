@@ -55,7 +55,7 @@ if (built.built) console.log(`  built client in ${built.ms} ms`);
 const server = await startOnlinePlatform();
 const browser = await chromium.launch();
 try {
-  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
   const errors = [];
@@ -81,6 +81,9 @@ try {
   await page.locator('.nt-map-disclosure summary').click();
   await page.waitForSelector('.nt-map-node');
   await check('the chapter map draws a node per chapter', await page.locator('.nt-map-node').count() === 14);
+  await check('expanded chapter map nodes are actually visible',
+    await page.locator('.nt-map-node').evaluateAll(nodes =>
+      nodes.every(node => getComputedStyle(node).opacity === '1' && getComputedStyle(node).transform === 'none')));
   await page.waitForTimeout(1400);
   await shot(page, 'map-open');
 
