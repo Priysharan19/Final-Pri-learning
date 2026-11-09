@@ -34,6 +34,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
+import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
@@ -105,6 +106,25 @@ function mmss(totalSeconds) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+// Where the marks went, in figures (local/examAnalysis.js): the mock note above
+// says the paper predicts nothing, so the headline never ranks the student.
+function LostLine({ lost }) {
+  const t = useT();
+  if (!lost) return null;
+  if (!lost.marks) return <p className="sub" data-exam-lost="0">{t('examRoom.lostNone')}</p>;
+  const [a, b] = lost.sections || [];
+  // "N of those…" needs the sentence it refers to: no section, no blank line.
+  if (!a) return null;
+  const head = b
+    ? t('examRoom.lostTwo', { count: lost.marks, a: a.lost, sa: a.label, b: b.lost, sb: b.label })
+    : t('examRoom.lostOne', { count: lost.marks, a: a.lost, sa: a.label });
+  return (
+    <p className="sub" data-exam-lost={lost.marks}>
+      {head}{head && lost.blankMarks > 0 && <> {t('examRoom.lostBlank', { count: lost.blankMarks })}</>}
+    </p>
+  );
 }
 
 export default function ExamRoom() {
@@ -182,6 +202,12 @@ export default function ExamRoom() {
   // Measured while the question is on screen and the page is visible; a hidden
   // tab's time is not attributed to any question (the paper's own clock still
   // runs — that is the deadline's job, not this one's).
+  // Every question of the paper is sent with a time — zero for one never
+  // opened — so a paper sat in this room is always reported as measured.
+  const allTimes = () => Object.fromEntries([
+    ...(latest.current.exam?.questions || []).map(q => [q.id, 0]),
+    ...Object.entries(timesRef.current)
+  ]);
   const accrue = useCallback(() => {
     const { qid, at } = enteredRef.current;
     if (qid && at) {
@@ -298,7 +324,7 @@ export default function ExamRoom() {
       points += n;
     }
     const body = {
-      answers: snap.answers, workings: snap.workings, times: timesRef.current, modes: snap.modes, cur: snap.cur,
+      answers: snap.answers, workings: snap.workings, times: allTimes(), modes: snap.modes, cur: snap.cur,
       inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }])),
       // The page is going away: the server's checkpoint is sent now, not after its debounce.
       ...(urgent === true ? { urgent: true } : {})
@@ -443,7 +469,7 @@ export default function ExamRoom() {
     const frozen = await freezeUnread(snap).catch(() => null) || { unread: unreadInkKeys(snap.inks, snap.answers), pages: {} };
     try {
       const r = await api.post(`/exams/${id}/submit`, {
-        answers: snap.answers, workings: snap.workings, times: timesRef.current,
+        answers: snap.answers, workings: snap.workings, times: allTimes(),
         ms: Date.now() - startedAtRef.current, submissionKey: submissionKey.current, reason,
         ...(frozen ? unreadBody(frozen) : {})
       });
@@ -712,12 +738,8 @@ export default function ExamRoom() {
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
           </div>
-          <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })} · {t(
-            shownPct >= 90 ? 'examRoom.verdictOutstanding' :
-              shownPct >= 80 ? 'examRoom.verdictExcellent' :
-                shownPct >= 65 ? 'examRoom.verdictSolid' :
-                  shownPct >= 50 ? 'examRoom.verdictFair' :
-                    'examRoom.verdictLow')}</p>
+          <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })}</p>
+          <LostLine lost={result.analysis?.lost} />
           {result.final?.finalisedBy === 'deadline' && (
             <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>{t(result.final.late ? 'examRoom.finalisedLate' : 'examRoom.finalisedByDeadline')}</p>
           )}
@@ -736,7 +758,8 @@ export default function ExamRoom() {
           </div>
         </div>
 
-        <ExamAnalysis analysis={result.analysis} />
+        <ExamAnalysis analysis={result.analysis} track={exam.indiaExam?.track} />
+        <SectionTime report={result.timeReport} offered={result.timeReportOffered} />
 
         {result.detail.map((d, i) => d.multipart ? (
           <div className="card" key={d.id}>

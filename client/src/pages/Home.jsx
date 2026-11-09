@@ -16,7 +16,7 @@ import { featureEnabled } from '../platform/features.js';
 // interface every build ships (client/interface.config.mjs); the v1.0 Home page
 // that used to live in this file is gone, and this module keeps only the parts
 // the Index renders.
-export function useHomeDecision(user, dueCount) {
+export function useHomeDecision(user, dueCount, dueUnit) {
   const [local, setLocal] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
   const [assignments, setAssignments] = useState(null);
@@ -68,10 +68,10 @@ export function useHomeDecision(user, dueCount) {
     return () => { live = false; };
   }, [online, user.id]);
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
-    user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
+    user, stats, dueCount, dueUnit, tasks: local.tasks, exams: local.exams, resume: local.resume,
     assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
     cachedAssignments: assignments === false ? cachedAssignments(user) : []
-  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
+  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, dueUnit, assignments, online]);
   // A generic "practice" alternative under a practice recommendation says the
   // same thing twice; the manual chooser below already covers it.
   const alternatives = homeDecision.alternatives.filter(item =>

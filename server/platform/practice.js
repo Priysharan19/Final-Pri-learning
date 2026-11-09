@@ -47,6 +47,7 @@ import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
 // D15: only the India curriculum's banks are issued (indiaBanks.js).
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
+import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -243,7 +244,12 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     mode: q._practiceMode || 'practice',
     version: String(q.contentVersion || q.version || 1),
     prompt: String(q.prompt || ''),
-    steps: (q.steps || []).map(step => ({ h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
+    // A step figure is SVG authored with the question; the client sanitises it
+    // (sanitizeFigure) before it is ever rendered.
+    // A figure that references anything outside itself is dropped here too.
+    steps: (q.steps || []).map(step => (typeof step?.figure === 'string' && step.figure && step.figure.length <= 60000 && !figureHasExternalRef(step.figure)
+      ? { h: String(step?.h ?? ''), d: String(step?.d ?? ''), figure: step.figure }
+      : { h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
     answerText: String(answerTextFor(q) ?? ''),
     hints: Array.isArray(q.hints) ? q.hints.filter(h => typeof h === 'string') : [],
     // Runs in the marker pool, never on this thread. A Step Check that is cut

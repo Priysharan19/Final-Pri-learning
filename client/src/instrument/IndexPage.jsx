@@ -96,10 +96,10 @@ function NextAction({ action, copy, online, nav, lang }) {
 }
 
 export default function IndexPage() {
-  const { user, dueCount } = useApp();
+  const { user, dueCount, dueUnit } = useApp();
   const t = useT();
   const nav = useNavigate();
-  const { stats: homeStats, local, assignments, online, homeDecision, alternatives, topicName } = useHomeDecision(user, dueCount);
+  const { stats: homeStats, local, assignments, online, homeDecision, alternatives, topicName } = useHomeDecision(user, dueCount, dueUnit);
   const [placement, skipPlacement] = usePlacement(user);
   const [curriculum, setCurriculum] = useState(null);
   const [recent, setRecent] = useState(undefined);

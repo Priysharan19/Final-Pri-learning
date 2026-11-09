@@ -223,6 +223,7 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [dueCount, setDueCount] = useState(0);
+  const [dueUnit, setDueUnit] = useState('topic');
   const [recent, setRecent] = useState([]);
   const moreButtonRef = useRef(null);
   const moreSheetRef = useRef(null);
@@ -239,7 +240,14 @@ export default function App() {
   }, []);
 
   const refreshDue = useCallback(async () => {
-    try { const r = await api.get('/reviews'); setDueCount(r.due.length); } catch { setDueCount(0); }
+    // One "due" count everywhere: the per-dot-point queue when the server sent
+    // one (the same figure the review card shows), else the chapter schedule.
+    try {
+      const r = await api.get('/reviews');
+      const dp = r?.dotpoints;
+      setDueCount(dp ? (Number(dp.dueCount) || 0) : (r?.due?.length || 0));
+      setDueUnit(dp ? 'dotpoint' : 'topic');
+    } catch { setDueCount(0); setDueUnit('topic'); }
   }, []);
 
   const refreshRecent = useCallback(async () => {
@@ -475,8 +483,8 @@ export default function App() {
   const activate = useCallback((ready) => {
     setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate }),
-    [user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate]);
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate }),
+    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate]);
 
   if (user === undefined) {
     return (

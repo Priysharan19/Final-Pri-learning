@@ -454,6 +454,9 @@ export const flow = {
       `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
     await check('no mark is given from it: the card is not auto-marked and Submit asks to check the reading first',
       await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 1);
+    // Relation swaps (relationSwap.js) appear only on a line with a relation
+    // sign; this doubtful line reads "7", so it offers none.
+    await check('a doubtful line with no relation sign offers no relation swaps', await page.locator('[data-relation-swaps]').count() === 0);
     const readsBeforeCorrection = reader.requests.length;
     const iWrote = page.getByRole('button', { name: /Correct line 1/ });
     await check('a one-tap "I wrote…" control is offered on that line', await iWrote.count() === 1);

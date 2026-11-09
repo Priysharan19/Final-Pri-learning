@@ -354,101 +354,101 @@ Answer type: numeric. Printed answer: `5`.
 
 ## Orienting Yourself: The Use of Coordinates (Class 9) · `c9-coordinate-geometry-ncert-mastery` D1 seed 1
 
-> In which quadrant does $P(4,-7)$ lie?
+> The point $P(25,-99)$ is reflected in the x-axis. In which quadrant does its image lie?
 
-Answer type: mcq. Printed answer: `Quadrant IV` (options: 0: Quadrant IV; 1: Quadrant I; 2: Quadrant III; 3: Quadrant II).
+Answer type: mcq. Printed answer: `Quadrant I` (options: 0: Quadrant II; 1: Quadrant I; 2: Quadrant III; 3: Quadrant IV).
+
+| Writing | Input | Pri's verdict | Examiner |
+|---|---|---|---|
+| the keyed option | `1` | ✓ credited | |
+| another option | `2` | ✗ wrong | |
+
+## Introduction to Linear Polynomials (Class 9) · `c9-linear-polynomials-ncert-mastery` D1 seed 1
+
+> What is the degree of $-12x^3 + 15x^2 + 3$?
+
+Answer type: mcq. Printed answer: `3` (options: 0: 2; 1: 3; 2: 1; 3: 0).
+
+| Writing | Input | Pri's verdict | Examiner |
+|---|---|---|---|
+| the keyed option | `1` | ✓ credited | |
+| another option | `2` | ✗ wrong | |
+
+## The World of Numbers (Class 9) · `c9-number-systems-ncert-mastery` D1 seed 1
+
+> Which is the most specific listed classification of $\sqrt{3}$?
+
+Answer type: mcq. Printed answer: `Irrational` (options: 0: Irrational; 1: Natural; 2: Rational; 3: Integer).
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
 | the keyed option | `0` | ✓ credited | |
 | another option | `1` | ✗ wrong | |
 
-## Introduction to Linear Polynomials (Class 9) · `c9-linear-polynomials-ncert-mastery` D1 seed 1
-
-> What is the degree of $2x^2-5x+3$?
-
-Answer type: mcq. Printed answer: `2` (options: 0: 3; 1: 1; 2: 0; 3: 2).
-
-| Writing | Input | Pri's verdict | Examiner |
-|---|---|---|---|
-| the keyed option | `3` | ✓ credited | |
-| another option | `0` | ✗ wrong | |
-
-## The World of Numbers (Class 9) · `c9-number-systems-ncert-mastery` D1 seed 1
-
-> Which is the most specific listed classification of $0$?
-
-Answer type: mcq. Printed answer: `Integer` (options: 0: Irrational; 1: Rational; 2: Natural; 3: Integer).
-
-| Writing | Input | Pri's verdict | Examiner |
-|---|---|---|---|
-| the keyed option | `3` | ✓ credited | |
-| another option | `0` | ✗ wrong | |
-
 ## Exploring Algebraic Identities (Class 9) · `c9-algebraic-identities-ncert-mastery` D1 seed 1
 
-> Use an identity to find $51^2$.
+> Use an identity to find $6269^2$.
 
-Answer type: numeric. Printed answer: `2601`.
+Answer type: numeric. Printed answer: `39300361`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `2601` | ✓ credited | |
-| as a sum still to do | `2600 + 1` | refused (D13) | |
-| a neighbouring value | `2602` | ✗ wrong | |
-| a contradicting unit | `2601 kg` | unread | |
+| key | `39300361` | ✓ credited | |
+| as a sum still to do | `39300360 + 1` | refused (D13) | |
+| a neighbouring value | `39300362` | ✗ wrong | |
+| a contradicting unit | `39300361 kg` | unread | |
 
 ## I’m Up and Down, and Round and Round (Class 9) · `c9-circles-ncert-mastery` D1 seed 1
 
-> A circle has radius $11$ cm. Find the length of its longest chord.
+> The longest chord of a circle is $1254$ cm. Find its radius.
 
-Answer type: numeric (unit "cm"). Printed answer: `22 cm`.
+Answer type: numeric (unit "cm"). Printed answer: `627 cm`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `22` | ✓ credited | |
-| with the box unit | `22 cm` | ✓ credited | |
-| as a sum still to do | `21 + 1` | refused (D13) | |
-| a neighbouring value | `23` | ✗ wrong | |
-| a contradicting unit | `22 kg` | ✗ wrong | |
+| key | `627` | ✓ credited | |
+| with the box unit | `627 cm` | ✓ credited | |
+| as a sum still to do | `626 + 1` | refused (D13) | |
+| a neighbouring value | `628` | ✗ wrong | |
+| a contradicting unit | `627 kg` | ✗ wrong | |
 
 ## Measuring Space: Perimeter and Area (Class 9) · `c9-perimeter-area-ncert-mastery` D1 seed 1
 
-> Using $\pi\approx22/7$, find the circumference of a circle of radius $21$ cm.
+> Using $\pi\approx22/7$, find the circumference of a circle of radius $616$ cm.
 
-Answer type: numeric (unit "cm"). Printed answer: `132 cm`.
+Answer type: numeric (unit "cm"). Printed answer: `3872 cm`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `132` | ✓ credited | |
-| with the box unit | `132 cm` | ✓ credited | |
-| as a sum still to do | `131 + 1` | refused (D13) | |
-| a neighbouring value | `133` | ✗ wrong | |
-| a contradicting unit | `132 kg` | ✗ wrong | |
+| key | `3872` | ✓ credited | |
+| with the box unit | `3872 cm` | ✓ credited | |
+| as a sum still to do | `3871 + 1` | refused (D13) | |
+| a neighbouring value | `3873` | ✗ wrong | |
+| a contradicting unit | `3872 kg` | ✗ wrong | |
 
 ## The Mathematics of Maybe: Introduction to Probability (Class 9) · `c9-probability-ncert-mastery` D1 seed 1
 
-> Classify the event: getting heads on a fair coin.
+> A bag holds $126$ counters, $0$ of them green. One counter is drawn at random. Classify the event "the counter is green".
 
-Answer type: mcq. Printed answer: `Even chance` (options: 0: More likely; 1: Less likely; 2: Impossible; 3: Even chance).
+Answer type: mcq. Printed answer: `Impossible` (options: 0: Less likely; 1: Impossible; 2: Even chance; 3: More likely).
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| the keyed option | `3` | ✓ credited | |
-| another option | `0` | ✗ wrong | |
+| the keyed option | `1` | ✓ credited | |
+| another option | `2` | ✗ wrong | |
 
 ## Predicting What Comes Next: Exploring Sequences and Progressions (Class 9) · `c9-sequences-progressions-ncert-mastery` D1 seed 1
 
-> The AP starts at $2$ with common difference $2$. Find its $13$th term.
+> An AP starts at $51$ with common difference $-30$. Find its $55$th term.
 
-Answer type: numeric. Printed answer: `26`.
+Answer type: numeric. Printed answer: `-1569`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `26` | ✓ credited | |
-| as a sum still to do | `25 + 1` | refused (D13) | |
-| a neighbouring value | `27` | ✗ wrong | |
-| a contradicting unit | `26 kg` | unread | |
+| key | `-1569` | ✓ credited | |
+| as a sum still to do | `-1570 + 1` | refused (D13) | |
+| a neighbouring value | `-1568` | ✗ wrong | |
+| a contradicting unit | `-1569 kg` | unread | |
 
 ## Real Numbers (Class 10) · `c10-real-numbers` D2 seed 1
 
@@ -1062,4 +1062,4 @@ Answer type: numeric. Printed answer: `378`.
 | a neighbouring value | `379` | ✗ wrong | |
 | a contradicting unit | `378 kg` | unread | |
 
-**Sample digest (sha256 of everything above this line):** `ebe8ca14e64376091d68eb19d664ee4827ba1b1828de0bbb4236636feb22c851`
+**Sample digest (sha256 of everything above this line):** `9eac4f66344bff7691bce31f42447066f264070b9bb4c2c91c89025eec15a8c6`

@@ -51,9 +51,9 @@ function healthy() {
       }
     }],
     '/release.json': [200, { ...identity }],
-    '/features.json': [200, { placement: false, extendedTracks: false, australia: false, examHandwriting: false, instrument: false, tutor: false }],
-    '/v1/tutor/status': [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }],
-    '/v1/parent-report': [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }],
+    '/features.json': [200, { placement: false, extendedTracks: false, australia: false, examHandwriting: false, instrument: false, tutor: true, pastPapers: true, parentReport: true }],
+    '/v1/tutor/status': [401, { error: { code: 'AUTH_REQUIRED' } }],
+    '/v1/parent-report': [401, { error: { code: 'AUTH_REQUIRED' } }],
     '/v1/billing/config': [200, {
       display: { currency: 'INR', monthly: 199, annual: 1499, trialDays: null, advisoryOnly: true },
       products: { appleMonthly: 'com.prilearning.app.premium.monthly', appleAnnual: 'com.prilearning.app.premium.annual', googleMonthly: null, googleAnnual: null, webMonthly: null, webAnnual: null },
@@ -129,9 +129,9 @@ try {
   routes['/v1/ready'][1].checks.handwriting = { state: 'unavailable', code: 'HANDWRITING_PROVIDER_AUTH' };
   routes['/v1/ready'][1].degraded = ['HANDWRITING_PROVIDER_AUTH'];
   routes['/v1/ready'][1].state = 'degraded';
-  routes['/v1/tutor/status'] = [401, { error: { code: 'AUTH_REQUIRED' } }];
+  routes['/v1/tutor/status'] = [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }];
   const quiet = await run({ engine: 'postgres', authEmailProven: true });
-  ok(quiet.ok && quiet.results.length === 15, "without the flags a degraded reader and an exposed tutor change nothing: 15/15 as before (14 + main's web-checkout row)");
+  ok(quiet.ok && quiet.results.length === 15, "without the flags a degraded reader and a dark tutor change nothing: 15/15 as before (14 + main's web-checkout row)");
   eq([...requests].sort(), threeGets, "and nothing beyond main's four GETs is requested");
 
   // ── 2 · --require-handwriting ─────────────────────────────────────────────
@@ -167,9 +167,12 @@ try {
   eq(manifestConfig.format, EXPECTED_CONFIG_FORMAT, 'the manifest block declares its format');
   eq(manifestConfig.publicOrigin, 'https://app.prilearning.com', 'the public origin is D5\'s app.prilearning.com');
   const probe = id => manifestConfig.probes.find(item => item.id === id);
-  eq([probe('tutor-dark')?.path, probe('tutor-dark')?.status, probe('tutor-dark')?.json], ['/v1/tutor/status', 404, { 'error.code': 'NOT_FOUND' }], 'D4: the tutor route must be the platform 404 (401 would mean it is mounted)');
-  eq(probe('web-build-tutor-off')?.json, { tutor: false }, 'D4: the web build was made without the tutor');
-  eq([probe('parent-report-dark')?.path, probe('parent-report-dark')?.status], ['/v1/parent-report', 404], 'D22: the parent report is not mounted');
+  eq([probe('tutor-on')?.path, probe('tutor-on')?.status], ['/v1/tutor/status', 401], 'owner 10 Nov: the tutor route is mounted (401 without a session; a 404 means the switch is off)');
+  eq(probe('web-build-tutor-on')?.json, { tutor: true }, 'owner 10 Nov: the web build was made with the tutor');
+  eq([probe('parent-report-on')?.path, probe('parent-report-on')?.status], ['/v1/parent-report', 401], 'owner 10 Nov: the parent report is mounted');
+  eq(probe('web-build-parent-report-on')?.json, { parentReport: true }, 'owner 10 Nov: the web build was made with the parent report');
+  eq(probe('web-build-past-papers-on')?.json, { pastPapers: true }, 'owner 10 Nov: the web build was made with past papers');
+  ok(!JSON.stringify(manifestConfig).includes('lineCheck'), 'the line check has no public probe: §3 H13 checks it is off');
   eq(probe('paid-ceiling-set')?.json, { 'checks.paidCeiling.state': 'ok' }, 'D21: the paid-call ceiling is configured');
   eq(probe('apple-products')?.json, { 'products.appleMonthly': 'com.prilearning.app.premium.monthly', 'products.appleAnnual': 'com.prilearning.app.premium.annual' }, 'the Apple product ids are the App Store Connect ones');
   eq(probe('display-prices')?.json, { 'display.currency': 'INR', 'display.monthly': 199, 'display.annual': 1499 }, 'D19: ₹199 a month, ₹1,499 a year');
@@ -195,8 +198,9 @@ try {
   eq([env.PRI_PAID_CALLS_PER_HOUR, env.PRI_PAID_CALLS_PER_DAY, env.PRI_APPLE_ENVIRONMENTS, env.NODE_ENV], ['120', '300', 'Production', 'production'], 'and D21\'s ceilings, Production-only Apple and NODE_ENV');
   ok(/verify@mail\.prilearning\.com/.test(env.PRI_AUTH_EMAIL_FROM || ''), 'and the auth email sender of row 9');
   for (const secret of ['PRI_RESEND_API_KEY', 'PRI_METRICS_TOKEN', 'PRI_DATABASE_URL', 'PRI_APPLE_APP_ID', 'PRI_TRUSTED_PROXY_HOPS']) ok(/^<[^>]+>$/.test(env[secret] || ''), `${secret} is a <placeholder> the owner fills, never a value`);
-  const mustBeUnset = ['PRI_FEATURE_TUTOR', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_PARENT_REPORT', 'PRI_PARENT_REPORT_EMAILS', 'PRI_SMS_PROVIDER', 'PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_ALLOW_SANDBOX'];
-  ok(mustBeUnset.every(name => !(name in env)) && !Object.keys(env).some(name => name.startsWith('PRI_TUTOR_')), 'the pasted block sets none of the variables the manifest requires unset');
+  eq([env.PRI_FEATURE_TUTOR, env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM, env.PRI_PAST_PAPERS, env.PRI_PARENT_REPORT], ['1', '40', '120', '1', 'on'], 'owner 10 Nov: tutor on with its 40 / 120 daily allowances, past papers on, parent report on');
+  const mustBeUnset = ['PRI_FEATURE_LINE_CHECK', 'PRI_FEATURE_STEP_COACH', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_PARENT_REPORT_EMAILS', 'PRI_SMS_PROVIDER', 'PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_ALLOW_SANDBOX'];
+  ok(mustBeUnset.every(name => !(name in env)) && Object.keys(env).filter(name => name.startsWith('PRI_TUTOR_')).sort().join() === 'PRI_TUTOR_CALLS_PER_ACCOUNT_DAY,PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM', 'the pasted block sets none of the variables the manifest requires unset');
   ok(mustBeUnset.every(name => clickList.split('**B2')[0].includes(`\`${name}\``)), 'and step B1 names every one of them for deletion');
 
   // ── 4 · --expect-config against a matching and a drifting deployment ─────
@@ -209,9 +213,11 @@ try {
   eq([...new Set(requests)].length, requests.length, 'each path is requested once: the probes reuse /v1/ready and each other');
   ok(requests.every(r => r.startsWith('GET ')), 'every request the config check makes is a GET');
   const drifts = [
-    ['tutor-dark', 'the tutor mounted (D4)', r => { r['/v1/tutor/status'] = [401, { error: { code: 'AUTH_REQUIRED' } }]; }],
-    ['web-build-tutor-off', 'a web build made with the tutor (D4)', r => { r['/features.json'][1].tutor = true; }],
-    ['parent-report-dark', 'the parent report mounted (D22)', r => { r['/v1/parent-report'] = [401, { error: { code: 'AUTH_REQUIRED' } }]; }],
+    ['tutor-on', 'the tutor switch off on the server', r => { r['/v1/tutor/status'] = [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }]; }],
+    ['web-build-tutor-on', 'a web build made without the tutor', r => { r['/features.json'][1].tutor = false; }],
+    ['parent-report-on', 'the parent report switch off on the server', r => { r['/v1/parent-report'] = [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }]; }],
+    ['web-build-parent-report-on', 'a web build made without the parent report', r => { r['/features.json'][1].parentReport = false; }],
+    ['web-build-past-papers-on', 'a web build made without past papers', r => { r['/features.json'][1].pastPapers = false; }],
     ['paid-ceiling-set', 'no paid-call ceiling (D21)', r => { r['/v1/ready'][1].checks.paidCeiling = { state: 'missing', code: 'PAID_CAPACITY_NOT_CONFIGURED' }; }],
     ['apple-products', 'a wrong Apple product id', r => { r['/v1/billing/config'][1].products.appleAnnual = 'com.prilearning.app.premium.yearly'; }],
     ['display-prices', 'a display price that is not D19', r => { r['/v1/billing/config'][1].display.monthly = 299; }],
@@ -324,9 +330,9 @@ try {
   out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--expect-config', write('local.json', JSON.stringify(localConfig))]);
   ok(out.code === 0, 'a .json manifest is read whole');
   reset();
-  routes['/v1/tutor/status'] = [401, { error: { code: 'AUTH_REQUIRED' } }];
+  routes['/v1/tutor/status'] = [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }];
   out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--expect-config', write('drift.md', asMarkdown(localConfig))]);
-  ok(out.code === 1 && /✗ public config tutor-dark \(D4 AI tutor off \(server\)\): GET \/v1\/tutor\/status {2}\(status 401, expected 404; error\.code "AUTH_REQUIRED", expected "NOT_FOUND"\)/.test(out.stdout), 'a drift exits 1 and names the probe');
+  ok(out.code === 1 && /✗ public config tutor-on \(AI tutor on \(server\), owner 10 Nov\): GET \/v1\/tutor\/status {2}\(status 404, expected 401\)/.test(out.stdout), 'a drift exits 1 and names the probe');
   for (const [name, text] of [
     ['no block', '# nothing here\n'],
     ['two blocks', asMarkdown(localConfig) + asMarkdown(localConfig)],
