@@ -18,7 +18,7 @@
 //     evidence that existed by then.
 //   · `backtest` — for every finished, fully marked Pri mock of this paper,
 //     the estimate as it stood the moment the mock started, beside the mock's
-//     own engine mark. This is the check the wording waits on: until it has
+//     own engine mark on the same chapters. This is the check the wording waits on: until it has
 //     proved itself on enough mocks, across performance bands, the product
 //     says "estimate from your practice", never a predicted board score. This
 //     module never decides that it has: `wording` is always 'estimate', and the
@@ -97,25 +97,39 @@ const BANDS = [['below-40', 0, 40], ['40-70', 40, 70], ['70-plus', 70, Infinity]
 const bandOf = pct => BANDS.find(([, lo, hi]) => pct >= lo && pct < hi)[0];
 
 /**
- * Past estimates against Pri mocks of the same paper. A mock is used only
- * when it is finished and fully marked (no handwriting still pending), and
- * only when an estimate could be shown before it started. The comparison is
- * on the practised marks' share, since that is all the estimate speaks to:
- * the estimate's percentage band against the mock's percentage.
+ * Past estimates against Pri mocks of the same paper, like for like. A mock is
+ * used only when it is finished and fully marked (no handwriting pending),
+ * when an estimate could be shown before it started, and when the server's
+ * own marked record of it is still held. The mock is then re-scored on ONLY
+ * the chapters of the units the estimate covered, from its per-chapter
+ * server-marked tallies (`chapters: [{id, marks, awarded}]`), and set beside
+ * the estimate's band on those same marks' share. Comparing a share of the
+ * practised marks with a share of the whole paper would be no evidence at all.
  */
 export function backtest(blueprint, evidence, mocks) {
   const rows = [];
   for (const m of mocks) {
     if (!m || m.indiaExam?.blueprintId !== blueprint.id || m.mock !== true || m.pendingHandwriting) continue;
-    const total = Number(m.total), score = Number(m.score), startedAt = Number(m.createdAt);
-    if (!(total > 0) || !Number.isFinite(score) || !Number.isFinite(startedAt)) continue;
+    const startedAt = Number(m.createdAt);
+    if (!Number.isFinite(startedAt) || !Array.isArray(m.chapters)) continue;
     const p = forecastAt(blueprint, evidence, startedAt);
     if (!p?.show) continue;
-    const mockPct = Math.round(1000 * score / total) / 10;
+    const coveredUnits = new Set(p.units.filter(u => u.covered).map(u => u.unitId));
+    const coveredChapters = new Set(blueprint.units.filter(u => coveredUnits.has(u.id)).flatMap(u => u.chapters));
+    let marks = 0, awarded = 0;
+    for (const ch of m.chapters) {
+      if (!coveredChapters.has(ch?.id)) continue;
+      const mk = Number(ch.marks), aw = Number(ch.awarded);
+      if (!(mk > 0) || !Number.isFinite(aw)) continue;
+      marks += mk; awarded += aw;
+    }
+    if (!(marks > 0)) continue;
+    const mockPct = Math.round(1000 * Math.max(0, awarded) / marks) / 10;
     const lowPct = Math.round(1000 * p.low / p.coveredMarks) / 10;
     const highPct = Math.round(1000 * p.high / p.coveredMarks) / 10;
     rows.push({ examId: m.examId || null, startedAt, estimatePct: p.percent, lowPct, highPct, coverage: p.coverage,
-      mockPct, error: Math.round((p.percent - mockPct) * 10) / 10, inBand: mockPct >= lowPct && mockPct <= highPct, band: bandOf(mockPct) });
+      mockMarksCompared: marks, mockPct, error: Math.round((p.percent - mockPct) * 10) / 10,
+      inBand: mockPct >= lowPct && mockPct <= highPct, band: bandOf(mockPct) });
   }
   const summary = rows => rows.length ? {
     n: rows.length, inBand: rows.filter(r => r.inBand).length,
@@ -125,10 +139,26 @@ export function backtest(blueprint, evidence, mocks) {
     // Never promoted here: a human calibration review over many accounts,
     // by band, decides whether any stronger wording is earned.
     wording: 'estimate',
+    basis: 'covered-chapters',
     mocks: rows.sort((a, b) => a.startedAt - b.startedAt),
     overall: summary(rows),
     byBand: Object.fromEntries(BANDS.map(([b]) => [b, summary(rows.filter(r => r.band === b))]))
   };
+}
+
+/** The per-chapter server-marked tallies of this account's held mock results. */
+async function mockChapters(db, accountId, examIds, now) {
+  const out = new Map();
+  for (const id of examIds) {
+    const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=? AND expires_at>?", [accountId, id, now]);
+    if (!row) continue;
+    try {
+      const r = JSON.parse(row.response_json);
+      const chapters = r?.summary?.chapters;
+      if (Array.isArray(chapters)) out.set(id, chapters.map(c => ({ id: c.id, marks: c.marks, awarded: c.awarded })));
+    } catch { /* unreadable record: not compared */ }
+  }
+  return out;
 }
 
 export function selectionOf(query = {}) {
@@ -163,7 +193,9 @@ export function createForecastRouter(rawDb) {
       return res.status(200).json({ premium: false, capability: FORECAST_CAPABILITY, wording: 'estimate', paper,
         coverage: now_.coverage, coveredMarks: now_.coveredMarks, unseenMarks: now_.unseenMarks });
     }
-    const mocks = rows.filter(r => r.state === 'finished' && r.mock === true);
+    const finished = rows.filter(r => r.state === 'finished' && r.mock === true && r.indiaExam?.blueprintId === blueprint.id && !r.pendingHandwriting).slice(0, 50);
+    const held = await mockChapters(db, accountId, finished.map(r => r.examId).filter(id => typeof id === 'string'), now);
+    const mocks = finished.map(r => ({ ...r, chapters: held.get(r.examId) || null }));
     return res.status(200).json({
       premium: true, wording: 'estimate', paper,
       forecast: { ...now_, units: now_.units.map(({ sd, ...u }) => u), priorities: now_.priorities.slice(0, 3).map(({ sd, ...u }) => u) },

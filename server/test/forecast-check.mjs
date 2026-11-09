@@ -54,18 +54,28 @@ c.deq(trend.at(-1).expected, server.show ? server.expected : null, 'the last poi
 c.ok(trend.filter(p => !p.show).every(p => p.expected === null && p.low === null), 'a week below the coverage floor carries no number');
 
 // ── 3 · Backtest ─────────────────────────────────────────────────────────────
-const mock = (at, score, extra = {}) => ({ state: 'finished', mock: true, examId: `m${at}`, createdAt: at, score, total: 80, indiaExam: { blueprintId: CBSE10.id }, ...extra });
+// Per-chapter server-marked tallies: two covered chapters (40 marks) and one
+// the estimate never covered (Real Numbers), which must not be compared.
+const tallies = (onCovered, onUncovered) => [
+  { id: 'c10-polynomials', marks: 20, awarded: onCovered / 2 }, { id: 'c10-circles', marks: 20, awarded: onCovered / 2 },
+  { id: 'c10-real-numbers', marks: 6, awarded: onUncovered }
+];
+const mock = (at, onCovered, extra = {}) => ({ state: 'finished', mock: true, examId: `m${at}`, createdAt: at, indiaExam: { blueprintId: CBSE10.id },
+  chapters: tallies(onCovered, 6), ...extra });
 const bt = backtest(CBSE10, evidence, [
-  mock(NOW - 2 * DAY, 60), mock(NOW - DAY, 20),
-  mock(NOW - 3 * DAY, 50, { pendingHandwriting: 2 }),
-  mock(NOW - 4 * DAY, 50, { indiaExam: { blueprintId: 'other' } }),
-  mock(NOW - 35 * DAY + 3600_000, 50)
+  mock(NOW - 2 * DAY, 30), mock(NOW - DAY, 10, { chapters: tallies(10, 0) }),
+  mock(NOW - 3 * DAY, 30, { pendingHandwriting: 2 }),
+  mock(NOW - 4 * DAY, 30, { indiaExam: { blueprintId: 'other' } }),
+  mock(NOW - 5 * DAY, 30, { chapters: null }),
+  mock(NOW - 6 * DAY, 30, { chapters: [{ id: 'c10-real-numbers', marks: 6, awarded: 6 }] }),
+  mock(NOW - 35 * DAY + 3600_000, 30)
 ]);
 c.eq(bt.wording, 'estimate', 'the backtest never promotes the wording');
-c.eq(bt.overall.n, 2, 'pending, other-paper and too-early mocks are left out');
+c.eq(bt.overall.n, 2, 'pending, other-paper, unheld, no-covered-chapter and too-early mocks are left out');
 const early = forecastAt(CBSE10, evidence, NOW - 2 * DAY);
 c.eq(bt.mocks[0].estimatePct, early.percent, 'each mock is compared with the estimate as it stood when the mock started');
-c.deq([bt.mocks[0].mockPct, bt.mocks[1].mockPct, bt.mocks[1].band], [75, 25, 'below-40'], 'the mock\'s own mark, and its performance band');
+c.deq([bt.mocks[0].mockPct, bt.mocks[1].mockPct, bt.mocks[1].band], [75, 25, 'below-40'], 'the mock is re-scored on the covered chapters only, and banded');
+c.deq([bt.basis, bt.mocks[0].mockMarksCompared], ['covered-chapters', 40], 'an uncovered chapter\'s marks are not in the comparison');
 c.eq(bt.mocks[1].inBand, false, 'a mock far below the band is recorded as outside it, not hidden');
 c.eq(bt.byBand['below-40'].n + bt.byBand['40-70'].n + bt.byBand['70-plus'].n, 2, 'every compared mock falls in exactly one band');
 
@@ -103,6 +113,15 @@ try {
   c.deq([p.premium, p.wording, p.forecast.show], [true, 'estimate', true], 'premium gets the estimate, worded as an estimate');
   c.ok(!p.forecast.units.some(u => u.unitId === 'number-systems' && u.covered), 'a device-written event is not evidence');
   c.ok(Array.isArray(p.trend) && p.trend.length > 0 && p.backtest.overall.n === 0, 'the trend is returned; with no mocks the backtest is empty, not invented');
+  // A held mock: its exam-result event and the server's own marked record.
+  const paidId = (await db.get("SELECT id FROM accounts WHERE email=?", ['paid@example.test'])).id;
+  const mockAt = now - DAY;
+  await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?,?,?,'exam-result',?,?,?,?)",
+    [cursor++, 'exam-1', paidId, 'server-grader', 9999, 'exam-1', mockAt + 3600_000, JSON.stringify({ state: 'finished', examId: 'exam-1', mock: true, createdAt: mockAt, score: 46, total: 80, indiaExam: { blueprintId: CBSE10.id } }), mockAt]);
+  await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
+    [paidId, 'exam-result', 'exam-1', JSON.stringify({ summary: { chapters: tallies(30, 6) } }), 'd', mockAt, now + 30 * DAY]);
+  const withMock = (await get(paid)).data.backtest;
+  c.deq([withMock.overall.n, withMock.mocks[0]?.mockPct, withMock.mocks[0]?.mockMarksCompared], [1, 75, 40], 'over HTTP the mock is re-scored from the server\'s own record, on covered chapters only');
   c.ok(p.forecast.priorities.length <= 3, 'at most three "what would move this most" chapters');
 } finally {
   await h.close();
