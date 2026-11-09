@@ -17,6 +17,11 @@
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// The PYQ sections below exercise the past-papers filter and its empty state.
+// Past papers are OFF for students by default (engine/pastPapers.js, decision
+// D23; pinned by past-papers-flag-check.mjs); the switch is on here so the
+// filter's own behaviour stays proven while it waits for the rights opinion.
+process.env.PRI_PAST_PAPERS = '1';
 
 const { dispatch } = await import('../src/local/backend.js');
 const idb = await import('../src/local/idb.js');

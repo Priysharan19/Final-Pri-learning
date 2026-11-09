@@ -64,7 +64,8 @@ export function currentPolynomialZeroes(rng, diff) {
     ],
     steps: [
       { h: 'Set p(x) equal to zero', d: `$${p}=0$` },
-      { h: 'Factorise', d: `$(x ${r1 < 0 ? '+' : '-'} ${Math.abs(r1)})(x ${r2 < 0 ? '+' : '-'} ${Math.abs(r2)})=0$` },
+      // A zero root factors as x itself, written first: x(x + 1) = 0, not (x + 1)(x - 0) = 0.
+      { h: 'Factorise', d: `$${[r1, r2].sort((m, n) => (m === 0 ? -1 : n === 0 ? 1 : 0)).map(r => (r === 0 ? 'x' : `(x ${r < 0 ? '+' : '-'} ${Math.abs(r)})`)).join('')}=0$` },
       { h: 'Zero-product property', d: `$x=${r1}$ or $x=${r2}$` },
       { h: 'Answer', d: `The zeroes are $${r1}$ and $${r2}$.` }
     ],

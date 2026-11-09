@@ -14,6 +14,7 @@
 // Run on its own:  node client/test/tour-first-run-scope.js [--no-build]
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
+import { pastPapersEnabled } from '../src/engine/pastPapers.js';
 import { indiaPracticeScope, indiaScope, resolveIndiaTarget } from '../src/engine/indiaProduct.js';
 
 const IPAD_PORTRAIT = { width: 1024, height: 1366 };
@@ -62,6 +63,23 @@ export const flow = {
     const afterMove = await servedChapter(page);
     await check('after moving to Class 10 the next question is Class 10 CBSE', cbse10.has(afterMove), `served "${afterMove}"`);
     await check('the old Class 12 question is not resumed under Class 10', afterMove !== first || cbse10.has(first));
+
+    // ── past papers switched off (decision D23, the default until counsel's
+    // rights opinion): an old pyq=1 link is refused with the past-papers
+    // reason, serves no question and never labels one "Previous year". ──
+    if (!pastPapersEnabled()) {
+      const chapter = indiaScope('cbse', 10)[0];
+      await goto(`/practice?subtopic=${encodeURIComponent(chapter.id)}&track=cbse&pyq=1`);
+      await page.waitForSelector('[data-practice-error="INDIA_PYQ_UNAVAILABLE"]', { timeout: 30000 });
+      await check('with past papers off, a pyq=1 link is refused with the past-papers reason, not a load failure',
+        /past papers/i.test(await page.locator('[data-practice-error] .verdict-title').innerText()));
+      await check('and no question is served in its place', await page.locator('.q-prompt').count() === 0);
+      await check('and nothing on screen is labelled a previous-year question',
+        await page.getByText('Previous year question', { exact: true }).count() === 0);
+      await check('and Practice offers no past-papers filter', await page.locator('.ws-filter[aria-pressed]').count() === 0);
+      await settle();
+      return;
+    }
 
     // ── past papers only: a chapter with no archive offers nearby chapters ──
     const bare = indiaScope('cbse', 10).find(c => !resolveIndiaTarget(c, { track: 'cbse', grade: 10, pyqOnly: true, random: () => 0 }));
