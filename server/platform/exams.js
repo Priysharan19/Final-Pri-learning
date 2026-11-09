@@ -167,6 +167,7 @@ import {
 import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engine/curriculum.js';
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
+import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
@@ -197,7 +198,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -292,7 +293,7 @@ function publicQuestion(sq) {
 
 function publicPaper(paper, now) {
   return {
-    id: paper.id, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+    id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL, typedOnly: true } : {}), title: paper.title, durationMin: paper.durationMin,
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
@@ -514,6 +515,13 @@ function readSpec(body) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
+  // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
+  // full blueprint paper on a board blueprint, sat typed, under its own title.
+  // For the plan it is a timed paper like any other (D19).
+  if (body.mock !== undefined) {
+    if (body.mock !== true || read.kind !== 'india' || !boardMockOf(read.blueprint)) return INVALID('A board mock is a CBSE Class X Standard or Class XII paper.');
+    return { ...read, mock: true, title: mockTitleOf(read.blueprint) };
+  }
   // The title of a certified paper is the server's, from the blueprint. A
   // device may call the paper what it likes locally; that name is never here.
   return { ...read, title: read.defaultTitle };
@@ -724,6 +732,9 @@ function readResponses(body, paper) {
   const times = readTimes(body.times, paper);
   const modes = readModes(body.modes, keys);
   const ink = readInk(body.ink, keys);
+  // A board mock is a typed paper (D22): a handwritten answer, or a page of
+  // ink left to read, does not belong on it.
+  if (paper.mock && ((modes && Object.values(modes).includes('ink')) || (ink && Object.keys(ink).length))) return null;
   return answers && workings && times && modes && ink ? { answers, workings, times, modes, ink } : null;
 }
 
@@ -1230,7 +1241,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     let next = 0;
     const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
-      authoritative: true, examId: id, kind: paper.kind, title: paper.title,
+      authoritative: true, examId: id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title,
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1267,7 +1278,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
     await event(id, 'exam-result', id, {
-      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), title: paper.title, durationMin: paper.durationMin,
       year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
@@ -1711,6 +1722,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
+      ...(spec.mock ? { mock: true } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };

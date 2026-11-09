@@ -41,6 +41,9 @@ export const ENGINE_SUITES = [
   // Examination papers: sealed paper, answer snapshots, exactly-once
   // finalisation and the deadline rule, account-scoped under Row-Level Security.
   'exam-authority-check.mjs',
+  // D22: typed board mocks — the typed-only refusal and the shared free
+  // window under the exam-create lock, on Postgres as pri_server.
+  'board-mock-check.mjs',
   // Handwriting not read when a paper closed: frozen by digest, pending, and
   // read a bounded number of times — the attempt reservation and the result
   // amendment under the account lock, on the Postgres store.

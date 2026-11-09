@@ -219,6 +219,7 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
+          grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
@@ -606,6 +607,11 @@ jobs:
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
           grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
+      - name: Board mock papers — typed, labelled, one timed paper in 30 days free (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
+          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -634,7 +640,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 75/75 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 77/77 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -658,9 +664,10 @@ jobs:
           grep -Fq '✓ child-erasure-check.mjs' platform-postgres.log
           # 61 → 62 (L6): JEE Advanced's own content and notebook twins under the free day, on Postgres.
           # 62 → 63 (L6): the mistake notebook on Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 63/63 suites' platform-postgres.log
           grep -Fq '✓ premium-practice-content-check.mjs' platform-postgres.log
           grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
+          # 61 → 62 (L6): typed board mocks on Postgres.
+          grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
