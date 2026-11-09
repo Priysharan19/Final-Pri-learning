@@ -2,7 +2,8 @@
 
 This directory holds, for each candidate `main` SHA, the operator record and the generated
 dossier that close issue #686 steps 25, 27, 28 and 30 (`docs/operations/postgres-cutover.md`
-§4.6 is the promotion order).
+§4.6 is the promotion order; `docs/release/FREEZE-RUNBOOK.md` is the freeze-day command order and
+who does each step).
 
 | File | Written by | Holds |
 |---|---|---|

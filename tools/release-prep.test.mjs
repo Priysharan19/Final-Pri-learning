@@ -573,12 +573,32 @@ const scratch = [];
   await noGo('main moved past the SHA (soak void)', () => {}, /merge freeze held/, w => { w.tip = OTHER; });
   await noGo('the Release Staging Proof never ran on the SHA', () => {}, /Release Staging Proof/, w => { w.runs = w.runs.filter(run => run.name !== 'Release Staging Proof'); });
   await noGo('the Release Staging Proof is red on the SHA', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'failure'; });
+  // Found re-running the freeze rehearsal on 63deeb757 (Train 1): Main Integrity failed on the
+  // merge, so the chained Release Staging Proof was SKIPPED, and a skipped run counted as green.
+  await noGo('the Release Staging Proof was skipped on the SHA (it verified nothing)', () => {}, /Release Staging Proof/, w => { w.runs.find(run => run.name === 'Release Staging Proof').conclusion = 'skipped'; });
   await noGo('a gate is NOT_RECORDED', r => { r.gates.counsel = { status: 'NOT_RECORDED' }; }, /counsel/);
   await noGo('a gate is BLOCKED', r => { r.gates.store = { status: 'BLOCKED', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: 'Paid Apps Agreement not signed' }; }, /Store readiness/);
   await noGo('a gate PASS is unsigned', r => { r.gates.examiner.by = ''; }, /examiner/);
   await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance S0–S8/);
   await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance S0–S8/);
   await noGo('the candidate was never frozen', r => { r.candidate = { frozenAt: '', by: '' }; }, /candidate SHA frozen/);
+  await noGo('the merge freeze was declared by an agent', r => { r.candidate.by = 'L9 agent (Claude Code)'; }, /candidate SHA frozen/);
+  {
+    // The step-21 row says which half is wrong (found by the 9 Nov 2026 freeze rehearsal on
+    // 1d3829103: an agent name read "not recorded", which sends the operator looking for a
+    // field that is there).
+    const frozenDetail = async mutate => {
+      const record = fullRecord(); mutate(record);
+      const row = (await dossier(frozen(), record)).rows.find(r => r.step === 21);
+      return [row.ok, row.detail];
+    };
+    assert.deepEqual(await frozenDetail(() => {}), [true, '2026-11-03T09:00:00Z by Priya Example'], 'a freeze declared by a named person at a past time passes and names them'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.by = 'L9 agent (Claude Code)'; }), [false, 'candidate.by "L9 agent (Claude Code)" does not name a human (an agent, CI or placeholder name is refused)'], 'an agent declaring the freeze is refused by name, not reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.by = ''; }), [false, 'candidate.by not recorded'], 'a missing declarer is reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = ''; }), [false, 'candidate.frozenAt not recorded'], 'a missing freeze time is reported as missing'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = 'Monday morning'; }), [false, 'candidate.frozenAt is not an ISO date-time'], 'a freeze time that is not a date is named as such'); count += 1;
+    assert.deepEqual(await frozenDetail(r => { r.candidate.frozenAt = '2026-11-06T00:00:00Z'; }), [false, 'candidate.frozenAt 2026-11-06T00:00:00Z is in the future'], 'a freeze dated after the dossier run is refused, with the reason'); count += 1;
+  }
   await noGo('the device evidence is missing (the nomination fails)', () => {}, /release-stage nomination/, w => { writeFileSync(w.ledger, ''); });
   await noGo('the record is for another SHA', r => { r.sha = OTHER; }, /operator record/);
   {

@@ -185,8 +185,15 @@ export async function buildDossier({
 
   // ── step 21: candidate frozen ──────────────────────────────────────────────
   const frozenAt = iso(rec.candidate?.frozenAt), frozenBy = human(rec.candidate?.by);
-  row(21, frozenAt !== null && frozenBy !== null && frozenAt <= now, 'candidate SHA frozen and the merge freeze declared by a named person',
-    frozenAt !== null && frozenBy ? `${rec.candidate.frozenAt} by ${frozenBy}` : 'candidate.frozenAt / candidate.by not recorded', { who: frozenBy || '' });
+  // Say which half is wrong: a typed agent name is refused, not "not recorded".
+  const typedBy = String(rec.candidate?.by || '').trim();
+  const frozenProblems = [
+    frozenAt === null ? (String(rec.candidate?.frozenAt || '').trim() ? 'candidate.frozenAt is not an ISO date-time' : 'candidate.frozenAt not recorded') : null,
+    frozenAt !== null && frozenAt > now ? `candidate.frozenAt ${rec.candidate.frozenAt} is in the future` : null,
+    frozenBy === null ? (typedBy ? `candidate.by ${JSON.stringify(typedBy)} does not name a human (an agent, CI or placeholder name is refused)` : 'candidate.by not recorded') : null
+  ].filter(Boolean);
+  row(21, frozenProblems.length === 0, 'candidate SHA frozen and the merge freeze declared by a named person',
+    frozenProblems.length ? frozenProblems.join('; ') : `${rec.candidate.frozenAt} by ${frozenBy}`, { who: frozenBy || '' });
 
   // ── nomination at the release stage ────────────────────────────────────────
   const overridePath = rec.overrides ? resolve(ROOT, String(rec.overrides)) : null;
@@ -199,8 +206,11 @@ export async function buildDossier({
   try {
     runsOnSha = await ghAll(gh, `repos/${repo}/actions/runs?head_sha=${expected}&per_page=${GH_PAGE}`, 'workflow_runs');
     const proof = evaluateRuns(runsOnSha.filter(run => run?.name === PROOF_WORKFLOW));
-    const green = proof.latest.filter(run => run.status === 'completed' && GREEN.has(run.conclusion));
-    row(25, green.length > 0 && proof.red.length === 0 && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
+    // `success` only: a skipped proof verified nothing. Release Staging Proof is skipped whenever Main
+    // Integrity did not pass on the merge (63deeb757, Train 1: 18 cancelled PR workflows), and a
+    // skipped run must never stand in for the 14/14 it did not run.
+    const green = proof.latest.filter(run => run.status === 'completed' && run.conclusion === 'success');
+    row(25, green.length > 0 && green.length === proof.latest.length && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
       proof.latest.length ? proof.latest.map(run => `${run.event || 'run'}: ${run.status}/${run.conclusion || '…'}${run.html_url ? ' ' + run.html_url : ''}`).join('; ') : `no ${PROOF_WORKFLOW} run has this head SHA (dispatch it, or wait for Main Integrity to trigger it)`);
   } catch (error) {
     if (error?.code === 'ENOENT') throw Object.assign(new Error('gh (GitHub CLI) is not installed or not on PATH'), { code: 'DEPENDENCY' });
