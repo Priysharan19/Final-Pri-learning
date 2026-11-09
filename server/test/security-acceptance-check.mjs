@@ -64,6 +64,8 @@ Object.assign(process.env, SECRETS, {
   // The AI tutor ships dark; the sweeps run with it switched on so its real
   // guards are what they meet. Section H also proves the dark 404.
   PRI_FEATURE_TUTOR: '1',
+  // Line check ships off too (PRI_FEATURE_LINE_CHECK); swept with it on, dark 404 proved in H.
+  PRI_FEATURE_LINE_CHECK: '1',
   PRI_PAID_CALLS_PER_HOUR: '1000',
   PRI_PAID_CALLS_PER_DAY: '1000'
 });
@@ -862,6 +864,10 @@ try {
     const dark = await help(first, body());
     c.deq([dark.status, dark.data?.error?.code], [404, 'NOT_FOUND'], 'tutor: dark without PRI_FEATURE_TUTOR=1, even for a verified account');
     process.env.PRI_FEATURE_TUTOR = '1';
+    process.env.PRI_FEATURE_LINE_CHECK = '0';
+    const darkLine = await h.request('/v1/tutor/line-check', { method: 'POST', jar: first.jar, body: { context: 'practice', serverQuestionId: '11111111-1111-4111-8111-111111111111', lines: ['a + b = c'] } });
+    c.deq([darkLine.status, darkLine.data?.error?.code], [404, 'NOT_FOUND'], 'line check: dark without PRI_FEATURE_LINE_CHECK=1, even for a verified account with the tutor on');
+    process.env.PRI_FEATURE_LINE_CHECK = '1';
 
     const exam = await help(first, body({ context: 'exam' }));
     c.deq([exam.status, exam.data?.error?.code], [403, 'TUTOR_EXAM_LOCKED'], 'tutor: an exam context is locked');

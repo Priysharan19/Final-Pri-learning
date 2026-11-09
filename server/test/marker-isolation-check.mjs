@@ -519,7 +519,7 @@ try {
     const sealed = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [who.account.id, t.q.id])).response_json);
     c.deq(await issued.workEvidence(lines), tutorEvidence(sealed, lines), 'tutor: the Step Check through the pool is exactly the in-process one');
     const stuck = await timed(issued.workEvidence([`x = ${t.root} ${magic('spin')}`]));
-    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake');
+    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null, unchecked: true }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake — marked as not checked');
     c.ok(stuck.ms < 250 + MARGIN, 'tutor: at the deadline');
   }
 

@@ -253,13 +253,31 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     // evidence", exactly as when the engine threw.
     async workEvidence(lines) {
       const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      // Silence because the check did not RUN (cooldown, busy pool, deadline)
+      // is marked `unchecked`, so a caller can say "couldn't check your working
+      // this time" instead of showing nothing — or, worse, implying the lines
+      // were checked and held. It is still no evidence about any line.
+      const unchecked = { ...silent, unchecked: true };
       if (!stepMetaFor(q) || !Array.isArray(lines) || !lines.length) return silent;
-      if (await markerCooldownUntil(db, accountId)) return silent;
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
       let outcome;
-      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return silent; }
+      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return unchecked; }
       if (outcome.ok) return outcome.value.evidence;
       if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
-      return silent;
+      return unchecked;
+    },
+    // "Check this line so far": the marker pool decides, by form and never by
+    // value, where the first final-answer attempt is, and Step Checks the lines
+    // only when there is none. Did not run → `unchecked`, for any lines.
+    async lineCheckEvidence(lines) {
+      const unchecked = { firstBreak: -1, verifiedLines: 0, misconception: null, attemptAt: -1, unchecked: true };
+      if (!Array.isArray(lines) || !lines.length) return { ...unchecked, unchecked: false, attemptAt: 0 };
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
+      let outcome;
+      try { outcome = await markerPool().run('lineCheck', { q, lines, answerText: String(answerTextFor(q) ?? '') }, { key: accountId }); } catch { return unchecked; }
+      if (outcome.ok) return outcome.value;
+      if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      return unchecked;
     }
   };
 }
