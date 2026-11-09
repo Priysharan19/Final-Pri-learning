@@ -349,7 +349,7 @@ jobs:
           grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
           # The Aurora skin stays on chrome: scope, no content tokens, glass
           # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
-          grep -Fq 'AURORA SKIN: PASS — 28/28 checks' suites.log
+          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
