@@ -1,0 +1,41 @@
+{
+  "identifier" : "4C1E7B7A-6E1B-4C55-9A3F-2B9F3D6C0A01",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "6700000000",
+    "_developerTeamID" : "SIMULATOR",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_IN",
+    "_storefront" : "IND",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21500001",
+      "localizations" : [],
+      "name" : "Pri Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [], "codeOffers" : [],
+          "displayPrice" : "199.00", "familyShareable" : false, "groupNumber" : 2,
+          "internalID" : "6700000001", "introductoryOffer" : null,
+          "localizations" : [ { "description" : "Pri Learning Premium, billed monthly", "displayName" : "Premium monthly", "locale" : "en_IN" } ],
+          "productID" : "com.prilearning.app.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M", "referenceName" : "Premium monthly",
+          "subscriptionGroupID" : "21500001", "type" : "RecurringSubscription", "winbackOffers" : []
+        },
+        {
+          "adHocOffers" : [], "codeOffers" : [],
+          "displayPrice" : "1499.00", "familyShareable" : false, "groupNumber" : 1,
+          "internalID" : "6700000002", "introductoryOffer" : null,
+          "localizations" : [ { "description" : "Pri Learning Premium, billed yearly", "displayName" : "Premium yearly", "locale" : "en_IN" } ],
+          "productID" : "com.prilearning.app.premium.annual",
+          "recurringSubscriptionPeriod" : "P1Y", "referenceName" : "Premium yearly",
+          "subscriptionGroupID" : "21500001", "type" : "RecurringSubscription", "winbackOffers" : []
+        }
+      ]
+    }
+  ],
+  "version" : { "major" : 4, "minor" : 0 }
+}
