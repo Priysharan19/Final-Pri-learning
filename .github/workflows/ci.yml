@@ -192,7 +192,7 @@ jobs:
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
           grep -Fq 'STEP14 REVIEW FIXES: PASS — 39533/39533 checks' suites.log
-          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 414/414 checks' suites.log
+          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 415/415 checks' suites.log
           grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
           grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log

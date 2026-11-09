@@ -138,16 +138,18 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
 {
   const G = 'division-echo';
   const q = { answerType: 'numeric', prompt: 'Find $(-56) \\div (-8)$.', answer: { value: 7 } };
-  for (const input of ['(-56)÷(-8)', '-56÷-8', '56÷8', '(-56)/(-8)', '-56/-8', '-56/(-8)', '56/8', '14/2', '7/1']) {
+  for (const input of ['(-56)÷(-8)', '-56÷-8', '56÷8', '(-56)/(-8)', '-56/-8', '-56/(-8)', '(-56) \\div (-8)']) {
     const r = verdict(q, input);
     check(G, r.correct === false && r.invalid === true && /Work it out first/.test(r.feedback || ''), `"${input}" is refused under D13 with guidance, never credited (got ${state(r)})`);
   }
   check(G, verdict(q, '7').correct === true, '"7" is credited');
+  // D13's accepted fractions are unchanged: a whole-valued fraction with at most one sign.
+  for (const input of ['56/8', '14/2']) check(G, verdict(q, input).correct === true, `"${input}" is a fraction as D13 accepts it, and credited`);
   const half = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 2.5 } };
   for (const input of ['5/2', '10/4', '2 1/2', '2.5']) check(G, verdict(half, input).correct === true, `"${input}" is a fraction as one is written, and credited`);
   const neg = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: -2.5 } };
-  for (const input of ['-5/2', '(-5)/2']) check(G, verdict(neg, input).correct === true, `"${input}" is credited`);
-  check(G, verdict(neg, '5/-2').correct !== true, '"5/-2" is not credited');
+  for (const input of ['-5/2', '(-5)/2', '5/-2']) check(G, verdict(neg, input).correct === true, `"${input}" is credited`);
+  check(G, verdict(neg, '(-5)/(-2)').correct !== true, '"(-5)/(-2)" is not credited');
 }
 
 const pass = Object.values(groups).reduce((n, g) => n + g.pass, 0);
