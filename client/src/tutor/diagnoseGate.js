@@ -25,8 +25,23 @@ export function showDiagnoseButton({ tutorEnabled, diagnostic = false, resolved 
  * "Check this line so far": under a server reading in Write mode, before the
  * question is resolved, with the tutor on, never on a placement check.
  */
-export function showLineCheckButton({ tutorEnabled, diagnostic = false, writeMode = false, resolved = false, hasLines = false, checksLeft = 2 } = {}) {
-  return tutorEnabled === true && !diagnostic && writeMode === true && !resolved && hasLines === true && checksLeft > 0;
+export function showLineCheckButton({ tutorEnabled, diagnostic = false, writeMode = false, resolved = false, hasLines = false, checksLeft = 2, lineCheckEnabled = lineCheckFeatureEnabled() } = {}) {
+  return lineCheckEnabled === true && tutorEnabled === true && !diagnostic && writeMode === true && !resolved && hasLines === true && checksLeft > 0;
+}
+
+/* global __PRI_PRODUCTION_BUILD__ */
+/**
+ * "Check this line so far" is OFF (Director decision): an answer relating two
+ * variables can still be told right from wrong until final-answer detection
+ * is engine-based. The server route is 404 without PRI_FEATURE_LINE_CHECK=1;
+ * here the button is hidden in every build. Only a non-production build (dev
+ * server, Node suites) may switch it on, through
+ * globalThis.__PRI_LINE_CHECK_OVERRIDE__ = true.
+ */
+export function lineCheckFeatureEnabled(scope = globalThis) {
+  const production = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' ? __PRI_PRODUCTION_BUILD__ : false;
+  if (production) return false;
+  return scope?.__PRI_LINE_CHECK_OVERRIDE__ === true;
 }
 
 /** The final-answer status the diagnosis is told: the engine's, as the card holds it. */

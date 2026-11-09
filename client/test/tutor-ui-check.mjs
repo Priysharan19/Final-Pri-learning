@@ -281,7 +281,9 @@ const fakeStream = events => async (body, { onEvent }) => { for (const [event, d
 
   // "Check this line so far": only with the tutor on, under an open reading.
   const { showLineCheckButton } = await import('../src/tutor/diagnoseGate.js');
-  const on = { tutorEnabled: true, writeMode: true, resolved: false, hasLines: true };
+  const on = { tutorEnabled: true, writeMode: true, resolved: false, hasLines: true, lineCheckEnabled: true };
+  ok(!showLineCheckButton({ ...on, lineCheckEnabled: undefined }), 'line check is OFF by default (Director decision): hidden even with the tutor on');
+  ok(!showLineCheckButton({ ...on, lineCheckEnabled: false }), 'and hidden when its flag is off');
   ok(showLineCheckButton(on), 'with the tutor on, an open reading offers "Check this line so far"');
   ok(!showLineCheckButton({ ...on, tutorEnabled: false }), 'with the tutor OFF nothing is shown');
   ok(!showLineCheckButton({ ...on, resolved: true }) && !showLineCheckButton({ ...on, hasLines: false }) && !showLineCheckButton({ ...on, diagnostic: true }) && !showLineCheckButton({ ...on, checksLeft: 0 }),

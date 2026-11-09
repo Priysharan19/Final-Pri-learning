@@ -692,6 +692,11 @@ export async function tutorDailyLimit(db, accountId, env = process.env) {
     : positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY) || TUTOR_DAILY_DEFAULTS.free;
 }
 
+/** "Check this line so far" ships dark on its own switch: PRI_FEATURE_LINE_CHECK=1. */
+export function lineCheckFeatureEnabled(env = process.env) {
+  return String(env.PRI_FEATURE_LINE_CHECK || '').trim() === '1';
+}
+
 /** The tutor ships dark: the route exists only where PRI_FEATURE_TUTOR=1. */
 export function tutorFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
@@ -935,6 +940,12 @@ export function createTutorRouter(db, {
   // like a tutor level and allows at most LINE_CHECKS_PER_QUESTION per question,
   // and here it spends one unit of the per-account daily allowance. No model.
   router.post('/line-check',
+    // Off unless PRI_FEATURE_LINE_CHECK=1 (Director decision): two-variable
+    // final answers can still be told right from wrong until final-answer
+    // detection is engine-based. Off, it is the platform's ordinary 404,
+    // before any session lookup — exactly as the tutor itself is when dark.
+    (req, res, next) => (lineCheckFeatureEnabled(env) ? next()
+      : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } })),
     requireSession(db),
     requireVerifiedEmail,
     rateLimit(db, 'tutor-line-check', TUTOR_RATE_LIMIT),

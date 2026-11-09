@@ -310,7 +310,7 @@ try {
   // The line-check route refuses before any spend.
   {
     const app = express(); app.use(express.json()); app.use(cookieParser());
-    app.use('/tutor', createTutorRouter(db, { ask: stubAsk, env }));
+    app.use('/tutor', createTutorRouter(db, { ask: stubAsk, env: { ...env, PRI_FEATURE_LINE_CHECK: '1' } }));
     const s = await new Promise(r => { const x = app.listen(0, '127.0.0.1', () => r(x)); }); servers.push(s);
     const lc = async (who, payload) => {
       const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', ...(who ? { cookie: `${SESSION_COOKIE}=raw-${who}` } : {}) }, body: JSON.stringify(payload) });
@@ -360,8 +360,19 @@ try {
     eq([c1.status, c2.status, c3.status, c3.json?.error?.code], [200, 200, 409, 'LINE_CHECK_LIMIT'], 'line check: the server refuses a third check on the same question');
     ok(!('checksLeft' in (right.json?.lineCheck || {})), 'final-value replies spend no check');
   }
-  const darkLc = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
-  void darkLc;
+  // Line check ships OFF: with PRI_FEATURE_LINE_CHECK unset (tutor on) the route is the ordinary 404.
+  {
+    const app = express(); app.use(express.json()); app.use(cookieParser());
+    app.use('/tutor', createTutorRouter(db, { ask: stubAsk, env }));
+    const s = await new Promise(r => { const x = app.listen(0, '127.0.0.1', () => r(x)); }); servers.push(s);
+    for (const who of [null, 'acct-a']) {
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', ...(who ? { cookie: `${SESSION_COOKIE}=raw-${who}` } : {}) }, body: JSON.stringify({ context: 'practice', serverQuestionId: '11111111-1111-4111-8111-111111111111', lines: ['a + b = c'] }) });
+      eq([r.status, (await r.json().catch(() => null))?.error?.code], [404, 'NOT_FOUND'], `line check with PRI_FEATURE_LINE_CHECK unset is 404 (${who ? 'signed in' : 'anonymous'})`);
+    }
+    // …while "What went wrong?" stays on with the tutor.
+    const help = await fetch(`http://127.0.0.1:${s.address().port}/tutor/help`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-a` }, body: JSON.stringify(body({}, { typedAnswer: '41' })) });
+    eq(help.status, 200, '"What went wrong?" is unaffected by the line-check switch');
+  }
 
   // Dark: the route does not exist.
   const dark = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
