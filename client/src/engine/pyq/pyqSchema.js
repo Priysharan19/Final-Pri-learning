@@ -25,7 +25,7 @@
 
 import { IN_CHAPTER_BY_ID } from '../curriculum-in.js';
 import { PYQ_PROVENANCE, PYQ_PUBLISHABLE, pyqExam, pyqSource } from './pyqSources.js';
-import { figureHasExternalRef } from '../../lib/figureRefs.js';
+import { figureHasExternalRef } from '../figureRefs.js';
 
 /** Answer contracts the archive can carry, and checker.js can mark. */
 export const PYQ_ANSWER_TYPES = Object.freeze(['mcq', 'numeric']);

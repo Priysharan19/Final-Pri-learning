@@ -77,7 +77,7 @@ ok(noFigure.every(scene => scene.visuals.every(v => v.kind !== 'figure')), 'no f
 // A paint or style url() that is not #local makes the browser fetch it (a
 // tracking/privacy leak). Only url(#id) and href="#id" are allowed — in the
 // archive, in the client sanitiser and on the server.
-const { figureHasExternalRef } = await import('../src/lib/figureRefs.js');
+const { figureHasExternalRef } = await import('../src/engine/figureRefs.js');
 const LOCAL = '<svg viewBox="0 0 10 10"><defs><linearGradient id="g"/><marker id="m"/><mask id="k"/><filter id="f"/></defs><path d="M0 0L9 9" fill="url(#g)" stroke="url(\'#g\')" marker-end="url(#m)" mask="url(#k)" filter="url(#f)" style="fill:url(#g)"/></svg>';
 ok(validatePyqRecord({ ...base, figure: LOCAL }).figure === LOCAL, 'url(#localId) references are admitted');
 ok(!figureHasExternalRef(LOCAL), 'local references are not external');
@@ -116,13 +116,19 @@ const backend = readFileSync(new URL('../src/local/backend.js', import.meta.url)
 ok(/const safeSteps[\s\S]{0,400}safeFigure\(s\.figure\)/.test(backend), 'the client step sanitiser passes step figures through safeFigure');
 // The server ships its own copy of the rule (the runtime image carries no
 // client/ files); the two copies must stay byte-identical.
-const clientRule = readFileSync(new URL('../src/lib/figureRefs.js', import.meta.url), 'utf8');
+const clientRule = readFileSync(new URL('../src/engine/figureRefs.js', import.meta.url), 'utf8');
 const serverRule = readFileSync(new URL('../../server/platform/figureRefs.js', import.meta.url), 'utf8');
-ok(clientRule === serverRule, 'server/platform/figureRefs.js is byte-identical to client/src/lib/figureRefs.js');
+ok(clientRule === serverRule, 'server/platform/figureRefs.js is byte-identical to client/src/engine/figureRefs.js');
+// The production image ships client/src/engine but not client/src/lib, and the
+// server loads the PYQ archive; the archive's rule must live in the engine.
+const schemaSrc = readFileSync(new URL('../src/engine/pyq/pyqSchema.js', import.meta.url), 'utf8');
+ok(/from '\.\.\/figureRefs\.js'/.test(schemaSrc) && !/\/lib\//.test(schemaSrc), 'the archive takes the rule from the engine, not client/src/lib');
+const engineRule = readFileSync(new URL('../src/engine/figureRefs.js', import.meta.url), 'utf8');
+ok(!/^\s*import\b/m.test(engineRule), 'the engine copy of the rule imports nothing');
 const serverRefs = await import('../../server/platform/figureRefs.js');
 ok([LOCAL, ...Object.values(carriers).flatMap(make => external.map(make))].every(svg => serverRefs.figureHasExternalRef(svg) === figureHasExternalRef(svg)), 'the server copy decides every fixture the same way');
 const practice = readFileSync(new URL('../../server/platform/practice.js', import.meta.url), 'utf8');
 ok(/steps: \(q\.steps \|\| \[\]\)\.map\(step => \(typeof step\?\.figure === 'string'/.test(practice), 'the server returns a step figure with the solution steps');
-ok(/from '\.\/figureRefs\.js'/.test(practice) && !/client\/src\/lib\/figureRefs/.test(practice) && /!figureHasExternalRef\(step\.figure\)/.test(practice), 'the server drops a step figure that references anything outside itself');
+ok(/from '\.\/figureRefs\.js'/.test(practice) && !/client\/src\/(?:lib|engine)\/figureRefs/.test(practice) && /!figureHasExternalRef\(step\.figure\)/.test(practice), 'the server drops a step figure that references anything outside itself');
 
 console.log(`PYQ FIGURES: PASS — ${pass}/${pass} checks — inline SVG only (no script, handler, embedded object, or any url()/href except #local — fill, stroke, filter, mask, marker-*, style) on questions and worked steps; payload, Pri Explain and step sanitiser carry them; a storyboard cannot invent one.`);

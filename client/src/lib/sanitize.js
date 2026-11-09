@@ -30,7 +30,7 @@ const ALLOWED_STYLE_PROPS = new Set(['max-width', 'width', 'height', 'display'])
 
 // Second belt on the values that do survive: no scheme, no protocol-relative
 // reference, no markup smuggled back in through an attribute.
-import { hasNonLocalUrlRef } from './figureRefs.js';
+import { hasNonLocalUrlRef } from '../engine/figureRefs.js';
 export { hasNonLocalUrlRef };
 
 const UNSAFE_VALUE = /(?:javascript|vbscript|data|blob|file)\s*:|^\s*\/\/|[<>]/i;
