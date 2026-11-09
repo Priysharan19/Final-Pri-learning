@@ -12,7 +12,7 @@
 // The render is deterministic: no dates, no hashes, no environment. Running it
 // twice on the same inputs writes the same bytes.
 
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROUTES, SITE_ORIGIN } from './src/config.mjs';
@@ -88,11 +88,11 @@ export function readOutput(dir = OUTPUT_DIR) {
   const files = new Map();
   const walk = (d) => {
     let entries;
-    try { entries = readdirSync(d); } catch { return; }
-    for (const name of entries) {
-      const full = join(d, name);
-      if (statSync(full).isDirectory()) walk(full);
-      else files.set(relative(dir, full), readFileSync(full, 'utf8'));
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const full = join(d, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) files.set(relative(dir, full), readFileSync(full, 'utf8'));
     }
   };
   walk(dir);
