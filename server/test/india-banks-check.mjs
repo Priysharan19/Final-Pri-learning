@@ -47,6 +47,8 @@ c.eq(INDIA_BANK_COUNT, new Set([...india, ...pyq]).size, `the server's India ban
 c.ok([...pyq].every(indiaBank), 'every India previous-year bank is issuable (D23, not D15, decides whether students see them)');
 c.ok(outside.length > 50, `there are banks outside the covers to refuse (${outside.length})`);
 c.ok(outside.every(id => !indiaBank(id)) && [...india].every(indiaBank), 'indiaBank() admits the covers and refuses every other engine bank');
+c.ok(['jee-advanced-c11-binomial-theorem', 'jee-main-c12-matrices', 'pyq-jee-advanced-c11-conic-sections', 'pyq-cbse-c10-real-numbers'].every(indiaBank), 'the JEE department catalog and the source-cited CBSE/JEE archive are India banks (#732 asks for them by name)');
+c.ok(!indiaBank('xjee-advanced-c11-sets') && !indiaBank('pyq-hsc-ext1-induction') && !indiaBank('jee-advanced-'), 'a name that only looks like a previous-year bank is not one');
 c.ok(!indiaBank(undefined) && !indiaBank('') && !indiaBank(['c10-polynomials']), 'and only a name is a bank');
 c.eq(practicePapersAllowed(), false, 'and the practice paper is not allowed');
 
