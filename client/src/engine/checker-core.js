@@ -20,9 +20,9 @@ import {
 } from './answer-forms.js';
 import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
-import { exactValue, fraction } from './exact.js';
+import { exactValue, fraction, ExactLimit } from './exact.js';
 
-const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
+const UNIT_TAIL = /(?<![a-zA-Z])(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
 // India-first currency. A student answering a question priced in rupees writes
 // ₹9.75, Rs 9.75, Rs. 9.75 or 9.75 rupees; the dollar sign was already read by
@@ -145,7 +145,11 @@ function withoutBoxWord(question, text) {
   const box = String(question?.answerSuffix ?? '').trim();
   if (!box || typeof text !== 'string' || !/[A-Za-z°]/.test(box)) return text;
   const escape = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const forms = [...new Set([box, box.replace(/(?<=[A-Za-z])s$/i, ''), `${box}s`])];
+  // A unit box ("m", "cm") takes its spellings from units.js alone: "ms" is not
+  // metres (the delta review's "5 ms" false credit). Only a word box ("years",
+  // "runs", "crore") is read in its singular and plural.
+  const forms = canonicalUnit(box) || angleUnitOfSuffix(box) ? [box]
+    : [...new Set([box, box.replace(/(?<=[A-Za-z])s$/i, ''), `${box}s`])];
   return text.replace(new RegExp(`(?<=[\\d)π]|pi)\\s*(?:${forms.map(escape).join('|')})\\.?\\s*$`, 'i'), '');
 }
 /** A box that counts rupees in a scale word: crore, lakh, million, thousand… */
@@ -169,7 +173,20 @@ function moneyQuestion(question) {
   if (COUNT_ASK.test(askingSentences(prompt.replace(/\$/g, ' ')))) return false;
   return RUPEE_MARK.test(prompt) || /\bpaise\b/i.test(prompt);
 }
-const COUNT_ASK = /\bhow\s+many\b(?!\s+(?:rupees|paise)\b)|\bnumber\s+of\b(?!\s+(?:rupees|paise)\b)|\bper\s?cent(?:age)?\b|%|\bratio\b|\bfraction\b|\bhow\s+long\b/i;
+// A percentage, ratio, fraction or rate counts only when the sentence ASKS for
+// it ("what percentage", "find the ratio", "as a fraction"), not when it gives
+// one: "Find the simple interest on ₹500 at 5% per annum" asks for rupees
+// (the delta review's R2).
+const COUNT_ASK = new RegExp([
+  String.raw`\bhow\s+many\b(?!\s+(?:rupees|paise)\b)`,
+  String.raw`\bnumber\s+of\b(?!\s+(?:rupees|paise)\b)`,
+  String.raw`\bhow\s+long\b`,
+  String.raw`\b(?:what|which)\s+(?:is\s+the\s+)?(?:per\s?cent(?:age)?|ratio|fraction|rate)\b`,
+  String.raw`\b(?:find|calculate|work\s+out|give|write|state)\s+(?:the\s+|its\s+|their\s+)?(?:\w+\s+)?(?:per\s?cent(?:age)?|ratio|fraction)\b`,
+  String.raw`\b(?:find|calculate)\s+the\s+rate\b`,
+  String.raw`\bas\s+an?\s+(?:per\s?cent(?:age)?|ratio|fraction)\b`,
+  String.raw`\bin\s+(?:per\s?cent|%)`
+].join('|'), 'i');
 /** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
 function paiseAsked(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? '');
@@ -305,14 +322,20 @@ function askedDimensions(question) {
   }
   // The asking sentence can name the unit itself: "How many metres are
   // left?", "Find the total mass in kg.", "… its area in cm²?"
-  const sentences = String(question?.prompt ?? '').replace(/\$/g, ' ').replace(/\\(?:text|mathrm)\s*\{([^{}]*)\}/g, ' $1 ')
-    .split(/(?<=[.?!])\s+(?=[A-Z])/);
-  const asking = sentences[sentences.length - 1] || '';
-  for (const named of [asking.match(/\bhow\s+many\s+([a-z]+(?:\s+per\s+[a-z]+)?)/i)?.[1],
-    asking.match(/\bin\s+((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°]+(?:\s*(?:\^?[23]|[²³]))?(?:\s*(?:\/|per)\s*[a-zA-Z]+)?)\s*[.?!]?\s*$/i)?.[1]]) {
-    const unit = named ? canonicalUnit(named) : null;
-    const dim = unit && !/^units/.test(unit) ? unitDimension(unit) : null;
-    if (dim) found.add(dim);
+  // The unit can stand mid-sentence ("How far, in cm, does its tip move?",
+  // "Find, in degrees, the angle …"), and the asking sentence need not be the
+  // last ("… ? Take π = 22/7.") — the delta review's P1 on
+  // c11-radian-unit-circle-reasoning.
+  const text = String(question?.prompt ?? '').replace(/\$/g, ' ').replace(/\\(?:text|mathrm)\s*\{([^{}]*)\}/g, ' $1 ');
+  const UNIT_WORDS = String.raw`((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°]+(?:\s*(?:\^?[23]|[²³]))?(?:\s*(?:\/|per)\s*[a-zA-Z]+)?)`;
+  for (const asking of askingSentences(text).split(/(?<=[.?!])\s+/)) {
+    for (const named of [asking.match(/\bhow\s+many\s+([a-z]+(?:\s+per\s+[a-z]+)?)/i)?.[1],
+      asking.match(new RegExp(String.raw`\bin\s+${UNIT_WORDS}\s*[.?!]?\s*$`, 'i'))?.[1],
+      asking.match(new RegExp(String.raw`,\s*in\s+${UNIT_WORDS}\s*,`, 'i'))?.[1]]) {
+      const unit = named ? canonicalUnit(named) : null;
+      const dim = unit && !/^units/.test(unit) ? unitDimension(unit) : null;
+      if (dim) found.add(dim);
+    }
   }
   // Two different kinds of quantity asked at once: no single dimension is asked.
   const kinds = new Set([...found].map(d => (d === 'volume' ? 'length³' : d)));
@@ -836,7 +859,9 @@ function checkAnswerWithinBudget(question, rawInput) {
             : 'Check the unit — this question does not ask for an amount of money.' };
         }
         if (meta.paise) {
-          if (!moneyQuestion(question)) {
+          // A box that counts rupees in crores or millions is not in paise:
+          // "9810 paise" is ₹98.10, not ₹98.1 crore (#723 review P2).
+          if (!moneyQuestion(question) || RUPEE_SCALE.test(String(question.answerSuffix ?? '').trim())) {
             return { correct: false, feedback: question.answerSuffix
               ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
               : 'Check the unit — this question does not ask for an amount in paise.' };
@@ -1017,6 +1042,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         return { correct: false, feedback: 'Unknown answer type.' };
     }
   } catch (err) {
+    // An exact value past the bounds is too large to check: unread, never the float band.
+    if (err instanceof ExactLimit) return { correct: false, invalid: true, feedback: 'That answer is too large to check. Write the value itself, worked out.' };
     // Digits broken apart in a way no single number is written: say how one is.
     if (err?.message === 'Not a single number') {
       return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512) — a comma followed by a space reads as two numbers.' };
