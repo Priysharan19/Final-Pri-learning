@@ -165,7 +165,7 @@ html.ui-instrument.skin-aurora .pri-plot-value {
 }
 /* The form always wins on phone. The mini-plot remains a real instrument:
    its equation and coordinate probe are identical to the desktop plot. */
-@media (max-width: 860px) {
+@media (max-width: 699px) {
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
     grid-template-columns: minmax(0,1fr); grid-template-rows: 178px auto;
   }
@@ -239,4 +239,23 @@ html.ui-instrument.skin-aurora .pri-plot-value {
 @media (max-width: 420px) {
   html.ui-instrument.skin-aurora .pri-plot-foot .in-signin-line { display: none; }
   html.ui-instrument.skin-aurora .pri-plot-foot { justify-content: flex-end; }
+}
+
+/* An iPad has space for the same full-depth workspace as desktop.
+   Keep the form wider than the plot in portrait orientation. */
+@media (min-width: 700px) and (max-width: 1020px) {
+  html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
+    grid-template-columns: minmax(0,.83fr) minmax(0,1.17fr);
+  }
+  html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) > .auth-col {
+    padding-inline: clamp(22px,3.1vw,44px);
+  }
+  html.ui-instrument.skin-aurora .pri-plot-foot {
+    display: block;
+  }
+  html.ui-instrument.skin-aurora .pri-plot-foot .in-signin-line {
+    font-size: clamp(28px,3vw,37px);
+  }
+  html.ui-instrument.skin-aurora .pri-plot-value { display: block; margin-top: 14px; }
+  html.ui-instrument.skin-aurora .pri-plot-equation { font-size: 17px; }
 }
