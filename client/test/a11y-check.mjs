@@ -1145,6 +1145,15 @@ async function run() {
       await wait(page, 600);
     });
 
+    // Readiness estimate and Mistake DNA (premium insights): signed in or not,
+    // the page settles on a section or an honest error, and is audited.
+    await step('insights · estimate from practice and Mistake DNA', '/insights', async () => {
+      await goTo(page, BASE, '/insights');
+      await page.waitForSelector('.ins-page h1', { timeout: 20000 });
+      await page.waitForSelector('.ins-page [data-insights-dna], .ins-page [data-insights-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
@@ -1218,13 +1227,6 @@ async function run() {
     await step('settings · deleting the profile', '/settings', async () => {
       await goTo(page, BASE, '/settings');
       await click(page, 'button.btn-quiet', { text: 'Delete this profile' });
-    });
-
-    await step('settings · handwriting calibration', '/settings', async () => {
-      await goTo(page, BASE, '/settings');
-      await click(page, 'button.btn-primary', { text: 'Teach it your handwriting' });
-      await page.waitForSelector('.ink-wrap', { timeout: 30000 });
-      await wait(page, 600);
     });
 
     // ── the documents a store, a payment provider and the DPDP Act require ──

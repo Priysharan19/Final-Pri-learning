@@ -69,7 +69,13 @@ export const flow = {
     await page.locator('[data-final-answer]').fill(BAD);
     const work = page.locator('[data-typed-working]');
     await work.waitFor({ state: 'visible', timeout: 10000 });
+    // Focus the Working box itself before filling: WebKit's fill inserts into
+    // whatever holds focus, and on Linux WebKit the lines landed in the final
+    // answer (CI screenshot). Both fields are then held to what was written.
+    await work.click();
     await work.fill(ELIMINATION);
+    const fields = { answer: await page.locator('[data-final-answer]').inputValue(), working: await work.inputValue() };
+    if (!await check('the final answer and the working are each in their own field', fields.answer === BAD && fields.working === ELIMINATION, JSON.stringify(fields))) return;
 
     // Inject a *forged browser-only presentation field* into the real first
     // unRESOLVED response. It must not appear as a marks panel, regardless of

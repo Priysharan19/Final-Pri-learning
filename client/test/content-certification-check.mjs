@@ -423,7 +423,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   eq(JSON.stringify(practiceRequestFromQuery(new URLSearchParams(''))), JSON.stringify({ mode: 'smart' }), 'a bare /practice link is smart practice');
   const page = src('../src/pages/PracticeBase.jsx');
   ok(page.includes('practiceRequestFromQuery(params)'), 'Practice reads its topic/smart request through the shared reader');
-  for (const [file, call] of [['../src/pages/Home.jsx', 'practiceHref('], ['../src/pages/IndiaProgress.jsx', 'indiaProgressPracticeHref('], ['../src/components/Class10NCERTLibrary.jsx', 'class10LibraryPracticeHref(']]) {
+  for (const [file, call] of [['../src/pages/Home.jsx', 'practiceHref('], ['../src/home/TopicGenerator.jsx', 'practiceHref('], ['../src/pages/IndiaProgress.jsx', 'indiaProgressPracticeHref('], ['../src/components/Class10NCERTLibrary.jsx', 'class10LibraryPracticeHref(']]) {
     ok(src(file).includes(call), `${file.split('/').pop()} builds its practice link through lib/practiceLinks.js`);
   }
 }
@@ -471,7 +471,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(libLinks.length >= NCERT_CLASS10_CONTENT.length && libLinks.length <= NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
   const library = src('../src/components/Class10NCERTLibrary.jsx');
   ok(library.includes('class10LibraryDifficulties(indiaRequestableDifficulties(') && library.includes('{levels.map(') && !library.includes('[1,2,3,4].map'), 'the Class X library buttons are the shared CBSE levels the chapter really has');
-  const home = src('../src/pages/Home.jsx');
+  const home = src('../src/home/TopicGenerator.jsx');
   ok(home.includes('offeredDifficulties.map(') && !/\[1, 2, 3, 4\]\.filter/.test(home), 'Home\'s difficulty picker offers only practiceDifficulties for the context');
   ok(home.includes('difficulty: chosenDifficulty'), 'a remembered D4 filter is not sent from a CBSE Home');
   ok(src('../src/pages/Tasks.jsx').includes('section?.difficultyCeiling || 3'), 'the Tasks difficulty picker stays within the section ceiling (D1–D3 for CBSE)');

@@ -15,17 +15,20 @@ a ticket). Each decision (`D4`, `D12`, …) is the owner default of
 
 | # | Setting | Production value | Decision it implements | Read by | How it is verified | On main? |
 |---|---|---|---|---|---|---|
-| 1 | AI tutor off | `PRI_FEATURE_TUTOR` **unset** (anything but `1` is off); `PRI_TUTOR_*` unset; client builds made **without** `PRI_FEATURE_TUTOR=1` | D4 — the tutor stays off at launch | `server/platform/tutor.js` `tutorFeatureEnabled` (every `/v1/tutor/*` path is the platform 404 before any session lookup); `client/vite.config.js` (`__PRI_FEATURE_TUTOR__`, `features.json` `tutor`) | probes `tutor-dark` (`GET /v1/tutor/status` → 404 `NOT_FOUND`; a 401 means the route is mounted, so the tutor is on) and `web-build-tutor-off` (`/features.json` → `tutor: false`) | yes |
+| 1 | AI tutor **on** | `PRI_FEATURE_TUTOR=1` on the production `/v1` service **and** in the environment of every client build that ships (web, iOS); the per-account daily allowances `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY=40` and `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM=120` (the code defaults, written out so §3 can read them); every other `PRI_TUTOR_*` unset (the tutor uses the handwriting key and endpoint); spend bounded by row 4 and note 4 | Owner decision, 10 Nov 2026 (replaces D4's "off at launch") | `server/platform/tutor.js` `tutorFeatureEnabled` and `TUTOR_DAILY_DEFAULTS` (free 40, Premium 120 calls a day per account, refused `429 TUTOR_DAILY_LIMIT`; every tutor model call also spends one unit of row 4's ceiling); `client/vite.config.js` (`__PRI_FEATURE_TUTOR__`, `features.json` `tutor`) | probes `tutor-on` (`GET /v1/tutor/status` without a session → 401: the route is mounted; a 404 means the server switch is off) and `web-build-tutor-on` (`/features.json` → `tutor: true`); §3 check H1 for the allowances | yes |
 | 2 | Method marks off | `PRI_METHOD_MARKS` **unset** (or `off`); `PRI_METHOD_MARKS_EXAMINER_RESULT` **unset** | D12 — final-answer marks only until a signed examiner result (#499) exists | `server/platform/markingPolicy.js` (any value but `on` is final-answer only; in production `on` also needs the examiner-result variable) | no public request can see it: §3 check H2 | **no — lands with #739** (L1 train 2). Until #739 is in the candidate, production would mark with method marks: the candidate must contain #739 |
 | 3 | Child-data erasure enforced | `PRI_CHILD_ERASURE=enforce` | D18 — under-18 accounts whose guardian never confirmed, or withdrew, are erased after 30 days (7-day restore grace); a guardian can request erasure without the child's login | `server/platform/childErasure.js` `childErasureMode` (anything but `enforce` only counts candidates; a guardian's own request is honoured either way) | §3 check H3 (operator `/v1/health`) | **no — lands with #736** (L2). Set it only after the owner confirms D18 and counsel sets the period (the code holds 30 days, `UNCONSENTED_CHILD_RETENTION_MS`) |
 | 4 | Paid-call ceiling | `PRI_PAID_CALLS_PER_HOUR=120`, `PRI_PAID_CALLS_PER_DAY=300`, plus the owner's monthly limit on the OpenAI project that holds the production key (recommended **US$100 a month**, see note 4) | D21 — 120 an hour and 300 a day, and a hard monthly limit in the OpenAI console | `server/platform/spendCeiling.js` (required at boot whenever `PRI_HANDWRITING_API_KEY` is set; shared by handwriting, working and tutor calls) | probe `paid-ceiling-set` (`/v1/ready` `checks.paidCeiling.state = ok`: both set; not their values); §3 check H4 for the numbers and the console limit | yes |
-| 5 | Parent report off | `PRI_PARENT_REPORT` **unset**; `PRI_PARENT_REPORT_EMAILS` **unset**; client builds **without** `PRI_FEATURE_PARENT_REPORT=1` | D22 — the parent report is finished in code and stays off until counsel reviews email about minors | `server/platform/parentReport.js` `parentReportEnabled` (off: `/v1/parent-report` is not mounted) | probe `parent-report-dark` (`GET /v1/parent-report` → 404; a 401 means it is mounted); §3 check H5 for the build flag | server switch: **lands with #743** (L6); the 404 already holds on main, where the route does not exist |
+| 5 | Parent report **on**, its emails **off** | `PRI_PARENT_REPORT=on`; `PRI_PARENT_REPORT_EMAILS` **unset** (no weekly email is sent until an email provider for it and counsel's review of email about minors both exist); client builds made **with** `PRI_FEATURE_PARENT_REPORT=1` | Owner decision, 10 Nov 2026 (the in-app report on; D22's email restriction kept) | `server/platform/parentReport.js` `parentReportEnabled` (on: `/v1/parent-report` is mounted behind the session and guardian-consent gates) and its weekly job (runs only with `PRI_PARENT_REPORT_EMAILS=on`) | probes `parent-report-on` (`GET /v1/parent-report` without a session → 401) and `web-build-parent-report-on` (`/features.json` → `parentReport: true`); §3 check H5 for the email switch | yes |
 | 6 | Proxy hops | `PRI_TRUSTED_PROXY_HOPS=<the value staging proves PER-CLIENT>`. Today both environments use `1` (`production-cutover-checklist.md` §2), and staging measured **PER-EDGE-NODE** on 8 Nov 2026 (#738): every client routed through one Railway edge node shares one rate-limit bucket. Add 1 if a CDN (Cloudflare) is put in front of `app.prilearning.com` | #653 — the anonymous rate limits count the client, never a proxy, and a forged `X-Forwarded-For` never earns a fresh bucket | `server/platform/config.js` (`trust proxy`), `server/app.js` | `node tools/verify-deployment-proxy.mjs --origin https://app.prilearning.com` from a fixed address → `PROXY IDENTITY: PER-CLIENT` (tool and method: #738, `docs/operations/railway-proxy-identity.md`) | the tool lands with #738. **Open:** the owner measures staging first (#738's runbook); if no hop count gives `PER-CLIENT`, the fix is code (L2 + security), not this variable |
 | 7 | Public origin | `PRI_PUBLIC_ORIGIN=https://app.prilearning.com`; native builds archive with `PRICloudOrigin=https://app.prilearning.com`. **The custom domain moves at promotion** (note 7): until GO it is attached to the staging service, so the build tested on devices is the build that ships; at promotion the owner moves it to the production `/v1` service (Railway-issued TLS) | D5 — `app.prilearning.com` for the app, `prilearning.com` (with `/support`) for the public site | `server/platform/security.js` `originGuard` (a browser write must carry exactly this `Origin`); `authDelivery.js` / `otpEmail.js` (links in emails); `config.js` (a clean HTTPS origin in production, or no boot) | `publicOrigin` check (the origin serves exactly the nominated release: `/v1/health` and `/release.json`); §3 check H7 for the email link host and the native archive | yes (the variable); the domain is an owner step |
 | 8 | Apple billing | `PRI_APPLE_MONTHLY_PRODUCT_ID=com.prilearning.app.premium.monthly`, `PRI_APPLE_ANNUAL_PRODUCT_ID=com.prilearning.app.premium.annual`, `PRI_APPLE_APP_ID=<the numeric App Apple ID from App Store Connect → App Information>`, `PRI_APPLE_BUNDLE_ID=com.prilearning.app`, `PRI_APPLE_ROOT_CA_PEM=<Apple Root CA - G3, PEM>` (or `PRI_APPLE_ROOT_CA_FILE`), `PRI_APPLE_ENVIRONMENTS=Production`, `PRI_APPLE_ALLOW_SANDBOX` **unset** (see note 8); display: `PRI_DISPLAY_CURRENCY=INR`, `PRI_DISPLAY_MONTHLY_PRICE=199`, `PRI_DISPLAY_ANNUAL_PRICE=1499` | D19 prices (₹199 a month, ₹1,499 a year); `docs/billing/storekit-certification.md` §2 production trust | `server/platform/appleBilling.js`, `appleSignedData.js`, `config.js` `platformConfigStatus` (a product id without trust and App ID fails closed), `billing.js` `commercialConfig` | probes `apple-products` and `display-prices` (`/v1/billing/config`), `billing-provider-complete` (`/v1/ready` `checks.billing.state = ok`); §3 check H8 for the store side | yes (the variables). The products are created but **not priced**: pricing needs the Paid Apps Agreement (`BLOCKED_EXTERNAL`, owner) |
 | 9 | Auth email sender | `PRI_AUTH_EMAIL_PROVIDER=resend`; `PRI_RESEND_API_KEY=<production key, sending access>`; `PRI_AUTH_EMAIL_FROM=Pri Learning <verify@mail.prilearning.com>`; `mail.prilearning.com` verified in Resend (its SPF and DKIM records in the `prilearning.com` DNS) | V1 hard blocker #13 (verification and reset email); the sending domain the privacy notices name (`docs/release/play-data-safety.md`) | `server/platform/authDelivery.js` (`probeAuthEmail`), `server/platform/readiness.js` | `--auth-email-proven` and probe `auth-email-sender` (`state ok`, `credential valid`, `sender` verified, or unknown for a sending-only key); §3 check H9 for the delivered message's From and DKIM domain | yes |
 | 10 | Sign-in methods | no `PRI_SMS_PROVIDER`; `PRI_GOOGLE_WEB_CLIENT_ID`, `PRI_APPLE_WEB_CLIENT_ID`, `PRI_GOOGLE_CLIENT_IDS`, `PRI_APPLE_CLIENT_IDS` **unset** | D3 — email code and password at launch; Apple and Google later, together; SMS off | `server/platform/otp.js` (`GET /v1/account/otp/channels`), `server/platform/identities.js` (`GET /v1/account/identity/providers`) | probes `sign-in-channels` and `provider-sign-in-off` | yes |
 | 11 | Staging test mailbox off | nothing to set. L2's test mailbox for the reserved `@e2e.prilearning.test` addresses turns itself on only where `RAILWAY_ENVIRONMENT_NAME` is `staging`; the production environment is named `production` | the Director's 9 Nov addition: the staging journeys' inbox never exists in production | L2's change (not yet on `main`) | probe `test-mailbox-off` (`/v1/ready` `checks.testMailbox.state = off`). Until L2's change lands the field is absent and the probe accepts that (`orAbsent`); once it exists, anything but `off` fails | **no — lands with L2's test-mailbox PR** |
+| 12 | Past papers **on** | `PRI_PAST_PAPERS=1` on the production `/v1` service; client builds made **with** `PRI_FEATURE_PAST_PAPERS=1` | Owner decision, 10 Nov 2026 (replaces D23's "off until a rights opinion exists") | `client/src/engine/pastPapers.js` (the bundled engine reads `PRI_PAST_PAPERS` on the server and `__PRI_FEATURE_PAST_PAPERS__` in the client); `client/vite.config.js` (`features.json` `pastPapers`) | probe `web-build-past-papers-on` (`/features.json` → `pastPapers: true`); the server switch has no public read: §3 check H12 | yes |
+| 13 | Line check **off** | `PRI_FEATURE_LINE_CHECK` **unset** | Owner decision, 10 Nov 2026 ("Check this line so far" stays off) | `server/platform/tutor.js` `lineCheckFeatureEnabled` (anything but `1` refuses the line-check route) | it is a POST under the tutor, so no anonymous GET can see it: §3 check H13 | yes |
+| 14 | Step coach **off** | `PRI_FEATURE_STEP_COACH` **unset**, on the server and in every client build | Owner decision, 10 Nov 2026 (relayed by the Director) | no code on `main` reads it yet (10 Nov 2026); listed so the switch is off from the first release that adds it | §3 check H13 | n/a (no reader yet) |
 
 ### Notes
 
@@ -37,6 +40,15 @@ a ticket). Each decision (`D4`, `D12`, …) is the owner default of
    the OpenAI project that holds the production key, then records whether the console **refuses**
    requests at the limit or only notifies: if it only notifies, the server ceiling is the only hard
    stop, and §4 says so.
+   **With the tutor on (row 1, 10 Nov 2026)** the same 120-an-hour and 300-a-day ceiling covers
+   handwriting, working checks and the tutor together: the tutor adds calls, never budget, so a busy
+   tutor day reaches `PAID_CAPACITY_REACHED` sooner and handwriting reads share that limit. Per
+   account the tutor allows 40 calls a day (Premium 120). The monthly limit stays **US$100**, with a
+   **budget alert at 80% (US$80)** set on the same OpenAI project (Settings → Limits → email
+   notification threshold), sent to `PRI_ALERT_EMAIL`'s address. The alert is a warning to read the
+   usage page, not a stop: at US$80 the owner checks which kind of call is spending and, if it is
+   the tutor, can switch the tutor off (`PRI_FEATURE_TUTOR` deleted, the service restarts; the
+   build flag only hides the screens) without touching handwriting.
 7. **One address, two services in turn.** The Director's plan (owner checklist item 2) attaches
    `app.prilearning.com` to the **staging** service until GO, with staging's `PRI_PUBLIC_ORIGIN` set to
    it, because every native build talks to that one address. At promotion, in this order: move the
@@ -74,10 +86,9 @@ with one more unauthenticated GET each (never a write, never a credential), plus
 Both flags are opt-in: without them `verify-deployment` sends its three GETs and prints the same
 14 rows as always (`tools/verify-deployment.test.mjs` pins that byte for byte).
 
-Expected result: `DEPLOYMENT VERIFIED: PASS — 28/28` (the 15 standard rows, the handwriting row, the
-eleven probes and the public origin). Against **staging** the same command is a rehearsal and some rows
-differ on purpose (a staging build made with the tutor on, staging's billing products): read each
-failed row rather than counting.
+Expected result: `DEPLOYMENT VERIFIED: PASS — 30/30` (the 15 standard rows, the handwriting row, the
+thirteen probes and the public origin). Against **staging** the same command is a rehearsal and some rows
+differ on purpose (staging's billing products and build flags): read each failed row rather than counting.
 
 The block between the markers is the manifest's machine-readable half. It holds only what an
 anonymous caller can already see; a change to a value above changes it here in the same commit.
@@ -93,9 +104,11 @@ value once it does.
   "environment": "production",
   "publicOrigin": "https://app.prilearning.com",
   "probes": [
-    { "id": "tutor-dark", "decision": "D4 AI tutor off (server)", "path": "/v1/tutor/status", "status": 404, "json": { "error.code": "NOT_FOUND" } },
-    { "id": "web-build-tutor-off", "decision": "D4 AI tutor off (web build)", "path": "/features.json", "status": 200, "json": { "tutor": false } },
-    { "id": "parent-report-dark", "decision": "D22 parent report off", "path": "/v1/parent-report", "status": 404 },
+    { "id": "tutor-on", "decision": "AI tutor on (server), owner 10 Nov", "path": "/v1/tutor/status", "status": 401 },
+    { "id": "web-build-tutor-on", "decision": "AI tutor on (web build), owner 10 Nov", "path": "/features.json", "status": 200, "json": { "tutor": true } },
+    { "id": "parent-report-on", "decision": "parent report on (server), owner 10 Nov", "path": "/v1/parent-report", "status": 401 },
+    { "id": "web-build-parent-report-on", "decision": "parent report on (web build), owner 10 Nov", "path": "/features.json", "status": 200, "json": { "parentReport": true } },
+    { "id": "web-build-past-papers-on", "decision": "past papers on (web build), owner 10 Nov", "path": "/features.json", "status": 200, "json": { "pastPapers": true } },
     { "id": "paid-ceiling-set", "decision": "D21 paid-call ceiling configured", "path": "/v1/ready", "json": { "checks.paidCeiling.state": "ok" } },
     { "id": "apple-products", "decision": "Apple billing product ids", "path": "/v1/billing/config", "status": 200, "json": { "products.appleMonthly": "com.prilearning.app.premium.monthly", "products.appleAnnual": "com.prilearning.app.premium.annual" } },
     { "id": "display-prices", "decision": "D19 display prices", "path": "/v1/billing/config", "status": 200, "json": { "display.currency": "INR", "display.monthly": 199, "display.annual": 1499 } },
@@ -138,14 +151,17 @@ into a record.
 
 | Check | Row | What the owner does | Pass when |
 |---|---|---|---|
+| H1 | 1 | Read `PRI_FEATURE_TUTOR`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM`; open the OpenAI project of the production key → Limits | `1`, `40`, `120`; no other `PRI_TUTOR_*`; the US$100 monthly limit and the 80% (US$80) email alert are both set (note 4) |
 | H2 | 2 | Confirm neither `PRI_METHOD_MARKS` nor `PRI_METHOD_MARKS_EXAMINER_RESULT` exists on the service | both absent (or `PRI_METHOD_MARKS=off`), and the candidate SHA contains #739 |
 | H3 | 3 | `curl -s -H "Authorization: Bearer $PRI_METRICS_TOKEN" https://app.prilearning.com/v1/health \| jq .housekeeping.lastRun.childErasure` after the first housekeeping pass (at boot, then every 6 h) | `mode` is `"enforce"`; `eraseFailed` and `scheduleFailed` are 0 |
 | H4 | 4 | Read `PRI_PAID_CALLS_PER_HOUR` and `PRI_PAID_CALLS_PER_DAY`; open the OpenAI project of the production key → limits | `120` and `300`; the monthly limit is set and §4 records whether it refuses or only notifies |
-| H5 | 5 | Confirm `PRI_PARENT_REPORT` and `PRI_PARENT_REPORT_EMAILS` are absent; after #743, `curl -s https://app.prilearning.com/features.json` | both absent; `parentReport` is `false` |
+| H5 | 5 | Read `PRI_PARENT_REPORT` and confirm `PRI_PARENT_REPORT_EMAILS` is absent | `PRI_PARENT_REPORT=on`; no `PRI_PARENT_REPORT_EMAILS` (the weekly email stays off) |
 | H6 | 6 | Run `tools/verify-deployment-proxy.mjs` (#738) from a fixed address | `PROXY IDENTITY: PER-CLIENT` |
 | H7 | 7 | Railway → production `/v1` service → Settings → Networking lists `app.prilearning.com`, and the staging service no longer does (note 7); register one owner-controlled address on production (`postgres-cutover.md` §4.6 step 8), then delete it; run `node scripts/check-native-archive.mjs <archive> --sha <SHA> --probe` on the iOS archive | the domain is on production only; the verification link starts `https://app.prilearning.com/`; the archive gate passes with `PRICloudOrigin` = `https://app.prilearning.com` |
 | H8 | 8 | App Store Connect: both products priced at ₹199 / ₹1,499 in India; App Store Server Notifications v2 production and sandbox URLs `https://app.prilearning.com/v1/billing/webhook/apple`, then *Request a Test Notification* (`docs/billing/storekit-certification.md` step 3); note 8 decided | test notification logged and stored; the note 8 choice recorded below |
 | H9 | 9 | In the smoke registration's email (H7), read the From header and the DKIM signature's `d=` | From `verify@mail.prilearning.com`; DKIM passes for `mail.prilearning.com` (`tools/acceptance/auth-email.mjs` checks the From with `PRI_ACCEPT_EXPECT_SENDER`) |
+| H12 | 12 | Read `PRI_PAST_PAPERS` | `1` |
+| H13 | 13, 14 | Confirm `PRI_FEATURE_LINE_CHECK` and `PRI_FEATURE_STEP_COACH` are absent | both absent |
 
 ## 4. Record (filled by the owner at the cutover window)
 
@@ -153,13 +169,16 @@ into a record.
 |---|---|---|---|---|
 | Release SHA verified | | | | |
 | §2 `verify:deployment … --expect-config` | `DEPLOYMENT VERIFIED: PASS — n/n` | | | |
+| H1 tutor switch, allowances, 80% alert | | | | |
 | H2 method marks | | | | |
 | H3 child erasure mode | | | | |
 | H4 ceilings and OpenAI monthly limit (refuses / notifies only) | | | | |
-| H5 parent report | | | | |
+| H5 parent report on, emails off | | | | |
 | H6 proxy identity | | | | |
 | H7 email link host and native archive | | | | |
 | H8 App Store products, notifications, note 8 decision | | | | |
 | H9 sender From and DKIM | | | | |
+| H12 past papers server switch | | | | |
+| H13 line check and step coach absent | | | | |
 
 An agent never fills this table: every row is a person's observation of production.

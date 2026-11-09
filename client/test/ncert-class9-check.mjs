@@ -108,5 +108,35 @@ assert.ok(conceptual>100,'substantial conceptual reasoning practice');
 await loadBanksFor(generatorIds);
 for(const id of generatorIds) assert.equal(typeof GENERATORS[id],'function',`${id}: dynamic production registry`);
 
+// #812 review: equivalent factorisations are ONE option. (x-3)(x+3) and
+// (x+3)(x-3) once appeared side by side when the two roots were opposites.
+// Every Class 9 MCQ is drawn widely here; options must differ after factor
+// order is canonicalised, and in the factorising cell no wrong option may
+// expand to the keyed quadratic.
+{
+  const canon = t => String(t).replace(/\s+/g, '').replace(/\(([^()]*)\)/g, '\u0001$1\u0002').split(/(?=\u0001)/).map(x => x.replace(/[\u0001\u0002]/g, '')).sort().join('*');
+  const roots = t => { const m = String(t).replace(/\s+/g, '').match(/^\(x([+-])(\d+)\)\(x([+-])(\d+)\)$/); return m && [(m[1] === '-' ? 1 : -1) * Number(m[2]), (m[3] === '-' ? 1 : -1) * Number(m[4])]; };
+  let mcqs = 0, factorCells = 0;
+  for (const [gid, gen] of Object.entries(NCERT_CLASS9_GENERATORS)) for (let diff = 1; diff <= 4; diff++) for (let seed = 1; seed <= 5000; seed++) {
+    const form = gen(makeRng((0x5eed0000 + seed * 7 + diff) >>> 0), diff);
+    if (form.answerType !== 'mcq') continue;
+    mcqs++;
+    const keys = form.mcqOptions.map(canon);
+    assert.equal(new Set(keys).size, keys.length, `${gid} D${diff} seed ${seed}: options repeat after canonical factor order — ${JSON.stringify(form.mcqOptions)}`);
+    if (gid === 'c9-algebraic-identities-ncert-mastery' && diff === 4) {
+      factorCells++;
+      const right = roots(form.mcqOptions[form.answer.correctIndex]);
+      assert.ok(right, `${gid} D4 seed ${seed}: the key is a factorisation`);
+      form.mcqOptions.forEach((o, i) => {
+        if (i === form.answer.correctIndex) return;
+        const r = roots(o);
+        if (r) assert.ok(!(r[0] + r[1] === right[0] + right[1] && r[0] * r[1] === right[0] * right[1]), `${gid} D4 seed ${seed}: "${o}" expands to the keyed quadratic`);
+      });
+    }
+  }
+  assert.ok(mcqs > 30000 && factorCells === 5000);
+  console.log(`PASS — Class 9 MCQ options distinct after canonical factor order: ${mcqs} questions, ${factorCells} factorising items with no equivalent wrong option.`);
+}
+
 console.log(`PASS — Grade 9 Ganita Manjari: ${generated} seeded forms (${numeric} numeric handwriting-ready, ${conceptual} conceptual).`);
 console.log('PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.');
