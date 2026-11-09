@@ -91,6 +91,11 @@ Object.assign(process.env, {
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_HANDWRITING_FALLBACK_MODEL']) delete process.env[name];
 
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because its papers are
+// the NSW-era practice paper (Year 7), the vehicle for handwritten exam answers;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { createPlatformDb } = await import('../platform/db.js');
