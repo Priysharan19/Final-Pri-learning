@@ -434,7 +434,10 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT', 'PAST_PAPERS']);
+//   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
+//   emailed confirm/stop page). Off until counsel has reviewed email about
+//   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT', 'PAST_PAPERS', 'PARENT_REPORT']);
 const OPT_IN_FLAGS = new Set(['INSTRUMENT', 'PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
@@ -449,7 +452,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
-    __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers)
+    __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
+    __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport)
   };
 }
 

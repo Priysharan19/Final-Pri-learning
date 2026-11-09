@@ -88,6 +88,8 @@ person. Location for every row is the platform database: SQLite on the Railway v
 | `account_mfa_recovery_codes` | SHA-256 hashes of the account's recovery codes |
 | `auth_delivery_outbox` | encrypted link envelopes and destination addresses (including a guardian's) |
 | `guardian_consents` | guardian name and email, notice version, confirmation/withdrawal times |
+| `parent_report_links` | the parent weekly report's recipient email, status (pending / active / stopped), request, confirmation and stop times and who stopped it; the confirmation link's hash and expiry; the unsubscribe credential's hash and its sealed envelope (`deliveryCrypto.js`) |
+| `parent_report_sends` | one row per week a report was due: status (sent / skipped / failed), skip reason, attempts, the provider's message id. The report's content is never stored: it is recomputed from `graded-attempt` rows |
 | `learning_events` | synced attempts, progress and mastery events |
 | `sync_entities` | synced profile, settings, bookmarks, favourites, tasks, custom questions |
 | `idempotency_keys` | cached sync responses; server-issued practice questions, grade responses, completions and reading receipts — a `practice-recognition` receipt holds the **transcription text** of a handwriting/photo read and any correction the student typed, and lives 90 days (`practice.js` `MAX_AGE`); exam papers, saved exam answers and results (`exams.js` `RECORD_TTL`, 5 years); and, under scope `recognition-read`, the transcript of a handwriting/photo read kept for 15 minutes so the same picture is not paid for twice (never the image; `docs/operations/recognition-cost.md` §7). Expired rows are purged by housekeeping (`housekeeping.js`) |
@@ -152,7 +154,7 @@ never the provider subject), learning events, sync entities, current class membe
 assignment submissions, teacher feedback on the account's work (without the teacher's id), the
 account's own allow-listed telemetry, the account's own issue reports, an entitlement summary (plan, status,
 provider, period end) and, for an under-18 account, the consent state with the guardian address
-masked. It never contains password, token or user-agent hashes, delivery envelopes, the session
+masked, and the parent weekly report's link (recipient masked, status, times) and its per-week send record. It never contains password, token or user-agent hashes, delivery envelopes, the session
 cookie, or anything of another account (teacher, classmates, guardian in full) — asserted on both
 engines.
 
@@ -258,6 +260,17 @@ clear a withdrawal. A version is added to the accepted list only when the change
 alter what a guardian agreed to. The 2 November 2026 change to `signup.noticeWithdraw` (it now says
 withdrawal stops marking, reading, exams and sync, not only sync) describes the existing behaviour
 more completely and adds no processing, so the version was not bumped and no re-consent is asked.
+
+**The parent weekly report is off (owner default D22).** Nothing below happens unless the deployment sets `PRI_PARENT_REPORT=on`, which waits for counsel's review of email about minors (`docs/privacy/parent-report-counsel-review.md`); until then its two tables exist and stay empty, and the published privacy notice and store disclosures do not describe it. When it is turned on, it is a separate consent, not a notice change. Emailing a child's
+weekly summary is a new purpose, so it is not folded into the account notice: the guardian
+confirms it separately, by following a link in an email that describes exactly what the report
+contains (`parentReport.js parentReportConfirmMessage`), and nothing is sent before that. For an
+under-18 account the only address that can be linked is the guardian whose account consent is
+`given` (`recipientDecision`), and it is re-checked when the link is confirmed and before every
+send; a withdrawal of the account consent stops the report link for good (`stopped_by =
+'consent'`), and re-linking needs a fresh confirmation. Every report carries a one-click
+unsubscribe (RFC 8058) that needs no sign-in. The report is data-minimised: chapter names,
+counts and percentages, no question text, answers, ink, photos or the child's name.
 
 ---
 

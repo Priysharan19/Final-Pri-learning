@@ -11,6 +11,7 @@ import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
 import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
+import { createParentReportRecipientRouter, createParentReportRouter, parentReportEnabled } from './parentReport.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
@@ -50,8 +51,11 @@ const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 // Sign in with Apple form-posts its answer from appleid.apple.com, so it can
 // never carry this origin; the route only relays it to the callback page.
 const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
+// RFC 8058 one-click unsubscribe: the mailbox provider POSTs it with no Origin
+// and no cookie. Its token can only stop parent reports (parentReport.js).
+const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -155,7 +159,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // and authenticate with provider signatures instead of a browser Origin. The
   // Apple sign-in callback is the other: it changes nothing server-side.
   router.use((req, res, next) => {
-    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path))) return next();
+    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path) || ONE_CLICK_UNSUBSCRIBE.test(req.path))) return next();
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);
@@ -200,6 +204,16 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
+  // The parent weekly report. The recipient's confirm/unsubscribe routes carry
+  // their own token and no session, so they come first; everything the
+  // account itself does is behind the guardian gate and premium (parentReport.js).
+  // Not mounted at all unless the deployment turns it on (D22: off until
+  // counsel has reviewed email about minors): every path answers 404.
+  const { enabled: parentReportOn = parentReportEnabled(process.env), ...parentReportOptions } = parentReport;
+  if (parentReportOn === true) {
+    router.use('/parent-report', createParentReportRecipientRouter(db));
+    router.use('/parent-report', requireGuardianConsent(db), createParentReportRouter(db, parentReportOptions));
+  }
   // A signed-out student may be shown a question to start working on. The
   // route takes no session and writes no account data; binding it to an
   // account later goes through the guarded /practice/issue below.

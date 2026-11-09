@@ -85,7 +85,9 @@ const { decryptJoinCode } = await import('../platform/classes.js');
 const inventory = loadInventory();
 
 const c = checks();
-const h = await startApp({ engine: requestedEngine(), log: () => {} });
+// The parent report is off by default (D22), but every inventoried route —
+// its included — is held to the same fail-closed floor, so it is on here.
+const h = await startApp({ engine: requestedEngine(), log: () => {}, parentReport: { enabled: true } });
 const db = h.db;
 const responses = [];
 
@@ -483,7 +485,7 @@ try {
     c.ok(exported.data.receipts.every(row => !('request_digest' in row) && !('requestDigest' in row)), 'no receipt carries its request digest');
     const ownPhones = (await db.all('SELECT phone_e164 FROM account_phones WHERE account_id=?', [alice.id])).length;
     c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');

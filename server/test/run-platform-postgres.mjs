@@ -126,6 +126,9 @@ export const ENGINE_SUITES = [
   // the grace, erased through the one deletion transaction; a guardian's own
   // request — on Postgres as pri_server, the erasure in system scope under RLS.
   'child-erasure-check.mjs',
+  // The parent weekly report: account-scoped reads under RLS, the send ledger
+  // and the lease on Postgres.
+  'parent-report-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',
