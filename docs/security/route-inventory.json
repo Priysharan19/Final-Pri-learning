@@ -5,6 +5,29 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/v1/forecast/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded events (learning_events where account_id = the session's account and device_id = 'server-grader'); premium detail only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise coverage only; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "forecast",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/health",
       "auth": "none",
       "roles": null,

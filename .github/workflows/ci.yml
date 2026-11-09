@@ -342,6 +342,8 @@ jobs:
           # 42 → 53 (#196): the predicted mark stays display-only — imported only by the progress
           # summary and page, never by the server or a marking module, and a pure read of the evidence.
           grep -Fq 'MARK PREDICTOR: PASS — 53/53 checks' suites.log
+          # The server's own readiness estimate equals the device's on a fixture set, and only the read-only forecast route reaches it.
+          grep -Fq 'FORECAST PARITY: PASS — 63/63 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           # #196: the hostile-PDF bounds of #204 (pre-parser size, canvas allocation, parse/render
           # timeouts with cleanup) had a regression suite that no script or workflow ran.
@@ -500,6 +502,14 @@ jobs:
           node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/tutor-guard-complexity-check.mjs
+          # Line check / live coach: a final-answer attempt is decided by form alone, never by value (#831).
+          # Each pinned by count, so a loosened probe set cannot pass vacuously.
+          node server/test/tutor-diagnose-check.mjs | tee tutor-diagnose.log
+          grep -Fq 'TUTOR DIAGNOSE: PASS — 152/152 checks' tutor-diagnose.log
+          node server/test/line-check-constant-pin-check.mjs | tee line-check-constant-pin.log
+          grep -Fq 'LINE CHECK CONSTANT PIN: PASS — 191/191 checks' line-check-constant-pin.log
+          node server/test/final-attempt-oracle-sweep-check.mjs | tee final-attempt-sweep.log
+          grep -Fq 'FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes' final-attempt-sweep.log
           node server/test/spend-ceiling-check.mjs
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
@@ -556,11 +566,13 @@ jobs:
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
+          grep -Fq 'READINESS FORECAST: PASS — 29/29 checks' practice-http.log
           grep -Fq 'MISTAKE DNA: PASS — 16/16 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
