@@ -165,7 +165,12 @@ export function tutorEvidence(q, lines) {
   const meta = stepMetaFor(q);
   if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
   try {
-    const judged = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
+    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
+    const judged = report?.lines || [];
+    // The engine's own misconception id for the break (audit D1), as a stable
+    // id only — never free text — exactly as the device reads it (tutorWork).
+    const code = report?.diagnosis?.code;
+    if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) evidence.misconception = code;
     const at = judged.findIndex(line => line?.status === 'break');
     if (at >= 0 && at < lines.length) evidence.firstBreak = at;
     while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&

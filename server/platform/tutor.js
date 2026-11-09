@@ -688,10 +688,22 @@ export async function whyAccess(db, accountId, env = process.env, at = Date.now(
   const limit = raw === '' ? WHY_FREE_PER_DAY_DEFAULT : (Number.isInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : WHY_FREE_PER_DAY_DEFAULT);
   const windowMs = 24 * 60 * 60 * 1000;
   if (limit === 0) return { allowed: false, plan: 'free', tasterLeft: 0, resetAt: at + windowMs };
-  const taster = await consumeRateLimit(db, `tutor-why-taster:${sha256(accountId).slice(0, 24)}`, { limit, windowMs }, at);
+  const bucket = `tutor-why-taster:${sha256(accountId).slice(0, 24)}`;
+  const taster = await consumeRateLimit(db, bucket, { limit, windowMs }, at);
   return taster.allowed
-    ? { allowed: true, plan: 'free', tasterLeft: taster.remaining }
+    ? { allowed: true, plan: 'free', tasterLeft: taster.remaining, unit: { bucket, windowStart: taster.resetAt - windowMs } }
     : { allowed: false, plan: 'free', tasterLeft: 0, resetAt: taster.resetAt };
+}
+
+/**
+ * Give a free taster try back: the call it paid for was refused (allowance,
+ * ceiling) or did not produce a model reply the student could use (provider
+ * failure, grounding guard). Only inside the window it was taken in, never
+ * below zero; a Premium access has no unit and nothing to give back.
+ */
+export async function refundWhyTaster(db, access) {
+  if (!access?.unit) return;
+  await db.run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [access.unit.bucket, access.unit.windowStart]);
 }
 
 /** The verified step itself, as the "why" reply when no model can (or may) speak. */
@@ -865,20 +877,24 @@ export function createTutorRouter(db, {
     const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
       { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
     if (!daily.allowed) {
+      await refundWhyTaster(db, access);
       res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
       return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help.", retryable: true } });
     }
     const overBudget = await consumePaidCall(db, { env });
-    if (overBudget) return refusePaidCall(res, overBudget);
+    if (overBudget) { await refundWhyTaster(db, access); return refusePaidCall(res, overBudget); }
 
     let reply;
     try { reply = await ask(request, { env }); } catch (error) {
+      await refundWhyTaster(db, access);
       return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
     }
     const issues = reply?.message
       ? diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines })
       : ['empty'];
     if (issues.length) {
+      // The student got the step itself, not an explanation: the try is given back.
+      await refundWhyTaster(db, access);
       const tutor = { ...whyFallback(request), reason: 'TUTOR_GROUNDING_GUARD', model: reply?.model || null };
       await remember(key, tutor, at);
       return res.json({ tutor: { ...tutor, cached: false } });

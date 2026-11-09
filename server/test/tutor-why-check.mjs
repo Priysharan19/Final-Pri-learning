@@ -139,6 +139,24 @@ try {
   eq([over.status, over.json?.error?.code], [503, 'PAID_CAPACITY_REACHED'], 'over the paid-call ceiling the dialogue is refused');
   ok(metrics.snapshot().firing.includes('PAID_CEILING_HIGH'), 'PAID_CEILING_HIGH is firing at 80% of the ceiling');
 
+  // A failed or refused model call gives the free try back (review finding 2).
+  {
+    await db.run('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)', ['acct-refund', 'acct-refund@example.test', 'r', 'student', now, now, now]);
+    await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at) VALUES (?,?,?,?,?,?,?,?)`,
+      ['ses-acct-refund', 'acct-refund', sha256('raw-acct-refund'), 'ipad', null, now, now, now + 86400000]);
+    const roomy = await mount(env);
+    const { TutorProviderError } = await import('../platform/tutorProvider.js');
+    script = Array.from({ length: 4 }, () => new TutorProviderError('down', { code: 'TUTOR_UNAVAILABLE', status: 503, retryable: true }));
+    for (let i = 0; i < 4; i += 1) {
+      const r = await roomy('acct-refund', body({ message: `fail ${i}` }));
+      eq([r.status, r.json?.tutor?.source], [200, 'fallback'], `a failed model call ${i + 1} shows the step itself`);
+    }
+    script = [{ message: 'So $\\cos A = \\frac{5}{12}$.', referencesStepIndex: 0, revealsAnswer: false }];
+    eq((await roomy('acct-refund', body({ message: 'guarded' }))).json?.tutor?.reason, 'TUTOR_GROUNDING_GUARD', 'a guarded reply shows the step itself');
+    for (let i = 0; i < 3; i += 1) eq((await roomy('acct-refund', body({ message: `ok ${i}` }))).json?.tutor?.source, 'model', `after five failed or guarded calls, free try ${i + 1} still works`);
+    eq((await roomy('acct-refund', body({ message: 'fourth' }))).status, 402, 'and only the three real explanations used the taster');
+  }
+
   // Model unconfigured: the step itself, never an error, no spend.
   const p0 = await paid();
   const bare = await mount({ ...env, PRI_HANDWRITING_API_KEY: '' });
@@ -159,6 +177,35 @@ try {
   await reservePaidCall(t.store, { env: e });
   const at8 = metrics.snapshot().counters['paid_ceiling_high_total{window=hour}']?.total || 0;
   eq([at7 - before, at8 - before], [0, 1], 'the 80% mark is counted at the eighth of ten calls, not before');
+  await t.close();
+}
+
+// ── 5 · D1 on the server-issued path (review finding 1) ──────────────────────
+{
+  const { tutorEvidence } = await import('../platform/markerOps.js');
+  const { groundIssued } = await import('../platform/tutor.js');
+  const q = {
+    prompt: 'Solve $3x + 5 = 20$.', answerType: 'numeric', answer: { value: 5 }, answerPrefix: 'x =', hints: [],
+    steps: [{ h: 'Subtract five from both sides', d: '$3x = 15$' }, { h: 'Divide by three', d: '$x = 5$' }],
+    stepcheck: { kind: 'equation', variable: 'x', solutions: [5] }
+  };
+  const lines = ['3x + 5 = 20', '3x = 20 + 5', 'x = 25/3'];
+  eq(tutorEvidence(q, lines).misconception, 'sign-on-transfer', "the server Step Check's evidence now carries the engine's misconception id");
+  const t = await openTestStore(engine, { label: 'tutor-why-d1' });
+  const at = Date.now();
+  await t.store.run('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)', ['acct-d1', 'd1@example.test', 'd1', 'student', at, at, at]);
+  const QID = '33333333-3333-4333-8333-333333333333';
+  await t.store.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)", ['acct-d1', QID, JSON.stringify(q), 'seed', at, at + 86400000]);
+  const issuedBody = { context: 'practice', level: 'why', locale: 'en', serverQuestionId: QID, stepIndex: 0, studentWork: { lines, misconception: 'device-claimed-id' } };
+  const open = await groundIssued(t.store, 'acct-d1', validateTutorRequest(issuedBody).request, at);
+  eq([open.ok, open.code], [false, 'TUTOR_LEVEL_ORDER'], 'an unresolved issued question is refused for why');
+  await t.store.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-completion',?,?,?,?,?)", ['acct-d1', QID, '{}', 'seed', at, at + 86400000]);
+  const grounded = await groundIssued(t.store, 'acct-d1', validateTutorRequest(issuedBody).request, at);
+  eq([grounded.ok, grounded.request?.resolved, grounded.request?.studentWork?.misconception], [true, true, 'sign-on-transfer'],
+    "resolved: the model is told the SERVER's misconception id, never the device's");
+  ok(/Diagnosed misconception id: sign-on-transfer/.test(userMessage(grounded.request)), 'and it is in the model turn');
+  const diag = await groundIssued(t.store, 'acct-d1', validateTutorRequest({ ...issuedBody, level: 'diagnose', stepIndex: undefined }).request, at);
+  eq(diag.request?.studentWork?.misconception, 'sign-on-transfer', 'the same for "What went wrong?"');
   await t.close();
 }
 
