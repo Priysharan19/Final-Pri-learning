@@ -209,7 +209,8 @@ jobs:
           # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
-          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39533/39533 checks' suites.log
+          # 39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39547/39547 checks' suites.log
           grep -Fq 'REVIEW FOLLOW-UPS: PASS — 415/415 checks' suites.log
           grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
@@ -219,12 +220,14 @@ jobs:
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
-          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10855/10855 checks' suites.log
+          # 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed.
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10820/10820 checks' suites.log
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406804 wrong answers marked correct across 18072 questions' suites.log
+          # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 409709 wrong answers marked correct across 18312 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
           grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 31792 right answers over 11932 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
@@ -262,7 +265,8 @@ jobs:
           # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 35/35 checks' suites.log
-          grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
+          # 1082/45 → 2915/173, the JEE archive (#795) (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'INDIA PYQ: PASS — 2915/2915 checks — 173 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
           grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
@@ -309,7 +313,8 @@ jobs:
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
-          grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
+          # 211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'STUDY PLAN: PASS — 215/215 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
