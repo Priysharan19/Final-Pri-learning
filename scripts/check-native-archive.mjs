@@ -166,9 +166,6 @@ export async function backendEvidence(origin, {
       name = next;
     }
   } catch { /* no CNAME (an A record) or no DNS answer: recorded as an empty chain */ }
-  const target = record.cname.at(-1) || null;
-  record.backend = target === BACKEND_HOSTS.staging ? 'staging' : target === BACKEND_HOSTS.production ? 'production' : 'unknown';
-  if (record.backend === 'unknown') record.problems.push(`${host} does not resolve to a known Pri service (CNAME ${target || 'none'})`);
   const getJson = async path => {
     const res = await fetchImpl(new URL(path, origin), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -180,10 +177,16 @@ export async function backendEvidence(origin, {
       service: body?.service ?? null,
       releaseSha: body?.releaseIdentity?.releaseSha ?? null,
       databaseEngine: body?.database?.engine ?? null,
-      schemaVersion: body?.schemaVersion ?? null
+      schemaVersion: body?.schemaVersion ?? null,
+      environment: body?.environment ?? null
     };
     if (record.health.service !== 'pri-learning-platform') record.problems.push(`${origin}/v1/health did not answer as a Pri server`);
   } catch (error) { record.problems.push(`${origin}/v1/health could not be read (${error?.message || error?.name || 'error'})`); }
+  // The backend is what the SERVER declares (/v1/health environment), never
+  // inferred from DNS: a custom domain's CNAME target is an opaque Railway host.
+  const declared = record.health?.environment;
+  record.backend = declared === 'staging' || declared === 'production' ? declared : 'unknown';
+  if (record.backend === 'unknown') record.problems.push(`${origin} does not declare whether it is staging or production (/v1/health environment ${declared ?? 'missing'})`);
   try { record.webReleaseSha = (await getJson('/release.json'))?.releaseSha ?? null; }
   catch (error) { record.problems.push(`${origin}/release.json could not be read (${error?.message || error?.name || 'error'})`); }
   if (sha) {

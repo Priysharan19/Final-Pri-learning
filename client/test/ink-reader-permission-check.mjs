@@ -304,6 +304,16 @@ for (const answer of [PROMPT_ANSWER.DECLINED, PROMPT_ANSWER.DISMISSED, PROMPT_AN
   ok(/dispatchEvent\(new Event\(MODAL_EVENT\)\)/.test(host) && /\}, \[open\]\);/.test(host), 'the prompt says so each time it opens and closes');
 }
 
+// ── 7 · Nothing else leaves after a decline (review of #737) ───────────────
+{
+  const card = read('client/src/components/QuestionCard.jsx');
+  ok(/const sentPhoto = photo && readerPermission\(user\) === READER_PERMISSION\.ACCEPTED \? photo : undefined;/.test(card) && /photo: sentPhoto, \.\.\.\(sentPhoto && photoAttested/.test(card) && !/ink, photo, \.\.\.\(photo && photoAttested/.test(card),
+    'a declined (or never-allowed) photo is dropped from the submission: "Type instead" sends the typed answer alone');
+  const exam = read('client/src/local/serverExam.js');
+  ok(/if \(permitted !== true\) return latest;/.test(exam) && /permitted = false \} = \{\}\) \{/.test(exam) && /recoverHandwriting\(exam, \{[^}]*permitted = examReadPermitted\(exam\)/.test(exam) && /READER_PERMISSION_REQUIRED/.test(exam),
+    'exam pages are read only with permission: the automatic read, a later visit and "Retry checking" all fail closed');
+}
+
 if (failures.length) {
   console.error(`READER PERMISSION (D17): FAIL — ${failures.length} of ${pass + failures.length} checks`);
   for (const f of failures) console.error(`  ✗ ${f}`);

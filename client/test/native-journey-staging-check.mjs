@@ -19,7 +19,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { STAGING_ORIGIN, STAGING_STEPS, TIER, inboxPurpose, openInbox, stagingEvidence, stagingOriginProblem } from '../../scripts/journey-staging.mjs';
+import { STAGING_ORIGIN, STAGING_STEPS, TIER, inboxPurpose, stagingBackendProblem, openInbox, stagingEvidence, stagingOriginProblem } from '../../scripts/journey-staging.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = rel => readFileSync(join(ROOT, rel), 'utf8');
@@ -34,6 +34,11 @@ eq(stagingOriginProblem('https://app.prilearning.com'), null, 'so is the public 
 for (const bad of ['https://final-pri-learning-production.up.railway.app', 'http://pri-learning-staging-staging.up.railway.app', 'https://app.prilearning.com/v1', 'https://example.com', 'not a url']) {
   ok(stagingOriginProblem(bad), `a staging run refuses ${bad}`);
 }
+
+eq(stagingBackendProblem({ backend: 'staging' }), null, 'a backend that declares staging may be run against');
+for (const b of ['production', 'unknown', undefined]) ok(stagingBackendProblem({ backend: b }), `a backend that declares ${b} is refused: sign-up and deletion never run against it`);
+const legSrc = read('scripts/journey-staging.mjs');
+ok(legSrc.indexOf('stagingBackendProblem(backend)') > 0 && legSrc.indexOf('stagingBackendProblem(backend)') < legSrc.indexOf("launchAndRead(udid, bundleId, '--journey-staging'"), 'the leg checks the declared backend before anything is launched');
 
 // ── the inbox ───────────────────────────────────────────────────────────────
 eq(['reauth', 'delete', 'guardian', undefined, 'sign-in'].map(inboxPurpose), ['delete', 'delete', 'guardian', 'sign-in', 'sign-in'], 'a page\'s code request maps to the inbox\'s purposes');

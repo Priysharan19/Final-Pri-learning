@@ -119,12 +119,12 @@ const scratch = [];
         const sha = device === 'other-sha' ? OTHER : SHA;
         const blocked = device === 'all-blocked' || (device === 'android-blocked' && android);
         if (!blocked && android) {
-          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', buildKind: 'play-internal', server: 'production', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          lines.push(JSON.stringify({ recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'pass', device: kase.family === 'AND' ? 'Pixel 8' : 'Galaxy Tab S9', os: 'Android 15', pencil: kase.family === 'ANT' && kase.pencil ? 'S Pen' : null, build: 'Play internal 4.0 (2)', buildKind: 'play-internal', server: 'staging', sha, tester: 'Priya Example', notes: null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
           continue;
         }
         lines.push(JSON.stringify(blocked
           ? { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: 'blocked', device: null, os: null, pencil: null, build: null, sha, tester: null, notes: 'no device of this family available', evidenceClass: 'BLOCKED-EXTERNAL', recorder: 'scripts/device-matrix-record.mjs' }
-          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', buildKind: 'testflight', server: 'production', severity: failing ? 'P1' : null, sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
+          : { recordedAt: '2026-10-19T01:00:00Z', case: kase.id, result: failing ? 'fail' : 'pass', device: kase.family === 'IPH' ? 'iPhone 16 Pro' : 'iPad Pro 11-inch (4th generation)', os: kase.family === 'IPH' ? 'iOS 26.0.1' : 'iPadOS 26.0.1', pencil: kase.pencil ? 'Apple Pencil Pro' : null, build: 'TestFlight 1.0 (2)', buildKind: 'testflight', server: 'staging', severity: failing ? 'P1' : null, sha, tester: 'Priya Example', notes: failing ? 'the code arrived but the field did not autofill' : null, evidenceClass: 'PHYSICAL-HUMAN', recorder: 'scripts/device-matrix-record.mjs' }));
       }
       if (device === 'one-missing') lines.pop();
     }

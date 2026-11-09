@@ -218,7 +218,8 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
-          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
+          # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -256,7 +257,7 @@ jobs:
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 71: client/src/ink/ReaderPermission.jsx, the D17 prompt before the first read (L4).
           grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 71 files scanned, 0 hard-coded strings' suites.log
-          grep -Fq 'READER PERMISSION (D17): PASS — 122/122 checks' suites.log
+          grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.

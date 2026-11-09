@@ -43,6 +43,12 @@ export function stagingOriginProblem(origin) {
   return `a staging run names ${STAGING_ORIGIN} or https://app.prilearning.com, not ${origin}`;
 }
 
+/** Why a staging run must not start against this backend (null when it may). Sign-up and deletion never run against production. */
+export function stagingBackendProblem(evidence) {
+  if (evidence?.backend === 'staging') return null;
+  return `the origin declares itself ${evidence?.backend || 'unknown'}, not staging: a staging run signs up and deletes accounts, so it refuses`;
+}
+
 /** The inbox purpose a page's code request maps to (codeFromSubject purposes). */
 export const inboxPurpose = purpose => (purpose === 'reauth' || purpose === 'delete' ? 'delete' : purpose === 'guardian' ? 'guardian' : 'sign-in');
 
@@ -113,6 +119,8 @@ export async function runStagingLeg({ sim, udid, bundleId, launchAndRead, run, o
   }
   const { backendEvidence } = await import(pathToFileURL(join(HERE, 'check-native-archive.mjs')).href);
   const backend = await backendEvidence(origin);
+  const refused = stagingBackendProblem(backend);
+  if (refused) { write(stagingEvidence({ sim, origin, backend, sha, dirty, notMeasured: refused })); console.log(`STAGING JOURNEY — REFUSED: ${refused}`); return 1; }
   console.log(`\nStaging leg · ${origin} (${backend.cname.join(' → ') || 'no CNAME'}) · server ${backend.health?.releaseSha?.slice(0, 12) || '?'} on ${backend.health?.databaseEngine || '?'} · ${TIER}`);
   const address = opened.inbox.tagAddress(opened.config.PRI_STAGING_INBOX_ADDRESS, `ios-${runTag}`, 1);
   const shown = opened.inbox.redactAddress ? opened.inbox.redactAddress(address, opened.config.PRI_STAGING_INBOX_ADDRESS) : '(test inbox)';

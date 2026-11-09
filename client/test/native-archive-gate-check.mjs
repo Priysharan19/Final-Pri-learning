@@ -54,9 +54,9 @@ assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40)
 // Release evidence: which service app.prilearning.com fronts, and on which release.
 {
   const SHA = 'a'.repeat(40);
-  const serving = (sha, engine = 'postgres', web = sha) => async url => {
+  const serving = (sha, engine = 'postgres', web = sha, environment = engine === 'sqlite' ? 'production' : 'staging') => async url => {
     const path = new URL(url).pathname;
-    if (path === '/v1/health') return { ok: true, json: async () => ({ service: 'pri-learning-platform', releaseIdentity: { releaseSha: sha }, database: { engine }, schemaVersion: '13' }) };
+    if (path === '/v1/health') return { ok: true, json: async () => ({ service: 'pri-learning-platform', releaseIdentity: { releaseSha: sha }, database: { engine }, schemaVersion: '13', environment }) };
     if (path === '/release.json') return { ok: true, json: async () => ({ releaseSha: web }) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
@@ -64,7 +64,7 @@ assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40)
   const stamp = { now: () => '2026-11-09T00:00:00.000Z' };
   const staging = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA), resolveCname: cnameTo(`${BACKEND_HOSTS.staging}.`), ...stamp });
   assert.deepEqual(staging, { origin: CANDIDATE_ORIGIN, checkedAt: '2026-11-09T00:00:00.000Z', cname: [BACKEND_HOSTS.staging], backend: 'staging',
-    health: { service: 'pri-learning-platform', releaseSha: SHA, databaseEngine: 'postgres', schemaVersion: '13' }, webReleaseSha: SHA, sha: SHA, problems: [] },
+    health: { service: 'pri-learning-platform', releaseSha: SHA, databaseEngine: 'postgres', schemaVersion: '13', environment: 'staging' }, webReleaseSha: SHA, sha: SHA, problems: [] },
     'before GO: app.prilearning.com CNAMEs to the staging service on the candidate SHA, and the record says so'); n++;
   const prod = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA, 'sqlite'), resolveCname: cnameTo('edge.example.net', BACKEND_HOSTS.production), ...stamp });
   assert.equal(prod.backend, 'production', 'after promotion it CNAMEs (through any hop) to the production service'); n++;
@@ -72,10 +72,14 @@ assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40)
   const stale = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving('b'.repeat(40), 'postgres', 'c'.repeat(40)), resolveCname: cnameTo(BACKEND_HOSTS.staging), ...stamp });
   assert.ok(stale.problems.some(p => /server is on b{40}/.test(p)) && stale.problems.some(p => /release\.json is c{40}/.test(p)),
     'a server or web bundle on another commit is a problem, each named'); n++;
-  const elsewhere = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA), resolveCname: cnameTo('someone-else.example.net'), ...stamp });
-  assert.ok(elsewhere.backend === 'unknown' && elsewhere.problems.some(p => /does not resolve to a known Pri service/.test(p)), 'a CNAME to neither service is unknown, and a problem'); n++;
+  const opaque = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA), resolveCname: cnameTo('c1rvjbl3.up.railway.app'), ...stamp });
+  assert.ok(opaque.backend === 'staging' && opaque.problems.length === 0, 'an opaque Railway CNAME (c1rvjbl3.up.railway.app) is fine: the server declares staging'); n++;
+  const undeclared = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA, 'postgres', SHA, null), resolveCname: cnameTo('c1rvjbl3.up.railway.app'), ...stamp });
+  assert.ok(undeclared.backend === 'unknown' && undeclared.problems.some(p => /does not declare whether it is staging or production/.test(p)), 'a server that does not declare its environment is unknown, and a problem'); n++;
+  const misleading = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA, 'postgres', SHA, 'production'), resolveCname: cnameTo(BACKEND_HOSTS.staging), ...stamp });
+  assert.equal(misleading.backend, 'production', 'what the server declares wins over the DNS name'); n++;
   const noDns = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: serving(SHA), resolveCname: async () => { throw Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' }); }, ...stamp });
-  assert.ok(noDns.cname.length === 0 && noDns.backend === 'unknown' && noDns.problems.length === 1, 'no DNS answer is recorded as an empty chain, never as a known backend'); n++;
+  assert.ok(noDns.cname.length === 0 && noDns.backend === 'staging' && noDns.problems.length === 0, 'no DNS answer is recorded as an empty chain; the backend still comes from the server'); n++;
   const down = await backendEvidence(CANDIDATE_ORIGIN, { sha: SHA, fetchImpl: async () => { throw new TypeError('fetch failed'); }, resolveCname: cnameTo(BACKEND_HOSTS.staging), ...stamp });
   assert.ok(down.health === null && down.webReleaseSha === null && down.problems.some(p => /health could not be read/.test(p)) && down.problems.some(p => /release\.json could not be read/.test(p)),
     'an unreachable origin is two named problems, never a pass'); n++;
