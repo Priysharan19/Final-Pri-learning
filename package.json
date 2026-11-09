@@ -248,7 +248,7 @@
     "engine:benchmark": "node scripts/engine-benchmark.mjs",
     "test:marker:correct": "node client/test/correct-answer-sweep-check.mjs",
     "test:marker:step14": "node server/test/step14-decimal-authenticated-check.mjs && node server/test/step14-false-credit-persistence-check.mjs && node server/test/step14-point-authenticated-check.mjs && node server/test/step14-set-authenticated-check.mjs && node server/test/step14-units-authenticated-check.mjs",
-    "test:marker:policy": "node server/test/marking-policy-check.mjs && node client/test/marker-interim-policy-check.mjs && node server/test/india-banks-check.mjs && node client/test/milestones-check.mjs && node client/test/slips-check.mjs",
+    "test:marker:policy": "node server/test/marking-policy-check.mjs && node client/test/marker-interim-policy-check.mjs && node server/test/india-banks-check.mjs && node client/test/milestones-check.mjs && node client/test/slips-check.mjs && node server/test/slip-open-reply-check.mjs",
     "test:ink:release-gate": "node client/test/ink-release-evidence-gate-check.mjs && node client/test/ink-physical-release-evidence-check.mjs",
     "test:ink:permission": "node client/test/ink-reader-permission-check.mjs",
     "test:ink:gate-c-tools": "node client/test/ink-writer-session-protocol-check.mjs && node client/test/ink-photo-reader-eval-check.mjs",

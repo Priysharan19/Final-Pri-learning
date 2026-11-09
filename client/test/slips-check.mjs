@@ -11,9 +11,13 @@ const ok = (c, l) => { if (c) pass += 1; else { fail += 1; console.error('FAIL',
 ok(classifySlip(-7, 7) === 'sign', 'sign');
 ok(classifySlip(0.25, 4) === 'reciprocal', 'reciprocal');
 ok(classifySlip(350, 35) === 'power-of-ten' && classifySlip(0.035, 35) === 'power-of-ten', 'power of ten both ways');
-ok(classifySlip(0.7, 0.3) === 'complement', 'complement');
+ok(classifySlip(0.7, 0.3) === null, 'no complement without a probability question');
+ok(classifySlip(0.7, 0.3, { prompt: 'Find the probability that it rains.' }) === 'complement', 'complement on a probability question');
+ok(checkAnswer({ prompt: 'Find the length AB in m.', answerType: 'numeric', answer: { value: 0.3 } }, '0.7').slip === undefined, 'a length never gets "the chance it does not happen"');
+ok(classifySlip(4, 2) === null, '5x = 10, wrote 4: doubling is as likely as squaring, so no kind');
+ok(classifySlip(1, 2) === null && classifySlip(3, 2) === null, 'off by one is not a kind here');
 ok(classifySlip(0.5, 0.5) === null, 'equal is not a slip');
-ok(classifySlip(49, 7) === 'square' && classifySlip(Math.sqrt(7), 7) === 'root', 'square and root');
+ok(classifySlip(49, 7) === 'square' && classifySlip(Math.sqrt(7), 7) === 'root', 'square and root where nothing simpler fits');
 ok(classifySlip(8, 7) === null, 'unrelated value: no kind');
 const q = { prompt: 'p', answerType: 'numeric', answer: { value: 14 }, steps: [{ h: 'Square', d: '$a = 49$' }, { h: 'Add', d: '$b = 49 - 35 = 14$' }] };
 ok(classifySlip(49, 14, q) === 'early-step', 'value of an earlier step');
@@ -35,7 +39,7 @@ let cases = 0, leaked = 0, wrongCredit = 0;
 for (let a = -40; a <= 40; a += 0.5) {
   if (a === 0) continue;
   const qq = { prompt: 'Find x.', answerType: 'numeric', answer: { value: a } };
-  for (const v of [-a, 1 / a, a * 10, a / 100, a * a, 1 - a, a + 1]) {
+  for (const v of [-a, 1 / a, a * 10, a / 100, a * a, 1 - a, a + 1, 2 * a]) {
     const res = checkAnswer(qq, String(v));
     cases += 1;
     if (res.correct && Math.abs(v - a) > 1e-9) wrongCredit += 1;
@@ -44,7 +48,7 @@ for (let a = -40; a <= 40; a += 0.5) {
 }
 ok(leaked === 0 && wrongCredit === 0, `slip sweep: ${leaked} leaks, ${wrongCredit} false credits in ${cases}`);
 console.log(`slip sweep: ${leaked} value leaks and ${wrongCredit} false credits in ${cases} wrong answers [SYNTHETIC]`);
-ok(slipReason(16 / 65, 56 / 65, '56/65') === null || true, 'reason computed after resolution only by the caller');
+ok(slipReason(16 / 65, 56 / 65, '56/65') === null, 'no relation: no resolved reason');
 ok(slipReason(-0.5, 0.5, '1/2').reason.includes('1/2') && slipReason(-0.5, 0.5, '1/2').kind === 'sign', 'resolved reason names the answer');
 
 // ── Group 3: the term that changed ──
@@ -62,5 +66,6 @@ ok(rep.lines[1].status === 'break', 'and the verdict is unchanged');
 
 const vague = stepCheck({ kind: 'equation', variable: 'x', solutions: [3] }, '2x + 4 = 10\n2x + 4 + x = 10');
 ok(/^A new term \+x appeared on the left/.test(vague.lines[1].note) && /was changed, but/.test(vague.lines[1].note) && vague.lines[1].status === 'break', '"one side was changed" now says which term');
+ok(changedTerm('x + e - 4 = 0', 'x + e + 4 = 0') !== null, 'a minus after the letter e still splits terms');
 console.log(`SLIPS: ${pass}/${pass + fail}`);
 if (fail) process.exit(1);

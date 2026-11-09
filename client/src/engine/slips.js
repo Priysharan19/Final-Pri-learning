@@ -25,6 +25,15 @@ function stepValues(q, answer) {
   return out;
 }
 
+/** A probability question: said so by its key, its topic or its prompt. */
+export function isProbability(q) {
+  if (!q) return false;
+  if (q.answer?.probability === true) return true;
+  const where = `${q.subtopic || ''} ${q.generator || ''} ${q.topic || ''}`;
+  if (/probab/i.test(where)) return true;
+  return /\b(probability|chance that|likelihood)\b/i.test(String(q.prompt || ''));
+}
+
 /**
  * The kind of slip that turns `answer` into `value`, or null. Kinds:
  * 'early-step', 'sign', 'reciprocal', 'power-of-ten', 'complement',
@@ -37,9 +46,13 @@ export function classifySlip(value, answer, q = null) {
   if (a !== 0 && close(v, -a)) return 'sign';
   if (a !== 0 && Math.abs(a) !== 1 && close(v, 1 / a)) return 'reciprocal';
   if (a !== 0) for (const n of [1, 2, 3]) if (close(v, a * 10 ** n) || close(v, a / 10 ** n)) return 'power-of-ten';
-  if (a > 0 && a < 1 && a !== 0.5 && close(v, 1 - a)) return 'complement';
-  if (Math.abs(a) > 1e-9 && Math.abs(a) !== 1 && close(v, a * a)) return 'square';
-  if (a > 0 && a !== 1 && close(v, Math.sqrt(a))) return 'root';
+  // Only a probability has a complement.
+  if (a > 0 && a < 1 && a !== 0.5 && close(v, 1 - a) && isProbability(q)) return 'complement';
+  // Squared or rooted only where no simpler slip gives the same number:
+  // for a = 2, 4 is just as much "doubled", so no kind is claimed.
+  const ambiguous = close(v, 2 * a) || close(v, a / 2) || close(v, a + 1) || close(v, a - 1);
+  if (!ambiguous && Math.abs(a) > 1e-9 && Math.abs(a) !== 1 && close(v, a * a)) return 'square';
+  if (!ambiguous && a > 0 && a !== 1 && close(v, Math.sqrt(a))) return 'root';
   return null;
 }
 
@@ -88,7 +101,7 @@ function termsOf(side) {
     const c = s[i];
     if (c === '(' || c === '[' || c === '{') depth += 1;
     else if (c === ')' || c === ']' || c === '}') depth -= 1;
-    else if (depth === 0 && (c === '+' || c === '-') && i > start && !/[*/^(eE]/.test(s[i - 1])) {
+    else if (depth === 0 && (c === '+' || c === '-') && i > start && !/[*/^(]/.test(s[i - 1]) && !(/[eE]/.test(s[i - 1]) && /\d/.test(s[i - 2] || ''))) {
       out.push({ sign, text: s.slice(start, i) });
       sign = c === '-' ? -1 : 1; start = i + 1;
     }
