@@ -27,7 +27,10 @@
 // forms instead of NCERT-numbered items; typesetting defects (double signs,
 // unit coefficients, +0 terms) fixed across 16 generators; past papers behind
 // a default-off switch (content honesty stream, Nov 2026).
-export const CONTENT_VERSION = '2026.11.0';
+// 2026.11.1 — Class 9 mastery generators widened: wide integer ranges and two
+// or three shapes per cell (some cells served 2–8 questions in all); the skill,
+// answer type, hints and worked solution of every cell are unchanged in kind.
+export const CONTENT_VERSION = '2026.11.1';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
