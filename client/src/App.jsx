@@ -1,18 +1,16 @@
-import { featureEnabled } from './platform/features.js';
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
+import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
+import Aurora from './instrument/Aurora.jsx';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import PageLink from './components/PageLink.jsx';
-import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
-import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
+import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
-import { prefetchInstrumentTabs } from './local/offlineWarm.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
-import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
@@ -37,7 +35,13 @@ const Match = React.lazy(() => import('./pages/Match.jsx'));
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
-const Classes = React.lazy(() => import('./pages/Classes.jsx'));
+// The student Classes page follows the classroom-product flag (CLASSES_ON
+// below). The build constant is read directly here, as for the instrument, so
+// a production build made with the flag off never emits or warms its 47 kB
+// chunk: nothing a student of that build can open is paid for by its install.
+/* global __PRI_FEATURE_EXTENDED_TRACKS__ */
+const CLASSES_BUILT_OUT = typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' && !__PRI_FEATURE_EXTENDED_TRACKS__ && import.meta.env?.PROD === true;
+const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
@@ -52,16 +56,25 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
+const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 // The parent weekly report's screen: off in a production build until counsel
 // has reviewed email about minors (D22, PRI_FEATURE_PARENT_REPORT).
 const PARENT_REPORT_ON = featureEnabled('parentReport');
-// The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
-// the owner flips it. Its code and stylesheet load only when the flag is on.
-// The build constant is read directly here (not through featureEnabled) so the
-// bundler can see which branch survives: an instrument build then drops the
-// v1.0 Home page, the v1.0 sidebar and everything only they import.
+// V1 decision D10 (1 Nov 2026): a student tab the V1 evidence does not cover
+// is hidden from students, starting with Classes. The classroom product is the
+// PRI_FEATURE_EXTENDED_TRACKS surface (platform/features.js: "the classroom/
+// assignment panels for students", as Settings already gates them), so the
+// student Classes tab and route follow that flag: off in a production build,
+// on in the test builds that walk them. The route itself lands on the Index
+// rather than a blank page, and the teacher's own Classes section is untouched.
+const CLASSES_ON = featureEnabled('extendedTracks');
+// The Instrument interface: the one student interface on every build (V1
+// decision D7), set in client/interface.config.mjs. The build constant is read
+// directly here (not through featureEnabled) so the bundler can see which
+// branch survives: the build drops the v1.0 Home page, the v1.0 sidebar and
+// everything only they import.
 /* global __PRI_FEATURE_INSTRUMENT__ */
 const INSTRUMENT_BUILD = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' && __PRI_FEATURE_INSTRUMENT__ && import.meta.env?.PROD === true;
 const INSTRUMENT_ON = INSTRUMENT_BUILD || featureEnabled('instrument');
@@ -71,19 +84,19 @@ const MapPage = INSTRUMENT_ON ? React.lazy(() => import('./instrument/MapPage.js
 const ReportHead = INSTRUMENT_ON ? React.lazy(() => import('./instrument/ReportHead.jsx')) : null;
 // The routes name `Home` and `Progress`; in the instrument build those are the
 // Index and the Report (the Report's summary above the same Progress page).
-const Home = INSTRUMENT_ON ? IndexPage : ClassicHome;
+const Home = IndexPage;
 const Progress = INSTRUMENT_ON ? function Progress() { return <><ReportHead /><ProgressPage /></>; } : ProgressPage;
 if (INSTRUMENT_ON && typeof document !== 'undefined') {
-  document.documentElement.classList.add('ui-instrument');
-  import('./instrument/instrument.css');
-  // The Map, Report and Scripts tabs are on demand in this build; after an
-  // online launch, at idle and only on a cheap link, fetch them so the service
-  // worker keeps them for offline (local/offlineWarm.js, issue #658).
-  void prefetchInstrumentTabs({
-    scope: window,
-    loaders: [() => import('./instrument/MapPage.jsx'), () => import('./instrument/ReportHead.jsx'),
-      () => import('./pages/Progress.jsx'), () => import('./pages/History.jsx')]
-  });
+  // Optional chaining: server-side renders and test harnesses may hand the
+  // module a document without a real documentElement (online-check-access-check).
+  document.documentElement?.classList?.add('ui-instrument');
+  // The chrome's skin (client/interface.config.mjs): aurora.css is scoped to
+  // this class, so 'instrument' (D8's fallback) turns every Aurora rule off.
+  if (INTERFACE_SKIN_UI === 'aurora') document.documentElement?.classList?.add('skin-aurora');
+  // Its stylesheets are in the boot stylesheet (main.jsx).
+  // The Map, Report and Scripts tabs are part of the warm pass in this build
+  // (vite.config.js: no on-demand rule names them), so the service worker
+  // keeps them for a first open offline without a runtime prefetch (#658).
 }
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.
@@ -103,12 +116,22 @@ const I = {
   progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
   settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
   rush: <Icon name="rush" />, notes: <Icon name="notes" />, teacher: <Icon name="teacher" />,
+  map: <Icon name="map" />,
 };
 
+// The instrument build names the same places as its tabs do: the Index, the
+// Report and Scripts (every script, not only the wrong ones), and it has the
+// Map, which the v1.0 shell folds into Progress. The phone bar, the More sheet
+// and the command bar's page list all read this one list, so a destination is
+// never reachable on one of them and missing from another.
 const STUDENT_NAV = [
   { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
-  { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
-  { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }, ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])] },
+  { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, ...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])] },
+  { label: 'nav.groupUnderstand', items: [
+    { to: '/progress', key: 'nav.progress', ico: I.progress },
+    { to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review },
+    ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])
+  ] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
@@ -124,8 +147,18 @@ const TEACHER_NAV = [
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
-const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/tasks', '/progress']);
+// The phone bar's four destinations (More holds the rest). The instrument
+// build puts the Map where v1.0 put Tasks: it is a tab of that interface and
+// had no phone entry at all before (audit-interface item 2).
+// Where the Aurora skin's light pools may show: screens with no question, ink,
+// review or exam surface on them.
+const AURORA_POOL_ROUTES = new Set(['/', '/map', '/settings']);
+const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/map', '/progress']);
 const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
+
+// In the instrument build the phone bar and the More sheet call these places
+// what the tab bar calls them.
+const INSTRUMENT_TAB_KEYS = { '/': 'inst.tabIndex', '/progress': 'inst.tabReport' };
 
 function targetParts(to) {
   const u = new URL(to, 'https://pri.local');
@@ -141,7 +174,7 @@ function isDestinationActive(location, to) {
 }
 
 const TITLE_KEYS = {
-  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks',
+  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks', '/map': 'inst.tabMap',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
   '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
@@ -198,6 +231,7 @@ export default function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [dueCount, setDueCount] = useState(0);
+  const [dueUnit, setDueUnit] = useState('topic');
   const [recent, setRecent] = useState([]);
   const moreButtonRef = useRef(null);
   const moreSheetRef = useRef(null);
@@ -214,7 +248,14 @@ export default function App() {
   }, []);
 
   const refreshDue = useCallback(async () => {
-    try { const r = await api.get('/reviews'); setDueCount(r.due.length); } catch { setDueCount(0); }
+    // One "due" count everywhere: the per-dot-point queue when the server sent
+    // one (the same figure the review card shows), else the chapter schedule.
+    try {
+      const r = await api.get('/reviews');
+      const dp = r?.dotpoints;
+      setDueCount(dp ? (Number(dp.dueCount) || 0) : (r?.due?.length || 0));
+      setDueUnit(dp ? 'dotpoint' : 'topic');
+    } catch { setDueCount(0); setDueUnit('topic'); }
   }, []);
 
   const refreshRecent = useCallback(async () => {
@@ -450,8 +491,8 @@ export default function App() {
   const activate = useCallback((ready) => {
     setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate }),
-    [user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate]);
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate }),
+    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate]);
 
   if (user === undefined) {
     return (
@@ -523,7 +564,9 @@ export default function App() {
   const navSections = user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
   const navItems = navSections.flatMap(section => section.items);
   const primarySet = user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
-  const mobilePrimary = navItems.filter(item => primarySet.has(item.to));
+  // In the bar's own order (Index, Practice, Map, Report in the instrument
+  // build), not the order the shell's list happens to hold them in.
+  const mobilePrimary = [...primarySet].map(to => navItems.find(item => item.to === to)).filter(Boolean);
   const mobileMore = navItems.filter(item => !primarySet.has(item.to));
   const roleLanding = user.role === 'teacher' ? '/teach' : '/';
 
@@ -566,35 +609,18 @@ export default function App() {
   return (
     <AppCtx.Provider value={ctx}>
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
+        {/* The Aurora skin's light pools: never behind mathematics or ink, so
+            only on the Index, the Map and Settings (D9). */}
+        {INSTRUMENT_ON && INTERFACE_SKIN_UI === 'aurora' && user.role !== 'teacher' && AURORA_POOL_ROUTES.has(loc.pathname) && <Aurora />}
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
-        {INSTRUMENT_ON ? (
-          <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
-            <InstrumentBar user={user} setUser={setUser} navItems={navItems}
-              accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
-          </React.Suspense>
-        ) : (
-          <header className="topbar">
-            <Logo onClick={() => nav('/', { replace: isCurrentUrl('/') })} />
-            <div className="top-stats">
-              <ThemeToggle />
-              <AccountMenu user={user} onSwitch={switchProfile} />
-            </div>
-          </header>
-        )}
+        {/* The one shell bar (the v1.0 top bar and rail are gone with the
+            v1.0 interface; client/interface.config.mjs). */}
+        <React.Suspense fallback={<div className="in-bar" aria-hidden="true" />}>
+          <InstrumentBar user={user} setUser={setUser} navItems={navItems}
+            accountMenu={<AccountMenu user={user} onSwitch={switchProfile} />} />
+        </React.Suspense>
 
         <div className="body-row">
-          {!INSTRUMENT_ON && <aside className="sidebar no-print">
-            <div className="sidebar-inner">
-              {navSections.map(section => (
-                <div className="nav-section" key={section.label}>
-                  <div className="nav-section-label">{t(section.label)}</div>
-                  {section.items.map(item => destinationLink(item, 'nav-item'))}
-                </div>
-              ))}
-              <div className="nav-spacer" />
-              {user.role !== 'teacher' && <SidebarHistory recent={recent} />}
-            </div>
-          </aside>}
 
           <div className="main">
             {activated?.offline && (
@@ -615,9 +641,10 @@ export default function App() {
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     <Route path="/premium" element={studentOnly(<Paywall />)} />
+                    <Route path="/insights" element={studentOnly(<Insights />)} />
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
-                    <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
+                    <Route path="/map" element={studentOnly(<MapPage />)} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
@@ -632,7 +659,7 @@ export default function App() {
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
                     <Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />
-                    <Route path="/classes" element={studentOnly(<Classes />, '/teach#teacher-classes')} />
+                    <Route path="/classes" element={CLASSES_ON && Classes ? studentOnly(<Classes />, '/teach#teacher-classes') : <Navigate to={roleLanding} replace />} />
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
@@ -657,7 +684,7 @@ export default function App() {
           return (
             <PageLink key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
-              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{INSTRUMENT_ON && item.to === '/' ? t('inst.tabIndex') : t(item.key)}</span>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_TAB_KEYS[item.to] || item.key)}</span>
             </PageLink>
           );
         })}
@@ -683,7 +710,7 @@ export default function App() {
               return (
                 <PageLink key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
                   aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
-                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
+                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(INSTRUMENT_TAB_KEYS[item.to] || item.key)}</span>
                 </PageLink>
               );
             })}
@@ -697,43 +724,6 @@ export default function App() {
   );
 }
 
-function SidebarHistory({ recent }) {
-  const nav = useNavigate();
-  const t = useT();
-  if (!recent.length) {
-    return (
-      <div className="nav-hist">
-        <div className="nav-hist-title">{t('app.questionHistory')}</div>
-        <div className="muted" style={{ fontSize: 12 }}>{t('app.noQuestionsYet')}</div>
-      </div>
-    );
-  }
-  return (
-    <div className="nav-hist">
-      <div className="nav-hist-title">{t('app.questionHistory')}</div>
-      {recent.slice(0, 3).map(it => {
-        const cls = it.correct === true ? 'g' : it.correct === false ? 'b' : 'w';
-        return (
-          <button key={it.id} className="hist-mini" onClick={() => nav('/review')}>
-            <div className="hist-mini-top">
-              <span className="hist-mini-name">{it.subtopicName}</span>
-              <span className={`hist-mini-pct ${cls}`}
-                aria-label={it.correct === true ? t('app.correct') : it.correct === false ? t('app.incorrect') : t('app.notMarkedYet')}>
-                {it.correct === true ? <Icon name="check" size={14} /> : it.correct === false ? <Icon name="correction" size={14} /> : '—'}
-              </span>
-            </div>
-            <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
-            <div className="hist-mini-tags">
-              <span className="tag" style={{ fontSize: 10.5 }}>{it.mode === 'practice' ? t('history.modePractice') : it.mode}</span>
-              <span className="tag" style={{ fontSize: 10.5 }}>{t('app.difficultyIs', { level: it.difficulty })}</span>
-            </div>
-          </button>
-        );
-      })}
-      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/review')}>{t('app.viewAll')}</button>
-    </div>
-  );
-}
 
 function initials(name = '') {
   return name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || 'PL';
@@ -839,38 +829,7 @@ function AccountMenu({ user, onSwitch }) {
   );
 }
 
-function stripTex(s = '') {
-  return s.replace(/\$[^$]*\$/g, m => m.slice(1, -1).replace(/\\[a-zA-Z]+/g, '').replace(/[{}^_]/g, '')).slice(0, 80);
-}
 
-/** The theme actually on screen for a preference; re-renders when the device flips. */
-function useResolvedTheme(pref) {
-  return useSyncExternalStore(
-    notify => followSystemTheme(pref, notify),
-    () => resolveTheme(pref),
-    () => (cleanThemePref(pref) === 'dark' ? 'dark' : 'light')
-  );
-}
-
-function ThemeToggle() {
-  const { user, setUser } = useApp();
-  const t = useT();
-  // What is on screen decides the direction, so a profile following the device
-  // still flips to the other paper in one press (and then stops following).
-  const shown = useResolvedTheme(user.theme);
-  const flip = async () => {
-    const theme = shown === 'dark' ? 'light' : 'dark';
-    setUser({ ...user, theme });
-    try { await api.patch('/me', { theme }); } catch { }
-  };
-  return (
-    <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={shown === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
-      style={{ minWidth: 44, minHeight: 44, padding: 0 }}>
-      <Icon name={shown === 'dark' ? 'sun' : 'moon'} size={17} />
-    </button>
-  );
-}
 
 function ToastLayer({ toasts }) {
   // Always mounted, so a screen reader hears each toast as it arrives.

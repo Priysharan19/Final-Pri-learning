@@ -107,7 +107,8 @@ export const flow = {
         return !!primary && !!generator && Boolean(primary.compareDocumentPosition(generator) & Node.DOCUMENT_POSITION_FOLLOWING);
       }));
     await check('manual generator remains available but secondary',
-      await page.locator('#home-manual-title').isVisible() && await page.locator('.genbar').isVisible());
+      // The Index's "More ways to practise" section is the manual chooser.
+      await page.locator('#home-manual-title, #in-also-title').first().isVisible() && await page.locator('.genbar').isVisible());
 
     await page.setViewportSize(PHONE);
     await check('phone Home has no horizontal overflow',

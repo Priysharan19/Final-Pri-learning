@@ -24,7 +24,9 @@ for (const source of grade10.chapters) {
     assert.equal(practiceTargetAvailable(chapter, i), true, `${chapter.id} dot point ${i + 1}`);
   }
 }
-const home = readFileSync(new URL('../src/pages/Home.jsx', import.meta.url), 'utf8');
+// The topic and dot-point pickers are the exact-topic generator, shared by Home
+// and the instrument Index (home/TopicGenerator.jsx).
+const home = readFileSync(new URL('../src/home/TopicGenerator.jsx', import.meta.url), 'utf8');
 // The "coming soon" copy moved into the translation catalogue when the app
 // became bilingual, so Home now names it by key. Both halves are still checked
 // — Home renders the marker, and the marker still says what it said — because a

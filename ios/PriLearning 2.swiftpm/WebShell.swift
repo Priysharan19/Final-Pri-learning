@@ -88,6 +88,14 @@ struct WebShell: UIViewRepresentable {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
+        // Reduce Transparency from the first paint: iOS WebKit does not answer
+        // prefers-reduced-transparency, so the shell states the setting as a
+        // class on <html> (aurora.css keys its opaque fallback on it).
+        config.userContentController.addUserScript(WKUserScript(
+            source: Coordinator.reduceTransparencyScript(UIAccessibility.isReduceTransparencyEnabled),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
@@ -233,6 +241,22 @@ struct WebShell: UIViewRepresentable {
                 if let container = webView?.superview { self?.applySafeArea(container.safeAreaInsets) }
             }
             applyTextSize()
+            reduceTransparencyObserver = NotificationCenter.default.addObserver(
+                forName: UIAccessibility.reduceTransparencyStatusDidChangeNotification, object: nil, queue: .main
+            ) { [weak self] _ in self?.applyReduceTransparency() }
+            applyReduceTransparency()
+        }
+
+        private var reduceTransparencyObserver: NSObjectProtocol?
+
+        /// The device's Reduce Transparency setting as `a11y-reduce-transparency`
+        /// on <html>, since iOS WebKit leaves prefers-reduced-transparency unanswered.
+        static func reduceTransparencyScript(_ on: Bool) -> String {
+            "document.documentElement.classList.toggle('a11y-reduce-transparency', \(on ? "true" : "false"));"
+        }
+
+        func applyReduceTransparency() {
+            shellWebView?.evaluateJavaScript(Self.reduceTransparencyScript(UIAccessibility.isReduceTransparencyEnabled), completionHandler: nil)
         }
 
         private var themeColorObservation: NSKeyValueObservation?
@@ -412,6 +436,8 @@ struct WebShell: UIViewRepresentable {
         func detachHost() {
             if let openURLObserver { NotificationCenter.default.removeObserver(openURLObserver) }
             if let contentSizeObserver { NotificationCenter.default.removeObserver(contentSizeObserver) }
+            if let reduceTransparencyObserver { NotificationCenter.default.removeObserver(reduceTransparencyObserver) }
+            reduceTransparencyObserver = nil
             openURLObserver = nil
             contentSizeObserver = nil
             host.detach()
@@ -474,6 +500,9 @@ struct WebShell: UIViewRepresentable {
             applyTextSize()
             appliedSafeArea = nil
             if let container = webView.superview { applySafeArea(container.safeAreaInsets) }
+            // A reload re-runs the launch-time user script with the value it was
+            // made with: state the current Reduce Transparency setting again.
+            applyReduceTransparency()
             #if DEBUG
             if BridgeSelfCheck.awaitingContentEnd {
                 // A load after the page's WebContent process ended (whoever reloaded it).

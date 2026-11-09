@@ -20,7 +20,8 @@ import { markGraphSketch, readFeatureSet } from '../../client/src/engine/graphFe
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
-import { answerForm, firstFinalAttempt } from './finalAttempt.js';
+import { annotateMilestones } from '../../client/src/engine/milestones.js';
+import { answerForm, firstFinalAttempt, planGivens } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -90,6 +91,11 @@ export function stepEvidence(q, answer, steps, result) {
       if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines, lost: method.lost };
     } catch { partial = null; }
   }
+  // Feedback only, after the mark is computed: a correct intermediate line
+  // that matches a step of the worked solution is ticked (milestones.js).
+  // A question whose working is not checked (no Step Check: supportsSteps
+  // false) gets no report at all, milestones or not.
+  try { if (report) report = annotateMilestones(q, report); } catch { /* the report stands */ }
   return { stepReport: report, partial };
 }
 
@@ -178,7 +184,12 @@ export function tutorEvidence(q, lines) {
   const meta = stepMetaFor(q);
   if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
   try {
-    const judged = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
+    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
+    const judged = report?.lines || [];
+    // The engine's own misconception id for the break (audit D1), as a stable
+    // id only — never free text — exactly as the device reads it (tutorWork).
+    const code = report?.diagnosis?.code;
+    if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) evidence.misconception = code;
     const at = judged.findIndex(line => line?.status === 'break');
     if (at >= 0 && at < lines.length) evidence.firstBreak = at;
     while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
@@ -245,17 +256,17 @@ export const MARKER_OPS = Object.freeze({
 export function lineCheckEvidence(q, lines, answerText) {
   const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
   const meta = stepMetaFor(q);
-  const form = answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix });
-  let stages = [];
-  let finalStage = -1;
-  if (meta?.kind === 'plan' && Array.isArray(meta.stages) && meta.stages.length && Array.isArray(lines) && lines.length) {
-    finalStage = meta.stages.filter(Boolean).length - 1;
-    try {
-      const rows = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
-      stages = lines.map((_, i) => (Number.isInteger(rows[i]?.stage) ? rows[i].stage : -1));
-    } catch { return { ...silent, attemptAt: 0 }; }   // unreadable: fail closed
-  }
-  const attemptAt = firstFinalAttempt(lines, form, { stages, finalStage });
+  // Letters the question or plan fixes are constants in the form analysis
+  // (#831 round 5). A plan that states none fails closed: every line is an attempt.
+  const fixed = planGivens(meta);
+  const form = fixed === null ? null
+    : answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix, fixed });
+  // The final-attempt decision is made FIRST, from each line's shape and
+  // symbols alone, before and independently of any Step Check verdict. The
+  // Step Check's stage tag is NOT used: it placed a wrong final value at the
+  // plan's last stage and left a right one unplaced (c10-areas-circles D1
+  // seed 11: "A = 462" judged, "A = 461" final), so it was an oracle.
+  const attemptAt = firstFinalAttempt(lines, form);
   if (attemptAt >= 0) return { ...silent, attemptAt };
   return { ...tutorEvidence(q, lines), attemptAt: -1 };
 }
