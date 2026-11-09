@@ -44,6 +44,32 @@ ok(r3.lines[0].status === 'ok' && r3.lines[1].status === 'note' && r3.lines[2].s
 ok(stepEvidence(noMeta, '0', 'D = 9', { correct: true }).stepReport?.lines[0].status === 'ok', 'stepEvidence builds it when there is no check');
 ok(stepEvidence(noMeta, '0', 'D = 9', { correct: true }).partial === null, 'and awards nothing');
 
+// ── Group 3b: compound steps (review of #813) and learner state ──
+const { fullyVerifiedWorking } = await import(`${SRC}engine/misconceptions.js`);
+const comp = { prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [
+  { h: 'Read off', d: '$a = 11, \\quad d = 7$' }, { h: 'Antiderivative', d: '$F(2) = 16, \\quad F(0) = 0$' }, { h: 'Parts', d: '$u = x^{3}, \\quad v = 3x + 4$' }] };
+for (const [line, want] of [['a = 7', false], ['a = 11', true], ['d = 7', true], ['F(2) = 0', false], ['F(2) = 16', true], ['u = 3x+4', false], ['u = x^3', true], ['v = 3x + 4', true]]) {
+  const r = stepEvidence(comp, '0', line, { correct: true }).stepReport;
+  ok((r?.lines[0].status === 'ok') === want, `compound step: ${line} ${want ? 'ticked' : 'not ticked'}`);
+}
+ok(milestonesOf({ steps: [{ d: '$x = 1, 2$' }] }).length === 0, 'a value with a top-level comma is never a milestone');
+// Real generators the review named, at every seed that shows the compound form.
+let compoundSeen = 0, compoundBad = 0;
+for (const [gen, d] of [['y12-series', 2], ['y12-integration', 2], ['y12-diff', 2]]) for (let seed = 1; seed <= 40; seed += 1) {
+  let g; try { g = generateQuestion(gen, d, seed); } catch { continue; }
+  for (const st of g?.steps || []) for (const sp of String(st.d || '').matchAll(/\$([^$]+)\$/g)) {
+    if (!/,\s*\\quad/.test(sp[1])) continue;
+    compoundSeen += 1;
+    const ms = milestonesOf(g);
+    for (const m of ms) if (m.values.some(v => /,/.test(v))) compoundBad += 1;
+  }
+}
+ok(compoundBad === 0 && compoundSeen > 0, `compound spans in y12 banks: ${compoundBad} values carry another statement (${compoundSeen} spans seen)`);
+const mo = milestoneOnlyReport({ steps: [{ h: 'D', d: '$D = 1$' }, { h: 'x', d: '$x = -\\frac{1}{6}$' }] }, 'D = 1\nx = -1/6');
+ok(mo.lines.every(l => l.status === 'ok') && fullyVerifiedWorking(mo) === false, 'milestone-only ticks never count as verified working');
+ok(fullyVerifiedWorking(annotateMilestones(q, stepCheck(meta, "f'(x)=6x+1\n6x+1=0\nx=-1/6"))) === false, 'an annotated tick never counts as verified working');
+ok(fullyVerifiedWorking(stepCheck(meta, '6x+1=0\nx=-1/6')) === true, 'checked working still counts');
+
 // ── Group 4: every milestone in the India catalogue, and its corruptions ──
 const cells = new Map();
 for (const ch of IN_CHAPTERS) for (const c of ch.covers || []) if (GENERATORS[c.gen]) for (const d of c.diff || [1, 2, 3, 4]) cells.set(`${c.gen}|${d}`, { gen: c.gen, d });
