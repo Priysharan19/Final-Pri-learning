@@ -148,7 +148,7 @@ const plot = read('instrument/SignInPlot.jsx');
 ok(/in-signin-example/.test(plot) && /login\.exampleLabel/.test(plot)
   && /2x \+ 7 = 19/.test(plot) && /2x = 12/.test(plot) && /x = 6/.test(plot),
   'the welcome illustration shows a mathematically correct example, explicitly labelled as illustrative');
-ok(/signup\.methodHint/.test(card) && typeof en['signup.methodHint'] === 'string'
+ok(/signup\.methodHint/.test(card) && /signup-method-hint/.test(card) && typeof en['signup.methodHint'] === 'string'
   && typeof hi['signup.methodHint'] === 'string',
   'the email road explains one-time code and no password before submitting');
 ok(/const controller = new AbortController\(\);/.test(card)
