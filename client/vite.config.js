@@ -259,6 +259,12 @@ export const ON_DEMAND = [
   // governs — and says so, which legal-pages-check.mjs holds it to.
   [/(^|\/)legalHindi-[^/]*\.js$/, 'Hindi legal notices'],
 
+  // The third-party licence notices, generated from the dependency licences
+  // (tools/third-party-notices.mjs) and reached by import() from Legal.jsx
+  // only when /third-party-notices is opened. Licence prose nobody reads
+  // twice has no place in anyone's install.
+  [/(^|\/)thirdPartyNotices-[^/]*\.js$/, 'third-party licence notices'],
+
   // Staff-only screens. ADR-0001 makes the product online-first, and these are
   // the screens a student never opens, so nothing a student does offline
   // depends on them and no student should pay to download them:

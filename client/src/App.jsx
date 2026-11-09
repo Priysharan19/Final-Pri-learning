@@ -468,6 +468,7 @@ export default function App() {
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
             <Route path="/grievance" element={<Legal />} />
+            <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>
@@ -504,6 +505,7 @@ export default function App() {
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
             <Route path="/grievance" element={<Legal />} />
+            <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
         </React.Suspense>
@@ -627,6 +629,7 @@ export default function App() {
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
+                    <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
