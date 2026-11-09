@@ -163,7 +163,9 @@ export const flow = {
       // A fresh question that takes written work: some India forms are
       // multiple choice (Class 7 integers at D3), which has no canvas, so Next
       // is pressed again — a bounded number of times — until one is written.
-      const writable = page.getByRole('button', { name: 'Answer by handwriting' });
+      // Only the card's own answer-mode switch (QuestionCard.jsx renders it for
+      // every non-MCQ question); a name search alone also matches other controls.
+      const writable = page.locator('.qpage .mode-tabs').getByRole('button', { name: 'Answer by handwriting' });
       for (let moved = 0; ; moved++) {
         const before = await shownId();
         await page.locator('.ctx-next').click();
