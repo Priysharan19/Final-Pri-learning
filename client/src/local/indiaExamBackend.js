@@ -406,6 +406,7 @@ function finalResult(exam, extra = {}) {
   return {
     score: exam.score, total: exam.total, pct, detail: exam.detail, summary: exam.summary,
     analysis: analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }),
+    timeReport: exam.timeReport || null, timeReportOffered: exam.timeReportOffered === true,
     final: { submittedAt: exam.final?.submittedAt ?? exam.finishedAt, finalisedBy: exam.final?.finalisedBy ?? null, late: !!exam.final?.late, paperVersion: exam.final?.paperVersion ?? null },
     markedBy: markedByOf(exam),
     indiaExam: exam.indiaExam,
@@ -439,6 +440,11 @@ async function adoptResult(exam, serverResult, { record = true } = {}) {
   const result = localResult(exam, serverResult);
   // A board mock sat on another device is known as one from its result.
   if (serverResult?.mock === true) { exam.mock = true; exam.mockLabel = MOCK_LABEL; }
+  // Where the time went (engine/examTime.js): the server sends it to a
+  // Premium account only; a free one is told it exists.
+  if (serverResult && 'timeReport' in serverResult) exam.timeReport = serverResult.timeReport || null;
+  else if (serverResult) delete exam.timeReport;
+  if (serverResult) exam.timeReportOffered = serverResult.timeReportOffered === true;
   const detail = [];
   for (const d of result.detail) {
     const row = await get('questions', d.id);

@@ -1,3 +1,4 @@
+import { createMistakeDnaRouter } from './mistakeDna.js';
 import { asyncRouter } from './asyncRouter.js';
 import { clientCompatibility } from './clientCompatibility.js';
 import { asStore } from './store.js';
@@ -229,6 +230,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // account later goes through the guarded /practice/issue below.
   router.post('/practice/prepare', ...createPracticePrepareRoute(db));
   router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
+  router.use('/habits', requireGuardianConsent(db), createMistakeDnaRouter(db));
   // An examination paper is issued, collected and marked here: the same
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.

@@ -309,7 +309,8 @@ jobs:
           # redrawn and the canvas encoding is sent, with no fall back to the original.
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
           # 114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
-          grep -Fq 'TUTOR UI: PASS — 114/114 checks' suites.log
+          # 114 → 127 (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'TUTOR UI: PASS — 127/127 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
@@ -320,7 +321,8 @@ jobs:
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt).
           # 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770).
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 75 files scanned, 0 hard-coded strings' suites.log
+          # 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 77 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -375,6 +377,7 @@ jobs:
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
+          grep -Fq 'IOS BUNDLE FLAG POLICY: PASS — 8/8 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
           # The committed certification report describes the content in the tree (version, digest, scope, result).
           grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
@@ -553,10 +556,12 @@ jobs:
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
+          grep -Fq 'MISTAKE DNA: PASS — 16/16 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
@@ -672,6 +677,11 @@ jobs:
           set -o pipefail
           node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
           grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
+      - name: Where the time went on a timed paper — measured per question, Premium on read (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/exam-time-check.mjs 2>&1 | tee exam-time.log
+          grep -Fq 'EXAM TIME: PASS — 23/23 checks' exam-time.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -700,7 +710,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 83/83 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 84/84 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -728,6 +738,8 @@ jobs:
           grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
           # 61 → 62 (L6): typed board mocks on Postgres.
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
+          # 83 → 84 (L6, plan F10): where the time went, on Postgres.
+          grep -Fq '✓ exam-time-check.mjs' platform-postgres.log
           # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
