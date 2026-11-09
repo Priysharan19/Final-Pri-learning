@@ -46,6 +46,10 @@ const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${S
 await loadAllBanks();
 const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
 const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
+// Installed AFTER the hardest tables (curriculum-in-forms-covers.js): not part of
+// what a chapter had "before this table".
+const { INDIA_FORMS_COVERS } = await import(`${SRC}engine/curriculum-in-forms-covers.js`);
+const LATER = new Set(Object.values(INDIA_FORMS_COVERS).flat().map(c => c.gen));
 const BASE_SOURCE = (await import('node:fs')).readFileSync(new URL('../src/engine/curriculum-in-base.js', import.meta.url), 'utf8');
 const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_COVERS, INDIA_JEE_REPLACEMENT_PROVENANCE, INDIA_RETIRED_RUNGS } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
 const { SOLVE_JEE_C11 } = await import('./india-hardest-solvers-jee-c11.mjs');
@@ -762,7 +766,7 @@ for (const e of entries) {
   ok(`${e.gen} resolves to its class bank`, bankOf(e.gen) === (rung === 3 ? BANK_FOR_GRADE[grade] : `india-class${grade}`), String(bankOf(e.gen)));
   ok(`${where} names exactly one dot point at exactly D${rung}`, e.dp.length === 1 && JSON.stringify(e.diff) === `[${rung}]`, JSON.stringify(e));
   // The gap was real: nothing else in the chapter reaches this dot point at the rung.
-  const others = chapter.covers.filter(c => !ids.includes(c.gen) && c.dp.includes(e.dp[0]) && c.diff.includes(rung));
+  const others = chapter.covers.filter(c => !ids.includes(c.gen) && !LATER.has(c.gen) && c.dp.includes(e.dp[0]) && c.diff.includes(rung));
   ok(`${where} had no D${rung} form before this table`, others.length === 0, others.map(c => c.gen).join(', '));
   ok(`${where} carries the new cover on the live chapter`, chapter.covers.some(c => c.gen === e.gen && c.dp[0] === e.dp[0] && c.diff.includes(rung)));
   for (const track of e.tranche.tracks) {
