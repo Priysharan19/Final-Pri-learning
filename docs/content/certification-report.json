@@ -1,23 +1,23 @@
 {
  "summary": {
-  "contentVersion": "2026.11.4",
+  "contentVersion": "2026.11.5",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
   "pastPapers": {
    "enabled": false,
    "reason": "rights-opinion-pending",
-   "paths": 63,
+   "paths": 67,
    "advertised": 0
   },
-  "paths": 809,
+  "paths": 813,
   "advertisedPaths": 746,
-  "passed": 809,
+  "passed": 813,
   "failed": 0,
   "questionsServed": 80880,
   "questionsFailed": 0,
   "emptyAdvertisedPaths": 0,
-  "unadvertisedEmptyPaths": 63,
+  "unadvertisedEmptyPaths": 67,
   "difficultySnapped": 10080,
   "difficultyBelowWindow": 0,
   "difficultyMismatch": 0,
@@ -83,14 +83,14 @@
     "chapters": 27
    },
    "jee-advanced · Class 11": {
-    "paths": 130,
-    "passed": 130,
+    "paths": 132,
+    "passed": 132,
     "served": 8640,
     "chapters": 27
    },
    "jee-advanced · Class 12": {
-    "paths": 130,
-    "passed": 130,
+    "paths": 132,
+    "passed": 132,
     "served": 8640,
     "chapters": 27
    }
@@ -782,6 +782,7 @@
   ["jee-advanced/11/c11-sets#1", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-sets#2", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-sets#3", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/11/c11-sets?pyq", "jee-advanced", 11, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-relations-functions", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-relations-functions#1", "jee-advanced", 11, 80, 0, 0, 77, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-relations-functions#2", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
@@ -820,6 +821,7 @@
   ["jee-advanced/11/c11-straight-lines#1", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-straight-lines#2", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-straight-lines#3", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/11/c11-straight-lines?pyq", "jee-advanced", 11, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c11-conic-sections", "jee-advanced", 11, 80, 0, 0, 48, 0, 0, 0, 0, 31, true],
   ["jee-advanced/11/c11-conic-sections#1", "jee-advanced", 11, 80, 0, 0, 48, 0, 0, 0, 0, 32, true],
   ["jee-advanced/11/c11-conic-sections#2", "jee-advanced", 11, 80, 0, 0, 48, 0, 0, 0, 0, 31, true],
@@ -912,6 +914,7 @@
   ["jee-advanced/12/c11-sets#1", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-sets#2", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-sets#3", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/12/c11-sets?pyq", "jee-advanced", 12, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-relations-functions", "jee-advanced", 12, 80, 0, 0, 78, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-relations-functions#1", "jee-advanced", 12, 80, 0, 0, 77, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-relations-functions#2", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
@@ -950,6 +953,7 @@
   ["jee-advanced/12/c11-straight-lines#1", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-straight-lines#2", "jee-advanced", 12, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-straight-lines#3", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/12/c11-straight-lines?pyq", "jee-advanced", 12, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c11-conic-sections", "jee-advanced", 12, 80, 0, 0, 48, 0, 0, 0, 0, 30, true],
   ["jee-advanced/12/c11-conic-sections#1", "jee-advanced", 12, 80, 0, 0, 48, 0, 0, 0, 0, 30, true],
   ["jee-advanced/12/c11-conic-sections#2", "jee-advanced", 12, 80, 0, 0, 48, 0, 0, 0, 0, 31, true],
