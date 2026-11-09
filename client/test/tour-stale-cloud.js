@@ -313,6 +313,15 @@ export const flow = {
     await check('the slow working check for A was requested', !!evalA && aId > askedBeforeA, `checks ${stub.checked}`);
     await page.locator('.ctx-next').click();
     await questionChangesFrom(idA);
+    await settle();
+    // B must take written work: a multiple-choice question (Class 7 integers
+    // at D3) has no canvas, so Next again, still without a reload, bounded.
+    for (let moved = 0; moved < 8 && !await page.locator('.qpage .mode-tabs').count(); moved++) {
+      const skipped = await shownId();
+      await page.locator('.ctx-next').click();
+      await questionChangesFrom(skipped);
+      await settle();
+    }
     await check('the student is on question B', !!idA && await shownId() !== idA, 'still on A');
     await writeTwoLinesAndResolve();
     const settleA = Date.now() + 15000;
