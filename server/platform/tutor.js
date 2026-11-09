@@ -521,9 +521,38 @@ export function stepAfterLastReached(request) {
  * and a wrong final value are treated identically (G1).
  */
 export function looksLikeFinalValue(line) {
-  const s = String(line ?? '').replace(/\\[a-z]+/gi, ' ');
-  const rhs = s.split('=').pop();
-  return /[0-9०-९]/.test(rhs) && !/\p{L}/u.test(rhs);
+  return isFinalAnswerAttempt(line);
+}
+
+const FUNCTION_NAMES = /\\?(?:arcsin|arccos|arctan|sinh|cosh|tanh|sin|cos|tan|cot|sec|csc|cosec|log|ln|exp|sqrt|frac|dfrac|tfrac|lim|max|min|det|left|right|cdot|times|div|pi|theta|infty|to|mathrm|text|operatorname|displaystyle)\b/gi;
+
+/**
+ * Could this line pin an unknown to a value — a final-answer attempt? FAIL
+ * CLOSED: true unless the line plainly relates two or more free symbols.
+ * After function names, LaTeX commands and scientific-notation exponents are
+ * removed, a line with at most one distinct free letter ("11 = t",
+ * "0 = t - 11", "t = 1.1e1", "t = 11 + t - t", "= 16") pins a single unknown
+ * (or nothing) to a constant and is never judged; neither is a line that
+ * cannot be read at all. Decided by the line's symbols, never by whether it
+ * is right, so a right and a wrong value always get the same reply (G1).
+ * The cost: some legitimate one-variable working lines are not judged either.
+ */
+export function isFinalAnswerAttempt(line) {
+  const raw = String(line ?? '').trim();
+  if (!raw) return true;
+  if (raw.length > 400 || /[^\p{L}\p{N}\s=+\-−*/^().,'′{}\[\]|\\_<>≤≥√π²³·×÷!]/u.test(raw)) return true;
+  const s = raw
+    .replace(/(\d)(?:\.\d+)?[eE][+-]?\d+/g, '$1')          // 1.1e1 → a number
+    .replace(FUNCTION_NAMES, ' ')
+    .replace(/\\[a-z]+/gi, ' ');
+  const symbols = new Set((s.match(/\p{L}/gu) || []).map(c => c.toLowerCase()));
+  return symbols.size <= 1;
+}
+
+/** The lines the line check may judge: those BEFORE the first final-answer attempt. */
+export function judgeableLines(lines) {
+  const cut = lines.findIndex(isFinalAnswerAttempt);
+  return cut < 0 ? lines : lines.slice(0, cut);
 }
 
 /**
@@ -927,7 +956,10 @@ export function createTutorRouter(db, {
       // G1: a line that could be the final answer is never judged here. Decided
       // by form alone, so a right and a wrong final value get the same reply,
       // and nothing is run or charged for it. The answer is marked by Check.
-      if (lines.some(looksLikeFinalValue)) {
+      // Only the lines BEFORE the first final-answer attempt are judged; if none
+      // are left, the generic reply — identical for every value (G1).
+      const judged = judgeableLines(lines);
+      if (!judged.length) {
         return res.json({ lineCheck: { status: 'final', message: (LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en).final } });
       }
       // G1: two checks per issued question per account, held HERE, not only on
@@ -937,8 +969,8 @@ export function createTutorRouter(db, {
       if (capRow && Number(capRow.count) >= LINE_CHECKS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
         return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
       }
-      const evidence = await issued.workEvidence(lines);
-      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale);
+      const evidence = await issued.workEvidence(judged);
+      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, judged, evidence, locale);
       // G2: a check that did not run costs nothing — no cap, no allowance.
       if (reply.status === 'unchecked') return res.json({ lineCheck: reply });
       const cap = await consumeRateLimit(db, capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);

@@ -30,7 +30,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 import {
-  createTutorRouter, deterministicDiagnosis, diagnosisIssues, lineCheckReply, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
+  createTutorRouter, deterministicDiagnosis, diagnosisIssues, isFinalAnswerAttempt, judgeableLines, lineCheckReply, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
 } from '../platform/tutor.js';
 import {
   DIAGNOSIS_SCHEMA, MAX_TIMEOUT_MS, TutorProviderError, askTutorModel, providerBody, providerConfig, systemInstructions, userMessage
@@ -328,19 +328,35 @@ try {
     const sealed = { prompt: 'Solve $t - 4 = 7$.', steps: [{ h: 'Add four to both sides', d: '$t = 11$' }], answer: '11', hints: [] };
     await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
       ['acct-b', QID, JSON.stringify(sealed), 'seed', now, now + 86400000]);
-    const lcFull = async (lines) => {
-      const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-b` }, body: JSON.stringify({ context: 'practice', serverQuestionId: QID, lines }) });
+    const lcFull = async (lines, qid = QID) => {
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-b` }, body: JSON.stringify({ context: 'practice', serverQuestionId: qid, lines }) });
       return { status: r.status, json: await r.json().catch(() => null) };
     };
+    // The re-review's probes: every right/wrong pair must be byte-identical.
+    for (const [r, w] of [['11 = t', '12 = t'], ['0 = t - 11', '0 = t - 12'], ['t = 1.1e1', 't = 1.2e1'], ['t = 11 + t - t', 't = 12 + t - t'], ['t = 11', 't = 12']]) {
+      const a = await lcFull([r]);
+      const z = await lcFull([w]);
+      eq(JSON.stringify(a.json), JSON.stringify(z.json), `line check probe: "${r}" and "${w}" get identical replies`);
+      eq(a.json?.lineCheck?.status, 'final', `— "${r}" is a final-answer attempt, never judged`);
+    }
+    // Multi-line: a final attempt and everything after it are never judged.
+    const mRight = await lcFull(['t - u = 7 + 4 - u', 't = 11', 't + u = 11 + u']);
+    const mWrong = await lcFull(['t - u = 7 + 4 - u', 't = 12', 't + u = 12 + u']);
+    eq(JSON.stringify(mRight.json?.lineCheck?.message), JSON.stringify(mWrong.json?.lineCheck?.message), 'line check: multi-line work with a right and a wrong final value reads the same');
+    eq([isFinalAnswerAttempt('f\'(x) = 6x + 1'), isFinalAnswerAttempt('sin(A+B) = sinA cosB + cosA sinB'), isFinalAnswerAttempt('= 16'), isFinalAnswerAttempt('@@ junk')], [false, false, true, true],
+      'a relation of two symbols is judged; a value, a bare result or unreadable text fails closed');
+    eq(judgeableLines(['a + b = c', 't = 11', 'a = b']), ['a + b = c'], 'only the lines before the first final attempt are judged');
+    const QID2 = '22222222-2222-4222-8222-222222222222';
+    await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)", ['acct-b', QID2, JSON.stringify(sealed), 'seed', now, now + 86400000]);
     const right = await lcFull(['t - 4 = 7', 't = 11']);
     const wrong = await lcFull(['t - 4 = 7', 't = 12']);
     eq(JSON.stringify(right.json), JSON.stringify(wrong.json), 'line check: a RIGHT and a WRONG final value get byte-identical replies');
     eq(right.json?.lineCheck?.message, 'Press Check to mark your answer.', '— both told to press Check');
     ok(!/11|12|match|break/i.test(JSON.stringify(right.json)), '— with no value and no verdict');
     // Server-side cap: two checks per issued question per account; the third is refused.
-    const c1 = await lcFull(['7 + 4 = t']);
-    const c2 = await lcFull(['7 + 4 = t']);
-    const c3 = await lcFull(['7 + 4 = t']);
+    const c1 = await lcFull(['t - u = 7 + 4 - u'], QID2);
+    const c2 = await lcFull(['t - u = 7 + 4 - u'], QID2);
+    const c3 = await lcFull(['t - u = 7 + 4 - u'], QID2);
     eq([c1.status, c2.status, c3.status, c3.json?.error?.code], [200, 200, 409, 'LINE_CHECK_LIMIT'], 'line check: the server refuses a third check on the same question');
     ok(!('checksLeft' in (right.json?.lineCheck || {})), 'final-value replies spend no check');
   }
