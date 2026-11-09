@@ -156,6 +156,32 @@ export function analyseExam({ detail, indiaExam } = {}) {
       .map(c => ({ id: c.id, label: c.label, questions: c.questions, marks: c.marks, awarded: c.awarded, lost: c.lost, unattempted: c.unattempted, wrong: c.wrong, partial: c.partial, scorePct: c.scorePct }))
   };
   if (!timed) out.totals = { ...out.totals, ms: null };
+  // Where the marks went, for the result's headline: the marks lost on the
+  // paper, the sections that lost the most (with how many of those were left
+  // blank). Figures only, from the marked rows; no tier sentence.
+  // Negative marks are marks lost too (JEE), as in weakChapters.
+  const lostOf = r => Math.max(0, r.marks - r.awarded);
+  out.lost = {
+    marks: lostOf(total),
+    blankMarks: total.unattemptedMarks,
+    sections: sections.map(s => ({ id: s.id, label: s.label, lost: lostOf(s), blankMarks: s.unattemptedMarks }))
+      .filter(s => s.lost > 0)
+      .sort((a, b) => (b.lost - a.lost) || String(a.label).localeCompare(String(b.label)))
+      .slice(0, 2)
+  };
+  // The next step always names chapters when any mark was lost: the chapters
+  // under half marks first; when none is, the chapters that lost the most.
+  out.focus = out.weakChapters.length
+    ? { kind: 'weak', chapters: out.weakChapters }
+    : {
+        kind: 'mostLost',
+        chapters: [...chapters.values()].map(finish).map(c => ({ ...c, lost: lostOf(c) }))
+          .filter(c => c.marks > 0 && c.lost > 0 && c.id !== 'unlabelled')
+          .sort((a, b) => (b.lost - a.lost) || String(a.label).localeCompare(String(b.label)))
+          .slice(0, 3)
+          .map(c => ({ id: c.id, label: c.label, questions: c.questions, marks: c.marks, awarded: c.awarded, lost: c.lost, unattempted: c.unattempted, wrong: c.wrong, partial: c.partial, scorePct: c.scorePct }))
+      };
+  if (out.focus.kind === 'mostLost' && !out.focus.chapters.length) out.focus = { kind: 'none', chapters: [] };
 
   if (pattern === 'cbse') {
     out.stepMarks = {
