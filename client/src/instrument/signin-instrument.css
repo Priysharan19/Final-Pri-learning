@@ -82,7 +82,7 @@ color:#c7beff;white-space:nowrap;font:500 11px/1.6 var(--in-mono)
 }
 @media (max-width:699px){
 html.ui-instrument.skin-aurora .pri-auth{grid-template-columns:minmax(0,1fr);grid-template-rows:124px auto}
-.skin-aurora .pri-auth>.in-signin-plot{display:block;height:124px;min-height:124px;border-bottom:1px solid var(--in-edge)}
+html.ui-instrument.skin-aurora .pri-auth>.in-signin-plot{display:block;height:124px;min-height:124px;border-bottom:1px solid var(--in-edge)}
 html.ui-instrument.skin-aurora .pri-auth>.auth-col{
 min-height:calc(100dvh - 124px);padding:22px 20px 30px;
 align-items:center;justify-content:flex-start;box-shadow:none
@@ -101,7 +101,7 @@ align-items:center;justify-content:flex-start;box-shadow:none
 }
 @media (min-width:700px) and (max-width:1020px){
 html.ui-instrument.skin-aurora .pri-auth{grid-template-columns:minmax(0,.83fr) minmax(0,1.17fr)}
-.skin-aurora .pri-auth>.in-signin-plot{display:block;min-height:100%}
+html.ui-instrument.skin-aurora .pri-auth>.in-signin-plot{display:block;min-height:100%}
 .skin-aurora .pri-auth .pri-plot-viewport{
 inset:auto 0;top:50%;height:min(54vh,540px);transform:translateY(-50%)
 }
@@ -120,7 +120,7 @@ html.ui-instrument.skin-aurora .pri-auth>.auth-col{padding-inline:12px}
 }
 @media (forced-colors:active){
 html.ui-instrument.skin-aurora .pri-auth{display:block;color:CanvasText;background:Canvas}
-.skin-aurora .pri-auth>.in-signin-plot{display:none}
+html.ui-instrument.skin-aurora .pri-auth>.in-signin-plot{display:none}
 html.ui-instrument.skin-aurora .pri-auth>.auth-col{color:CanvasText;background:Canvas}
 }
 
