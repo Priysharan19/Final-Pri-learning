@@ -228,7 +228,11 @@ export function createOtpRouter(db, {
           await db.transaction(async () => {
             await db.run('UPDATE accounts SET email_verified_at = ?, password_hash = NULL, updated_at = ? WHERE id = ?', [now, now, existing.id]);
             await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, existing.id]);
-            await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND delivered_at IS NULL', [existing.id]);
+            // Only the unproven registrant's own mail goes: a guardian's
+            // withdrawal credential or consent link was asked for by someone
+            // else and must still reach them.
+            await db.run(`DELETE FROM auth_delivery_outbox WHERE account_id = ? AND delivered_at IS NULL
+              AND kind IN ('verify-email','reset-password')`, [existing.id]);
             await db.run(`UPDATE account_tokens SET consumed_at = ? WHERE account_id = ? AND consumed_at IS NULL
               AND purpose IN ('verify-email','reset-password')`, [now, existing.id]);
             await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
