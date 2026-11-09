@@ -14,7 +14,7 @@
 // TLS only: a plain-text IMAP port is refused.
 // ─────────────────────────────────────────────────────────────────────────────
 import { connect as tlsConnect } from 'node:tls';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,11 +23,17 @@ const KEYS = ['PRI_STAGING_INBOX_ADDRESS', 'PRI_STAGING_INBOX_IMAP_HOST', 'PRI_S
 
 /** { ok, reason, config }. `reason` never contains a value from the file. */
 export function loadInbox(file = INBOX_FILE) {
-  if (!existsSync(file)) return { ok: false, reason: 'the inbox file does not exist' };
-  const mode = statSync(file).mode & 0o777;
-  if (mode & 0o077) return { ok: false, reason: `the inbox file is mode ${mode.toString(8)}; it must be 600 (owner-only)` };
+  // One descriptor for the mode check and the read: the file checked is the file read.
+  let fd;
+  try { fd = openSync(file, 'r'); } catch (error) { if (error?.code === 'ENOENT') return { ok: false, reason: 'the inbox file does not exist' }; throw error; }
+  let text;
+  try {
+    const mode = fstatSync(fd).mode & 0o777;
+    if (mode & 0o077) return { ok: false, reason: `the inbox file is mode ${mode.toString(8)}; it must be 600 (owner-only)` };
+    text = readFileSync(fd, 'utf8');
+  } finally { closeSync(fd); }
   const config = {};
-  for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+  for (const line of text.split(/\r?\n/)) {
     const m = /^\s*([A-Z_]+)\s*=\s*(.*?)\s*$/.exec(line);
     if (!m || line.trim().startsWith('#')) continue;
     config[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');

@@ -194,7 +194,7 @@ ok(/PRI_GOOGLE_CLIENT_IDS is set/.test(preflight({ PRI_GOOGLE_CLIENT_IDS: 'id.ap
     'link mail is recognised by the subjects Pri sends');
   ok(decodeQuotedPrintable('caf=C3=A9 =\r\nau lait') === 'café au lait', 'quoted-printable soft breaks and UTF-8 bytes are decoded');
   const qpBody = `--b\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${(`Confirm here: ${LINK}`).replace(/=/g, '=3D').replace(/(.{70})/g, '$1=\r\n')}\r\n--b--`;
-  const b64Body = `--b\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from(`<p><a href="${LINK.replace('&', '&amp;')}">Confirm</a></p>`).toString('base64').replace(/(.{76})/g, '$1\r\n')}\r\n--b--`;
+  const b64Body = `--b\r\nContent-Transfer-Encoding: base64\r\n\r\n${Buffer.from(`<p><a href="${LINK.replace(/&/g, '&amp;')}">Confirm</a></p>`).toString('base64').replace(/(.{76})/g, '$1\r\n')}\r\n--b--`;
   ok(linkFromBody(`Confirm here:\n\n${LINK}\n`, 'guardian-consent', STAGING) === LINK && linkFromBody(qpBody, 'guardian-consent', STAGING) === LINK && linkFromBody(b64Body, 'guardian-consent', STAGING) === LINK,
     'the consent link is found in plain, quoted-printable and base64 (HTML) bodies');
   ok(linkFromBody(`Confirm here: ${LINK.replace(STAGING, 'https://evil.example')}`, 'guardian-consent', STAGING) === null && linkFromBody(`Confirm here: ${LINK}`, 'guardian-withdraw', STAGING) === null

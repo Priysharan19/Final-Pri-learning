@@ -22,12 +22,12 @@
 //   ~/Developer/.pri-fleet/heavy-slot.sh L8 node tools/staging-journey-local.mjs [--profile full] [--out <dir>] [--dist <client dist>]
 //
 // Needs a built client (client/dist). Evidence is written OUTSIDE the
-// repository (default: <tmp>/pri-staging-journey-local/<stamp>). There is no
+// repository (default: a fresh owner-only <tmp>/pri-staging-journey-local-XXXXXX/<stamp>). There is no
 // --origin: the only origin this entry reaches is the loopback server it
 // booted itself, and runJourney accepts that origin only with the platform
 // object in hand (assertJourneyOrigin).
 // ─────────────────────────────────────────────────────────────────────────────
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -48,7 +48,7 @@ export function parseLocalArgs(argv) {
     else throw new Error(`Unknown argument: ${flag} (the local entry takes no origin: it reaches only the server it boots)`);
   }
   if (!PROFILES[args.profile]) throw new Error(`--profile must be ${Object.keys(PROFILES).join(' or ')}`);
-  args.out = args.out || join(tmpdir(), 'pri-staging-journey-local', new Date().toISOString().replace(/[:.]/g, '-'));
+  args.out = args.out || join(mkdtempSync(join(tmpdir(), 'pri-staging-journey-local-')), new Date().toISOString().replace(/[:.]/g, '-'));
   if ((args.out + sep).startsWith(ROOT + sep)) throw new Error('refused: local evidence is written outside the repository (it is not staging evidence)');
   return args;
 }

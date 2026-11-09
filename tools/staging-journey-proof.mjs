@@ -33,7 +33,7 @@
 // train: --sha must equal what staging reports, or the run says so first.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createRequire } from 'node:module';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -136,7 +136,9 @@ export async function runJourney(args) {
   // this user, until every account it made is deleted: a crash or a bug must
   // never leave a staging account nobody can sign in to and delete.
   const password = `Pri-${randomBytes(9).toString('base64url')}-staging`;
-  const recovery = join(tmpdir(), 'pri-staging-journey', `${runTag}.json`);
+  // A fresh owner-only directory per run (mkdtemp, 0700): never a predictable path in the shared temp dir.
+  const recovery = join(mkdtempSync(join(tmpdir(), 'pri-staging-journey-')), `${runTag}.json`);
+  let recoveryWritten = false;
   // Code source, in order: a mailbox handed in (the local proof entry); L2's
   // staging test mailbox when /v1/ready says it is on (the default); the
   // owner's IMAP inbox file if it exists. Codes from the test mailbox prove
@@ -170,8 +172,8 @@ export async function runJourney(args) {
   const remember = () => {
     // A local run's accounts live in an in-process database that goes with it.
     if (!args.accounts || where === 'local') return;
-    mkdirSync(dirname(recovery), { recursive: true, mode: 0o700 });
-    writeFileSync(recovery, JSON.stringify({ origin: args.origin, password, accounts: run.created }, null, 2), { mode: 0o600 });
+    writeFileSync(recovery, JSON.stringify({ origin: args.origin, password, accounts: run.created }, null, 2), { mode: 0o600, flag: recoveryWritten ? 'w' : 'wx' });
+    recoveryWritten = true;
     chmodSync(recovery, 0o600);
   };
 
@@ -768,8 +770,8 @@ export async function runJourney(args) {
     for (const b of Object.values(browsers)) await b.close().catch(() => {});
     if (args.accounts) {
       if (run.notDeleted.length) run.recoveryFile = recovery;   // kept: `--cleanup <file>` finishes the job
-      else rmSync(recovery, { force: true });
-    }
+      else rmSync(dirname(recovery), { recursive: true, force: true });
+    } else rmSync(dirname(recovery), { recursive: true, force: true });
     // What this run spent against staging's limits, from its own evidence.
     const calls = run.steps.flatMap(st => st.evidence).filter(e => e.method === 'POST');
     run.usage = {
