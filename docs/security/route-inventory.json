@@ -123,7 +123,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; no id is taken from the request; another account's sessions are never touched",
+      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; the optional body accountId never selects what is revoked — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before anything is revoked (#481, as #521); another account's sessions are never touched",
       "rateLimits": [
         {
           "key": "logout-all",
