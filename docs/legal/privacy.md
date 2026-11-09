@@ -25,7 +25,8 @@ until it can be checked.
 **Your handwriting and photos are read online.** When you write an answer by
 hand or attach a photo, a picture of it is sent to our server, which passes it
 to OpenAI to read. This is on for a signed-in account and can be turned off, in
-which case you type your answers instead. A second setting, off unless you turn
+which case you type your answers instead. The first time, the app asks your
+permission, naming OpenAI, and nothing is sent until you agree. A second setting, off unless you turn
 it on, sends your working to the same service to find where a mistake is. Both
 are described below.
 
@@ -75,6 +76,13 @@ device can open a profile that has no password.
   and you can turn it off at any time in Settings → Handwriting, after which you
   type your answers; it stays off for an account under 18 until a parent or
   guardian has confirmed it, and it never runs without an account.
+
+  **Nothing is sent until you agree.** The first time a picture would be sent —
+  your handwriting, a photo of your working or a photo of a question — the app
+  asks your permission once, naming OpenAI. If you say no, reading is turned
+  off and you type your answers; if you turn it back on, you are asked again
+  before the next picture. Your answer is kept on your device, for that
+  profile, and the app asks again whenever what it tells you changes.
 
   When you write with a pencil or your finger, what is sent is an image drawn
   from your own stroke coordinates and nothing else: not the question, not the
@@ -188,7 +196,8 @@ Only the services needed to run the parts you use:
 - **Our hosting and database providers** (Railway; Supabase after the planned
   move), which store and process it for us — see "Where your data is stored".
 - **A handwriting reader** (OpenAI), while the handwriting-reading setting is
-  on, and only the image of your writing or the photo described above.
+  on and you have agreed to send it, and only the image of your writing or the
+  photo described above.
 - **A step checker** (the same provider), only while the optional working-check
   setting is on, and only the working and question described above.
 

@@ -61,6 +61,23 @@ export const PROMISES = Object.freeze([
         why: 'without it production only counts these accounts and the 30-day rule erases nothing (server/platform/childErasure.js); a guardian\'s own request is honoured either way'
       }
     ]
+  },
+  {
+    id: 'D17 permission before the first read or photo',
+    notice: 'docs/legal/privacy.md',
+    says: /Nothing\s+is\s+sent\s+until\s+you\s+agree/,
+    needs: [
+      {
+        what: 'the one-time prompt\'s versioned record and gate',
+        files: ['client/src/ink/readerPermission.js'],
+        code: /export\s+const\s+READER_PERMISSION_VERSION\s*=/
+      },
+      {
+        what: 'prompt text that names OpenAI',
+        files: ['client/src/i18n/strings.en.js'],
+        code: /'readerPermission\.leadInk':[^\n]*OpenAI/
+      }
+    ]
   }
 ]);
 
@@ -87,13 +104,17 @@ export async function legalPromiseSettings(readAt, promises = PROMISES) {
  */
 export async function legalPromiseGaps(readAt, promises = PROMISES) {
   const gaps = [];
+  const notices = new Map();
   for (const promise of promises) {
-    let notice;
-    try { notice = await readAt(promise.notice); }
-    catch (error) {
-      gaps.push(`${promise.notice} could not be read at this commit (${error?.message || error})`);
-      continue;
+    if (!notices.has(promise.notice)) {
+      try { notices.set(promise.notice, { text: await readAt(promise.notice) }); }
+      catch (error) {
+        notices.set(promise.notice, { error });
+        gaps.push(`${promise.notice} could not be read at this commit (${error?.message || error})`);
+      }
     }
+    const { text: notice } = notices.get(promise.notice);
+    if (notice === undefined) continue;
     if (!promise.says.test(notice)) continue;
     for (const need of promise.needs) {
       const sources = await Promise.all(need.files.map(file => Promise.resolve(readAt(file)).catch(() => '')));
