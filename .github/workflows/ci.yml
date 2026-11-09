@@ -190,6 +190,10 @@ jobs:
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
           # #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic
           # form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks.
+          # Distinct questions per class (L5): measured against the owner's 10^8-per-class target, NOT met today.
+          # The pin is the measurement; widening generators moves it and the report together.
+          grep -Fq 'DISTINCT QUESTIONS REPORT: PASS' suites.log
+          grep -Fq 'DISTINCT QUESTIONS: Class 7 1.38×10^7, Class 8 8.20×10^6, Class 9 6.95×10^4, Class 10 1.15×10^7, Class 11 1.19×10^7, Class 12 9.01×10^6 — 0/6 classes at the 10^8 target' suites.log
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
