@@ -13,16 +13,22 @@ action per screen (ivory at night, graphite by day) and one signal orange for "t
 
 ## Owner decisions (2026-10-20)
 
-- Ships behind `PRI_FEATURE_INSTRUMENT` (build-time, `client/src/platform/features.js`):
-  **on in staging, off in production** until v1.0 clears App Store review; then the owner flips it.
+- ~~Ships behind `PRI_FEATURE_INSTRUMENT`, on in staging, off in production.~~ Superseded by
+  V1 decision D7 (1 Nov 2026): the Instrument is the **one student interface on every build**
+  (web, iOS, Android), chosen once in `client/interface.config.mjs`; the build variable is
+  retired and ignored. D8: it wears its plain tokens (this document) unless and until the Aurora
+  skin passes contrast, reduced-motion and ink-alignment gates. `client/test/interface-decisions-check.mjs`
+  holds the setting, the three build paths and the bundles together.
 - Mark labels use **CBSE marking-scheme wording** (step marks, ½-mark steps), never B1/M1/A1.
 - The theme **follows the device** by default; Settings and the command bar can fix it.
 
 ## How it is built
 
-- `html.ui-instrument` (set by `App.jsx` only when the flag is on) remaps the legacy token
-  names (`--page`, `--surface`, `--ink`, `--accent`, `--font`…) in `client/src/instrument/instrument.css`,
-  so every existing screen takes the new material without a markup change. Production is untouched.
+- `html.ui-instrument` (set by `App.jsx`) remaps the legacy token names (`--page`, `--surface`,
+  `--ink`, `--accent`, `--font`…) in `client/src/instrument/instrument.css`, so every existing screen
+  takes the material without a markup change. `instrument.css` and the Map, Report and Scripts
+  sheets are part of the boot stylesheet (`main.jsx`), so a tab opened for the first time offline
+  fetches no stylesheet (#658).
 - New surfaces live in `client/src/instrument/`: `InstrumentBar` (tabs, ⌘K field, online state),
   `CommandBar` (⌘K dialog), `IndexPage` (thumb-indexed syllabus with a chapter plate) and
   `ChapterScope` (the chapter's mathematics on a graduated canvas, decorative for marks).

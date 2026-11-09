@@ -1,0 +1,126 @@
+// Pri Learning · distinct-question estimator (India curriculum)
+//
+// How many DIFFERENT questions can a class actually serve? Each generator cell
+// (generator × difficulty, as the live covers claim it) is drawn N times with
+// fixed seeds. Two draws count as the same question when they have the same
+// canonical key: the numbers the prompt shows, in order, plus the keyed answer
+// (and MCQ options). A re-wording with the same numbers is therefore NOT a new
+// question, and neither is the same numbers with a shuffled sentence.
+//
+// The estimate per cell comes from collisions (the birthday estimator):
+//   with collisions             →  Chao1 (bias-corrected): S + f1(f1−1) / (2(f2+1)),
+//                                  S distinct keys seen, f1 seen once, f2 seen twice —
+//                                  never below S, and close to S once the cell saturates
+//   0 collisions                →  N ≥ n² / 6  (95% lower bound: P(no collision) ≈ e^(−n²/2N) ≥ 0.05)
+// A cell with no collision is reported as a LOWER bound ("≥"); its true size may
+// be far larger. The birthday estimate is the effective size under the
+// generator's own sampling, so a generator that serves a few forms far more
+// often than others scores lower than its raw parameter count — which is what a
+// student experiences. Class totals add their cells (cells of one class share no
+// generator, so the sum does not double count).
+//
+// Target (owner, Nov 2026): at least 10^8 distinct questions per class. This
+// tool MEASURES against that target; it does not claim it is met.
+//
+//   node tools/distinct-questions.mjs            # write docs/content/distinct-questions.md
+//   node tools/distinct-questions.mjs --check    # fail if the committed report is stale
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const REPORT = `${ROOT}docs/content/distinct-questions.md`;
+const DRAWS = 2000;
+// A cell with no collision in DRAWS is redrawn ESCALATE times: its 95% lower
+// bound n²/6 rises from 6.7×10^5 to 1.0×10^8, so a cell is never under-reported
+// merely because the first sample was too small to see a repeat.
+const ESCALATE = 25000;
+const TARGET = 1e8;
+const THIN = 1e4;
+
+const { IN_CURRICULUM, IN_CHAPTERS } = await import('../client/src/engine/curriculum-in.js');
+const { generateQuestion, loadAllBanks } = await import('../client/src/engine/generators/index.js');
+await loadAllBanks();
+
+/** Canonical identity of a question: what changes between two genuinely different items. */
+export function canonicalKey(q) {
+  const nums = (String(q.prompt).match(/-?\d+(?:\.\d+)?/g) || []).join(',');
+  const a = q.answer || {};
+  const answer = JSON.stringify(a.value ?? a.correctIndex ?? a.points ?? a.set ?? a.expr ?? a);
+  const options = (q.mcqOptions || []).map(o => String(o).replace(/\s+/g, '')).join('¦');
+  return `${nums}|${answer}|${options}`;
+}
+
+/** Deterministic, well-spread seeds. */
+const seedAt = i => Number((BigInt(i) * 2654435761n) % 4294967291n);
+
+function measureCell(gen, diff, draws = DRAWS) {
+  const keys = new Map();
+  let drawn = 0, failed = 0;
+  for (let i = 1; i <= draws; i++) {
+    try { const k = canonicalKey(generateQuestion(gen, diff, seedAt(i))); keys.set(k, (keys.get(k) || 0) + 1); drawn += 1; } catch { failed += 1; }
+  }
+  const collisions = drawn - keys.size;
+  const lowerBound = collisions === 0;
+  let f1 = 0, f2 = 0;
+  for (const n of keys.values()) { if (n === 1) f1 += 1; else if (n === 2) f2 += 1; }
+  const estimate = lowerBound ? (drawn * drawn) / 6 : keys.size + (f1 * (f1 - 1)) / (2 * (f2 + 1));
+  const cell = { gen, diff, drawn, failed, distinctSeen: keys.size, collisions, lowerBound, estimate };
+  return lowerBound && draws === DRAWS ? measureCell(gen, diff, ESCALATE) : cell;
+}
+
+const fmt = n => (n >= 1e4 ? n.toExponential(2).replace('e+', '×10^') : String(Math.round(n)));
+/** A class total that includes any lower-bound cell is itself a lower bound. */
+const fmtTotal = c => `${c.bounded ? '≥ ' : ''}${fmt(c.total)}`;
+
+const classes = [];
+for (const group of IN_CURRICULUM) {
+  const label = group.grade ? `Class ${group.grade}` : String(group.label || group.id);
+  const cells = [];
+  const seen = new Set();
+  for (const ch of group.chapters) {
+    const chapter = IN_CHAPTERS.find(x => x.id === ch.id) || ch;
+    for (const cover of chapter.covers) {
+      for (const d of cover.diff) {
+        const k = `${cover.gen}@${d}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        cells.push({ chapter: chapter.id, ...measureCell(cover.gen, d) });
+      }
+    }
+  }
+  const total = cells.reduce((n, c) => n + c.estimate, 0);
+  classes.push({ label, cells, total, bounded: cells.filter(c => c.lowerBound).length, thin: cells.filter(c => c.estimate < THIN) });
+}
+
+const lines = [
+  '# Distinct questions per class (India curriculum)',
+  '',
+  `Generated by \`node tools/distinct-questions.mjs\`: ${DRAWS} seeded draws per generator cell, and ${ESCALATE} for any cell with no repeat in the first ${DRAWS}; two draws are the same question when the prompt's numbers and the keyed answer (and MCQ options) are the same. Per cell, the bias-corrected Chao1 estimate S + f1(f1−1)/(2(f2+1)) from the keys seen once (f1) and twice (f2); a cell with no repeat even in ${ESCALATE} draws is a 95% lower bound n²/6 (1.0×10^8), and a class total that includes such a cell is a LOWER BOUND, marked ≥. **Synthetic sampling estimate — not an enumeration, and not evidence that any question is pitched well.**`,
+  '',
+  `Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status below is measured, not claimed.`,
+  '',
+  '| Class | Cells | Distinct questions (≥ = lower bound) | Cells at lower bound (≥) | Cells under 10^4 | Target 10^8 |',
+  '|---|---|---|---|---|---|'
+];
+for (const c of classes) lines.push(`| ${c.label} | ${c.cells.length} | ${fmtTotal(c)} | ${c.bounded} | ${c.thin.length} | ${c.total >= TARGET ? 'met' : 'not met'} |`);
+lines.push('', 'A class can clear 10^8 through a few very large cells while many of its cells stay thin; the thin-cell count above is the breadth measure, and both are reported so neither hides the other.');
+lines.push('', '## Thinnest cells per class', '', 'Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges, multi-step compositions — never padding).', '');
+for (const c of classes) {
+  lines.push(`### ${c.label}`, '');
+  const thin = [...c.thin].sort((a, b) => a.estimate - b.estimate);
+  if (!thin.length) { lines.push('None.', ''); continue; }
+  lines.push('| Generator | D | Draws | Distinct seen | Estimate |', '|---|---|---|---|---|');
+  for (const t of thin) lines.push(`| \`${t.gen}\` | ${t.diff} | ${t.drawn} | ${t.distinctSeen} | ${fmt(t.estimate)} |`);
+  lines.push('');
+}
+const report = lines.join('\n');
+const summary = `DISTINCT QUESTIONS: ${classes.map(c => `${c.label} ${fmtTotal(c)}`).join(', ')} — ${classes.filter(c => c.total >= TARGET).length}/${classes.length} classes at the 10^8 target [SYNTHETIC SAMPLING ESTIMATE]`;
+
+if (process.argv.includes('--check')) {
+  const committed = readFileSync(REPORT, 'utf8');
+  if (committed !== report) { console.error(`${summary}\nDISTINCT QUESTIONS REPORT: FAIL — docs/content/distinct-questions.md is stale; run node tools/distinct-questions.mjs`); process.exit(1); }
+  console.log(`${summary}\nDISTINCT QUESTIONS REPORT: PASS — committed report matches`);
+} else {
+  writeFileSync(REPORT, report);
+  console.log(summary);
+}

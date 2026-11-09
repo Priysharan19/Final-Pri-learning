@@ -1,0 +1,45 @@
+/* Insights: the readiness estimate and Mistake DNA. Shared instrument tokens
+   only (instrument.css, theme.css): hairlines, ink, one chapter hue. No glow,
+   gradient, shadow or animation — a calm, ruled instrument page. */
+.ins-page { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+.ins-page h1 { margin-bottom: 4px; }
+.ins-sheet { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--in-edge); }
+.ins-sheet h3.sc-label { margin-top: 20px; }
+.ins-honest { padding: 12px 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; }
+.ins-figure { margin: 8px 0 2px; font-variant-numeric: tabular-nums; color: var(--in-ink); }
+.ins-figure b { font-size: 2rem; font-weight: 600; letter-spacing: -0.01em; }
+.ins-figure span { color: var(--in-l2); margin-left: 2px; }
+.ins-sentence { margin: 6px 0 12px; color: var(--in-ink); }
+.ins-coverage-track { height: 6px; border-radius: 3px; background: var(--in-edge); overflow: hidden; }
+.ins-coverage-track i { display: block; height: 100%; background: var(--in-ink); }
+.ins-coverage .in-note { margin-top: 6px; font-variant-numeric: tabular-nums; }
+.ins-premium { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; }
+.ins-premium a { display: inline-flex; align-items: center; min-height: 44px; }
+
+.ins-trend { margin: 8px 0 0; }
+.ins-trend svg { display: block; width: 100%; height: 150px; overflow: visible; }
+.ins-grid { stroke: var(--in-edge); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ins-axis { fill: var(--in-l2); font-size: 9px; font-variant-numeric: tabular-nums; }
+.ins-band { fill: var(--in-c1); fill-opacity: 0.18; stroke: none; }
+.ins-line { fill: none; stroke: var(--in-ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ins-dot { fill: var(--in-ink); }
+.ins-tick { stroke: var(--in-l2); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+.ins-list, .ins-habits { list-style: none; padding: 0; margin: 6px 0 0; }
+.ins-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--in-edge); }
+.ins-list b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--in-l2); }
+.ins-habit { padding: 12px 0; border-bottom: 1px solid var(--in-edge); }
+.ins-habit-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.ins-habit-name { color: var(--in-ink); }
+.ins-habit-head b { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ins-meter { height: 4px; margin: 8px 0 6px; border-radius: 2px; background: var(--in-edge); overflow: hidden; }
+.ins-meter i { display: block; height: 100%; background: var(--in-ink); }
+
+.ins-matrix-wrap { margin-top: 18px; overflow-x: auto; }
+.ins-matrix { border-collapse: collapse; font-size: 0.85em; }
+.ins-matrix caption { text-align: left; margin-bottom: 6px; }
+.ins-matrix th, .ins-matrix td { padding: 6px 8px; border-bottom: 1px solid var(--in-edge); text-align: center; }
+.ins-matrix th[scope=row] { text-align: left; font-weight: 400; color: var(--in-ink); }
+.ins-matrix thead th { font-weight: 500; color: var(--in-l2); }
+.ins-cell { display: inline-block; width: 10px; height: 10px; border: 1px solid var(--in-edge-2); border-radius: 2px; }
+.ins-cell.on { background: var(--in-ink); border-color: var(--in-ink); }
