@@ -210,7 +210,7 @@ jobs:
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406703 wrong answers marked correct across 18072 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
-          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29829 right answers over 11282 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 30679 right answers over 11740 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
