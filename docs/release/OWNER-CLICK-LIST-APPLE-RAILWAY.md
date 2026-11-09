@@ -38,8 +38,8 @@ deploy **with or after** the fast-forward of `deploy/production`, never before.
 **B1 — before the window: what must not be on production.** Open Railway → project
 `profound-spontaneity` → environment `production` → service `Final-Pri-learning` → **Variables**.
 Delete every one of these that is present:
-`PRI_FEATURE_TUTOR`, every `PRI_TUTOR_*`, `PRI_METHOD_MARKS`, `PRI_METHOD_MARKS_EXAMINER_RESULT`,
-`PRI_PARENT_REPORT`, `PRI_PARENT_REPORT_EMAILS`, `PRI_SMS_PROVIDER`, `PRI_GOOGLE_CLIENT_IDS`,
+every `PRI_TUTOR_*` except the two allowances in B2, `PRI_FEATURE_LINE_CHECK`, `PRI_METHOD_MARKS`,
+`PRI_METHOD_MARKS_EXAMINER_RESULT`, `PRI_PARENT_REPORT_EMAILS`, `PRI_SMS_PROVIDER`, `PRI_GOOGLE_CLIENT_IDS`,
 `PRI_GOOGLE_WEB_CLIENT_ID`, `PRI_APPLE_CLIENT_IDS`, `PRI_APPLE_WEB_CLIENT_ID`, and the stale manual
 release identity `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` (`production-cutover-checklist.md`).
 `PRI_APPLE_ALLOW_SANDBOX` is deleted too, unless note 8 chose option (a) for the review window.
@@ -56,6 +56,11 @@ PRI_PUBLIC_ORIGIN=https://app.prilearning.com
 PRI_TRUSTED_PROXY_HOPS=<the value staging proved PER-CLIENT (#653)>
 PRI_PAID_CALLS_PER_HOUR=120
 PRI_PAID_CALLS_PER_DAY=300
+PRI_FEATURE_TUTOR=1
+PRI_TUTOR_CALLS_PER_ACCOUNT_DAY=40
+PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM=120
+PRI_PAST_PAPERS=1
+PRI_PARENT_REPORT=on
 PRI_AUTH_EMAIL_PROVIDER=resend
 PRI_AUTH_EMAIL_FROM=Pri Learning <verify@mail.prilearning.com>
 PRI_RESEND_API_KEY=<the production Resend key>
@@ -79,6 +84,12 @@ confirmed D18 with counsel's period. The other production variables stay as
 handwriting key and the rest). The staging test mailbox needs nothing here: it turns itself on only
 in the environment named `staging`.
 
+The tutor, past papers and the parent report are on at GO (owner decision, 10 Nov 2026), so the
+web and iOS builds that ship must also be made with `PRI_FEATURE_TUTOR=1`,
+`PRI_FEATURE_PAST_PAPERS=1` and `PRI_FEATURE_PARENT_REPORT=1`. `PRI_PARENT_REPORT_EMAILS` and
+`PRI_FEATURE_LINE_CHECK` stay unset. In the OpenAI project of the production key, set the
+US$100 monthly limit and an email alert at 80% (US$80) (`production-config-v1.md` note 4).
+
 **B3 — the domain.** On the **staging** service, open Settings → Networking and remove
 `app.prilearning.com`. On the **production** service, open Settings → Networking → *Custom Domain*
 and add `app.prilearning.com`. If Railway shows a new DNS target, change the record at your
@@ -90,4 +101,4 @@ release with the staged variables. If the push does not start a deployment (as o
 Deployments and deploy that exact commit yourself.
 
 **B5 — prove it.** Run `production-config-v1.md` §2, which must print
-`DEPLOYMENT VERIFIED: PASS — 28/28`, then do its human checks H2–H9 and fill its §4.
+`DEPLOYMENT VERIFIED: PASS — 30/30`, then do its human checks H1–H13 and fill its §4.
