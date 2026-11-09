@@ -478,7 +478,7 @@ export const flow = {
           if (chromium) {
             // Only the press below is timed, not the Tab walk above it.
             await page.evaluate(() => { window.__priSlowInput = []; });
-            const safe = page.locator('[role=tab], .mode-tab, .pill-opt').first();
+            const safe = page.locator('[role=tab], .mode-tab, .pill-opt, button.in-flt[aria-pressed]').first();
             if (!(await safe.count())) { note(`${tag}: no tab or choice control to time`); continue; }
             await safe.click({ timeout: 3000 });
             await page.waitForTimeout(400);
