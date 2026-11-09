@@ -12,6 +12,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
+import { checkProof } from './proofSteps.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -42,6 +43,8 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  // A proof is never marked automatically: its algebra is checked as evidence for a teacher (proofSteps.js).
+  if (question?.answerType === 'proof') return checkProof(question, rawInput);
   const long = answerTooLong(rawInput);
   if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
