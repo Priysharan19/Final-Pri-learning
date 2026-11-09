@@ -28,6 +28,7 @@ a ticket). Each decision (`D4`, `D12`, …) is the owner default of
 | 11 | Staging test mailbox off | nothing to set. L2's test mailbox for the reserved `@e2e.prilearning.test` addresses turns itself on only where `RAILWAY_ENVIRONMENT_NAME` is `staging`; the production environment is named `production` | the Director's 9 Nov addition: the staging journeys' inbox never exists in production | L2's change (not yet on `main`) | probe `test-mailbox-off` (`/v1/ready` `checks.testMailbox.state = off`). Until L2's change lands the field is absent and the probe accepts that (`orAbsent`); once it exists, anything but `off` fails | **no — lands with L2's test-mailbox PR** |
 | 12 | Past papers **on** | `PRI_PAST_PAPERS=1` on the production `/v1` service; client builds made **with** `PRI_FEATURE_PAST_PAPERS=1` | Owner decision, 10 Nov 2026 (replaces D23's "off until a rights opinion exists") | `client/src/engine/pastPapers.js` (the bundled engine reads `PRI_PAST_PAPERS` on the server and `__PRI_FEATURE_PAST_PAPERS__` in the client); `client/vite.config.js` (`features.json` `pastPapers`) | probe `web-build-past-papers-on` (`/features.json` → `pastPapers: true`); the server switch has no public read: §3 check H12 | yes |
 | 13 | Line check **off** | `PRI_FEATURE_LINE_CHECK` **unset** | Owner decision, 10 Nov 2026 ("Check this line so far" stays off) | `server/platform/tutor.js` `lineCheckFeatureEnabled` (anything but `1` refuses the line-check route) | it is a POST under the tutor, so no anonymous GET can see it: §3 check H13 | yes |
+| 14 | Step coach **off** | `PRI_FEATURE_STEP_COACH` **unset**, on the server and in every client build | Owner decision, 10 Nov 2026 (relayed by the Director) | no code on `main` reads it yet (10 Nov 2026); listed so the switch is off from the first release that adds it | §3 check H13 | n/a (no reader yet) |
 
 ### Notes
 
@@ -160,7 +161,7 @@ into a record.
 | H8 | 8 | App Store Connect: both products priced at ₹199 / ₹1,499 in India; App Store Server Notifications v2 production and sandbox URLs `https://app.prilearning.com/v1/billing/webhook/apple`, then *Request a Test Notification* (`docs/billing/storekit-certification.md` step 3); note 8 decided | test notification logged and stored; the note 8 choice recorded below |
 | H9 | 9 | In the smoke registration's email (H7), read the From header and the DKIM signature's `d=` | From `verify@mail.prilearning.com`; DKIM passes for `mail.prilearning.com` (`tools/acceptance/auth-email.mjs` checks the From with `PRI_ACCEPT_EXPECT_SENDER`) |
 | H12 | 12 | Read `PRI_PAST_PAPERS` | `1` |
-| H13 | 13 | Confirm `PRI_FEATURE_LINE_CHECK` is absent | absent |
+| H13 | 13, 14 | Confirm `PRI_FEATURE_LINE_CHECK` and `PRI_FEATURE_STEP_COACH` are absent | both absent |
 
 ## 4. Record (filled by the owner at the cutover window)
 
@@ -178,6 +179,6 @@ into a record.
 | H8 App Store products, notifications, note 8 decision | | | | |
 | H9 sender From and DKIM | | | | |
 | H12 past papers server switch | | | | |
-| H13 line check absent | | | | |
+| H13 line check and step coach absent | | | | |
 
 An agent never fills this table: every row is a person's observation of production.

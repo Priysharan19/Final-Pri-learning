@@ -199,7 +199,7 @@ try {
   ok(/verify@mail\.prilearning\.com/.test(env.PRI_AUTH_EMAIL_FROM || ''), 'and the auth email sender of row 9');
   for (const secret of ['PRI_RESEND_API_KEY', 'PRI_METRICS_TOKEN', 'PRI_DATABASE_URL', 'PRI_APPLE_APP_ID', 'PRI_TRUSTED_PROXY_HOPS']) ok(/^<[^>]+>$/.test(env[secret] || ''), `${secret} is a <placeholder> the owner fills, never a value`);
   eq([env.PRI_FEATURE_TUTOR, env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM, env.PRI_PAST_PAPERS, env.PRI_PARENT_REPORT], ['1', '40', '120', '1', 'on'], 'owner 10 Nov: tutor on with its 40 / 120 daily allowances, past papers on, parent report on');
-  const mustBeUnset = ['PRI_FEATURE_LINE_CHECK', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_PARENT_REPORT_EMAILS', 'PRI_SMS_PROVIDER', 'PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_ALLOW_SANDBOX'];
+  const mustBeUnset = ['PRI_FEATURE_LINE_CHECK', 'PRI_FEATURE_STEP_COACH', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT', 'PRI_PARENT_REPORT_EMAILS', 'PRI_SMS_PROVIDER', 'PRI_GOOGLE_CLIENT_IDS', 'PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS', 'PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_ALLOW_SANDBOX'];
   ok(mustBeUnset.every(name => !(name in env)) && Object.keys(env).filter(name => name.startsWith('PRI_TUTOR_')).sort().join() === 'PRI_TUTOR_CALLS_PER_ACCOUNT_DAY,PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM', 'the pasted block sets none of the variables the manifest requires unset');
   ok(mustBeUnset.every(name => clickList.split('**B2')[0].includes(`\`${name}\``)), 'and step B1 names every one of them for deletion');
 

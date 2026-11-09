@@ -38,7 +38,7 @@ deploy **with or after** the fast-forward of `deploy/production`, never before.
 **B1 — before the window: what must not be on production.** Open Railway → project
 `profound-spontaneity` → environment `production` → service `Final-Pri-learning` → **Variables**.
 Delete every one of these that is present:
-every `PRI_TUTOR_*` except the two allowances in B2, `PRI_FEATURE_LINE_CHECK`, `PRI_METHOD_MARKS`,
+every `PRI_TUTOR_*` except the two allowances in B2, `PRI_FEATURE_LINE_CHECK`, `PRI_FEATURE_STEP_COACH`, `PRI_METHOD_MARKS`,
 `PRI_METHOD_MARKS_EXAMINER_RESULT`, `PRI_PARENT_REPORT_EMAILS`, `PRI_SMS_PROVIDER`, `PRI_GOOGLE_CLIENT_IDS`,
 `PRI_GOOGLE_WEB_CLIENT_ID`, `PRI_APPLE_CLIENT_IDS`, `PRI_APPLE_WEB_CLIENT_ID`, and the stale manual
 release identity `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` (`production-cutover-checklist.md`).
@@ -87,7 +87,8 @@ in the environment named `staging`.
 The tutor, past papers and the parent report are on at GO (owner decision, 10 Nov 2026), so the
 web and iOS builds that ship must also be made with `PRI_FEATURE_TUTOR=1`,
 `PRI_FEATURE_PAST_PAPERS=1` and `PRI_FEATURE_PARENT_REPORT=1`. `PRI_PARENT_REPORT_EMAILS` and
-`PRI_FEATURE_LINE_CHECK` stay unset. In the OpenAI project of the production key, set the
+`PRI_FEATURE_LINE_CHECK` and `PRI_FEATURE_STEP_COACH` stay unset, and no build sets them. An iOS
+build with the tutor on can ship only after L3's #829 (the iPad bundle features check) is on `main`. In the OpenAI project of the production key, set the
 US$100 monthly limit and an email alert at 80% (US$80) (`production-config-v1.md` note 4).
 
 **B3 — the domain.** On the **staging** service, open Settings → Networking and remove
