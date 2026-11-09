@@ -606,7 +606,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 69/69 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 72/72 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -619,6 +619,11 @@ jobs:
           grep -Fq '✓ guardian-consent-coverage-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seen-aware-pick-check.mjs' platform-postgres.log
           grep -Fq '✓ learning-state-identity-check.mjs' platform-postgres.log
+          # 61 → 64: sign-in (the one-time-code card contract and lifecycle) and the
+          # guardian-consent state machine and gate, on Postgres as well as SQLite.
+          grep -Fq '✓ otp-sign-in-check.mjs' platform-postgres.log
+          grep -Fq '✓ otp-lifecycle-check.mjs' platform-postgres.log
+          grep -Fq '✓ guardian-consent-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

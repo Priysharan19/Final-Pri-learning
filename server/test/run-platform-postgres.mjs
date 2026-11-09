@@ -93,6 +93,14 @@ export const ENGINE_SUITES = [
   'export-reauth-check.mjs',
   'password-set-check.mjs',
   'session-alerts-check.mjs',
+  // Sign-in and a guardian's consent, proved on Postgres and not only on
+  // SQLite: the one-time-code card contract and lifecycle (expiry, single use,
+  // the attempt ceiling, no enumeration, the pre-registration takeover rule,
+  // a parent's approval and withdrawal by code) and the consent state machine
+  // and gate, each as pri_server under RLS.
+  'otp-sign-in-check.mjs',
+  'otp-lifecycle-check.mjs',
+  'guardian-consent-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   // A parent who approves by email code is sent the long-lived withdrawal
   // credential, as the link path does (otp.js /guardian/approve).
