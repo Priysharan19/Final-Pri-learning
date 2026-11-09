@@ -87,8 +87,25 @@ function cleanNodes(parent, depth, budget) {
 
 // ── Node path: no DOM, so the same allowlist is applied by scanning ──────────
 
-const TAG = /<\/?([a-zA-Z][^\s/>]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
-const ATTR = /([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
+// Each scan must take time linear in the markup, with no DOMParser to lean on
+// (Node, a Web Worker). Three things make TAG linear:
+//  · The alternatives inside a tag are disjoint: a quoted run, or one character
+//    that is none of '<', '>' or a quote. With `[^>]` a quote could also be read
+//    as a plain character, and an unterminated `<A""""…` backtracked
+//    exponentially (47 characters held the scan for 25 s; CodeQL js/redos).
+//  · The name is maximal: the lookahead lets it end only where a name character
+//    cannot follow, so a failed tag never retries with a shorter name read as
+//    attributes. Before, one long unterminated tag was quadratic.
+//  · '<' belongs to neither the name nor a plain attribute character, so a tag
+//    attempt that fails stops at the next '<' (outside quotes) instead of
+//    running on to the end. Before, '<a'.repeat(k) was cubic: 4,000 characters
+//    held it for over 20 s.
+// A tag with an unbalanced quote, or a bare '<' inside it, no longer matches and
+// is escaped as text, which is the safe reading.
+const TAG = /<\/?([a-zA-Z][^\s/<>"'=]*)(?![^\s/<>"'=])((?:"[^"]*"|'[^']*'|[^<>"'])*)>/g;
+// An attribute name starts only where a name character does not precede it, so
+// a long run with no '=' is tried once, not once per character (quadratic).
+const ATTR = /(?<![-\w:.])([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 
 function cleanTag(whole, name, rawAttrs) {
   const tag = String(name).toLowerCase();
@@ -101,9 +118,26 @@ function cleanTag(whole, name, rawAttrs) {
   return `<${tag}${attrs}${/\/\s*$/.test(rawAttrs) ? '/' : ''}>`;
 }
 
+// Removes exactly what /<!--[\s\S]*?-->/g removes, in one pass. The regex
+// rescanned to the end from every '<!--' that never closes, so a run of them
+// was quadratic. Once one opener has no '-->' after it, no later opener can
+// have one either, and the rest is left for TAG to escape as text.
+function stripComments(src) {
+  let out = '';
+  let from = 0;
+  for (;;) {
+    const open = src.indexOf('<!--', from);
+    if (open < 0) break;
+    const close = src.indexOf('-->', open + 4);
+    if (close < 0) break;
+    out += src.slice(from, open);
+    from = close + 3;
+  }
+  return out + src.slice(from);
+}
+
 function cleanMarkup(src) {
-  const stripped = src
-    .replace(/<!--[\s\S]*?-->/g, '')
+  const stripped = stripComments(src)
     .replace(/<\s*(script|style|foreignobject|iframe|object|embed)\b[\s\S]*?(?:<\s*\/\s*\1\s*>|$)/gi, '');
   let out = '';
   let last = 0;
