@@ -94,6 +94,7 @@ eq([a2.timed, a2.sections[0].ms, a2.totals.ms], [false, null, null], 'JEE Main: 
 // chapters: calc 16/16, vec −1/8 (lost 9), prob −1/4 (lost 5)
 eq(a2.weakChapters.map(c => [c.id, c.lost]), [['vec', 9], ['prob', 5]], 'JEE Main: weak chapters count negative marks as marks lost');
 eq(a2.partialMarking, undefined, 'JEE Main: no partial-marking section');
+eq([a2.lost.marks, a2.lost.sections.map(s => [s.id, s.lost])], [14, [['A', 9], ['B', 5]]], 'JEE Main: a negative mark counts as a mark lost in the headline (28 − 14)');
 
 // ── JEE Advanced ─────────────────────────────────────────────────────────────
 // 1 (single +3/−1): 3, −1

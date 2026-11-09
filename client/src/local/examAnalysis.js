@@ -159,7 +159,8 @@ export function analyseExam({ detail, indiaExam } = {}) {
   // Where the marks went, for the result's headline: the marks lost on the
   // paper, the sections that lost the most (with how many of those were left
   // blank). Figures only, from the marked rows; no tier sentence.
-  const lostOf = r => Math.max(0, r.marks - Math.max(0, r.awarded));
+  // Negative marks are marks lost too (JEE), as in weakChapters.
+  const lostOf = r => Math.max(0, r.marks - r.awarded);
   out.lost = {
     marks: lostOf(total),
     blankMarks: total.unattemptedMarks,
