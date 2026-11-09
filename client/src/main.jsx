@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import './fonts.css';
 import './theme.css';
 import './theme-state.css';
+import './instrument/signin-base.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
 import AccountAction from './pages/AccountAction.jsx';

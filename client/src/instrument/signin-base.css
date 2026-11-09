@@ -1,0 +1,29 @@
+/* Pri signed-out first paint. The optional mathematical canvas and complete
+   entry styling arrive lazily, but the real account form never shifts, flashes
+   light or waits on an illustration to become usable. Signed-in UI unaffected. */
+.auth-wrap.pri-auth {
+  --in-base:#111319;--in-l1:#191b22;--in-l2:#232630;
+  --in-tx:#f5f5f7;--in-tx-2:#bec0cb;--in-tx-3:#a2a5b3;
+  --in-action:#b8adfa;--in-on-action:#15141f;
+  --ink:#f5f5f7;--ink-2:#bec0cb;--ink-3:#a2a5b3;
+  --surface:#232630;--control-border:#606575;
+  background:var(--in-base);color:var(--in-tx);color-scheme:dark;
+  display:grid;place-items:stretch;overflow:visible;padding:0;min-height:100dvh;
+  grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);
+}
+.pri-auth > * {margin-block:0;}
+.pri-auth > .in-signin-plot {display:block;position:relative;min-height:100%;background:#0d0f14;}
+.pri-auth > .auth-col {
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;
+  min-width:0;padding:42px clamp(24px,5vw,80px);background:var(--in-l1);
+}
+.pri-auth .signin-landing {max-width:430px;width:100%;margin-top:24px;padding:0;border:0;box-shadow:none;background:transparent;}
+@media(max-width:699px){
+  .auth-wrap.pri-auth{grid-template-columns:minmax(0,1fr);grid-template-rows:124px auto;}
+  .pri-auth > .in-signin-plot{height:124px;min-height:124px;}
+  .pri-auth > .auth-col{min-height:calc(100dvh - 124px);padding:22px 20px 30px;align-items:center;justify-content:flex-start;}
+}
+@media(min-width:700px) and (max-width:1020px){
+  .auth-wrap.pri-auth{grid-template-columns:minmax(0,.83fr) minmax(0,1.17fr);}
+  .pri-auth > .auth-col{padding-inline:clamp(22px,3vw,44px);}
+}
