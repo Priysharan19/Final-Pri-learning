@@ -17,6 +17,7 @@
 //   node tools/production-preflight.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { randomBytes } from 'node:crypto';
+import { testMailboxState } from '../server/platform/testMailboxPolicy.js';
 
 const env = process.env;
 const has = name => String(env[name] || '').trim().length > 0;
@@ -201,6 +202,24 @@ console.log('\nOptional, and what each unlocks:\n');
 for (const item of OPTIONAL) {
   console.log(`  ${has(item.name) ? '·' : '○'} ${item.name}`);
   console.log(`     ${item.what}\n`);
+}
+
+// The staging test mailbox (server/platform/testMailboxPolicy.js) keeps mail to
+// reserved test addresses instead of sending it, and serves the codes on
+// /v1/test-mailbox. It must never be on in production. It decides by itself
+// from RAILWAY_ENVIRONMENT_NAME and PRI_PUBLIC_ORIGIN; this refuses (exit 1)
+// any configuration under which it would be on, so a production environment
+// named or set up like staging is caught here, before it is deployed.
+const mailbox = testMailboxState(env);
+console.log('─'.repeat(70));
+if (mailbox.on) {
+  console.log(`\n  ✗ The staging test mailbox would be ON with this configuration (${mailbox.reason}).`);
+  console.log('     It keeps mail to @e2e.prilearning.test instead of sending it and serves the codes on');
+  console.log('     /v1/test-mailbox. Production must have RAILWAY_ENVIRONMENT_NAME=production or a');
+  console.log('     prilearning.com PRI_PUBLIC_ORIGIN, and must not run with NODE_ENV=test.\n');
+  process.exitCode = 1;
+} else {
+  console.log(`\n  · Staging test mailbox: off (${mailbox.reason}).\n`);
 }
 
 console.log('Nothing was written and nothing was sent. This only prints.\n');

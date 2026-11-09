@@ -109,6 +109,9 @@ export const ENGINE_SUITES = [
   // telemetry, classes, assignments and reports refuse a child and write
   // nothing, never touch an adult, and leave staff routes open (#292).
   'guardian-consent-coverage-check.mjs',
+  // The staging test mailbox: reserved-domain codes and links kept in
+  // platform_meta and read back, every other address sent — as pri_server.
+  'test-mailbox-check.mjs',
   'guardian-notice-version-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
