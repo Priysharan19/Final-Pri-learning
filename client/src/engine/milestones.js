@@ -127,8 +127,11 @@ export function annotateMilestones(q, report) {
   const milestones = milestonesOf(q);
   if (!milestones.length) return report;
   let changed = false;
-  const lines = report.lines.map(l => {
-    if (l?.status !== 'note') return l;
+  // Lines after the first break carry its error forward; the report leaves
+  // them unjudged on purpose, so they are never ticked either.
+  const stop = Number.isInteger(report.firstBreak) && report.firstBreak >= 0 ? report.firstBreak : Infinity;
+  const lines = report.lines.map((l, i) => {
+    if (l?.status !== 'note' || i > stop) return l;
     const m = matchMilestone(milestones, l.text);
     if (!m) return l;
     changed = true;
@@ -138,23 +141,3 @@ export function annotateMilestones(q, report) {
 }
 
 export const NOT_CHECKED_NOTE = 'Not checked — this question’s check covers the lines that lead to the answer.';
-
-/**
- * A question with no Step Check of its own but a worked solution: each line
- * that matches a milestone is ticked, every other line is "not checked".
- * Nothing here is ever a break: without a check, a line that matches no
- * milestone may still be right, so it is never called wrong.
- */
-export function milestoneOnlyReport(q, workingText) {
-  const milestones = milestonesOf(q);
-  if (!milestones.length) return null;
-  const lines = String(workingText ?? '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).slice(0, 40);
-  if (!lines.length) return null;
-  return {
-    lines: lines.map(text => {
-      const m = matchMilestone(milestones, text);
-      return m ? { text, status: 'ok', note: milestoneNote(m), milestone: { step: m.step + 1, heading: m.heading, label: m.label } } : { text, status: 'note', note: NOT_CHECKED_NOTE };
-    }),
-    firstBreak: -1, diagnosis: null, source: 'milestones'
-  };
-}
