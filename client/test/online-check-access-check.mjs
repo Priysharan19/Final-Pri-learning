@@ -31,7 +31,10 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 // What a button says: its text without markup, and without the aria-hidden
 // shortcut hint (<kbd aria-hidden>) the Instrument draws beside the label.
-const buttonText = inner => inner.replace(/<kbd[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/kbd>/g, '').replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<[^>]+>/g, '').trim();
+// Each removal repeats until the string stops changing, so markup that a
+// removal itself reassembles is removed too (CodeQL js/incomplete-multi-character-sanitization).
+const stripAll = (s, re) => { let prev; do { prev = s; s = s.replace(re, ''); } while (s !== prev); return s; };
+const buttonText = inner => stripAll(stripAll(stripAll(inner, /<kbd[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/kbd>/g), /<svg[\s\S]*?<\/svg>/g), /<[^>]+>/g).trim();
 // The action bar's primary button (the in-card sign-in button is primary too).
 const primaryLabel = html => { const bar = /<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || ''; const m = /<button[^>]*class="btn btn-primary"[^>]*>([\s\S]*?)<\/button>/.exec(bar); return m ? buttonText(m[1]) : null; };
 
