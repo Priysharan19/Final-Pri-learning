@@ -1,15 +1,26 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · legal pages contract
 //
-// Apple, Google and Razorpay each require a privacy notice, terms and a refund
-// policy at a real URL, and India's DPDP Act requires a published grievance
-// contact. This suite checks that all four exist, that the app routes to them
-// signed in and signed out, and — the part that matters most — that an
-// unfinished template can never be published as though it were finished.
+// Apple and Google each require a privacy notice, terms and a refund policy at
+// a real URL, and India's DPDP Act requires a published grievance contact.
+// This suite checks that all four exist, that the app routes to them signed in
+// and signed out, and — the part that matters most — that a notice no lawyer
+// has reviewed can never be published as though one had.
+//
+// THE REVIEW FLAG. Until 1 November 2026 the "not yet reviewed" banner was
+// shown while a document still had {{PLACEHOLDER}} text in it, so filling the
+// placeholders on 19 October made the banner vanish although no lawyer had
+// looked at anything. The banner now depends on one explicit switch,
+// docs/legal/review-status.json, and this suite pins that: the page's banner
+// must read the switch, the switch must be false until a human records a
+// lawyer's review with name, qualification, date and evidence, that date may
+// not be earlier than any notice's "Last updated", and while the switch is off
+// every English notice says in words that it is unreviewed and every Hindi one
+// says so in Hindi. Placeholders keep their own, separate banner.
 //
 // TWO LANGUAGES. Section 5(3) of the DPDP Act gives a data principal the right
 // to read the notice in English or in any language of the Eighth Schedule.
-// This app ships a full Hindi interface, so every notice now exists twice and
+// This app ships a full Hindi interface, so every notice exists twice and
 // this suite holds the pair together: both languages present for all four, the
 // same placeholders in both so one fill serves both, the same sections and the
 // same internal links, and — the assertion that carries the legal weight —
@@ -17,6 +28,12 @@
 // English governs. A reader must never be able to close the page believing
 // they have read the operative text when they have read a translation of it
 // that no lawyer has seen.
+//
+// THIRD-PARTY NOTICES. A fifth page lists the licences of the software the app
+// ships. It is generated from the dependency licences (tools/third-party-
+// notices.mjs, whose --check runs beside this suite in `npm run test:legal`),
+// so this suite only has to prove it is reachable, rendered by the same reader,
+// and loaded on demand rather than carried by every install.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -37,8 +54,9 @@ const PAGES = [
   ['privacy', 'Privacy notice', ['data fiduciary', 'child', 'grievance']],
   ['terms', 'Terms of use', ['subscription', 'governed by the laws of India']],
   ['refund-policy', 'Cancellation and refund policy', ['Cancelling', 'Refunds']],
-  ['grievance', 'Grievances', ['Data Protection Board of India', 'working days']]
+  ['grievance', 'Grievances', ['Data Protection Board of India', '48 hours', '30 days']]
 ];
+const NOTICES_PAGE = 'third-party-notices';
 
 // English is the operative text and is named without a suffix; a translation
 // carries its language in the filename, which is also how the Legal page and
@@ -50,6 +68,7 @@ const placeholdersOf = (text) => [...new Set(text.match(/\{\{[A-Z_]+\}\}/g) || [
 const app = readFileSync(join(ROOT, 'client/src/App.jsx'), 'utf8');
 const page = readFileSync(join(ROOT, 'client/src/pages/Legal.jsx'), 'utf8');
 const hindiModule = readFileSync(join(ROOT, 'client/src/i18n/legalHindi.js'), 'utf8');
+const noticesModule = readFileSync(join(ROOT, 'client/src/legal/thirdPartyNotices.js'), 'utf8');
 
 for (const [slug, title, phrases] of PAGES) {
   const file = fileFor(slug, 'en');
@@ -68,33 +87,116 @@ for (const [slug, title, phrases] of PAGES) {
   ok(text.includes(title.split(' ')[0]), `${slug} is titled`);
 }
 
-// The draft banner is the safety rule: while a document still has placeholders,
-// the page must say it is unreviewed. Deleting the banner without filling the
-// placeholders would publish an unfinished notice as a finished one.
+// ─────────────────────────────────────────────────────────────────────────────
+// The review flag
 //
-// The count is over both languages, because both are published. A placeholder
-// left in the Hindi is a template on a public URL exactly as much as one left
-// in the English.
+// One switch, set by a person, read by the page, pinned here in both of its
+// states. Flipping it without the paperwork fails; removing the banner fails;
+// tying the banner back to the placeholder count fails.
+// ─────────────────────────────────────────────────────────────────────────────
+const reviewPath = join(ROOT, 'docs/legal/review-status.json');
+ok(existsSync(reviewPath), 'docs/legal/review-status.json exists — the one switch behind the review banner');
+const review = existsSync(reviewPath) ? JSON.parse(readFileSync(reviewPath, 'utf8')) : {};
+ok(typeof review.reviewed === 'boolean', 'review-status.json says, as a boolean, whether a lawyer has reviewed the notices');
+const REVIEWED = review.reviewed === true;
+
+// The page reads the switch, and the banner is conditioned on the switch alone.
+ok(/import review from '\.\.\/\.\.\/\.\.\/docs\/legal\/review-status\.json'/.test(page),
+  'the legal page imports review-status.json');
+ok(/export const LEGAL_REVIEWED = review\.reviewed === true;/.test(page),
+  'and treats only an explicit `reviewed: true` as reviewed — a missing or truthy-but-not-true value is unreviewed');
+ok(/\{!LEGAL_REVIEWED && \(\s*<div className="notice error" role="alert"[^>]*data-legal-unreviewed="true">/.test(page),
+  'the page shows the unreviewed banner whenever the switch is off');
+ok(!/LEGAL_REVIEWED[^\n]*unfilled|unfilled[^\n]*LEGAL_REVIEWED/.test(page),
+  'and never conditions that banner on the placeholder count — filling the templates is not a legal review');
+ok(/\{unfilled\.length > 0 && \(\s*<div className="notice error" role="alert"[^>]*data-legal-draft="true">/.test(page),
+  'a document with placeholders left still gets its own template banner');
+ok(/not yet reviewed by a lawyer/i.test(en['legal.unreviewedTitle']) && /no lawyer qualified in Indian law has reviewed it/i.test(en['legal.unreviewedBody']),
+  'the banner says in words that no lawyer has reviewed the notice');
+ok(/अधिवक्ता/.test(hi['legal.unreviewedTitle']) && /अधिवक्ता/.test(hi['legal.unreviewedBody']),
+  'and says it in Hindi too, so the banner speaks the language the notice is being read in');
+ok(/not yet reviewed/i.test(en['legal.draftTitle']) && /अधिवक्ता/.test(hi['legal.draftBody'].one) && /अधिवक्ता/.test(hi['legal.draftBody'].other),
+  'the template banner still says, in both languages, that the document is unreviewed');
+
+// "Last updated: 2 November 2026" → a Date, parsed by hand so the comparison
+// does not depend on which English date forms the runtime happens to accept.
+const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+function lastUpdatedOf(text) {
+  const m = text.match(/\*\*Last updated: (\d{1,2}) ([A-Za-z]+) (\d{4})\*\*/);
+  if (!m) return null;
+  const month = MONTHS.indexOf(m[2].toLowerCase());
+  return month < 0 ? null : new Date(Date.UTC(Number(m[3]), month, Number(m[1])));
+}
+const lastUpdated = Object.fromEntries(PAGES.map(([slug]) => [slug, lastUpdatedOf(readDoc(slug, 'en'))]));
+for (const [slug] of PAGES) ok(lastUpdated[slug] instanceof Date, `${slug} carries a parseable "Last updated" date`);
+
+const ENGLISH_UNREVIEWED = /has not yet been reviewed by a lawyer|have not yet been reviewed by a lawyer/;
+// The exact sentence every Hindi document carries while unreviewed. Asserted as
+// a literal string rather than by pattern: this is the paragraph whose wording
+// protects a reader from believing they have read the operative text, and it
+// should not be possible to weaken it by rephrasing.
+const ENGLISH_GOVERNS = 'अंग्रेज़ी पाठ ही मान्य होगा';
+const NOT_REVIEWED = 'किसी अधिवक्ता ने अब तक नहीं जाँचा है';
+
+if (!REVIEWED) {
+  for (const key of ['reviewer', 'qualification', 'reviewedOn', 'evidence']) {
+    ok(review[key] == null, `while unreviewed, review-status.json leaves ${key} empty rather than half-filled`);
+  }
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(String(review.unreviewedSince || '')), 'and records since when the published text has been unreviewed');
+  for (const [slug] of PAGES) {
+    ok(ENGLISH_UNREVIEWED.test(readDoc(slug, 'en').replace(/\s+/g, ' ')),
+      `while unreviewed, the English ${slug} says in its own text that no lawyer has reviewed it`);
+    ok(readDoc(slug, 'hi').replace(/\s+/g, ' ').includes(NOT_REVIEWED),
+      `and the Hindi ${slug} says so in Hindi`);
+  }
+} else {
+  // A review is recorded by a person, with enough for the next person to check.
+  ok(typeof review.reviewer === 'string' && review.reviewer.trim().length > 3, 'a recorded review names the reviewer');
+  ok(typeof review.qualification === 'string' && /india/i.test(review.qualification),
+    'and states a qualification in Indian law — the notices are for Indian readers under Indian law');
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(String(review.reviewedOn || '')), 'and the date of the review, as an ISO date');
+  const reviewedOn = new Date(`${review.reviewedOn}T00:00:00Z`);
+  ok(!Number.isNaN(reviewedOn.getTime()) && reviewedOn.getTime() <= Date.now(), 'which is a real date that has already happened');
+  ok(Array.isArray(review.languages) && review.languages.includes('en') && review.languages.includes('hi'),
+    'and covers both languages — the Hindi is published too, so it has to have been checked against the English');
+  ok(typeof review.evidence === 'string' && review.evidence.trim().length > 10,
+    'and points at the sign-off kept outside the repository');
+  for (const [slug] of PAGES) {
+    ok(lastUpdated[slug] && lastUpdated[slug].getTime() <= reviewedOn.getTime(),
+      `${slug} was not edited after the review (Last updated ${lastUpdated[slug]?.toISOString().slice(0, 10)} ≤ reviewed ${review.reviewedOn}); a later edit reopens the review`);
+    ok(!ENGLISH_UNREVIEWED.test(readDoc(slug, 'en').replace(/\s+/g, ' ')),
+      `once reviewed, the English ${slug} no longer says it is unreviewed`);
+    ok(!readDoc(slug, 'hi').replace(/\s+/g, ' ').includes(NOT_REVIEWED),
+      `and the Hindi ${slug} no longer says no advocate has checked it`);
+  }
+}
+
+// The placeholder count is a separate fact with a separate banner. It is over
+// both languages, because both are published.
 const placeholderCount = PAGES.reduce((n, [slug]) => (
   n + ['en', 'hi'].reduce((m, lang) => (
     existsSync(fileFor(slug, lang)) ? m + placeholdersOf(readDoc(slug, lang)).length : m
   ), 0)
 ), 0);
+ok(/unfilled\.length > 0/.test(page), 'the template banner shows while placeholders remain, whatever the review switch says');
 
-if (placeholderCount > 0) {
-  ok(/data-legal-draft="true"/.test(page), 'while placeholders remain, the page marks itself a draft');
-  ok(/unfilled\.length > 0/.test(page), 'and shows that banner only while placeholders remain');
-  // The words themselves moved out of the page and into the catalogues when the
-  // notices became bilingual: a Hindi reader met an English banner over a Hindi
-  // notice, which is the exact failure the translation exists to fix. So the
-  // sentence is asserted where it now lives, in both languages.
-  ok(/not yet reviewed/i.test(en['legal.draftTitle']),
-    'and says in words that it has not been reviewed');
-  ok(/अधिवक्ता/.test(hi['legal.draftBody'].one) && /अधिवक्ता/.test(hi['legal.draftBody'].other),
-    'and says it in Hindi too, so the banner speaks the language the notice is being read in');
-} else {
-  ok(true, 'every placeholder is filled — a lawyer must still review before publishing');
+// The visible "COUNSEL REVIEW:" note moved out of the student pages and into
+// the counsel pack; the status is carried by the banner and the flag instead.
+for (const [slug] of PAGES) {
+  for (const lang of ['en', 'hi']) {
+    ok(!/COUNSEL REVIEW:|अधिवक्ता की समीक्षा आवश्यक:/.test(readDoc(slug, lang)),
+      `${slug}.${lang} carries no inline counsel-review note — questions for counsel live in docs/legal/counsel/`);
+  }
 }
+const pack = readFileSync(join(ROOT, 'docs/legal/counsel/COUNSEL-INFORMATION-PACK.md'), 'utf8');
+ok(/cross-border transfer/i.test(pack) && /review-status\.json/.test(pack),
+  'the counsel pack carries the cross-border question that used to sit in the notice, and explains the review switch');
+// The pack says every factual statement cites its source. What OpenAI's pages say
+// changes, so each of those statements carries the page and the day it was read.
+ok(/developers\.openai\.com\/api\/docs\/guides\/your-data[^|\n]*retrieved 2026-11-02/i.test(pack),
+  'the pack cites the OpenAI page and retrieval date for the abuse-monitoring retention');
+ok(/developers\.openai\.com\/api\/docs\/guides\/safety-checks\/under-18-api-guidance[^\n]*retrieved 2026-11-02/i.test(pack.replace(/\n(?=\s)/g, ' ')),
+  'and for the under-18 guidance');
 
 // The notice describes real behaviour; these are the facts it rests on.
 const syncContract = readFileSync(join(ROOT, 'client/src/platform/syncContract.js'), 'utf8');
@@ -127,35 +229,57 @@ const privacyHi = readDoc('privacy', 'hi');
 for (const [pattern, what] of [
   [/फ़ोटो/, 'the photograph path'],
   [/फ़्रेम में जो कुछ है वह सब भेजा जाता है/, 'that the whole frame is sent'],
-  [/पहचान-पंक्ति का\s*\n?\s*एक एकतरफ़ा हैश/, 'the browser identification hash']
+  [/पहचान-पंक्ति का\s*\n?\s*एक एकतरफ़ा हैश/, 'the browser identification hash'],
+  [/क्रैश रिपोर्ट/, 'the crash reports'],
+  [/30 दिन/, 'the 30-day erasure of an unconfirmed child account']
 ]) {
   ok(pattern.test(privacyHi), `the Hindi notice discloses ${what}, as the English does`);
 }
 ok(!/आपके डिवाइस\s*\n?\s*का एक पहचानकर्ता, और आपके साइन-इन/.test(privacyHi),
   'and no longer describes the device identifier as the device’s own');
+ok(!/ढलता है/.test(privacyHi) && !/adapts to your hand/i.test(privacy),
+  'neither language still describes a handwriting model that adapts to the student — on-device readers are retired (D16)');
 
-// ── A promised control has to exist ─────────────────────────────────────────
-// The refund policy said a website subscription can be cancelled from Settings
-// → Account. The server route and the transport call both existed and nothing
-// in the app ever reached them, so the document described a button that was not
-// there — and a refund policy is exactly the document a regulator reads.
+// ── Store purchases, not website purchases ─────────────────────────────────
+// Web purchasing is out of V1 (PRI_V1_RELEASE_SCOPE §12): the refund policy and
+// the terms describe the App Store and Google Play, on iPhone, iPad and Android,
+// and promise no control inside the app that the app does not have.
 const refunds = readDoc('refund-policy', 'en').replace(/\s+/g, ' ');
-const panel = readFileSync(join(ROOT, 'client/src/components/CloudAccountPanel.jsx'), 'utf8');
-// The panel's copy is in the i18n catalogue; read the English of every key the
-// panel names, which is what a student sees.
-const cloudCatalogue = en;
-const panelCopy = [...panel.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
-  .map(m => cloudCatalogue[m[1]]).filter(v => typeof v === 'string').join('\n');
-if (/cancel a website subscription at any time from/i.test(refunds)) {
-  ok(/cloud\.cancelWebBilling\(/.test(panel),
-    'the app has the cancel control the refund policy promises');
-  ok(/^Cancel subscription$/m.test(panelCopy), 'and a student can find it by that name');
-  ok(/onClick=\{cancelWebSubscription\}>\s*\{busy === 'cancel-web' \? t\('cloud\.cancelling'\) : t\('cloud\.cancelSubscription'\)\}/.test(panel)
-    && /async function cancelWebSubscription\(\)[\s\S]{0,600}cloud\.cancelWebBilling\(\)/.test(panel),
-    'and that name is rendered by the panel that calls the cancel endpoint');
-  ok(/end of the period you have already paid for/i.test(panelCopy),
-    'and is told when it takes effect, which is what the policy says');
+const refundsHi = readDoc('refund-policy', 'hi').replace(/\s+/g, ' ');
+const termsHi = readDoc('terms', 'hi').replace(/\s+/g, ' ');
+ok(!/website subscription|bought .* through the website|Settings → Account/i.test(refunds),
+  'the refund policy no longer describes website purchases or an in-app cancel control');
+ok(/no purchase on the website/i.test(refunds) && /no purchase on the website/i.test(terms),
+  'and both the refund policy and the terms say there is no purchase on the website');
+// That sentence is true only while the server reports web checkout off: the web
+// client offers Razorpay whenever it reports it configured. So the deployment
+// verifier refuses a server that does, and the README names the dependency.
+const accountPanel = readFileSync(join(ROOT, 'client/src/components/CloudAccountPanel.jsx'), 'utf8');
+ok(/setWebCheckout\(result\?\.webCheckout\?\.configured === true\)/.test(accountPanel),
+  'the web client shows checkout only when the server reports it configured (the fact that sentence rests on)');
+const deployVerifier = readFileSync(join(ROOT, 'tools/verify-deployment.mjs'), 'utf8');
+ok(/\/v1\/billing\/config/.test(deployVerifier) && /billing\.body\?\.webCheckout\?\.configured === false/.test(deployVerifier),
+  'and the deployment verifier fails a server that reports it configured');
+ok(/no purchase on the website[\s\S]{0,240}verify-deployment\.mjs/i.test(readFileSync(join(ROOT, 'docs/legal/README.md'), 'utf8')),
+  'and the legal README lists that dependency among what the text rests on');
+for (const [doc, label] of [[refunds, 'refund policy'], [terms, 'terms']]) {
+  ok(/App Store/.test(doc) && /Google Play/.test(doc), `the ${label} covers the App Store and Google Play`);
+  ok(/iPhone/.test(doc) && /iPad/.test(doc) && /Android/.test(doc), `the ${label} names iPhone, iPad and Android`);
+  ok(/does not cancel (a|the) subscription/i.test(doc), `the ${label} says deleting the account does not cancel a store subscription`);
 }
+for (const [doc, label] of [[refundsHi, 'refund policy'], [termsHi, 'terms']]) {
+  ok(/ऐप स्टोर/.test(doc) && /गूगल प्ले/.test(doc) && /आईफ़ोन/.test(doc) && /आईपैड/.test(doc) && /एंड्रॉइड/.test(doc),
+    `the Hindi ${label} names both stores and all three devices`);
+}
+ok(/refunded by Apple, not by us/i.test(refunds) && /within 48 hours/i.test(refunds),
+  'the refund policy says Apple decides App Store refunds and names Google’s 48-hour window');
+ok(/Indian consumer law/i.test(refunds) && /उपभोक्ता कानून/.test(refundsHi),
+  'and preserves the reader’s rights under Indian consumer law in both languages');
+ok(!/\bPremium subscription\b.*unlocks everything|unlimited everything/i.test(terms), 'the terms make no unlimited-everything promise');
+ok(/outside service, OpenAI/.test(terms) && /never by that service/.test(terms),
+  'the terms say handwriting is read by an outside service and that the mark is never decided by it');
+ok(/\(\/privacy\)/.test(readDoc('terms', 'en')) && /\(\/privacy\)/.test(readDoc('terms', 'hi')),
+  'and link to the privacy notice from both languages');
 
 // ── Nor may it fall behind the code ─────────────────────────────────────────
 // The same opt-in that sends an image of your ink also sends a PHOTOGRAPH of
@@ -177,13 +301,15 @@ ok(/user-agent/i.test(privacy), 'and mentions the user-agent hash it also stores
 
 // The terms denied predicting an exam result while the progress screen showed
 // one. It refuses percentile, rank and admission — which is true — and now says
-// what it does show.
+// what it does show, in both languages.
 ok(!/\*\*It does not predict your exam result\*\*/.test(terms),
   'the terms no longer deny a prediction the progress screen makes');
 ok(/does not predict a percentile, a rank or an admission/i.test(terms),
   'refusing the three it genuinely refuses');
 ok(/parts of a paper you\s+have actually practised/i.test(terms),
   'and describing the estimate it genuinely gives');
+ok(!/परीक्षा-परिणाम की भविष्यवाणी नहीं करता/.test(termsHi) && /परसेंटाइल, रैंक या दाख़िले/.test(termsHi),
+  'and the Hindi terms say the same three refusals rather than the old blanket denial');
 
 // ── The notice may never run ahead of the code — or fall behind it ─────────
 // It once described a guardian-consent flow that did not exist; #210 then
@@ -206,6 +332,27 @@ ok(/not the verifiable\s+parental consent/i.test(privacy) && !/we (obtain|have) 
   'and never calls it verifiable parental consent');
 ok(!/does not ask for or record a parent's consent/i.test(privacy),
   'the notice no longer denies the consent record the server keeps');
+
+// Withdrawal stops marking, reading and exams as well as sync; "Sync stops at
+// once" understated it in the guardian notice, and the privacy notice says the
+// whole list.
+ok(/stops all of that at once — marking, reading, exams and sync/i.test(privacy),
+  'the notice says what a withdrawal actually stops');
+ok(!/Sync stops at once\.?$/.test(en['signup.noticeWithdraw']) && /marking, handwriting and photo reading, exams and sync/i.test(en['signup.noticeWithdraw']),
+  'and the in-app guardian notice no longer reduces it to sync');
+ok(/अंकन/.test(hi['signup.noticeWithdraw']) && /परीक्षाएँ/.test(hi['signup.noticeWithdraw']),
+  'in Hindi too');
+
+// SMS sign-in is off at launch (D3): the shipped client shows the SMS option
+// only when the server reports channels.sms, and both environments report
+// false. The notice describes no mobile-number route and says so plainly.
+const signUp = readFileSync(join(ROOT, 'client/src/components/SignUpFlow.jsx'), 'utf8');
+ok(/result\.channels\.sms === true/.test(signUp) && /\{channels\.sms && \(/.test(signUp),
+  'the sign-up flow offers SMS only when the server reports it live (the fact the notice rests on)');
+ok(/We do not offer sign-in by SMS/.test(privacy) && !/mobile number/i.test(privacy),
+  'the notice describes no mobile-number route and says SMS sign-in is not offered');
+ok(/एसएमएस से साइन-इन की\s*सुविधा नहीं देते/.test(privacyHi.replace(/\s+/g, ' ')) && !/मोबाइल नंबर/.test(privacyHi),
+  'and the Hindi says the same');
 
 ok(!/handwriting strokes are not uploaded/i.test(privacy),
   'and no longer makes the unconditional claim the optional setting would break');
@@ -233,6 +380,18 @@ ok(/Railway's `ams` region/.test(privacy) && /Supabase in its Mumbai region/.tes
   'the notice states where data is stored today and where it is planned to move');
 ok(!/whole app without an account|servers in India|on your own device\.|so a teacher can set work/i.test(privacy),
   'the notice no longer claims an account-free app, Indian servers, on-device marking or a teacher product');
+// The notice may not claim to "follow" the Act while its own Children section
+// says the consent method is not what the Act will require.
+ok(!/follows the Digital Personal Data Protection Act/i.test(privacy) && !/का पालन करती है/.test(privacyHi),
+  'the notice no longer claims to follow the DPDP Act');
+ok(/meant to give you what India's Digital Personal Data Protection Act 2023 asks a notice to give you/.test(privacy),
+  'and says instead what it is meant to do');
+// The commencement date is stated as an expectation with its basis, not as a
+// bare day the notice cannot vouch for; the exact day is a question for counsel.
+ok(!/14 May 2027|13 May 2027/.test(privacy) && /expected to take effect in May 2027, eighteen months after the DPDP Rules were notified in November 2025/.test(privacy),
+  'the notice states the expected commencement month and its basis rather than a bare day');
+ok(!/14 मई 2027|13 मई 2027/.test(privacyHi) && /मई 2027/.test(privacyHi) && /अठारह महीने/.test(privacyHi),
+  'and the Hindi does the same');
 // #283: plan copy may only promise what FREE_TIER / PLAN_CAPABILITIES enforce.
 // The numbers come from the placeholders, never from literals in the copy.
 for (const [lang, cat] of [['en', en], ['hi', hi]]) {
@@ -249,6 +408,38 @@ for (const [lang, key] of [['en', 'signup.noticeWhat'], ['hi', 'signup.noticeWha
     `${lang}: the guardian consent notice does not say data is stored in India before it is`);
 }
 ok(/90 days/.test(privacy), 'the notice states the telemetry retention window');
+// Retention the server actually applies (practice.js MAX_AGE, exams.js
+// RECORD_TTL, telemetry.js RETENTION_MS) is stated, not only the telemetry line.
+const practiceCode = readFileSync(join(ROOT, 'server/platform/practice.js'), 'utf8');
+const examsCode = readFileSync(join(ROOT, 'server/platform/exams.js'), 'utf8');
+ok(/const MAX_AGE = 90 \* 24 \* 60 \* 60 \* 1000/.test(practiceCode), 'practice receipts live 90 days in the code');
+ok(/const RECORD_TTL = 5 \* 365 \* 24 \* 60 \* 60 \* 1000/.test(examsCode), 'exam records live five years in the code');
+ok(/record of each marked answer[^.]*kept for 90 days/i.test(privacy), 'the notice states the 90-day life of a marked answer’s record');
+// The mark outlives the 90 days in the graded-attempt event, so "the mark is kept
+// for 90 days" alone would read as the mark being gone. The notice says which
+// half goes and which half stays, and that split is pinned to both events the
+// server keeps: neither may start carrying what the student wrote.
+ok(/After that your answer, your working and the transcription are gone; which question it was, whether it was right, the marks and the chapter stay in your learning history while your account is open/.test(privacy),
+  'the notice says what leaves after 90 days and what stays in the learning history');
+ok(/उसके बाद आपका उत्तर, आपका हल और लिप्यंतरण हट जाते हैं; कौन-सा प्रश्न था, वह सही था या नहीं, अंक और अध्याय आपके पढ़ाई के इतिहास में तब तक रहते हैं जब तक आपका खाता खुला है/.test(privacyHi.replace(/\s+/g, ' ')),
+  'and the Hindi says the same');
+const gradedStart = practiceCode.indexOf('attemptId, submissionId, questionId: qid');
+const gradedEvent = practiceCode.slice(gradedStart, practiceCode.indexOf('serverAcknowledgedAt: now', gradedStart));
+ok(/correct: response\.correct/.test(gradedEvent) && /marksEarned: response\.marksEarned/.test(gradedEvent) && /subtopic: q\.subtopic/.test(gradedEvent),
+  'the graded-attempt event keeps the question, the result, the marks and the chapter, as the notice says');
+const syncWorkerCode = readFileSync(join(ROOT, 'client/src/platform/syncWorker.js'), 'utf8');
+const syncedAttempt = syncWorkerCode.slice(syncWorkerCode.indexOf('function attemptPayload'), syncWorkerCode.indexOf('async function loadState'));
+for (const [event, label] of [[gradedEvent, 'the graded-attempt event'], [syncedAttempt, 'the synced attempt event']]) {
+  ok(event.length > 200 && !/\b(answer|answers|working|workingLines|transcript\w*|transcription|typed|ink)\s*:/i.test(event),
+    `${label} carries none of what the student wrote, so it can outlive the 90 days`);
+}
+ok(/Exam papers[^.]*up to five years/i.test(privacy), 'and the five-year life of exam records');
+ok(/crash reports?/i.test(privacy) && /Never the error message/i.test(privacy),
+  'and discloses coded crash reports, saying what they never contain');
+ok(/30 days after it was\s+created/i.test(privacy) && /is\s+closed/i.test(privacy) && /erased 7 days later/i.test(privacy) && /without the child's login/i.test(privacy),
+  'and promises D18 as the accounts stream builds it (#736): closed 30 days after creation or withdrawal, erased 7 days later, and a guardian may ask for erasure without the child’s login');
+ok(!/deleted\s+30\s+days\s+after\s+that/i.test(privacy),
+  'and no longer says "deleted 30 days after that", which the code does not do (it closes the account, then erases it 7 days later)');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),
   'the notice admits that a profile without a password is not encrypted');
 
@@ -256,6 +447,7 @@ ok(existsSync(join(ROOT, 'tools/legal-status.mjs')), 'there is a tool listing wh
 const statusTool = readFileSync(join(ROOT, 'tools/legal-status.mjs'), 'utf8');
 ok(/\.hi\.md|parts\[1\]/.test(statusTool),
   'and it knows a notice has a translation, so it counts what is unfilled in both languages');
+ok(/review-status\.json/.test(statusTool), 'and it reports the review switch beside the placeholder count');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The second language
@@ -266,13 +458,6 @@ ok(/\.hi\.md|parts\[1\]/.test(statusTool),
 // safe thing to say and starts being the reason a reader was misled.
 // ─────────────────────────────────────────────────────────────────────────────
 const DEVANAGARI = /[ऀ-ॿ]/;
-
-// The exact sentences every Hindi document has to carry. They are asserted as
-// literal strings rather than by pattern: this is the one paragraph whose
-// wording protects a reader from believing they have read the operative text,
-// and it should not be possible to weaken it by rephrasing.
-const ENGLISH_GOVERNS = 'अंग्रेज़ी पाठ ही मान्य होगा';
-const NOT_REVIEWED = 'किसी अधिवक्ता ने अब तक नहीं जाँचा है';
 
 // Latin words a Hindi legal notice keeps in Latin, each with the reason. Same
 // rule as the i18n catalogue's allowlist: an exception carries an argument, in
@@ -324,13 +509,15 @@ for (const [slug] of PAGES) {
   const flat = hindi.replace(/\s+/g, ' ');
   ok(flat.includes(ENGLISH_GOVERNS),
     `the Hindi ${slug} says in Hindi that the English text is the one that governs`);
-  ok(flat.includes(NOT_REVIEWED),
-    `the Hindi ${slug} says in Hindi that no lawyer has checked either version`);
   // …and it says it before anything a reader could mistake for the notice
   // itself. Under the title and the date, and above the first section.
   const preamble = hindi.slice(0, hindi.indexOf('\n## ')).replace(/\s+/g, ' ');
   ok(preamble.includes(ENGLISH_GOVERNS),
     `and says it at the top of ${slug}.hi.md, above the first section`);
+  if (!REVIEWED) {
+    ok(preamble.includes(NOT_REVIEWED),
+      `and, while unreviewed, says at the top of ${slug}.hi.md that no lawyer has checked either version`);
+  }
 
   // One fill serves both languages, or it serves neither.
   same(placeholdersOf(hindi), placeholdersOf(english),
@@ -424,7 +611,7 @@ ok(foldedEnglish && /in\s+which case you type your answers instead\. A second se
   'a paragraph wrapped across six source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))
   .find(b => b.kind === 'p' && b.text.includes(ENGLISH_GOVERNS));
-ok(foldedHindi && foldedHindi.text.includes(NOT_REVIEWED),
+ok(foldedHindi && (REVIEWED || foldedHindi.text.includes(NOT_REVIEWED)),
   'and so does the Hindi paragraph that says the English governs — a reader gets it as one statement');
 
 // A bullet with a wrapped second line is one bullet, not a bullet and an
@@ -439,11 +626,21 @@ ok(emailBullet && /verification and password reset links/.test(emailBullet),
 // run together into a sentence is an address nobody can post a letter to.
 const officer = blocksOf(readDoc('grievance', 'en')).find(b => b.kind === 'ul');
 eq(officer?.items.length, 4, 'the grievance officer block renders as four separate lines');
-// …and the numbered timetable beside it stays numbered.
+ok(officer && officer.items[0] !== officer.items[1],
+  'and does not print the same name twice where a name and a role belong');
+// …and the numbered timetable beside it stays numbered, and makes no claim
+// about what period the DPDP Act "allows" — the statutory periods are a
+// question for counsel (COUNSEL-INFORMATION-PACK.md), not a promise to a reader.
 const steps = blocksOf(readDoc('grievance', 'en')).find(b => b.kind === 'ol');
 eq(steps?.items.length, 3, 'the grievance timetable renders as a numbered list of three steps');
-ok(/which is the period the DPDP Act allows/.test(steps?.items[1] || ''),
-  'and its second step keeps the sentence that wrapped onto the next line');
+ok(/within \*\*48 hours\*\*/.test(steps?.items[0] || ''), 'and acknowledges within 48 hours');
+ok(/where the law sets a shorter time for your kind of request, that shorter time applies/.test(steps?.items[1] || ''),
+  'and its second step keeps the sentence that wrapped onto the next line, deferring to any shorter statutory period');
+ok(!/period the DPDP Act allows/.test(readDoc('grievance', 'en')) && !/यही अवधि\s+DPDP Act देता है/.test(readDoc('grievance', 'hi')),
+  'and neither language claims that 30 days is the period the DPDP Act allows');
+const stepsHi = blocksOf(readDoc('grievance', 'hi')).find(b => b.kind === 'ol');
+ok(/48 घंटों/.test(stepsHi?.items[0] || '') && /30 दिनों/.test(stepsHi?.items[1] || ''),
+  'and the Hindi timetable gives the same two periods');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // How the page reaches the second language
@@ -462,8 +659,9 @@ for (const key of [...new Set(page.match(/'legal\.[A-Za-z.]+'/g) || [])].map(k =
   ok(key in hi, `and in the Hindi one — chrome in English over a Hindi notice is the bug this fixes`);
 }
 
-// Nothing may pull the Hindi documents into the entry: a static import
-// anywhere in src would put 34 kB of Devanagari in front of every reader.
+// Nothing may pull the Hindi documents or the licence notices into the entry:
+// a static import anywhere in src would put tens of kilobytes in front of
+// every reader.
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
     const full = join(dir, entry.name);
@@ -471,10 +669,13 @@ function sourceFiles(dir) {
     return /\.jsx?$/.test(entry.name) ? [full] : [];
   });
 }
-const staticHindi = sourceFiles(join(ROOT, 'client/src'))
-  .filter(file => /\bfrom\s*'[^']*legalHindi\.js'/.test(readFileSync(file, 'utf8')));
+const sources = sourceFiles(join(ROOT, 'client/src'));
+const staticHindi = sources.filter(file => /\bfrom\s*'[^']*legalHindi\.js'/.test(readFileSync(file, 'utf8')));
 same(staticHindi.map(f => f.slice(ROOT.length)), [],
   'nothing statically imports the Hindi notices — they are reached by import() alone');
+const staticNotices = sources.filter(file => /\bfrom\s*'[^']*thirdPartyNotices\.js'/.test(readFileSync(file, 'utf8')));
+same(staticNotices.map(f => f.slice(ROOT.length)), [],
+  'nothing statically imports the licence notices — they are reached by import() alone');
 
 for (const [slug] of PAGES) {
   const specifier = slug === 'refund-policy' ? 'refund-policy.hi.md' : `${slug}.hi.md`;
@@ -485,6 +686,86 @@ ok(!/^\s*import\s+(?!.*docs\/legal).*$/m.test(hindiModule),
   'and imports nothing but the documents, so its chunk carries the notices and nothing else');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The third-party notices
+// ─────────────────────────────────────────────────────────────────────────────
+const noticesFile = join(ROOT, 'docs/legal/third-party/NOTICES.md');
+ok(existsSync(noticesFile), 'docs/legal/third-party/NOTICES.md exists — the licence page the app renders');
+const notices = existsSync(noticesFile) ? readFileSync(noticesFile, 'utf8') : '';
+ok(/generated by `tools\/third-party-notices\.mjs`/.test(notices), 'and says it is generated, so nobody edits it by hand');
+ok(existsSync(join(ROOT, 'tools/third-party-notices.mjs')), 'the generator exists');
+const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+ok(/third-party-notices\.mjs --check/.test(pkg.scripts['test:legal'] || ''),
+  'and its --check runs inside npm run test:legal, which CI runs, so a stale page fails the build');
+ok(/legal-promises\.test\.mjs/.test(pkg.scripts['test:legal'] || ''),
+  'and so does the test of the gate that stops a notice being promoted ahead of its code');
+// Every production dependency in the lockfile is on the page, with a licence.
+const lock = JSON.parse(readFileSync(join(ROOT, 'client/package-lock.json'), 'utf8'));
+const shipped = Object.entries(lock.packages)
+  .filter(([path, entry]) => path && !entry.dev && !entry.optional)
+  .map(([path, entry]) => `### ${path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length)} ${entry.version}`);
+ok(shipped.length >= 10, `the lockfile names the shipped packages (${shipped.length})`);
+same(shipped.filter(h => !notices.includes(`\n${h}\n`)), [], 'every shipped web package has its own section on the page');
+ok(/^### react 18\.3\.1$/m.test(notices) && /MIT License/.test(notices) && /Apache License/.test(notices) && /SIL OPEN FONT LICENSE/i.test(notices),
+  'and the page carries the licence texts themselves, not only their names');
+ok(/## The Android app/.test(notices) && /com\.android\.billingclient:billing/.test(notices) && /androidx\.webkit:webkit/.test(notices),
+  'the Android libraries are listed with their publishers’ licences');
+ok(/## The iPhone and iPad app/.test(notices), 'and the iPhone and iPad app is accounted for');
+// The web list comes from the whole lockfile; the Android list does not, and the
+// page may not imply that it does.
+ok(!/lists what ships\s+inside the app/.test(notices) && /the libraries the Android app declares/.test(notices),
+  'the page says it lists the libraries the Android app declares, not everything that ships');
+ok(/bring in libraries of their own, which also ship in the app/.test(notices.replace(/\s+/g, ' ')) && /not listed here one by one/.test(notices.replace(/\s+/g, ' ')),
+  'and says their own dependencies ship too and are not listed one by one');
+// The page is routed and rendered like the notices, in English, on demand.
+const noticeRoutes = app.split(`path="/${NOTICES_PAGE}"`).length - 1;
+ok(noticeRoutes >= 2, `/${NOTICES_PAGE} is routed for signed-out and signed-in visitors (${noticeRoutes} routes)`);
+ok(page.includes(`'${NOTICES_PAGE}': { kind: 'licences'`), 'the legal page knows the licence page by its route');
+ok(/import\('\.\.\/legal\/thirdPartyNotices\.js'\)/.test(page), 'and reaches it by import()');
+ok(/import notices from '\.\.\/\.\.\/\.\.\/docs\/legal\/third-party\/NOTICES\.md\?raw'/.test(noticesModule),
+  'the licence module imports the generated page, not a copy');
+ok(!/^\s*import\s+(?!.*docs\/legal).*$/m.test(noticesModule), 'and nothing else');
+ok(/data-legal-notices-unavailable="true"/.test(page) && Boolean(en['legal.thirdPartyUnavailable']) && Boolean(hi['legal.thirdPartyUnavailable']),
+  'the page says so, in both languages, when the licence texts cannot be fetched');
+ok(/lang="en"/.test(page.slice(page.indexOf("entry.kind === 'licences'"))) && /legal\.thirdPartyLead/.test(page),
+  'the licence texts are marked as English and the page says why they are not translated');
+// It renders through the same reader without an empty block, and no licence
+// line is mistaken for a heading or a table row.
+const noticeBlocks = blocksOf(notices);
+ok(noticeBlocks.length > 100, `the licence page renders as a long document (${noticeBlocks.length} blocks)`);
+ok(noticeBlocks.every(b => (b.items ? b.items.every(i => i.trim()) : b.text.trim())), 'with no empty paragraph or bullet');
+eq(noticeBlocks.filter(b => b.kind === 'h1').length, 1, 'and exactly one top heading');
+const vite = readFileSync(join(ROOT, 'client/vite.config.js'), 'utf8');
+ok(/thirdPartyNotices-\[\^\/\]\*\\\.js\$\/, 'third-party licence notices'/.test(vite),
+  'the build keeps the licence chunk out of every install, as it does the Hindi notices');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coverage wording (owner default D24): a notice describes what the app is for,
+// never how much of a syllabus it covers. The terms said "follows the NCERT
+// syllabus" until 8 November 2026, which the content audit contradicts (Class 8
+// follows the earlier book, Class 9 has 8 of the 15 chapters in the CBSE
+// 2026-27 list). A negation ("does not predict a percentile") is not a claim,
+// so only the claiming phrases are refused, in both languages.
+// ─────────────────────────────────────────────────────────────────────────────
+const COVERAGE_CLAIMS = [
+  /\bfollows?\s+the\s+(?:NCERT|CBSE)\s+syllabus\b/i,
+  /\bsyllabus[-\s]+(?:aligned|complete)\b|\b(?:complete|full|entire)\s+syllabus\b/i,
+  /\bevery\s+(?:chapter|topic)\b|\ball\s+chapters\b/i,
+  /\bcertified\b|\bexaminer[-\s]grade\b|\blike\s+an\s+examiner\b/i,
+  /पाठ्यक्रम\s+(?:और\s+[^।]*?)?का\s+अनुसरण|पूरा\s+पाठ्यक्रम|संपूर्ण\s+पाठ्यक्रम|हर\s+अध्याय|सभी\s+अध्याय/
+];
+const coverageClaimIn = text => COVERAGE_CLAIMS.map(re => text.match(re)?.[0]).find(Boolean);
+for (const [slug] of PAGES) {
+  for (const lang of ['en', 'hi']) {
+    const claim = coverageClaimIn(readDoc(slug, lang));
+    ok(!claim, `${slug}${lang === 'hi' ? '.hi' : ''}.md makes no coverage claim D24 forbids${claim ? ` (found "${claim}")` : ''}`);
+  }
+}
+ok(coverageClaimIn('Pri Learning follows the NCERT syllabus and public examination patterns.'),
+  'the coverage refusal catches the English sentence the terms carried until 8 November 2026');
+ok(coverageClaimIn('Pri Learning NCERT के पाठ्यक्रम और सार्वजनिक परीक्षा-प्रारूपों का अनुसरण करता है।'),
+  'the coverage refusal catches the Hindi sentence the terms carried until 8 November 2026');
+
+// ─────────────────────────────────────────────────────────────────────────────
 // The client build imports these documents from outside client/, so the
 // container's build context has to carry them. It did not, and the production
 // image failed to build with "Module not found" — a regression only the
@@ -493,7 +774,7 @@ ok(!/^\s*import\s+(?!.*docs\/legal).*$/m.test(hindiModule),
 const dockerfile = readFileSync(join(ROOT, 'Dockerfile'), 'utf8');
 const clientBuildStage = dockerfile.slice(0, dockerfile.indexOf('AS server-deps'));
 const imported = [...new Set(
-  [page, hindiModule].flatMap(text => (text.match(/from '([^']*\.\.\/[^']*)'/g) || []))
+  [page, hindiModule, noticesModule].flatMap(text => (text.match(/from '([^']*\.\.\/[^']*)'/g) || []))
     .map(line => line.replace(/^from '|'$/g, ''))
     .filter(spec => spec.includes('../../../'))
     .map(spec => spec.replace(/^(\.\.\/)+/, '').replace(/\?raw$/, '').split('/').slice(0, 2).join('/'))
@@ -506,5 +787,5 @@ ok(imported.length > 0, 'the legal page imports its documents from the repositor
 
 console.log(failures.length
   ? `LEGAL PAGES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `LEGAL PAGES: PASS — ${pass}/${pass} checks — privacy, terms, refunds and grievances exist in English and Hindi, route signed in and out, carry the same placeholders in both, say in Hindi that the English governs and that no lawyer has seen either, and say they are unreviewed while ${placeholderCount} placeholders remain.`);
+  : `LEGAL PAGES: PASS — ${pass}/${pass} checks — privacy, terms, refunds and grievances exist in English and Hindi, route signed in and out, carry the same placeholders in both, say in Hindi that the English governs, show the review banner from the explicit switch (${REVIEWED ? 'reviewed' : 'not yet reviewed by a lawyer'}, ${placeholderCount} placeholders), cover App Store and Google Play purchases, and ship the generated third-party notices on demand.`);
 process.exit(failures.length ? 1 : 0);

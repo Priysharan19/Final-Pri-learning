@@ -86,6 +86,8 @@ jobs:
         run: node client/test/native-shell-csp-check.mjs
       - name: Store-facing privacy manifest matches the privacy labels; Android permissions and signing stay closed
         run: node tools/store-readiness-check.mjs
+      - name: Public site is generated from docs/legal, uses only approved wording, links resolve, nothing phones home
+        run: npm run test:site
       - name: Install client dependencies
         run: npm ci --prefix client
       # Grading is online-only and server-authoritative, so the suites that
@@ -228,7 +230,15 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
+          # 364 (m-finish-16): the review switch, store-purchase wording, retention and
+          # crash-report disclosures, and the generated third-party notices page.
+          # 374 (L7): no notice makes a coverage claim D24 forbids, in either language.
+          # 375 (L7): the D18 wording matches the accounts stream's code (#736).
+          grep -Fq 'LEGAL PAGES: PASS — 375/375 checks' suites.log
+          # 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination.
+          grep -Fq 'LEGAL PROMISES GATE: PASS — 16/16 checks' suites.log
+          # L7: the counsel question sheet quotes the current text and code locations.
+          grep -Fq 'COUNSEL QUESTIONS: PASS — 13/13 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
@@ -374,6 +384,9 @@ jobs:
           set -o pipefail
           node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
           grep -Fq 'RLS FAIL-CLOSED: PASS — 141/141 checks' rls-fail-closed.log
+          # A parent who approves by email code is sent the withdrawal credential too.
+          node server/test/guardian-code-approval-withdraw-check.mjs | tee guardian-code-approval.log
+          grep -Fq 'GUARDIAN CODE APPROVAL WITHDRAWAL: PASS — 14/14 checks' guardian-code-approval.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -559,7 +572,9 @@ jobs:
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 61/61 suites' platform-postgres.log
+          # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -952,12 +967,15 @@ jobs:
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
-          # public page (Apple 5.1.1(v), Play "Delete account"). Two flows. The
-          # in-app flow also proves the persisted account link is gone after the
-          # deletion and after a reload (#500).
+          # public page (Apple 5.1.1(v), Play "Delete account"). The in-app flow
+          # also proves the persisted account link is gone after the deletion
+          # and after a reload (#500). The third flow: Settings "Sign out
+          # everywhere" ends every session of the account, after a confirmation,
+          # and returns to the sign-in card (#481).
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*2 flows' browser.log
+          grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
+          grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
           # Account first (issue #477): a child signs up on the one card and a
           # parent approves on their own page; the gate journey in both engines.
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log

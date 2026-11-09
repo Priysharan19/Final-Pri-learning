@@ -1,6 +1,6 @@
 # App Store listing — Pri Learning (draft for App Store Connect)
 
-**Status:** original Phase 6 draft prepared 2026-10-18 against `7bef402f7`; reconciled at `98a30194caf349885a24b11d75edf01ac50df428` on 20 October. This document retains a **price-gated historical draft**, not approved public copy; the conservative proposed listing in `task04-acceptance/01-Apple-Listing-and-Review.md` must be used until payment and privacy evidence are satisfied. **Not entered in App
+**Status:** original Phase 6 draft prepared 2026-10-18 against `7bef402f7`; reconciled at `98a30194caf349885a24b11d75edf01ac50df428` on 20 October, and again on 8 November 2026 against `main` `1d3829103` for the owner defaults of 1 November (D3 sign-in, D5 origins, D17 reading prompt, D18 child-account erasure, D23 past papers, D24 coverage wording; §10). This document retains a **price-gated historical draft**, not approved public copy; the conservative proposed listing in `task04-acceptance/01-Apple-Listing-and-Review.md` must be used until payment and privacy evidence are satisfied. **Not entered in App
 Store Connect.** Every product statement below is checked against the code it describes (cited in
 §9). Nothing here claims superiority over another app, a level of accuracy, complete syllabus
 coverage or production readiness. Where a fact belongs to the owner (prices, URLs, reviewer
@@ -80,8 +80,10 @@ account), it is marked **OWNER**.
 > same service to find where a mistake is. You can switch server reading off
 > in Settings and type your answers instead. You can delete your account in the app at any time.
 >
-> Pri Learning follows the NCERT syllabus and public examination patterns. It is not endorsed by,
-> affiliated with or approved by NCERT, CBSE, the NTA or any examination authority.
+> Pri Learning offers maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced:
+> 77 chapters. Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list, and Class 8
+> follows the earlier NCERT book. Marking is automatic and can be wrong. Pri Learning is not endorsed
+> by, affiliated with or approved by NCERT, CBSE, the NTA or any examination authority.
 >
 > SUBSCRIPTION TERMS
 > Pri Learning Premium is an auto-renewing subscription, monthly or yearly. Payment is charged to
@@ -90,12 +92,16 @@ account), it is marked **OWNER**.
 > for renewal within 24 hours before the end of the period. You can manage and cancel your
 > subscription in your Apple Account settings after purchase.
 >
-> Terms of use: <PRI_PUBLIC_ORIGIN>/terms
-> Privacy notice: <PRI_PUBLIC_ORIGIN>/privacy
+> Terms of use: https://prilearning.com/terms
+> Privacy notice: https://prilearning.com/privacy
 
 **Do not publish this description until:** (a) the prices are set in App Store Connect and match;
 (b) the Premium feature list is checked against the paywall on the release build; (c) the **19 October revised** privacy notice at `/privacy` is tested against live providers/data flows and receives counsel approval; the 18 October counsel pack's assertion that it still describes on-device marking is historically stale; (d) if an introductory offer or free trial is
-configured, its terms are added to the subscription paragraph.
+configured, its terms are added to the subscription paragraph; (e) the D17 one-time prompt naming
+OpenAI is in the release build, and the PRIVACY paragraph is rewritten to describe it (today it
+describes reading as on for a signed-in account and switchable off, which is what the code does);
+(f) `https://prilearning.com/privacy`, `/terms` and `/support` are live (the site in `site/` is not
+deployed and DNS is untouched, D5).
 
 ## 3. Keywords, category, other metadata
 
@@ -106,11 +112,11 @@ configured, its terms are added to the subscription paragraph.
 | Secondary category | **Reference** (optional; leave blank if unsure) |
 | Kids Category | **No** — see §5 |
 | Copyright | `© 2026 {{OWNER_LEGAL_NAME}}` — **OWNER** |
-| Content rights | Does the app contain, show or access third-party content? **OWNER / counsel:** the question bank includes official NTA / CBSE / NCERT paper material the owner has approved for use (owner decision 2026-10-02); confirm the rights basis before answering. |
-| Support URL | `<PRI_PUBLIC_ORIGIN>/support` — **OWNER** (page does not exist yet; a page with `{{SUPPORT_EMAIL}}` and the grievance link is enough) |
-| Marketing URL | `https://prilearning.com` — **OWNER** confirms |
-| Privacy policy URL | `<PRI_PUBLIC_ORIGIN>/privacy` |
-| User privacy choices URL (optional) | `<PRI_PUBLIC_ORIGIN>/account/delete-request` |
+| Content rights | Does the app contain, show or access third-party content? Past papers are **off for students** until a rights opinion exists (D23); the generated questions do not depend on them. **OWNER / counsel:** answer from the release build, and revisit when counsel gives the rights opinion (`docs/legal/counsel/QUESTIONS-FOR-COUNSEL.md`, D23). |
+| Support URL | `https://prilearning.com/support` (D5). Generated by `site/` from `docs/legal/grievance.md`; **not deployed** — it must resolve before this field is entered |
+| Marketing URL | `https://prilearning.com` (D5) — **OWNER** confirms before the first signed build |
+| Privacy policy URL | `https://prilearning.com/privacy` (D5) — the site renders `docs/legal/privacy.md` word for word |
+| User privacy choices URL (optional) | `https://prilearning.com/delete-account` (D5), which links to the working form at `https://app.prilearning.com/account/delete-request` |
 | App Privacy answers | `docs/release/app-store-privacy-labels.md` |
 
 ## 4. Age rating questionnaire
@@ -180,18 +186,24 @@ children, and India's DPDP Act defines a child as under 18 (counsel to confirm b
 > Camera: used only when the student chooses to photograph paper working or a textbook question.
 >
 > Under-18 accounts: the app asks whether the user is 18 or older; if not, a parent or guardian
-> must confirm by email link or SMS code before answers can be checked. The second demo account
-> has this confirmation already completed.
+> must confirm by an email link or a code sent by email before answers can be checked. The second
+> demo account has this confirmation already completed.
 >
 > Subscriptions: Pri Learning Premium (monthly and annual auto-renewing subscriptions) is sold
 > only through StoreKit. Restore is in Settings → Plan.
 >
 > Account deletion: Settings → Account → Delete cloud account. It is immediate.
 >
-> No ads, no tracking, no third-party analytics.
+> No ads, no tracking, and no third-party analytics or crash SDK. Pri's own server keeps
+> operational telemetry and coded crash reports, declared in App Privacy.
 
 **Before submitting, check on the release build:** the menu paths above (Settings → Plan,
-Settings → Account), that Sign in with Apple appears, and that restore works in the sandbox.
+Settings → Account), that sign-in offers email code and password only (D3: Sign in with Apple and
+Google arrive together in an update, so Guideline 4.8 is not engaged by this submission), that the
+D17 prompt appears before the first read or photo and that declining it leaves typed answers
+working, and that restore works in the sandbox. If the D17 prompt is not in the build, rewrite the
+handwriting paragraph of these notes to say reading is on for a signed-in account and can be
+switched off in Settings → Handwriting.
 
 ## 7. Screenshot shot list
 
@@ -249,7 +261,25 @@ claims.
 | JEE Advanced is Premium | `client/src/local/backend.js` (`requireCapability(…, JEE_ADVANCED)`), `indiaExamBackend.js`, `exams.js` |
 | Not claimed | `advanced-pri-explain` and `advanced-analytics` are declared in `entitlements.js` but not enforced as gates today, so the listing does not advertise them. Add them to the copy only when a gate exists |
 | Needs account + connection; ink kept offline | `client/src/i18n/strings.en.js` `settings.localPlanSub`, `verdict.statusSavedWaitingSignIn`; `authoritative-architecture.md` |
-| Under-18 guardian confirmation by link or code | `guardianConsent.js`, `otp.js` |
+| Under-18 guardian confirmation by link or code (email only while SMS is off, D3) | `guardianConsent.js`, `otp.js` `channels` |
+| Coverage sentences (77 chapters; Class 8 earlier NCERT book; Class 9 8 of 15) | D24 approved wording (owner audit `audit-content`). 77 is the chapter count `client/test/notes-content-check.mjs` measures ("77/77 chapters", pinned in `.github/workflows/ci.yml`); the Class 8 and Class 9 labels are lane L5's to keep true (`client/src/engine/indiaProductionMeta.js`) |
 | Server reading can be switched off | `client/src/ink/cloudReader.js`; `settings.cloudHandwritingCopy` |
 | In-app deletion | `CloudAccountSecurity.jsx` → `DELETE /v1/account` |
 | No ads / tracking | `PrivacyInfo.xcprivacy`; `tools/check-client-network-boundary.mjs` |
+
+## 10. Reconciled on 8 November 2026 (`main` `1d3829103`)
+
+| # | What was stale | Now |
+|---|---|---|
+| 1 | A public-origin placeholder stood for every URL | D5 origins: `https://prilearning.com` for the site (`/privacy`, `/terms`, `/support`, `/delete-account`) and `https://app.prilearning.com` for the app. The owner still confirms D5 before the first signed build; none of these URLs resolves until the site is deployed |
+| 2 | Review notes said a guardian confirms "by email link or SMS code" | SMS is off at launch (D3) and the client hides it unless the server reports it live (`SignUpFlow.jsx`, `channels.sms`); the notes say email link or email code |
+| 3 | The pre-submission check expected Sign in with Apple to appear | D3: email code and password only in the first submission |
+| 4 | Content rights cited official paper material approved for use | D23: past papers are off for students until a rights opinion exists |
+| 5 | "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only; nothing says complete, every chapter, syllabus-aligned, official or accurate |
+| 6 | "No third-party analytics" with no word about the server's own telemetry | Says what is true: no third-party analytics or crash SDK; Pri's server keeps operational telemetry and coded crash reports, which App Privacy declares |
+| 7 | The description and notes did not say what changes when D17 lands | Publication gates (e) and (f) in §2 and the pre-submission check in §6 |
+
+D18 (an unconfirmed or withdrawn under-18 account is erased after 30 days; a guardian can ask for
+erasure without the child's login) is in the privacy notice and not yet in the code; a production
+nomination is refused until it is (`tools/legal-promises.mjs`). The listing makes no D18 statement
+of its own.

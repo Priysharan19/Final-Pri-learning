@@ -1,0 +1,10 @@
+{
+  "$comment": "The one switch behind the 'not yet reviewed by a lawyer' banner on /privacy, /terms, /refund-policy and /grievance (client/src/pages/Legal.jsx). It is false until a lawyer qualified in Indian law has reviewed the English notices and checked the Hindi against them. Filling placeholders never clears it; only a human does, by editing this file, and client/test/legal-pages-check.mjs refuses `reviewed: true` unless every field below is filled, `reviewedOn` is on or after the 'Last updated' date of every English notice, and the Hindi notices no longer say that no advocate has checked them. Nothing in the code or in any agent's work may set this to true.",
+  "reviewed": false,
+  "reviewer": null,
+  "qualification": null,
+  "reviewedOn": null,
+  "languages": [],
+  "evidence": null,
+  "unreviewedSince": "2026-10-19"
+}

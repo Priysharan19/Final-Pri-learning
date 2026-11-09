@@ -25,7 +25,7 @@ import {
 import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv } from './otpEmail.js';
 import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
-import { deleteAccountRows, queueAccountToken } from './accounts.js';
+import { WITHDRAW_CREDENTIAL_MS, deleteAccountRows, invalidatePendingTokens, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
 import { logEvent, safeCode } from './observability.js';
@@ -504,7 +504,19 @@ export function createOtpRouter(db, {
     const row = await db.get('SELECT guardian_email, guardian_phone, withdrawn_at FROM guardian_consents WHERE account_id = ?', [live.account_id]);
     const named = row && (channel === 'sms' ? row.guardian_phone === destination : normalizeEmail(row.guardian_email) === destination);
     if (!named || row.withdrawn_at) return invalidCode(res);
-    const confirmed = await confirmConsent(db, live.account_id, req.body.noticeVersion, now);
+    // An email parent who approves by code gets the same long-lived withdrawal
+    // credential as one who approves by link (accounts.js /guardian/confirm):
+    // the link expires within the hour and is purged, so without it a parent
+    // who approved by code could neither withdraw later nor ask for the
+    // account to be erased (decision D18). A phone parent withdraws by SMS.
+    let confirmed = false;
+    await db.transaction(async () => {
+      confirmed = await confirmConsent(db, live.account_id, req.body.noticeVersion, now);
+      if (confirmed && channel === 'email') {
+        await invalidatePendingTokens(db, live.account_id, 'guardian-withdraw', now);
+        await queueAccountToken(db, live.account_id, destination, 'guardian-withdraw', now, { ttlMs: WITHDRAW_CREDENTIAL_MS });
+      }
+    });
     const child = await db.get('SELECT name FROM accounts WHERE id = ?', [live.account_id]);
     res.json({ ok: true, confirmed, childName: child?.name || null });
   });
