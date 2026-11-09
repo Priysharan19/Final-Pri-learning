@@ -622,7 +622,9 @@ const scratch = [];
         ok(importPlan({ ...good, exportedAt: new Date().toISOString(), records: [good.records[0]] }, { ledger: importLedger }).problems.length === 0, 'an export made after the ledger\'s rows for its cases is accepted');
         ok(importPlan({ ...good, server: 'production', records: [good.records[0]] }, { ledger: importLedger }).problems.length === 0, 'rows against another server are other evidence: they never make an export look older');
         appends.length = 0;
-        const soakAt = new Date().toISOString();
+        // A second before the import: the soak it writes is then strictly after this export
+        // (newer() compares in milliseconds), so a re-import is refused however fast this runs.
+        const soakAt = new Date(Date.now() - 1000).toISOString();
         const imported = importExport({ ...good, exportedAt: soakAt, records: [], soaks: [soak] }, { ledger: importLedger, append: counting });
         ok(imported.soaks.length === 1 && readLedger(soakLedger).length === 1 && validateLedger(importLedger).length === 0, 'a soak in the export is written by the recorder\'s recordSoak, and both ledgers validate');
         assert.deepEqual(appends, [soakLedger], 'an export of soaks only appends to the soak ledger, once'); count += 1;

@@ -294,8 +294,8 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
 
   // ── opt-in: the public configuration matches the manifest (--expect-config) ─
   if (expectedConfig) {
-    // The three reads above are reused; every other path is one more GET.
-    const answers = new Map([['/v1/health', health], ['/v1/ready', ready], ['/release.json', web]]);
+    // The four reads above (#752's three, plus main's /v1/billing/config) are reused; every other path is one more GET.
+    const answers = new Map([['/v1/health', health], ['/v1/ready', ready], ['/release.json', web], ['/v1/billing/config', billing]]);
     for (const probe of expectedConfig.probes) {
       if (!answers.has(probe.path)) {
         try { answers.set(probe.path, await getJson(fetchImpl, `${base}${probe.path}`)); }

@@ -31,9 +31,11 @@ function matrix(dir, selection = () => 'pass', sha = SHA) {
         : 'Synthetic test row; no real person or hardware was used',
       ...(result === 'pass' ? {
         tester: 'Fixture Human', device: c.family === 'IPH' ? 'Sample iPhone' : 'Sample Tablet',
-        os: 'iOS fixture 26.0', pencil: c.pencil ? 'Sample Pencil' : undefined,
-        buildKind: c.family === 'AND' || c.family === 'ANT' ? 'play-internal' : 'testflight', server: 'production'
-      } : {})
+        os: 'iOS fixture 26.0', pencil: c.pencil ? 'Sample Pencil' : undefined
+      } : {}),
+      // Every row is the store build against staging, the rows release evidence counts
+      // (release-nominate releaseDeviceRows, #760; docs/release/device-matrix.md, #737).
+      buildKind: c.family === 'AND' || c.family === 'ANT' ? 'play-internal' : 'testflight', server: 'staging'
     }, { now: Date.parse('2026-10-30T00:00:00Z') });
   });
   writeFileSync(path, rows.map(row => JSON.stringify(row)).join('\n') + '\n');

@@ -108,10 +108,13 @@ try {
     `  ✓ web client release.json equals server release identity  (web ${SHA})`,
     '  ✓ /v1/ready says this replica can serve  (ready)',
     `  ✓ /v1/ready reports the same SHA  (${SHA})`,
-    `DEPLOYMENT VERIFIED: PASS — ${engineAndProven ? '14/14' : '12/12'}`,
+    // Main's web-checkout row (#727, Train 3), added after 1d3829103.
+    '  ✓ web checkout is off, as the terms and refund policy say  (configured false)',
+    `DEPLOYMENT VERIFIED: PASS — ${engineAndProven ? '15/15' : '13/13'}`,
     ''
   ].join('\n');
-  const threeGets = ['GET /v1/health', 'GET /release.json', 'GET /v1/ready'].sort();
+  // Main's web-checkout row (#727) reads /v1/billing/config as well.
+  const threeGets = ['GET /v1/health', 'GET /release.json', 'GET /v1/ready', 'GET /v1/billing/config'].sort();
   for (const [name, args, proven] of [
     ['bare', ['--origin', origin, '--sha', SHA, '--allow-http'], false],
     ['--engine postgres --auth-email-proven', ['--origin', origin, '--sha', SHA, '--allow-http', '--engine', 'postgres', '--auth-email-proven'], true]
@@ -119,7 +122,7 @@ try {
     reset();
     const out = await cli(args);
     eq([out.code, out.stdout], [0, golden(proven)], `default CLI (${name}) prints exactly the rows it always has`);
-    eq([...requests].sort(), threeGets, `default CLI (${name}) sends exactly three GETs, once each`);
+    eq([...requests].sort(), threeGets, `default CLI (${name}) sends exactly main's four GETs, once each`);
   }
   // The handwriting state and every probe path are ignored unless asked for.
   reset();
@@ -128,13 +131,13 @@ try {
   routes['/v1/ready'][1].state = 'degraded';
   routes['/v1/tutor/status'] = [401, { error: { code: 'AUTH_REQUIRED' } }];
   const quiet = await run({ engine: 'postgres', authEmailProven: true });
-  ok(quiet.ok && quiet.results.length === 14, 'without the flags a degraded reader and an exposed tutor change nothing: 14/14 as before');
-  eq([...requests].sort(), threeGets, 'and nothing beyond the three GETs is requested');
+  ok(quiet.ok && quiet.results.length === 15, "without the flags a degraded reader and an exposed tutor change nothing: 15/15 as before (14 + main's web-checkout row)");
+  eq([...requests].sort(), threeGets, "and nothing beyond main's four GETs is requested");
 
   // ── 2 · --require-handwriting ─────────────────────────────────────────────
   reset();
   let report = await run({ engine: 'postgres', authEmailProven: true, requireHandwriting: true });
-  ok(report.ok && report.results.length === 15, 'a ready reader passes: 15/15');
+  ok(report.ok && report.results.length === 16, 'a ready reader passes: 16/16');
   eq(report.results.at(-1), { ok: true, label: 'handwriting reader ready: /v1/ready checks.handwriting.state is ok', detail: 'state ok, code none' }, 'the handwriting row comes after every standard row');
   for (const [state, code] of [['degraded', 'HANDWRITING_PROVIDER_429'], ['unavailable', 'HANDWRITING_PROVIDER_AUTH'], ['not_configured', null]]) {
     reset();
@@ -179,7 +182,7 @@ try {
     ['D22', 'PRI_PARENT_REPORT'], ['#653', 'PRI_TRUSTED_PROXY_HOPS'], ['D5', 'PRI_PUBLIC_ORIGIN=https://app.prilearning.com'], ['Apple billing', 'PRI_APPLE_ROOT_CA_PEM'], ['sender', 'verify@mail.prilearning.com']]) {
     ok(doc.includes(needle), `the manifest table states ${decision}: ${needle}`);
   }
-  ok(doc.includes(`DEPLOYMENT VERIFIED: PASS — ${14 + 1 + manifestConfig.probes.length + 1}/${14 + 1 + manifestConfig.probes.length + 1}`), 'the manifest states the full count the production check prints');
+  ok(doc.includes(`DEPLOYMENT VERIFIED: PASS — ${15 + 1 + manifestConfig.probes.length + 1}/${15 + 1 + manifestConfig.probes.length + 1}`), 'the manifest states the full count the production check prints');
   // The owner's Railway click-list pastes these values: it must agree with the manifest, hold secrets
   // only as <placeholders>, and set none of the variables the manifest requires unset.
   const clickList = readFileSync(join(ROOT, 'docs', 'release', 'OWNER-CLICK-LIST-APPLE-RAILWAY.md'), 'utf8');
@@ -199,8 +202,8 @@ try {
   // ── 4 · --expect-config against a matching and a drifting deployment ─────
   reset();
   report = await run({ engine: 'postgres', authEmailProven: true, requireHandwriting: true, expectedConfig: localConfig });
-  ok(report.ok && report.results.length === 14 + 1 + localConfig.probes.length + 1, `a deployment matching the manifest passes ${report.results.length}/${report.results.length}`);
-  eq(report.results.slice(0, 14).map(r => r.label), (await run({ engine: 'postgres', authEmailProven: true })).results.map(r => r.label), 'the standard rows keep their order; the new rows only follow them');
+  ok(report.ok && report.results.length === 15 + 1 + localConfig.probes.length + 1, `a deployment matching the manifest passes ${report.results.length}/${report.results.length}`);
+  eq(report.results.slice(0, 15).map(r => r.label), (await run({ engine: 'postgres', authEmailProven: true })).results.map(r => r.label), 'the standard rows keep their order; the new rows only follow them');
   reset();
   await run({ expectedConfig: localConfig });
   eq([...new Set(requests)].length, requests.length, 'each path is requested once: the probes reuse /v1/ready and each other');
@@ -314,7 +317,7 @@ try {
   const asMarkdown = config => `# fixture\n\n${EXPECTED_CONFIG_START}\n\`\`\`json\n${JSON.stringify(config, null, 2)}\n\`\`\`\n${EXPECTED_CONFIG_END}\n`;
   reset();
   let out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--engine', 'postgres', '--auth-email-proven', '--require-handwriting', '--expect-config', write('local.md', asMarkdown(localConfig))]);
-  const total = 14 + 1 + localConfig.probes.length + 1;
+  const total = 15 + 1 + localConfig.probes.length + 1;
   ok(out.code === 0 && out.stdout.endsWith(`DEPLOYMENT VERIFIED: PASS — ${total}/${total}\n`), `the CLI passes a matching deployment ${total}/${total}`);
   ok(out.stdout.startsWith(golden(true).split('\nDEPLOYMENT VERIFIED')[0]), 'and prints the standard rows first, unchanged');
   reset();

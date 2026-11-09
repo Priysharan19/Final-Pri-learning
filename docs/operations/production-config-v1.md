@@ -74,7 +74,7 @@ with one more unauthenticated GET each (never a write, never a credential), plus
 Both flags are opt-in: without them `verify-deployment` sends its three GETs and prints the same
 14 rows as always (`tools/verify-deployment.test.mjs` pins that byte for byte).
 
-Expected result: `DEPLOYMENT VERIFIED: PASS — 27/27` (the 14 standard rows, the handwriting row, the
+Expected result: `DEPLOYMENT VERIFIED: PASS — 28/28` (the 15 standard rows, the handwriting row, the
 eleven probes and the public origin). Against **staging** the same command is a rehearsal and some rows
 differ on purpose (a staging build made with the tutor on, staging's billing products): read each
 failed row rather than counting.

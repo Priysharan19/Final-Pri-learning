@@ -90,4 +90,4 @@ release with the staged variables. If the push does not start a deployment (as o
 Deployments and deploy that exact commit yourself.
 
 **B5 — prove it.** Run `production-config-v1.md` §2, which must print
-`DEPLOYMENT VERIFIED: PASS — 27/27`, then do its human checks H2–H9 and fill its §4.
+`DEPLOYMENT VERIFIED: PASS — 28/28`, then do its human checks H2–H9 and fill its §4.
