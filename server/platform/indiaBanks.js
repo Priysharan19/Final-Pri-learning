@@ -18,6 +18,8 @@
 // useMarkerPoolForTests() — so a production server can never serve these banks.
 import { allGenerators, IN_CHAPTERS } from '../../client/src/engine/curriculum-in.js';
 import { indiaPyqCells } from '../../client/src/engine/indiaExamCells.js';
+import { hasJeePyqGenerator } from '../../client/src/engine/generators/jee-pyq-runtime.js';
+import { hasPyqGenerator } from '../../client/src/engine/pyq/pyqCoverage.js';
 
 // The covers' generators, and the India previous-year banks the exam cells
 // draw on (the source-cited archive and the reviewed JEE department catalog).
@@ -30,7 +32,17 @@ let outsideAllowedForTests = false;
 
 /** Is this generator one the India curriculum's covers draw on? */
 export function indiaBank(generator) {
-  return typeof generator === 'string' && (INDIA_BANKS.has(generator) || outsideAllowedForTests);
+  return typeof generator === 'string' && (INDIA_BANKS.has(generator) || indiaPyqBank(generator) || outsideAllowedForTests);
+}
+
+/**
+ * Every bank of the two India previous-year sources — the reviewed JEE Main /
+ * Advanced department catalog and the source-cited CBSE / JEE archive
+ * (pyq-…) — is India content, whether or not an exam cell draws on it yet:
+ * premium JEE practice asks for these by name (#732).
+ */
+export function indiaPyqBank(generator) {
+  return hasJeePyqGenerator(generator) || hasPyqGenerator(generator);
 }
 
 /** May the NSW-era practice-paper kind be issued? Never, outside a test that asked. */

@@ -41,7 +41,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const LIMIT = FREE_PRACTICE_ALLOWANCE.perDay;
 const ADVANCED = 'jee-advanced-c11-binomial-theorem';
 const ARCHIVE = 'pyq-jee-advanced-c11-conic-sections';
-const PERCENT = 'y7-decimals-perc'; // seed 4242: 30% of 90; the trap answer 3 divides by 30
+const PERCENT = 'c8-percentage-reasoning'; // seed 4242, D2: a 30% rise, with a trap value (an India bank, D15)
 const post = (path, body, jar = {}, headers = {}) => h.request(path, { method: 'POST', jar, body, headers });
 const issue = (jar, generator, extra = {}, headers = {}) => post('/v1/practice/issue', { generator, difficulty: 3, curriculum: 'in', mode: 'practice', ...extra }, jar, headers);
 let sub = 0;
