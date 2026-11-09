@@ -243,6 +243,6 @@
     "test:apple:not-on-sale": "node client/test/apple-billing-not-on-sale-check.mjs",
     "test:release:prep": "node tools/release-prep.test.mjs && node scripts/device-matrix-record.mjs validate && node tools/governance-text.test.mjs && node client/test/q4-release-negative-controls.mjs && node client/test/release-source-policy-consistency-check.mjs",
     "engine:benchmark": "node scripts/engine-benchmark.mjs",
-    "test:marker:policy": "node server/test/marking-policy-check.mjs && node client/test/marker-interim-policy-check.mjs"
+    "test:marker:policy": "node server/test/marking-policy-check.mjs && node client/test/marker-interim-policy-check.mjs && node server/test/india-banks-check.mjs"
   }
 }
