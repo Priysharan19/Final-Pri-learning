@@ -3109,6 +3109,7 @@ export default {
   "inst.reportHeatSpoken": "You practised on {days} days in the last {n} weeks.",
   "inst.reportLost": "Where marks were lost",
   "inst.reportLostLoading": "Reading this period's marks…",
+  "inst.reportLostFailed": "This period's marks could not be read just now.",
   "inst.reportLostNonePeriod": "No certified marks lost in this period.",
   "inst.ledeChapterPeriod": "{chapter} lost the most marks in this period.",
   "inst.trend": "{method}, {answer} {since}.",

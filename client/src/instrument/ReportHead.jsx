@@ -111,6 +111,7 @@ export default function ReportHead() {
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(null);
   const [marks, setMarks] = useState(null);
+  const [marksFailed, setMarksFailed] = useState(false);
   const [curriculum, setCurriculum] = useState(null);
 
   useEffect(() => {
@@ -139,11 +140,14 @@ export default function ReportHead() {
   useEffect(() => {
     let live = true;
     setMarks(null);
-    if (!periodFrom) { if (failed) setMarks({}); return () => { live = false; }; }
+    setMarksFailed(false);
+    // No period start (the series failed or is loading): no list, and no
+    // claim about it. A failed read of the marks says so, not "none lost".
+    if (!periodFrom) return () => { live = false; };
     api.get(`/marks/by-chapter?since=${encodeURIComponent(periodFrom)}`)
-      .then(r => live && setMarks(r?.chapters || {})).catch(() => live && setMarks({}));
+      .then(r => live && setMarks(r?.chapters || {})).catch(() => { if (live) setMarksFailed(true); });
     return () => { live = false; };
-  }, [periodFrom, failed]);
+  }, [periodFrom]);
 
   const view = useMemo(() => {
     if (!stats) return null;
@@ -237,7 +241,8 @@ export default function ReportHead() {
           </div>
           <div className="in-report-lost">
             <h3>{t('inst.reportLost')}</h3>
-            {!view.lostReady ? <p className="in-note" aria-busy="true">{t('inst.reportLostLoading')}</p> : view.lost.length ? (
+            {failed || marksFailed ? <p className="in-note" role="status" data-report-lost-failed>{t('inst.reportLostFailed')}</p>
+              : !view.lostReady ? <p className="in-note" aria-busy="true">{t('inst.reportLostLoading')}</p> : view.lost.length ? (
               <ul>{view.lost.map(c => (
                 <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
                   <i aria-hidden="true" /><PageLink to={c.href} data-report-lost-link={c.id}><span lang="en"><TermGloss text={c.name} /></span></PageLink><small>{`${c.earned}/${c.possible}`}</small>

@@ -31,6 +31,11 @@ check('lost marks are read with since = the period start, never all-time', () =>
   assert.match(src, /\/marks\/by-chapter\?since=\$\{encodeURIComponent\(periodFrom\)\}/);
   assert.doesNotMatch(src, /api\.get\('\/marks\/by-chapter'\)/);
 });
+check('a failed load never claims no marks were lost', () => {
+  assert.match(src, /failed \|\| marksFailed \? <p[^>]*data-report-lost-failed>\{t\('inst\.reportLostFailed'\)\}/);
+  assert.doesNotMatch(src, /catch\(\(\) => live && setMarks\(\{\}\)\)/);
+  assert.doesNotMatch(src, /if \(failed\) setMarks\(\{\}\)/);
+});
 check('each lost chapter links to practice', () => assert.match(src, /<PageLink to=\{c\.href\} data-report-lost-link/));
 check('period-scoped copy, English and Hindi', () => {
   const hi = readFileSync(new URL('../src/i18n/strings.hi.js', import.meta.url), 'utf8');

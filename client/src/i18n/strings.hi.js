@@ -3172,6 +3172,7 @@ export default {
   "inst.reportHeatSpoken": "आपने पिछले {n} सप्ताहों में {days} दिन अभ्यास किया।",
   "inst.reportLost": "जहाँ अंक कटे",
   "inst.reportLostLoading": "इस अवधि के अंक पढ़े जा रहे हैं…",
+  "inst.reportLostFailed": "इस अवधि के अंक अभी पढ़े नहीं जा सके।",
   "inst.reportLostNonePeriod": "इस अवधि में कोई प्रमाणित अंक नहीं कटे।",
   "inst.ledeChapterPeriod": "इस अवधि में सबसे ज़्यादा अंक {chapter} में गए।",
   "inst.trend": "{since} {method}, {answer}।",
