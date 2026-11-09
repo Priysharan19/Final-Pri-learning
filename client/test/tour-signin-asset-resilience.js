@@ -44,8 +44,12 @@ export const flow = {
     // The two pieces render independently; neither can move the other once
     // the form becomes actionable. This is checked in a fresh page so the
     // aborted import above cannot poison the React.lazy module cache.
-    const delayedPage = await ctx.newPage();
-    await delayedPage.setViewportSize({width:390,height:844});
+    // A new browser context avoids an already registered service worker
+    // short-circuiting Playwright's deliberate network delay.
+    const delayedContext = await ctx.browser().newContext({
+      viewport:{width:390,height:844},serviceWorkers:'block'
+    });
+    const delayedPage = await delayedContext.newPage();
     const delayed = [];
     const pageErrors = [];
     delayedPage.on('pageerror', error => pageErrors.push(error.message));
@@ -86,7 +90,7 @@ export const flow = {
       first.background + ' / ' + last.background);
     await check('delayed load does not create page errors', pageErrors.length === 0, pageErrors.join(','));
     await check('delayed load stays within the viewport', first.overflow <= 0 && last.overflow <= 0);
-    await delayedPage.close();
+    await delayedContext.close();
   }
 };
 
