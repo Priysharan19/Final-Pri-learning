@@ -132,6 +132,17 @@ const OPTIONAL = manifest('OPTIONAL');
 ok(Array.isArray(PRECACHE) && PRECACHE.length > 1, 'the build wrote an install manifest into the worker');
 ok(Array.isArray(WARM) && WARM.length > 0, 'and a warm manifest for what the install no longer carries');
 ok(Array.isArray(OPTIONAL) && OPTIONAL.length > 0, 'and an optional one for the recogniser');
+// The Class 7 and 8 hardest banks are on demand (not warmed for everyone)
+// only because warmScope() loads them at sign-in for their own class: a Class 7
+// or 8 profile's scope must name them, or that student loses them offline.
+{
+  const { indiaGeneratorsForScope } = await import('../src/engine/indiaProduct.js');
+  const { bankOf } = await import('../src/engine/generators/index.js');
+  for (const [grade, bank] of [[7, 'india-class7-hardest'], [8, 'india-class8-hardest']]) {
+    const banks = new Set(indiaGeneratorsForScope('cbse', grade).map(bankOf));
+    ok(banks.has(bank), `a Class ${grade} profile's sign-in scope loads ${bank}, so it is offline-ready without being warmed for everyone`);
+  }
+}
 if (!PRECACHE || !WARM || !OPTIONAL) {
   console.log(`${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
