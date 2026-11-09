@@ -6,7 +6,7 @@ import { useT } from '../i18n/index.js';
 // All points are evaluated from f(x)=x³−3x; pointer changes trigger redraws,
 // never a continuous animation or React rerenders.
 const fn = x => x * x * x - 3 * x;
-const range = [-2.3, 2.3];
+const range = [-2.1, 2.1];
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const value = x => (Math.abs(x) < 0.005 ? '0.00' : x.toFixed(2));
 
@@ -32,18 +32,21 @@ export default function SignInPlot() {
       ctx.clearRect(0, 0, w, h);
       const compact = h < 240;
       const px = compact ? 16 : Math.min(88, w * .10);
-      const py = compact ? 52 : Math.min(180, h * .24);
-      const lower = compact ? 29 : py;
+      const py = compact ? 56 : Math.min(180, h * .24);
+      const lower = compact ? 26 : py;
       const gw = w - 2 * px, gh = h - py - lower;
       if (gw < 20 || gh < 20) return;
       const sx = x => px + (x - range[0]) / (range[1] - range[0]) * gw;
-      const sy = y => py + (5 - y) / 10 * gh;
+      const sy = y => py + (3.5 - y) / 7 * gh;
       const grid = (spacing, color) => {
         ctx.lineWidth = 1; ctx.strokeStyle = color; ctx.beginPath();
         for (let x = -2; x <= 2; x += spacing) { ctx.moveTo(sx(x), py); ctx.lineTo(sx(x), py + gh); }
-        for (let y = -5; y <= 5; y += spacing) { ctx.moveTo(px, sy(y)); ctx.lineTo(px + gw, sy(y)); }
+        for (let y = -3; y <= 3; y += spacing) { ctx.moveTo(px, sy(y)); ctx.lineTo(px + gw, sy(y)); }
         ctx.stroke();
       };
+      // Keep the curve and probe inside the calibrated plotting area.
+      // Its un-clipped old rendering could run through labels on narrow phones.
+      ctx.save(); ctx.beginPath(); ctx.rect(px, py, gw, gh); ctx.clip();
       grid(.5, 'rgba(230,232,246,.055)');
       grid(1, 'rgba(230,232,246,.095)');
       ctx.strokeStyle = 'rgba(230,232,246,.36)'; ctx.lineWidth = 1;
@@ -60,16 +63,26 @@ export default function SignInPlot() {
       }
       ctx.stroke();
       const x = clamp(probe, ...range), y = fn(x), cx = sx(x), cy = sy(y);
+      const slope = 3 * x * x - 3;
+      const tangentHalf = compact ? .24 : .45;
+      ctx.strokeStyle = 'rgba(181,170,255,.85)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(sx(x - tangentHalf), sy(y - slope * tangentHalf));
+      ctx.lineTo(sx(x + tangentHalf), sy(y + slope * tangentHalf));
+      ctx.stroke();
       ctx.setLineDash([2,5]); ctx.strokeStyle = 'rgba(181,170,255,.58)'; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(cx, py); ctx.lineTo(cx, py+gh);
       ctx.moveTo(px, cy); ctx.lineTo(px+gw, cy); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = '#b4a6ff'; ctx.beginPath(); ctx.arc(cx,cy,compact?3.5:5,0,Math.PI*2);ctx.fill();
-      if (readoutRef.current) readoutRef.current.textContent = 'x ' + value(x) + '  /  f(x) ' + value(y);
+      ctx.restore();
+      if (readoutRef.current) readoutRef.current.textContent = compact
+        ? 'x ' + value(x) + '  ·  y ' + value(y)
+        : 'x ' + value(x) + '   /   f(x) ' + value(y) + '   /   f′(x) ' + value(slope);
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(draw); };
     const resize = new ResizeObserver(schedule); resize.observe(canvas);
     const move = e => {
-      if (e.pointerType === 'touch') return;
+      if (e.pointerType === 'touch') return; // Visual-only inspection, no scroll capture.
       const box = canvas.getBoundingClientRect();
       const px = box.height < 240 ? 16 : Math.min(88, box.width * .10);
       probe = range[0] + clamp((e.clientX-box.left-px) / Math.max(box.width-2*px,1),0,1) * (range[1]-range[0]);
@@ -81,12 +94,12 @@ export default function SignInPlot() {
   },[]);
   return (
     <div className="in-signin-plot" aria-hidden="true">
-      <div className="pri-plot-top"><span>PRI / MATHEMATICS</span><span>INTERACTIVE STUDY</span></div>
+      <div className="pri-plot-top"><span>FUNCTION STUDY</span><span>MOVE POINTER TO INSPECT</span></div>
       <canvas ref={canvasRef}/>
-      <span className="pri-plot-equation">f(x) = x³ − 3x <small>EXAMPLE</small></span>
+      <span className="pri-plot-equation">f(x) = x³ − 3x <small>ILLUSTRATION</small></span>
       <div className="pri-plot-foot">
         <p className="in-signin-line">{t('login.instrumentHeadline')}</p>
-        <span className="pri-plot-value" ref={readoutRef}>x 1.15 / f(x) −1.93</span>
+        <span className="pri-plot-value" ref={readoutRef}>x 1.15 / f(x) −1.93 / f′(x) 0.97</span>
       </div>
     </div>
   );
