@@ -25,42 +25,47 @@ const tidyLabel = s => String(s).replace(/\\Delta/g, 'Δ').replace(/\\prime/g, "
   .replace(/[{}\s]/g, '').replace(/\\left|\\right/g, '');
 
 /**
- * Words and TeX tokens that join two statements in one span: an implication,
- * a line break, a connective, a separator. A span is cut at every one of them
- * (at bracket depth 0 for , and ;) so a label never keeps another statement's value.
- */
-export const JOINERS = /\\(?:Rightarrow|Longrightarrow|implies|iff|Leftrightarrow|to|therefore|because|qquad|quad|;|,|:|\s)|\\\\|\\(?:text|mathrm|textrm)\{\s*(?:so|gives|then|hence|and|or|i\.e\.|thus|therefore|which gives|giving)\s*,?\s*\}|⇒|→|∴|\b(?:so|gives|then|hence|and)\b/g;
-
-/**
- * The statements of one span. A piece with no `=` (the "2" of `x = 1, 2`) is
- * glued to the statement before it, whose value then has a top-level comma
- * and so is dropped whole. A piece with its own `=` but no label is its own
- * statement and yields nothing; it is never glued to a label.
+ * The statements of one TeX span, read structurally or not at all.
+ *
+ * The whole span is converted by plainTex; any TeX command it has no reading
+ * of (\Rightarrow, \text{…}, \mid, \hspace, …) makes the span unreadable and
+ * it yields NOTHING. The plain text is cut only at top-level `,` and `;`, and
+ * then every piece must be a complete statement `LABEL = v1 = v2 = …` in
+ * which every value parses and every value is equivalent to the last one. If
+ * any piece fails, the whole span yields nothing: never a partial reading,
+ * never a guess. Returns [{ label, value }].
  */
 export function statements(span) {
-  const marked = String(span).replace(JOINERS, '\u0000');
+  const plain = plainTex(String(span).replace(/\\Delta/g, 'Δ').replace(/\\prime/g, "'"));
+  if (!plain || /[^\x20-\x7EΔ′’]/.test(plain.replace(/[−–]/g, '-'))) return [];
   const pieces = [];
   let depth = 0, cur = '';
-  for (const c of marked) {
+  for (const c of plain) {
     if ('([{'.includes(c)) depth += 1;
     else if (')]}'.includes(c)) depth -= 1;
-    if (c === '\u0000' || (depth === 0 && (c === ',' || c === ';'))) { pieces.push(cur); cur = ''; continue; }
+    if (depth === 0 && (c === ',' || c === ';')) { pieces.push(cur); cur = ''; continue; }
     cur += c;
   }
   pieces.push(cur);
   const out = [];
   for (const raw of pieces) {
-    const p = raw.trim();
-    if (!p) continue;
-    if (!p.includes('=') && out.length) { out[out.length - 1] = { text: `${out[out.length - 1].text}, ${p}`, glued: true }; continue; }
-    out.push({ text: p, glued: false });
+    const parts = raw.split(/(?<![<>!])=(?!=)/).map(p => p.trim());
+    if (parts.length < 2 || parts.some(p => !p)) return [];
+    const label = tidyLabel(parts[0]);
+    if (!LABEL.test(label)) return [];
+    const values = parts.slice(1);
+    for (const v of values) { try { parse(normalize(v)); } catch { return []; } }
+    const last = values[values.length - 1];
+    for (const v of values.slice(0, -1)) {
+      let same = false;
+      try { same = exprEquivalent(v, last, { isolatedDomain: true }) === true; } catch { same = false; }
+      if (!same) return [];
+    }
+    // A one-letter label defined in terms of itself (i = 2i) is not a statement.
+    try { if (/^[A-Za-z]$/.test(label) && values.some(v => variablesOf(parse(normalize(v))).has(label))) return []; } catch { return []; }
+    out.push({ label, value: last });
   }
-  return out.filter(x => !x.glued).map(x => x.text);
-}
-function topLevelComma(v) {
-  let depth = 0;
-  for (const c of String(v)) { if ('([{'.includes(c)) depth += 1; else if (')]}'.includes(c)) depth -= 1; else if (c === ',' && depth === 0) return true; }
-  return false;
+  return out;
 }
 
 /** The milestones of a question's worked solution: [{ step, label, values: [plain expr] }]. */
@@ -69,17 +74,8 @@ export function milestonesOf(q) {
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   steps.forEach((step, i) => {
     const d = String(step?.d ?? '');
-    for (const m of d.matchAll(TEX_SPAN)) for (const piece of statements(m[1])) {
-      const parts = piece.split(/(?<![<>!])=(?!=)/);
-      if (parts.length < 2) continue;
-      const label = tidyLabel(parts[0]);
-      if (!LABEL.test(label)) continue;
-      const values = parts.slice(1).map(p => plainTex(p)).filter(v => {
-        // A top-level comma means two statements were not split apart: never a value.
-        if (!v || topLevelComma(v)) return false;
-        try { parse(normalize(v)); return true; } catch { return false; }
-      });
-      if (values.length) out.push({ step: i, heading: String(step?.h ?? '').trim(), label, values });
+    for (const m of d.matchAll(TEX_SPAN)) for (const st of statements(m[1])) {
+      out.push({ step: i, heading: String(step?.h ?? '').trim(), label: st.label, values: [st.value] });
     }
   });
   return out;
@@ -94,6 +90,8 @@ const SAME_SIDE = /(?<![<>!])=(?!=)/;
 export function matchMilestone(milestones, line) {
   const text = String(line ?? '').replace(/[−–—]/g, '-').trim();
   if (text.length > 160) return null;
+  // Every character must be one the engine reads: an unknown token is no tick.
+  if (/[^\x20-\x7E′’Δ√π²³]/.test(text)) return null;
   const parts = text.split(SAME_SIDE);
   if (parts.length !== 2) return null;
   const label = tidyLabel(parts[0]);
@@ -110,6 +108,8 @@ export function matchMilestone(milestones, line) {
       const want = variablesOf(parse(normalize(target)));
       const got = variablesOf(parse(rhs));
       if ([...got].some(v => !want.has(v))) continue;
+      // A one-letter label defined in terms of itself (i = 2i) is not a step.
+      if (/^[A-Za-z]$/.test(label) && (want.has(label) || got.has(label))) continue;
       ok = exprEquivalent(rhs, target, { isolatedDomain: true }) === true;
     } catch { ok = false; }
     if (ok) return m;
