@@ -176,6 +176,6 @@ owner private photo, no claims beyond what the screen shows.
 | 5 | Nothing said when Android ships | D1: the Android software is finished, but the public launch is iPhone and iPad first, because a new personal developer account needs a 14-day closed test with 12 testers (§7) |
 
 **Before this description is published:** the release build must include the D17 prompt (#737),
-whose wording counsel approves, and the site URLs above must resolve. D18 (erasure of
-an unconfirmed or withdrawn under-18 account after 30 days) is in the privacy notice and not yet in
-the code; a production nomination is refused until it is (`tools/legal-promises.mjs`).
+whose wording counsel approves, and the site URLs above must resolve. D18 (an unconfirmed or withdrawn under-18 account
+is closed after 30 days and erased 7 days after closing) is in the privacy notice and is
+**built** (#736, in Train 4: `server/platform/childErasure.js`) **and off until enabled**: the automatic 30-day rule runs only where production sets `PRI_CHILD_ERASURE=enforce` (default: report only); a guardian's own erasure request is honoured in every mode.

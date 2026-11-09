@@ -6,7 +6,8 @@ const {startApp,registerAccount,verifyEmail}=await import('./support/app-harness
 const h=await startApp({engine:(await import('./support/engine.mjs')).requestedEngine()});console.log('engine: '+h.engine);console.log('Q1_TEST_ENGINE '+h.engine);
 const samples=[
  {id:'c11-conic-sections',d:2,s:1,solve:p=>{let m=p.match(/length of the latus rectum of the parabola \$y\^2 = (\d+)x\$/);if(!m)throw Error('CONIC_PROMPT_NOT_MATCH');return Number(m[1]);}},
- {id:'c9-quadrilaterals',d:3,s:1,solve:p=>{let m=p.match(/parallelogram has adjacent sides \$(\d+)\$ and \$(\d+)\$/);if(!m)throw Error('QUAD_PROMPT_NOT_MATCH');return 2*(Number(m[1])+Number(m[2]));}}
+ // D15: c9-quadrilaterals is a retired bank the server refuses; this length question is its covered successor's.
+ {id:'c8-quadrilateral-property-reasoning',d:1,s:1,solve:p=>{let m=p.match(/perimeter of a rhombus is \$(\d+)\$ cm and one of its diagonals is \$(\d+)\$ cm/);if(!m)throw Error('QUAD_PROMPT_NOT_MATCH');const side=Number(m[1])/4,half=Number(m[2])/2;return 2*Math.sqrt(side*side-half*half);}}
 ];
 const forms=[['correct number',v=>String(v),true],['wrong currency for length',v=>v+' rupees',false],['wrong mass for length',v=>v+' kg',false],['wrong paise',v=>v+' paise',false]];
 let fails=0,cases=0;

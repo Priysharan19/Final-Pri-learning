@@ -18,13 +18,10 @@
 // summing a list that holds 0, substituting C = 0 — so the +0 rule fires only on
 // a side of a relation that has a variable in it.
 //
-// HELD lists the generators whose hints or steps still break a rule, each
-// defined in a file this lane may not edit yet: client/src/engine/generators/
-// india-class11-jee-hardest.js is lane L1's for wave 1 (#686 lock map), and the
-// other files carry #700's prompt fixes, which need CONTENT_VERSION in L1's
-// contentIdentity.js. Both land in the held L5 commit after L1's train, which
-// fixes these steps and empties HELD. A generator outside HELD with a hit
-// fails here; a HELD generator that no longer exists fails here too.
+// HELD lists generators whose hints or steps may still break a rule, each with
+// the file that could not be edited yet. It is empty: the held L5 commit (after
+// lane L1's train) fixed the last 26. A generator outside HELD with a hit fails
+// here; a HELD generator that no longer exists fails here too.
 // ─────────────────────────────────────────────────────────────────────────────
 import { workedStepHits } from './support/typesetting-rules.mjs';
 
@@ -33,36 +30,10 @@ const { indiaScope } = await import('../src/engine/indiaProduct.js');
 const { generateQuestion, loadAllBanks, GENERATORS } = await import('../src/engine/generators/index.js');
 
 const DRAWS = 60;
-const L1 = 'india-class11-jee-hardest.js (lane L1, wave 1)';
-const V = 'needs CONTENT_VERSION (contentIdentity.js, lane L1)';
-const HELD = new Map([
-  ['c11-complex-algebra-reasoning', L1],
-  ['c11-first-principles-reasoning', L1],
-  ['c11-limit-jee-reasoning', L1],
-  ['c11-line-angle-reasoning', L1],
-  ['c11-line-equation-jee-reasoning', L1],
-  ['c11-mean-deviation-jee-reasoning', L1],
-  ['c11-binomial-theorem', `india-algebra.js: ${V}`],
-  ['c12-determinants', `india-algebra.js: ${V}`],
-  ['c12-matrices', `india-algebra.js: ${V}`],
-  ['c11-complex-numbers', `india-class11.js: ${V}`],
-  ['c11-limits-derivatives', `india-class11.js: ${V}`],
-  ['c11-straight-lines', `india-class11.js: ${V}`],
-  ['c12-continuity-mvt', `india-senior.js: ${V}`],
-  ['c12-definite-integrals', `india-class12.js: ${V}`],
-  ['c12-differentiation-rules', `india-class12.js: ${V}`],
-  ['c12-integrals-methods', `india-class12.js: ${V}`],
-  ['c12-differential-equations', `india-calculus.js: ${V}`],
-  ['c7-finding-unknown-current', `ncert/class7-part2-2026-27-production.js: ${V}`],
-  ['c8-algebraic-identities-ncert-mastery', `ncert/class8-chapters-3-13-production.js: ${V}`],
-  ['c8-quadrilaterals-ncert-mastery', `ncert/class8-chapters-3-13-production.js: ${V}`],
-  ['c8-linear-equations-both-sides', `ncert/class8-linear-equations.js: ${V}`],
-  ['c8-linear-equations-brackets', `ncert/class8-linear-equations.js: ${V}`],
-  ['c8-linear-equations-fractions', `ncert/class8-linear-equations.js: ${V}`],
-  ['c8-linear-equations-verification', `ncert/class8-linear-equations.js: ${V}`],
-  ['c8-rational-numbers-between', `ncert/class8-rational-numbers.js: ${V}`],
-  ['c9-algebraic-identities-ncert-mastery', `ncert/class9-generators.js: ${V}`]
-]);
+// Empty since the held L5 commit landed after lane L1's train: every V1
+// generator's hints and steps pass. A generator may be added here only with a
+// reason naming the file that cannot be edited yet.
+const HELD = new Map();
 
 let pass = 0;
 const failures = [];
@@ -164,4 +135,4 @@ if (failures.length) {
   console.log(`WORKED STEPS TYPESETTING: FAIL — ${pass}/${total} checks`);
   process.exit(1);
 }
-console.log(`WORKED STEPS TYPESETTING: PASS — ${pass}/${total} checks — ${draws} questions, ${strings} hint and step strings; ${heldSeen.size} of ${HELD.size} held generators (${heldHits} defect kinds) wait for the held commit after lane L1's train`);
+console.log(`WORKED STEPS TYPESETTING: PASS — ${pass}/${total} checks — ${draws} questions, ${strings} hint and step strings; ${HELD.size} generators held`);

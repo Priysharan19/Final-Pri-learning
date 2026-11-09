@@ -43,6 +43,10 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-marker-isolation-'));
 process.env.NODE_ENV = 'test';
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because it uses NSW Year 7 banks (y7-algebra, a practice paper) as the vehicle for worker-pool isolation;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 // D12: method marks are off by default — production marks the final answer only
 // until an examiner signs (#499). This suite pins the method rubric itself, so it
 // turns the server switch on; marking-policy-check.mjs pins the default.
@@ -515,7 +519,7 @@ try {
     const sealed = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [who.account.id, t.q.id])).response_json);
     c.deq(await issued.workEvidence(lines), tutorEvidence(sealed, lines), 'tutor: the Step Check through the pool is exactly the in-process one');
     const stuck = await timed(issued.workEvidence([`x = ${t.root} ${magic('spin')}`]));
-    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake');
+    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null, unchecked: true }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake — marked as not checked');
     c.ok(stuck.ms < 250 + MARGIN, 'tutor: at the deadline');
   }
 

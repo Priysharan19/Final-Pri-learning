@@ -112,6 +112,10 @@ jobs:
           node client/test/entitlement-check.mjs
           node client/test/question-clock-check.mjs
           node client/test/sync-contract-check.mjs
+          # #300: legacy generator-keyed rows count on the chapter, its dot points and the
+          # predicted paper — sibling generators, after a new answer, after a restore.
+          node client/test/india-legacy-rows-check.mjs | tee india-legacy-rows.log
+          grep -Fq 'india-legacy-rows-check: 85/85 checks passed' india-legacy-rows.log
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs
@@ -187,7 +191,7 @@ jobs:
           # #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic
           # form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks.
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
@@ -204,13 +208,16 @@ jobs:
           grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
-          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
+          # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10855/10855 checks' suites.log
+          # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
+          grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406703 wrong answers marked correct across 18072 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
-          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29829 right answers over 11282 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 30679 right answers over 11740 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -260,7 +267,8 @@ jobs:
           # 374 (L7): no notice makes a coverage claim D24 forbids, in either language.
           # 375 (L7): the D18 wording matches the accounts stream's code (#736).
           # 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737).
-          grep -Fq 'LEGAL PAGES: PASS — 378/378 checks' suites.log
+          # 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned.
+          grep -Fq 'LEGAL PAGES: PASS — 383/383 checks' suites.log
           # 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination.
           # 19 (L7): the D17 prompt promise.
           grep -Fq 'LEGAL PROMISES GATE: PASS — 19/19 checks' suites.log
@@ -286,7 +294,8 @@ jobs:
           # 65 → 73 (#196): the camera file (and its EXIF/GPS) is never what is sent; every photo is
           # redrawn and the canvas encoding is sent, with no fall back to the original.
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
-          grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          # 114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
+          grep -Fq 'TUTOR UI: PASS — 114/114 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 60/60 checks' suites.log
@@ -298,7 +307,8 @@ jobs:
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt).
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 74 files scanned, 0 hard-coded strings' suites.log
+          # 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770).
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 75 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -598,6 +608,7 @@ jobs:
       - name: Rate-limit identity, sync idempotency, grants, body size, compressed-body survival and catalogue exposure
         run: |
           node server/test/proxy-identity-contract-check.mjs
+          node server/test/client-ip-header-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
           node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs

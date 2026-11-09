@@ -103,8 +103,11 @@ device can open a profile that has no password.
   answer. We ask the reading service not to store it. Under its own terms it
   does not use it to train its models, but it may hold a copy for a limited time
   to watch for abuse; we do not control that. Turning the setting off stops the
-  next picture from being sent, and it stays off; a picture already sent cannot
-  be recalled. What the reading service returns is a transcription of your
+  next picture of your handwriting or working from being sent, and it stays off;
+  a picture already sent cannot be recalled. **"Practise this" is separate:** a
+  photo of a printed question, taken to find practice questions like it, goes to
+  OpenAI the same way after the same one-time permission, but the Handwriting
+  setting does not cover it. It is sent only when you use "Practise this". What the reading service returns is a transcription of your
   writing, nothing more, and you can correct it before it counts: your mark is
   always decided by the marking engine on our server, never by the reading
   service.

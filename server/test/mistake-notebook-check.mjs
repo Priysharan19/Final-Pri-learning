@@ -32,7 +32,7 @@ const h = await startApp({ engine: requestedEngine() });
 const c = checks();
 const DAY = 24 * 60 * 60 * 1000;
 const LINEAR = 'c8-linear-equations-both-sides';
-const PERCENT = 'y7-decimals-perc'; // seed 4242: 30% of 90; the trap answer 3 divides by 30
+const PERCENT = 'c8-percentage-reasoning'; // seed 4242, D2: a 30% rise, with a trap value (an India bank, D15)
 const post = (path, body, jar, headers = {}) => h.request(path, { method: 'POST', jar, body, headers });
 const get = (path, jar) => h.request(path, { method: 'GET', jar });
 const issue = (jar, generator, seed, difficulty = 2) => post('/v1/practice/issue', { generator, difficulty, seed, curriculum: 'in' }, jar);
