@@ -107,6 +107,19 @@ const WORK_REASONS = {
 };
 
 /** The words for one recommendation. Every claim comes from the action's own data. */
+// The engine's specific reason for its pick. A misconception reason names the
+// slip only when the engine named one; a dot point is named only when the pick
+// targets one. Anything else keeps the general sentence.
+function adaptiveReasonKey(d) {
+  const tag = d.reasonTag;
+  if (tag === 'misconception') return d.misconception ? 'home.reason.adaptiveSlipNamed' : 'home.reason.adaptiveSlip';
+  if (tag === 'review-due') return d.dotpointN ? 'home.reason.adaptiveReviewDp' : 'home.reason.adaptiveReview';
+  if (tag === 'weak-spot') return d.dotpointN ? 'home.reason.adaptiveWeakDp' : 'home.reason.adaptiveWeak';
+  if (tag === 'new-ground') return 'home.reason.adaptiveNew';
+  if (tag === 'interleave') return 'home.reason.adaptiveInterleave';
+  return 'home.reason.adaptive';
+}
+
 export function actionCopy(action, user, t, topicName, resume) {
   const d = action.data || {};
   const india = user.course === 'in';
@@ -116,7 +129,7 @@ export function actionCopy(action, user, t, topicName, resume) {
     : action.kind === 'assignment' || action.kind === 'task' ? d.title
       : action.kind === 'task-resume' ? (d.title || t('home.next.resumePractice'))
         : action.kind === 'practice-resume' ? (resumeTopic || t('home.next.resumePractice'))
-          : action.kind === 'reviews' ? t('home.next.reviews', d)
+          : action.kind === 'reviews' ? t(d.unit === 'dotpoint' ? 'review.dueToday' : 'home.next.reviews', d)
             : action.kind === 'daily-goal' ? t('home.goalRemaining', d)
               : action.kind === 'first-practice' ? t(india ? 'home.next.firstIndia' : 'home.next.firstNsw', d)
                 : adaptiveTopic ? adaptiveTopic
@@ -126,9 +139,9 @@ export function actionCopy(action, user, t, topicName, resume) {
     : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status] || 'home.reason.ready'
       : action.kind.endsWith('resume') ? 'home.reason.resume'
-        : action.kind === 'reviews' ? 'home.reviewDue'
+        : action.kind === 'reviews' ? 'home.reason.reviews'
           : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
-            : action.kind === 'adaptive' ? 'home.reason.adaptive'
+            : action.kind === 'adaptive' ? adaptiveReasonKey(d)
               : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')
                 : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
   const kicker = action.kind === 'exam' || action.kind === 'exam-expired' ? 'home.kicker.exam'
