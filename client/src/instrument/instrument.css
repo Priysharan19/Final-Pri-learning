@@ -731,7 +731,8 @@ html.ui-instrument select:focus, html.ui-instrument textarea:focus {
 html.ui-instrument .mathfield { display: none; }
 html.ui-instrument .auth-wrap { background: var(--in-base); }
 html.ui-instrument .auth-wrap:has(> .in-signin-plot) {
-  display: grid; grid-template-columns: 1.05fr 0.95fr; place-items: stretch; min-height: 100dvh;
+  display: grid; grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  place-items: stretch; min-height: 100dvh; overflow: visible;
   /* The grid keeps the safe-area insets as the theme's .auth-wrap does (#615):
      the plot and the column both start below the status bar and the Dynamic
      Island and end above the home indicator, so the content column itself
@@ -739,8 +740,25 @@ html.ui-instrument .auth-wrap:has(> .in-signin-plot) {
   padding: var(--pri-inset-top) var(--pri-inset-right) var(--pri-inset-bottom) var(--pri-inset-left);
 }
 html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 32px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 0; padding: 48px clamp(24px, 5vw, 72px);
   background: var(--in-l1); box-shadow: inset 1px 0 0 var(--in-edge);
+}
+/* Keep branding, headline, form and legal copy on one readable left edge. The
+   column is fluid at high text zoom; it never forces a minimum desktop width. */
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col > :is(
+  .logo, .hero-kicker, .hero-title, .hero-sub, .signin-landing, p.muted
+) {
+  width: 100%; max-width: 440px; min-width: 0; text-align: left;
+}
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col > .logo {
+  display: flex; justify-content: flex-start; margin-bottom: 10px;
+}
+/* The outlined SVG wordmark is 224px wide at its default 44px height.
+   Under 200% text zoom the CSS viewport can be 188px; constrain the SVG
+   itself, not merely its parent, or it still widens the whole page. */
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) .brand-wordmark {
+  max-width: 100%; height: auto; flex-shrink: 1;
 }
 .in-signin-plot { position: relative; min-height: 100%; background: var(--in-void); overflow: hidden; }
 .in-signin-plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -751,19 +769,55 @@ html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col {
 @media (max-width: 860px) {
   html.ui-instrument .auth-wrap:has(> .in-signin-plot) { grid-template-columns: minmax(0, 1fr); }
   html.ui-instrument .auth-wrap > .in-signin-plot { display: none; }
-  html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col { box-shadow: none; padding: 32px 16px; }
+  html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col {
+    box-shadow: none; padding: 32px 20px; min-height: 100dvh;
+  }
 }
 html.ui-instrument .auth-card,
 html.ui-instrument .signin-landing { border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); border: 0; }
-html.ui-instrument .auth-col > .signin-landing { box-shadow: none; padding-inline: 0; max-width: 304px; }
-html.ui-instrument .auth-col .hero-kicker { font: 500 11px var(--in-mono); letter-spacing: 0.1em; color: var(--in-tx-3); }
-html.ui-instrument .auth-col .hero-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; color: var(--in-tx); margin-top: 14px; }
-html.ui-instrument .auth-col .hero-sub { font-size: 13px; color: var(--in-tx-3); }
-html.ui-instrument .auth-col > p.muted { max-width: 304px; font-size: 12px !important; color: var(--in-tx-3); }
+html.ui-instrument .auth-col > .signin-landing {
+  width: 100%; max-width: 440px; box-shadow: none; padding-inline: 0; margin-top: 22px;
+}
+html.ui-instrument .auth-col .hero-kicker {
+  font: 500 11px/1.5 var(--in-mono); letter-spacing: 0.08em; color: var(--in-tx-3);
+  margin-top: 4px;
+}
+html.ui-instrument .auth-col .hero-title {
+  font: 500 clamp(28px, 2.7vw, 36px)/1.16 var(--in-ui);
+  letter-spacing: -0.035em; color: var(--in-tx); margin: 16px 0 0;
+}
+html.ui-instrument .auth-col .hero-sub {
+  font-size: 15px; line-height: 1.5; color: var(--in-tx-2); margin: 9px 0 0;
+}
+html.ui-instrument .auth-col > p.muted {
+  max-width: 440px; font-size: 12.5px !important; line-height: 1.55;
+  color: var(--in-tx-3); overflow-wrap: anywhere;
+}
+html.ui-instrument .auth-col > .auth-privacy { margin-top: 26px; text-align: left; }
 html.ui-instrument .signup-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
-html.ui-instrument .signin-landing .input, html.ui-instrument .auth-card .input { height: 44px; border-radius: 4px; padding: 0 14px; font-size: 15px; background: var(--in-l1); }
-html.ui-instrument .signin-landing .btn, html.ui-instrument .auth-card .btn { border-radius: 4px; }
+html.ui-instrument .signin-landing .input, html.ui-instrument .auth-card .input {
+  min-height: 48px; height: auto; border-radius: 6px; padding: 12px 14px;
+  font-size: 16px; background: var(--in-l1); color: var(--in-tx);
+}
+html.ui-instrument .signin-landing .btn, html.ui-instrument .auth-card .btn {
+  border-radius: 6px;
+}
+html.ui-instrument .signin-landing .signup-next,
+html.ui-instrument .signin-landing .signup-social > .btn {
+  min-height: 50px; font-size: 15px;
+}
+html.ui-instrument .signin-landing .signup-alt { gap: 8px 16px; }
+html.ui-instrument .signin-landing :is(.signup-or, .signup-alt) { max-width: 100%; }
+html.ui-instrument .signin-landing .signup-or { margin-top: 20px; }
+html.ui-instrument .signin-landing :is(.signup-error, .signup-notice) {
+  overflow-wrap: anywhere;
+}
 html.ui-instrument .signin-landing .btn-ghost, html.ui-instrument .signin-landing .btn-quiet { border: 0; background: var(--in-l2); box-shadow: 0 0 0 1px var(--in-edge-2), 0 1px 0 var(--in-edge); }
+@media (max-width: 420px) {
+  html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col { padding: 26px 16px; }
+  html.ui-instrument .auth-col .hero-title { font-size: 27px; }
+  html.ui-instrument .auth-col > .signin-landing { margin-top: 14px; }
+}
 html.ui-instrument .signup-choice, html.ui-instrument .signup-back, html.ui-instrument .signup-cc { border-radius: 4px; border-color: var(--control-border); }
 html.ui-instrument .signup-choice.is-selected { border-color: var(--in-tx); background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-tx); }
 html.ui-instrument .otp-box { border-radius: 4px; font-family: var(--in-mono); }
@@ -1331,4 +1385,53 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
 @media (max-width: 299px) {
   html.ui-instrument .q-topmeta { flex-wrap: wrap; }
   html.ui-instrument .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; height: auto; min-height: 24px; min-width: 0; max-width: 100%; }
+}
+
+
+/* Aurora authentication first paint: reserve the final form geometry before
+   the optional plot and detailed visual stylesheet arrive. This critical
+   material and layout is deliberately small and never styles graded work. */
+html.ui-instrument.skin-aurora .auth-wrap.pri-auth {
+  --in-void:#0d0f14;--in-base:#111319;--in-l1:#191b22;--in-l2:#232630;
+  --in-tx:#f5f5f7;--in-tx-2:#bec0cb;--in-tx-3:#a2a5b3;
+  --in-action:#b8adfa;--in-on-action:#15141f;
+  --ink:var(--in-tx);--ink-2:var(--in-tx-2);--ink-3:var(--in-tx-3);
+  --surface:var(--in-l2);--hairline:rgba(232,234,248,.12);
+  --hairline-strong:rgba(232,234,248,.26);--control-border:#606575;
+  color-scheme:dark;background:var(--in-base);color:var(--in-tx);
+  grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);
+}
+html.ui-instrument.skin-aurora .pri-auth>.auth-col {
+  align-items:flex-start;justify-content:center;min-width:0;
+  padding:42px clamp(24px,5vw,80px);background:var(--in-l1);
+}
+html.ui-instrument.skin-aurora .pri-auth .auth-col>:is(.logo,.hero-kicker,.hero-title,.hero-sub,.signin-landing,p.muted){
+  width:100%;max-width:430px;min-width:0;text-align:left;
+}
+html.ui-instrument.skin-aurora .pri-auth .auth-col>.logo{display:flex;justify-content:flex-start;margin-bottom:26px}
+html.ui-instrument.skin-aurora .pri-auth .hero-title{
+  font:500 clamp(32px,3.15vw,44px)/1.07 var(--in-ui);
+  letter-spacing:-.05em;margin:14px 0 0;color:var(--in-tx);
+}
+html.ui-instrument.skin-aurora .pri-auth .signin-landing{
+  margin-top:24px;padding:0;max-width:430px;border:0;box-shadow:none;background:transparent;
+}
+@media (max-width:699px){
+  html.ui-instrument.skin-aurora .auth-wrap.pri-auth{
+    grid-template-columns:minmax(0,1fr);grid-template-rows:124px auto;
+  }
+  html.ui-instrument.skin-aurora .pri-auth>.in-signin-plot{
+    display:block;height:124px;min-height:124px;
+  }
+  html.ui-instrument.skin-aurora .pri-auth>.auth-col{
+    min-height:calc(100dvh - 124px);padding:22px 20px 30px;
+    align-items:center;justify-content:flex-start;box-shadow:none;
+  }
+}
+@media (min-width:700px) and (max-width:1020px){
+  html.ui-instrument.skin-aurora .auth-wrap.pri-auth {
+    grid-template-columns:minmax(0,.83fr) minmax(0,1.17fr);
+  }
+  html.ui-instrument.skin-aurora .pri-auth>.in-signin-plot{display:block;min-height:100%}
+  html.ui-instrument.skin-aurora .pri-auth>.auth-col{padding-inline:clamp(22px,3vw,44px)}
 }

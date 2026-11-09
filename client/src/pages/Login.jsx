@@ -21,7 +21,14 @@ import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
-const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+const SignInPlot = INSTRUMENT_UI ? React.lazy(() =>
+  import('../instrument/SignInPlot.jsx').catch(() => ({
+    // A visual-only chunk must never take down authentication during a
+    // first offline visit or a transient asset failure. The actual account
+    // gate remains server-authoritative and reports connection state itself.
+    default: () => <div className="in-signin-plot" aria-hidden="true" />
+  }))
+) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -565,7 +572,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     // back, so the code boxes are the only thing asking for attention.
     const atStart = cardStep === 'method';
     return (
-      <div className="auth-wrap">
+      <div className="auth-wrap pri-auth">
         <MathField />
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         <div className="auth-col fade-in">
@@ -592,8 +599,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </div>
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
-              <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              {/* One clear privacy statement, not a repeated marketing paragraph
+                  below the form. The headline already says what Pri does. */}
+              <p className="muted auth-privacy">{t('login.heroPrivacy')}</p>
+              {/* Screen readers hear the fuller capability and server-check
+                  explanation; the visible subtitle and privacy line are enough
+                  without two dense paragraphs below the button. */}
+              <p className="sr-only">{t('login.heroSub')}</p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for

@@ -2902,7 +2902,7 @@ export default {
 
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to Pri Learning",
-  'login.welcomeSub': "Your mathematics journey starts here.",
+  'login.welcomeSub': "Write your working. Get each step checked.",
   'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",
@@ -2940,6 +2940,8 @@ export default {
   'signup.codesOff': "Codes can’t be sent right now. If your account has a password, sign in with it.",
   'signup.deliveryFailed': "We couldn’t send the code just now. Try again in a moment.",
   'signup.offlineError': "No connection. What you entered is kept here — try again when you’re back online.",
+  'signup.originRejected': "This page is connected to the wrong Pri server address. Open app.prilearning.com and try again. If you’re already there, contact support.",
+  'signup.sessionNeedsRefresh': "Your sign-in session is out of date. Refresh Pri Learning, then try again.",
   'signup.serverDown': "Pri’s server isn’t answering right now. Try again in a moment.",
   'signup.ticketExpired': "That took a little long and the code has expired. Your answers are kept — send a new code to finish.",
   'signup.aboutTitle': "A little about you",

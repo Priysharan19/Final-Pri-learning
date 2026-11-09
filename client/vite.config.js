@@ -172,6 +172,16 @@ export const ON_DEMAND = [
   // a face is fetched only if something asks to paint in it.
   [/(^|\/)KaTeX_(Fraktur|Script|Caligraphic|Typewriter|SansSerif)-[^/]*\.woff2$/, 'unused KaTeX face'],
 
+  // SignInPlot and its CSS are a *decorative*, aria-hidden sign-in illustration.
+  // Login.jsx loads them behind React.lazy and uses an explicit safe fallback if
+  // unavailable. Sign-in is server-required; an offline first visit cannot
+  // authenticate, but the email/password/guardian controls still render with
+  // the correct offline notice. A successful online fetch is retained by
+  // sw.js's content-hashed /assets/ runtime cache for later offline revisits.
+  // Do not apply this rule to SignUpFlow (real identity controls) or any other
+  // Instrument tab (those remain warmed for offline navigation).
+  [/(^|\/)SignInPlot-[^/]*\.(js|css)$/, 'optional sign-in graph; identity form survives without it'],
+
   // Six years of question banks, of which a student practises from one year and
   // the revision year below it. api.js already loads exactly that set through
   // warmScope() the moment a profile signs in — the same code that serves the
