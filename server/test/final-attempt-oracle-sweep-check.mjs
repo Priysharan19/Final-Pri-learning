@@ -147,6 +147,92 @@ let r4 = 0;
 }
 ok(r4 >= 100000, `the round-4 shape set ran (${r4} probes)`);
 
+// ── Round 5 (probes826/r5sweep.mjs): givens are constants ────────────────────
+// "S = -59.5*n" with n fixed by the question is "S = <number>". Every letter
+// the plan fixes (givens, derived, stage substitutions, aliases) is
+// substituted, and letters that cancel ACROSS the sides ("S + x = v + x") do
+// not count. Families: the answer times / plus a given, over a given, mixed
+// with free letters that cancel, inequalities around it.
+let r5 = 0;
+let r5judgedRight = 0;
+{
+  const f = x => String(+x.toPrecision(12));
+  for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (const seed of [1, 7, 11, 23, 42]) {
+    let q; try { q = generateQuestion(id, d, seed); } catch { continue; }
+    const meta = q && stepMetaFor(q);
+    if (meta?.kind !== 'plan' || q.answerType !== 'numeric') continue;
+    const v = Number(q.answer.value);
+    if (!Number.isFinite(v)) continue;
+    const answerText = String(answerTextFor(q) ?? '');
+    const stages = meta.stages.filter(Boolean);
+    const subs = Object.assign({}, meta.givens || {}, ...stages.map(s => s.substitutions || {}));
+    const labs = [...new Set(stages.flatMap(s => s.labels || []).concat(['A']))].filter(l => /^[A-Za-z]+$/.test(l)).slice(0, 4);
+    const pre = stages.slice(0, -1).filter(s => s.source).map(s => `${s.labels?.[0] || 'k'} = ${s.source}`);
+    const fams = (lab, val) => {
+      const out = [`${lab} + x = ${f(val)} + x`, `${lab}*x = ${f(val)}*x`, `(${lab} - ${f(val)})*x + y = y`, `${lab} + x < ${f(val + 0.5)} + x`, `${lab} + x > ${f(val - 0.5)} + x`];
+      for (const [s, sv] of Object.entries(subs)) {
+        if (!/^[A-Za-z]$/.test(s) || !Number(sv)) continue;
+        out.push(`${lab} = ${f(val / sv)}*${s}`, `${lab} = ${s} + ${f(val - sv)}`, `${lab} - ${s} = ${s} - ${s} + ${f(val - sv)} + y - y + 0*${s}`, `${lab} = ${f(val / sv)}*${s} + y - y`,
+          `${lab} < ${f((val + 0.5) / sv)}*${s}`, `${lab} > ${f((val - 0.5) / sv)}*${s}`, `${lab}/${s} = ${f(val / sv)}*${s}/${s}`, `${lab} = (${f(val)}/${f(sv)})*${s}`, `${lab}*${s} = ${f(val * sv)}*${s}^0*${s}/${s}*${s}`);
+      }
+      return out;
+    };
+    for (const lab of labs) for (const P of [[], pre]) {
+      const right = fams(lab, v);
+      for (const w of [v + 1, v * 1.1, v - 0.5]) {
+        const wrong = fams(lab, w);
+        right.forEach((line, i) => {
+          r5 += 1;
+          const a = lineCheckEvidence(q, [...P, line], answerText);
+          const b = lineCheckEvidence(q, [...P, wrong[i]], answerText);
+          if (a.attemptAt === -1 && a.verifiedLines > P.length) r5judgedRight += 1;
+          if (JSON.stringify(a) !== JSON.stringify(b)) failures.push(`round-5 ${JSON.stringify(line)} vs ${JSON.stringify(wrong[i])} (${id} D${d} seed ${seed}, after ${P.length}): ${JSON.stringify(a)} | ${JSON.stringify(b)}`);
+          else pass += 1;
+        });
+      }
+    }
+  }
+}
+ok(r5 >= 40000, `the round-5 givens families ran (${r5} probes)`);
+
+// ── probes826/sweep831.mjs, ported: cancellation across sides, products,
+// quotients, a free letter minus the value ("z = V - v", whose quotient once
+// hid V at large magnitudes), subscripts, comma-joined bounds, juxtaposition.
+let r831 = 0;
+{
+  const fmt6 = x => String(Math.round(x * 1e6) / 1e6);
+  const shapes = (lab, v, sfx) => [
+    [`${lab} = ${v}`], [`${lab} + z = ${v} + z`], [`${lab} = ${v} + z - z`], [`${lab}*z = ${v}*z`], [`${lab} - B = ${v} - B`],
+    [`${lab} = ${v}*m/m`], [`${lab} + ${lab} = 2*${v}`], [`(${lab} - ${v})*z = 0`], [`${lab}/z = ${v}/z`], [`z = ${lab} - ${v}`],
+    [`${lab} = ${v} ${sfx}`], [`${lab} = ${v} cubic cm`], [`${lab} = ${v} ft`], [`${lab}_1 + y = ${v} + y`],
+    [`${lab} > ${v} - 1, ${lab} < ${v} + 1`], [`${lab} = ${v}`, `${lab} + z = ${v} + z`], [`${lab}·z = ${v}·z`], [`${v} + z`], [`${v}z`],
+    [`z = V - ${v}`], [`z*(V - ${v}) = y`], [`(V - ${v})/z = y`]
+  ];
+  for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (const seed of [7, 11, 23]) {
+    let q; try { q = generateQuestion(id, d, seed); } catch { continue; }
+    const meta = q && stepMetaFor(q);
+    if (meta?.kind !== 'plan') continue;
+    const v = Number(q.answer?.value);
+    if (!Number.isFinite(v)) continue;
+    const answerText = String(answerTextFor(q) ?? '');
+    const stages = meta.stages.filter(Boolean);
+    const lab = stages.at(-1).labels?.[0] || 'A';
+    const pre = stages.slice(0, -1).filter(s => s.source).map(s => `${s.labels?.[0] || 'k'} = ${s.source}`);
+    const R = shapes(lab, fmt6(v), q.answerSuffix || '');
+    for (const P of [[], pre]) R.forEach((right, i) => {
+      const a = JSON.stringify(lineCheckEvidence(q, [...P, ...right], answerText));
+      for (const w of [v + 1, v * 1.1, 7, v * 1000 + 3, v / 1000]) {
+        r831 += 1;
+        const b = JSON.stringify(lineCheckEvidence(q, [...P, ...shapes(lab, fmt6(w), q.answerSuffix || '')[i]], answerText));
+        if (a !== b) failures.push(`sweep831 shape ${i} ${JSON.stringify(right)} (${id} D${d} seed ${seed}): ${a} | ${b}`);
+        else pass += 1;
+      }
+    });
+  }
+}
+ok(r831 >= 5000, `the sweep831 shapes ran (${r831} probes)`);
+ok(r5judgedRight === 0, `no right final value is ever verified by the line check (${r5judgedRight})`);
+
 // The reviewer's exact repro.
 {
   const q = generateQuestion('c10-areas-circles', 1, 11);
@@ -161,5 +247,5 @@ ok(constantAnswers >= 20, `and their constant answers (${constantAnswers})`);
 
 console.log(failures.length
   ? `FINAL-ATTEMPT ORACLE SWEEP: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 40).join('\n  · ')}`
-  : `FINAL-ATTEMPT ORACLE SWEEP: PASS — ${pass}/${pass} checks — ${planQuestions} plan questions in ${banks.size} banks, ${constantAnswers} constant answers, ${r4} round-4 probes, right and wrong values byte-identical for every probe shape.`);
+  : `FINAL-ATTEMPT ORACLE SWEEP: PASS — ${pass}/${pass} checks — ${planQuestions} plan questions in ${banks.size} banks, ${constantAnswers} constant answers, ${r4} round-4 probes, ${r5} round-5 probes, ${r831} sweep831 probes, right and wrong values byte-identical for every probe shape.`);
 process.exit(failures.length ? 1 : 0);

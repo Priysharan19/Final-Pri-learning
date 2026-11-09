@@ -64,6 +64,26 @@ for (const line of ['A = l b', 'area = l * b', '2l + 2b = P', 'area = π r^2', '
   for (const line of ['A = l * b', 'V = l*b*h + 2*r*h', 'P = 2*l + 2*b', 'A = π*r^2']) {
     eq(firstFinalAttempt([line], f), -1, `"${line}" relates two or more letters on both sides: judged`);
   }
+  eq([firstFinalAttempt(['S + x = 952 + x'], f), firstFinalAttempt(['S*x = 952*x'], f)], [0, 0], 'letters that cancel across the sides do not count');
+}
+
+// GIVENS (#831 round 5): a letter the question fixes is a constant.
+{
+  const { planGivens } = await import('../platform/finalAttempt.js');
+  const meta = { kind: 'plan', givens: { a: -12, d: -8, n: 16 }, derived: { l: -132 }, aliases: { l: ['a_n', 'tn'] }, stages: [{ substitutions: { n: 16, a: -12 } }] };
+  const fixed = planGivens(meta);
+  eq([fixed.n, fixed.a, fixed.l, fixed.tn], [16, -12, -132, -132], 'givens, derived values, stage substitutions and aliases are all fixed');
+  eq(planGivens({ kind: 'plan', stages: [{}] }), null, 'a plan that states no givens yields null (the caller fails closed)');
+  const g = answerForm({ answerText: '-952', fixed });
+  for (const line of ['S = -59.5*n', 'S = n/2*(2*a + (n-1)*d)', 'S = -59.5*N', 'S - n = n - n - 968', 'S/n = -59.5*n/n']) {
+    eq(firstFinalAttempt([line], g), 0, `with n, a, d given, "${line}" pins S: an attempt`);
+  }
+  eq(firstFinalAttempt(['S = k*m'], g), -1, 'a relation of letters the question does not fix is still judged');
+  const ap = generateQuestion('c10-arithmetic-progressions', 2, 7);
+  const apText = String(answerTextFor(ap) ?? '');
+  eq(lineCheckEvidence(ap, ['S = n/2*(2*a+(n-1)*d)'], apText).attemptAt, 0, 'on a real AP question the formula with the givens substituted is an attempt');
+  const noGivens = { prompt: 'p', answerType: 'numeric', answer: { value: 5 }, stepcheck: { kind: 'plan', stages: [{ kind: 'formula', labels: ['A'] }] } };
+  eq(lineCheckEvidence(noGivens, ['A = l * b'], '5').attemptAt, 0, 'a plan question whose givens cannot be extracted fails closed: every line is an attempt');
 }
 eq(stripUnits('m = 2'), 'm = 2', 'a variable named like a unit is never stripped');
 ok(['36036 cm³', '₹ 450', '56/65', '-3'].every(isConstantAnswer), 'a bare constant answer is recognised through its unit');
@@ -122,7 +142,8 @@ if (ap) {
       eq(r.attemptAt, 0, `— "${name} = …" is an attempt`);
     }
     const formula = lineCheckEvidence(ap.q, ['t = a + (n - 1) d'], ap.answerText);
-    eq(formula.attemptAt, -1, 'AP: the general-term formula (symbols only) is still judged');
+    // Round 5: a, n, d are given here, so the general-term formula pins t — an attempt, not judged.
+    eq(formula.attemptAt, 0, 'AP: with a, n, d given, the general-term formula pins its left side: an attempt');
   }
 }
 

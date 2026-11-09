@@ -20,7 +20,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
-import { answerForm, firstFinalAttempt } from './finalAttempt.js';
+import { answerForm, firstFinalAttempt, planGivens } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -238,7 +238,11 @@ export const MARKER_OPS = Object.freeze({
 export function lineCheckEvidence(q, lines, answerText) {
   const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
   const meta = stepMetaFor(q);
-  const form = answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix });
+  // Letters the question or plan fixes are constants in the form analysis
+  // (#831 round 5). A plan that states none fails closed: every line is an attempt.
+  const fixed = planGivens(meta);
+  const form = fixed === null ? null
+    : answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix, fixed });
   // The final-attempt decision is made FIRST, from each line's shape and
   // symbols alone, before and independently of any Step Check verdict. The
   // Step Check's stage tag is NOT used: it placed a wrong final value at the

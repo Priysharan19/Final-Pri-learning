@@ -153,7 +153,29 @@ const sameSet = (a, b) => a.size === b.size && [...a].every(v => b.has(v));
  * then an attempt). `answerText` is the escrow's display answer, `variable`
  * the Step Check's asked unknown when it has one, `prefix` the answer prefix.
  */
-export function answerForm({ answerText = '', variable = null, prefix = '' } = {}) {
+/**
+ * Every letter a plan fixes — its givens, its derived values, every stage's
+ * substitutions, and each of their aliases — as { name: value }. null when the
+ * plan states none (the caller then fails closed: every line is an attempt).
+ */
+export function planGivens(meta) {
+  if (!meta || meta.kind !== 'plan') return {};
+  const out = {};
+  const put = (name, value) => {
+    const v = Number(value);
+    if (typeof name === 'string' && name && Number.isFinite(v) && !Object.hasOwn(out, name)) out[name] = v;
+  };
+  for (const [k, v] of Object.entries(meta.givens || {})) put(k, v);
+  for (const [k, v] of Object.entries(meta.derived || {})) put(k, v);
+  for (const stage of meta.stages || []) for (const [k, v] of Object.entries(stage?.substitutions || {})) put(k, v);
+  for (const [k, names] of Object.entries(meta.aliases || {})) {
+    if (!Object.hasOwn(out, k)) continue;
+    for (const alias of Array.isArray(names) ? names : []) if (/^[A-Za-z][A-Za-z0-9_]*$/.test(alias)) put(alias, out[k]);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+export function answerForm({ answerText = '', variable = null, prefix = '', fixed = {} } = {}) {
   const unknowns = new Set();
   if (typeof variable === 'string' && variable) unknowns.add(variable);
   const pre = String(prefix || '').match(/^\s*([A-Za-z])\s*=\s*$/);
@@ -163,7 +185,7 @@ export function answerForm({ answerText = '', variable = null, prefix = '' } = {
   // attempt, whatever the symbol is called (V, V_1, A, x) and whatever the
   // value. Without this a unit made the answer unreadable as a claim, and the
   // Step Check's own placement of a RIGHT value decided the reply (L2 repro).
-  if (isConstantAnswer(answerText)) return { constant: true, forms: [], unknowns, valueSymbols: [] };
+  if (isConstantAnswer(answerText)) return { constant: true, forms: [], unknowns, valueSymbols: [], fixed: fixed || {} };
   const claims = parts(clean(answerText)).map(readClaimForm);
   if (!claims.length || claims.some(c => !c)) return null;
   for (const c of claims) {
@@ -194,17 +216,31 @@ function readTree(text) {
 // probing the engine's evaluator at fixed points. Never compares a value with
 // the answer's — only which letters a side depends on. Unreadable → null.
 const PROBES = [[0.37, 1.91], [1.53, -0.71], [-1.29, 2.47]];
-export function effectiveSymbols(node) {
-  const names = vars(node);
-  const env = (shift = null) => Object.fromEntries(names.map((n, i) => [n, PROBES[i % 3][0] + i * 0.113 + (shift === n ? 0.731 : 0)]));
+export function effectiveSymbols(node, fixed = {}) {
+  // A fixed letter (a given) takes its value, case-folded both ways (the safe
+  // direction: more letters fixed means more lines treated as attempts), and
+  // is never probed.
+  const fixedValue = n => (Object.hasOwn(fixed, n) ? fixed[n] : Object.hasOwn(fixed, n.toLowerCase()) ? fixed[n.toLowerCase()] : Object.hasOwn(fixed, n.toUpperCase()) ? fixed[n.toUpperCase()] : undefined);
+  const all = vars(node);
+  const names = all.filter(n => fixedValue(n) === undefined);
+  const env = (shift = null, step = 0.731) => Object.fromEntries(all.map((n, i) => [n, fixedValue(n) !== undefined ? fixedValue(n) : PROBES[i % 3][0] + i * 0.113 + (shift === n ? step : 0)]));
   try {
     const base = evaluate(node, env());
     if (!Number.isFinite(base)) return null;
     const out = new Set();
+    // A letter counts when moving it changes the value — tried at a small and
+    // a very large step, with a RELATIVE tolerance and a tiny absolute floor,
+    // so the answer's own magnitude never decides it: "z/(V - 16488.27)" moves
+    // with V by only 1e-9 at the small step, which an absolute floor of 1 hid
+    // for one value and not another (an oracle). "x - x" stays a constant:
+    // its change is float noise, under the floor at both steps.
     for (const n of names) {
-      const moved = evaluate(node, env(n));
-      if (!Number.isFinite(moved)) return null;
-      if (Math.abs(moved - base) > 1e-9 * Math.max(1, Math.abs(base))) out.add(n.toLowerCase());
+      for (const step of [0.731, 7311.7]) {
+        const moved = evaluate(node, env(n, step));
+        if (!Number.isFinite(moved)) return null;
+        const change = Math.abs(moved - base);
+        if (change > 1e-12 && change > 1e-9 * Math.max(Math.abs(base), Math.abs(moved))) { out.add(n.toLowerCase()); break; }
+      }
     }
     return out;
   } catch { return null; }
@@ -248,12 +284,29 @@ function claimIsAttempt(text, form) {
     // the evaluator reduces to a number — brackets, sqrt, abs, factorial,
     // functions of constants, decimals, scientific notation — makes the line
     // an attempt, and so does anything it cannot evaluate. Fail closed.
+    //
+    // GIVENS (#831 round 5): a letter the question or the plan fixes ("n" in
+    // "the first 16 terms") is a CONSTANT here — substituted before evaluating
+    // and never counted as free. "S = -59.5*n" with n given is "S = <number>".
     if (c.shape === 'expr') return true;
+    const fixed = form.fixed || {};
+    const free = new Set();
     for (const side of c.sides || []) {
-      const eff = effectiveSymbols(side);
+      const eff = effectiveSymbols(side, fixed);
       if (!eff || eff.size === 0) return true;
+      for (const s of eff) free.add(s);
     }
-    return new Set([...c.symbols].map(s => String(s).toLowerCase())).size <= 1;
+    // Across the sides too: "S + x = 462 + x" has a free letter on each side
+    // but its difference, S - 462, pins S. The relation is judged only when
+    // left minus right still depends on two or more free letters.
+    // The same for a product: "S*x = 952*x" has a quotient, S/952, that pins S.
+    if (c.sides?.length === 2) {
+      const across = effectiveSymbols({ t: 'bin', op: '-', l: c.sides[0], r: c.sides[1] }, fixed);
+      if (!across || across.size <= 1) return true;
+      const ratio = effectiveSymbols({ t: 'bin', op: '/', l: c.sides[0], r: c.sides[1] }, fixed);
+      if (!ratio || ratio.size <= 1) return true;
+    }
+    return free.size <= 1;
   }
   // VALUE SIDE: any side of the line (or the line itself) that depends on
   // exactly the letters the answer's value side depends on — case-folded,
