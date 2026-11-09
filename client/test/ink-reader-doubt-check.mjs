@@ -65,6 +65,11 @@ const en = read('client/src/i18n/strings.en.js');
 ok(!/Tap it below if I read it wrong/.test(en), 'no prompt points at a symbol that is not there');
 ok(!/answer|expected|solution/i.test(read('client/src/ink/relationSwap.js').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), 'the swap helpers know no answer');
 
+// One set of swap buttons, and each is a thumb-sized target on a touch screen.
+const inkSrc = read('client/src/ink/InkAnswer.jsx');
+ok((inkSrc.match(/data-relation-swaps/g) || []).length === 1, 'InkAnswer renders one set of relation-swap buttons per line');
+ok(/@media \(pointer: coarse\), \(hover: none\) \{ \.ink-relation-swap \{ min-width: 44px; min-height: 44px; \} \}/.test(read('client/src/theme.css')), 'a relation-swap button is 44 px on a touch screen');
+
 if (failures.length) {
   console.error(`READER DOUBTS: FAIL — ${failures.length} of ${pass + failures.length} checks`);
   for (const f of failures) console.error(`  ✗ ${f}`);
