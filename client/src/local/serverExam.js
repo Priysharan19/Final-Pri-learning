@@ -628,13 +628,14 @@ export async function recoverHandwriting(exam, { force = false, transport = clou
  * caller holds the paper's lock and writes `exam` back.
  */
 export async function retryHandwriting(exam, key, { transport = cloud, permitted = examReadPermitted(exam) } = {}) {
-  if (permitted !== true) {
-    throw Object.assign(new Error('Your handwriting is kept on this device. It is sent to be read only after you allow it (Settings → Handwriting).'), { status: 409, code: 'READER_PERMISSION_REQUIRED' });
-  }
   const images = exam?.server?.handwriting?.pages || {};
   const image = images[String(key)];
   if (!isServerPaper(exam) || !exam.finishedAt || typeof image !== 'string') {
     throw Object.assign(new Error('The saved page for this answer is not on this device, so it cannot be checked from here.'), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
+  }
+  // D17: a page that is here is sent only once the profile has allowed the reader.
+  if (permitted !== true) {
+    throw Object.assign(new Error('Your handwriting is kept on this device. It is sent to be read only after you allow it (Settings → Handwriting).'), { status: 409, code: 'READER_PERMISSION_REQUIRED' });
   }
   let reply;
   try { reply = await transport.resolveExamHandwriting(exam.server.examId, { key: String(key), image, retry: true }); }
