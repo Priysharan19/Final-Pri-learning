@@ -74,7 +74,7 @@ const USABLE_LIMIT_MS = 5000;
 const PRACTICE_CASES = 4; // SIZES × SCHEMES
 
 // In the page: arm the measurement of one press on the `to` mode tab.
-const ARM_SWITCH = ({ to, limitMs }) => {
+const ARM_SWITCH = ({ to, limitMs, selected = false }) => {
   const card = document.querySelector('.qpage[data-question-id]');
   const tabs = card ? [...card.querySelectorAll('.mode-tabs .mode-tab')] : [];
   const target = tabs[to === 'type' ? 0 : 1];
@@ -83,7 +83,9 @@ const ARM_SWITCH = ({ to, limitMs }) => {
     entries: [], error: null, done: false
   };
   if (!target) { s.error = 'no mode tab to press'; s.done = true; return; }
-  if (target.getAttribute('aria-pressed') === 'true') { s.error = `${to} is already the mode on`; s.done = true; return; }
+  // #684's 256 ms was a press on the tab already on: that press is timed too (selected), a switch must change mode.
+  if (!selected && target.getAttribute('aria-pressed') === 'true') { s.error = `${to} is already the mode on`; s.done = true; return; }
+  if (selected && target.getAttribute('aria-pressed') !== 'true') { s.error = `${to} is not the mode on`; s.done = true; return; }
   s.eventTiming = typeof PerformanceObserver === 'function' && typeof PerformanceEventTiming === 'function'
     && (PerformanceObserver.supportedEntryTypes || []).includes('event') && 'interactionId' in PerformanceEventTiming.prototype;
   let observer = null;
@@ -270,8 +272,8 @@ export const flow = {
     }
     const pinned = k => k?.kind === 'text' && k.text === '-6' && !!k.prompt?.includes('Solve by elimination');
     const frames = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-    const pressAndTime = async to => {
-      await page.evaluate(ARM_SWITCH, { to, limitMs: USABLE_LIMIT_MS });
+    const pressAndTime = async (to, selected = false) => {
+      await page.evaluate(ARM_SWITCH, { to, limitMs: USABLE_LIMIT_MS, selected });
       if (!(await page.evaluate(() => window.__priSwitch?.done === true))) {
         await page.locator('.qpage[data-question-id] .mode-tabs .mode-tab').nth(to === 'type' ? 0 : 1).click({ timeout: 3000 });
         await page.waitForFunction(() => window.__priSwitch?.done === true, null, { timeout: USABLE_LIMIT_MS + 3000 }).catch(() => {});
@@ -298,8 +300,9 @@ export const flow = {
       await settle();
       await frames();
       await page.evaluate(() => { window.__priSlowInput = []; });
-      for (const to of ['write', 'type']) {
-        const s = await pressAndTime(to);
+      // The selected tab (Type) first, as #684 caught it; then Write and Type, each a real switch.
+      for (const [to, selected] of [['type', true], ['write', false], ['type', false]]) {
+        const s = { ...(await pressAndTime(to, selected)), selected };
         out.switches.push(s);
         if (s.error) break;
         await settle();
@@ -441,13 +444,13 @@ export const flow = {
           if (chromium && practice) {
             const r = await timePractice();
             const presses = r.switches;
-            const both = !r.error && presses.length === 2 && presses.every(s => !s.error);
+            const both = !r.error && presses.length === 3 && presses.every(s => !s.error);
             const inside = s => s.eventTiming === true && s.pressedMs !== null && s.usableMs !== null
               && s.pressedMs <= MAX_INPUT_MS && s.usableMs <= MAX_INPUT_MS && s.entries.every(e => e.ms <= MAX_INPUT_MS);
             const raw = {
               error: r.error, tabs: r.tabs, draft: r.draft, slow: r.slow.slice(0, 4),
               presses: presses.map(s => ({
-                to: s.to, error: s.error, eventTiming: s.eventTiming, frameMs: round1(s.pressedMs), usableMs: round1(s.usableMs),
+                to: s.selected ? `${s.to} (already on)` : s.to, error: s.error, eventTiming: s.eventTiming, frameMs: round1(s.pressedMs), usableMs: round1(s.usableMs),
                 entries: (s.entries || []).map(e => `${e.name} ${Math.round(e.ms)}ms (delay ${e.delay}, handlers ${e.handlers}) on ${e.onTarget ? 'the tab' : e.on}`)
               }))
             };
@@ -493,9 +496,9 @@ export const flow = {
       const summary = `press→frame ${stat(presses.map(s => s.pressedMs))} · press→usable ${stat(presses.map(s => s.usableMs))}`
         + ` · Event Timing ${stat(presses.flatMap(s => s.entries.map(e => e.ms)))} · Chromium ${version} · checkout ${checkout}`;
       const passed = practiceCases.filter(c => c.pass).length;
-      if (measured && passed === PRACTICE_CASES && presses.length === 2 * PRACTICE_CASES) {
+      if (measured && passed === PRACTICE_CASES && presses.length === 3 * PRACTICE_CASES) {
         note(`PRACTICE INPUT TIMING: PASS — ${PRACTICE_CASES}/${PRACTICE_CASES} cases (390×844 and 820×1180, light and dark), `
-          + `${presses.length}/${2 * PRACTICE_CASES} answer-mode presses inside ${MAX_INPUT_MS} ms · ${summary}`);
+          + `${presses.length}/${3 * PRACTICE_CASES} answer-mode presses (the selected tab included) inside ${MAX_INPUT_MS} ms · ${summary}`);
       } else {
         note(`PRACTICE INPUT TIMING: FAIL — ${passed}/${PRACTICE_CASES} cases passed · ${summary}`);
       }
@@ -511,7 +514,9 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   // build yet is built first, because the server will not boot without one.
   const argv = process.argv.slice(2);
   const { runOne, ensureBuild } = await import('./e2e.mjs');
-  if (!argv.includes('--no-build') && !existsSync(join(HERE, '..', 'dist', 'index.html'))) { ensureBuild(true); argv.push('--no-build'); }
+  // Build BEFORE the seeded platform boots: booting sets NODE_ENV=test, and a build
+  // made after it would be a development bundle (React dev, no service worker).
+  if (!argv.includes('--no-build')) { ensureBuild(true); argv.push('--no-build'); }
   const { onlinePlatform } = await import('./support/online-session.mjs');
   await onlinePlatform({ allowSeededPractice: true });
   process.exit(await runOne(flow, argv) ? 1 : 0);

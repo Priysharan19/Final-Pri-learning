@@ -1024,7 +1024,7 @@ jobs:
           # presses inside MAX_INPUT_MS (100, unchanged).
           # The separate ink-canvas 200/200 invariant remains enforced above.
           grep -Fq 'E2E SUITE PASSED — 209/209 checks across 1 flows' browser.log
-          grep -Fq 'PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 8/8 answer-mode presses inside 100 ms' browser.log
+          grep -Fq 'PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms' browser.log
           grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
