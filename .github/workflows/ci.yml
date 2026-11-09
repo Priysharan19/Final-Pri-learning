@@ -219,6 +219,8 @@ jobs:
           grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
+          # F1 live step coach (#826): no guess oracle, premium-only, off by default, capped.
+          grep -Fq 'STEP COACH: PASS — 49/49 checks' suites.log
           # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
           # 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed.
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10820/10820 checks' suites.log
