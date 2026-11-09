@@ -93,13 +93,20 @@ function knownBlockOf(who, isOnline) {
  * reading panel (and on the ink where line geometry is known).
  * focusSymbol and recognitionContext are accepted for API compatibility; the
  * server reader is answer-blind and receives no question context.
+ * liveRead (the live step coach, F1): when true, a page is read on its own
+ * once the student has started a NEW line and the pen has rested — one read
+ * per finished line, and only after the student has already said yes to the
+ * reader (D17). It never opens the permission prompt. The read is the same
+ * answer-blind picture-only request; the reading it lands carries `live`.
  */
 // eslint-disable-next-line no-unused-vars
 /** One page of paper. More pages extend the same sheet, so reading, the stored
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
+/** The pen rests this long on a new line before the line above is read (liveRead). */
+export const LIVE_READ_REST_MS = 1500;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, liveRead = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -170,6 +177,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const readRef = useRef(null);
   const strokesRef = useRef([]);
   const disabledRef = useRef(!!disabled);
+  const liveReadRef = useRef(!!liveRead);
+  liveReadRef.current = !!liveRead;
+  // The finished-line count the last live read was for, and its pending timer.
+  const liveFinishedRef = useRef(0);
+  const liveTimerRef = useRef(null);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
@@ -179,7 +191,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, []);
 
-  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false, readMs = null } = {}) => {
+  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false, readMs = null, live = false } = {}) => {
     setRec(r);
     setStale(isStale && r.lines.length > 0);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
@@ -213,6 +225,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       readMs: Number.isFinite(readMs) ? Math.max(0, readMs) : null,
       // The reading is of EARLIER writing: shown, labelled, never submitted.
       stale: isStale && r.lines.length > 0,
+      // A live read (liveRead): its last line may still be being written.
+      live: live === true,
       // What the card keeps with the ink so a reload restores the transcript
       // (and the student's corrections) without reading the page again.
       kept: r.lines.length ? { signature: readRef.current, reading: r } : null,
@@ -241,7 +255,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
    * the student asked. Its reading is the only reading.
    */
   const askingRef = useRef(false);
-  const readNow = useCallback(async () => {
+  const readNow = useCallback(async (opts) => {
+    const auto = opts?.auto === true;
     if (disabledRef.current || !strokesRef.current.length) return;
     if (flyingRef.current === strokeSignature(strokesRef.current)) return;
     const asker = userRef.current;
@@ -254,7 +269,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // writing goes to OpenAI, and nothing is sent unless they say yes. The
     // press that opened the prompt is the press that reads, once accepted.
     if (readerPermission(asker) !== READER_PERMISSION.ACCEPTED) {
-      if (askingRef.current) return;
+      // A live read never asks: only a press of "Read my answer" may.
+      if (auto || askingRef.current) return;
       askingRef.current = true;
       let permitted;
       try { permitted = await askReaderPermission(asker, { kind: 'ink' }); } finally { askingRef.current = false; }
@@ -327,7 +343,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           before.lines.forEach((line, i) => { if (line.corrected === true) landed = applyLineCorrection(landed, i, line.text); });
         }
         expiredSigRef.current = null;
-        publish(landed, now, { stale: nowSignature !== signature, readMs: sincePress() });
+        publish(landed, now, { stale: nowSignature !== signature, readMs: sincePress(), live: auto });
         setStatus(null);
         return;
       }
@@ -340,6 +356,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
     });
   }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
+  const readRef2 = useRef(readNow);
+  readRef2.current = readNow;
 
   /**
    * One tap: the student says what they wrote on a line the reader was unsure
@@ -358,6 +376,21 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
     setHasInk(strokes.length > 0);
+    // The live step coach: a new line has been started below the last one, so
+    // the line above is finished. Read once the pen rests — once per finished
+    // line, never before the student accepted the reader.
+    if (liveReadRef.current && !disabledRef.current) {
+      clearTimeout(liveTimerRef.current);
+      let finished = 0;
+      try { finished = Math.max(0, segmentInkLines(strokes).length - 1); } catch { finished = 0; }
+      if (finished < liveFinishedRef.current) liveFinishedRef.current = finished;
+      if (finished > liveFinishedRef.current && readerPermission(userRef.current) === READER_PERMISSION.ACCEPTED) {
+        liveTimerRef.current = setTimeout(() => {
+          liveFinishedRef.current = finished;
+          readRef2.current?.({ auto: true });
+        }, LIVE_READ_REST_MS);
+      }
+    }
     setCorrecting(null);
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
@@ -456,6 +489,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus(null);
   }, [disabled]);
   useEffect(() => () => {
+    clearTimeout(liveTimerRef.current);
     readSeqRef.current += 1;
     abortRef.current?.abort?.();
   }, []);

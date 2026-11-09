@@ -1885,7 +1885,56 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
     ? cloudCheckFor.result : null;
 
+  // ── The live step coach (F1) ────────────────────────────────────────────────
+  // While the attempt is open, each FINISHED line the reader has read is
+  // checked by the server against the worked steps: a tick with the step it
+  // reached, "doesn't follow from the line above" on the first break under a
+  // verified line, or nothing. A final-answer line gets only "Press Check".
+  // No value and no mark: Check alone marks. On only where the server says so
+  // (its switch and the account's Premium), so this asks the backend once.
+  const [coachOn, setCoachOn] = useState(false);
+  const [liveCoach, setLiveCoach] = useState(null);   // { lines, rows }
+  const coachSentRef = useRef(null);
+  useEffect(() => {
+    if (!writeMode) return undefined;
+    let live = true;
+    api.get('/tutor/step-coach').then(r => { if (live) setCoachOn(r?.on === true); }).catch(() => { });
+    return () => { live = false; };
+  }, [writeMode]);
+  useEffect(() => { setLiveCoach(null); coachSentRef.current = null; }, [question?.id]);
+  useEffect(() => {
+    if (!coachOn || !writeMode || resolved || !question?.id || !inkResult || inkResult.stale === true) return undefined;
+    const all = (inkResult.lines || []).map(l => String(l || '').trim());
+    // A live read's last line may still be being written: only the lines above it are finished.
+    const finished = inkResult.live === true ? all.slice(0, -1) : all;
+    if (!finished.length || finished.some(l => !l)) return undefined;
+    const key = finished.join('\n');
+    if (coachSentRef.current === key) return undefined;
+    coachSentRef.current = key;
+    let live = true;
+    api.post(`/practice/${question.id}/tutor/step-coach`, { lines: finished })
+      .then(r => { if (live && Array.isArray(r?.stepCoach?.lines)) setLiveCoach({ lines: finished, rows: r.stepCoach.lines }); })
+      .catch(() => { });
+    return () => { live = false; };
+  }, [coachOn, writeMode, resolved, question?.id, inkResult]);
+  const liveLineVerdicts = useMemo(() => {
+    if (!coachOn || !writeMode || resolved || !liveCoach || inkResult?.stale === true) return null;
+    const shown = (inkResult?.lines || []).map(l => String(l || '').trim());
+    // Drawn only while the lines it judged are still the lines on screen.
+    if (!liveCoach.lines.every((l, i) => shown[i] === l)) return null;
+    const out = shown.map((_, i) => {
+      const r = liveCoach.rows[i];
+      if (r?.status === 'ok') return { status: 'ok', note: Number.isInteger(r.step) ? t('ink.coachStep', { n: r.step }) : t('ink.coachOk') };
+      if (r?.status === 'break') return { status: 'break', note: t('ink.coachBreak') };
+      return { status: 'unknown' };
+    });
+    return out.some(v => v.status !== 'unknown') ? out : null;
+  }, [coachOn, writeMode, resolved, liveCoach, inkResult, t]);
+  const liveCoachFinal = !!liveCoach && !resolved && liveCoach.rows.some(r => r?.status === 'final');
+
   const lineVerdicts = useMemo(() => {
+    // The live coach speaks only while nothing has been submitted for marking.
+    if (!localLineVerdicts && !resolved && liveLineVerdicts) return liveLineVerdicts;
     // The second read was of the submitted lines: it is drawn only on them.
     const ofShown = resolved && sameLines(judged?.lines, inkResult?.lines) && inkResult?.stale !== true;
     const merged = mergeVerdicts(localLineVerdicts, ofShown ? cloudCheck : null, { lineCount: inkResult?.lines?.length || 0 });
@@ -1895,7 +1944,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // nothing wrong it earns no tick on the page.
     const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
     return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
-  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
+  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved, liveLineVerdicts]);
   // What the server established about the working that was submitted, for a
   // reading-based submission (handwriting or a photo), where the lines came
   // from a reader and may not be what the student wrote.
@@ -2641,7 +2690,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer liveRead={coachOn && !resolved} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
@@ -3157,6 +3206,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
               </button>
             </span>
+          )}
+          {writeMode && liveCoachFinal && (
+            <span className="ws-line-check-result muted" role="status" data-step-coach-final>{t('ink.coachPressCheck')}</span>
           )}
           {writeMode && !resolved && (lineCheck?.message || lineCheck?.key) && (
             <span className="ws-line-check-result muted" role="status" data-line-check-status={lineCheck.status}>{lineCheck.message || t(lineCheck.key)}</span>

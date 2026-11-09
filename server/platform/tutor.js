@@ -656,6 +656,36 @@ export function lineCheckFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_LINE_CHECK || '').trim() === '1';
 }
 
+/** The live step coach (F1) ships dark on its own switch: PRI_FEATURE_STEP_COACH=1. */
+export function stepCoachFeatureEnabled(env = process.env) {
+  return String(env.PRI_FEATURE_STEP_COACH || '').trim() === '1';
+}
+
+/** Is this account on the premium plan, by the server's own entitlement snapshot? */
+export async function accountIsPremium(db, accountId) {
+  const row = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id = ?', [accountId]);
+  return !!row && publicEntitlement(row).plan === 'premium';
+}
+
+/**
+ * The live step coach's reads per issued question per account. One read per
+ * finished line, so this is also the most lines one question can have coached;
+ * it bounds probing a question's checker line by line.
+ */
+export const STEP_COACH_READS_PER_QUESTION = 12;
+const STEP_COACH_STATUSES = new Set(['ok', 'break', 'unsure', 'final']);
+
+/**
+ * The step coach's public reply: status and step number only. No message, no
+ * value, no heading; a step number is given only for a verified line.
+ */
+export function stepCoachReply(rows) {
+  return (Array.isArray(rows) ? rows : []).map(r => {
+    const status = STEP_COACH_STATUSES.has(r?.status) ? r.status : 'unsure';
+    return status === 'ok' && Number.isInteger(r.step) && r.step > 0 ? { status, step: r.step } : { status };
+  });
+}
+
 /** The tutor ships dark: the route exists only where PRI_FEATURE_TUTOR=1. */
 export function tutorFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
@@ -683,7 +713,11 @@ export function createTutorRouter(db, {
 
   router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
-    res.json({ available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true, diagnosis: true });
+    res.json({
+      available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true, diagnosis: true,
+      // The live step coach needs no model: on where its switch is on and the account is premium.
+      stepCoach: stepCoachFeatureEnabled(env) && await accountIsPremium(db, req.platformSession.account_id)
+    });
   });
 
   async function cached(key, at) {
@@ -949,6 +983,54 @@ export function createTutorRouter(db, {
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
       res.json({ lineCheck: { ...reply, checksLeft: cap.remaining } });
+    });
+
+  // ── The live step coach (F1) ───────────────────────────────────────────────
+  // As the student writes, each finished line is checked against the server's
+  // escrowed solution for an OPEN server-issued question. One row per line:
+  // 'ok' (with the plan step it reached), 'break' (the first line that does
+  // not follow from the one above — a location only, A1), 'unsure' (say
+  // nothing) or 'final' (a final-answer attempt, by FORM — finalAttempt.js —
+  // which gets only "Press Check"; right and wrong final lines get identical
+  // rows). No values, no headings, no marks. Premium only, decided here from
+  // the server's entitlement snapshot; off unless PRI_FEATURE_STEP_COACH=1.
+  // Each check that runs spends one of STEP_COACH_READS_PER_QUESTION and one
+  // unit of the per-account daily allowance. No model.
+  router.post('/step-coach',
+    (req, res, next) => (stepCoachFeatureEnabled(env) ? next()
+      : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } })),
+    requireSession(db),
+    requireVerifiedEmail,
+    rateLimit(db, 'tutor-step-coach', TUTOR_RATE_LIMIT),
+    async (req, res) => {
+      const refuse = (status, code, message) => res.status(status).json({ error: { code, message } });
+      const b = req.body;
+      if (!plain(b) || closed(b, ['context', 'serverQuestionId', 'lines']).length) return refuse(400, 'TUTOR_BODY_INVALID', 'Send { context, serverQuestionId, lines }.');
+      if (b.context !== 'practice') return refuse(b.context === 'exam' ? 403 : 400, b.context === 'exam' ? 'TUTOR_EXAM_LOCKED' : 'TUTOR_CONTEXT_REQUIRED', 'The step coach is for practice only.');
+      if (!(typeof b.serverQuestionId === 'string' && ISSUED_ID.test(b.serverQuestionId))) return refuse(400, 'TUTOR_BODY_INVALID', 'serverQuestionId is the id of a question this server issued.');
+      if (!Array.isArray(b.lines) || b.lines.length > LIMITS.lines || !b.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line)) return refuse(400, 'TUTOR_BODY_INVALID', 'lines are the student\'s working lines.');
+      const lines = b.lines.map(l => l.trim());
+      if (!lines.length || lines.some(l => !l)) return refuse(400, 'TUTOR_NOTHING_TO_DIAGNOSE', 'Send the finished lines, none blank.');
+      const at = now();
+      const accountId = req.platformSession.account_id;
+      if (!(await accountIsPremium(db, accountId))) return refuse(403, 'STEP_COACH_PREMIUM', 'The step coach is part of Premium.');
+      const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
+      if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+      if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
+      const capBucket = `step-coach:${sha256(`${accountId}:${b.serverQuestionId}`).slice(0, 32)}`;
+      const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
+      if (capRow && Number(capRow.count) >= STEP_COACH_READS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
+        return refuse(409, 'STEP_COACH_LIMIT', 'This question has had all its live checks.');
+      }
+      const rows = await issued.stepCoachEvidence(lines);
+      // A check that did not run costs nothing and says nothing.
+      if (!rows) return res.json({ stepCoach: { lines: lines.map(() => ({ status: 'unsure' })), unchecked: true } });
+      const cap = await consumeRateLimit(db, capBucket, { limit: STEP_COACH_READS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
+      if (!cap.allowed) return refuse(409, 'STEP_COACH_LIMIT', 'This question has had all its live checks.');
+      const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+        { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+      if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
+      res.json({ stepCoach: { lines: stepCoachReply(rows), checksLeft: cap.remaining } });
     });
 
   // ── Streaming ──────────────────────────────────────────────────────────────

@@ -61,7 +61,7 @@ import {
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
-import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
+import { requestLineCheck, requestStepCoach, requestTutorHelp, stepCoachAvailable } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
@@ -3913,6 +3913,55 @@ const routes = {
       lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked', 'final'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
       tutorLevel: Number(row.tutorLevel) || 0, checksLeft: Math.max(0, 2 - (Number(row.lineChecks) || 0))
     };
+  },
+
+  // The live step coach (F1): is it on for this account? The server decides.
+  'GET /tutor/step-coach': async () => ({ on: await stepCoachAvailable() }),
+
+  // The live step coach (F1): the server's Step Check of the FINISHED lines of
+  // an OPEN server-issued question, as the student writes. One status per
+  // line — 'ok' (with the plan step), 'break' (the first line that does not
+  // follow from a verified line above), 'unsure' (say nothing) or 'final' (a
+  // final-answer attempt: only "Press Check"). No value, no mark. The server
+  // gates it (switch, Premium, per-question cap, daily allowance).
+  //
+  // Assistance provenance (PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL §6): a shown
+  // break is A1 (localization only), a shown tick is verification feedback.
+  // Both are recorded on the attempt, system-initiated, with the line index;
+  // no help credit is charged here — that policy is the owner's decision.
+  'POST /practice/:id/tutor/step-coach': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt || row.answered || !row.serverQuestionId) return { stepCoach: null };
+    const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+    if (!lines.length) return { stepCoach: null };
+    const outcome = await requestStepCoach({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines });
+    const rows = outcome?.stepCoach?.lines;
+    if (!Array.isArray(rows) || rows.length !== lines.length || outcome.stepCoach.unchecked) return { stepCoach: null, code: outcome?.error?.code || null };
+    const clean = rows.map(r => {
+      const status = ['ok', 'break', 'unsure', 'final'].includes(r?.status) ? r.status : 'unsure';
+      return status === 'ok' && Number.isInteger(r.step) && r.step > 0 && r.step < 100 ? { status, step: r.step } : { status };
+    });
+    const shown = clean.map((r, i) => ({ i, s: r.status })).filter(r => r.s === 'ok' || r.s === 'break');
+    if (shown.length) {
+      const env = row.assistance && typeof row.assistance === 'object' ? row.assistance : {};
+      const coach = env.stepCoach && typeof env.stepCoach === 'object' ? env.stepCoach : { reads: 0, breaks: [], ticks: [] };
+      coach.reads = (Number(coach.reads) || 0) + 1;
+      for (const { i, s } of shown) {
+        const list = s === 'break' ? (coach.breaks ||= []) : (coach.ticks ||= []);
+        if (!list.includes(i) && list.length < 40) list.push(i);
+      }
+      coach.level = coach.breaks?.length ? 'A1' : 'A0-verify';
+      coach.initiatedBy = 'system';
+      coach.revealedNextStep = false;
+      coach.revealedFinalAnswer = false;
+      row.assistance = { ...env, stepCoach: coach };
+      await put('questions', row);
+    }
+    return { stepCoach: { lines: clean, checksLeft: Number.isInteger(outcome.stepCoach.checksLeft) ? outcome.stepCoach.checksLeft : null } };
   },
 
   // The student's own question, between levels 1 and 3. Grounded and streamed

@@ -66,7 +66,14 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // shows "Checking your earlier answer…" and holds back Read; it carries
   // nothing about the question, the submission's content or its mark, and
   // never reaches the reader request.
-  'checkingEarlier'
+  'checkingEarlier',
+  // Reviewed 2026-11-10 (F1 live step coach, L4): a boolean, true where the
+  // server says the coach is on for this account (its switch and Premium) and
+  // the attempt is open. It only lets the surface read the page on its own
+  // after a line is finished — the same picture-only, answer-blind request,
+  // never before the student accepted the reader. It carries nothing about the
+  // question or its answer and never reaches the reader request.
+  'liveRead'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([
@@ -411,6 +418,10 @@ for (const file of files) {
     inkAnswerSites++;
     const unknown = props.filter(p => !INK_ANSWER_PROPS.includes(p));
     ok(unknown.length === 0, `${rel}: <InkAnswer> receives undeclared prop(s) ${unknown.join(', ')}; review the channel into the engine before allowing it`);
+  }
+  // liveRead is the coach's on/off switch and nothing else.
+  for (const m of source.matchAll(/liveRead=\{([^}]*)\}/g)) {
+    ok(/^coachOn && !resolved$/.test(m[1].trim()), `${rel}: liveRead must be exactly {coachOn && !resolved}, got {${m[1].trim()}}`);
   }
 }
 ok(contextSites >= 2, `found ${contextSites} recognition-context site(s) in production code (QuestionCard, ExamRoom expected)`);
