@@ -123,3 +123,9 @@ html.ui-instrument.skin-aurora .pri-auth{display:block;color:CanvasText;backgrou
 .skin-aurora .pri-auth>.in-signin-plot{display:none}
 html.ui-instrument.skin-aurora .pri-auth>.auth-col{color:CanvasText;background:Canvas}
 }
+
+/* An unavailable action must never look identical to a ready-to-submit one. */
+html.ui-instrument.skin-aurora .pri-auth .signup-next:disabled {
+  background:#464151; border-color:#5b556b; color:#dcd9e8;
+  opacity:1; cursor:not-allowed; box-shadow:none;
+}
