@@ -37,6 +37,7 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
+import { neqWorthCheck, relationChoices, swapRelation } from './relationSwap.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -99,7 +100,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -713,6 +714,26 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
               )}
+              {/* The reader's own doubt about this line, said as a question about the
+                  reading; a relation sign is fixed with one tap, not by retyping. */}
+              {!disabled && !stale && line.corrected !== true && (line.doubt || neqWorthCheck(line.text, promptAsksInequality)) && (
+                <span className="ink-line-symbol-check" role="status" data-line-symbol-doubt={line.doubt || '≠'}>
+                  {line.doubt ? t('ink.checkSymbol', { doubt: line.doubt }) : t('ink.checkNotEqual')}
+                </span>
+              )}
+              {!disabled && !stale && correcting?.index !== li && (() => {
+                const choice = relationChoices(line);
+                if (!choice || (line.corrected === true && !line.doubt)) return null;
+                return (
+                  <span className="ink-relation-swaps" role="group" aria-label={t('ink.relationSwapAria', { n: li + 1 })} data-relation-swaps>
+                    {choice.options.map(sign => (
+                      <button key={sign} type="button" className="btn btn-quiet btn-sm ink-relation-swap" data-relation-swap={sign}
+                        aria-label={t('ink.relationSwapTo', { from: choice.current, to: sign })}
+                        onClick={() => correctLine(li, swapRelation(line.text, choice.at, sign))}>{sign}</button>
+                    ))}
+                  </span>
+                );
+              })()}
               {/* Every line of the reading is the student's to correct before
                   Submit, not only the ones the reader doubted: a confident
                   misread is still a misread, and it is their page. */}
