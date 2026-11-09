@@ -135,3 +135,9 @@ html.ui-instrument.skin-aurora .pri-auth .signup-next:disabled {
 html.ui-instrument.skin-aurora .pri-auth .signup-flow[data-signup-step="method"] .signup-step {
   animation:none; opacity:1; transform:none;
 }
+
+/* Touch devices can scroll over the illustration but do not support mouse
+   inspection; avoid an instruction the student cannot perform with a finger. */
+@media (pointer: coarse) {
+  html.ui-instrument.skin-aurora .pri-auth .pri-plot-top span:last-child { display: none; }
+}
