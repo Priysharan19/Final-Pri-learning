@@ -65,7 +65,12 @@ export const flow = {
     const notice = await page.getByTestId('signup-notice').innerText().catch(() => '');
     await check('the cancellation is explained instead of trapping the learner',
       /cancel|रद्द/i.test(notice), notice);
-    await check('the old provider popup is closed', popup.isClosed());
+    // WebKit reports popup closure asynchronously after AbortSignal dispatch.
+    // Require a real close event within a bound; never infer closure from
+    // removal of the Cancel button or from the form being enabled.
+    const popupClosed = popup.isClosed() || await popup.waitForEvent('close', {timeout: 4000})
+      .then(() => true, () => popup.isClosed());
+    await check('the old provider popup is closed', popupClosed);
     await check('cancelling cannot issue a Google account sign-in request',
       !requests.some(r => r.startsWith('POST /v1/account/identity/google/sign-in')),
       JSON.stringify(requests.filter(r => r.includes('identity'))));
