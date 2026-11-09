@@ -651,6 +651,12 @@ html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col > :is(
 html.ui-instrument .auth-wrap:has(> .in-signin-plot) > .auth-col > .logo {
   display: flex; justify-content: flex-start; margin-bottom: 10px;
 }
+/* The outlined SVG wordmark is 224px wide at its default 44px height.
+   Under 200% text zoom the CSS viewport can be 188px; constrain the SVG
+   itself, not merely its parent, or it still widens the whole page. */
+html.ui-instrument .auth-wrap:has(> .in-signin-plot) .brand-wordmark {
+  max-width: 100%; height: auto; flex-shrink: 1;
+}
 .in-signin-plot { position: relative; min-height: 100%; background: var(--in-void); overflow: hidden; }
 .in-signin-plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .in-signin-line {
