@@ -110,6 +110,41 @@ export function classify(samples, startedAtSeconds) {
   return { verdict: 'INCONCLUSIVE', reason: 'buckets vary within an edge node: either this client\'s address changes between connections or buckets are keyed some other way; run from a fixed address', facts };
 }
 
+/**
+ * X-Real-IP forgery verdict from the staging diagnostic (/v1/diag/client-ip).
+ * `echoes`: [{ forged, reply }]. SPOOFABLE when any forged value reached the app.
+ */
+export function classifyRealIp(echoes) {
+  const usable = echoes.filter(e => e.reply && e.reply.probe === 'client-ip');
+  if (!usable.length) return { verdict: 'UNAVAILABLE', reason: 'the staging diagnostic /v1/diag/client-ip is not on (PRI_CLIENT_IP_HEADER_PROBE=1 on staging)' };
+  const leaked = usable.filter(e => String(e.reply.xRealIp || '').split(',').map(v => v.trim()).includes(e.forged));
+  if (leaked.length) return { verdict: 'X-REAL-IP-SPOOFABLE', reason: `${leaked.length} of ${usable.length} forged X-Real-IP values reached the app: X-Real-IP must NOT be trusted` };
+  const empty = usable.filter(e => !e.reply.xRealIp);
+  if (empty.length) return { verdict: 'X-REAL-IP-ABSENT', reason: 'the edge did not set X-Real-IP on every request' };
+  return { verdict: 'X-REAL-IP-EDGE-SET', reason: `the edge replaced every forged X-Real-IP (${usable.length} tries)` };
+}
+
+function echo(origin, headers) {
+  return new Promise(resolve => {
+    const req = request(new URL('/v1/diag/client-ip', origin), { method: 'GET', agent: false, headers: { Accept: 'application/json', ...headers }, timeout: REQUEST_TIMEOUT_MS }, res => {
+      let body = ''; res.setEncoding('utf8'); res.on('data', d => { body += d; });
+      res.on('end', () => { try { resolve(res.statusCode === 200 ? JSON.parse(body) : null); } catch { resolve(null); } });
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
+export async function forgeRealIp(origin, tries = 4) {
+  const echoes = [];
+  for (let i = 0; i < tries; i++) {
+    const forged = `198.18.${Math.floor(Math.random() * 255)}.${1 + Math.floor(Math.random() * 254)}`;
+    echoes.push({ forged, reply: await echo(origin, { 'X-Real-IP': forged, 'X-Forwarded-For': forged }) });
+  }
+  return { ...classifyRealIp(echoes), echoes };
+}
+
 function probe(origin, headers = {}) {
   return new Promise(resolve => {
     // agent: false — a new connection (and so a fresh edge choice) per request.
@@ -163,6 +198,10 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const errors = out.samples.filter(s => s.status !== 200);
   if (errors.length) console.log(`  ${errors.length} request(s) did not answer 200: ${[...new Set(errors.map(s => s.status || s.error))].join(', ')}`);
   console.log(`  ${JSON.stringify(out.facts)} in ${Math.round(out.elapsedMs / 1000)} s`);
+  const realIp = await forgeRealIp(origin);
+  console.log(`X-REAL-IP: ${realIp.verdict} — ${realIp.reason}`);
+  for (const e of realIp.echoes) if (e.reply) console.log(`  forged ${e.forged} → X-Real-IP ${e.reply.xRealIp} · XFF ${e.reply.xForwardedFor} · req.ip ${e.reply.reqIp}`);
+  if (realIp.verdict === 'X-REAL-IP-SPOOFABLE') { console.log(`PROXY IDENTITY: ${out.verdict} — ${out.reason}`); process.exit(1); }
   console.log(`PROXY IDENTITY: ${out.verdict} — ${out.reason} (${origin}, ${new Date().toISOString()})`);
   process.exit(out.verdict === 'SINGLE-BUCKET' ? 0 : out.verdict === 'INCONCLUSIVE' ? 2 : 1);
 }
