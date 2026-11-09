@@ -110,6 +110,24 @@ function mmss(totalSeconds) {
 
 // Where the marks went, in figures (local/examAnalysis.js): the mock note above
 // says the paper predicts nothing, so the headline never ranks the student.
+// The "why these questions" key of a targeted paper (engine/targetedMock.js):
+// the server's own record of which questions leant toward which subtopic and
+// on what evidence. Facts about the student's marked work; no prediction.
+function WhyKey({ why }) {
+  const rows = (why?.rows || []).filter(r => r.targeted);
+  if (!why) return null;
+  return (
+    <details style={{ marginTop: 10, textAlign: 'left' }} data-exam-why-key={why.targeted}>
+      <summary>{t('mock.whyTitle', { targeted: why.targeted, questions: why.questions })}</summary>
+      {rows.length
+        ? <ul style={{ marginTop: 8, paddingLeft: 18 }}>
+          {rows.map(r => <li key={r.order} data-exam-why-row={r.order}>{t('mock.whyRow', { order: r.order, chapter: r.chapterName || r.subtopic })}{r.due > 0 && <> {t('mock.whyDue', { count: r.due })}</>}{r.open > 0 && <> {t('mock.whyOpen', { count: r.open })}</>}</li>)}
+        </ul>
+        : <p className="muted" style={{ marginTop: 8 }}>{t('mock.whyNone')}</p>}
+    </details>
+  );
+}
+
 function LostLine({ lost }) {
   const t = useT();
   if (!lost) return null;
@@ -734,6 +752,8 @@ export default function ExamRoom() {
         <div className="card" style={{ textAlign: 'center', padding: 34 }}>
           <div className="card-title">{exam.title}</div>
           {exam.mock && <p className="muted" data-exam-mock-label>{t('mock.resultNote', { label: MOCK_LABEL })}</p>}
+          {exam.targeted && <p className="muted" data-exam-targeted-label>{t('mock.targetedResultNote')}</p>}
+          {exam.targeted && <WhyKey why={exam.why} />}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
