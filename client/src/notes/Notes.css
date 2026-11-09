@@ -455,3 +455,35 @@
   .nt-study-layout { display: block; }
   .nt-sheet { border: 0; }
 }
+
+/* Personal, device-only resume cue: never imply assessed progress or mastery. */
+.nt-resume {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; padding: 17px 20px; margin: 0 0 25px;
+  border-radius: 12px; border: 1px solid var(--nt-rule-strong);
+  background: var(--nt-raised); position: relative;
+}
+.nt-resume::before {
+  content: ''; position: absolute; top: 14px; bottom: 14px;
+  left: 0; width: 3px; border-radius: 0 4px 4px 0;
+  background: var(--nt-accent);
+}
+.nt-resume-content { min-width: 0; }
+.nt-resume-eyebrow {
+  margin: 0 0 5px; font-size: 11px; font-weight: 650;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--nt-ink-3);
+}
+.nt-resume h2 { margin: 0; font-family: var(--nt-serif); font-weight: 500; font-size: 20px; line-height: 1.3; }
+.nt-resume-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; min-height: 44px; padding: 9px 16px;
+  border-radius: 6px; border: 1px solid var(--nt-accent);
+  color: var(--nt-accent); text-decoration: none; font-weight: 650; font-size: 13px;
+}
+.nt-resume-link:hover { background: var(--nt-accent-soft); }
+.nt-resume-link:focus-visible { outline: 2px solid var(--nt-accent); outline-offset: 3px; }
+@media(max-width:600px) {
+  .nt-resume { align-items: flex-start; padding: 14px 16px; }
+  .nt-resume h2 { font-size: 18px; }
+  .nt-resume-link { padding: 8px 10px; font-size: 12px; }
+}

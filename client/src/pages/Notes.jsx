@@ -24,6 +24,7 @@ import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
+import { readRecentNotesChapter, rememberRecentNotesChapter } from './notesRecentChapter.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
 import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
 
@@ -124,6 +125,8 @@ function NotesIndex() {
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const [{ notes, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
+  const [recentId] = useState(() => readRecentNotesChapter(user?.id));
+  const recentChapter = IN_CHAPTER_BY_ID[recentId];
   const [onlyMarked, setOnlyMarked] = useState(false);
   const [query, setQuery] = useState(() =>
     readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
@@ -177,6 +180,17 @@ function NotesIndex() {
         ? <SearchResults query={query.trim()} />
         : (
           <>
+            {recentChapter && (
+              <section className="nt-resume" aria-label={t('home.kicker.continue')} data-testid="notes-resume">
+                <div className="nt-resume-content">
+                  <p className="nt-resume-eyebrow">{t('home.kicker.continue')} · {t('common.classNumber', { n: recentChapter.grade })} · {recentChapter.strand}</p>
+                  <h2>{recentChapter.name}</h2>
+                </div>
+                <PageLink className="nt-resume-link" to={chapterNotesLink(recentChapter, params)}>
+                  {t('classes.continue')}
+                </PageLink>
+              </section>
+            )}
             {failed && <LoadFailed retry={retry} />}
             {!failed && !notes && <p className="nt-status" role="status">{t('notes.loading')}</p>}
             <section className="nt-index" aria-labelledby="nt-index-h">
@@ -396,6 +410,9 @@ function ChapterNotes({ chapterId }) {
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
+  useEffect(() => {
+    if (IN_CHAPTER_BY_ID[chapterId]) rememberRecentNotesChapter(user?.id, chapterId);
+  }, [user?.id, chapterId]);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
   const [visibleExamples, setVisibleExamples] = useState(3);
   const [visualOnly, setVisualOnly] = useState(false);
@@ -488,11 +505,11 @@ function ChapterNotes({ chapterId }) {
           <nav className="nt-toc" aria-label={t('study.choosePath')}>
             <p className="nt-toc-label">{t('study.choosePath')}</p>
             <a href="#ideas">{t('notes.sectionIdeas')}</a>
-            <a href="#definitions">{t('notes.sectionDefinitions')}</a>
             <a href="#formulas">{t('notes.sectionFormulas')}</a>
-            <a href="#points">{t('notes.sectionPoints')}</a>
-            <a href="#mistakes">{t('notes.sectionMistakes')}</a>
             <a href="#examples">{t('notes.sectionExamples')}</a>
+            <a href="#mistakes">{t('notes.sectionMistakes')}</a>
+            <a href="#points">{t('notes.sectionPoints')}</a>
+            <a href="#definitions">{t('notes.sectionDefinitions')}</a>
             {linkedResources.length > 0 && <a href="#resources">{t('notes.sectionResources')}</a>}
             <button type="button" onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
           </nav>
@@ -502,43 +519,10 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           {chapter.id === 'c11-complex-numbers' && <ComplexArgandFigure />}
-          <Section id="definitions" title={t('notes.sectionDefinitions')}>
-            <dl className="nt-defs">
-              {notes.definitions.map((d, i) => (
-                <div key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <dt><MathText text={d.term} /></dt>
-                  <dd><MathText text={d.meaning} /></dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-
           <Section id="formulas" title={t('notes.sectionFormulas')}>
             <div className="nt-formulas">
               {notes.formulas.map((f, i) => <Formula key={i} f={f} i={i} />)}
             </div>
-          </Section>
-
-          <Section id="points" title={t('notes.sectionPoints')}>
-            <ol className="nt-points">
-              {notes.points.map((p, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <MathText className="nt-point-front" text={p.front} />
-                  <MathText className="nt-point-back" text={p.back} />
-                </li>
-              ))}
-            </ol>
-          </Section>
-
-          <Section id="mistakes" title={t('notes.sectionMistakes')}>
-            <ul className="nt-mistakes">
-              {notes.mistakes.map((m, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <div className="nt-wrong"><span className="nt-tag">{t('notes.mistakeWrong')}</span><MathText text={m.wrong} /></div>
-                  <div className="nt-right"><span className="nt-tag">{t('notes.mistakeRight')}</span><MathText text={m.right} /></div>
-                </li>
-              ))}
-            </ul>
           </Section>
 
           <Section id="examples" title={t('notes.sectionExamples')}>
@@ -561,6 +545,39 @@ function ChapterNotes({ chapterId }) {
                 </button>
               </div>
             )}
+          </Section>
+
+          <Section id="mistakes" title={t('notes.sectionMistakes')}>
+            <ul className="nt-mistakes">
+              {notes.mistakes.map((m, i) => (
+                <li key={i} className="nt-reveal" style={{ '--i': i }}>
+                  <div className="nt-wrong"><span className="nt-tag">{t('notes.mistakeWrong')}</span><MathText text={m.wrong} /></div>
+                  <div className="nt-right"><span className="nt-tag">{t('notes.mistakeRight')}</span><MathText text={m.right} /></div>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section id="points" title={t('notes.sectionPoints')}>
+            <ol className="nt-points">
+              {notes.points.map((p, i) => (
+                <li key={i} className="nt-reveal" style={{ '--i': i }}>
+                  <MathText className="nt-point-front" text={p.front} />
+                  <MathText className="nt-point-back" text={p.back} />
+                </li>
+              ))}
+            </ol>
+          </Section>
+
+          <Section id="definitions" title={t('notes.sectionDefinitions')}>
+            <dl className="nt-defs">
+              {notes.definitions.map((d, i) => (
+                <div key={i} className="nt-reveal" style={{ '--i': i }}>
+                  <dt><MathText text={d.term} /></dt>
+                  <dd><MathText text={d.meaning} /></dd>
+                </div>
+              ))}
+            </dl>
           </Section>
 
           {linkedResources.length > 0 && (

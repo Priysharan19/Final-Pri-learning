@@ -143,6 +143,17 @@ try {
   await page.reload();
   await page.waitForSelector('.nt-formula');
   await check('the bookmark is still there after a reload', await page.locator('.nt-mark-toggle').getAttribute('aria-pressed') === 'true');
+  const orderedSections = await page.locator('.nt-section').evaluateAll(nodes => nodes.map(n => n.id));
+  await check('learning order leads from concepts to formulas, examples and then reference',
+    ['ideas', 'formulas', 'examples', 'mistakes', 'points', 'definitions']
+      .every((id, i, arr) => i === 0 || orderedSections.indexOf(arr[i - 1]) < orderedSections.indexOf(id)));
+  await page.goto(server.origin + '/notes');
+  await page.getByTestId('notes-resume').waitFor();
+  await check('Notes remembers the previous chapter without inventing a mastery score',
+    (await page.getByTestId('notes-resume').innerText()).includes('Quadratic Equations'));
+  await page.getByTestId('notes-resume').getByRole('link').click();
+  await page.waitForSelector('.nt-formula');
+  await check('resume reopens the same chapter', page.url().includes('/notes/' + CHAPTER));
 
   // ── 4 · revise in five minutes ─────────────────────────────────────────────
   await page.getByTestId('notes-revise').click();

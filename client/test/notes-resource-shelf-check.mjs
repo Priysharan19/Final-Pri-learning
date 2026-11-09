@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { STUDY_RESOURCE_LINKS, studyResourcesForGrade } from '../src/notes/data/notes-study-resources.js';
+import { recentNotesChapterKey, readRecentNotesChapter, rememberRecentNotesChapter } from '../src/pages/notesRecentChapter.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8');
 assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources missing from student Notes');
@@ -24,6 +26,19 @@ assert.ok(view.includes('selectedExamples.slice(0, visibleExamples)'), 'unbounde
 assert.ok(view.includes('Math.min(v + 3, selectedExamples.length)'), 'load-more action must never overshoot lesson length');
 assert.ok(view.includes('useReveal(root, [chapterId, notes, visibleExamples, visualOnly])'), 'newly mounted examples must be observable');
 assert.ok(view.includes('setVisibleExamples(3)'), 'chapter navigation must reset visible example count');
+
+// Reading continuity is device-local and strictly scoped to the signed-in profile.
+const map = new Map();
+const store = { getItem: k => map.get(k) ?? null, setItem: (k,v) => { map.set(k,v); } };
+assert.equal(recentNotesChapterKey(null), null, 'anonymous profiles must not store recents');
+assert.equal(readRecentNotesChapter(undefined, store), null);
+assert.equal(rememberRecentNotesChapter('student-A', 'c10-quadratic-equations', store), true);
+assert.equal(readRecentNotesChapter('student-A', store), 'c10-quadratic-equations');
+assert.equal(readRecentNotesChapter('student-B', store), null, 'cross-profile reading history leaked');
+assert.equal(rememberRecentNotesChapter('student-A', '../unsafe', store), false, 'untrusted chapter path stored');
+assert.equal(readRecentNotesChapter('student-A', { getItem: () => { throw Error('blocked'); } }), null);
+assert.equal(rememberRecentNotesChapter('student-A', 'c11-complex-numbers', { setItem: () => { throw Error('blocked'); } }), false);
+assert.ok(view.includes('data-testid="notes-resume"'), 'resume affordance is not exposed');
 
 assert.ok(!view.includes('dangerouslySetInnerHTML'), 'SVG must not permit raw HTML injection');
 assert.equal(STUDY_RESOURCE_LINKS.length, 23, 'unexpected source register count');
