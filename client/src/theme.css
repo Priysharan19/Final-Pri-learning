@@ -402,6 +402,18 @@ select.input {
 /* ── Landing / auth ────────────────────────────────────────────────────── */
 .auth-wrap { display: grid; place-items: center; padding: 24px; position: relative; overflow: hidden; }
 .auth-col { position: relative; z-index: 2; display: grid; justify-items: center; gap: 0; width: 100%; }
+/* In the plain V1 fallback, a 200%-zoom-equivalent phone may have a 188px
+   CSS viewport. Do not let the outlined 224px wordmark set the grid minimum
+   and clip the email sign-in, heading or legal copy. */
+@media (max-width: 320px) {
+  .auth-wrap { padding-inline: 16px; }
+  .auth-wrap > .auth-col { min-width: 0; max-width: 100%; }
+  .auth-wrap > .auth-col > :is(.logo, .hero-title, .hero-kicker, .hero-sub, .signin-landing, p.muted) {
+    min-width: 0; max-width: 100%; overflow-wrap: anywhere;
+  }
+  .auth-wrap > .auth-col .brand-wordmark { max-width: 100%; height: auto; flex-shrink: 1; }
+}
+
 .mathfield { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .mathfield span {
   position: absolute;
