@@ -1,11 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · the pages a store, a payment provider and the DPDP Act require
 //
-// Apple, Google and Razorpay all need a privacy notice, terms and a refund
-// policy at a real URL, and India's DPDP Act requires a published grievance
-// contact. Those four documents live in docs/legal/*.md and are rendered here,
-// so there is exactly one copy of each and it ships with the app — it works
-// offline, and it cannot drift from the version in the repository.
+// Apple and Google need a privacy notice, terms and a refund policy at a real
+// URL, and India's DPDP Act requires a published grievance contact. Those four
+// documents live in docs/legal/*.md and are rendered here, so there is exactly
+// one copy of each and it ships with the app — it works offline, and it cannot
+// drift from the version in the repository. A fifth page, the third-party
+// licence notices, is generated from the dependency licences and rendered by
+// the same reader.
 //
 // TWO LANGUAGES. The DPDP Act's section 5(3) gives a data principal the right
 // to read the notice in English or in any language of the Eighth Schedule, and
@@ -23,10 +25,16 @@
 // (i18n/legalHindi.js) and, if it cannot be, the page shows the English and
 // says why. Failing back to the governing text is the safe direction to fail.
 //
-// While a document still contains {{PLACEHOLDER}} text it is a template, and
-// the page says so at the top, in the reader's language.
-// legal-pages-check.mjs fails if that banner is removed while placeholders
-// remain, so an unfinished notice can never be published as a finished one.
+// THE REVIEW BANNER. Every notice says at the top that no lawyer has reviewed
+// it until one has. That sentence used to depend on {{PLACEHOLDER}} text being
+// left in the documents, so filling the placeholders on 19 October 2026 made
+// the banner disappear although nobody had reviewed anything. It now depends
+// on one explicit switch, docs/legal/review-status.json, which only a person
+// sets after a lawyer qualified in Indian law has reviewed the English and
+// checked the Hindi against it. legal-pages-check.mjs refuses the switch
+// without the reviewer's name, qualification, date and evidence, and refuses
+// it again if a notice is edited after the review date. A document that still
+// contains a placeholder is a template, and the page says that too.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -36,18 +44,28 @@ import privacy from '../../../docs/legal/privacy.md?raw';
 import terms from '../../../docs/legal/terms.md?raw';
 import refund from '../../../docs/legal/refund-policy.md?raw';
 import grievance from '../../../docs/legal/grievance.md?raw';
+import review from '../../../docs/legal/review-status.json';
 
 // The English of each notice, keyed by its own route. There is no `title` here
 // any more: a notice names itself in its first heading, in whichever language
 // it is written in, and titleOf() reads it back. One name per document, in the
 // document, is the only arrangement that cannot leave the two languages
 // disagreeing about what the page is called.
+//
+// The licence page is different in kind: it is generated, English by nature
+// (licence texts are reproduced as published), carries no placeholders and is
+// not a notice a lawyer reviews, so it is named by the catalogue, reached by
+// import() and shows neither banner.
 export const LEGAL_PAGES = Object.freeze({
-  privacy: { source: privacy },
-  terms: { source: terms },
-  'refund-policy': { source: refund },
-  grievance: { source: grievance }
+  privacy: { kind: 'notice', source: privacy },
+  terms: { kind: 'notice', source: terms },
+  'refund-policy': { kind: 'notice', source: refund },
+  grievance: { kind: 'notice', source: grievance },
+  'third-party-notices': { kind: 'licences', source: null, titleKey: 'legal.thirdPartyTitle' }
 });
+
+/** True only when a human has recorded a lawyer's review in review-status.json. */
+export const LEGAL_REVIEWED = review.reviewed === true;
 
 // The three exported helpers below close over nothing. That is deliberate:
 // legal-pages-check.mjs cannot import this file — it is JSX and its documents
@@ -65,7 +83,7 @@ export function titleOf(markdown) {
   return String(markdown || '').match(/^#[ \t]+(.+)$/m)?.[1].trim() || '';
 }
 
-// ── The Hindi documents ──────────────────────────────────────────────────────
+// ── The Hindi documents, and the licence notices ─────────────────────────────
 // Module scope rather than component state, so the four pages share one fetch
 // and following a link from the privacy notice to the grievance page does not
 // ask for the chunk again. The in-flight promise is cleared on failure, so a
@@ -82,13 +100,24 @@ function loadHindi() {
   return hindiRequest;
 }
 
+let noticesDocument = null;
+let noticesRequest = null;
+
+function loadNotices() {
+  if (noticesDocument) return Promise.resolve(noticesDocument);
+  noticesRequest ||= import('../legal/thirdPartyNotices.js')
+    .then(module => { noticesDocument = module.default; return noticesDocument; })
+    .catch(() => { noticesRequest = null; return null; });
+  return noticesRequest;
+}
+
 // ── Markdown ─────────────────────────────────────────────────────────────────
 
 /**
  * A very small Markdown reader — headings, paragraphs, lists, bold, links. The
- * source is eight files in this repository, not user input, so this does not
- * need to be a general parser; it needs to be one that cannot render anything
- * the eight files do not contain.
+ * source is a handful of files in this repository, not user input, so this does
+ * not need to be a general parser; it needs to be one that cannot render
+ * anything those files do not contain.
  */
 function renderInline(text, key) {
   const nodes = [];
@@ -192,8 +221,8 @@ function Markdown({ source }) {
 // ── The page ─────────────────────────────────────────────────────────────────
 
 export default function Legal() {
-  // The four routes are declared explicitly rather than as one parameterised
-  // path, so the page is read from the location.
+  // The routes are declared explicitly rather than as one parameterised path,
+  // so the page is read from the location.
   const page = useLocation().pathname.replace(/^\/+|\/+$/g, '');
   const entry = LEGAL_PAGES[page];
   const { language, t } = useLanguage();
@@ -219,6 +248,8 @@ export default function Legal() {
 
   const [hindi, setHindi] = useState(hindiDocuments);
   const [hindiFailed, setHindiFailed] = useState(false);
+  const [notices, setNotices] = useState(noticesDocument);
+  const [noticesFailed, setNoticesFailed] = useState(false);
 
   // One attempt per ask. `hindiFailed` closes the loop after a failure so the
   // page does not retry on every render, and pressing the button again clears
@@ -234,11 +265,27 @@ export default function Legal() {
     return () => { live = false; };
   }, [wanted, hindi, hindiFailed]);
 
+  // The licence notices arrive the same way, only when their page is opened.
+  useEffect(() => {
+    if (entry?.kind !== 'licences' || notices || noticesFailed) return undefined;
+    let live = true;
+    loadNotices().then(document => {
+      if (!live) return;
+      if (document) setNotices(document); else setNoticesFailed(true);
+    });
+    return () => { live = false; };
+  }, [entry, notices, noticesFailed]);
+
   // Every notice names itself in whichever language it is being read in, so a
   // link to another one is labelled in the language the reader will land in —
   // and falls back to the English name when the Hindi has not arrived, because
-  // that is the page they will actually get.
-  const nameOf = (key) => titleOf((wanted === 'hi' && hindi?.[key]) || LEGAL_PAGES[key].source);
+  // that is the page they will actually get. The licence page is named by the
+  // catalogue, in the app's language.
+  const nameOf = (key) => {
+    const target = LEGAL_PAGES[key];
+    if (target.titleKey) return t(target.titleKey);
+    return titleOf((wanted === 'hi' && hindi?.[key]) || target.source);
+  };
 
   if (!entry) {
     const published = Object.keys(LEGAL_PAGES).map((key, i, all) => (
@@ -254,6 +301,36 @@ export default function Legal() {
       <div className="qpage">
         <h1>{t('legal.notFoundTitle')}</h1>
         <p className="muted">{tx('legal.notFoundBody', { pages: published })}</p>
+      </div>
+    );
+  }
+
+  const others = Object.keys(LEGAL_PAGES).filter(key => key !== page).map((key, i, all) => (
+    <React.Fragment key={key}>
+      <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
+      {i < all.length - 1 ? ' · ' : ''}
+    </React.Fragment>
+  ));
+
+  if (entry.kind === 'licences') {
+    return (
+      <div className="qpage" style={{ maxWidth: 720 }}>
+        <h1>{t(entry.titleKey)}</h1>
+        <p className="muted">{t('legal.thirdPartyLead')}</p>
+        {notices && (
+          <article className="legal-body" lang="en">
+            <Markdown source={notices} />
+          </article>
+        )}
+        {!notices && noticesFailed && (
+          <div className="notice" role="status" style={{ marginTop: 18 }} data-legal-notices-unavailable="true">
+            {t('legal.thirdPartyUnavailable')}
+          </div>
+        )}
+        {!notices && !noticesFailed && (
+          <p className="muted" role="status">{t('legal.thirdPartyLoading')}</p>
+        )}
+        <p className="muted" style={{ marginTop: 28 }}>{others}</p>
       </div>
     );
   }
@@ -291,6 +368,15 @@ export default function Legal() {
         </div>
       )}
 
+      {/* The review banner depends on the explicit switch alone — never on how
+          many placeholders are left, which is a different fact with a banner
+          of its own below. */}
+      {!LEGAL_REVIEWED && (
+        <div className="notice error" role="alert" style={{ marginBottom: 18 }} data-legal-unreviewed="true">
+          <b>{t('legal.unreviewedTitle')}</b> {t('legal.unreviewedBody')}
+        </div>
+      )}
+
       {unfilled.length > 0 && (
         <div className="notice error" role="alert" style={{ marginBottom: 18 }} data-legal-draft="true">
           <b>{t('legal.draftTitle')}</b> {t('legal.draftBody', { count: unfilled.length, n: unfilled.length })}
@@ -301,14 +387,7 @@ export default function Legal() {
         <Markdown source={source} />
       </article>
 
-      <p className="muted" style={{ marginTop: 28 }}>
-        {Object.keys(LEGAL_PAGES).filter(key => key !== page).map((key, i, all) => (
-          <React.Fragment key={key}>
-            <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
-            {i < all.length - 1 ? ' · ' : ''}
-          </React.Fragment>
-        ))}
-      </p>
+      <p className="muted" style={{ marginTop: 28 }}>{others}</p>
     </div>
   );
 }

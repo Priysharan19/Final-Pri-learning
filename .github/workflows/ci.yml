@@ -228,7 +228,15 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 245/245 checks' suites.log
+          # 364 (m-finish-16): the review switch, store-purchase wording, retention and
+          # crash-report disclosures, and the generated third-party notices page.
+          # 374 (L7): no notice makes a coverage claim D24 forbids, in either language.
+          # 375 (L7): the D18 wording matches the accounts stream's code (#736).
+          grep -Fq 'LEGAL PAGES: PASS — 375/375 checks' suites.log
+          # 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination.
+          grep -Fq 'LEGAL PROMISES GATE: PASS — 16/16 checks' suites.log
+          # L7: the counsel question sheet quotes the current text and code locations.
+          grep -Fq 'COUNSEL QUESTIONS: PASS — 13/13 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).

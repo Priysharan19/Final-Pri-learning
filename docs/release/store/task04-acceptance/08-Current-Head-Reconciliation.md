@@ -65,3 +65,23 @@ Decisions of 1 November 2026 that the pack must follow before any copy is entere
   Android software finished but its closed test pending.
 - **D24** only the plain coverage wording; never "complete", "every chapter", "certified" or any
   accuracy, question-count or percentile claim.
+
+## Re-checked on 8 November 2026 against `main` `1d3829103` (lane L7)
+
+Files 01–07 and the README in this directory are the original Task 04 package, byte for byte
+(`CHECKSUMS.sha256`), and are not edited. Where they and the primary drafts disagree, the primary
+drafts win: `docs/release/app-store-privacy-labels.md`, `docs/release/play-data-safety.md`,
+`docs/release/store/app-store-listing.md` and `docs/release/store/play-listing.md`. Nothing below is
+a store submission, a legal opinion or an acceptance.
+
+| Open point in this package | State now | Where |
+|---|---|---|
+| Crash Data: Apple said No, Play said Yes (03 §B, §E item 3; item 7 above) | **Closed 2 Nov.** Collected in all three: Apple label Yes (optional), Play Crash logs Yes, `CrashData` in both iOS manifests; `tools/store-readiness-check.mjs` holds them to `reportCrash` and `POST /v1/telemetry/error` | labels §6 row 12; Play §6b row 16 |
+| Optional SMS and phone number declared (03 §E item 5) | **Closed 2 Nov.** SMS is off at launch (D3); Phone number removed from both manifests and both forms, with the re-enable procedure beside each; the listings no longer mention an SMS code | labels §6 row 13; Play §6b row 15; listings §10 and §8 |
+| "No third-party analytics" in review notes (03 §E item 4) | **Closed 8 Nov.** The notes say no third-party analytics or crash SDK, and that Pri's server keeps operational telemetry and coded crash reports, which App Privacy declares | `app-store-listing.md` §6 |
+| Privacy notice "revised 19 Oct, not legally approved" (item 5 above) | Corrected against the code on 2 Nov; **still not reviewed by counsel**, shown on every notice by the switch `docs/legal/review-status.json` (`reviewed: false`), which nothing in code or any agent sets | `docs/legal/README.md` |
+| Privacy URL `[LIVE COUNSEL-APPROVED HTTPS]/privacy`; deletion URL `[PRODUCTION VERIFIED HTTPS ORIGIN]/account/delete-request` (03 §B, §C) | D5 values written in: `https://prilearning.com/privacy`, `/support`, `/terms`, and `https://prilearning.com/delete-account` linking to the form at `https://app.prilearning.com/account/delete-request`. The site is **not deployed** and DNS is untouched; each URL must resolve, and counsel must have approved the notice, before it is entered | labels §1; Play §1 and Step 2 |
+| Explicit permission before third-party AI (03 §B, §D; item 8 above) | **Open.** D17 (a one-time prompt naming OpenAI before the first read or photo; nothing sent until accepted; declining keeps typed answers) is the default and is **not yet in the code**. Every disclosure describes reading as on for a signed-in account and switchable off, which is what `client/src/ink/cloudReader.js` does, and changes when the prompt lands | labels §1 and §4 item 3; Play §5 item 11; counsel questions on D17 |
+| Unconfirmed child accounts (03 §D) | **Open.** D18 (erasure after 30 days; a guardian can ask for erasure without the child's login) is promised in the privacy notice and **not yet in the code**; `scripts/release-nominate.mjs` refuses a production nomination until it is (`tools/legal-promises.mjs`) | labels §1; Play §3 |
+| Past-paper content rights (01 content-rights row) | D23: past papers are off for students until a rights opinion exists | `app-store-listing.md` §3 |
+| Customer Support classification; Apple Product Personalisation; service-provider "shared" exemption; Families target audience | **Open**, owner and counsel | labels §2 and §4; Play §5; `docs/legal/counsel/QUESTIONS-FOR-COUNSEL.md` |
