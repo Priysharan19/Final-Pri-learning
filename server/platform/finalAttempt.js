@@ -84,6 +84,27 @@ export function readClaimForm(text) {
   } catch { return null; }
 }
 
+// Units a school answer may carry after its number. Stripped only when they
+// FOLLOW a number, so a variable named m or g elsewhere is never touched.
+const UNIT = String.raw`(?:sq\.?\s*|cu\.?\s*)?(?:cm|mm|km|m|kg|mg|g|ml|l|litres?|liters?|s|sec|min|h|hrs?|hours?|days?|years?|rs\.?|rupees?|paise|degrees?|deg|units?|°|%)(?:\s*\^?\s*[23]|[²³])?`;
+// The number must stand on its own — at the start, or after "=" or a space —
+// so "r^2 h" (an exponent, then a variable) is never read as "2 hours".
+const TRAILING_UNITS = new RegExp(String.raw`((?:^|[=\s])[-−]?\d[\d.,]*)\s*(?:${UNIT})(?:\s*(?:\/|per)\s*(?:${UNIT}))?\s*\.?\s*$`, 'i');
+const LEADING_CURRENCY = /^[\s]*(?:₹|rs\.?|\$)\s*/i;
+
+/** The text with a currency sign before, and units after, its number removed. */
+export function stripUnits(text) {
+  return clean(text).replace(LEADING_CURRENCY, '').replace(/=\s*(?:₹|rs\.?)\s*/i, '= ').replace(TRAILING_UNITS, '$1').trim();
+}
+
+/** Is the escrowed answer a bare constant once its units are stripped? */
+export function isConstantAnswer(answerText) {
+  const parts_ = parts(stripUnits(answerText));
+  if (parts_.length !== 1) return false;
+  const c = readClaimForm(parts_[0]);
+  return !!c && c.shape === 'expr' && c.symbols.size === 0;
+}
+
 const sameSet = (a, b) => a.size === b.size && [...a].every(v => b.has(v));
 
 /**
@@ -97,6 +118,12 @@ export function answerForm({ answerText = '', variable = null, prefix = '' } = {
   if (typeof variable === 'string' && variable) unknowns.add(variable);
   const pre = String(prefix || '').match(/^\s*([A-Za-z])\s*=\s*$/);
   if (pre) unknowns.add(pre[1]);
+  // A bare constant answer, units stripped ("36036 cm³", "₹ 450", "12.5 %"):
+  // every line that pins ONE symbol to a constant — or is a constant — is an
+  // attempt, whatever the symbol is called (V, V_1, A, x) and whatever the
+  // value. Without this a unit made the answer unreadable as a claim, and the
+  // Step Check's own placement of a RIGHT value decided the reply (L2 repro).
+  if (isConstantAnswer(answerText)) return { constant: true, forms: [], unknowns, valueSymbols: [] };
   const claims = parts(clean(answerText)).map(readClaimForm);
   if (!claims.length || claims.some(c => !c)) return null;
   for (const c of claims) {
@@ -170,8 +197,15 @@ function answerValueSymbols(answerText, unknowns) {
 
 /** Is this one claim a final-answer attempt, by form alone? Unreadable → yes. */
 function claimIsAttempt(text, form) {
-  const c = readClaimForm(text);
+  const c = readClaimForm(stripUnits(text));
   if (!c) return true;
+  if (form.constant) {
+    // Decided by which letters each side carries, never by the value.
+    if (c.shape === 'expr') return c.symbols.size === 0;
+    const [l, r] = c.sides;
+    const nl = vars(l).length, nr = vars(r).length;
+    return (nl === 0 && nr <= 1) || (nr === 0 && nl <= 1);
+  }
   // VALUE SIDE: any side of the line (or the line itself) that depends on
   // exactly the letters the answer's value side depends on — case-folded,
   // cancelling terms removed — is the answer's expression in another dress:
