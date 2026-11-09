@@ -24,14 +24,15 @@ await loadAllBanks();
 const h = await startApp({ engine: requestedEngine() });
 let count = 0;
 const ok = (c, name) => { assert.ok(c, name); count += 1; };
-const GEN = 'c8-linear-equations-both-sides', D = 2;
+const CELLS = [['c8-linear-equations-both-sides', 2], ['c7-large-numbers-current', 1]];
 const PINNING = ['sign', 'reciprocal', 'complement', 'square', 'root'];
 try {
   const a = await registerAccount(h, { email: 'slip.open@example.test', deviceId: 'ipad-slip-open' });
   ok(a.status === 201 && (await verifyEmail(h, a.account.id)).status === 200, 'account');
-  let tried = 0, seed = 1000;
   const seenKinds = new Set();
-  while (tried < 12 && seed < 1400) {
+  for (const [GEN, D] of CELLS) {
+  let tried = 0, seed = 1000;
+  while (tried < 8 && seed < 1400) {
     seed += 1;
     const q = generateQuestion(GEN, D, seed);
     const v = Number(q?.answer?.value);
@@ -54,7 +55,8 @@ try {
       tried += 1;
     }
   }
-  ok(seenKinds.size >= 2, `exercised open replies for: ${[...seenKinds].join(', ')}`);
+  }
+  ok(seenKinds.has('sign') && seenKinds.has('reciprocal'), `exercised open replies for: ${[...seenKinds].join(', ')}`);
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
