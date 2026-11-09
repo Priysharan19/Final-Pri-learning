@@ -277,12 +277,9 @@ button { font-family: inherit; color: inherit; }
 /* ── App shell ─────────────────────────────────────────────────────────── */
 .shell { display: flex; min-height: 100%; flex-direction: column; }
 
-.topbar {
-  display: flex; align-items: center; gap: 14px;
-  padding: 0 18px 0 14px;
-  position: sticky; top: 0; z-index: 60}
-.topbar h1 { display: none; }
-.top-stats { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+
+
+
 
 .logo { display: inline-flex; align-items: center; color: var(--ink); user-select: none; cursor: pointer; }
 
@@ -296,11 +293,8 @@ button { font-family: inherit; color: inherit; }
 .body-row { display: flex; flex: 1; min-height: 0; }
 
 /* Icon rail → expands on hover (overlays content, never pushes it) */
-.sidebar { flex-shrink: 0; position: sticky;
-  z-index: 55}
-.sidebar-inner {
-  position: absolute; top: 0; bottom: 0; left: 0;
-  display: flex; flex-direction: column; overflow: hidden}
+
+
 
 .nav-item {
   display: flex; align-items: center; white-space: nowrap;
@@ -309,27 +303,24 @@ button { font-family: inherit; color: inherit; }
 .nav-ico { text-align: center; font-size: 16px; opacity: 0.85; display: inline-flex; justify-content: center; }
 
 .nav-label { opacity: 0; transition: opacity 0.12s; }
-.sidebar:hover .nav-label { opacity: 1; }
+
 .nav-badge {
   margin-left: auto; font-size: 11px; padding: 0 7px; opacity: 0; transition: opacity 0.12s}
-.sidebar:hover .nav-badge { opacity: 1; }
-.nav-spacer { flex: 1; }
+
+
 
 /* Question history in expanded sidebar */
-.nav-hist { border-top: 1px solid var(--hairline); margin-top: 10px; padding: 12px 10px 4px; opacity: 0; transition: opacity 0.12s; overflow-y: auto; }
-.sidebar:hover .nav-hist { opacity: 1; }
-.nav-hist-title { font-size: 13.5px; color: var(--ink-2); margin-bottom: 10px; white-space: nowrap; }
-.hist-mini {
-  border: 1px solid var(--hairline); border-radius: 4px; padding: 9px 10px; margin-bottom: 8px;
-  cursor: pointer; background: var(--surface); display: block; width: 100%; text-align: left; font-family: inherit;
-}
-.hist-mini:hover { border-color: var(--hairline-strong); }
-.hist-mini-top { display: flex; align-items: baseline; gap: 6px; }
-.hist-mini-name { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.hist-mini-pct { font-size: 11.5px; }
-.hist-mini-pct.g { color: var(--good); } .hist-mini-pct.w { color: var(--warn); } .hist-mini-pct.b { color: var(--bad); }
-.hist-mini-preview { font-size: 11.5px; color: var(--ink-3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hist-mini-tags { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+
+
+
+
+
+
+
+
+  
+
+
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .content { width: 100%; margin: 0 auto; }
@@ -350,7 +341,7 @@ button { font-family: inherit; color: inherit; }
 @media (max-width: 1020px) { .cols-4 { grid-template-columns: repeat(2, 1fr); } .cols-3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 760px) {
   .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
+  
   .content { padding: 18px 14px 90px; }
   .mobilenav { display: flex !important; }
 }
@@ -424,7 +415,7 @@ select.input {
 .error-box { padding: 10px 14px; font-size: 13.5px; margin-bottom: 14px; }
 
 /* ── Home ──────────────────────────────────────────────────────────────── */
-.home-wrap { flex-direction: column; }
+
 
 
 /* Percentages of the content column, not vw: robust under any page scaling
@@ -830,7 +821,7 @@ select.input {
 .mnav-item span:first-child { font-size: 18px; }
 
 @media print {
-  .sidebar, .topbar, .mobilenav, .q-rail, .no-print { display: none !important; }
+   .mobilenav, .q-rail, .no-print { display: none !important; }
   body { background: #fff; color: #111; }
   .card { box-shadow: none; border-color: #ddd; }
 }
@@ -843,13 +834,13 @@ select.input {
   .mcq-opt { padding: 15px 16px; min-height: 54px; }
   .input { min-height: 46px; font-size: 16px; }
   
-  .sidebar { width: 47px; }
+  
 }
 @media (min-width: 1000px) { .qcard.split { max-width: none; } }
 html { -webkit-text-size-adjust: 100%; }
 body { overscroll-behavior-y: none; }
-.topbar { padding-top: max(0px, var(--pri-inset-top)); }
-@media (display-mode: standalone) { .topbar { padding-top: max(4px, var(--pri-inset-top)); } }
+
+
 
 /* qcard compat (exam room uses it) */
 .qcard { max-width: 820px; margin: 0 auto; }
@@ -1174,20 +1165,12 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .muted { color: var(--ink-3); }
 
 /* ── Shell ────────────────────────────────────────────────────────────────── */
-.topbar { padding-inline: 18px 20px;
-  border-bottom: 1px solid var(--hairline); }
 
 
-.sidebar { width: 58px; top: 56px; height: calc(100vh - 56px); }
-.sidebar-inner {
-  width: 58px;
-  padding: 12px 7px;
-  gap: 2px;
-  background: var(--page);
-  border-right: 1px solid var(--hairline);
-  transition: width var(--motion-base) var(--ease-standard), box-shadow var(--motion-base) var(--ease-standard);
-}
-.sidebar:hover .sidebar-inner { width: 224px; background: var(--surface); box-shadow: var(--shadow); }
+
+
+
+
 .nav-item {
   min-height: 42px;
   margin: 0;
@@ -1211,29 +1194,17 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
-.nav-section { display: grid; gap: 2px; }
-.nav-section + .nav-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--hairline-faint); }
-.nav-section-label {
-  max-height: 0;
-  overflow: hidden;
-  opacity: 0;
-  padding: 0 12px;
-  color: var(--ink-3);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transition: opacity var(--motion-fast) var(--ease-standard), max-height var(--motion-fast) var(--ease-standard);
-}
-.sidebar:hover .nav-section-label { max-height: 22px; opacity: 1; padding-top: 4px; }
+
+
+
+
 
 .content { max-width: 1180px; padding: 32px var(--content-gutter) 88px; }
 
 /* Thinking mode: while a student is working a question or sitting a paper,
    the app's furniture leaves. The page keeps one way out. */
-.shell.is-focus .sidebar, .shell.is-focus ~ .mobilenav { display: none !important; }
-.shell.is-focus .topbar { display: none; }
+.shell.is-focus ~ .mobilenav { display: none !important; }
+
 .shell.is-focus .content { max-width: none; padding: 0 0 calc(24px + var(--pri-inset-bottom)); }
 
 /* ── Surfaces ─────────────────────────────────────────────────────────────── */
@@ -1433,44 +1404,30 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 .check-row input { accent-color: var(--accent); }
 
 /* ── Home: what should I do now? ─────────────────────────────────────────── */
-.home-wrap {
-  display: block; width: min(760px, 100%); margin: 0 auto; padding-top: clamp(12px, 4vh, 48px);
-  min-height: 0; align-items: stretch;
-}
+
 .home-greet {
   font-family: var(--font-display); font-weight: 560; font-size: clamp(22px, 2.4vw, 28px);
   letter-spacing: -0.02em; text-align: left; color: var(--ink-2);
 }
 .home-greet b { color: var(--ink); font-weight: 400; }
-.home-next {
-  margin-top: 22px; padding: 28px 28px 26px; background: var(--surface);
-  border: 1px solid var(--hairline); border-radius: var(--radius-lg);
-  display: grid; gap: 6px; position: relative;
-}
-.home-next-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
-.home-next-title { font-size: clamp(22px, 2.6vw, 30px); font-weight: 620; letter-spacing: -0.025em; line-height: 1.15; }
-.home-next-reason { color: var(--ink-2); font-size: 15.5px; max-width: 56ch; }
-.home-next-meta { color: var(--ink-3); font-size: 13.5px; font-variant-numeric: tabular-nums; }
-.home-next-cta { margin-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.home-next-cta .btn-primary { min-width: 148px; }
-.home-next[data-loading="true"] .home-next-title { color: var(--ink-3); }
-.home-section { margin-top: 40px; }
-.home-section-title {
-  font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--ink-3); margin-bottom: 10px;
-}
-.home-alts { list-style: none; margin: 0 0 18px; padding: 0; border-top: 1px solid var(--hairline); }
-.home-alt { border-bottom: 1px solid var(--hairline); }
-.home-alt > button {
-  width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; align-items: center;
-  padding: 14px 4px; background: none; border: 0; text-align: left; cursor: pointer; color: var(--ink);
-  font: inherit; border-radius: var(--radius-xs);
-}
-.home-alt > button:hover { background: var(--surface-2); }
-.home-alt-title { font-weight: 560; font-size: 15px; }
-.home-alt-reason { grid-column: 1; color: var(--ink-3); font-size: 13.5px; }
-.home-alt-go { grid-column: 2; grid-row: 1 / span 2; color: var(--ink-3); }
-.home-cloud-note { margin-top: 12px; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .genbar { width: 100%; margin-top: 0; z-index: 20; }
 .genbar-head {
@@ -1856,13 +1813,13 @@ html.theme-switching, html.theme-switching * {
 
 /* ── Tablet: persistent, touchable navigation rather than a hover-only rail ─ */
 @media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px) {
-  .sidebar { width: 178px; }
-  .sidebar-inner { width: 178px; padding: 12px 9px; box-shadow: none; }
-  .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
-  .nav-label, .nav-badge, .sidebar:hover .nav-label, .sidebar:hover .nav-badge { opacity: 1; }
-  .nav-section-label, .sidebar:hover .nav-section-label { max-height: 22px; opacity: 1; padding: 4px 12px 0; }
+  
+  
+  
+   .nav-label, .nav-badge { opacity: 1; }
+  
   .nav-item { min-height: 48px; padding: 11px 12px; }
-  .nav-hist { display: none; }
+  
   .content { padding: 28px 24px 88px; }
   .qpage { max-width: 100%; }
   .btn { min-height: 44px; }
@@ -1879,11 +1836,11 @@ html.theme-switching, html.theme-switching * {
 /* ── Phone: recomposed, not shrunk ───────────────────────────────────────── */
 @media (max-width: 760px) {
   :root { --content-gutter: 16px; --text-math: 18px; }
-  .topbar { min-height: 54px; height: 54px; padding-inline: 12px; }
+  
   .content { padding: 18px var(--content-gutter) calc(92px + var(--pri-inset-bottom)); }
-  .home-wrap { padding-top: 4px; }
-  .home-next { padding: 22px 18px 20px; }
-  .home-next-cta .btn-primary { width: 100%; }
+  
+  
+  
   .gen-panel { max-height: none; }
   .gen-cats { width: 112px; }
   .card { padding: 18px; }
@@ -1996,22 +1953,20 @@ html.theme-switching, html.theme-switching * {
 
 /* ── Guideline pass: keyboard, focus and touch ─────────────────────────── */
 /* The rail opens for keyboard focus exactly as it does for a pointer. */
-.sidebar:focus-within .sidebar-inner { width: 224px; background: var(--surface); box-shadow: var(--shadow); }
-.sidebar:focus-within .nav-label, .sidebar:focus-within .nav-badge, .sidebar:focus-within .nav-hist { opacity: 1; }
-.sidebar:focus-within .nav-section-label { max-height: 22px; opacity: 1; padding-top: 4px; }
+
+
+
 /* A touch screen has no hover to open the rail, and nine unlabelled icons are
    a guessing game. From iPad landscape up the rail is shown with its words. */
 @media (hover: none) and (min-width: 1024px) {
-  .sidebar { width: 178px; }
-  .sidebar-inner, .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
+  
+  
   .nav-label, .nav-badge { opacity: 1; }
-  .nav-section-label { max-height: 22px; opacity: 1; padding: 4px 12px 0; }
-  .nav-hist { display: none; }
+  
+  
 }
 /* In a rail that is always open, a group name wraps instead of being cut off. */
-@media (pointer: coarse) and (min-width: 761px), (hover: none) and (min-width: 1024px) {
-  .nav-section-label, .sidebar:hover .nav-section-label { max-height: 40px; white-space: normal; line-height: 1.35; }
-}
+
 /* The answer surface shows focus as a ring on the whole sheet. */
 .editor-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-line); }
 .editor-body .answer-input:focus-visible, .editor-body textarea:focus-visible { outline: none; }
@@ -2061,12 +2016,9 @@ html.theme-switching, html.theme-switching * {
     padding-right: calc(18px + var(--pri-inset-right));
   }
 }
-.topbar { height: auto; min-height: calc(54px + var(--pri-inset-top)); }
-@media (min-width: 761px) {
-  .topbar { min-height: calc(64px + var(--pri-inset-top)); }
-  .sidebar { top: calc(64px + var(--pri-inset-top)); height: calc(100vh - 64px - var(--pri-inset-top)); height: calc(100dvh - 64px - var(--pri-inset-top)); }
-}
-@media (max-width: 760px) { .topbar { height: auto; min-height: calc(58px + var(--pri-inset-top)); } }
+
+
+
 
 /* Full-height surfaces follow the dynamic viewport (browser toolbars, keyboard). */
 .auth-wrap { min-height: 100vh; min-height: 100dvh; }
@@ -2116,7 +2068,7 @@ html.theme-switching, html.theme-switching * {
   .gen-opt, .seg > button, .ws-filter, .genbar .icon-btn, .field input, .field select { min-height: var(--tap-min); }
   .genbar .icon-btn { min-width: var(--tap-min); }
   /* The wordmark keeps its drawn size; the finger lands in a 44px area laid
-     under it (as .chip-x in theme-legacy.css). */
+     under it. */
   .logo-btn { position: relative; }
   .logo-btn::after {
     content: ''; position: absolute; left: 50%; top: 50%;
@@ -2142,7 +2094,7 @@ html.theme-switching, html.theme-switching * {
    The top bar, the phone bottom bar, the exam head and the workspace bars sit
    over content that scrolls. At 92-96% opacity their blur was invisible, but it
    was recomposited on every scroll frame. Solid surfaces, same hairlines. */
-.topbar { background: var(--page); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
 .mobilenav { background: var(--page); -webkit-backdrop-filter: none; backdrop-filter: none; }
 
 /* ── Placement check and the Class 7 → JEE evidence map ─────────────────────── */
@@ -2185,7 +2137,7 @@ html.theme-switching, html.theme-switching * {
      what is selected, focused or progressing, so it still means something.
    · Labels above content are small tracked capitals in the quiet ink.
    ─────────────────────────────────────────────────────────────────────── */
-.home-greet, .pg-head h1, .home-next-title { font-weight: 400; letter-spacing: 0; }
+ .home-greet, .pg-head h1 { font-weight: 400; letter-spacing: 0; }
 .brand-wordmark { display: block; flex: none; color: var(--ink); }
 
 /* ── Motion system ────────────────────────────────────────────────────────
@@ -2205,9 +2157,9 @@ html.theme-switching, html.theme-switching * {
 @keyframes pri-fill { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* Page and list reveals: a screen's blocks arrive in reading order. */
-.home-wrap > * { animation: pri-rise var(--motion-reveal) var(--ease-emphasized) both; }
-.home-wrap > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
-.home-wrap > *:nth-child(n+3) { animation-delay: calc(var(--stagger) * 2); }
+
+
+
 
 /* Press physics: a short, firm give under the finger, released on a spring. */
 .btn:active:not(:disabled) { transform: scale(0.97); }
@@ -2220,7 +2172,7 @@ html.theme-switching, html.theme-switching * {
 .week-dot.hit { animation: pri-fill 300ms var(--ease-spring) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-wrap > *, .verdict, .verdict-good .verdict-ico, .week-dot.hit {
+   .verdict, .verdict-good .verdict-ico, .week-dot.hit {
     animation: none !important;
   }
   .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
@@ -2354,6 +2306,10 @@ html { background-color: var(--page); }
   .ws-actions-btns { flex-wrap: wrap; }
   .ws-actions .btn-primary, .ws-actions-btns .btn { min-width: 0; flex: 1 1 100%; }
   .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  /* A tag beside a heading (the chapter shells, assignment cards) wraps its
+     words instead of holding the row at its one-line width. */
+  .spread > .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+  .spread > :first-child { min-width: 0; }
   .ws-actions .status-line > .ws-read-by { white-space: normal; }
   .answer-row .answer-input { min-width: 0; flex: 1 1 96px; }
   .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
@@ -2385,9 +2341,7 @@ html { background-color: var(--page); }
 /* Where the rail is a fixed, labelled column (tablets, and touch screens from
    iPad landscape up), keyboard focus inside it must not widen it over the
    page: the focus rule above is for the hover-to-open rail only. */
-@media (pointer: coarse) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 761px) and (max-width: 1180px), (hover: none) and (min-width: 1024px) {
-  .sidebar:focus-within .sidebar-inner { width: 178px; box-shadow: none; }
-}
+
 
 /* The first screen never rises under the status bar (App Review sees it
    first). A grid that centres its column lets a column taller than the screen

@@ -860,6 +860,9 @@ jobs:
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
             node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
+            # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
+            node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -874,6 +877,7 @@ jobs:
             node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -968,12 +972,15 @@ jobs:
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
-          # public page (Apple 5.1.1(v), Play "Delete account"). Two flows. The
-          # in-app flow also proves the persisted account link is gone after the
-          # deletion and after a reload (#500).
+          # public page (Apple 5.1.1(v), Play "Delete account"). The in-app flow
+          # also proves the persisted account link is gone after the deletion
+          # and after a reload (#500). The third flow: Settings "Sign out
+          # everywhere" ends every session of the account, after a confirmation,
+          # and returns to the sign-in card (#481).
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*2 flows' browser.log
+          grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
+          grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
           # Account first (issue #477): a child signs up on the one card and a
           # parent approves on their own page; the gate journey in both engines.
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log
@@ -1031,6 +1038,8 @@ jobs:
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           # The v1.1 instrument tour ran (Chromium, flag-on build).
           test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
+          # Maths at 200% text ran in both engines (its count follows the sample).
+          test "$(grep -Fc 'Maths at 200% text: superscripted formulas wrap or scroll in their own box, nothing cut' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Preserve evidence that the interface tour ran in both engines.
           # Their measured coverage counts differ, so verify each separately.
