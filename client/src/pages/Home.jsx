@@ -46,7 +46,7 @@ function LazyReviewQueueCard(props) {
 }
 
 export default function Home() {
-  const { user, dueCount } = useApp();
+  const { user, dueCount, dueUnit } = useApp();
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
@@ -256,10 +256,10 @@ export default function Home() {
   const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
 
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
-    user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
+    user, stats, dueCount, dueUnit, tasks: local.tasks, exams: local.exams, resume: local.resume,
     assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
     cachedAssignments: assignments === false ? cachedAssignments(user) : []
-  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
+  }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, dueUnit, assignments, online]);
   // A generic "practice" alternative under a practice recommendation says the
   // same thing twice; the manual chooser below already covers it.
   const alternatives = homeDecision.alternatives.filter(item =>
@@ -517,7 +517,7 @@ function actionCopy(action, user, t, topicName, resume) {
     : action.kind === 'assignment' || action.kind === 'task' ? d.title
       : action.kind === 'task-resume' ? (d.title || t('home.next.resumePractice'))
         : action.kind === 'practice-resume' ? (resumeTopic || t('home.next.resumePractice'))
-          : action.kind === 'reviews' ? t('home.next.reviews', d)
+          : action.kind === 'reviews' ? t(d.unit === 'dotpoint' ? 'review.dueToday' : 'home.next.reviews', d)
             : action.kind === 'daily-goal' ? t('home.goalRemaining', d)
               : action.kind === 'first-practice' ? t(india ? 'home.next.firstIndia' : 'home.next.firstNsw', d)
                 : adaptiveTopic ? adaptiveTopic
@@ -527,7 +527,7 @@ function actionCopy(action, user, t, topicName, resume) {
     : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status] || 'home.reason.ready'
       : action.kind.endsWith('resume') ? 'home.reason.resume'
-        : action.kind === 'reviews' ? 'home.reviewDue'
+        : action.kind === 'reviews' ? 'home.reason.reviews'
           : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
             : action.kind === 'adaptive' ? adaptiveReasonKey(d)
               : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')

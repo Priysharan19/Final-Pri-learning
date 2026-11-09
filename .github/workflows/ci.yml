@@ -118,6 +118,8 @@ jobs:
           grep -Fq 'india-legacy-rows-check: 85/85 checks passed' india-legacy-rows.log
           node client/test/report-narrative-check.mjs | tee report-narrative.log
           grep -Fq 'REPORT NARRATIVE: PASS — 9/9 checks' report-narrative.log
+          node client/test/review-consistency-check.mjs | tee review-consistency.log
+          grep -Fq 'REVIEW CONSISTENCY: PASS — 7/7 checks' review-consistency.log
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs

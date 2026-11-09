@@ -3074,7 +3074,9 @@ async function serverReviewQueue(p) {
       ? `/practice?subtopic=${encodeURIComponent(named.chapterId)}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
       : `/practice?subtopic=${encodeURIComponent(named.chapterId)}${Number.isInteger(named.ordinal) ? `&dotpoint=${named.ordinal}` : ''}`;
     return { id: `${r.subtopic}|${r.dotpoint}`, subtopic: r.subtopic, dotpoint: r.dotpoint, chapterName: named.chapterName, text: named.text,
-      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href };
+      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href,
+      // The history the estimate rests on, as the server counted it.
+      attempts: Math.max(0, Number(r.attempts) || 0), correct: Math.max(0, Number(r.correct) || 0), lastAt: Number(r.lastAt) || 0 };
   };
   return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
 }

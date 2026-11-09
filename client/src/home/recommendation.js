@@ -95,7 +95,7 @@ function adaptiveItem(adaptive) {
 }
 
 export function resolveHomeRecommendation({
-  user, stats = null, dueCount = 0, tasks = [], exams = [], resume = null,
+  user, stats = null, dueCount = 0, dueUnit = 'topic', tasks = [], exams = [], resume = null,
   assignments = [], cachedAssignments = [], online = true, cloudReady = true, now = Date.now()
 } = {}) {
   // Only a learner gets a learning next action. Teacher, guardian, staff,
@@ -137,7 +137,7 @@ export function resolveHomeRecommendation({
   ));
 
   const due = Math.max(0, Number(dueCount) || 0);
-  if (due) rows.push(item('reviews', 80, 'reviews', { count: due, n: due }));
+  if (due) rows.push(item('reviews', 80, 'reviews', { count: due, n: due, unit: dueUnit === 'dotpoint' ? 'dotpoint' : 'topic' }));
 
   const done = Math.max(0, Number(user?.today?.questions) || 0);
   const goal = Math.max(1, Number(user?.dailyGoal) || 10);
