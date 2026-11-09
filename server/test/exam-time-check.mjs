@@ -58,8 +58,6 @@ let keySeq = 0;
 const idem = () => `time-suite-${String(++keySeq).padStart(4, '0')}-${Date.now().toString(36)}`;
 const create = (jar, body) => h.request('/v1/exams', { method: 'POST', jar, body, headers: { 'Idempotency-Key': idem() } });
 const finish = (jar, id, body = {}) => h.request(`/v1/exams/${id}/finish`, { method: 'POST', jar, body });
-const sealed = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-paper' AND key=?", [id])).response_json);
-const rows = async (accountId, scope) => Number((await h.db.get('SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope=?', [accountId, scope]))?.n || 0);
 
 await loadAllBanks();
 async function spec(jar, grade, variant = 'standard') {
