@@ -65,9 +65,11 @@ banner on its own.
   longer describes a model that adapts to the student.
 - An AI tutor exists in code but is compiled out of production builds
   (`client/vite.config.js` `PRI_FEATURE_TUTOR`; D4 keeps it off).
-- Method marks (partial credit for working) are off in production through a server switch until
-  an independent examiner signs them off (D12; GitHub issue #499; `docs/release/EXAMINER-REQUEST.md`).
-  Marks are for the final answer only until then.
+- Method marks (partial credit for working) are off through a server switch until an independent
+  examiner signs them off (D12, built in Train 4 #775 by L1's #739: `server/platform/markingPolicy.js`;
+  final-answer marking unless `PRI_METHOD_MARKS=on`, which production honours only with
+  `PRI_METHOD_MARKS_EXAMINER_RESULT` naming the signed #499 result). Before Train 4 the server
+  awarded method marks. Marks are for the final answer only until the examiner signs.
 
 ---
 

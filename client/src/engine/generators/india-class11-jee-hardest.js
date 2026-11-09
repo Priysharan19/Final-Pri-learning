@@ -66,6 +66,8 @@ const rTex = f => fracTex(f.n, f.d);
 // ── Formatting ───────────────────────────────────────────────────────────────
 /** "+ 3" / "- 3" — a signed constant written after another term. */
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3i", "- i"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** cx written the way it is read: x, -x, 3x. */
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 /** "ax + b", with a zero term left out. */
@@ -569,10 +571,10 @@ function complexAlgebraReasoning(rng) {
       const value = askModulus ? modulus : x;
       if (value.n === 0) continue;
       return {
-        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sg(b)}i$.`,
+        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sgt(b, 'i')}$.`,
         answerType: 'numeric', ...exact(value),
         traps: traps(value.value, [
-          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sg(b)}i|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
+          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sgt(b, 'i')}|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
           { value: -value.value, why: 'Check the sign when the square root is isolated: the real part satisfies a linear equation once both sides are squared.' },
           { value: askModulus ? R(a * a + b * b, a).value : R(Math.abs(a * a - b * b), a).value, why: 'Expanding $(a \\mp x)^2$ gives a cross term $2ax$, so the division at the end is by $2a$.' }
         ]),
@@ -611,8 +613,8 @@ function complexAlgebraReasoning(rng) {
       ],
       steps: [
         { h: 'Triangle inequality', d: `$\\left|r - \\dfrac{${a}}{r}\\right| \\le \\left|z - \\dfrac{${a}}{z}\\right| = ${b}$, where $r = |z|$` },
-        { h: 'Upper bound', d: `$r - \\dfrac{${a}}{r} \\le ${b} \\Rightarrow r^2 - ${b}r - ${a} \\le 0 \\Rightarrow r \\le \\dfrac{${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k + b) / 2}$` },
-        { h: 'Lower bound', d: `$\\dfrac{${a}}{r} - r \\le ${b} \\Rightarrow r^2 + ${b}r - ${a} \\ge 0 \\Rightarrow r \\ge \\dfrac{-${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k - b) / 2}$` },
+        { h: 'Upper bound', d: `$r - \\dfrac{${a}}{r} \\le ${b} \\Rightarrow r^2 - ${b === 1 ? '' : b}r - ${a} \\le 0 \\Rightarrow r \\le \\dfrac{${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k + b) / 2}$` },
+        { h: 'Lower bound', d: `$\\dfrac{${a}}{r} - r \\le ${b} \\Rightarrow r^2 + ${b === 1 ? '' : b}r - ${a} \\ge 0 \\Rightarrow r \\ge \\dfrac{-${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k - b) / 2}$` },
         { h: 'Both are reached', d: `$z = ${(k + b) / 2}$ gives $\\left|${(k + b) / 2} - ${rTex(R(a, (k + b) / 2))}\\right| = ${b}$, and $z = ${(k - b) / 2}$ gives $\\left|${(k - b) / 2} - ${rTex(R(a, (k - b) / 2))}\\right| = ${b}$` },
         { h: 'Answer', d: `The ${askMax ? 'greatest' : 'least'} value of $|z|$ is $${value}$` }
       ],
@@ -640,9 +642,9 @@ function complexAlgebraReasoning(rng) {
       ],
       steps: [
         { h: 'Compare parts', d: `$x^2 - y^2 = ${a}$ and $2xy = ${b}$` },
-        { h: 'Moduli', d: `$x^2 + y^2 = \\sqrt{${a}^2 + ${b}^2} = ${x * x + y * y}$` },
+        { h: 'Moduli', d: `$x^2 + y^2 = \\sqrt{${a < 0 ? `(${a})` : a}^2 + ${b < 0 ? `(${b})` : b}^2} = ${x * x + y * y}$` },
         { h: 'Solve', d: `$x^2 = ${x * x}$ and $y^2 = ${y * y}$; with $x > 0$, $x = ${x}$, and $2xy = ${b}$ makes $y = ${y}$` },
-        { h: 'Answer', d: `The root is $${x} ${sg(y)}i$; its ${askIm ? 'imaginary' : 'real'} part is $${value}$` }
+        { h: 'Answer', d: `The root is $${x} ${sgt(y, 'i')}$; its ${askIm ? 'imaginary' : 'real'} part is $${value}$` }
       ],
       reasoning: 'square-root'
     };
@@ -1193,7 +1195,7 @@ function lineEquationReasoning(rng) {
           { h: 'Section formula', d: `The point dividing $AB$ in the ratio $${m} : ${n}$ is $\\left(\\dfrac{${n}a}{${m + n}}, \\dfrac{${m}b}{${m + n}}\\right)$` },
           { h: 'Equate with P', d: `$\\dfrac{${n}a}{${m + n}} = ${h} \\Rightarrow a = ${rTex(a)}$ and $\\dfrac{${m}b}{${m + n}} = ${k} \\Rightarrow b = ${rTex(b)}$` },
           { h: 'The line', d: `$\\dfrac{x}{${rTex(a)}} + \\dfrac{y}{${rTex(b)}} = 1$` },
-          { h: 'Answer', d: askSlope ? `Slope $= -\\dfrac{b}{a} = ${rTex(value)}$` : `$a + b = ${rTex(a)} + ${rTex(b)} = ${rTex(value)}$` }
+          { h: 'Answer', d: askSlope ? `Slope $= -\\dfrac{b}{a} = ${rTex(value)}$` : `$a + b = ${rTex(a)} + ${b.n < 0 ? `\\left(${rTex(b)}\\right)` : rTex(b)} = ${rTex(value)}$` }
         ],
         reasoning: 'section-intercepts'
       };
@@ -1312,8 +1314,8 @@ function lineAngleReasoning(rng) {
         ],
         steps: [
           { h: 'Slope of the given line', d: `$m = ${rTex(m)}$` },
-          { h: 'The two slopes', d: `$\\dfrac{s - m}{1 + sm} = \\pm${rTex(t)}$ gives $s_1 = \\dfrac{m + ${rTex(t)}}{1 - ${rTex(t)}m} = ${rTex(s1)}$ and $s_2 = \\dfrac{m - ${rTex(t)}}{1 + ${rTex(t)}m} = ${rTex(s2)}$` },
-          { h: askProduct ? 'Product' : 'Intercepts', d: askProduct ? `$s_1 s_2 = ${rTex(value)}$` : `$(${k} - ${par(h)}s_1) + (${k} - ${par(h)}s_2) = ${2 * k} - ${par(h)}(s_1 + s_2)$` },
+          { h: 'The two slopes', d: `$\\dfrac{s - m}{1 + sm} = \\pm${rTex(t)}$ gives $s_1 = \\dfrac{m + ${rTex(t)}}{1 - ${t.n === t.d ? '' : rTex(t)}m} = ${rTex(s1)}$ and $s_2 = \\dfrac{m - ${rTex(t)}}{1 + ${t.n === t.d ? '' : rTex(t)}m} = ${rTex(s2)}$` },
+          { h: askProduct ? 'Product' : 'Intercepts', d: askProduct ? `$s_1 s_2 = ${rTex(value)}$` : (h === 0 ? `$${k} + ${par(k)} = ${2 * k}$, whatever the slopes` : `$(${k} - ${h === 1 ? '' : par(h)}s_1) + (${k} - ${h === 1 ? '' : par(h)}s_2) = ${2 * k} - ${h === 1 ? '' : par(h)}(s_1 + s_2)$`) },
           { h: 'Answer', d: `$${rTex(value)}$` }
         ],
         reasoning: 'angle-between-lines'
@@ -1522,7 +1524,7 @@ function limitReasoning(rng) {
           'Divide numerator and denominator by $x$ and let $x \\to \\infty$.'
         ],
         steps: [
-          { h: 'Rationalise', d: `$\\dfrac{(${polyTex([a * a, p, qq])}) - ${a * a}x^2}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}} = \\dfrac{${lin(p, qq)}}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}}$` },
+          { h: 'Rationalise', d: `$\\dfrac{(${polyTex([a * a, p, qq])}) - ${a * a === 1 ? '' : a * a}x^2}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}} = \\dfrac{${lin(p, qq)}}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}}$` },
           { h: 'Divide by x', d: `$\\dfrac{${p} + \\frac{${qq}}{x}}{\\sqrt{${a * a} ${sg(p)}/x + ${qq}/x^2} + ${a}}$` },
           { h: 'Limit', d: `$\\dfrac{${p}}{${a} + ${a}}$` },
           { h: 'Answer', d: `$${rTex(value)}$` }
@@ -1590,8 +1592,8 @@ function firstPrinciplesReasoning(rng) {
         ],
         steps: [
           { h: 'f(0)', d: '$x = y = 0$ gives $f(0) = 2f(0)$, so $f(0) = 0$' },
-          { h: 'Difference', d: `$f(x + h) - f(x) = f(h) ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}xh(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}xh`}$` },
-          { h: 'Divide and let h → 0', d: `$f'(x) = \\displaystyle\\lim_{h \\to 0}\\left(\\dfrac{f(h)}{h} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}x(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}x`}\\right) = ${c} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}x^2` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}x`}$` },
+          { h: 'Difference', d: `$f(x + h) - f(x) = f(h) ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}xh(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}xh`}$` },
+          { h: 'Divide and let h → 0', d: `$f'(x) = \\displaystyle\\lim_{h \\to 0}\\left(\\dfrac{f(h)}{h} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x`}\\right) = ${c} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x^2` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x`}$` },
           { h: 'Evaluate', d: `$f'(${x0}) = ${c} ${k < 0 ? '-' : '+'} ${Math.abs(k)}${cubic ? `(${x0})^2` : `(${x0})`} = ${value}$` }
         ],
         reasoning: cubic ? 'functional-cubic' : 'functional-quadratic'
@@ -1630,7 +1632,7 @@ function firstPrinciplesReasoning(rng) {
           ]
           : [
             { h: 'Add and subtract f(a)', d: `$\\dfrac{f(${atTex(a, p, 1)}) - f(${a})}{h} + \\dfrac{f(${a}) - f(${atTex(a, qq, -1)})}{h}$` },
-            { h: 'Each piece', d: `$\\to ${p}f'(${a}) + ${qq}f'(${a}) = ${p + qq}f'(${a})$` },
+            { h: 'Each piece', d: `$\\to ${p === 1 ? '' : p}f'(${a}) + ${qq === 1 ? '' : qq}f'(${a}) = ${p + qq}f'(${a})$` },
             { h: 'Differentiate', d: `$f'(x) = ${polyTex([3 * co[0], 2 * co[1], co[2]])}$, so $f'(${a}) = ${fp}$` },
             { h: 'Answer', d: `$${p + qq} \\times ${par(fp)} = ${rTex(value)}$` }
           ],
@@ -1658,14 +1660,14 @@ function firstPrinciplesReasoning(rng) {
       ],
       steps: reciprocal
         ? [
-          { h: 'Quotient', d: `$\\dfrac{1}{h}\\left(\\dfrac{1}{\\sqrt{${lin(a, b)} + ${a}h}} - \\dfrac{1}{\\sqrt{${lin(a, b)}}}\\right) = \\dfrac{\\sqrt{${lin(a, b)}} - \\sqrt{${lin(a, b)} + ${a}h}}{h\\sqrt{${lin(a, b)}}\\sqrt{${lin(a, b)} + ${a}h}}$` },
-          { h: 'Rationalise', d: `The numerator times its conjugate is $-${a}h$, so the quotient is $\\dfrac{-${par(a)}}{\\sqrt{\\cdots}\\sqrt{\\cdots}\\left(\\sqrt{\\cdots} + \\sqrt{\\cdots}\\right)}$` },
+          { h: 'Quotient', d: `$\\dfrac{1}{h}\\left(\\dfrac{1}{\\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}} - \\dfrac{1}{\\sqrt{${lin(a, b)}}}\\right) = \\dfrac{\\sqrt{${lin(a, b)}} - \\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}}{h\\sqrt{${lin(a, b)}}\\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}}$` },
+          { h: 'Rationalise', d: `The numerator times its conjugate is $${cx(-a, 'h')}$, so the quotient is $\\dfrac{-${par(a)}}{\\sqrt{\\cdots}\\sqrt{\\cdots}\\left(\\sqrt{\\cdots} + \\sqrt{\\cdots}\\right)}$` },
           { h: 'Let h → 0', d: `$f'(x) = \\dfrac{-${par(a)}}{2(${lin(a, b)})^{3/2}}$` },
           { h: 'At the point', d: `$${lin(a, b).replace('x', `(${x0})`)} = ${u * u}$, so $f'(${x0}) = \\dfrac{-${par(a)}}{2 \\times ${u}^3} = ${rTex(value)}$` }
         ]
         : [
-          { h: 'Quotient', d: `$\\dfrac{\\sqrt{${a}(${x0} + h) ${sg(b)}} - \\sqrt{${u * u}}}{h}$` },
-          { h: 'Rationalise', d: `$\\dfrac{${a}h}{h\\left(\\sqrt{${u * u} ${sg(a)}h} + ${u}\\right)}$` },
+          { h: 'Quotient', d: `$\\dfrac{\\sqrt{${a === 1 ? '' : a === -1 ? '-' : a}(${x0} + h) ${sg(b)}} - \\sqrt{${u * u}}}{h}$` },
+          { h: 'Rationalise', d: `$\\dfrac{${cx(a, 'h')}}{h\\left(\\sqrt{${u * u} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h} + ${u}\\right)}$` },
           { h: 'Let h → 0', d: `$\\dfrac{${a}}{${u} + ${u}}$` },
           { h: 'Answer', d: `$${rTex(value)}$` }
         ],
@@ -1715,10 +1717,10 @@ function meanDeviationReasoning(rng) {
           'Add the deviations, divide by the number of observations, and solve for $d$.'
         ],
         steps: [
-          { h: 'Centre', d: n % 2 ? `The ${about} is the middle observation, $a + ${r}d$` : `The ${about} is halfway between $a + ${r - 1}d$ and $a + ${r}d$, i.e. $a + ${rTex(R(2 * r - 1, 2))}d$` },
-          { h: 'Sum of deviations', d: n % 2 ? `$2(1 + 2 + \\cdots + ${r})d = ${total}d$` : `$2\\left(\\dfrac{1}{2} + \\dfrac{3}{2} + \\cdots + \\dfrac{${2 * r - 1}}{2}\\right)d = ${total}d$` },
-          { h: 'Mean deviation', d: `$\\dfrac{${total}d}{${n}} = ${rTex(R(total, n))}d$` },
-          { h: 'Solve', d: `$${rTex(R(total, n))}d = ${mdText} \\Rightarrow d = ${d}$` }
+          { h: 'Centre', d: n % 2 ? `The ${about} is the middle observation, $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r)}$` : `The ${about} is halfway between $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r - 1)}$ and $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r)}$, i.e. $a + ${rTex(R(2 * r - 1, 2))}d$` },
+          { h: 'Sum of deviations', d: n % 2 ? `$2(1 + 2 + \\cdots + ${r})d = ${total === 1 ? '' : total}d$` : `$2\\left(\\dfrac{1}{2} + \\dfrac{3}{2} + \\cdots + \\dfrac{${2 * r - 1}}{2}\\right)d = ${total === 1 ? '' : total}d$` },
+          { h: 'Mean deviation', d: `$\\dfrac{${total === 1 ? '' : total}d}{${n}} = ${rTex(R(total, n)) === '1' ? '' : rTex(R(total, n))}d$` },
+          { h: 'Solve', d: `$${rTex(R(total, n)) === '1' ? '' : rTex(R(total, n))}d = ${mdText} \\Rightarrow d = ${d}$` }
         ],
         reasoning: 'inverse-mean-deviation'
       };

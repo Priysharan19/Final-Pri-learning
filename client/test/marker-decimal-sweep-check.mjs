@@ -190,14 +190,24 @@ ok(demandedGenerators.size >= Math.min(12, scaled(12) || 1), `generators that de
 const NAMED = [
   'c8-rational-numbers-strategy', 'c8-rational-numbers-between', 'c12-random-variable', 'c12-differentiation-rules',
   'c8-rational-numbers-identities', 'c8-rational-numbers', 'c11-conic-sections', 'c12-conditional-probability',
-  'c11-limits-derivatives', 'c8-linear-equations-source-mastery', 'c11-sequences-series', 'c10-trigonometry-current',
+  'c11-limits-derivatives', 'c11-sequences-series', 'c10-trigonometry-current',
   'c10-areas-circles', 'y11-lines', 'c8-rational-numbers-distributivity', 'y12-series', 'c7-fractions-current',
   'c11-trig-functions', 'c12-inverse-trigonometric'
 ];
+// Named in #527 but retired from the list: since CONTENT_VERSION 2026.11.0
+// (004400b7c, Class 8 serves original forms) this mixed-review generator draws
+// its own whole-number solutions, so it has no keyed fraction for the sweep to
+// mark. That is pinned rather than skipped: if it draws a keyed fraction again,
+// this fails and the id goes back into NAMED.
+const RETIRED_NO_FRACTIONS = ['c8-linear-equations-source-mastery'];
 if (DRAWS >= DEFAULT_DRAWS) {
   for (const id of NAMED) {
     const row = perGenerator.get(id);
     ok(row && (row.decimalAccepted > 0 || row.demanded > 0), `#527 generator ${id} drew a terminating keyed fraction and marked it (${JSON.stringify(row || null)})`);
+  }
+  for (const id of RETIRED_NO_FRACTIONS) {
+    ok(id in GENERATORS, `#527 retired generator ${id} still exists (otherwise drop it from this list)`);
+    ok(!perGenerator.has(id), `#527 retired generator ${id} drew a keyed fraction again (${JSON.stringify(perGenerator.get(id))}): put it back in NAMED`);
   }
 }
 
