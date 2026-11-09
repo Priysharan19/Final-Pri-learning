@@ -442,6 +442,9 @@ jobs:
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
+          # Learning-state identity (v2), exact legacy lookups and monotonic expiry (#689, #690, #691) on SQLite; Postgres below.
+          node server/test/learning-state-identity-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'LEARNING STATE IDENTITY: PASS — 179/179 checks' practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
@@ -449,6 +452,8 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
+          # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
+          node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
@@ -462,12 +467,29 @@ jobs:
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+          # 295 → 306: legacy-only repeats over HTTP, flagged repeatEvidence: 'legacy' on issue, receipt and event.
+          grep -Fq 'REPEAT CREDIT: PASS — 306/306 checks' practice-http.log
+          grep -Fq 'PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
           set -o pipefail
           node server/test/marker-isolation-check.mjs 2>&1 | tee marker-isolation.log
           grep -Fq 'MARKER ISOLATION: PASS — 152/152 checks' marker-isolation.log
+      # Races the request thread cannot serialise on its own, and the guardian
+      # gate across every router holding a child's data. Real /v1 routes, real
+      # marker; the same suites run on Postgres below.
+      - name: Reveal/submit race, deletion mid-mark, billing event order and guardian-consent coverage (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/practice-reveal-submit-race-check.mjs 2>&1 | tee races.log
+          node server/test/account-deletion-midflight-check.mjs 2>&1 | tee -a races.log
+          node server/test/billing-out-of-order-concurrency-check.mjs 2>&1 | tee -a races.log
+          node server/test/guardian-consent-coverage-check.mjs 2>&1 | tee -a races.log
+          # The reveal race's check count follows which request wins each round; its pass line does not.
+          grep -Fq 'PRACTICE REVEAL/SUBMIT RACE: PASS' races.log
+          grep -Fq 'ACCOUNT DELETION MID-FLIGHT: PASS — 54/54 checks' races.log
+          grep -Fq 'BILLING OUT-OF-ORDER CONCURRENCY: PASS — 151/151 checks' races.log
+          grep -Fq 'GUARDIAN CONSENT COVERAGE — PASS — 38/38 checks' races.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -571,8 +593,19 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 69/69 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
+          # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
+          # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
+          # 66 → 67: the question picker passes over content the account has resolved, on Postgres too.
+          # 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres.
+          grep -Fq '✓ practice-reveal-submit-race-check.mjs' platform-postgres.log
+          grep -Fq '✓ account-deletion-midflight-check.mjs' platform-postgres.log
+          grep -Fq '✓ billing-out-of-order-concurrency-check.mjs' platform-postgres.log
+          grep -Fq '✓ postgres-cutover-rehearsal-check.mjs' platform-postgres.log
+          grep -Fq '✓ guardian-consent-coverage-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-seen-aware-pick-check.mjs' platform-postgres.log
+          grep -Fq '✓ learning-state-identity-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -655,6 +688,53 @@ jobs:
   # unless every group succeeded, and runs the unchanged invariant block
   # against the concatenated group logs. tools/ci-runner-policy-check.mjs
   # proves every command of npm run test:e2e is in exactly one group.
+  # The restore drill postgres-cutover.md §6 and ADR-0001 require, rehearsed
+  # on throwaway databases: a pg_dump of a live platform restored into an EMPTY
+  # database must carry every row, RLS policy, pri_server grant and the cursor
+  # sequence, and the real server on it must keep sessions, passwords,
+  # histories, marks and Premium. pg_dump refuses a newer server, so the job
+  # installs the client tools of the service's major version. A job of its own:
+  # the apt step never sits inside a required check.
+  postgres-restore:
+    name: Postgres backup restore rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: PostgreSQL 17 client tools (pg_dump and pg_restore at the server's major version)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q --no-install-recommends postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - name: pg_dump of a live platform restored into an empty database, then served as pri_server
+        run: |
+          set -o pipefail
+          node scripts/with-postgres.mjs node server/test/postgres-restore-rehearsal-check.mjs 2>&1 | tee restore.log
+          grep -Fq 'POSTGRES RESTORE REHEARSAL: PASS — 34/34 checks' restore.log
+
   browser-shard:
     name: Browser shard (${{ matrix.group }})
     runs-on: ubuntu-24.04

@@ -16,7 +16,7 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
@@ -349,30 +349,96 @@ function readQuestionRequest(body, fields) {
 }
 
 /**
+ * The seek, shared by both pickers below: draw seeds and keep the first
+ * question that is fresh and, when asked for, springs the misconception or is
+ * written out. A generator: it yields each batch of drawn questions and is
+ * sent back, for each, whether the account has already resolved it (null when
+ * no account is known). "Fresh" is neither in the request's `avoid` list (what
+ * this device has just been served) nor resolved by the account.
+ *
+ * When nothing fresh is found the fallback is the best of what was drawn:
+ * unresolved before resolved (an unresolved question can still earn credit; a
+ * resolved one is a repeat and cannot), then not avoided before avoided, then
+ * the earliest drawn. Every resolved question met adds to the budget exactly
+ * as an avoided one does, since it rules out one more item of the pool.
+ */
+function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), trap, written = false }, { draw, tries, batches }) {
+  // `written` asks for a form the student writes out; a multiple-choice
+  // item can be guessed, which a diagnostic must avoid where it can.
+  const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
+  const resolvedElsewhere = new Set();
+  const budget = () => tries ?? seekBudget(avoid.size + resolvedElsewhere.size);
+  let fallback = null, drawn = 0;
+  for (let round = 0; drawn < budget(); round++) {
+    const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
+    const batch = [];
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint));
+    const resolved = yield batch;
+    for (const [i, q] of batch.entries()) {
+      const hash = opaqueContentHash(q.contentHash);
+      const avoided = avoid.has(hash);
+      const done = resolved?.[i] === true;
+      if (done && !avoided) resolvedElsewhere.add(hash);
+      if (!avoided && !done && springs(q)) return { q, repeat: false, trapDelivered: !!trap };
+      const rank = (done ? 0 : 2) + (avoided ? 0 : 1);
+      if (!fallback || rank > fallback.rank) fallback = { q, rank };
+    }
+  }
+  return { q: fallback.q, repeat: fallback.rank < 3, trapDelivered: !!(trap && carriesTrap(trap.owner, fallback.q, trap.key)) };
+}
+
+/**
  * The server picks the question: a fresh random seed, re-drawn (seekBudget)
  * to avoid content the student has just seen and, when a misconception is
  * being worked on, to find a form that can spring it. `seed` is given only by
  * the test suites. `draw` is where each seed comes from — crypto.randomInt in
  * the product; a test may hand in a seeded one. Throws when the generator has
  * no such form.
+ *
+ * This one knows no account (signed-out preparation, and the seek-budget
+ * suite): it draws one seed at a time, exactly as before. An account's
+ * questions are picked by chooseQuestionFor, which also passes over what the
+ * account has resolved.
  */
-function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null,
-  { draw = () => randomInt(0x80000000), tries = seekBudget(avoid?.size || 0) } = {}) {
+function chooseQuestion(request, seed = null, { draw = () => randomInt(0x80000000), tries } = {}) {
+  const { generator, difficulty, dotpoint, trap } = request;
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
-  let fallback = null;
-  for (let i = 0; i < tries; i++) {
-    const q = generateQuestion(generator, difficulty, draw(), dotpoint);
-    const fresh = !avoid.has(opaqueContentHash(q.contentHash));
-    // `written` asks for a form the student writes out; a multiple-choice
-    // item can be guessed, which a diagnostic must avoid where it can.
-    const springs = (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
-    if (fresh && springs) return { q, repeat: false, trapDelivered: !!trap };
-    if (!fallback || (fresh && !fallback.fresh)) fallback = { q, fresh };
+  const seek = seekQuestion(request, { draw, tries, batches: [1] });
+  let step = seek.next();
+  while (!step.done) step = seek.next(null);
+  return step.value;
+}
+
+// An account's seek asks its records once per batch: a small first batch,
+// since nearly every issue ends on its first fresh draw, then larger ones
+// when the cell is nearly exhausted (the 300-draw cap is five reads).
+const ACCOUNT_SEEK_BATCHES = [8, 32, 96];
+
+/**
+ * chooseQuestion for a signed-in account. The request's `avoid` list is what
+ * this DEVICE has just been served, held in its memory: empty after a relaunch
+ * and on any other device. The account's seen records are the server's own
+ * and are what the repeat verdict reads, so the seek passes over everything
+ * they hold too. Otherwise a relaunched app could be handed content it had
+ * already resolved, marked a repeat for no credit, while fresh questions were
+ * left in the pool. A repeat is served only when the cell has nothing fresh
+ * left for this account (or the budget could not find it), and it is flagged
+ * one, as before. Reads only; the verdict is still decided where it was.
+ */
+async function chooseQuestionFor(db, accountId, request, now, { draw = () => randomInt(0x80000000), tries } = {}) {
+  const seek = seekQuestion(request, { draw, tries, batches: ACCOUNT_SEEK_BATCHES });
+  let step = seek.next();
+  while (!step.done) {
+    const keys = step.value.map(q => seenKeysOf(q));
+    // A failed read is the store's failure, not an unsupported question: it is
+    // tagged so the routes rethrow it rather than answer 422.
+    const known = await seenAmong(db, accountId, keys.flat(), now).catch(error => { throw Object.assign(error, { pickerStore: true }); });
+    step = seek.next(keys.map(itemKeys => itemKeys.some(key => known.has(key))));
   }
-  return { q: fallback.q, repeat: !fallback.fresh, trapDelivered: !!(trap && carriesTrap(trap.owner, fallback.q, trap.key)) };
+  return step.value;
 }
 
 /**
@@ -470,8 +536,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         seedGiven = true;
       }
-      try { ({ q, repeat, trapDelivered } = chooseQuestion(request, seed)); }
-      catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+      // A test's fixed seed is that question; otherwise the account's own records steer the seek.
+      try { ({ q, repeat, trapDelivered } = seed !== null ? chooseQuestion(request, seed) : await chooseQuestionFor(db, accountId, request, now)); }
+      catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
       q._generator = request.generator;
     }
@@ -486,18 +553,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Sealed with the question, so the receipt and the attempt carry it
     // whatever the device does or does not send.
     // (Seen and tried are records of one scope: one statement answers both.)
-    const seenKeys = seenKeysOf(q);
-    const triedKey = triedKeyOf(q);
-    const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
-    if (seenKeys.some(key => known.has(key))) { q._repeat = true; repeat = true; }
+    const triedKeys = triedKeysOf(q);
+    const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
+    const evidence = repeatEvidenceOf(q, known);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     // A try already spent on another copy of this content is spent on this one
     // (decided again, authoritatively, when it is marked). Content that has
     // resolved is a repeat and starts over with both tries: it earns nothing.
-    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && known.has(triedKey);
+    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && triedKeys.some(key => known.has(key));
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     // The free plan's daily cap counts the Practice surface's own modes; Rush,
     // Match and the placement check are "everything else", unlimited.
     const counted = practiceModeCounted(practiceMode);
@@ -724,7 +791,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const q = JSON.parse(escrow.response_json);
     // Decided now, not only at issue: copies issued before the first of them
     // was resolved are repeats the moment its solution has been shown.
-    if (await contentSeen(db, accountId, q, now)) q._repeat = true;
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     await markContentSeen(db, accountId, q, now);
     const ladder = ladderEvidence(viaHint ? HINT_RUNGS.length : await hintLevelOf(accountId, qid));
     const attemptId = randomUUID();
@@ -732,7 +800,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       marksEarned: 0, marksPossible: marksPossibleFor(q), creditedMarks: 0,
       hintLevel: ladder.hintLevel, markWeight: 0,
       questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
-      ...(q._repeat === true ? { repeat: true } : {}) };
+      ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}) };
     const hash = digest({ qid, operation: 'reveal' });
     for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
@@ -744,7 +812,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
       [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
         revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         contentId: opaqueContentId(q.contentId),
         subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
         dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
@@ -949,20 +1017,20 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // Whether this content has been resolved before, and whether a try has
       // been spent on any copy of it: both are records of one scope, asked for
       // together (they were two statements).
-      const seenKeys = seenKeysOf(q);
-      const triedKey = triedKeyOf(q);
-      const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
+      const triedKeys = triedKeysOf(q);
+      const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
       // Decided now, not only at issue: several copies of one question can be
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
-      if (seenKeys.some(key => known.has(key))) q._repeat = true;
+      const evidence = repeatEvidenceOf(q, known);
+      if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
       const priorTry = held.get('practice-tries') || null;
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // A try spent on ANY copy of this content is spent on this one: the
       // first try is not renewed by asking for the question again. Content
       // already resolved is a repeat, which earns nothing and keeps its own
       // two tries.
-      const spent = tries >= 1 || (q._repeat !== true && known.has(triedKey));
+      const spent = tries >= 1 || (q._repeat !== true && triedKeys.some(key => known.has(key)));
       // The hint rungs served so far, as the server charged them.
       const hintLevel = await hintLevelOf(accountId, qid);
       return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel };
@@ -1190,7 +1258,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(notRead ? { workingNotRead: true } : {}),
         ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
@@ -1252,7 +1320,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           [cursor, attemptId, accountId, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct,
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
-            ...(q._repeat === true ? { repeat: true } : {}),
+            ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
             contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
@@ -1359,16 +1427,17 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
     let chosen;
     try {
-      chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
+      chosen = await chooseQuestionFor(db, accountId, { generator, difficulty: Number(original.difficulty) || 2,
         dotpoint: typeof original.dotpoint === 'string' ? original.dotpoint : undefined,
         avoid: new Set([opaqueContentHash(original.contentHash)]),
-        trap: { owner: original.subtopic, key: attempt.misconception } });
-    } catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+        trap: { owner: original.subtopic, key: attempt.misconception } }, now);
+    } catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
     const q = chosen.q;
     q._practiceMode = 'review';
     q._generator = generator;
     let repeat = chosen.repeat;
-    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     const trySpent = !repeat && await contentTried(db, accountId, q, now);
     const payload = JSON.stringify(q);
     const id = randomUUID();
@@ -1379,7 +1448,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
       twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
-      ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
+      ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
   });
 
   // ── The spaced review queue, per dot point ──────────────────────────────
@@ -1408,4 +1477,4 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 // The same server-owned question choice, public projection and rubric, for the
 // examination router (server/platform/exams.js). One implementation, so a
 // paper and a practice question can never be chosen or marked by two rules.
-export { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash };
+export { ensureBanks, chooseQuestion, chooseQuestionFor, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash };
