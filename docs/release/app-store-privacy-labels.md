@@ -145,7 +145,7 @@ way round.
 | 13 | **Phone Number** declared as collected for an SMS path that is off at launch (D3) and that the client hides unless the server reports it live; the notice described a mobile-number route that does not exist on either environment | Row → No at launch with the re-enable procedure; `PhoneNumber` removed from both manifests; Play form and notice changed the same way |
 | 14 | The privacy-policy row called the notice "outdated" and the counsel pack §8 listed errors that were fixed on 19 Oct | Row rewritten: filled and corrected, unreviewed by counsel; the review state is `docs/legal/review-status.json` |
 | 15 | Sign in with Apple row assumed both providers ship | Owner decision D3 recorded: neither in the first submission |
-| 16 | The 5.1.2(i) row left the consent prompt as an open question | Owner default D17 recorded, with its state: built, off until enabled (`PRI_CHILD_ERASURE=enforce`) |
+| 16 | The 5.1.2(i) row left the consent prompt as an open question | Owner default D17 recorded; the one-time prompt naming OpenAI is built (#737, `client/src/ink/readerPermission.js`) and shown before the first read or photo (row 19) |
 
 Re-verified and unchanged on 2026-11-02: the telemetry event allowlist (`EVENTS` / `TYPES`);
 `FORBIDDEN_FIELDS` in `handwriting.js`, `working.js` and `questionPhoto.js`; `store: false` on every
