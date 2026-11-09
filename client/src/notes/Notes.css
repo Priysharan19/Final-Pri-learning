@@ -487,3 +487,42 @@
   .nt-resume h2 { font-size: 18px; }
   .nt-resume-link { padding: 8px 10px; font-size: 12px; }
 }
+
+/* Active learning stays an optional, quiet instrument — never an assessment. */
+.nt-example-learning { display: grid; justify-items: start; gap: 8px; }
+.nt-predict-toggle {
+  min-height: 44px; padding: 7px 0; border: 0; background: none;
+  color: var(--nt-accent); text-decoration: underline; text-underline-offset: 4px;
+  font: inherit; font-size: 13px; font-weight: 650; cursor: pointer;
+}
+.nt-predict-toggle:focus-visible, .nt-example-practice:focus-visible {
+  outline: 2px solid var(--nt-accent); outline-offset: 3px;
+}
+.nt-predict-editor {
+  width: min(100%, 620px); padding: 12px 14px; border-radius: 8px;
+  background: var(--nt-raised); border: 1px solid var(--nt-rule-strong);
+}
+.nt-predict-editor label { display: grid; gap: 7px; color: var(--nt-ink); font: inherit; font-size: 13px; font-weight: 650; }
+.nt-predict-editor textarea {
+  width: 100%; display: block; resize: vertical; min-height: 64px;
+  padding: 9px 11px; background: var(--nt-paper); border: 1px solid var(--nt-rule-strong);
+  border-radius: 5px; font: inherit; font-size: 14px; line-height: 1.5;
+  color: var(--nt-ink); overflow-wrap: anywhere;
+}
+.nt-predict-editor textarea:focus-visible { outline: 2px solid var(--nt-accent); outline-offset: 1px; }
+.nt-predict-editor p { margin: 7px 0 0; color: var(--nt-ink-3); font-size: 12px; line-height: 1.5; }
+.nt-step-attempt {
+  margin: 9px 0 2px; padding: 10px 12px;
+  background: var(--nt-raised); border-left: 2px solid var(--nt-rule-strong);
+}
+.nt-step-attempt > span {
+  display: block; font-family: var(--font, inherit); color: var(--nt-ink-3);
+  font-size: 12px; font-weight: 600; margin-bottom: 4px;
+}
+.nt-step-attempt p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
+.nt-example-practice {
+  display: inline-flex; align-items: center; min-height: 44px;
+  color: var(--nt-accent); font-size: 13px; font-weight: 650;
+  padding: 8px 0; text-decoration: underline; text-underline-offset: 4px;
+}
+@media(max-width:600px) { .nt-predict-editor { width: 100%; } }

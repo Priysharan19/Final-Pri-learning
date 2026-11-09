@@ -125,11 +125,25 @@ try {
   await check('tapping a concept unfolds it', await second.getAttribute('aria-expanded') === 'true' &&
     await page.locator('.nt-concept').nth(1).locator('.nt-concept-body').isVisible());
 
-  // A worked example, stepped through to its checked answer.
+  // The first example offers optional self-explanation before revealing each step.
+  // This is never graded or submitted: the learner checks their own prediction.
   const ex = page.locator('.nt-example').first();
   await ex.scrollIntoViewIfNeeded();
+  await check('prediction editor is opt-in, not mandatory', await ex.getByTestId('notes-step-prediction').count() === 0);
+  await ex.getByRole('button', { name: 'Try the next step first' }).click();
+  const prediction = ex.getByRole('textbox', { name: 'Your next step (optional)' });
+  await prediction.fill('I would split the middle term using product ac');
+  await check('prediction is explicitly ungraded and stays on this page',
+    (await ex.locator('.nt-predict-editor').innerText()).includes('Nothing is submitted or graded'));
+  await check('prediction does not reveal the solution automatically', await ex.locator('.nt-step').count() === 0);
+  await ex.getByRole('button', { name: 'Show next step' }).click();
+  await check('learner compares their own attempt with the revealed mathematical step',
+    (await ex.locator('.nt-step-attempt').innerText()).includes('I would split the middle term'));
+  await check('prediction editor closes after reveal', await ex.getByTestId('notes-step-prediction').count() === 0);
   await ex.getByRole('button', { name: 'Show all steps' }).click();
   await check('the worked example reaches its answer', await ex.locator('.nt-answer').isVisible());
+  await check('practice follows the worked example in the same chapter',
+    (await ex.getByRole('link', { name: 'Try a question from this chapter' }).getAttribute('href')).includes('subtopic=c10-quadratic-equations'));
   await check('the answer says the engine checked it', /checked by the maths engine/.test(await ex.locator('.nt-answer').innerText()));
   await shot(page, 'example');
   await page.locator('.nt-mistakes').scrollIntoViewIfNeeded();

@@ -536,7 +536,7 @@ function ChapterNotes({ chapterId }) {
                 </button>
               </div>
             )}
-            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} />)}
+            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} practiceLink={practiceLink} />)}
             {selectedExamples.length > visibleExamples && (
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
@@ -707,10 +707,17 @@ function Formula({ f, i }) {
   );
 }
 
-function Example({ ex, n }) {
+function Example({ ex, n, practiceLink }) {
   const t = useT();
   // The student first sees only the problem, never an unsolicited solution.
   const [shown, setShown] = useState(0);
+  // Only component state: no persistence, server call, telemetry or marking.
+  const [predictionOpen, setPredictionOpen] = useState(false);
+  const [predictions, setPredictions] = useState({});
+  const reveal = (count) => {
+    setPredictionOpen(false);
+    setShown(current => Math.min(ex.steps.length, Math.max(current, count)));
+  };
   const done = shown >= ex.steps.length;
   return (
     <div className="nt-example nt-reveal">
@@ -727,15 +734,39 @@ function Example({ ex, n }) {
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
           <MathText text={s} />
           {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
+          {predictions[i]?.trim() && (
+            <div className="nt-step-attempt">
+              <span>{t('notes.yourAttempt')}</span>
+              <p>{predictions[i].trim()}</p>
+            </div>
+          )}
         </li>)}
       </ol>
       {!done ? (
-        <div className="nt-example-more">
-          <button type="button" className="btn btn-secondary" onClick={() => setShown(s => s + 1)}>{t('notes.nextStep')}</button>
-          <button type="button" className="nt-link-btn" onClick={() => setShown(ex.steps.length)}>{t('notes.allSteps')}</button>
+        <div className="nt-example-learning">
+          <button type="button" className="nt-predict-toggle" aria-expanded={predictionOpen}
+            onClick={() => setPredictionOpen(value => !value)}>
+            {t('notes.tryNextStep')}
+          </button>
+          {predictionOpen && (
+            <div className="nt-predict-editor">
+              <label>
+                <span>{t('notes.predictionLabel')}</span>
+                <textarea rows={2} maxLength={360} value={predictions[shown] || ''}
+                  onChange={event => setPredictions(prev => ({ ...prev, [shown]: event.target.value }))}
+                  data-testid="notes-step-prediction" />
+              </label>
+              <p>{t('notes.predictionPrivacy')}</p>
+            </div>
+          )}
+          <div className="nt-example-more">
+            <button type="button" className="btn btn-secondary" onClick={() => reveal(shown + 1)}>{t('notes.nextStep')}</button>
+            <button type="button" className="nt-link-btn" onClick={() => reveal(ex.steps.length)}>{t('notes.allSteps')}</button>
+          </div>
         </div>
       ) : (
-        <div className="nt-answer nt-step">
+        <>
+          <div className="nt-answer nt-step">
           <span className="nt-tag">{t('notes.answer')}</span>
           <MathText text={ex.answer} />
           <span className="nt-checked">{t('notes.engineChecked')}</span>
@@ -745,7 +776,9 @@ function Example({ ex, n }) {
               <MathText block text={ex.alternative} />
             </details>
           )}
-        </div>
+          </div>
+          <PageLink className="nt-example-practice" to={practiceLink}>{t('notes.tryChapterPractice')}</PageLink>
+        </>
       )}
     </div>
   );
