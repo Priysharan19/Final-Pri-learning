@@ -627,7 +627,14 @@ const safeFigure = (v) => sanitizeFigure(typeof v === 'string' ? v : '') || null
 // is escaped by the renderer that shows it.
 const safeLabel = (v, max) => sanitizeText(String(primitive(v) ?? '').replace(/<[^>]*>?/g, ' ').replace(/\s+/g, ' '), max);
 const safeSteps = (v) => (Array.isArray(v) ? v : []).slice(0, 40)
-  .map(s => ({ h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) }));
+  .map(s => {
+    const step = { h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) };
+    // A worked-solution step may carry a figure (SVG); it goes through the
+    // same figure sanitiser as a question's figure, or is dropped.
+    const figure = typeof s?.figure === 'string' ? safeFigure(s.figure) : null;
+    if (figure) step.figure = figure;
+    return step;
+  });
 const safeOptions = (v) => (Array.isArray(v) ? v : []).slice(0, 6).map(o => sanitizeText(o, 200));
 const safeStrokes = (v, max) => (Array.isArray(v) ? v : []).slice(0, max)
   .map(st => ({ points: (Array.isArray(st?.points) ? st.points : []).slice(0, 4000).map(pt => ({
@@ -3074,7 +3081,9 @@ async function serverReviewQueue(p) {
       ? `/practice?subtopic=${encodeURIComponent(named.chapterId)}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
       : `/practice?subtopic=${encodeURIComponent(named.chapterId)}${Number.isInteger(named.ordinal) ? `&dotpoint=${named.ordinal}` : ''}`;
     return { id: `${r.subtopic}|${r.dotpoint}`, subtopic: r.subtopic, dotpoint: r.dotpoint, chapterName: named.chapterName, text: named.text,
-      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href };
+      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href,
+      // The history the estimate rests on, as the server counted it.
+      attempts: Math.max(0, Number(r.attempts) || 0), correct: Math.max(0, Number(r.correct) || 0), lastAt: Number(r.lastAt) || 0 };
   };
   return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
 }
@@ -3876,6 +3885,34 @@ const routes = {
       code: outcome?.tutor?.source === 'model' ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
       tutorLevel: Number(row.tutorLevel) || 0
     };
+  },
+
+  // "Why this step?" — a grounded dialogue about one step of a RESOLVED
+  // question's verified solution. Writes nothing to the row (no charge: the
+  // mark is decided; Premium and the free taster are the server's to enforce).
+  'POST /practice/:id/tutor/why': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (!row.answered) throw Object.assign(new Error('"Why this step?" follows the answer.'), { status: 409, code: 'TUTOR_LEVEL_ORDER' });
+    const q = row.payload;
+    const stepIndex = Number(body?.stepIndex);
+    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex > 23) throw Object.assign(new Error('Choose a step of the solution.'), { status: 400, code: 'TUTOR_BODY_INVALID' });
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText, solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const base = tutorRequest(p, row, q, solution, { level: 'why', locale: body?.locale, work: tutorWork(q, body?.work), resolved: true });
+    if (!base) return { message: null, source: 'deterministic', code: 'TUTOR_UNGROUNDED' };
+    const message = typeof body?.message === 'string' ? sanitizeText(body.message, 600) : '';
+    const history = (Array.isArray(body?.history) ? body.history : []).slice(-6)
+      .map(turn => ({ role: turn?.role === 'tutor' ? 'tutor' : 'student', text: sanitizeText(turn?.text, 600) })).filter(turn => turn.text);
+    const outcome = await requestTutorHelp({ ...base, stepIndex, ...(message ? { message, history } : {}) });
+    const tutor = outcome?.tutor;
+    if (!tutor || typeof tutor.message !== 'string') return { message: null, source: 'deterministic', code: outcome?.error?.code || 'TUTOR_FAILED' };
+    return { message: sanitizeText(tutor.message, 1200), source: tutor.source === 'model' ? 'tutor' : 'deterministic', code: tutor.source === 'model' ? null : (tutor.reason || null) };
   },
 
   // "Check this line so far": the server's Step Check of the lines on an OPEN
@@ -5612,7 +5649,7 @@ function tutorWork(q, raw) {
 function tutorRequest(p, row, q, solution, { level, locale, work, captions, resolved }) {
   // `resolved` belongs to a diagnosis only (the server refuses it elsewhere);
   // for a server-issued question the server decides it from its own records.
-  const diagnosis = level === 'diagnose' ? { resolved: resolved === true } : {};
+  const diagnosis = level === 'diagnose' || level === 'why' ? { resolved: resolved === true } : {};
   if (row.serverQuestionId) {
     // Server-issued: name the question, send the student's own work, and
     // nothing else. No prompt, step, answer or hint leaves the device for it —

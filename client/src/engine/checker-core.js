@@ -6,6 +6,7 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { slipFeedback } from './slips.js';
 import { checkGraphSketch } from './graphFeatures.js';
 import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, relativeBand, variablesOf, withEvaluationBudget } from './expr.js';
 
@@ -1168,7 +1169,8 @@ function checkAnswerWithinBudget(question, rawInput) {
           if (gd !== undefined) {
             if (!numsClose(gn / gd, n / d)) {
               const why = matchTraps(question, gn / gd, rawInput);
-              return { correct: false, feedback: why ?? undefined };
+              const slip = why ? null : slipFeedback(gn / gd, n / d, question);
+              return { correct: false, feedback: why ?? slip?.feedback ?? undefined, ...(slip ? { slip: slip.kind } : {}) };
             }
             if (gn !== n || gd !== d) {
               const g = gcdInt(gn, gd);
@@ -1186,7 +1188,9 @@ function checkAnswerWithinBudget(question, rawInput) {
         }
         if (!ok) {
           const why = matchTraps(question, value, rawInput);
-          return { correct: false, feedback: why ?? undefined };
+          // No authored trap: name the kind of slip (sign, ×10, upside down, an earlier step), never a value.
+          const slip = why ? null : slipFeedback(value, target, question);
+          return { correct: false, feedback: why ?? slip?.feedback ?? undefined, ...(slip ? { slip: slip.kind } : {}) };
         }
         return { correct: true };
       }

@@ -36,6 +36,12 @@ check('ContentView sets the status bar from the page tone, only where the page i
   /\.preferredColorScheme\(Self\.statusBarScheme\(for: pageTone\)\)/.test(app)
     && /guard !edgeToEdge\.isEmpty, let tone else \{ return nil \}/.test(app)
     && /\.onReceive\(NotificationCenter\.default\.publisher\(for: \.priPageTone\)\)/.test(app));
+// Safe area (#615): inside the native shell env(safe-area-inset-*) is 0. The
+// welcome and sign-in padding read --pri-inset-*, which fall back to env() on
+// the web; the shell side (WebShell injecting the real insets, and the
+// simulator journey's wordmarkClearsStatusBar step) is lane L4's #615.
+check('the welcome and sign-in screens pad by the injected insets',
+  /\.auth-wrap \{\s*padding-top: calc\(24px \+ var\(--pri-inset-top\)\)/.test(read('client/src/theme.css')));
 check('the web shell observes the page\'s theme-color and reports its tone (iPhone only)',
   /webView\.observe\(\\\.themeColor, options: \[\.initial, \.new\]\)/.test(shell)
     && /StatusBarAppearance\.tone\(/.test(shell)

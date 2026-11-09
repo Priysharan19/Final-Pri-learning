@@ -170,6 +170,7 @@ import { multipartForYear } from '../../client/src/engine/generators/multipart.j
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
+import { timeReport } from '../../client/src/engine/examTime.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 import { recognitionOpsFor } from './recognitionOps.js';
@@ -1321,6 +1322,22 @@ const mayAttempt = (page, now, retry) => page.state !== 'resolved' && page.tries
  * handwriting is returned as stored. One with some says so: `provisional`
  * while any page is unresolved, and how many marks are not yet decided.
  */
+/**
+ * Where the time went (engine/examTime.js, plan F10) is Premium's
+ * (premium-exams): added to a result as it is READ, from the entitlement the
+ * server holds now, so it is never stored as a free plan's and appears the
+ * day an account upgrades. The basic section analysis stays on every plan.
+ */
+async function withTimeReport(db, accountId, view, now) {
+  // A paper with no measured times has nothing to report on any plan, and
+  // its result is returned exactly as stored.
+  const report = view && Array.isArray(view.detail) ? timeReport(view.detail) : null;
+  if (!report) return view;
+  const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+  if (!serverEntitlementCapabilities(snapshot, now).includes('premium-exams')) return { ...view, timeReportOffered: true };
+  return { ...view, timeReport: report };
+}
+
 export function resultView(result, now) {
   const handwriting = result?.handwriting;
   if (!handwriting) return result;
@@ -1816,7 +1833,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     if (outcome.status === 404) return notFound(res);
     if (outcome.status === 503) res.set('Retry-After', '2');
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
-    return res.status(200).json(resultView(outcome.result, Date.now()));
+    const now = Date.now();
+    return res.status(200).json(await withTimeReport(db, accountId, resultView(outcome.result, now), now));
   });
 
   // One page of handwriting that was frozen, unread, when the paper closed.
@@ -1832,7 +1850,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     });
     if (outcome.status === 404) return notFound(res);
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
-    return res.status(200).json({ result: outcome.result, attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
+    return res.status(200).json({ result: await withTimeReport(db, accountId, outcome.result, Date.now()), attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
   });
 
   router.get('/:id', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
@@ -1847,7 +1865,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     if (!paper) return notFound(res);
     const result = await read(accountId, 'exam-result', id, now);
     const exam = publicPaper(paper, now);
-    if (result) return res.status(200).json({ state: 'finished', exam, result: resultView(result, now), accountId: String(accountId) });
+    if (result) return res.status(200).json({ state: 'finished', exam, result: await withTimeReport(db, accountId, resultView(result, now), now), accountId: String(accountId) });
     const snapshot = await read(accountId, 'exam-answers', id, now);
     return res.status(200).json({
       state: 'open', exam, snapshot: snapshot || null,

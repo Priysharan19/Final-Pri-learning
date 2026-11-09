@@ -560,7 +560,7 @@ eq(root.lang, 'hi', 'and the document says Hindi — never before the text is Hi
 eq(i18n.translate('common.questionsCounted', { count: 1, n: 1 }), '1 प्रश्न', 'a counted noun takes its Hindi singular');
 eq(i18n.translate('common.questionsCounted', { count: 5, n: 5 }), '5 प्रश्न',
   'and its plural — which in Hindi is the same word after a numeral, which is the point of writing both out');
-eq(i18n.translate('home.reviewDue', { count: 3, n: 3 }), 'अंतराल पुनरावृत्ति के लिए आपके 3 टॉपिक बाकी हैं।',
+eq(i18n.translate('home.next.reviews', { count: 3, n: 3 }), '3 टॉपिक पुनरावृत्ति के लिए बाकी हैं',
   'a whole sentence comes back in Hindi word order, with the verb last');
 
 await i18n.setLanguage('en');

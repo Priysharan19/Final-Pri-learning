@@ -553,7 +553,7 @@ it in a real Chromium. `npm run test:browser` runs both; the `browser` job in
 
 | Command | n | Result |
 |---|---|---|
-| `npm run test:e2e` (`node client/test/e2e.mjs`) | 5 flows — login, practice, ink, exam, calibrate | **129 / 129** checks, 17s (15.7s of it in the browser, 1.2s building) |
+| `npm run test:e2e` (`node client/test/e2e.mjs`) | 12 flows — login, India, phone, practice, ink, exams, submission, cloud, placement, photo | **421 / 421** checks (CI's invariant; recogniser calibration was removed with the on-device reader) |
 | `npm run test:a11y` (`node client/test/a11y-check.mjs`) | 52 views walked; ~1,680 controls, ~57 fields, ~21,500 elements inspected | **38 / 38** checks across 11 groups, 1m04s |
 
 `npm run test:browser` runs both back to back: **1m21s** (`time npm run test:browser`, Node v24.19.0
@@ -569,8 +569,8 @@ Read these the same careful way as the ink table:
   worked. Every check above asserts on behaviour — an answer marked, a password refused, a stroke
   recognised, marks returned, a name a screen reader will actually say — and names what it expected
   and what it got when it breaks.
-- **The e2e suite covers five flows, not the app.** The profile gate, the question card, the ink
-  canvas, the exam room and recogniser calibration are the surfaces that only exist on the far side
+- **The e2e suite covers its flows, not the app.** The profile gate, the question card, the ink
+  canvas and the exam room are the surfaces that only exist on the far side
   of a render. Progress, Match, Tasks, Classes, Favorites, History, Settings and the Knowledge map
   are *walked* by the accessibility suite and *asserted* by nothing. That is a gap, and it is the
   reason the e2e figure is quoted as "5 flows" rather than "the app".
@@ -787,8 +787,8 @@ is missing, serve it from inside their own process on an ephemeral port, and let
 its own browser — no `executablePath`, no `/opt` path, no server to start, nothing left behind in the
 repo. Both assert on behaviour and exit non-zero when an assertion fails.
 
-**`npm run test:e2e`** — the four surfaces on the far side of a render, which no Node suite reaches,
-plus recogniser calibration: the profile gate, the question card, the ink canvas and the exam room.
+**`npm run test:e2e`** — the four surfaces on the far side of a render, which no Node suite reaches:
+the profile gate, the question card, the ink canvas and the exam room.
 It is **not a screenshot tour**; a screenshot proves a page painted, not that it worked. Figures in
 **[Measured accuracy](#measured-accuracy)**.
 
