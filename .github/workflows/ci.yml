@@ -377,6 +377,7 @@ jobs:
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
+          grep -Fq 'INSIGHTS VIEW: PASS — 37/37 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
           # The committed certification report describes the content in the tree (version, digest, scope, result).
           grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log

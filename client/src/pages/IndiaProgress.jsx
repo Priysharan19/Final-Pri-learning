@@ -5,6 +5,7 @@ import { useApp } from '../App.jsx';
 import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import PageLink from '../components/PageLink.jsx';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
@@ -121,6 +122,8 @@ export default function IndiaProgress() {
               {prediction.unseenMarks > 0 && t('progress.marksUntouched', { n: prediction.unseenMarks })}
             </div>
           </div>
+
+          <p className="pg-coverage-note"><PageLink to="/insights" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }} data-insights-link>{t('insights.open')} →</PageLink></p>
 
           {prediction.priorities.length > 0 && (
             <div className="pg-priorities">
