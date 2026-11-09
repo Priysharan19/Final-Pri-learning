@@ -2903,7 +2903,7 @@ export default {
 
   // ── एक साइन-इन कार्ड और सक्रियण द्वार (खाता पहले) ──
   'login.welcomeTitle': "Pri Learning में आपका स्वागत है",
-  'login.welcomeSub': "आपकी गणित की यात्रा यहीं से शुरू होती है।",
+  'login.welcomeSub': "अपना हल लिखें। हर चरण की जाँच कराएँ।",
   'login.instrumentHeadline': 'हाथ से लिखिए। उसे जँचते हुए देखिए।',
   'login.existingDeviceProfile': "इस डिवाइस पर सहेजी गई प्रोफ़ाइल से जारी रखें",
   'login.createAnotherAccount': "एक और Pri खाता बनाएँ",
