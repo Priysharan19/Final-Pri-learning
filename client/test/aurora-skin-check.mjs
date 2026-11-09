@@ -126,6 +126,8 @@ const rtc = all.filter(r => /\.a11y-reduce-transparency/.test(r.selector) && !r.
 ok(rtc.some(r => /\.in-bar/.test(r.selector) && /backdrop-filter:\s*none/.test(r.body)) && rtc.some(r => /\.in-pal/.test(r.selector) && /backdrop-filter:\s*none/.test(r.body)) && rtc.some(r => /\.a-aurora/.test(r.selector) && /display:\s*none/.test(r.body)), 'the shell\'s Reduce Transparency class makes the same rules opaque as the media query (bars, menus, palette, no pools)');
 const shell = read('ios/PriLearning.swiftpm/WebShell.swift');
 ok(/reduceTransparencyScript\(UIAccessibility\.isReduceTransparencyEnabled\)/.test(shell) && /injectionTime: \.atDocumentStart/.test(shell.slice(shell.indexOf('reduceTransparencyScript(UIAccessibility'))) && /UIAccessibility\.reduceTransparencyStatusDidChangeNotification/.test(shell) && /classList\.toggle\('a11y-reduce-transparency'/.test(shell), 'the iOS shell sets that class from the first paint and on every change of the setting');
+ok(/didFinish navigation[\s\S]{0,600}applyReduceTransparency\(\)/.test(shell), 'and states it again when every navigation finishes, so a reload never keeps a stale value');
+ok(read('ios/PriLearning 2.swiftpm/WebShell.swift') === shell, 'the second iOS project (PriLearning 2.swiftpm) carries the same shell');
 const fc = inMedia('forced-colors: active');
 ok(fc.some(r => /\.a-aurora/.test(r.selector) && /display:\s*none/.test(r.body)) && fc.some(r => /backdrop-filter:\s*none/.test(r.body)), 'forced colours: no pools, no glass');
 ok(inMedia('prefers-reduced-motion: reduce').some(r => /\.a-aurora i/.test(r.selector) && /animation:\s*none/.test(r.body)), 'Reduce Motion: the pools stand still');

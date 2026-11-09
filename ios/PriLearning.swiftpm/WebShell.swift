@@ -500,6 +500,9 @@ struct WebShell: UIViewRepresentable {
             applyTextSize()
             appliedSafeArea = nil
             if let container = webView.superview { applySafeArea(container.safeAreaInsets) }
+            // A reload re-runs the launch-time user script with the value it was
+            // made with: state the current Reduce Transparency setting again.
+            applyReduceTransparency()
             #if DEBUG
             if BridgeSelfCheck.awaitingContentEnd {
                 // A load after the page's WebContent process ended (whoever reloaded it).
