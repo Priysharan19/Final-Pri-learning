@@ -418,6 +418,8 @@ export default function SignUpFlow({
     await cloud.logout().catch(() => {});
     setAccount(null); setConsent(null); setChallenge(null); setCode(''); setTicket(''); setResendAt(0);
     setPassword(''); setDestination('');
+    // The signed-out account's name must not follow into the next one.
+    setName(String(initialName || '').slice(0, 80));
     setBusy('');
     go('method', 'back');
   }

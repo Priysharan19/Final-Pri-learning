@@ -17,6 +17,13 @@ on:
       - 'handwriting/v12/evidence/physical/**'
       - '.github/workflows/ink-physical-evidence.yml'
 
+concurrency:
+  # Pull-request runs share one group per branch, so a newer push supersedes the
+  # queued or running check. Every other run (main, schedule, manual dispatch)
+  # gets its own group, so it is never cancelled or replaced while pending.
+  group: ink-physical-evidence-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

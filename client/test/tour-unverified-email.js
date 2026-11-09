@@ -135,6 +135,35 @@ export const flow = {
       await check('and the unconfirmed session is signed out on the server', me === 401, String(me));
       await check('the app has not opened', await page.locator('.shell').count() === 0);
     } finally { await second.close(); }
+
+    // ── the takeover rule spares a guardian's mail (review of #747, P1) ──────
+    // An approved child whose address was never proved signs in by email
+    // code: the server retires the unproven password and the registrant's own
+    // pending mail, but the guardian's withdrawal credential was asked for by
+    // the guardian and must still reach them.
+    const { decryptDeliveryToken } = await import('../../server/platform/deliveryCrypto.js');
+    const { CONSENT_NOTICE_VERSION } = await import('../../server/platform/guardianConsent.js');
+    h.db.prepare("DELETE FROM rate_limits").run();
+    const childEmail = freshEmail('approved-child');
+    const made = await h.request('/v1/account/register', { method: 'POST', jar: {}, body: {
+      name: 'Approved Child', email: childEmail, password: PASSWORD, deviceId: 'api-child', isAdult: false, year: '9',
+      guardianName: 'Parent', guardianEmail: freshEmail('parent') } });
+    const childId = String(made.data.account.id);
+    const consentRow = h.db.prepare("SELECT token_id, token_ciphertext FROM auth_delivery_outbox WHERE account_id=? AND kind='guardian-consent'").get(childId);
+    const consentToken = decryptDeliveryToken(consentRow.token_ciphertext, `${childId}:guardian-consent:${consentRow.token_id}`);
+    await h.request('/v1/account/guardian/confirm', { method: 'POST', jar: {}, body: { token: consentToken, approve: true, noticeVersion: CONSENT_NOTICE_VERSION } });
+    const withdrawBefore = h.db.prepare("SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE account_id=? AND kind='guardian-withdraw' AND delivered_at IS NULL").get(childId).n;
+    await check('the guardian\'s confirmation queued their withdrawal email', withdrawBefore === 1);
+    resetOtpLimits(platform);
+    const asked = await h.request('/v1/account/otp/request', { method: 'POST', jar: {}, body: { channel: 'email', destination: childEmail } });
+    const code = lastEmailCode(platform, childEmail);
+    const signed = await h.request('/v1/account/otp/verify', { method: 'POST', jar: {}, body: { channel: 'email', destination: childEmail, challengeId: asked.data?.challengeId, code } });
+    await check('the child signs in by code, proving the address (the takeover rule runs)', signed.status === 200 &&
+      h.db.prepare('SELECT password_hash FROM accounts WHERE id=?').get(childId).password_hash == null, `${signed.status}`);
+    await check('the guardian\'s withdrawal email is still queued for them',
+      h.db.prepare("SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE account_id=? AND kind='guardian-withdraw' AND delivered_at IS NULL").get(childId).n === 1);
+    await check('while the registrant\'s own verification mail is gone',
+      h.db.prepare("SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE account_id=? AND kind='verify-email' AND delivered_at IS NULL").get(childId).n === 0);
   }
 };
 
