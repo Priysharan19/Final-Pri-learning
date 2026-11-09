@@ -24,19 +24,41 @@ const LABEL = /^(?:Δ|[A-Za-z])(?:'{1,2})?(?:_[A-Za-z0-9]+)?(?:\([^()=]{1,12}\))
 const tidyLabel = s => String(s).replace(/\\Delta/g, 'Δ').replace(/\\prime/g, "'").replace(/[′’]/g, "'")
   .replace(/[{}\s]/g, '').replace(/\\left|\\right/g, '');
 
+/**
+ * One TeX span may hold several statements: `a = 11, \\quad d = 7` or
+ * `u = x^3; v = 3x + 4`. Split at a comma, semicolon or TeX space that is
+ * followed by another `LABEL =`, so each label keeps its own value.
+ */
+function statements(span) {
+  const pieces = String(span).split(/\s*(?:,|;|\\qquad|\\quad|\\;|\\,|\\text\{\s*and\s*\})\s*(?:\\qquad|\\quad|\\;|\\,)?\s*/);
+  const out = [];
+  for (const p of pieces) {
+    const head = tidyLabel(p.split(/(?<![<>!])=(?!=)/)[0] ?? '');
+    if (out.length && !(p.includes('=') && LABEL.test(head))) out[out.length - 1] += `, ${p}`;
+    else out.push(p);
+  }
+  return out;
+}
+function topLevelComma(v) {
+  let depth = 0;
+  for (const c of String(v)) { if ('([{'.includes(c)) depth += 1; else if (')]}'.includes(c)) depth -= 1; else if (c === ',' && depth === 0) return true; }
+  return false;
+}
+
 /** The milestones of a question's worked solution: [{ step, label, values: [plain expr] }]. */
 export function milestonesOf(q) {
   const out = [];
   const steps = Array.isArray(q?.steps) ? q.steps : [];
   steps.forEach((step, i) => {
     const d = String(step?.d ?? '');
-    for (const m of d.matchAll(TEX_SPAN)) {
-      const parts = m[1].split(/(?<![<>!])=(?!=)/);
+    for (const m of d.matchAll(TEX_SPAN)) for (const piece of statements(m[1])) {
+      const parts = piece.split(/(?<![<>!])=(?!=)/);
       if (parts.length < 2) continue;
       const label = tidyLabel(parts[0]);
       if (!LABEL.test(label)) continue;
       const values = parts.slice(1).map(p => plainTex(p)).filter(v => {
-        if (!v) return false;
+        // A top-level comma means two statements were not split apart: never a value.
+        if (!v || topLevelComma(v)) return false;
         try { parse(normalize(v)); return true; } catch { return false; }
       });
       if (values.length) out.push({ step: i, heading: String(step?.h ?? '').trim(), label, values });
