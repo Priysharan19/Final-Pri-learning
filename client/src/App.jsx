@@ -222,7 +222,7 @@ export default function App() {
       const dp = r?.dotpoints;
       setDueCount(dp ? (Number(dp.dueCount) || 0) : (r?.due?.length || 0));
       setDueUnit(dp ? 'dotpoint' : 'topic');
-    } catch { setDueCount(0); }
+    } catch { setDueCount(0); setDueUnit('topic'); }
   }, []);
 
   const refreshRecent = useCallback(async () => {

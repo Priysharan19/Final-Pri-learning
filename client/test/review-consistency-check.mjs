@@ -16,11 +16,11 @@ const fnSrc = card.slice(card.indexOf('export function reviewHistory'), card.ind
 const reviewHistory = new Function(fnSrc.replace('export function', 'return function'))();
 const DAY = 86400000; const now = Date.parse('2026-11-09T12:00:00Z');
 
-check('history line from the server counts', () =>
-  assert.equal(reviewHistory({ attempts: 3, correct: 1, lastAt: now - 12 * DAY }, t, now), 'Last time 1 of 3 right, 12 days ago · '));
+check('history line: all-time counts, said as such (not "last time")', () =>
+  assert.equal(reviewHistory({ attempts: 3, correct: 1, lastAt: now - 12 * DAY }, t, now), '1 of 3 right so far · last practised 12 days ago · '));
 check('same-day history says today; one day is singular', () => {
-  assert.equal(reviewHistory({ attempts: 2, correct: 2, lastAt: now - 3600000 }, t, now), 'Last time 2 of 2 right, today · ');
-  assert.equal(reviewHistory({ attempts: 2, correct: 1, lastAt: now - DAY }, t, now), 'Last time 1 of 2 right, 1 day ago · ');
+  assert.equal(reviewHistory({ attempts: 2, correct: 2, lastAt: now - 3600000 }, t, now), '2 of 2 right so far · last practised today · ');
+  assert.equal(reviewHistory({ attempts: 2, correct: 1, lastAt: now - DAY }, t, now), '1 of 2 right so far · last practised 1 day ago · ');
 });
 check('no counts, no history claim; correct never exceeds attempts', () => {
   assert.equal(reviewHistory({ recall: 0.4 }, t, now), '');

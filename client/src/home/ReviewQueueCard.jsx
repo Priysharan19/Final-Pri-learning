@@ -9,7 +9,7 @@ import TermGloss from '../components/TermGloss.jsx';
 // (engine/reviewQueue.js); signed out or offline it is null and this card
 // renders nothing. It is a support card: it never holds the page's primary
 // action, and says plainly that recall is an estimate.
-// "Last time 1 of 3 right, 12 days ago · ": the record the recall estimate is
+// "1 of 3 right so far · last practised 12 days ago · ": the all-time record the recall estimate is
 // read from. Said only when the server sent the counts.
 export function reviewHistory(r, t, now) {
   const attempts = Number(r?.attempts) || 0;

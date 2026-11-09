@@ -921,7 +921,7 @@ export default {
   'review.dueToday': { one: '{n} बिंदु दोहराने का समय है', other: '{n} बिंदु दोहराने का समय है' },
   'review.dueTodayWhy': 'हर बिंदु को आपने पिछली बार कब और कैसे किया, उससे लगाया गया अनुमान। यह अनुमान है, परीक्षा का परिणाम नहीं।',
   'review.recall': 'अनुमानित याद {percent}%',
-  'review.history': "पिछली बार {attempts} में से {correct} सही, {when}",
+  'review.history': 'अब तक {attempts} में से {correct} सही · आखिरी अभ्यास {when}',
   'review.lastToday': "आज",
   'review.lastDays': { one: "{n} दिन पहले", other: "{n} दिन पहले" },
   'home.reason.reviews': "अनुमान इस पर आधारित है कि आपने हर एक का अभ्यास आखिरी बार कब किया। अभी थोड़ा दोहराने से वह याद रहेगा।",

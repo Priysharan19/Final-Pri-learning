@@ -860,7 +860,7 @@ export default {
   'review.dueToday': { one: '{n} dot point is due for review', other: '{n} dot points are due for review' },
   'review.dueTodayWhy': 'Estimated from when you last practised each dot point and how it went. An estimate, not a test result.',
   'review.recall': 'estimated recall {percent}%',
-  'review.history': "Last time {correct} of {attempts} right, {when}",
+  'review.history': '{correct} of {attempts} right so far · last practised {when}',
   'review.lastToday': "today",
   'review.lastDays': { one: "{n} day ago", other: "{n} days ago" },
   'home.reason.reviews': "Estimated from when you last practised each one. A short review now keeps it from fading.",
