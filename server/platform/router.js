@@ -1,3 +1,4 @@
+import { createForecastRouter } from './forecast.js';
 import { createMistakeDnaRouter } from './mistakeDna.js';
 import { asyncRouter } from './asyncRouter.js';
 import { clientCompatibility } from './clientCompatibility.js';
@@ -235,6 +236,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.
   router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
+  router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
   router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));
