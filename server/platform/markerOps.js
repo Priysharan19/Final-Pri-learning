@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -93,7 +94,7 @@ export function stepEvidence(q, answer, steps, result) {
 }
 
 // ── Examination marking, in the two stages the pool can tell apart ──────────
-const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
+const OBJECTIVE = new Set(['mcq', 'multi-mcq', 'matrix-match']);
 const blank = v => v === undefined || v === null || String(v).trim() === '';
 
 /**
@@ -118,6 +119,13 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
       partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
       outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'matrix-match') {
+    let r;
+    try { r = markMatrixMatch(grid, given, q.answer?.matrix); } catch { r = { awarded: 0, outcome: 'invalid', feedback: 'This grid cannot be checked.' }; }
+    return { final: true, response: { unanswered: r.outcome === 'unanswered', correct: r.outcome === 'full', awarded: r.awarded,
+      feedback: String(r.feedback || '').slice(0, 3000), partial: r.outcome === 'partial' ? { awarded: r.awarded, note: r.feedback } : null,
+      markingScheme: 'objective-per-row', outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
