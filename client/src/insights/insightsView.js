@@ -13,7 +13,6 @@
 //     line through it: only its coverage tick is drawn;
 //   · a habit always carries its chances ("7 of 12"), never a bare count.
 // ─────────────────────────────────────────────────────────────────────────────
-import { COVERAGE_FLOOR } from '../engine/markPredictor.js';
 
 export const PLOT = Object.freeze({ width: 320, height: 132, padL: 30, padR: 8, padT: 10, padB: 22 });
 
@@ -78,7 +77,7 @@ export function trendGeometry(points = [], plot = PLOT) {
 
 /** The forecast's headline, as i18n key + values. Never a number below the floor. */
 export function headline(f) {
-  if (!f || !f.show) return { key: 'insights.forecastNoBand', values: { pct: Math.round((f?.coverage || 0) * 100), floor: Math.round(COVERAGE_FLOOR * 100) } };
+  if (!f || !f.show) return { key: 'insights.forecastNoBand', values: { pct: Math.round((f?.coverage || 0) * 100) } };
   return { key: 'insights.forecastBand', values: { covered: f.coveredMarks, total: f.totalMarks, expected: f.expected, low: f.low, high: f.high, unseen: f.unseenMarks } };
 }
 

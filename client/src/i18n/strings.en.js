@@ -3292,7 +3292,7 @@ export default {
   "insights.seePremium": 'See Premium',
   "insights.forecastTitle": 'Estimate from your practice',
   "insights.forecastBand": 'On the {covered} of {total} marks you have practised, you would score around {expected} ({low}–{high}). {unseen} marks are untouched.',
-  "insights.forecastNoBand": 'You have practised {pct}% of this paper. An estimate appears once you have practised {floor}%.',
+  "insights.forecastNoBand": 'You have practised {pct}% of this paper. The server shows an estimate once enough of the paper is practised.',
   "insights.forecastPremium": 'Premium shows an estimate of your mark from your own practice, with its range, how it has moved week by week, and how much of the paper it covers.',
   "insights.forecastHonesty": 'An estimate from your practice, not a predicted board score. The range is over the marks you have practised only, and it is wide when the evidence is thin.',
   "insights.coverage": 'Practised {pct}% of the paper ({covered} of {total} marks)',

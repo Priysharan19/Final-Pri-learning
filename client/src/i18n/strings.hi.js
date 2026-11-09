@@ -3354,7 +3354,7 @@ export default {
   "insights.seePremium": 'Premium देखें',
   "insights.forecastTitle": 'आपके अभ्यास से अनुमान',
   "insights.forecastBand": 'आपने जिन {total} में से {covered} अंकों का अभ्यास किया है, उन पर आपके लगभग {expected} ({low}–{high}) अंक आते। {unseen} अंक अभी छुए नहीं गए।',
-  "insights.forecastNoBand": 'आपने इस पेपर का {pct}% अभ्यास किया है। {floor}% अभ्यास होने पर अनुमान दिखेगा।',
+  "insights.forecastNoBand": 'आपने इस पेपर का {pct}% अभ्यास किया है। पेपर का पर्याप्त अभ्यास होने पर अनुमान दिखेगा।',
   "insights.forecastPremium": 'Premium आपके अपने अभ्यास से आपके अंकों का अनुमान दिखाता है — उसकी सीमा, हफ़्ते-दर-हफ़्ते बदलाव, और वह पेपर का कितना हिस्सा देखता है।',
   "insights.forecastHonesty": 'यह आपके अभ्यास से अनुमान है, बोर्ड अंकों का पूर्वानुमान नहीं। सीमा केवल अभ्यास किए गए अंकों पर है, और कम प्रमाण होने पर चौड़ी होती है।',
   "insights.coverage": 'पेपर का {pct}% अभ्यास ({total} में से {covered} अंक)',

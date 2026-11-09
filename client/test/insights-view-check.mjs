@@ -61,6 +61,10 @@ ok('chances never fall below the times seen', chancesValues({ times: 3, chances:
 const m = chapterMatrix([{ id: 'a', chapters: ['x', 'y'] }, { id: 'b', chapters: ['y'] }]);
 ok('cross-chapter matrix orders chapters by how many habits touch them', m.chapters.join() === 'y,x' && m.rows[0].cells.join() === 'true,true' && m.rows[1].cells.join() === 'true,false');
 
+// the view reads the server's answer, never the device's predictor
+ok('insightsView imports no engine module (the marking-authority import rule)',
+  !/from '\.\.\/engine\//.test(readFileSync(new URL('../src/insights/insightsView.js', import.meta.url), 'utf8')));
+
 // copy
 const keys = Object.keys(en).filter(k => k.startsWith('insights.'));
 ok('every insights string is in Hindi too', keys.every(k => k in hi), keys.filter(k => !(k in hi)).join(','));
