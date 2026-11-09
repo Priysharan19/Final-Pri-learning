@@ -51,15 +51,13 @@ export const INDIA_NATIVE_COVERS = Object.freeze({
     c('c10-linear-graphs', [0]),
     c('c10-linear-solution-conditions', [1]),
     c('c10-linear-pair-methods', [2], [1, 2, 3]),
-    c('c10-linear-pair-methods', [3], [4]),
-    c('c10-linear-ticket-competency', [3], [3])
+    c('c10-linear-pair-methods', [3], [4])
   ],
   'c10-quadratic-equations': [
     c('c10-quadratic-roots', [0], [1, 2]),
     c('c10-quadratic-roots', [1], [3, 4]),
     c('c10-quadratic-discriminant', [2]),
-    c('c10-quadratic-context', [3]),
-    c('c10-quadratic-triangle-competency', [3], [3])
+    c('c10-quadratic-context', [3])
   ],
   // The Year 8 bank could only be credited at D1, because its D2–D4 rungs run
   // on to complement, expected frequency and experimental probability — none of

@@ -27,6 +27,7 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
+import { CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS } from './curriculum-in-competency-covers.js';
 import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS, INDIA_RETIRED_RUNGS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
@@ -181,6 +182,31 @@ function installNativeCovers() {
 }
 
 installNativeCovers();
+
+// Append newly authored competency forms independently of the previously
+// source-reviewed syllabus contracts and the canonical native-bank rewires.
+// Never label these additions as historically reviewed source questions.
+function installOriginalCompetencyCovers() {
+  for (const [chapterId, covers] of Object.entries(CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS)) {
+    const views = new Set([
+      IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
+      IN_CHAPTER_BY_ID[chapterId],
+      IN_CHAPTERS.find(chapter => chapter.id === chapterId)
+    ].filter(Boolean));
+    if (!views.size) throw new Error(`${chapterId}: competency chapter missing`);
+    for (const chapter of views) {
+      for (const item of covers) {
+        if (chapter.covers.some(c => c.gen === item.gen)) throw new Error(`${chapterId}: repeated competency form ${item.gen}`);
+        if (item.diff.length !== 1 || item.diff[0] !== 3) throw new Error(`${chapterId}: competency forms must stay at CBSE D3`);
+        if (item.dp.length !== 1 || item.dp.some(i => !Number.isInteger(i) || i < 0 || i >= chapter.dotpoints.length)) {
+          throw new Error(`${chapterId}: competency form ${item.gen} does not match a current outcome`);
+        }
+      }
+      chapter.covers = [...chapter.covers, ...covers.map(item => ({ gen: item.gen, dp: [...item.dp], diff: [...item.diff] }))];
+    }
+  }
+}
+installOriginalCompetencyCovers();
 
 // Hardest-level forms, tranche 1 (curriculum-in-hardest-covers.js): one D3 form
 // for each Class X / Class XII dot point that had none. These are APPENDED —

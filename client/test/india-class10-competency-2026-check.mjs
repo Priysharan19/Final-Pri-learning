@@ -11,7 +11,21 @@ import { loadAllBanks, generateQuestion } from '../src/engine/generators/index.j
 import { checkAnswer } from '../src/engine/checker.js';
 import { inspect } from '../../server/test/selfcheck.mjs';
 import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
+import { CBSE_CLASS10_2026_27_CHAPTERS } from '../src/engine/ncert/class10-2026-27-production.js';
+import { CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE, CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS } from '../src/engine/curriculum-in-competency-covers.js';
 await loadAllBanks();
+assert.equal(CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.humanMathApproved, false);
+assert.equal(CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.mathReviewStatus, 'pending-independent');
+assert.equal(CBSE_CLASS10_ORIGINAL_COMPETENCY_PROVENANCE.boardApproved, false);
+for (const [chapterId, covers] of Object.entries(CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS)) {
+  const sourceChapter = CBSE_CLASS10_2026_27_CHAPTERS.find(ch => ch.id === chapterId);
+  const liveChapter = IN_CHAPTERS.find(ch => ch.id === chapterId);
+  assert.ok(sourceChapter && liveChapter);
+  for (const cover of covers) {
+    assert.ok(!sourceChapter.covers.some(x => x.gen === cover.gen), 'original additions do not falsely claim historical source review');
+    assert.ok(liveChapter.covers.some(x => x.gen === cover.gen && x.dp[0] === cover.dp[0] && x.diff[0] === 3), 'new practice reaches live syllabus independently');
+  }
+}
 
 const families = [
   { id: 'c10-ap-inverse-competency', family: 'original-cbse-x-2026-inverse-ap' },
