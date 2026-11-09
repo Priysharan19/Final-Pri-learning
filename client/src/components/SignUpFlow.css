@@ -70,7 +70,7 @@
 .signup-method-hint { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--ink-3); }
 .signup-social-wait { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
 .signup-social-wait p { margin: 0; color: var(--ink-2); }
-.signup-social-wait button { min-height: 36px; text-decoration: underline; text-underline-offset: 2px; }
+.signup-social-wait button { min-height: 44px; text-decoration: underline; text-underline-offset: 2px; }
 .signup-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-size: 13.5px; }
 .signup-error { margin-top: var(--space-4); }
 

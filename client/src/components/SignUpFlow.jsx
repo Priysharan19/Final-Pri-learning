@@ -496,10 +496,11 @@ export default function SignUpFlow({
               type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'} autoCapitalize="none" autoCorrect="off" spellCheck={false}
               autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
               placeholder={isSms ? '98765 43210' : 'you@example.com'}
-              aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
+              aria-invalid={!!error || undefined}
+              aria-describedby={[!isSms && 'signup-method-hint', error && errorId].filter(Boolean).join(' ') || undefined}
               onChange={e => { setDestination(e.target.value); setError(''); }} />
           </div>
-          {!isSms && <p className="signup-method-hint">{t('signup.methodHint')}</p>}
+          {!isSms && <p className="signup-method-hint" id="signup-method-hint">{t('signup.methodHint')}</p>}
           <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
             {busy === 'send' ? t('signup.sending') : t(isSms ? 'signup.continuePhone' : 'signup.continueEmail')}
           </button>
