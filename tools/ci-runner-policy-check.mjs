@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(`../.github/workflows/${name}`, import.meta.url), 'utf8');
 
@@ -51,6 +51,360 @@ assert.match(appHealth, /group:\s*pri-app-health-\$\{\{ github\.ref \}\}/,
   'Pri App Health Agent must group runs by ref');
 assert.match(appHealth, /cancel-in-progress:\s*\$\{\{ github\.ref != 'refs\/heads\/main' \}\}/,
   'Pri App Health Agent must not cancel an in-progress run on main');
+
+// Thirteen workflows that had no concurrency group (#748) now give pull-request
+// runs one group per pull request (github.ref is refs/pull/<n>/merge there), so a
+// newer push supersedes the queued or running check; every other run (a push, a
+// manual dispatch) is keyed by its own run id. A pull-request group can therefore
+// never cancel, or replace while pending, a run on main, and main runs never
+// replace each other. The block must be the file's ONLY concurrency key in any
+// literal form (a job-level one keyed on github.ref would bring the hazard back);
+// the triggers keep GitHub's default pull_request types (a merged pull request's
+// `closed` run has github.ref = refs/heads/main); and concurrency groups are
+// repository-wide and case-insensitive, so no other workflow may produce a group
+// with one of these prefixes, and a group this check cannot read fails closed.
+export const PR_SUPERSEDED_ONLY = Object.freeze([
+  ['kalp-01-design-system.yml', 'kalp-01'],
+  ['kalp-02-information-architecture.yml', 'kalp-02'],
+  ['kalp-03-onboarding-profile.yml', 'kalp-03'],
+  ['kalp-04-home-command-centre.yml', 'kalp-04'],
+  ['pri-reason.yml', 'pri-reason'],
+  ['promotions.yml', 'promotions'],
+  ['ink-physical-evidence.yml', 'ink-physical-evidence'],
+  ['ink-physical-study.yml', 'ink-physical-study'],
+  ['ink-production-evidence-capture.yml', 'ink-production-evidence-capture'],
+  ['ink-structural-v4-candidate.yml', 'ink-structural-v4-candidate'],
+  ['ink-structural-v4-contextual-glyphs.yml', 'ink-structural-v4-contextual-glyphs'],
+  ['ink-structural-v4-group-relations.yml', 'ink-structural-v4-group-relations'],
+  ['ink-writer-generalization.yml', 'ink-writer-generalization']
+]);
+// Any mention of a key, block or one-line, quoted or not, in a flow mapping too.
+const yamlKey = name => new RegExp(`(^|[{,\\s])["']?${name}["']?\\s*:`, 'gm');
+const CONCURRENCY_KEY = yamlKey('concurrency');
+const TYPES_KEY = yamlKey('types');
+// Every uses: key, block or flow, with the rest of its line.
+const USES_KEY = /(^|[{,\s])["']?uses["']?[ \t]*:([^\n]*)/gm;
+// Plain YAML only. The checks below read a workflow's text with regular expressions, and YAML can
+// spell a key or a value in ways those cannot follow: double-quoted escapes and line continuations,
+// explicit "? key" entries, anchors, aliases, tags and merge keys. GitHub decodes them, so a
+// workflow that uses any of them OUTSIDE its block scalars (run: scripts and the like, which YAML
+// reads as plain text) is not read at all: a pinned workflow is refused and any other workflow's
+// group is unreadable, so both fail closed. Comments are kept in the structure, so nothing after a
+// quoted # can hide; a block scalar is blanked from the column of the key that owns it.
+export function structureText(source) {
+  const out = [];
+  let blockIndent = -1;
+  for (const line of source.split('\n')) {
+    const indent = line.match(/^ */)[0].length;
+    if (blockIndent >= 0) {
+      if (line.trim() === '' || indent > blockIndent) { out.push(''); continue; }
+      blockIndent = -1;
+    }
+    const text = line.replace(/\$\{\{.*?\}\}/g, 'EXPR');
+    out.push(text);
+    const bare = text.replace(/[ \t]+#.*$/, '');
+    const keyed = bare.match(/^([ \t]*(?:-[ \t]+)*)[^\s#][^\n]*:[ \t]*[|>][-+0-9]*[ \t]*$/);
+    const itemed = bare.match(/^([ \t]*(?:-[ \t]+)*)-[ \t]+[|>][-+0-9]*[ \t]*$/);
+    if (keyed) blockIndent = keyed[1].length;
+    else if (itemed) blockIndent = itemed[1].length;
+  }
+  return out.join('\n');
+}
+const NON_CANONICAL = Object.freeze([
+  [/\\/, 'a backslash (an escape or a line continuation)'],
+  [/^[ \t]*(?:-[ \t]+)*\?(?:[ \t]|$)|[{,[][ \t]*\?[ \t]/m, 'an explicit key (? key)'],
+  [/(?:^[ \t]*(?:-[ \t]+)*|:[ \t]+|[{,[][ \t]*)[&*][^\s,[\]{}]/m, 'an anchor or alias'],
+  [/(?:^[ \t]*(?:-[ \t]+)*|:[ \t]+|[{,[][ \t]*)![^\s=]/m, 'a tag'],
+  [/(^|[\s{,])<<[ \t]*:/m, 'a merge key (<<:)']
+]);
+/** The YAML forms outside block scalars that this check cannot read (empty for plain YAML). */
+export function nonCanonical(source) {
+  const text = structureText(source);
+  return NON_CANONICAL.filter(([pattern]) => pattern.test(text)).map(([, what]) => what);
+}
+/** Why a workflow's concurrency is not the pull-request-only pattern (empty when it is). */
+export function prSupersededOnlyProblems(source, prefix) {
+  if (source.includes('\r')) return ['the workflow must use LF line endings'];
+  const odd = nonCanonical(source);
+  if (odd.length) return [`a pinned workflow must be plain YAML: ${odd.join(', ')} outside a run: script cannot be read by this check, so it fails closed`];
+  const keys = [...source.matchAll(CONCURRENCY_KEY)].length;
+  const lines = source.split('\n');
+  const at = lines.findIndex(line => line === 'concurrency:');
+  if (keys !== 1 || at < 0) return [`needs exactly one concurrency key, a top-level block written "concurrency:" alone on its line (found ${keys} concurrency key${keys === 1 ? '' : 's'}${at < 0 ? ', none of them that block' : ''})`];
+  const block = [];
+  for (let i = at + 1; i < lines.length && !/^\S/.test(lines[i]); i += 1) block.push(lines[i]);
+  while (block.length && block.at(-1) === '') block.pop();
+  const group = `  group: ${prefix}-\${{ github.event_name == 'pull_request' && github.ref || github.run_id }}`;
+  const cancel = "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}";
+  const problems = [];
+  for (const line of block) {
+    if (line !== group && line !== cancel && !/^  # /.test(line)) problems.push(`unexpected line in the concurrency block: ${JSON.stringify(line)} (only comments, the group and cancel-in-progress, two-space indented)`);
+  }
+  if (block.filter(line => line === group).length !== 1) problems.push(`group must be exactly "${group.trim()}": only a pull_request run is keyed by its ref; every other run by its own run id`);
+  if (block.filter(line => line === cancel).length !== 1) problems.push(`cancel-in-progress must be exactly "${cancel.trim()}"`);
+  const comment = block.filter(line => /^  # /.test(line)).map(line => line.slice(4)).join(' ');
+  if (!/one group per pull request/.test(comment) || /one group per branch/.test(comment)) problems.push('the comment must say "one group per pull request" (github.ref of a pull_request run is refs/pull/<n>/merge, not the branch)');
+  // A reusable workflow (a job's uses: …/.github/workflows/…, in this repository or another) brings
+  // its own concurrency group into the run, outside this file's guard: the pinned workflows call
+  // none. A step's action (./.github/actions/…, owner/action@sha) carries no concurrency. A uses:
+  // value this cannot read on its own line fails closed.
+  for (const match of source.matchAll(USES_KEY)) {
+    const raw = match[2].replace(/[ \t]+#.*$/, '').trim();
+    const value = raw.replace(/^(["'])(.*?)\1.*$/, '$2').replace(/[,}\]].*$/, '').trim();
+    if (!value || /^[|>&*!]/.test(value)) problems.push(`a uses: value this check cannot read (${JSON.stringify(raw || 'nothing on its line')}) fails closed`);
+    else if (/\.github\/workflows\//i.test(value)) problems.push(`a pinned workflow must not call a reusable workflow (uses: ${value}): its own concurrency group would escape this check`);
+  }
+  // Callable, a pinned workflow would run inside another workflow's run, with that run's event and ref.
+  if (/\bworkflow_call\b/.test(source.split('\n').filter(line => !/^\s*#/.test(line)).join('\n'))) problems.push('a pinned workflow must not be callable (on: workflow_call): a caller\'s pull_request run would bring its own ref into this group');
+  // A merged pull request's `closed` run has github.ref = refs/heads/main: it would share one group
+  // with every other such run. The pattern holds only with GitHub's default pull_request types.
+  if ([...source.matchAll(TYPES_KEY)].length) problems.push('the triggers must keep GitHub\'s default pull_request types (no types: key): a closed pull request runs with github.ref = refs/heads/main');
+  return problems;
+}
+/**
+ * Every concurrency group a workflow can produce, lower-cased with quotes removed and
+ * ${{ github.workflow }} resolved from name:. A group this cannot read as a plain one-line
+ * value (a block scalar, an anchor, alias or tag, a value on the next line, format()) is
+ * returned as `unreadable` rather than guessed at.
+ */
+export function groupLiterals(source) {
+  const unreadable = [...nonCanonical(source)];
+  // name: a plain value up to a " #" comment, or a quoted value.
+  const nameRaw = (source.match(/^name:[ \t]*(.*)$/m) || [])[1];
+  const nameText = nameRaw === undefined ? '' : nameRaw.trim();
+  const quotedName = nameText.match(/^(["'])(.*?)\1/);
+  const name = quotedName ? quotedName[2] : nameText.replace(/\s+#.*$/, '').trim();
+  const EXPR = /^\$\{\{\s*github\.workflow\s*\}\}/;
+  // In a reusable workflow, github.workflow is the CALLING workflow's name: it cannot be read here.
+  const reusable = /(^|[{,\s])["']?workflow_call["']?\s*:|^on:\s*\[?[^\n]*\bworkflow_call\b/m.test(source);
+  const readable = value => value && !/^[>|{&!*]/.test(value) && !/\bformat\s*\(/.test(value)
+    // A group that starts with an expression is readable only when it is github.workflow and the name is.
+    && (!/^\$\{\{/.test(value) || (EXPR.test(value) && name && !/^[>|&!*]/.test(name) && !reusable))
+    && !(reusable && /\$\{\{\s*github\.workflow\s*\}\}/.test(value));
+  const values = [];
+  const take = raw => {
+    const value = String(raw || '').trim().replace(/^(["'])(.*)\1$/, '$2').replace(/^["']/, '');
+    // A flow sequence is never a concurrency group (GitHub needs a string): it is a
+    // matrix key that happens to be called group (ci.yml's browser groups).
+    if (value.startsWith('[')) return;
+    if (!readable(value)) { unreadable.push(value || '(empty)'); return; }
+    values.push(value.replace(/\$\{\{\s*github\.workflow\s*\}\}/g, name).toLowerCase());
+  };
+  // A value runs to the end of the line or to a " #" comment; ${{ … }} is kept whole.
+  const VALUE = String.raw`((?:\$\{\{[^}]*\}\}|[^#\n])*)`;
+  for (const m of source.matchAll(new RegExp(String.raw`^[ \t]*["']?group["']?[ \t]*:[ \t]*` + VALUE, 'gm'))) take(m[1]);
+  // A group inside a flow mapping, wherever the mapping starts; its value ends at , or } outside ${{ … }}.
+  for (const m of source.matchAll(/[{,][ \t]*["']?group["']?[ \t]*:[ \t]*((?:\$\{\{[^}]*\}\}|[^,}\n])*)/g)) take(m[1]);
+  const lines = source.split('\n');
+  for (const [index, line] of lines.entries()) {
+    const m = line.match(new RegExp(String.raw`(?:^|[{, \t])["']?concurrency["']?[ \t]*:[ \t]*` + VALUE));
+    if (!m) continue;
+    const value = m[1].trim();
+    if (value.startsWith('{')) continue; // its group is read by the flow-mapping pass above
+    if (value) { take(value); continue; }
+    // No value on the key's line: the next content line is either the block (a key: line, read
+    // above, or a flow mapping) or a plain scalar continuing the value, which is the group itself.
+    const indent = line.match(/^[ \t]*/)[0].length;
+    const next = lines.slice(index + 1).find(l => l.trim() && !l.trim().startsWith('#'));
+    if (!next || next.match(/^[ \t]*/)[0].length <= indent) { unreadable.push('(empty)'); continue; }
+    const content = next.trim();
+    if (/^["']?[A-Za-z0-9_-]+["']?[ \t]*:/.test(content) || content.startsWith('{')) continue;
+    take(content.replace(/\s+#.*$/, ''));
+  }
+  return { values, unreadable };
+}
+/** The pinned prefix another workflow's group could collide with ({ prefix, literal }), or null. */
+export function prefixCollision(source, prefixes) {
+  const { values, unreadable } = groupLiterals(source);
+  if (unreadable.length) return { prefix: '(unreadable)', literal: unreadable[0] };
+  for (const value of values) {
+    const hit = prefixes.find(prefix => value.startsWith(`${prefix.toLowerCase()}-`));
+    if (hit) return { prefix: hit, literal: value };
+    // The literal text may be a shorter piece of a pinned "<prefix>-" that the first expression
+    // completes (ink-${{ matrix.lane }}-… can become ink-physical-evidence-…). Only an expression
+    // whose expansion is known can rule that out: github.ref starts "refs/", run ids are digits,
+    // SHAs from GitHub are hex. Anything else (matrix, inputs, even one named like a SHA, since a
+    // dispatch input is free text; vars, head_ref…) fails closed.
+    const at = value.indexOf('${{');
+    if (at < 0) continue;
+    const head = value.slice(0, at);
+    const expr = (value.slice(at).match(/^\$\{\{\s*([^}]*?)\s*\}\}/) || [])[1] || '';
+    for (const prefix of prefixes) {
+      const pinned = `${prefix.toLowerCase()}-`;
+      if (!pinned.startsWith(head) || pinned === head) continue;
+      const next = pinned.slice(head.length);
+      const known = /^github\.ref$/.test(expr) ? next.startsWith('refs/') || 'refs/'.startsWith(next)
+        : /^github\.(run_id|run_number|run_attempt)$/.test(expr) ? /^[0-9]/.test(next)
+          : /^(github\.sha|github\.event\.workflow_run\.head_sha)(\s*\|\|\s*github\.sha)*$/.test(expr) ? /^[0-9a-f]/.test(next)
+            : null;
+      if (known === null || known === true) return { prefix, literal: value, completes: true };
+    }
+  }
+  return null;
+}
+{
+  const prefixes = PR_SUPERSEDED_ONLY.map(([, prefix]) => prefix);
+  assert.equal(new Set(prefixes.map(p => p.toLowerCase())).size, prefixes.length, 'the pull-request-only concurrency prefixes are distinct');
+  for (const a of prefixes) for (const b of prefixes) if (a !== b) assert.ok(!`${b}-`.toLowerCase().startsWith(`${a}-`.toLowerCase()), `the prefix ${b} does not start with ${a}-, so their groups can never meet`);
+  for (const [file, prefix] of PR_SUPERSEDED_ONLY) {
+    assert.deepEqual(prSupersededOnlyProblems(read(file), prefix), [], `${file}: pull-request runs share one group per pull request; runs on main and dispatched runs are never cancelled or replaced`);
+  }
+  // Repository-wide, case-insensitive groups: no other workflow produces a group with one of these prefixes.
+  const workflowDir = new URL('../.github/workflows/', import.meta.url);
+  const pinned = new Set(PR_SUPERSEDED_ONLY.map(([file]) => file));
+  for (const name of readdirSync(workflowDir).filter(n => /\.ya?ml$/.test(n) && !pinned.has(n))) {
+    const hit = prefixCollision(read(name), prefixes);
+    assert.equal(hit, null, hit?.prefix === '(unreadable)'
+      ? `${name}: its concurrency group "${hit.literal}" cannot be read; write it as a plain one-line value so it can be checked against the pull-request-only prefixes`
+      : hit?.completes
+        ? `${name}: its concurrency group "${hit.literal}" could expand into the group of the pull-request-only workflow "${hit.prefix}" (an expression completes its prefix); start the group with text no pinned prefix begins with`
+        : `${name}: its concurrency group "${hit?.literal}" would share a group with the pull-request-only workflow "${hit?.prefix}"`);
+  }
+  // Mutation controls: the dangerous variants are refused, not merely absent today.
+  const good = read(PR_SUPERSEDED_ONLY[6][0]); // ink-physical-evidence.yml: it also runs on push to main
+  const prefix = PR_SUPERSEDED_ONLY[6][1];
+  const job = (s, text) => s.replace(/\njobs:\n(  [A-Za-z0-9_-]+:\n)/, `\njobs:\n$1${text}`);
+  for (const [name, mutate] of [
+    ['a group keyed on github.ref for every event (a pending main run would be replaced by the next)', s => s.replace(/  group: .*\n/, `  group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a group keyed on the branch name (github.head_ref)', s => s.replace(/  group: .*\n/, `  group: ${prefix}-\${{ github.head_ref || github.run_id }}\n`)],
+    ['cancel-in-progress for every event', s => s.replace(/  cancel-in-progress: .*\n/, '  cancel-in-progress: true\n')],
+    ['no run-id fallback', s => s.replace(/ \|\| github\.run_id/, '')],
+    ['the "one group per branch" wording', s => s.replace('one group per pull request', 'one group per branch')],
+    ['a third setting in the block', s => s.replace(/(  cancel-in-progress: .*\n)/, '$1  queue: max\n')],
+    ['a continuation line in the block', s => s.replace(/(  group: .*)\n/, '$1\n    || true\n')],
+    ['a pull_request trigger with type closed', s => s.replace(/pull_request:\n/, 'pull_request:\n    types: [opened, synchronize, closed]\n')],
+    ['a types list with a commented closed item', s => s.replace(/pull_request:\n/, 'pull_request:\n    types:\n      - closed  # post-merge\n')],
+    ['a quoted closed type', s => s.replace(/pull_request:\n/, "pull_request:\n    types:\n      - 'closed'\n")],
+    ['a types flow list split over lines', s => s.replace(/pull_request:\n/, 'pull_request:\n    types: [opened,\n      closed]\n')],
+    ['a types flow list on the next line', s => s.replace(/pull_request:\n/, 'pull_request:\n    types:\n      [closed]\n')],
+    ['a pull_request flow mapping with types', s => s.replace(/  pull_request:\n/, '  pull_request: { types: [closed] }\n  pull_request_review:\n')],
+    ['CRLF line endings', s => s.replace(/\n/g, '\r\n')],
+    ['a job-level block', s => job(s, `    concurrency:\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level one-line form', s => job(s, `    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level flow form', s => job(s, `    concurrency: { group: "${prefix}-\${{ github.ref }}", cancel-in-progress: true }\n`)],
+    ['a job-level block with a trailing comment', s => job(s, `    concurrency: # main runs\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level block with an anchor', s => job(s, `    concurrency: &jc\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level quoted key', s => job(s, `    "concurrency":\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a top-level key with a trailing comment', s => s.replace(/^concurrency:$/m, 'concurrency: # pinned')],
+    ['a top-level one-line form instead of the block', s => s.replace(/^concurrency:\n(?:  .*\n)+/m, `concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job that calls a local reusable workflow', s => job(s, `    uses: ./.github/workflows/shared.yml\n`)],
+    ['a job that calls a reusable workflow in another repository', s => job(s, `    uses: example-org/shared-workflows/.github/workflows/report.yml@0123456789abcdef0123456789abcdef01234567 # v2.1.0\n`)],
+    ['a job that calls this repository\'s reusable workflow by its full path', s => job(s, `    uses: Priysharan19/Final-Pri-learning/.github/workflows/promotions-report.yml@0123456789abcdef0123456789abcdef01234567\n`)],
+    ['a quoted reusable-workflow call', s => job(s, `    uses: 'example-org/shared/.github/workflows/report.yml@v1'\n`)],
+    ['a reusable-workflow call in a flow mapping', s => s.replace(/\njobs:\n/, '\njobs:\n  report: { uses: example-org/shared/.github/workflows/report.yml@v1, secrets: inherit }\n')],
+    ['a uses: value on the next line', s => job(s, `    uses:\n      example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a uses: value as a block scalar', s => job(s, `    uses: >-\n      example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an on: workflow_call trigger', s => s.replace(/^on:\n/m, 'on:\n  workflow_call:\n')],
+    ['a quoted workflow_call trigger', s => s.replace(/^on:\n/m, 'on:\n  "workflow_call": {}\n')],
+    // Sixth review: forms YAML decodes into the ones refused above.
+    ['a uses key written with an escape', s => job(s, `    "u\\x73es": example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a reusable-workflow path with an escaped slash', s => job(s, `    uses: "example-org/shared/.github\\x2Fworkflows/report.yml@v1"\n`)],
+    ['a reusable-workflow path with a \\/ escape', s => job(s, `    uses: "example-org/shared/.github\\/workflows/report.yml@v1"\n`)],
+    ['a reusable-workflow path split by a double-quoted line continuation', s => job(s, `    uses: "example-org/shared/.github/\\\n      workflows/report.yml@v1"\n`)],
+    ['an explicit ? uses key', s => job(s, `    ? uses\n    : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a workflow_call trigger written with an escape', s => s.replace(/^on:\n/m, 'on:\n  "workflow\\x5Fcall": {}\n')],
+    ['a job-level concurrency key written with an escape', s => job(s, `    "con\\x63urrency":\n      group: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level concurrency key written with a \\u escape', s => job(s, `    "con\\u0063urrency": ${prefix}-\${{ github.ref }}\n`)],
+    ['an explicit ? concurrency key', s => job(s, `    ? concurrency\n    : ${prefix}-\${{ github.ref }}\n`)],
+    ['a types key written with an escape', s => s.replace(/pull_request:\n/, 'pull_request:\n    "t\\x79pes": [closed]\n')],
+    ['an explicit ? types key', s => s.replace(/pull_request:\n/, 'pull_request:\n    ? types\n    : [closed]\n')],
+    ['a key written as an alias', s => job(s, `    env: { K: &k uses }\n    *k : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    // Seventh review: a backslash ending a comment or a plain value, explicit keys with comments or block-scalar keys, tags and anchors on keys.
+    ['a job-level concurrency after a comment ending in a backslash', s => job(s, `    # see C:\\\n    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a job-level concurrency after a plain value ending in a backslash', s => job(s, `    env:\n      P: C:\\\n    concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['a reusable-workflow call after a comment ending in a backslash', s => job(s, `    # C:\\\n    uses: example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an explicit ? concurrency key with a comment', s => job(s, `    ? concurrency # c\n    : ${prefix}-\${{ github.ref }}\n`)],
+    ['an explicit ? uses key with a comment line before its value', s => job(s, `    ? uses\n    # note\n    : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an explicit block-scalar uses key', s => job(s, `    ? |-\n      uses\n    : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a tag on a job-level concurrency key', s => job(s, `    !!str concurrency: ${prefix}-\${{ github.ref }}\n`)],
+    ['an anchor on a uses key', s => job(s, `    &u uses: example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['an alias key whose anchor name starts with a dot', s => job(s, `    env: { K: &.k uses }\n    *.k : example-org/shared/.github/workflows/report.yml@v1\n`)],
+    ['a merge key', s => job(s, `    <<: { concurrency: ${prefix}-\${{ github.ref }} }\n`)]
+  ]) {
+    const mutated = mutate(good);
+    assert.notEqual(mutated, good, `the mutation "${name}" applies`);
+    assert.ok(prSupersededOnlyProblems(mutated, prefix).length > 0, `the policy refuses ${name}`);
+  }
+  // A step's own action carries no concurrency: a local action is not a reusable workflow.
+  const withLocalAction = good.replace(/(\n      - uses: actions\/setup-node@[^\n]*\n)/, '$1      - uses: ./.github/actions/setup-pri\n');
+  assert.notEqual(withLocalAction, good, 'the local-action control applies');
+  assert.deepEqual(prSupersededOnlyProblems(withLocalAction, prefix), [], 'a step that uses a local action (./.github/actions/…) is not a reusable-workflow call');
+  // Block scalars are text to YAML and are skipped; the keys beside them are not.
+  assert.deepEqual(nonCanonical('      - run: |\n          echo "a && b" \\\n            *.md\n        env: { A: 1 }\n'), [], 'a run: script may hold backslashes, && and globs');
+  assert.deepEqual(nonCanonical('      - run: |\n          echo hi\n        env: { A: *alias }\n'), ['an anchor or alias'], 'a key beside a run: script, at the column of run:, is still read');
+  assert.deepEqual(nonCanonical('x: { a: "x #", b: *alias }\n'), ['an anchor or alias'], 'a quoted # never hides the rest of a flow mapping');
+  assert.deepEqual(nonCanonical("on:\n  schedule:\n    - cron: '*/5 * * * *'\njobs:\n  a:\n    if: github.event_name == 'push' && github.ref == 'refs/heads/main'\n    steps:\n      - run: npm ci && npm test\n"), [], 'quoted cron stars and && inside a value are plain text');
+  for (const [name, other] of [
+    ['an unquoted group', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }}\n`],
+    ['a single-quoted group', `name: Other\nconcurrency:\n  group: '${prefix}-\${{ github.ref }}'\n`],
+    ['a double-quoted group', `name: Other\nconcurrency:\n  group: "${prefix}-\${{ github.ref }}"\n`],
+    ['a group differing only in case', `name: Other\nconcurrency:\n  group: ${prefix.toUpperCase()}-\${{ github.ref }}\n`],
+    ['a one-line concurrency', `name: Other\nconcurrency: ${prefix}-\${{ github.ref }}\n`],
+    ['a job-level one-line concurrency', `name: Other\njobs:\n  a:\n    concurrency: ${prefix}-\${{ github.ref }}\n`],
+    ['a group built from github.workflow', `name: ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a group built from a quoted github.workflow name', `name: "${prefix}"\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a flow-mapping concurrency', `name: Other\nconcurrency: { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`],
+    ['a job-level flow-mapping concurrency', `name: Other\njobs:\n  a:\n    concurrency: { group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['a flow mapping on the line after its key', `name: Other\nconcurrency:\n  { group: ${prefix}-\${{ github.ref }}, cancel-in-progress: true }\n`],
+    ['a one-line concurrency with a trailing comment', `name: Other\nconcurrency: ${prefix}-\${{ github.ref }}  # one run per ref\n`],
+    ['a job-level quoted one-line concurrency with a trailing comment', `name: Other\njobs:\n  a:\n    concurrency: '${prefix}-\${{ github.ref }}' # note\n`],
+    ['a group with a trailing comment', `name: Other\nconcurrency:\n  group: ${prefix}-\${{ github.ref }} # note\n`],
+    ['a concurrency value on the next line', `name: Other\nconcurrency:\n  ${prefix}-\${{ github.ref }}\n`],
+    ['a flow-mapping group built from github.workflow', `name: ${prefix}\nconcurrency: { group: "\${{ github.workflow }}-\${{ github.ref }}" }\n`],
+    ['a github.workflow group whose name: carries a comment', `name: ${prefix} # copied\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`]
+  ]) {
+    assert.ok(prefixCollision(other, prefixes)?.prefix === prefix, `another workflow cannot share a pinned group through ${name}`);
+  }
+  for (const [name, other] of [
+    ['a folded block-scalar group', `name: Other\nconcurrency:\n  group: >-\n    ${prefix}-\${{ github.ref }}\n`],
+    ['a literal block-scalar group', `name: Other\nconcurrency:\n  group: |-\n    ${prefix}-\${{ github.ref }}\n`],
+    ['a group value on the next line', `name: Other\nconcurrency:\n  group:\n    ${prefix}-\${{ github.ref }}\n`],
+    ['an anchored group', `name: Other\nconcurrency:\n  group: &g ${prefix}-\${{ github.ref }}\n`],
+    ['a tagged group', `name: Other\nconcurrency:\n  group: !!str ${prefix}-\${{ github.ref }}\n`],
+    ['a group built with format()', `name: Other\nconcurrency:\n  group: \${{ format('{0}-{1}', '${prefix}', github.ref) }}\n`],
+    ['a github.workflow group with an unreadable name', `name: >-\n  ${prefix}\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a group starting with another expression', `name: Other\nconcurrency:\n  group: \${{ matrix.lane }}-\${{ github.ref }}\n`],
+    ['a quoted group starting with another expression', `name: Other\nconcurrency:\n  group: '\${{ matrix.lane }}-\${{ github.ref }}'\n`],
+    ['a github.workflow group in a reusable workflow (the caller names it)', `name: Shared\non:\n  workflow_call:\nconcurrency:\n  group: \${{ github.workflow }}-\${{ github.ref }}\n`],
+    ['a concurrency key with nothing under it', `name: Other\nconcurrency:\njobs: {}\n`],
+    ['a concurrency key written as an alias', `name: Other\nenv: { K: &c concurrency }\n*c : ${prefix}-\${{ github.ref }}\n`],
+    // Sixth and seventh reviews: forms GitHub decodes but a regular expression cannot follow are not read at all.
+    ['a group with an escaped hyphen', `name: Other\nconcurrency:\n  group: "${prefix}\\x2D\${{ github.ref }}"\n`],
+    ['a group split by a double-quoted line continuation', `name: Other\nconcurrency:\n  group: "ink-\\\n    physical-evidence-\${{ github.ref }}"\n`],
+    ['a group key written with an escape', `name: Other\nconcurrency:\n  "gr\\x6Fup": ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit ? group key', `name: Other\nconcurrency:\n  ? group\n  : ${prefix}-\${{ github.ref }}\n`],
+    ['a one-line concurrency key written with an escape', `name: Other\n"con\\x63urrency": ${prefix}-\${{ github.ref }}\n`],
+    ['a group written with a \\U escape', `name: Other\nconcurrency:\n  group: "${prefix}\\U0000002D\${{ github.ref }}"\n`],
+    ['a group key after a comment that ends in a backslash', `name: Other\nconcurrency:\n  # see C:\\\n  group: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit ? concurrency key with a comment', `name: Other\n? concurrency # c\n: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit key indicator alone on its line', `name: Other\n?\n  concurrency\n: ${prefix}-\${{ github.ref }}\n`],
+    ['an explicit block-scalar key', `name: Other\nconcurrency:\n  ? |-\n    group\n  : ${prefix}-\${{ github.ref }}\n`],
+    ['a tag on the group key after another key', `name: Other\nconcurrency:\n  cancel-in-progress: false\n  !!str group: '${prefix}-\${{ github.ref }}'\n`],
+    ['an anchor on the group key after another key', `name: Other\nconcurrency:\n  cancel-in-progress: false\n  &g group: ${prefix}-\${{ github.ref }}\n`],
+    ['an anchor on the group key in a flow mapping', `name: Other\nconcurrency: { &a group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['a tag on the group key in a flow mapping', `name: Other\nconcurrency: { !!str group: '${prefix}-\${{ github.ref }}' }\n`],
+    ['an explicit group key in a flow mapping', `name: Other\nconcurrency: { ? group : '${prefix}-\${{ github.ref }}' }\n`],
+    ['an alias key whose anchor name starts with a dot', `name: Other\nenv: { K: &.c concurrency }\n*.c : ${prefix}-\${{ github.ref }}\n`],
+    ['a merge key bringing in a concurrency mapping', `name: Other\nx: &m { concurrency: ${prefix}-\${{ github.ref }} }\njobs:\n  a:\n    <<: *m\n`]
+  ]) {
+    assert.equal(prefixCollision(other, prefixes)?.prefix, '(unreadable)', `a group the check cannot read fails closed: ${name}`);
+  }
+  assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${prefix}x-\${{ github.ref }}\n`, prefixes), null, 'a different prefix that merely starts the same is not a collision');
+  // An expression that can complete a pinned prefix fails closed; a known expansion that cannot does not.
+  for (const [name, group] of [
+    ['a matrix value completing ink-physical-evidence', 'ink-${{ matrix.lane }}-${{ github.ref }}'],
+    ['an input completing a kalp gate', 'kalp-${{ inputs.gate }}-${{ github.ref }}'],
+    ['a variable completing pri-reason', 'pri-${{ vars.lane }}-${{ github.ref }}'],
+    ['github.head_ref after a piece of a prefix', 'promo${{ github.head_ref }}'],
+    ['a dispatch input named like a SHA (free text, not hex)', 'pri-${{ inputs.release_sha }}'],
+    ['a SHA input behind the workflow_run SHA', 'pri-${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}']
+  ]) assert.ok(prefixCollision(`name: Other\nconcurrency:\n  group: ${group}\n`, prefixes)?.completes === true, `another workflow cannot reach a pinned group through ${name}`);
+  for (const [name, group] of [
+    ['ink-structural-v4-${{ github.ref }} (a real workflow: refs/ never completes -candidate-)', 'ink-structural-v4-${{ github.ref }}'],
+    ['a run id after a piece of a prefix', 'ink-physical-${{ github.run_id }}'],
+    ['a SHA after a piece of a prefix', 'pri-${{ github.sha }}']
+  ]) assert.equal(prefixCollision(`name: Other\nconcurrency:\n  group: ${group}\n`, prefixes), null, `a known expansion that cannot complete a pinned prefix passes: ${name}`);
+}
 
 assert.match(hybrid, /pull_request:\s*\n\s+paths:/,
   'Ink Hybrid must be path-scoped on pull requests');
