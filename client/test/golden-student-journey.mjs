@@ -128,15 +128,24 @@ async function snapshot(page, origin) {
   const row = page.locator('.syl-table tbody tr').filter({ hasText: TOPIC_NAME }).first();
   assert.equal(await row.count(), 1, 'Progress must contain the practised Finding the Unknown row');
   const progressText = clean(await row.textContent());
-  const attemptMatch = progressText.match(/(\d+) attempt(?:s)?/i);
-  const masteryMatch = progressText.match(/(\d+)% mastery/i);
+  // India Progress (IndiaProgress.jsx): attempts and correct are columns (and
+  // data-attempts / data-correct); accuracy is a percentage once there are
+  // enough answers, and says "Too few answers" until then. It shows no
+  // separate "mastery", so mastery here is that accuracy, or null while the
+  // row honestly says there are too few answers.
+  const attempts = await row.getAttribute('data-attempts');
+  const correct = await row.getAttribute('data-correct');
+  const attemptMatch = /^\d+$/.test(String(attempts)) && /^\d+$/.test(String(correct)) ? [null, attempts] : null;
+  const accuracyCell = clean(await row.locator('td').nth(3).textContent());
+  const accuracy = accuracyCell.match(/^(\d+)%$/);
+  const masteryMatch = accuracy || (accuracyCell === 'Too few answers' ? [null, null] : null);
   assert.ok(attemptMatch, 'Progress row must expose a concrete attempt count: ' + progressText);
-  assert.ok(masteryMatch, 'Progress row must expose mastery after repeated practice: ' + progressText);
+  assert.ok(masteryMatch, 'Progress row must expose accuracy, or say there are too few answers: ' + progressText);
 
   return {
     history,
     topicAttempts: Number(attemptMatch[1]),
-    mastery: Number(masteryMatch[1]),
+    mastery: masteryMatch[1] === null ? null : Number(masteryMatch[1]),
     progressText
   };
 }
@@ -217,7 +226,7 @@ try {
   const beforeRestart = await snapshot(page, server.origin);
   assert.equal(beforeRestart.history, 3);
   assert.equal(beforeRestart.topicAttempts, 3);
-  assert.ok(beforeRestart.mastery >= 0 && beforeRestart.mastery <= 100);
+  assert.ok(beforeRestart.mastery === null || (beforeRestart.mastery >= 0 && beforeRestart.mastery <= 100));
 
   const unfinished = await typedQuestion(page, server.origin, { navigate: true });
   await unfinished.input.fill(DRAFT);
@@ -373,7 +382,7 @@ try {
   const finalState = await snapshot(page, server.origin);
   assert.equal(finalState.history, 5);
   assert.equal(finalState.topicAttempts, 5, 'Progress must count every topic attempt: ' + JSON.stringify(await attemptRows(page)));
-  assert.ok(finalState.mastery >= 0 && finalState.mastery <= 100);
+  assert.ok(finalState.mastery === null || (finalState.mastery >= 0 && finalState.mastery <= 100));
   const rows = await attemptRows(page);
   assert.ok(rows.length === 5 && rows.every(a => typeof a.server === 'string') && new Set(rows.map(a => a.server)).size === 5,
     'five attempt rows, each one a distinct server attempt: ' + JSON.stringify(rows));
