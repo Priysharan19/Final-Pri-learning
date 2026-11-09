@@ -192,7 +192,11 @@ export const ON_DEMAND = [
   // 16 kB of Australian exam questions; a profile that holds the NSW course has
   // it from its first paper on, and backend.js already charges an unreachable
   // fetch to that one paper rather than every paper after it.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // The Class 7 and Class 8 hardest-level (D3) forms are the same case: each
+  // is one class's bank in the registry (generators/index.js), and warmScope()
+  // loads it at sign-in for that class through the generator-to-bank map, so a
+  // Class 7 or 8 student is offline-ready for it and nobody else warms ~157 kB.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|class7-hardest|class7-part2-hardest|class8-hardest|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
   // The source-audited NCERT Class 7–9 production banks: each class's
   // generators, topper notes, worked examples and answer audits. They used to
