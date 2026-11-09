@@ -16,7 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
-import { markGraphSketch, readFeatureSet } from '../../client/src/engine/graphFeatures.js';
+import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -159,6 +159,25 @@ export function examWorkingStage(q, working, grid, stage) {
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }
   return response;
+}
+
+/**
+ * A sketch inside the working (q.answer.sketchMethod = { spec, features, marks,
+ * label }). Method credit only: off unless the marking policy turns method
+ * marks on (D12), never for a right answer (it already has full marks), and
+ * capped one below full marks like every method mark.
+ */
+export function sketchWorkingStage(q, sketch, grid, response, policy) {
+  const rule = q.answer?.sketchMethod;
+  if (!rule || !policyOf({ policy }).methodMarks || response.correct || response.unanswered) return response;
+  const set = readFeatureSet(sketch);
+  if (!set) return response;
+  let credit;
+  try { credit = sketchMethodCredit(rule.spec, set, rule); } catch { return response; }
+  const marks = Number(grid.correct);
+  const awarded = Math.max(0, Math.min(marks - 1, credit.awarded));
+  if (awarded <= (response.awarded || 0)) return response;
+  return { ...response, awarded, partial: { awarded, note: credit.label ? `Method: ${credit.label}.` : 'Method: the sketch in your working.' }, markingScheme: 'step-marked' };
 }
 
 /**

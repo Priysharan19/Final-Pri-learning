@@ -170,3 +170,48 @@ console.log(`graph-feature sweep: ${falseCredit} false credits in ${cases} pertu
 
 console.log(`GRAPH FEATURES: ${pass}/${pass + fail}`);
 if (fail) process.exit(1);
+
+// ── Group 4: per-feature verdicts, reveal only after resolution, sketches in working ──
+{
+  const { sketchVerdicts, sketchMethodCredit, fromConfirmedSketch, overlaySvg } = await import('../src/engine/graphFeatures.js');
+  const { sketchWorkingStage } = await import('../../server/platform/markerOps.js');
+  let p2 = 0, f2 = 0;
+  const ok2 = (c, l) => { if (c) p2 += 1; else { f2 += 1; console.error('FAIL', l); } };
+  const spec = { expression: 'x^2-4*x+3' };
+  const st = { intercepts: { x: [1, 3.5], y: 3 }, turning: [{ x: 2, y: -1, kind: 'max' }] };
+  const scheme = { xIntercepts: 1, yIntercept: 1, turning: 1, vertical: 1 };
+  const open = sketchVerdicts(spec, st, scheme);
+  const by = Object.fromEntries(open.verdicts.map(v => [v.feature, v]));
+  ok2(by.yIntercept.verdict === 'ok' && by.xIntercepts.detail === 'misplaced' && by.turning.detail === 'wrong-kind' && by.vertical.verdict === 'missing', 'verdict per feature');
+  const text = JSON.stringify(open);
+  ok2(!/\b3\b(?!\.5)/.test(text.replace(/"y":3/, '')) && !text.includes('correct') && open.overlay === null, 'open attempt: no correct value, no overlay');
+  ok2(!/It should be|minimum at|"x = 1/.test(text), 'open attempt: the right kind and roots are not revealed');
+  ok2(by.vertical.wentWrong.includes('or say there are none'), 'not-supplied does not hint whether any exist');
+  const done = sketchVerdicts(spec, st, scheme, { resolved: true });
+  const db = Object.fromEntries(done.verdicts.map(v => [v.feature, v]));
+  ok2(db.xIntercepts.correct === 'x = 1, 3' && db.turning.correct === 'minimum at (2, −1)' && db.vertical.correct === 'none', 'resolved: correct values');
+  ok2(/^<svg[^>]*>.*<path d="M[^"]+"/.test(done.overlay) && !done.overlay.includes('NaN'), 'resolved: overlay SVG');
+  ok2(!overlaySvg({ expression: '1/x' }).includes('NaN'), 'overlay breaks at an asymptote cleanly');
+  const tv = sketchVerdicts({ expression: 'tan(x)', from: -40, to: 40 }, {}, { vertical: 1 });
+  ok2(tv.verdicts[0].verdict === 'needs-review' && tv.awarded === 0, 'review feature: no verdict either way');
+  // Sketch in the working.
+  const rule = { spec, features: ['xIntercepts'], marks: 1, label: 'sketch showing the correct roots' };
+  ok2(sketchMethodCredit(spec, { intercepts: { x: [1, 3] } }, rule).awarded === 1, 'working sketch with the right roots earns the method mark');
+  ok2(sketchMethodCredit(spec, { intercepts: { x: [1, 3.5] } }, rule).awarded === 0, 'wrong root earns nothing');
+  ok2(sketchMethodCredit(spec, { intercepts: { x: [1, 3] } }, { ...rule, features: ['xIntercepts', 'turning'] }).awarded === 0, 'every listed feature is needed');
+  ok2(sketchMethodCredit({ expression: 'tan(x)', from: -40, to: 40 }, { asymptotes: { vertical: [] } }, { features: ['vertical'], marks: 1 }).awarded === 0, 'review feature earns no method mark');
+  const q = { answerType: 'numeric', answer: { value: 1, sketchMethod: rule } };
+  const wrongResp = { correct: false, unanswered: false, awarded: 0, partial: null };
+  const sk = JSON.stringify({ intercepts: { x: [1, 3] } });
+  ok2(sketchWorkingStage(q, sk, { correct: 3 }, wrongResp, { methodMarks: true }).awarded === 1, 'policy on: method mark for the sketch');
+  ok2(sketchWorkingStage(q, sk, { correct: 3 }, wrongResp, { methodMarks: false }).awarded === 0, 'policy off (D12 default): nothing');
+  ok2(sketchWorkingStage(q, sk, { correct: 3 }, wrongResp, undefined).awarded === 0, 'no policy: nothing');
+  ok2(sketchWorkingStage(q, sk, { correct: 1 }, wrongResp, { methodMarks: true }).awarded === 0, 'capped below full marks');
+  ok2(sketchWorkingStage(q, '{bad', { correct: 3 }, wrongResp, { methodMarks: true }).awarded === 0, 'unreadable sketch: nothing');
+  // L4 #793 shape.
+  const c = fromConfirmedSketch({ intercepts: { x: [1, 3], y: [3] }, turning: [{ x: 2, y: -1, kind: 'minimum' }], asymptotes: [] });
+  ok2(compareFeatures(deriveFeatures(spec), c, { xIntercepts: 1, yIntercept: 1, turning: 1, vertical: 1, horizontal: 1 }).awarded === 5, 'L4 confirmed sketch adapts and marks');
+  ok2(compareFeatures(deriveFeatures(spec), fromConfirmedSketch({ intercepts: { x: [1, 3], y: [3, 4] } }), { yIntercept: 1 }).awarded === 0, 'two y-intercepts never credit');
+  console.log(`GRAPH VERDICTS: ${p2}/${p2 + f2}`);
+  if (f2) process.exit(1);
+}

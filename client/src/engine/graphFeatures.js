@@ -307,10 +307,27 @@ export function compareFeatures(expected, student, scheme, opts = {}) {
     if (given === undefined) { features[key] = { status: 'not-supplied', marks: 0 }; continue; }
     let ok = false;
     try { ok = match() === true; } catch { ok = false; }
-    features[key] = { status: ok ? 'credited' : 'not-credited', marks: ok ? marks : 0 };
+    features[key] = ok ? { status: 'credited', marks } : { status: 'not-credited', marks: 0, detail: whatWentWrong(key, expected, given, tolX) };
     awarded += ok ? marks : 0;
   }
   return { awarded, possible, features, needsReview: Object.values(features).some(f => f.status === 'needs-review') };
+}
+
+const expectedList = (key, e) => ({ xIntercepts: e.intercepts.x, turning: e.turning, vertical: e.asymptotes.vertical, horizontal: [...new Set(e.asymptotes.horizontal)],
+  oblique: e.asymptotes.oblique, discontinuities: e.discontinuities })[key];
+/** How a feature is wrong, by count and kind only: never the right value. */
+function whatWentWrong(key, e, given, tolX) {
+  if (key === 'symmetry' || key === 'yIntercept') return 'wrong';
+  if (key === 'intervals') return 'wrong';
+  const want = expectedList(key, e);
+  if (!Array.isArray(given)) return 'unreadable';
+  if (given.length < want.length) return 'missing';
+  if (given.length > want.length) return 'extra';
+  if (key === 'turning') {
+    const g = given.map(t => ({ x: num(t?.x), kind: t?.kind })).sort((a, b) => a.x - b.x);
+    if (want.every((t, i) => within(t.x, g[i].x, tolX)) && want.some((t, i) => t.kind !== g[i].kind)) return 'wrong-kind';
+  }
+  return 'misplaced';
 }
 
 /** Mark a sketch: derive from the function in `spec`, then compare. */
@@ -345,4 +362,105 @@ export function checkGraphSketch(question, rawInput) {
   const r = markGraphSketch(g.spec, set, g.scheme, g.tol);
   if (r.needsReview) return { correct: false, needsReview: true, features: r.features, feedback: 'Part of this sketch needs a teacher to check it; it has not been marked right or wrong automatically.' };
   return { correct: r.awarded === r.possible && r.possible > 0, features: r.features };
+}
+
+// ── What went wrong in the visual ─────────────────────────────────────────
+const FEATURE_WORDS = { xIntercepts: 'the x-intercepts', yIntercept: 'the y-intercept', turning: 'the turning points', vertical: 'the vertical asymptotes',
+  horizontal: 'the horizontal asymptotes', oblique: 'the oblique asymptote', intervals: 'where the curve rises and falls', symmetry: 'the symmetry', discontinuities: 'the gaps in the curve' };
+const DETAIL_WORDS = { missing: 'Your sketch is missing one or more of', extra: 'Your sketch has more than there should be of', misplaced: 'Check the position of',
+  'wrong-kind': 'Check whether each is a maximum or a minimum:', wrong: 'Check', unreadable: 'Mark clearly', 'not-supplied': 'Your sketch says nothing about' };
+const show = v => (v === Infinity ? '∞' : v === -Infinity ? '−∞' : Number.isFinite(v) ? String(Math.round(v * 100) / 100).replace('-', '−') : String(v));
+function correctValue(key, e) {
+  switch (key) {
+    case 'xIntercepts': return e.intercepts.x.length ? `x = ${e.intercepts.x.map(show).join(', ')}` : 'none';
+    case 'yIntercept': return e.intercepts.y === null ? 'none' : `y = ${show(e.intercepts.y)}`;
+    case 'turning': return e.turning.length ? e.turning.map(t => `${t.kind === 'max' ? 'maximum' : 'minimum'} at (${show(t.x)}, ${show(t.y)})`).join('; ') : 'none';
+    case 'vertical': return e.asymptotes.vertical.length ? e.asymptotes.vertical.map(v => `x = ${show(v)}`).join(', ') : 'none';
+    case 'horizontal': return e.asymptotes.horizontal.length ? [...new Set(e.asymptotes.horizontal)].map(v => `y = ${show(v)}`).join(', ') : 'none';
+    case 'oblique': return e.asymptotes.oblique.length ? e.asymptotes.oblique.map(o => `y = ${show(o.m)}x + ${show(o.c)}`).join(', ') : 'none';
+    case 'intervals': return `increasing on ${e.intervals.increasing.map(([a, b]) => `(${show(a)}, ${show(b)})`).join(', ') || 'nowhere'}; decreasing on ${e.intervals.decreasing.map(([a, b]) => `(${show(a)}, ${show(b)})`).join(', ') || 'nowhere'}`;
+    case 'symmetry': return e.symmetry;
+    case 'discontinuities': return e.discontinuities.length ? `x = ${e.discontinuities.map(show).join(', ')}` : 'none';
+    default: return '';
+  }
+}
+
+/**
+ * Per-feature verdicts for "What went wrong?". While the attempt is open
+ * (`resolved` false) a verdict names the feature and how it is wrong, never
+ * its right value. Once resolved, `correct` carries the value and `overlay`
+ * the correct graph as SVG.
+ */
+export function sketchVerdicts(spec, student, scheme, { resolved = false, tol } = {}) {
+  let expected = null;
+  try { expected = deriveFeatures(spec); } catch { expected = null; }
+  const result = expected ? compareFeatures(expected, student, scheme, tol) : markGraphSketch(spec, student, scheme, tol);
+  const verdicts = Object.entries(result.features).map(([feature, f]) => {
+    const v = { feature, verdict: f.status === 'credited' ? 'ok' : f.status === 'needs-review' ? 'needs-review' : f.status === 'not-supplied' ? 'missing' : 'wrong' };
+    if (f.status === 'not-credited' || f.status === 'not-supplied') {
+      v.detail = f.detail || 'not-supplied';
+      // Not-supplied must not hint whether any exist: the student states them, or that there are none.
+      v.wentWrong = v.detail === 'not-supplied' ? `${DETAIL_WORDS[v.detail]} ${FEATURE_WORDS[feature]} (mark them, or say there are none).` : `${DETAIL_WORDS[v.detail]} ${FEATURE_WORDS[feature]}.`;
+      if (resolved && expected) { v.correct = correctValue(feature, expected); v.wentWrong += ` It should be: ${v.correct}.`; }
+    }
+    if (f.status === 'needs-review') v.wentWrong = `A teacher will check ${FEATURE_WORDS[feature]}.`;
+    return v;
+  });
+  return { awarded: result.awarded, possible: result.possible, verdicts, overlay: resolved && expected ? overlaySvg(spec) : null };
+}
+
+/** The correct graph as SVG path data, sampled by the engine (breaks at asymptotes and gaps). */
+export function overlaySvg(spec, { width = 320, height = 240 } = {}) {
+  const variable = spec.variable || 'x';
+  const f = evaluator(spec.expression, variable);
+  const from = Number(spec.from ?? -10), to = Number(spec.to ?? 10);
+  const pts = [];
+  for (let i = 0; i <= 600; i += 1) { const x = from + (to - from) * i / 600; pts.push([x, f(x)]); }
+  const ys = pts.map(p => p[1]).filter(fin).sort((a, b) => a - b);
+  if (!ys.length) return null;
+  const yLo = Math.max(ys[Math.floor(ys.length * 0.02)], -50), yHi = Math.min(ys[Math.ceil(ys.length * 0.98) - 1], 50);
+  const pad = (yHi - yLo) * 0.1 || 1, y0 = yLo - pad, y1 = yHi + pad;
+  const X = x => ((x - from) / (to - from) * width).toFixed(1), Y = y => ((y1 - y) / (y1 - y0) * height).toFixed(1);
+  let d = '', pen = false;
+  for (let i = 0; i < pts.length; i += 1) {
+    const [x, y] = pts[i];
+    const jump = i > 0 && fin(pts[i - 1][1]) && fin(y) && Math.abs(y - pts[i - 1][1]) > (y1 - y0);
+    if (!fin(y) || y < y0 - (y1 - y0) || y > y1 + (y1 - y0) || jump) { pen = false; continue; }
+    d += `${pen ? 'L' : 'M'}${X(x)} ${Y(y)}`; pen = true;
+  }
+  const axes = `${from <= 0 && to >= 0 ? `<line x1="${X(0)}" y1="0" x2="${X(0)}" y2="${height}" class="axis"/>` : ''}${y0 <= 0 && y1 >= 0 ? `<line x1="0" y1="${Y(0)}" x2="${width}" y2="${Y(0)}" class="axis"/>` : ''}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="The correct graph">${axes}<path d="${d}" fill="none" class="correct-curve"/></svg>`;
+}
+
+// ── A sketch inside the working ───────────────────────────────────────────
+/**
+ * Method credit for a sketch in the working, e.g. { features: ['xIntercepts'],
+ * marks: 1, label: 'sketch showing the correct roots' }. Earned only when
+ * every listed feature is credited and none needs review. The caller applies
+ * the marking policy (D12): with method marks off this earns nothing.
+ */
+export function sketchMethodCredit(spec, sketch, rule) {
+  const keys = (rule?.features || []).filter(k => FEATURE_KEYS.includes(k));
+  const marks = Math.max(0, Number(rule?.marks) || 0);
+  if (!keys.length || !marks || !sketch) return { awarded: 0, label: rule?.label || null, features: {} };
+  const r = markGraphSketch(spec, sketch, Object.fromEntries(keys.map(k => [k, 1])));
+  const earned = !r.needsReview && keys.every(k => r.features[k]?.status === 'credited');
+  return { awarded: earned ? marks : 0, label: rule.label || null, features: r.features };
+}
+
+/**
+ * L4's confirmed-sketch shape (PR #793, graphCompare.js) in this contract:
+ * intercepts.y is a list there, asymptotes a list of { axis: 'x'|'y', value }.
+ */
+export function fromConfirmedSketch(c) {
+  if (!c || typeof c !== 'object') return null;
+  const ys = Array.isArray(c.intercepts?.y) ? c.intercepts.y : c.intercepts?.y == null ? [] : [c.intercepts.y];
+  const asy = Array.isArray(c.asymptotes) ? c.asymptotes : [];
+  const out = {
+    intercepts: { x: Array.isArray(c.intercepts?.x) ? c.intercepts.x : [], y: ys.length === 1 ? ys[0] : ys.length === 0 ? null : NaN },
+    turning: Array.isArray(c.turning) ? c.turning.map(t => ({ x: t?.x, y: t?.y, kind: t?.kind === 'maximum' ? 'max' : t?.kind === 'minimum' ? 'min' : t?.kind })) : [],
+    asymptotes: Array.isArray(c.asymptotes) ? { vertical: asy.filter(a => a?.axis === 'x').map(a => a.value), horizontal: asy.filter(a => a?.axis === 'y').map(a => a.value), oblique: [] } : c.asymptotes
+  };
+  for (const k of ['intervals', 'symmetry', 'discontinuities']) if (k in c) out[k] = c[k];
+  return out;
 }
