@@ -111,6 +111,24 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-11-09',
     note: 'Read from the Internet Archive capture (sha256 05159c8d51acbfcb39d46ccb1933a7f3aa1e986c754e90231d3d76431c770767); the authority prints each question with its final answer.'
   }),
+  'jeeadv-2023-p1-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2023 · Paper 1 · Final Answer Keys (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper1_Final_Answer_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20230620190303/https://jeeadv.ac.in/documents/Paper1_Final_Answer_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 5d27f94c2df2fd00491ba536f47c35bf31ae9b8e95625eda05c5fe9f9f1b82d3); the authority prints each question with its final answer.'
+  }),
+  'jeeadv-2023-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2023 · Paper 2 · Final Answer Keys (question paper with answers)',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/Paper2_Final_Answer_Keys.pdf',
+    archivedAt: 'https://web.archive.org/web/20230620151251/https://jeeadv.ac.in/documents/Paper2_Final_Answer_Keys.pdf',
+    retrieved: '2026-11-09',
+    note: 'Read from the Internet Archive capture (sha256 3f4261ee5c514046c56b59b6b7c0ee277451d3946be6800b0a1667eb05dfbb21); the authority prints each question with its final answer.'
+  }),
   'cbse-2025-xii-65-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
     title: 'CBSE Senior School Certificate Examination 2025 · Mathematics (041) · question paper 65/1/1',
