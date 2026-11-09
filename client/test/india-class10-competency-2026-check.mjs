@@ -14,9 +14,9 @@ import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
 await loadAllBanks();
 
 const families = [
-  { id: 'c10-arithmetic-progressions', family: 'original-cbse-x-2026-inverse-ap' },
-  { id: 'c10-linear-pair-methods', family: 'original-cbse-x-2026-ticket-system' },
-  { id: 'c10-quadratic-context', family: 'original-cbse-x-2026-triangle-quadratic' }
+  { id: 'c10-ap-inverse-competency', family: 'original-cbse-x-2026-inverse-ap' },
+  { id: 'c10-linear-ticket-competency', family: 'original-cbse-x-2026-ticket-system' },
+  { id: 'c10-quadratic-triangle-competency', family: 'original-cbse-x-2026-triangle-quadratic' }
 ];
 let assertions = 0, newDraws = 0;
 const unique = {};
@@ -69,10 +69,10 @@ for (const { id, family } of families) {
   const prompts = new Set();
   let found = 0;
   for (let seed = 1; seed <= 1600; seed++) {
-    const q = generateQuestion(id, 4, seed * 311 + 17);
+    const q = generateQuestion(id, 3, seed * 311 + 17);
     assert.equal(q.subtopic, id);
-    assert.equal(q.difficulty, 4);
-    assert.ok(IN_CHAPTERS.some(ch => ch.grade === 10 && ch.covers.some(c => c.gen === id && c.diff.includes(4))), 'generator belongs to live Class X curricular coverage');
+    assert.equal(q.difficulty, 3);
+    assert.ok(IN_CHAPTERS.some(ch => ch.grade === 10 && ch.covers.some(c => c.gen === id && c.diff.includes(3))), 'generator belongs to live Class X curricular coverage');
     if (q.contentFamily !== family) continue;
     found++;
     prompts.add(q.prompt);
@@ -83,7 +83,7 @@ for (const { id, family } of families) {
     assert.equal(checkAnswer(q, String(oracle + 1)).correct, false, 'real checker rejects +1');
     assert.equal(checkAnswer(q, String(oracle - 1)).correct, false, 'real checker rejects -1');
     assert.equal(checkAnswer(q, String(-oracle)).correct, false, 'real checker rejects sign error');
-    const replay = generateQuestion(id, 4, seed * 311 + 17);
+    const replay = generateQuestion(id, 3, seed * 311 + 17);
     assert.deepEqual(q, replay, 'same seed yields same complete item');
     for (const hint of q.hints) {
       assert.ok(!hint.includes(`$${oracle}$`) && !hint.endsWith(`=${oracle}$`), 'hint does not give final answer');
@@ -92,19 +92,20 @@ for (const { id, family } of families) {
     newDraws++;
     assertions += 13;
   }
-  assert.ok(found > 600 && found < 1000, `extra content is served alongside the old questions (${id} got ${found})`);
+  assert.equal(found, 1600, `new standalone Class X bank is always available (${id})`);
   assert.ok(prompts.size > 150, `meaningful variation in ${id}: ${prompts.size}`);
   unique[id] = { newlyServed: found, distinctPrompts: prompts.size };
 }
 
-// No regression in the D1–D3 generator output (same seeded RNG/unchanged raw q).
+// No regression in ANY existing D1–D4 generator output. New families use
+// separate IDs instead of changing old seeded prompts or content identities.
 const original = {
   'c10-arithmetic-progressions': originalBank['c10-arithmetic-progressions'],
   'c10-linear-pair-methods': indiaClass10Core['c10-linear-pair-methods'],
   'c10-quadratic-context': currentQuadraticContext
 };
-for (const { id } of families) {
-  for (const diff of [1, 2, 3]) {
+for (const id of Object.keys(original)) {
+  for (const diff of [1, 2, 3, 4]) {
     for (let seed = 1; seed <= 100; seed++) {
       const s = seed * 83 + diff * 7;
       assert.deepEqual(indiaClass10[id](makeRng(s), diff), original[id](makeRng(s), diff),
@@ -115,4 +116,4 @@ for (const { id } of families) {
 }
 assert.ok(allAnswers.every(Number.isSafeInteger));
 console.log('PASS: Class X original competency families — independently solved, unique, checkable, replayable');
-console.log(JSON.stringify({ assertions, independentlyAuditedNewDraws: newDraws, lowerDifficultyRegressions: 900, families: unique }, null, 2));
+console.log(JSON.stringify({ assertions, independentlyAuditedNewDraws: newDraws, unchangedExistingFormChecks: 1200, families: unique }, null, 2));

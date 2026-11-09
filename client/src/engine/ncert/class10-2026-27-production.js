@@ -67,7 +67,8 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     cover('c10-linear-graphs', [0], [1, 2, 3, 4]),
     cover('c10-linear-solution-conditions', [1], [1, 2, 3, 4]),
     cover('y10-simeq', [2], [1, 2, 3]),
-    cover('y10-simeq', [3], [4])
+    cover('y10-simeq', [3], [4]),
+    cover('c10-linear-ticket-competency', [3], [3])
   ], true),
 
   chapter('c10-quadratic-equations', [
@@ -79,7 +80,8 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
     cover('y10-quadratics', [0], [1, 3]),
     cover('y10-quadratics', [1], [4]),
     cover('c10-quadratic-discriminant', [2], [1, 2, 3, 4]),
-    cover('c10-quadratic-context', [3], [1, 2, 3, 4])
+    cover('c10-quadratic-context', [3], [1, 2, 3, 4]),
+    cover('c10-quadratic-triangle-competency', [3], [3])
   ], true),
 
   chapter('c10-arithmetic-progressions', [
@@ -89,7 +91,8 @@ export const CBSE_CLASS10_2026_27_CHAPTERS = Object.freeze([
   ], [
     cover('c10-arithmetic-progressions', [0], [1, 3]),
     cover('c10-arithmetic-progressions', [1], [2]),
-    cover('c10-arithmetic-progressions', [2], [4])
+    cover('c10-arithmetic-progressions', [2], [4]),
+    cover('c10-ap-inverse-competency', [2], [3])
   ], true),
 
   chapter('c10-triangles', [

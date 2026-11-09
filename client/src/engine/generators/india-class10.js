@@ -21,15 +21,9 @@ import {
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
-// Add original Class X scenario families at D4 only. The previous forms stay
-// reachable and the established lower difficulties remain unchanged.
-// A change to these outputs requires the canonical content-version/digest
-// reconciliation by the current L1/L5 owner before integration into main.
-const extraD4 = (existing, extra) => (rng, difficulty) =>
-  difficulty === 4 && rng() < 0.5 ? extra(rng) : existing(rng, difficulty);
-const class10Ap = extraD4(baseIndiaClass10['c10-arithmetic-progressions'], competencyInverseApRows);
-const class10Pair = extraD4(indiaClass10Core['c10-linear-pair-methods'], competencyTicketSystem);
-const class10QuadraticContext = extraD4(currentQuadraticContext, competencyTriangleArea);
+// Original competency-based CBSE D3 generators are separate keys, not overrides of
+// existing forms. A previously issued seed keeps its original question/answer
+// and content identity, and the syllabus explicitly opts into these new keys.
 
 function polynomialZeroes(rng, diff) {
   // D1–D2 cover the current outcome "find zeroes graphically and algebraically".
@@ -40,14 +34,15 @@ function polynomialZeroes(rng, diff) {
 export const indiaClass10 = Object.freeze({
   ...baseIndiaClass10,
   ...indiaClass10Core,
-  'c10-arithmetic-progressions': class10Ap,
-  'c10-linear-pair-methods': class10Pair,
+  'c10-ap-inverse-competency': competencyInverseApRows,
+  'c10-linear-ticket-competency': competencyTicketSystem,
+  'c10-quadratic-triangle-competency': competencyTriangleArea,
   'c10-polynomial-zeroes': polynomialZeroes,
   'c10-triangles-current': currentTriangles,
   'c10-irrationality-proofs': currentIrrationalityProof,
   'c10-linear-graphs': currentLinearPairGraphs,
   'c10-linear-solution-conditions': currentLinearSolutionConditions,
-  'c10-quadratic-context': class10QuadraticContext,
+  'c10-quadratic-context': currentQuadraticContext,
   'c10-quadratic-discriminant': currentQuadraticDiscriminant,
   'c10-surface-area-combo': currentSurfaceAreaCombination,
   'c10-trigonometry-current': currentClass10Trigonometry,
