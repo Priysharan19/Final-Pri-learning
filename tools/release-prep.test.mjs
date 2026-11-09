@@ -6,7 +6,7 @@
 // in-process HTTP server, the "human" who reads codes is a function, and the
 // "pictures" are byte strings. No network, no provider, no mailbox.
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -23,7 +23,8 @@ import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
 import {
-  EVIDENCE, EXPORT_FRESH_MS, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
+  CONSENT_WITHDRAWN, EVIDENCE, EXPORT_FRESH_MS, SKIPPABLE_STEPS, STATUS, STEPS, STEP_IDS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail,
+  parseArgs as parseAcceptanceArgs, plusAddress, returnedAttempts, runAcceptance, withdrawalTokenFrom
 } from './acceptance/staging-acceptance.mjs';
 import { PNG_SIGNATURE, crc32, encodeGreyPng, pngDimensions, simulatedInkPng, simulatedPhotoPng, toDataUrl } from './acceptance/synthetic-png.mjs';
 
@@ -575,8 +576,8 @@ const scratch = [];
   await noGo('a gate is NOT_RECORDED', r => { r.gates.counsel = { status: 'NOT_RECORDED' }; }, /counsel/);
   await noGo('a gate is BLOCKED', r => { r.gates.store = { status: 'BLOCKED', by: 'Kalp Example', at: '2026-11-04T08:00:00Z', evidence: 'Paid Apps Agreement not signed' }; }, /Store readiness/);
   await noGo('a gate PASS is unsigned', r => { r.gates.examiner.by = ''; }, /examiner/);
-  await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance A–D/);
-  await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance A–D/);
+  await noGo('the acceptance was not run by a named human', r => { r.acceptance.tester = 'CI'; }, /acceptance S0–S8/);
+  await noGo('the acceptance failed', r => { r.acceptance.result = 'FAIL'; }, /acceptance S0–S8/);
   await noGo('the candidate was never frozen', r => { r.candidate = { frozenAt: '', by: '' }; }, /candidate SHA frozen/);
   await noGo('the device evidence is missing (the nomination fails)', () => {}, /release-stage nomination/, w => { writeFileSync(w.ledger, ''); });
   await noGo('the record is for another SHA', r => { r.sha = OTHER; }, /operator record/);
@@ -678,9 +679,17 @@ const scratch = [];
   assert.throws(() => parseAcceptanceArgs(['--target', 'production', '--sha', SHA, '--origin', 'https://elsewhere.example']), /cannot change it/, 'production cannot be pointed elsewhere'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--target', 'prod']), /staging or production/, 'unknown targets are refused'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--skip', 'Z']), /unknown step/, 'unknown skip ids are refused'); count += 1;
+  assert.deepEqual([...STEP_IDS], ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8'], 'the steps are S0–S8, in run order'); count += 1;
+  ok(STEP_IDS.every(id => /^S\d$/.test(id) && typeof STEPS[id] === 'string') && Object.keys(STEPS).length === STEP_IDS.length, 'every step id is S<n> with a title: none is a bare letter that reads as one of issue #686\'s Gates A–D');
+  for (const letter of ['A', 'B', 'C', 'D', 'E', 'F', '0']) {
+    assert.throws(() => parseAcceptanceArgs(['--skip', letter]), /unknown step/, `the retired id ${letter} is refused by --skip, not mapped`); count += 1;
+  }
+  assert.throws(() => parseAcceptanceArgs(['--skip', 'S0']), /preflight S0 cannot be/, 'the preflight cannot be skipped'); count += 1;
+  assert.deepEqual([...parseAcceptanceArgs(['--skip', 's3, S6']).skip], ['S3', 'S6'], '--skip takes S-ids, case-insensitively'); count += 1;
+  assert.deepEqual([...SKIPPABLE_STEPS], STEP_IDS.slice(1), 'every step but S0 can be skipped'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--origin', 'http://staging.example']), /https/, 'plain http is only for loopback'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--email', 'not-an-address']), /email/, 'a malformed mailbox is refused'); count += 1;
-  assert.throws(() => parseAcceptanceArgs(['--max-reads', '1']), /2 to 10/, '--max-reads 1 is refused: C and D each reserve 2 reads, so 1 would silently skip both'); count += 1;
+  assert.throws(() => parseAcceptanceArgs(['--max-reads', '1']), /2 to 10/, '--max-reads 1 is refused: S4 and S5 each reserve 2 reads, so 1 would silently skip both'); count += 1;
   eq(parseAcceptanceArgs(['--max-reads', '2']).maxReads, 2, '--max-reads 2 is the minimum');
   const prod = parseAcceptanceArgs(['--target', 'production', '--sha', SHA.toUpperCase(), '--email', 'o@example.test']);
   ok(prod.cleanup === true && prod.sha === SHA && prod.origin === PRODUCTION_ORIGIN, 'production forces cleanup and normalises the SHA');
@@ -698,15 +707,26 @@ const scratch = [];
 
   // ── the fake deployed host ─────────────────────────────────────────────────
   /**
-   * A well-behaved deployment, with two defects it can be told to have so the
-   * tool's isolation probes are shown to catch them: `skipOwnership` answers
-   * practice calls for any verified account's question (no per-account check);
-   * `leakExport` puts another account's learning rows into every export.
+   * A well-behaved deployment, with four defects it can be told to have so the
+   * tool's probes are shown to catch them: `skipOwnership` answers practice
+   * calls for any verified account's question (no per-account check);
+   * `leakExport` puts another account's learning rows into every export;
+   * `issueAfterWithdrawal` keeps issuing questions to a child whose guardian
+   * withdrew (the consent gate on /practice/issue ignores a withdrawal);
+   * `loseAttempt` drops an account's oldest graded attempt when it signs in
+   * again (History lost on a returning sign-in).
+   *
+   * The parent's mailbox gets what the real server sends an email parent:
+   * the approval code and, beside it, the "Confirm your child's account" link
+   * (`kind: 'link'`, /guardian/consent#action=guardian-consent&token=…) whose
+   * token POST /v1/account/guardian/withdraw accepts. `pullPageSize` (state)
+   * makes GET /v1/sync/pull/:cursor page.
    */
-  function fakeHost({ sha = SHA, schemaVersion = SCHEMA_VERSION, skipOwnership = false, leakExport = false } = {}) {
+  function fakeHost({ sha = SHA, schemaVersion = SCHEMA_VERSION, skipOwnership = false, leakExport = false, issueAfterWithdrawal = false, loseAttempt = false } = {}) {
     const state = {
       accounts: new Map(), sessions: new Map(), challenges: new Map(), mailbox: [], questions: new Map(), receipts: new Map(),
       grades: new Map(), reads: new Set(), log: [], transcribeBodies: [], originMisses: 0, csrfMisses: 0, codeSeq: 0,
+      links: new Map(), cursorSeq: 0, pullPageSize: 100,
       // One clock for the host and the runner (passed as its `now`), so a test
       // can age student A's session past the export's fresh-proof window.
       clockOffsetMs: 0
@@ -750,7 +770,14 @@ const scratch = [];
       const consentOf = acct => acct.ageBasis === 'child' ? { required: true, state: acct.consent } : { required: false, state: 'not-required' };
       const requireSession = () => { if (!session || !account) { fail(401, 'AUTH_REQUIRED'); return false; } return true; };
       const requireVerified = () => { if (!account.verified) { fail(403, 'EMAIL_UNVERIFIED'); return false; } return true; };
-      const requireConsent = () => { if (account.ageBasis === 'child' && account.consent !== 'given') { fail(403, 'GUARDIAN_CONSENT_PENDING'); return false; } return true; };
+      // guardianConsent.js consentBlockerCode: pending → GUARDIAN_CONSENT_PENDING, withdrawn → GUARDIAN_CONSENT_WITHDRAWN.
+      const blockerOf = acct => acct.ageBasis !== 'child' || acct.consent === 'given' ? null : acct.consent === 'withdrawn' ? 'GUARDIAN_CONSENT_WITHDRAWN' : 'GUARDIAN_CONSENT_PENDING';
+      const requireConsent = ({ issuing = false } = {}) => {
+        const blocker = blockerOf(account);
+        if (!blocker || (issuing && issueAfterWithdrawal && blocker === 'GUARDIAN_CONSENT_WITHDRAWN')) return true;
+        fail(403, blocker);
+        return false;
+      };
 
       if (method === 'GET' && path === '/v1/health') return send(200, { ok: true, service: 'pri-learning-platform', releaseIdentity: { releaseSha: sha }, schemaVersion: String(schemaVersion), billingSchemaVersion: String(BILLING_SCHEMA_VERSION), database: { engine: 'postgres', reachable: true } });
       if (method === 'GET' && path === '/v1/ready') return send(200, { ready: true, state: 'ready', releaseSha: sha, failing: [], degraded: [], checks: { database: { state: 'ok', engine: 'postgres', schemaVersion: String(schemaVersion), billingSchemaVersion: String(BILLING_SCHEMA_VERSION) }, authEmail: { state: 'ok' }, handwriting: { state: 'ok' } } });
@@ -780,7 +807,11 @@ const scratch = [];
           }
           ch.consumed = true;
         }
-        if (existing) { issueSession(existing, body.deviceId); return send(200, { status: 'signed-in', created: false, account: publicAccount(existing), guardianConsent: consentOf(existing) }); }
+        if (existing) {
+          if (loseAttempt) { const at = existing.events.findIndex(ev => ev.kind === 'graded-attempt'); if (at >= 0) existing.events.splice(at, 1); }
+          issueSession(existing, body.deviceId);
+          return send(200, { status: 'signed-in', created: false, account: publicAccount(existing), guardianConsent: consentOf(existing) });
+        }
         const child = body.profile.isAdult !== true;
         const acct = { id: `acct-${randomUUID().slice(0, 8)}`, email: body.destination, name: body.profile.name, verified: !(state.unverifiedSignups && /pri-iso/.test(body.destination)), ageBasis: child ? 'child' : 'adult', consent: child ? 'pending' : 'not-required', password: null, events: [] };
         state.accounts.set(acct.id, acct);
@@ -819,6 +850,15 @@ const scratch = [];
         acct.consent = 'given';
         return send(200, { ok: true, confirmed: true, childName: acct.name });
       }
+      if (method === 'POST' && path === '/v1/account/guardian/withdraw') {
+        // accounts.js: no session; the emailed link's token, whatever the consent's state.
+        const link = state.links.get(String(body?.token || ''));
+        if (!link) return fail(400, 'TOKEN_INVALID');
+        const acct = state.accounts.get(link.accountId);
+        const withdrawn = !!acct && acct.consent !== 'withdrawn';
+        if (acct) acct.consent = 'withdrawn';
+        return send(200, { ok: true, withdrawn });
+      }
 
       if (!requireSession()) return;
       if (method === 'GET' && path === '/v1/account/me') return send(200, { account: publicAccount(account) });
@@ -844,7 +884,10 @@ const scratch = [];
         state.accounts.delete(account.id);
         return send(200, { deleted: true });
       }
-      if (method === 'GET' && path === '/v1/account/guardian/state') return send(200, { state: account.ageBasis === 'child' ? account.consent : 'not-required' });
+      if (method === 'GET' && path === '/v1/account/guardian/state') {
+        const blockerCode = blockerOf(account);
+        return send(200, { accountId: account.id, required: account.ageBasis === 'child', state: account.ageBasis === 'child' ? account.consent : 'not-required', blockerCode, eligible: blockerCode === null && account.verified, emailVerified: account.verified });
+      }
       if (method === 'POST' && path === '/v1/account/otp/guardian/request') {
         if (account.ageBasis !== 'child') return fail(409, 'GUARDIAN_CONSENT_NOT_REQUIRED');
         if (body.destination === account.email) return fail(400, 'GUARDIAN_SAME_AS_STUDENT');
@@ -852,11 +895,25 @@ const scratch = [];
         const code = newCode();
         state.challenges.set(id, { code, destination: body.destination, purpose: 'guardian-consent', consumed: false, accountId: account.id });
         state.mailbox.push({ to: body.destination, code, purpose: 'guardian-consent' });
+        if (body.channel === 'email') {
+          // otp.js queues the parent's link (authDelivery.js buildAuthActionUrl) beside the code.
+          const token = randomBytes(32).toString('base64url');
+          state.links.set(token, { accountId: account.id, purpose: 'guardian-consent' });
+          state.mailbox.push({ to: body.destination, kind: 'link', token, link: `${myOrigin}/guardian/consent#action=guardian-consent&token=${token}`, purpose: 'guardian-consent' });
+        }
         return send(202, { ok: true, channel: 'email', noticeVersion: NOTICE, challengeId: id });
       }
-      if (method === 'GET' && path === '/v1/sync/pull/0') { if (!requireConsent()) return; return send(200, { cursor: 0, hasMore: false, events: account.events, entities: [] }); }
+      const pull = path.match(/^\/v1\/sync\/pull\/(\d+)$/);
+      if (method === 'GET' && pull) {
+        if (!requireConsent()) return;
+        // sync.js syncPullPage: this account's rows past the cursor, in cursor order, a page at a time.
+        const after = Number(pull[1]);
+        const rows = account.events.filter(ev => ev.serverCursor > after).sort((x, y) => x.serverCursor - y.serverCursor).slice(0, state.pullPageSize);
+        const cursor = rows.length ? rows[rows.length - 1].serverCursor : after;
+        return send(200, { schemaVersion: 1, cursor, hasMore: account.events.some(ev => ev.serverCursor > cursor), events: rows, entities: [] });
+      }
       if (method === 'POST' && path === '/v1/practice/issue') {
-        if (!requireVerified() || !requireConsent()) return;
+        if (!requireVerified() || !requireConsent({ issuing: true })) return;
         const id = randomUUID();
         state.questions.set(id, { accountId: account.id, expectedN: EXPECTED_N });
         return send(201, { question: { id, prompt: PROMPT, subtopic: 'c10-arithmetic-progressions', difficulty: 3, criteriaCount: 3, supportsSteps: true }, accountId: account.id });
@@ -909,7 +966,9 @@ const scratch = [];
         const correct = final === String(q.expectedN);
         const response = { authoritative: true, questionId: qid, submissionId: body.submissionId, attemptId: randomUUID(), correct, invalid: false, resolved: true, marksEarned: correct ? 3 : 0, marksPossible: 3, triesLeft: correct ? 0 : 1 };
         state.grades.set(key, response);
-        account.events.push({ kind: 'graded-attempt', entityId: qid, id: response.attemptId, serverCursor: account.events.length + 1 });
+        // practice.js: the server grader's row, keyed by the attempt id, payload carrying the mark.
+        account.events.push({ serverCursor: ++state.cursorSeq, id: response.attemptId, deviceId: 'server-grader', kind: 'graded-attempt', entityId: qid,
+          payload: { attemptId: response.attemptId, submissionId: body.submissionId, questionId: qid, correct, marksEarned: response.marksEarned, marksPossible: response.marksPossible } });
         return send(200, response);
       }
       return fail(404, 'NOT_FOUND');
@@ -920,8 +979,19 @@ const scratch = [];
     ink: lines => ({ png: Buffer.from('PNG:' + lines.join('\n')), label: 'SIMULATED-ink', width: 320, height: 240, strokes: lines.length }),
     photo: lines => ({ png: Buffer.from('PNG:' + lines.join('\n')), label: 'SIMULATED-photo', width: 640, height: 480, strokes: lines.length })
   };
-  /** A scripted human who reads the newest unread code out of the one shared mailbox. */
-  const humanFor = state => async () => { const item = state.mailbox.find(m => !m.read); if (!item) return ''; item.read = true; return item.code; };
+  /**
+   * A scripted human at the one shared mailbox: asked at S3, they copy the
+   * parent's link; asked anywhere else, they read the oldest unread code.
+   */
+  const humanFor = state => async question => {
+    const wantsLink = /^\[S3\]/.test(String(question ?? ''));
+    const item = state.mailbox.find(m => !m.read && (wantsLink ? m.kind === 'link' : m.kind !== 'link'));
+    if (!item) return '';
+    item.read = true;
+    return wantsLink ? item.link : item.code;
+  };
+  /** Everything a human read or copied from the mailbox: none of it may be printed or saved. */
+  const secretsOf = state => state.mailbox.flatMap(m => [m.code, m.link, m.token]).filter(Boolean);
   const baseArgs = (origin, extra = {}) => ({ target: 'staging', origin, sha: SHA, email: 'owner@example.test', childEmail: null, guardianEmail: null, tester: 'Priya Example', nonInteractive: false, skip: new Set(), cleanup: false, out: null, maxReads: 4, json: false, ...extra });
 
   // ── 3a · the full interactive staging run ─────────────────────────────────
@@ -929,44 +999,75 @@ const scratch = [];
     const { server, state, origin } = await fakeHost();
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     const lines = [];
+    const reader = humanFor(state);
+    // From S6's sign-in on, the host answers the pull one row per page, so the
+    // returning student's walk has to follow hasMore to see both attempts.
+    const human = async question => { if (/^\[S6\]/.test(question)) state.pullPageSize = 1; return reader(question); };
     try {
-      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: line => lines.push(line), pictures: fakePictures, outDir, now: state.now });
+      const report = await runAcceptance(baseArgs(origin), { prompt: human, log: line => lines.push(line), pictures: fakePictures, outDir, now: state.now });
       const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
       const failures = report.steps.flatMap(s => s.checks.filter(c => !c.ok).map(c => `${s.id}: ${c.label} (${c.detail || ''})`));
-      ok(status['0'] === STATUS.PASS && status.A === STATUS.PASS && status.B === STATUS.PASS && status.C === STATUS.PASS && status.D === STATUS.PASS && status.E === STATUS.PASS,
-        `steps 0, A–E pass against a well-behaved host (failures: ${failures.join(' | ') || 'none'}; statuses ${JSON.stringify(status)})`);
-      eq(status.F, STATUS.SKIPPED, 'cleanup is off on staging unless asked');
+      ok(['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7'].every(id => status[id] === STATUS.PASS),
+        `steps S0–S7 pass against a well-behaved host (failures: ${failures.join(' | ') || 'none'}; statuses ${JSON.stringify(status)})`);
+      assert.deepEqual(report.steps.map(s => s.id), [...STEP_IDS], 'the report lists S0–S8 in run order'); count += 1;
+      assert.deepEqual(Object.keys(report.summary), [...STEP_IDS], 'the report summary is keyed S0–S8'); count += 1;
+      eq(status.S8, STATUS.SKIPPED, 'cleanup is off on staging unless asked');
       eq(exitCodeFor(report), 0, 'exit 0 when every attempted step passed');
-      ok(report.humanSteps.filter(h => h.step === 'A').length === 1 && report.humanSteps.filter(h => h.step === 'B').length === 2 && report.humanSteps.filter(h => h.step === 'E').length === 1, 'A names one human step (the code), B names two (the child\'s code and the parent\'s), E names one (the isolation account\'s code)');
-      ok(lines.some(l => l.startsWith('HUMAN STEP [A]:')) && lines.some(l => l.startsWith('HUMAN STEP [B]:')), 'HUMAN STEP lines are printed');
-      const codes = state.mailbox.map(m => m.code);
-      ok(codes.length >= 4 && lines.every(line => !codes.some(code => line.includes(code))), 'no code the human typed appears in the output');
-      ok(codes.every(code => !JSON.stringify(report).includes(code)), 'no code appears in the report');
+      const humanCount = id => report.humanSteps.filter(h => h.step === id).length;
+      ok(humanCount('S1') === 1 && humanCount('S2') === 2 && humanCount('S3') === 1 && humanCount('S6') === 1 && humanCount('S7') === 1 && report.humanSteps.length === 6,
+        'S1 names one human step (the code), S2 two (the child\'s code and the parent\'s), S3 one (the parent\'s link), S6 one (A\'s new code), S7 one (the isolation account\'s code): six in all');
+      ok(['S1', 'S2', 'S3', 'S6', 'S7'].every(id => lines.some(l => l.startsWith(`HUMAN STEP [${id}]:`))), 'HUMAN STEP lines are printed with the S-id');
+      ok(!lines.some(l => /^HUMAN STEP \[[A-F0]\]/.test(l)) && !lines.some(l => /^── [A-F0] · /.test(l)), 'no line names a retired step letter');
+      const secrets = secretsOf(state);
+      ok(secrets.length >= 7 && lines.every(line => !secrets.some(secret => line.includes(secret))), 'no code, link or link token the human read appears in the output');
+      ok(secrets.every(secret => !JSON.stringify(report).includes(secret)), 'no code, link or link token appears in the report');
       ok(!JSON.stringify(report).includes('owner@example.test'), 'the report masks the mailbox address');
       ok(state.transcribeBodies.length === 2 && state.transcribeBodies.every(b => Object.keys(b).join(',') === 'image'), 'every transcribe body was exactly { image }');
-      eq(report.providerReads, 2, 'C and D each spent one provider read; recognize reused it');
+      eq(report.providerReads, 2, 'S4 and S5 each spent one provider read; recognize reused it');
       eq(state.originMisses, 0, 'every mutation carried the deployed origin');
       eq(state.csrfMisses, 0, 'every authenticated mutation carried the CSRF pair');
-      ok(report.steps.find(s => s.id === 'C').evidence === EVIDENCE.SYNTHETIC_PICTURE && report.steps.find(s => s.id === 'A').evidence === EVIDENCE.REAL_MAILBOX && report.steps.find(s => s.id === 'E').evidence === EVIDENCE.TEST_ACCOUNTS, 'evidence classes are labelled per step');
-      ok(/SYNTHETIC/.test(EVIDENCE.SYNTHETIC_PICTURE) && /REAL mailbox/.test(EVIDENCE.REAL_MAILBOX) && /not a student/i.test(EVIDENCE.REAL_MAILBOX), 'the labels say synthetic vs real and that the accounts are not students');
+      const stepOf = id => report.steps.find(s => s.id === id);
+      ok(stepOf('S4').evidence === EVIDENCE.SYNTHETIC_PICTURE && stepOf('S1').evidence === EVIDENCE.REAL_MAILBOX && stepOf('S3').evidence === EVIDENCE.REAL_MAILBOX_LINK && stepOf('S6').evidence === EVIDENCE.REAL_MAILBOX && stepOf('S7').evidence === EVIDENCE.TEST_ACCOUNTS, 'evidence classes are labelled per step');
+      ok(/SYNTHETIC/.test(EVIDENCE.SYNTHETIC_PICTURE) && /REAL mailbox/.test(EVIDENCE.REAL_MAILBOX) && /not a student/i.test(EVIDENCE.REAL_MAILBOX) && /REAL mailbox/.test(EVIDENCE.REAL_MAILBOX_LINK) && /not a student/i.test(EVIDENCE.REAL_MAILBOX_LINK), 'the labels say synthetic vs real and that the accounts are not students');
       const files = readdirSync(outDir);
-      ok(files.includes('SIMULATED-ink-C.png') && files.includes('SIMULATED-photo-D.png') && files.includes('report.json'), 'pictures are saved under SIMULATED-* names next to the report');
-      const c = report.steps.find(s => s.id === 'C');
-      ok(c.checks.some(ch => /right term number is marked right/.test(ch.label) && ch.ok), 'C: the term number worked out from the printed question is marked right');
-      ok(c.checks.some(ch => /no double credit/.test(ch.label) && ch.ok), 'C: the replay returns the same attempt');
-      const d = report.steps.find(s => s.id === 'D');
-      ok(d.checks.some(ch => /explicit transcript correction/.test(ch.label) && ch.ok), 'D: a multi-line photo reading goes through the explicit confirmation of the final line');
-      ok(d.checks.some(ch => /right term number is marked right/.test(ch.label) && ch.ok), 'D: the confirmed final line is marked right');
+      ok(files.includes('SIMULATED-ink-S4.png') && files.includes('SIMULATED-photo-S5.png') && files.includes('report.json'), 'pictures are saved under SIMULATED-* names next to the report');
+      const c = stepOf('S4');
+      ok(c.checks.some(ch => /right term number is marked right/.test(ch.label) && ch.ok), 'S4: the term number worked out from the printed question is marked right');
+      ok(c.checks.some(ch => /no double credit/.test(ch.label) && ch.ok), 'S4: the replay returns the same attempt');
+      const d = stepOf('S5');
+      ok(d.checks.some(ch => /explicit transcript correction/.test(ch.label) && ch.ok), 'S5: a multi-line photo reading goes through the explicit confirmation of the final line');
+      ok(d.checks.some(ch => /right term number is marked right/.test(ch.label) && ch.ok), 'S5: the confirmed final line is marked right');
       const accounts = [...state.accounts.values()];
-      ok(accounts.length === 3 && accounts.filter(a => a.ageBasis === 'child').length === 1 && accounts.every(a => a.verified === true), 'the run made exactly three test accounts: A (adult), the child, the isolation account — all verified by code (none through /register)');
+      ok(accounts.length === 3 && accounts.filter(a => a.ageBasis === 'child').length === 1 && accounts.every(a => a.verified === true), 'the run made exactly three test accounts: A (adult), the child, the isolation account — all verified by code (none through /register); S6 made none');
       ok(report.accounts.every(a => a.email && !a.email.includes('owner@')), 'account rows in the report are masked');
-      const e = report.steps.find(s => s.id === 'E');
-      ok(e.checks.length >= 12 && e.checks.every(ch => ch.ok), `E: ${e.checks.length} isolation probes all held`);
+      // S3 · the parent withdraws through their page's route; the child is refused.
+      const w = stepOf('S3');
+      ok(w.checks.length === 4 && w.checks.every(ch => ch.ok), `S3: the link, the withdrawal, the refusal and the state all held (${w.checks.map(ch => ch.label).join('; ')})`);
+      ok(w.checks.some(ch => /refused \(403 GUARDIAN_CONSENT_WITHDRAWN\)/.test(ch.label) && /status 403 GUARDIAN_CONSENT_WITHDRAWN/.test(ch.detail)), 'S3: the child\'s next POST /v1/practice/issue was refused 403 GUARDIAN_CONSENT_WITHDRAWN');
+      ok(w.checks.some(ch => /state is now withdrawn/.test(ch.label) && /state withdrawn, blocker GUARDIAN_CONSENT_WITHDRAWN/.test(ch.detail)), 'S3: /v1/account/guardian/state says withdrawn');
+      const child = accounts.find(a => a.ageBasis === 'child');
+      eq(child.consent, 'withdrawn', 'S3: the child\'s consent is withdrawn on the host');
+      const withdrawals = state.log.filter(r => r.path === '/v1/account/guardian/withdraw');
+      ok(withdrawals.length === 1 && withdrawals[0].status === 200 && withdrawals[0].accountId === null, 'S3: one POST /v1/account/guardian/withdraw, with no session (the parent\'s page holds none)');
+      const issuesByChild = state.log.filter(r => r.path === '/v1/practice/issue' && r.accountId === child.id);
+      ok(issuesByChild.map(r => r.status).join(',') === '403,201,403', `the child was refused before approval, issued after it, refused after the withdrawal (${issuesByChild.map(r => r.status).join(',')})`);
+      // S6 · a fresh session gets both marked attempts back.
+      const r6 = stepOf('S6');
+      ok(r6.checks.every(ch => ch.ok) && r6.checks.length === 6, `S6: the new code, the same account, a new session, the pull and both attempt checks held (${r6.checks.map(ch => `${ch.label} (${ch.detail || ''})`).join('; ')})`);
+      ok(r6.checks.some(ch => /reads History back/.test(ch.label) && /^2 page\(s\), 2 event\(s\)$/.test(ch.detail)), 'S6: the pull followed hasMore across pages (one row per page: two pages for two attempts)');
+      ok(r6.checks.some(ch => /comes back, once, by attempt id \(2\)/.test(ch.label) && /^2\/2 back$/.test(ch.detail)), 'S6: both attempts S4 and S5 marked came back by attempt id');
+      ok(r6.checks.some(ch => /carries the question, submission and mark/.test(ch.label) && ch.detail === '2 match'), 'S6: and both carry the mark the server gave');
+      const aId = report.accounts.find(a => a.role === 'A').accountId;
+      const aSessions = [...state.sessions.values()].filter(s => s.accountId === aId);
+      ok(aSessions.length === 2 && aSessions.some(s => /^acceptance-S1-/.test(s.deviceId)) && aSessions.some(s => /^acceptance-S6-/.test(s.deviceId)), 'S6 signed A in on its own device session; S1\'s session was left alone');
+      // S7 · isolation, unchanged.
+      const e = stepOf('S7');
+      ok(e.checks.length >= 12 && e.checks.every(ch => ch.ok), `S7: ${e.checks.length} isolation probes all held`);
       const ownership = e.checks.filter(ch => /refused by ownership \(404 QUESTION_NOT_FOUND\)/.test(ch.label));
-      ok(ownership.length === 4 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'E: all four cross-account question probes (submit, recognize, reveal, repeat) reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
-      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok) && e.checks.some(ch => /export holds none of student A/.test(ch.label) && ch.ok && /^1 event\(s\)/.test(ch.detail) === false), 'E: the export probe read learningEvents[] of the real shape');
-      ok(e.checks.some(ch => /inside the fresh-proof window, is student A's/.test(ch.label) && ch.ok && /status 200/.test(ch.detail)), 'E: a quick run (A signed in moments ago) reads A\'s own export');
-      ok(!e.pending, 'E: no probe was left NOT VERIFIED on a verified isolation account');
+      ok(ownership.length === 4 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'S7: all four cross-account question probes (submit, recognize, reveal, repeat) reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
+      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok) && e.checks.some(ch => /export holds none of student A/.test(ch.label) && ch.ok && /^1 event\(s\)/.test(ch.detail) === false), 'S7: the export probe read learningEvents[] of the real shape');
+      ok(e.checks.some(ch => /inside the fresh-proof window, is student A's/.test(ch.label) && ch.ok && /status 200/.test(ch.detail)), 'S7: a quick run (A signed in moments ago) reads A\'s own export');
+      ok(!e.pending, 'S7: no probe was left NOT VERIFIED on a verified isolation account');
       const isoId = report.accounts.find(a => a.role === 'B2 (isolation)').accountId;
       const practiceByIso = state.log.filter(r => /^\/v1\/practice\//.test(r.path) && r.accountId === isoId);
       ok(practiceByIso.length === 4 && practiceByIso.every(r => r.status === 404), 'the fake host saw exactly four practice calls from the isolation account (submit, recognize, reveal, repeat) and refused each with 404');
@@ -981,13 +1082,15 @@ const scratch = [];
     try {
       const report = await runAcceptance(baseArgs(origin, { nonInteractive: true, tester: null }), { prompt: null, log: line => lines.push(line), pictures: fakePictures, outDir });
       const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
-      eq(status['0'], STATUS.PASS, 'non-interactive: preflight still runs');
-      eq(status.A, STATUS.NOT_VERIFIED, 'non-interactive: A is NOT VERIFIED, not failed');
-      ok(status.C === STATUS.SKIPPED && status.D === STATUS.SKIPPED && status.E === STATUS.SKIPPED, 'non-interactive: C, D, E are skipped for want of a session');
+      eq(status.S0, STATUS.PASS, 'non-interactive: preflight still runs');
+      eq(status.S1, STATUS.NOT_VERIFIED, 'non-interactive: S1 is NOT VERIFIED, not failed');
+      ok(status.S4 === STATUS.SKIPPED && status.S5 === STATUS.SKIPPED && status.S6 === STATUS.SKIPPED && status.S7 === STATUS.SKIPPED, 'non-interactive: S4, S5, S6, S7 are skipped for want of a session');
+      ok(status.S3 === STATUS.SKIPPED && report.steps.find(s => s.id === 'S3').notes.some(n => /confirmed at S2/.test(n)), 'non-interactive: S3 is skipped: no child was confirmed at S2');
       eq(exitCodeFor(report), 3, 'exit 3 when a human step is open');
-      ok(lines.some(l => l.startsWith('HUMAN STEP [A]:')), 'non-interactive: the human step is printed');
+      ok(lines.some(l => l.startsWith('HUMAN STEP [S1]:')) && lines.some(l => l.startsWith('HUMAN STEP [S2]:')), 'non-interactive: the human steps are printed');
       eq(state.accounts.size, 0, 'non-interactive: no account was created (no code was ever typed)');
-      ok(state.log.filter(r => r.path === '/v1/account/otp/request').length === 2, 'the two codes (A, child) were requested so the human can find them');
+      ok(state.log.filter(r => r.path === '/v1/account/otp/request').length === 2, 'the two codes (S1, the child at S2) were requested so the human can find them');
+      eq(state.log.filter(r => r.path === '/v1/account/guardian/withdraw').length, 0, 'non-interactive: nothing was withdrawn');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -1029,38 +1132,38 @@ const scratch = [];
       const report = await runAcceptance(baseArgs(origin, { target: 'production', cleanup: true }), { prompt: humanFor(state), log: line => lines.push(line), pictures: fakePictures, outDir, nominate: passing });
       const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
       const failures = report.steps.flatMap(s => s.checks.filter(c => !c.ok).map(c => `${s.id}: ${c.label} (${c.detail || ''})`));
-      ok(['0', 'A', 'B', 'C', 'D', 'E', 'F'].every(id => status[id] === STATUS.PASS), `a nominated production run passes every step including cleanup (failures: ${failures.join(' | ') || 'none'})`);
-      eq(state.accounts.size, 0, 'cleanup deleted every account the run created');
-      ok(report.humanSteps.filter(h => h.step === 'F').length === 3, 'cleanup names the three deletion codes a human reads (A, the child and the isolation account: all are code accounts)');
+      ok(STEP_IDS.every(id => status[id] === STATUS.PASS), `a nominated production run passes every step S0–S8 including cleanup (failures: ${failures.join(' | ') || 'none'})`);
+      eq(state.accounts.size, 0, 'cleanup deleted every account the run created (the withdrawn child included)');
+      ok(report.humanSteps.filter(h => h.step === 'S8').length === 3, 'cleanup names the three deletion codes a human reads (A, the child and the isolation account: all are code accounts)');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
-  // ── 3d′ · a host without the per-account ownership check FAILS step E ─────
+  // ── 3d′ · a host without the per-account ownership check FAILS S7 ────────
   {
     const { server, state, origin } = await fakeHost({ skipOwnership: true });
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     try {
       const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
-      const e = report.steps.find(s => s.id === 'E');
-      eq(e.status, STATUS.FAIL, 'E FAILS when a verified second account can act on A\'s question');
+      const e = report.steps.find(s => s.id === 'S7');
+      eq(e.status, STATUS.FAIL, 'S7 FAILS when a verified second account can act on A\'s question');
       const failed = e.checks.filter(ch => !ch.ok);
       const ownershipFailed = failed.filter(ch => /refused by ownership/.test(ch.label));
       ok(ownershipFailed.length === 4 && ownershipFailed.filter(ch => /status 20[01]/.test(ch.detail)).length === 3 && ownershipFailed.every(ch => !/QUESTION_NOT_FOUND/.test(ch.detail)), `all four ownership probes (submit, recognize, reveal, repeat) failed: submit, reveal and repeat were accepted, none was refused by ownership (${failed.map(ch => ch.detail).join('; ')})`);
       const exportFailed = failed.filter(ch => /export holds none of student A/.test(ch.label));
       ok(failed.length === 5 && exportFailed.length === 1 && /1 of A's/.test(exportFailed[0].detail), 'and the accepted foreign submit then shows up as A\'s row in B2\'s export — the export probe counts real rows');
-      ok(['0', 'A', 'B', 'C', 'D'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on E');
+      ok(['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on S7');
       eq(exitCodeFor(report), 1, 'exit 1: a missing ownership check is a failed release gate');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
-  // ── 3d″ · an export that leaks one of A's rows FAILS step E ───────────────
+  // ── 3d″ · an export that leaks one of A's rows FAILS S7 ──────────────────
   {
     const { server, state, origin } = await fakeHost({ leakExport: true });
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     try {
       const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
-      const e = report.steps.find(s => s.id === 'E');
-      eq(e.status, STATUS.FAIL, 'E FAILS when student B2\'s export carries one of A\'s learningEvents rows');
+      const e = report.steps.find(s => s.id === 'S7');
+      eq(e.status, STATUS.FAIL, 'S7 FAILS when student B2\'s export carries one of A\'s learningEvents rows');
       const failed = e.checks.filter(ch => !ch.ok);
       ok(failed.length === 1 && /export holds none of student A/.test(failed[0].label) && /2 of A's/.test(failed[0].detail), `exactly the export-row probe failed and it counted A's rows (${failed[0]?.detail})`);
       eq(exitCodeFor(report), 1, 'exit 1 on a leaking export');
@@ -1068,27 +1171,29 @@ const scratch = [];
   }
 
   // ── 3d″′ · a slow run: A's session is older than the export's fresh-proof window ──
-  // Three human mailbox reads sit between A's sign-in and E's export, so on
+  // Five human mailbox reads sit between A's S1 sign-in and S7's export, so on
   // staging A's session is usually past EXPORT_FRESH_MS by then. The contract
   // the branch of #521 made (requireRecentAuth) is that the cookie alone is
-  // then refused 401 REAUTH_REQUIRED naming otp — E PASSES on that refusal and
-  // does not report a false FAIL for the old "A exports 200" expectation.
+  // then refused 401 REAUTH_REQUIRED naming otp — S7 PASSES on that refusal and
+  // does not report a false FAIL for the old "A exports 200" expectation. S6's
+  // fresh sign-in is another session and does not refresh S1's.
   {
     const { server, state, origin } = await fakeHost();
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     const readCodes = humanFor(state);
-    // The scripted human takes eleven minutes to find B2's code (the third read).
-    const slowHuman = async () => { const item = state.mailbox.find(m => !m.read); if (item && /pri-iso/.test(item.to)) state.clockOffsetMs += EXPORT_FRESH_MS + 60_000; return readCodes(); };
+    // The scripted human takes eleven minutes to find B2's code (S7's read).
+    const slowHuman = async question => { if (/^\[S7\]/.test(question)) state.clockOffsetMs += EXPORT_FRESH_MS + 60_000; return readCodes(question); };
     try {
       const report = await runAcceptance(baseArgs(origin), { prompt: slowHuman, log: () => {}, pictures: fakePictures, outDir, now: state.now });
-      const e = report.steps.find(s => s.id === 'E');
+      const e = report.steps.find(s => s.id === 'S7');
       const failures = e.checks.filter(ch => !ch.ok).map(ch => `${ch.label} (${ch.detail})`);
-      eq(e.status, STATUS.PASS, `E PASSES when A's session has aged past the window (failures: ${failures.join(' | ') || 'none'})`);
-      ok(state.clockOffsetMs > EXPORT_FRESH_MS, 'the clock really was advanced past the window before E\'s export');
+      eq(e.status, STATUS.PASS, `S7 PASSES when A's S1 session has aged past the window (failures: ${failures.join(' | ') || 'none'})`);
+      ok(state.clockOffsetMs > EXPORT_FRESH_MS, 'the clock really was advanced past the window before S7\'s export');
+      eq(report.steps.find(s => s.id === 'S6').status, STATUS.PASS, 'S6 (before the delay) still passed');
       const refused = e.checks.find(ch => /older session is refused the export/.test(ch.label));
-      ok(refused?.ok && /status 401 REAUTH_REQUIRED/.test(refused.detail) && /"otp"/.test(refused.detail), `E: A's stale cookie was refused 401 REAUTH_REQUIRED naming otp (${refused?.detail})`);
-      ok(!e.checks.some(ch => /inside the fresh-proof window/.test(ch.label)), 'E: the quick-run expectation (A exports 200) was not applied to a stale session');
-      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok), 'E: the shape probe still ran on B2, whose sign-in is fresh');
+      ok(refused?.ok && /status 401 REAUTH_REQUIRED/.test(refused.detail) && /"otp"/.test(refused.detail), `S7: A's stale cookie was refused 401 REAUTH_REQUIRED naming otp (${refused?.detail})`);
+      ok(!e.checks.some(ch => /inside the fresh-proof window/.test(ch.label)), 'S7: the quick-run expectation (A exports 200) was not applied to a stale session');
+      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok), 'S7: the shape probe still ran on B2, whose sign-in is fresh');
       const exportsByA = state.log.filter(r => r.path === '/v1/account/export' && r.accountId === report.accounts.find(a => a.role === 'A')?.accountId);
       ok(exportsByA.length === 1 && exportsByA[0].status === 401, `the fake host saw exactly one export call from A and refused it (${JSON.stringify(exportsByA)})`);
       eq(exitCodeFor(report), 0, 'exit 0: a refusal the contract requires is not a failure');
@@ -1098,31 +1203,33 @@ const scratch = [];
   // ── 3d‴ · an unverified second account must not count as an isolation PASS ──
   {
     // A host that signs an OTP account in without marking it verified: the
-    // ownership probes are not run and E stays NOT VERIFIED (exit 3), never PASS.
+    // ownership probes are not run and S7 stays NOT VERIFIED (exit 3), never PASS.
     const { server, state, origin } = await fakeHost();
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     try {
       state.unverifiedSignups = true;
-      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['B']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
-      const e = report.steps.find(s => s.id === 'E');
-      ok(e.checks.some(ch => /mailbox counts as verified/.test(ch.label) && !ch.ok), 'E records that the isolation account is not verified');
-      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'E does not run the ownership probes on an unverified account (EMAIL_UNVERIFIED proves nothing)');
-      ok(e.pending && report.humanSteps.some(h => h.step === 'E' && /NOT run/.test(h.text)), 'the skipped probes are named as NOT run, for a human');
-      ok(e.status !== STATUS.PASS, `E is ${e.status}, never PASS, on an unverified isolation account`);
+      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['S2']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'S7');
+      ok(e.checks.some(ch => /mailbox counts as verified/.test(ch.label) && !ch.ok), 'S7 records that the isolation account is not verified');
+      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'S7 does not run the ownership probes on an unverified account (EMAIL_UNVERIFIED proves nothing)');
+      ok(e.pending && report.humanSteps.some(h => h.step === 'S7' && /NOT run/.test(h.text)), 'the skipped probes are named as NOT run, for a human');
+      ok(e.status !== STATUS.PASS, `S7 is ${e.status}, never PASS, on an unverified isolation account`);
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
-  // ── 3d⁗′ · --skip C,D leaves A without a question: E must not read PASS ───
+  // ── 3d⁗′ · --skip S4,S5 leaves A without a question: S7 must not read PASS ─
   {
     const { server, state, origin } = await fakeHost();
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     try {
-      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['C', 'D']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
-      const e = report.steps.find(s => s.id === 'E');
-      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'E runs no ownership probe when A issued no question');
-      ok(e.pending && report.humanSteps.some(h => h.step === 'E' && /NOT run/.test(h.text)), 'the unrun probes are named as NOT run, for a human');
-      eq(e.status, STATUS.NOT_VERIFIED, 'E is NOT VERIFIED, never PASS, without the ownership probes');
-      eq(exitCodeFor(report), 3, 'exit 3: nothing failed but E is open');
+      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['S4', 'S5']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'S7');
+      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'S7 runs no ownership probe when A issued no question');
+      ok(e.pending && report.humanSteps.some(h => h.step === 'S7' && /NOT run/.test(h.text)), 'the unrun probes are named as NOT run, for a human');
+      eq(e.status, STATUS.NOT_VERIFIED, 'S7 is NOT VERIFIED, never PASS, without the ownership probes');
+      const r6 = report.steps.find(s => s.id === 'S6');
+      ok(r6.status === STATUS.SKIPPED && r6.notes.some(n => /needs an attempt S4 or S5 marked/.test(n)) && !report.humanSteps.some(h => h.step === 'S6'), 'S6 is skipped, asking no code, when S4 and S5 marked nothing');
+      eq(exitCodeFor(report), 3, 'exit 3: nothing failed but S7 is open');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -1141,12 +1248,100 @@ const scratch = [];
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     try {
       state.accounts.set('acct-owner', { id: 'acct-owner', email: 'owner@example.test', name: 'Owner', verified: true, ageBasis: 'adult', consent: 'not-required', password: null, events: [] });
-      const report = await runAcceptance(baseArgs(origin, { cleanup: true, skip: new Set(['B', 'E']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir, nominate: async () => ({ ok: true, results: [] }) });
+      const report = await runAcceptance(baseArgs(origin, { cleanup: true, skip: new Set(['S2', 'S7']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir, nominate: async () => ({ ok: true, results: [] }) });
       const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
-      ok(status.A === STATUS.PASS && status.B === STATUS.SKIPPED && status.E === STATUS.SKIPPED, 'an existing address signs in (no profile needed); --skip is honoured');
+      ok(status.S1 === STATUS.PASS && status.S2 === STATUS.SKIPPED && status.S7 === STATUS.SKIPPED, 'an existing address signs in (no profile needed); --skip is honoured');
+      ok(status.S3 === STATUS.SKIPPED && report.steps.find(s => s.id === 'S3').notes.some(n => /confirmed at S2/.test(n)), 'S3 is skipped when S2 is: there is no confirmed child to withdraw');
+      eq(status.S6, STATUS.PASS, 'S6: the pre-existing account comes back and gets this run\'s attempts back');
       ok(state.accounts.has('acct-owner'), 'cleanup never deletes an account that existed before the run');
       ok(report.accounts.find(a => a.role === 'A').created === false, 'the report says the account was not created by this run');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3h · a host that keeps issuing questions after a withdrawal FAILS S3 ──
+  {
+    const { server, state, origin } = await fakeHost({ issueAfterWithdrawal: true });
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const w = report.steps.find(s => s.id === 'S3');
+      eq(w.status, STATUS.FAIL, 'S3 FAILS when the withdrawn child is still issued a question');
+      const failed = w.checks.filter(ch => !ch.ok);
+      ok(failed.length === 1 && /next question is refused/.test(failed[0].label) && /status 201/.test(failed[0].detail) && /a question was issued/.test(failed[0].detail), `exactly the refusal probe failed, naming the 201 (${failed.map(ch => `${ch.label}: ${ch.detail}`).join('; ')})`);
+      ok(w.checks.some(ch => /state is now withdrawn/.test(ch.label) && ch.ok), 'the state probe still held: the defect is the issuance, not the record');
+      ok(['S0', 'S1', 'S2', 'S4', 'S5', 'S6', 'S7'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on S3');
+      eq(exitCodeFor(report), 1, 'exit 1: a child served after withdrawal is a failed release gate');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3i · a host that loses an attempt on a returning sign-in FAILS S6 ─────
+  {
+    const { server, state, origin } = await fakeHost({ loseAttempt: true });
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const r6 = report.steps.find(s => s.id === 'S6');
+      eq(r6.status, STATUS.FAIL, 'S6 FAILS when the returning student\'s History is missing an attempt S4 marked');
+      const s4Attempt = report.steps.find(s => s.id === 'S4').notes.join(' ').match(/attempt ([0-9a-f-]{36})/)?.[1];
+      const failed = r6.checks.filter(ch => !ch.ok);
+      ok(failed.length === 1 && /comes back, once, by attempt id/.test(failed[0].label) && /^1\/2 back; missing /.test(failed[0].detail) && !!s4Attempt && failed[0].detail.includes(s4Attempt), `exactly the comeback probe failed and it names S4's attempt (${failed[0]?.detail})`);
+      ok(r6.checks.some(ch => /carries the question, submission and mark/.test(ch.label) && ch.ok && ch.detail === '1 match'), 'the attempt that did come back still matches its mark');
+      ok(['S4', 'S5'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'S4 and S5 passed: each saw its attempt in History before the returning sign-in');
+      ok(['S0', 'S1', 'S2', 'S3', 'S7'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on S6');
+      eq(exitCodeFor(report), 1, 'exit 1: History lost on a returning sign-in is a failed release gate');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3j · S3 never withdraws a child account that existed before the run ───
+  {
+    const { server, state, origin } = await fakeHost();
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      state.accounts.set('acct-kid', { id: 'acct-kid', email: 'kid@example.test', name: 'Kid', verified: true, ageBasis: 'child', consent: 'pending', password: null, events: [] });
+      const report = await runAcceptance(baseArgs(origin, { childEmail: 'kid@example.test', skip: new Set(['S4', 'S5', 'S6', 'S7']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
+      eq(status.S2, STATUS.PASS, 'S2 approves the pre-existing pending child (the ceremony runs)');
+      const w = report.steps.find(s => s.id === 'S3');
+      ok(w.status === STATUS.NOT_VERIFIED && w.notes.some(n => /existed before this run/.test(n)), `S3 stays NOT VERIFIED and says why (${w.notes.join(' | ')})`);
+      ok(!report.humanSteps.some(h => h.step === 'S3') && state.log.every(r => r.path !== '/v1/account/guardian/withdraw'), 'S3 asked for no link and sent no withdrawal');
+      eq(state.accounts.get('acct-kid').consent, 'given', 'the pre-existing child\'s consent is left as the parent gave it');
+      eq(exitCodeFor(report), 3, 'exit 3: nothing failed, S3 is open');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3k · the S3 link reader and the S6 attempt matcher ────────────────────
+  {
+    const token = randomBytes(32).toString('base64url');
+    const parsed = withdrawalTokenFrom(`https://h.example/guardian/consent#action=guardian-consent&token=${token}`);
+    ok(parsed.token === token && parsed.origin === 'https://h.example' && parsed.problem === null, 'the approval email\'s link gives its token, read from the fragment');
+    eq(withdrawalTokenFrom(`https://h.example/account-action#action=guardian-withdraw&token=${token}`).token, token, 'the later withdrawal link is read too');
+    ok(withdrawalTokenFrom(`  ${token}\n`).token === token && withdrawalTokenFrom(token).origin === null, 'a bare token is accepted');
+    for (const [label, text] of [
+      ['an empty paste', ''], ['a sign-in code', '123456'], ['a verify-email link', `https://h.example/account-action#action=verify-email&token=${token}`],
+      ['a consent link on the wrong page', `https://h.example/account-action#action=guardian-consent&token=${token}`], ['a link without a token', 'https://h.example/guardian/consent#action=guardian-consent'],
+      ['a token in the query, not the fragment', `https://h.example/guardian/consent?action=guardian-consent&token=${token}`]
+    ]) {
+      const result = withdrawalTokenFrom(text);
+      ok(result.token === null && typeof result.problem === 'string' && !result.problem.includes(token), `${label} gives no token, and the problem never echoes one`);
+    }
+    const want = [
+      { step: 'S4', attemptId: 'a1', questionId: 'q1', submissionId: 's1', marksEarned: 3, marksPossible: 3, correct: true },
+      { step: 'S5', attemptId: 'a2', questionId: 'q2', submissionId: 's2', marksEarned: 0, marksPossible: 3, correct: false }
+    ];
+    const row = (w, extra = {}, payload = {}) => ({ id: w.attemptId, kind: 'graded-attempt', deviceId: 'server-grader', entityId: w.questionId, ...extra,
+      payload: { attemptId: w.attemptId, questionId: w.questionId, submissionId: w.submissionId, marksEarned: w.marksEarned, marksPossible: w.marksPossible, correct: w.correct, ...payload } });
+    let back = returnedAttempts(want, [row(want[0]), row(want[1])]);
+    ok(back.matched.length === 2 && !back.missing.length && !back.mismatched.length && !back.duplicated.length, 'both attempts back with their marks: matched');
+    back = returnedAttempts(want, [row(want[0])]);
+    ok(back.missing.join() === 'a2' && back.matched.length === 1, 'a lost attempt is missing');
+    back = returnedAttempts(want, [row(want[0]), row(want[1], {}, { marksEarned: 3, correct: true })]);
+    ok(back.mismatched.map(m => m.attemptId).join() === 'a2', 'a changed mark is a mismatch');
+    back = returnedAttempts(want, [row(want[0]), row(want[1], { deviceId: 'device-1' })]);
+    ok(back.missing.join() === 'a2', 'a device-written row is not a server mark (the app\'s History skips it too)');
+    back = returnedAttempts(want, [row(want[0]), row(want[1], { entityId: 'q9' })]);
+    ok(back.missing.join() === 'a2', 'a row whose entityId is not its payload\'s question is skipped, as the app skips it');
+    back = returnedAttempts(want, [row(want[0]), row(want[0]), row(want[1])]);
+    ok(back.duplicated.join() === 'a1', 'an attempt returned twice is caught');
   }
 
   // ── 3f · no tester, or a non-human tester, is refused on an interactive run ──
@@ -1281,22 +1476,54 @@ const scratch = [];
   // The fake host of §3 mirrors these two server contracts; this pins them to the
   // source so a renamed field or a reordered guard shows up here, not on staging.
   const accountsSrc = read('server/platform/accounts.js');
-  ok(/format:\s*'pri-account-export-v1'/.test(accountsSrc) && /learningEvents:\s*events/.test(accountsSrc) && /\bentities\b/.test(accountsSrc) && !/^\s*events,\s*$/m.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export answers { format: pri-account-export-v1, learningEvents, entities } — the keys step E reads');
-  ok(/SELECT id,device_id,device_seq,kind,entity_id,/.test(accountsSrc), 'export learningEvents rows carry entity_id (the column step E filters on)');
-  ok(/requireSession\(db\), requireRecentAuth\(db\)/.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export is behind requireRecentAuth — the fresh-proof contract step E holds A\'s export to');
+  ok(/format:\s*'pri-account-export-v1'/.test(accountsSrc) && /learningEvents:\s*events/.test(accountsSrc) && /\bentities\b/.test(accountsSrc) && !/^\s*events,\s*$/m.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export answers { format: pri-account-export-v1, learningEvents, entities } — the keys S7 reads');
+  ok(/SELECT id,device_id,device_seq,kind,entity_id,/.test(accountsSrc), 'export learningEvents rows carry entity_id (the column S7 filters on)');
+  ok(/requireSession\(db\), requireRecentAuth\(db\)/.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export is behind requireRecentAuth — the fresh-proof contract S7 holds A\'s export to');
   const securitySrc = read('server/platform/security.js');
   const serverWindow = securitySrc.match(/export const REAUTH_FRESH_MS = ([^;]+);/)?.[1];
   eq(serverWindow && Function(`return (${serverWindow})`)(), EXPORT_FRESH_MS, `the runner's EXPORT_FRESH_MS equals the server's REAUTH_FRESH_MS (${serverWindow})`);
+  ok(/let at = Number\(session\?\.created_at\) \|\| 0;/.test(securitySrc), 'fresh proof is per session (its own created_at): S6\'s new sign-in does not refresh S1\'s session for S7\'s export');
   const practiceSrc = read('server/platform/practice.js');
-  ok(/router\.use\(requireSession\(db\), requireVerifiedEmail, requireRole\('student'\)\)/.test(practiceSrc), 'the practice router refuses unverified accounts before any ownership lookup (why step E signs B2 up by code)');
-  ok(/404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account\.'/.test(practiceSrc), 'the ownership refusal is 404 QUESTION_NOT_FOUND — what step E asserts');
-  for (const route of ['/:id/recognize', '/:id/repeat', '/:id/reveal', '/:id/submit']) ok(practiceSrc.includes(`router.post('${route}'`), `${route} is a practice route (the four ownership probes of step E)`);
+  ok(/router\.use\(requireSession\(db\), requireVerifiedEmail, requireRole\('student'\)\)/.test(practiceSrc), 'the practice router refuses unverified accounts before any ownership lookup (why S7 signs B2 up by code)');
+  ok(/404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account\.'/.test(practiceSrc), 'the ownership refusal is 404 QUESTION_NOT_FOUND — what S7 asserts');
+  for (const route of ['/:id/recognize', '/:id/repeat', '/:id/reveal', '/:id/submit']) ok(practiceSrc.includes(`router.post('${route}'`), `${route} is a practice route (the four ownership probes of S7)`);
   const syncSrc = read('server/platform/sync.js');
-  ok(/return \{ schemaVersion: SCHEMA, cursor: cutoff, hasMore: [^}]*, events, entities \};/.test(syncSrc), 'GET /v1/sync/pull answers { …, events, entities } — the key step E reads from B2\'s pull');
+  ok(/return \{ schemaVersion: SCHEMA, cursor: cutoff, hasMore: [^}]*, events, entities \};/.test(syncSrc), 'GET /v1/sync/pull answers { …, events, entities } — the key S7 reads from B2\'s pull');
+  // S3 · the withdrawal route, its refusal and the parent's link, pinned to the source the fake mirrors.
+  const withdrawRoute = accountsSrc.split("router.post('/guardian/withdraw'")[1]?.split("router.get('/guardian/state'")[0] || '';
+  ok(withdrawRoute.length > 0 && !/requireSession/.test(withdrawRoute) && /purpose = 'guardian-consent'/.test(withdrawRoute) && /res\.json\(\{ ok: true, withdrawn \}\)/.test(withdrawRoute),
+    'POST /v1/account/guardian/withdraw takes no session, accepts the approval link\'s guardian-consent token and answers { ok, withdrawn } — what S3 drives and checks');
+  const stateRoute = accountsSrc.split("router.get('/guardian/state'")[1]?.split('router.post(')[0] || '';
+  ok(/state: state\.state,/.test(stateRoute) && /\bblockerCode,/.test(stateRoute), 'GET /v1/account/guardian/state answers state and blockerCode — what S3 reads after the withdrawal');
+  const consentSrc = read('server/platform/guardianConsent.js');
+  ok(consentSrc.includes(`if (state.state === 'withdrawn') return '${CONSENT_WITHDRAWN.code}';`) && consentSrc.includes(`return res.status(${CONSENT_WITHDRAWN.status}).json({ error: { code, message } });`),
+    `a withdrawn consent is refused ${CONSENT_WITHDRAWN.status} ${CONSENT_WITHDRAWN.code} (guardianConsent.js) — the refusal S3 asserts`);
+  ok(read('server/platform/router.js').includes("router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));"), 'the consent gate stands in front of /v1/practice, so the child\'s next /practice/issue meets it');
+  ok(read('server/platform/otp.js').includes("if (channel === 'email') await queueAccountToken(db, accountId, destination, 'guardian-consent', now);"), 'an email parent is sent the approval link beside the code (the link S3 asks the human to copy)');
+  const deliverySrc = read('server/platform/authDelivery.js');
+  ok(deliverySrc.includes("kind === 'guardian-consent' ? '/guardian/consent' : '/account-action'") && deliverySrc.includes('url.hash = new URLSearchParams({ action: kind, token }).toString();'), 'the parent\'s link opens /guardian/consent with action and token in the fragment — the shape withdrawalTokenFrom reads');
+  ok(read('client/src/pages/GuardianConsent.jsx').includes('else await cloud.guardianWithdraw(linkToken);') && read('client/src/platform/cloudTransport.js').includes("guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } })"),
+    'the parent\'s own page withdraws through the same route with the link\'s token — S3 drives the product\'s path, not a test-only one');
+  // S6 · the graded-attempt row and the app's History filter.
+  ok(/'server-grader', COALESCE\(MAX\(device_seq\), 0\) \+ 1, 'graded-attempt'/.test(practiceSrc) && /attemptId, submissionId, questionId: qid, correct: response\.correct,\s*marksEarned: response\.marksEarned, marksPossible: response\.marksPossible,/.test(practiceSrc),
+    'a resolved submit writes the server-grader graded-attempt row whose payload carries attemptId, submissionId, questionId, correct and the marks — what S6 matches');
+  ok(/serverCursor: row\.server_cursor, id: row\.id, deviceId: row\.device_id, deviceSeq: row\.device_seq, kind: row\.kind,\s*entityId: row\.entity_id, occurredAt: row\.occurred_at, payload: parseJson\(row\.payload_json, \{\}\)/.test(syncSrc),
+    'GET /v1/sync/pull events carry id, deviceId, kind, entityId and payload — the fields S6 reads');
+  const workerSrc = read('client/src/platform/syncWorker.js');
+  ok(/row\.kind !== 'graded-attempt' \|\| row\.deviceId !== 'server-grader' \|\|\s*row\.eventId !== row\.payload\?\.attemptId \|\|\s*row\.entityId !== row\.payload\?\.questionId/.test(workerSrc) && /eventId: event\.id/.test(workerSrc),
+    'the app\'s History counts only server-grader graded-attempt rows keyed by their attempt and question — the filter returnedAttempts mirrors');
+  ok(/const raw = await cloud\.syncPull\(cursor\);/.test(workerSrc) && /if \(!raw\.hasMore\) break;/.test(workerSrc) && /for \(let page = 0; page < 100; page\+\+\)/.test(workerSrc), 'the app pulls from its cursor while hasMore, at most 100 pages — the walk S6 makes');
   const readme = read('tools/acceptance/README.md');
-  ok(/# Staging acceptance A–D/.test(readme) && /HUMAN STEP/.test(readme) && /SYNTHETIC/.test(readme), 'tools/acceptance/README.md documents the staging acceptance and its evidence classes');
-  ok(/QUESTION_NOT_FOUND/.test(readme) && /EMAIL_UNVERIFIED/.test(readme) && !/needs no action/.test(readme), 'the README says E uses a verified code account and asserts the ownership refusal, not merely non-success');
-  ok(/takeover|pre-registration/i.test(readme), 'the README warns about the unverified-password-account takeover on step A');
+  ok(/# Staging acceptance S0–S8/.test(readme) && /HUMAN STEP/.test(readme) && /SYNTHETIC/.test(readme), 'tools/acceptance/README.md documents the staging acceptance and its evidence classes');
+  ok(!/acceptance A–[DF]|steps 0, A/.test(readme) && /Gates A–D/.test(readme), 'the README names the steps S0–S8, never by letter, and says why (issue #686\'s Gates A–D)');
+  ok(STEP_IDS.every(id => readme.includes(`| ${id} |`)), 'the README\'s step table has a row for every step S0–S8');
+  ok(/QUESTION_NOT_FOUND/.test(readme) && /EMAIL_UNVERIFIED/.test(readme) && !/needs no action/.test(readme), 'the README says S7 uses a verified code account and asserts the ownership refusal, not merely non-success');
+  ok(/GUARDIAN_CONSENT_WITHDRAWN/.test(readme) && /\/v1\/account\/guardian\/withdraw/.test(readme) && /sync\/pull/.test(readme), 'the README documents S3\'s withdrawal and refusal and S6\'s History read');
+  ok(/takeover|pre-registration/i.test(readme), 'the README warns about the unverified-password-account takeover on S1');
+  for (const doc of ['scripts/release-dossier.mjs', 'scripts/release-nominate.mjs', 'docs/release/production-cutover-checklist.md', 'docs/release/PERMANENT-DEPLOYMENT-AUTOMATION.md', 'docs/release/device-matrix.md', 'docs/operations/postgres-cutover.md']) {
+    const text = read(doc);
+    ok(!/acceptance A–[DF]|staging-acceptance\.mjs`? A–F|steps? 0,? (and )?A–[EF]/.test(text), `${doc} no longer names the acceptance steps by letter`);
+  }
   const pkg = JSON.parse(read('package.json'));
   ok(pkg.scripts['test:release:prep']?.includes('tools/release-prep.test.mjs') && pkg.scripts['test:release:prep'].includes('device-matrix-record.mjs validate'), 'test:release:prep runs this file and the ledger validation');
   ok(pkg.scripts['test:release:prep'].includes('node client/test/q4-release-negative-controls.mjs') && pkg.scripts['test:release:prep'].includes('node client/test/release-source-policy-consistency-check.mjs'),

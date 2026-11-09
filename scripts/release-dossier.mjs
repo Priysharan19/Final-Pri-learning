@@ -13,7 +13,7 @@
 //     in the operator's record is at least 24 h, staging served the SHA before
 //     it began, no incident is recorded, and origin/main has not moved past the
 //     SHA (a later merge redeploys staging and voids the soak, §4.6);
-//   · staging acceptance A–D by a named human (tools/acceptance);
+//   · staging acceptance S0–S8 by a named human (tools/acceptance);
 //   · the physical-device matrix rows for the SHA (PHYSICAL-HUMAN /
 //     BLOCKED-EXTERNAL) and the real-human reader evaluation naming the SHA;
 //   · step 23 — the gates only people can close (examiner, counsel, security,
@@ -233,9 +233,9 @@ export async function buildDossier({
       ahead === 0 ? 'origin/main is this SHA' : `${ahead} commit(s) on origin/main after the SHA (tip ${tip.slice(0, 12)}); the soak clock belongs to one SHA (§4.6)`);
   } catch (error) { row(25, false, 'merge freeze held: origin/main has not moved past the SHA', error?.message || String(error)); }
 
-  // ── §4.6 step 3: staging acceptance A–D ────────────────────────────────────
+  // ── §4.6 step 3: staging acceptance S0–S8 ──────────────────────────────────
   const tester = human(rec.acceptance?.tester);
-  row('acceptance', rec.acceptance?.result === 'PASS' && tester !== null, 'staging acceptance A–D passed, run by a named human (tools/acceptance/staging-acceptance.mjs)',
+  row('acceptance', rec.acceptance?.result === 'PASS' && tester !== null, 'staging acceptance S0–S8 passed, run by a named human (tools/acceptance/staging-acceptance.mjs)',
     rec.acceptance?.result ? `${rec.acceptance.result}${tester ? ' by ' + tester : ' (tester not a named human)'}${rec.acceptance.report ? ' · ' + rec.acceptance.report : ''}${rec.acceptance.at ? ' · ' + rec.acceptance.at : ''}` : 'acceptance not recorded',
     { who: tester || '', evidenceClass: 'real mailbox / synthetic pictures / test accounts (the report labels each step)' });
 
@@ -333,7 +333,7 @@ export function renderMarkdown(result, { device, reader } = {}) {
   lines.push('## Release-stage nomination (`scripts/release-nominate.mjs`)', '', table(by('nominate')), '');
   lines.push('| | Nomination row | Detail |', '|---|---|---|', ...nomination.results.map(r => `| ${r.ok === null ? '·' : r.ok ? '✓' : '✗'} | ${cell(r.label)} | ${cell(r.detail || '')} |`), '');
   lines.push('## Step 25 — staging proof and the 24 h soak under a merge freeze', '', table(by(25)), '');
-  lines.push('## Staging acceptance A–D (§4.6 step 3)', '', table(by('acceptance')), '');
+  lines.push('## Staging acceptance S0–S8 (§4.6 step 3)', '', table(by('acceptance')), '');
   lines.push('## Physical-device matrix for this SHA', '', ...by('device').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');
   if (device?.summary) lines.push(reportMarkdown(device.summary), '');
   lines.push('## Server reader evidence for this SHA', '', ...by('reader').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');
