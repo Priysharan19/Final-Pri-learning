@@ -53,6 +53,18 @@ for (const line of ['area = 462', 'Area = 462', 'total area = 462', 'Total surfa
 for (const line of ['A = l b', 'area = l * b', '2l + 2b = P', 'area = π r^2', 'V = l*b*h + 2*r*h']) {
   ok(!statesAConstant(line), `"${line}" relates letters: not a stated constant`);
 }
+
+// ALLOWLIST (#831 round 4): judged only when every side depends on a free variable and the relation has two letters.
+{
+  const f = answerForm({ answerText: '462 cm²' });
+  for (const line of ['area = [462]', 'area = sqrt(213444)', 'area = abs(462)', 'area = |462|', 'area = 462!', 'area = (462)', 'A = 4.62e2',
+    'A = x - x + 462', 'A + B - B = 462', 'l*b', 'area = {462}', 'A = 2*462/2', 'A = 462^1', '@@ = 3', 'area = 462 ✓', 'A = cos(0)*462']) {
+    eq(firstFinalAttempt([line], f), 0, `"${line}" is not judged (a side reduces to a number, one letter, a bare expression or unreadable)`);
+  }
+  for (const line of ['A = l * b', 'V = l*b*h + 2*r*h', 'P = 2*l + 2*b', 'A = π*r^2']) {
+    eq(firstFinalAttempt([line], f), -1, `"${line}" relates two or more letters on both sides: judged`);
+  }
+}
 eq(stripUnits('m = 2'), 'm = 2', 'a variable named like a unit is never stripped');
 ok(['36036 cm³', '₹ 450', '56/65', '-3'].every(isConstantAnswer), 'a bare constant answer is recognised through its unit');
 ok(!['y = 2x + 1', 'x^2 + 2x + 1'].some(isConstantAnswer), 'an answer with a symbol is not a constant');

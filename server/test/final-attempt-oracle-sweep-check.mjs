@@ -105,6 +105,48 @@ for (const id of Object.keys(GENERATORS)) {
   }
 }
 
+// ── The reviewer's round-4 shape set (probes826/shapes3.mjs), ported whole ──
+// 53 ways to write a final value under each plan stage's own label words,
+// alone and after the plan's earlier stages, right vs three wrong values —
+// brackets, sqrt, abs, factorial, sci notation, LaTeX \text/\frac, arrows,
+// emoji, quotes, Devanagari digits, subscripts. Every pair must be identical.
+let r4 = 0;
+{
+  const sci = v => { const e = Math.floor(Math.log10(Math.abs(v) || 1)); return `${+(v / 10 ** e).toPrecision(12)}e${e}`; };
+  const SH = (w, v) => [
+    `${v} is the ${w}`, `${w} ≈ ${v}`, `${v} (approx)`, `A=${v}.0`, `A=${sci(v)}`, `${w}=${v} ✓`, `${w} = ${v} 🎉`, `\\text{${w}}=${v}`, `\\text{${w}} = ${v}\\,\\text{cm}^2`,
+    `${w} = ${v}`, `${w}: ${v}`, `${w} is ${v}`, `${w} = ${v}.00`, `${w} = +${v}`, `${w} = (${v})`, `${w} = ${v}/1`, `${w} = 2*${v}/2`, `${w} = ${v} + 0`, `${w} = ${v}*1`,
+    `${w}=${v};`, `${w} = ${v} exactly`, `${w} = ${v}!`, `${w}=${v}\n`, `${w}\t=\t${v}`, `${w} = ${v} → done`, `${w} ⇒ ${v}`, `${w} -> ${v}`, `${w} == ${v}`, `${w} := ${v}`,
+    `${w} = ${String(v).replace('.', ',')}`, `${w} = ${v}`.replace(/\d/g, d => String.fromCharCode(0x0966 + +d)), `${w}=\\frac{${2 * v}}{2}`, `${w} = \\dfrac{${2 * v}}{2}`, `${w}=${v}\\%`,
+    `${w} = |${v}|`, `${w} = sqrt(${v * v})`, `${w} = √${v * v}`, `${w} = ${v}^1`, `${w} = 1*${v}`, `so ${w} = ${v}`, `∴ ${w} = ${v}`, `hence ${w} is ${v}`, `${w} = ${v} units`,
+    `${w}=${v} (ans)`, `${w}≅${v}`, `${w} ~ ${v}`, `${w} = ${v}…`, `${w} = '${v}'`, `${w} = "${v}"`, `${w} = [${v}]`, `${w} = {${v}}`, `${w}₁ = ${v}`, `${w}' = ${v}`
+  ];
+  for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (const seed of [7, 11, 23]) {
+    let q; try { q = generateQuestion(id, d, seed); } catch { continue; }
+    const meta = q && stepMetaFor(q);
+    if (meta?.kind !== 'plan' || q.answerType !== 'numeric') continue;
+    const v = Number(q.answer.value);
+    if (!Number.isFinite(v)) continue;
+    const answerText = String(answerTextFor(q) ?? '');
+    const words = [...new Set(meta.stages.filter(Boolean).flatMap(s => s.labels || []).concat(['area', 'dy/dx', 'total']))];
+    const pre = meta.stages.filter(Boolean).slice(0, -1).filter(s => s.source).map(s => `${s.labels?.[0] || 'k'} = ${s.source}`);
+    for (const w of words) for (const P of [[], pre]) {
+      const right = SH(w, v);
+      for (const x of [v + 1, v * 1.1, 7]) {
+        const wrong = SH(w, +x.toFixed(6));
+        right.forEach((line, i) => {
+          r4 += 1;
+          const a = JSON.stringify(lineCheckEvidence(q, [...P, line], answerText));
+          const b = JSON.stringify(lineCheckEvidence(q, [...P, wrong[i]], answerText));
+          if (a !== b) failures.push(`round-4 shape ${i} ${JSON.stringify(line)} (${id} D${d} seed ${seed}, after ${P.length} lines): ${a} | ${b}`);
+          else pass += 1;
+        });
+      }
+    }
+  }
+}
+ok(r4 >= 100000, `the round-4 shape set ran (${r4} probes)`);
+
 // The reviewer's exact repro.
 {
   const q = generateQuestion('c10-areas-circles', 1, 11);
@@ -119,5 +161,5 @@ ok(constantAnswers >= 20, `and their constant answers (${constantAnswers})`);
 
 console.log(failures.length
   ? `FINAL-ATTEMPT ORACLE SWEEP: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 40).join('\n  · ')}`
-  : `FINAL-ATTEMPT ORACLE SWEEP: PASS — ${pass}/${pass} checks — ${planQuestions} plan questions in ${banks.size} banks, ${constantAnswers} constant answers, right and wrong values byte-identical for every probe shape.`);
+  : `FINAL-ATTEMPT ORACLE SWEEP: PASS — ${pass}/${pass} checks — ${planQuestions} plan questions in ${banks.size} banks, ${constantAnswers} constant answers, ${r4} round-4 probes, right and wrong values byte-identical for every probe shape.`);
 process.exit(failures.length ? 1 : 0);

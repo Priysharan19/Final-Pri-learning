@@ -240,11 +240,19 @@ function claimIsAttempt(text, form) {
   const c = readClaimForm(stripUnits(text));
   if (!c) return true;
   if (form.constant) {
-    // Decided by which letters each side carries, never by the value.
-    if (c.shape === 'expr') return c.symbols.size === 0;
-    // STRUCTURAL: any equation or inequality whose free symbols are all one
-    // letter (case-folded) determines that letter — "V = 36036", "n*n = 19*n",
-    // "2n + 3 > 7" — so it is an attempt whatever its form.
+    // ALLOWLIST (#831 review round 4). With a constant answer a line is judged
+    // ONLY when it is a relation the engine parsed whole, in which EVERY side
+    // depends on at least one free variable (effective symbols, so "x - x"
+    // or "2*v/2" is a constant) and the whole relation carries at least two
+    // distinct letters (a one-letter relation determines that letter). A side
+    // the evaluator reduces to a number — brackets, sqrt, abs, factorial,
+    // functions of constants, decimals, scientific notation — makes the line
+    // an attempt, and so does anything it cannot evaluate. Fail closed.
+    if (c.shape === 'expr') return true;
+    for (const side of c.sides || []) {
+      const eff = effectiveSymbols(side);
+      if (!eff || eff.size === 0) return true;
+    }
     return new Set([...c.symbols].map(s => String(s).toLowerCase())).size <= 1;
   }
   // VALUE SIDE: any side of the line (or the line itself) that depends on
