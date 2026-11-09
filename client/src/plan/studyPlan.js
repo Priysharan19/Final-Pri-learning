@@ -55,7 +55,8 @@ export const REASON_KEYS = Object.freeze({
 // ── Repeated slips and the mistake notebook ──────────────────────────────────
 
 const SLIP_LABEL_MAX = 120;
-const SLIP_GAP_DAYS = 3;   // the same slip is planned again no sooner than this
+const SLIP_REPEAT_MIN = 2;  // one mistake is not a pattern: "keeps coming back" needs two
+const SLIP_GAP_DAYS = 7;    // a repeated slip comes back once a week, no more
 
 /**
  * The slips worth a session of their own, worst first, one per chapter:
@@ -77,15 +78,18 @@ export function slipFocus({ misconceptions = [], notebook = null } = {}) {
   for (const m of Array.isArray(misconceptions) ? misconceptions : []) {
     const n = Math.max(0, Number(m?.count) || 0);
     const label = clean(m?.label);
-    if (!label || n < 2) continue;
+    if (!label || n < SLIP_REPEAT_MIN) continue;
     add(m.subtopic, r => (n > r.repeats ? { ...r, label, repeats: n } : r));
   }
   for (const g of Array.isArray(notebook?.groups) ? notebook.groups : []) {
     const open = Math.max(0, Number(g?.open) || 0);
     const due = (Array.isArray(g?.items) ? g.items : []).filter(i => i?.review?.due === true && !i.fixed).length;
     if (!open && !due) continue;
-    const label = clean(g?.misconception?.label);
-    add(g.subtopic, r => ({ ...r, label: r.label || label, open: r.open + open, due: r.due + due }));
+    // The group's label counts as a repeated slip only when the group itself
+    // holds at least SLIP_REPEAT_MIN mistakes under it.
+    const n = Math.max(0, Number(g?.count) || 0);
+    const label = n >= SLIP_REPEAT_MIN ? clean(g?.misconception?.label) : null;
+    add(g.subtopic, r => ({ ...r, label: r.label || label, repeats: label ? Math.max(r.repeats, n) : r.repeats, open: r.open + open, due: r.due + due }));
   }
   return [...by.values()].sort((a, b) => b.due - a.due || b.repeats - a.repeats || b.open - a.open || a.subtopic.localeCompare(b.subtopic));
 }
@@ -225,9 +229,10 @@ function session(date, type, candidate, minutes, reasonKey, vars = {}) {
  *   candidates     override the derived candidate list (tests, previews)
  *   previous       the last plan, to pin today's sessions on a re-plan
  *   nowMs          the instant mastery is measured at (defaults to today, noon UTC)
- *   slips          slipFocus(...) rows: at most one "fix the slip" session a
- *                  day, after due reviews, each slip again no sooner than
- *                  SLIP_GAP_DAYS later
+ *   slips          slipFocus(...) rows: at most one such session a day, after
+ *                  due reviews. A repeated slip (≥ SLIP_REPEAT_MIN) recurs
+ *                  every SLIP_GAP_DAYS; notebook mistakes alone are planned
+ *                  once (today when a second try is due)
  *
  * Returns { generatedFor, settings, weeks, today, summary }.
  */
@@ -254,7 +259,7 @@ export function buildStudyPlan({
   const timesPlanned = new Map();  // candidate id → sessions planned so far (fairness)
   const pinnedToday = previous?.today?.date === start ? previous.today.sessions || [] : [];
   const slipRows = (Array.isArray(slips) ? slips : []).filter(s => s && index.get(s.subtopic));
-  const lastSlip = new Map();   // slip subtopic → day index last planned
+  const lastSlip = new Map();   // slip chapter id → day index last planned
 
   const weeks = [];
   let mockThisWeek = false;
@@ -331,18 +336,26 @@ export function buildStudyPlan({
     //      last SLIP_GAP_DAYS. A notebook second try that is due is named as
     //      that; otherwise the named slip; otherwise the open mistakes.
     if (!rest && remaining >= PLAN_LIMITS.minSession) {
+      const repeated = s => !!s.label && s.repeats >= SLIP_REPEAT_MIN;
       const slip = slipRows.find(s => {
         const c = index.get(s.subtopic);
         const last = lastSlip.get(c.id);
-        return !usedToday.has(c.id) && (last == null || d - last >= SLIP_GAP_DAYS);
+        if (usedToday.has(c.id)) return false;
+        // A notebook-only row is planned once; a repeated slip weekly.
+        if (!repeated(s)) return last == null;
+        return last == null || d - last >= SLIP_GAP_DAYS;
       });
       if (slip) {
         const c = index.get(slip.subtopic);
+        const first = !lastSlip.has(c.id);
         lastSlip.set(c.id, d);
-        const useDue = d === 0 && slip.due > 0;
+        // A due second try is named on its first placement; a repeated slip
+        // by its label; anything else is the open notebook count.
+        const asDue = first && slip.due > 0;
+        const n = Math.max(1, asDue ? slip.due : slip.open);
         place(session(date, 'practise', c, Math.min(SESSION_MINUTES.practise, remaining),
-          useDue || !slip.label ? 'notebook' : 'slip',
-          useDue || !slip.label ? { n: Math.max(1, useDue ? slip.due : slip.open), count: Math.max(1, useDue ? slip.due : slip.open) } : { slip: slip.label }));
+          !asDue && repeated(slip) ? 'slip' : 'notebook',
+          !asDue && repeated(slip) ? { slip: slip.label } : { n, count: n }));
       }
     }
 

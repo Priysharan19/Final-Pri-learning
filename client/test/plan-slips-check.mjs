@@ -42,12 +42,32 @@ check('the named slip gets its own session, naming it', () => {
   const s = slipSessions(plan).find(x => x.subtopic === 'ch-c');
   assert.ok(s, 'ch-c slip session'); assert.equal(s.reason.key, 'plan.reason.slip'); assert.equal(s.reason.vars.slip, 'drops the ± on the square root');
 });
-check('at most one slip session a day, the same slip no sooner than 3 days apart, unknown chapters never planned', () => {
+check('at most one slip session a day, a repeated slip weekly, unknown chapters never planned', () => {
   for (const d of days(plan)) assert.ok(d.sessions.filter(s => [REASON_KEYS.slip, REASON_KEYS.notebook].includes(s.reason.key)).length <= 1, d.date);
   const byChapter = {};
   for (const s of slipSessions(plan)) (byChapter[s.subtopic] ||= []).push(Date.parse(s.day));
-  for (const [id, list] of Object.entries(byChapter)) for (let i = 1; i < list.length; i++) assert.ok(list[i] - list[i - 1] >= 3 * 86400000, id);
+  for (const [id, list] of Object.entries(byChapter)) for (let i = 1; i < list.length; i++) assert.ok(list[i] - list[i - 1] >= 7 * 86400000, id);
   assert.ok(!slipSessions(plan).some(s => s.subtopic === 'zz-unknown'));
+});
+check('one notebook mistake is never called a repeated slip, and is planned once', () => {
+  const single = slipFocus({ notebook: { groups: [{ subtopic: 'ch-c', misconception: { label: 'drops the ±' }, count: 1, open: 1, items: [] }] } });
+  assert.equal(single[0].label, null);
+  const p = buildStudyPlan({ ...base, slips: single });
+  const s = slipSessions(p);
+  assert.equal(s.length, 1, 'planned once');
+  assert.equal(s[0].reason.key, 'plan.reason.notebook'); assert.equal(s[0].reason.vars.n, 1);
+});
+check('a notebook group of two under one label is a repeated slip', () => {
+  const two = slipFocus({ notebook: { groups: [{ subtopic: 'ch-c', misconception: { label: 'drops the ±' }, count: 2, open: 2, items: [] }] } });
+  assert.equal(two[0].label, 'drops the ±'); assert.equal(two[0].repeats, 2);
+  const s = slipSessions(buildStudyPlan({ ...base, slips: two }));
+  assert.ok(s.length >= 2 && s.every(x => x.reason.key === 'plan.reason.slip'), 'recurs weekly as a slip');
+});
+check('a due second try is named once, then the repeated slip takes over', () => {
+  const both = slipFocus({ misconceptions: [{ subtopic: 'ch-b', label: 'sign error', count: 3 }], notebook: { groups: [{ subtopic: 'ch-b', count: 1, open: 1, items: [{ fixed: false, review: { due: true } }] }] } });
+  const s = slipSessions(buildStudyPlan({ ...base, slips: both })).filter(x => x.subtopic === 'ch-b');
+  assert.equal(s[0].reason.key, 'plan.reason.notebook'); assert.equal(s[0].day, '2026-10-02');
+  assert.ok(s.slice(1).every(x => x.reason.key === 'plan.reason.slip'));
 });
 check('no slips: the plan is unchanged', () => assert.equal(JSON.stringify(buildStudyPlan(base)), JSON.stringify(buildStudyPlan({ ...base, slips: [] }))));
 check('usePlan feeds the notebook and /stats misconceptions in', () => {
