@@ -442,7 +442,7 @@ function onlineSession(platform, ctx, page) {
     if (shown.prompt !== null && q.prompt !== shown.prompt) {
       throw new Error('online-session: the server\'s sealed question is not the one on screen — the oracle refuses to guess');
     }
-    return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
+    return { answerType: q.answerType, answerPrefix: q.answerPrefix ?? null, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
   }
 
   // ── Exam papers: the server's sealed paper and its stored result ───────────

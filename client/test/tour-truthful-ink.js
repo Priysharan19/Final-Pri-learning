@@ -234,7 +234,10 @@ export const flow = {
     {
       // The page says the question's working can be step-checked only when the
       // server has step meta for it; the lines below are then checked by it.
-      const made = await openFresh({ topic: STEP_CHECKED });
+      // Only a question whose answer names its letter ("x =") has the step
+      // meta the server checks lines against (markerOps.stepMetaFor); the
+      // topic's later forms do not, so they are skipped.
+      const made = await openFresh({ topic: STEP_CHECKED, tries: 16, want: right => /^[a-z]\s*=$/i.test(String(right.answerPrefix || '')) });
       if (await check('checked method: a numeric question is on the card', !!made)) {
         const { right, box } = made;
         const lines = [String(right.text), String(right.text)];
