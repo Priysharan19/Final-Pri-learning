@@ -10,7 +10,8 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classifyStrokes, confirmGraphFeatures, parseValues, readGraphSketch, showValues } from '../src/ink/graphSketch.js';
+import { classifyStrokes, confirmGraphFeatures, geometryStrokes, labelGroups, parseLines, parsePoints, parseValues, readGraphSketch, showValues, splitSketchRegion, tickValuesFromLabels } from '../src/ink/graphSketch.js';
+import { proposeSketch, readSketchLabels } from '../src/ink/graphLabels.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 let pass = 0;
@@ -100,8 +101,66 @@ eq(parseValues('-2 3.5'), [-2, 3.5], 'spaces separate too');
 eq(parseValues('two'), null, 'words are refused');
 eq(parseValues('none'), [], '"none" is an empty list');
 
+
+// ── a page with written lines AND a graph ─────────────────────────────────────
+// Writing sits to the right of the axes box (x > 600); a digit-like squiggle per tick label.
+const squiggle = (cx, cy, s = 7) => ({ points: Array.from({ length: 13 }, (_, i) => ({ x: cx + Math.cos(i * 0.9) * s, y: cy + Math.sin(i * 0.9) * s + i * 0.3 })) });
+const writingLine = y => ({ points: Array.from({ length: 40 }, (_, i) => ({ x: 640 + i * 6, y: y + Math.sin(i) * 6 })) });
+const pageGraph = [...axes(), ...ticks(), curve(parab, -3, 4)];
+const tickLabels = [[2, 'x'], [4, 'x'], [2, 'y'], [4, 'y']].map(([k, a]) => (a === 'x' ? squiggle(O.x + k * U, O.y + 18) : squiggle(O.x - 20, O.y - k * U)));
+const page = [writingLine(80), ...pageGraph, ...tickLabels, writingLine(160)];
+const region = splitSketchRegion(page);
+ok(region.writing.length === 2 && region.sketch.length === pageGraph.length + tickLabels.length, `a page splits into 2 written lines and the sketch (${region.writing.length} / ${region.sketch.length})`);
+eq(splitSketchRegion([writingLine(80)]).sketch, [], 'a page without axes is all writing');
+const groups = labelGroups(region.sketch);
+eq(groups.length, 4, 'four label groups are found in the sketch');
+eq(geometryStrokes(region.sketch).length, pageGraph.length, 'label writing is kept out of the geometry');
+eq(readGraphSketch(region.sketch, { tickValues: { x: 1, y: 1 } }).intercepts.x, [-2, 3], 'the sketch reads the same with its labels on it');
+
+// ── labels: read alone, answer-blind, through the reader ─────────────────────
+const sent = [];
+const fakeRead = values => async (strokes, opts) => {
+  sent.push({ strokes, opts });
+  const i = sent.length - 1;
+  const v = values[i];
+  return v === undefined ? { reason: 'empty' } : { transcription: { lines: [{ text: String(v.text), confidence: v.c ?? 0.95 }] }, readiness: { confidenceFloor: 0.6 } };
+};
+const order = groups.map(g => (Math.abs(g.y - (O.y + 18)) < 5 ? { a: 'x', k: Math.round((g.x - O.x) / U) } : { a: 'y', k: Math.round((O.y - g.y) / U) }));
+const worth = { x: 2, y: 5 };
+const read1 = await readSketchLabels(groups, { user: { id: 'u' }, read: fakeRead(order.map(o => ({ text: o.k * worth[o.a] }))) });
+ok(read1.labels.length === 4 && read1.unread === 0, 'every label is read');
+ok(sent.every(x => Object.keys(x.opts).sort().join() === 'signal,user' && x.strokes.length <= 2), 'each label is sent alone, with only the user and a signal: no question, no answer');
+eq(tickValuesFromLabels(region.sketch, read1.labels), { x: 2, y: 5 }, 'the numbers next to ticks say what one tick is worth');
+eq(tickValuesFromLabels(region.sketch, read1.labels.slice(0, 1)), { x: null, y: null }, 'one number alone is not enough: ask');
+sent.length = 0;
+const low = await readSketchLabels(groups, { user: { id: 'u' }, read: fakeRead(order.map(o => ({ text: o.k, c: 0.3 }))) });
+ok(low.labels.length === 0 && low.unread === 4, 'labels read below the reader\'s floor are kept as unread');
+const refused = await readSketchLabels(groups, { user: { id: 'u' }, read: async () => ({ reason: 'declined' }) });
+ok(refused.stopped === 'declined' && refused.unread === 4, 'a declined D17 prompt stops every label read');
+sent.length = 0;
+const prop = await proposeSketch(region.sketch, { user: { id: 'u' }, read: fakeRead(order.map(o => ({ text: o.k * worth[o.a] }))) });
+eq(prop.intercepts.x, [-4, 6], 'the full proposal scales x by the label-read tick value (2)');
+ok(prop.scale.tickValue.x === 2 && prop.scale.tickValue.y === 5 && !prop.reasons.some(r => /taken as 1/.test(r)), 'and no longer asks what a tick is worth');
+const unreadProp = await proposeSketch(region.sketch, { user: { id: 'u' }, read: async () => ({ reason: 'declined' }) });
+ok(unreadProp.reasons.some(r => /not sent to be read/.test(r)) && unreadProp.reasons.some(r => /taken as 1/.test(r)), 'unread labels ask the student instead');
+
+// ── editing turning points and asymptotes ────────────────────────────────────
+eq(parsePoints('(0.5, −3), (2,1)'), [{ x: 0.5, y: -3 }, { x: 2, y: 1 }], 'points parse');
+eq(parsePoints('(1, 2) junk'), null, 'anything else beside points is refused');
+eq(parseLines('x = 1, y = −2'), [{ axis: 'x', value: 1 }, { axis: 'y', value: -2 }], 'asymptote lines parse');
+eq(parseLines('z = 3'), null, 'an unknown line is refused');
+const conf2 = confirmGraphFeatures(p, { turning: [{ x: 2, y: -3 }], asymptotes: [{ axis: 'x', value: 1 }] });
+ok(conf2.turning[0].x === 2 && conf2.asymptotes[0].value === 1, 'turning point and asymptote edits reach the confirmed set');
+
+// ── wiring ───────────────────────────────────────────────────────────────────
+const ink = readFileSync(join(ROOT, 'client/src/ink/InkAnswer.jsx'), 'utf8');
+ok(/splitSketchRegion\(strokes\)/.test(ink) && /readWithCloud\(lineStrokes/.test(ink) && /proposeSketch\(region\.sketch/.test(ink), 'the ink page reads lines without the sketch, and the sketch as a graph');
+ok(/onGraphRef\.current\?\.\(null\)/.test(ink), 'a changed page withdraws what was confirmed');
+const card = readFileSync(join(ROOT, 'client/src/components/QuestionCard.jsx'), 'utf8');
+ok(/onGraphFeatures=\{setGraphFeatures\}/.test(card) && /graph: graphFeatures \} : \{\}\), scribble/.test(card) && /graph: graphFeatures \} : \{\}\) \}\}/.test(card), 'the question sends the confirmed set with Check and to "What went wrong?"');
+
 // ── answer-blind ──────────────────────────────────────────────────────────────
-for (const rel of ['client/src/ink/graphSketch.js', 'client/src/ink/GraphSketchConfirm.jsx']) {
+for (const rel of ['client/src/ink/graphSketch.js', 'client/src/ink/GraphSketchConfirm.jsx', 'client/src/ink/graphLabels.js']) {
   const src = readFileSync(join(ROOT, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   ok(!/\b(answer|expected|solution|mark(s|ing)?|correct)\b/i.test(src.replace(/confirm/gi, '')) && !/import .*(engine|marking|question)/.test(src),
     `${rel} names no answer, expected value, solution or mark and imports no engine`);

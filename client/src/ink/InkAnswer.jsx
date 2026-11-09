@@ -37,6 +37,9 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
+import { splitSketchRegion } from './graphSketch.js';
+import { proposeSketch } from './graphLabels.js';
+import GraphSketchConfirm from './GraphSketchConfirm.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -99,7 +102,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, onGraphFeatures = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -169,6 +172,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const flyingRef = useRef(null);
   const readRef = useRef(null);
   const strokesRef = useRef([]);
+  // A sketched graph on the page: its proposal, and the set the student confirmed (graphSketch.js).
+  const [sketch, setSketch] = useState(null);
+  const onGraphRef = useRef(onGraphFeatures);
+  useEffect(() => { onGraphRef.current = onGraphFeatures; }, [onGraphFeatures]);
   const disabledRef = useRef(!!disabled);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
@@ -287,7 +294,18 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus({ kind: 'reading' });
     const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
     const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
+    // A page may hold a sketched graph beside written lines: the graph is read
+    // as geometry (its labels alone, answer-blind), the rest as lines.
+    const region = splitSketchRegion(strokes);
+    const lineStrokes = region.sketch.length ? region.writing : strokes;
+    if (region.sketch.length) {
+      proposeSketch(region.sketch, { user: who, signal: controller?.signal }).then(proposal => {
+        if (seq !== readSeqRef.current || disabledRef.current) return;
+        setSketch({ signature, proposal, confirmed: null });
+      }).catch(() => {});
+      if (!lineStrokes.length) { landed(); setStatus(null); return; }
+    }
+    readWithCloud(lineStrokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
@@ -295,7 +313,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // Line geometry comes from the strokes themselves (no recognition), so
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
-      try { geometry = { lines: segmentInkLines(strokes) }; } catch { geometry = null; }
+      try { geometry = { lines: segmentInkLines(lineStrokes) }; } catch { geometry = null; }
       // Only placed on the ink when each read line plausibly IS that written
       // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
       if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
@@ -359,6 +377,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     strokesRef.current = strokes;
     setHasInk(strokes.length > 0);
     setCorrecting(null);
+    // A changed page is a different sketch: what was confirmed no longer stands.
+    setSketch(prev => { if (prev) { try { onGraphRef.current?.(null); } catch { /* reporting only */ } } return null; });
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
@@ -682,6 +702,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             ? <PageLink className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</PageLink>
             : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
+      )}
+
+      {sketch?.proposal && (
+        <GraphSketchConfirm key={sketch.signature} proposal={sketch.proposal} confirmed={!!sketch.confirmed}
+          onConfirm={features => { setSketch(s => (s ? { ...s, confirmed: features } : s)); try { onGraphRef.current?.(features); } catch { /* reporting only */ } }} />
       )}
 
       {rec.lines.length > 0 && (

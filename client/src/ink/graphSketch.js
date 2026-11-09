@@ -89,6 +89,82 @@ function tickStep(ticks, axis) {
   return gaps.length ? median(gaps) : null;
 }
 
+/**
+ * Where the sketch is on a page that may also hold written lines. The sketch
+ * is the two axes and every stroke that lies mostly inside their box (padded
+ * by a tenth of the axes); everything else is writing, read as lines.
+ * { sketch: strokes[], writing: strokes[], box } — sketch empty when there are no axes.
+ */
+export function splitSketchRegion(strokes) {
+  const all = (strokes || []).filter(s => s?.points?.length);
+  const { xAxis, yAxis } = classifyStrokes(all);
+  if (!xAxis || !yAxis) return { sketch: [], writing: all, box: null };
+  const ax = bbox([...xAxis.pts, ...yAxis.pts]);
+  const pad = Math.max(ax.x1 - ax.x0, ax.y1 - ax.y0) * 0.1;
+  const box = { x0: ax.x0 - pad, x1: ax.x1 + pad, y0: ax.y0 - pad, y1: ax.y1 + pad };
+  const inside = p => p.x >= box.x0 && p.x <= box.x1 && p.y >= box.y0 && p.y <= box.y1;
+  const sketch = [], writing = [];
+  for (const s of all) (s.points.filter(inside).length >= s.points.length * 0.7 ? sketch : writing).push(s);
+  return { sketch, writing, box };
+}
+
+/**
+ * Handwriting inside the sketch: short, not-straight strokes that are neither
+ * axis, tick, dash nor curve, clustered by proximity into label groups. Each
+ * group is what the label reader is shown, alone, with its centre on the canvas.
+ */
+export function labelGroups(sketchStrokes) {
+  const { xAxis, yAxis, curves } = classifyStrokes(sketchStrokes);
+  if (!xAxis || !yAxis) return [];
+  const span = Math.max(xAxis.len, yAxis.len);
+  const written = curves.filter(c => c.len < span * 0.25 && Math.max(c.box.x1 - c.box.x0, c.box.y1 - c.box.y0) < span * 0.08);
+  const gap = span * 0.025;
+  const groups = [];
+  for (const m of written) {
+    const near = groups.find(g => m.box.x0 <= g.box.x1 + gap && m.box.x1 >= g.box.x0 - gap && m.box.y0 <= g.box.y1 + gap && m.box.y1 >= g.box.y0 - gap);
+    if (near) { near.strokes.push({ points: m.pts }); near.box = bbox([...near.strokes.flatMap(s => s.points)]); }
+    else groups.push({ strokes: [{ points: m.pts }], box: m.box });
+  }
+  return groups.map(g => ({ strokes: g.strokes, x: (g.box.x0 + g.box.x1) / 2, y: (g.box.y0 + g.box.y1) / 2 }));
+}
+
+/** Strokes of the sketch that are not label writing: what the geometry reads. */
+export function geometryStrokes(sketchStrokes) {
+  const label = new Set(labelGroups(sketchStrokes).flatMap(g => g.strokes.map(s => s.points)));
+  return sketchStrokes.filter(s => !label.has(s.points));
+}
+
+/**
+ * What one tick is worth on each axis, from numbers read next to ticks.
+ * A number next to the k-th tick from the origin, worth v, says one tick is
+ * v / k; at least two numbers that agree are needed, otherwise null (ask).
+ */
+export function tickValuesFromLabels(sketchStrokes, labels) {
+  const { xAxis, yAxis, ticks } = classifyStrokes(sketchStrokes);
+  if (!xAxis || !yAxis) return { x: null, y: null };
+  const origin = { x: mean(yAxis.pts.map(p => p.x)), y: mean(xAxis.pts.map(p => p.y)) };
+  const one = axis => {
+    const step = tickStep(ticks, axis);
+    if (!step) return null;
+    const near = step * 0.6;
+    const votes = [];
+    for (const l of labels || []) {
+      const v = Number(String(l.text).replace(/−/g, '-').trim());
+      if (!Number.isFinite(v) || v === 0) continue;
+      const along = axis === 'x' ? l.x - origin.x : origin.y - l.y;
+      const across = axis === 'x' ? Math.abs(l.y - origin.y) : Math.abs(l.x - origin.x);
+      if (across > near * 1.5) continue;
+      const k = Math.round(along / step);
+      if (!k || Math.abs(along - k * step) > near / 2) continue;
+      votes.push(v / k);
+    }
+    if (votes.length < 2) return null;
+    const m = median(votes);
+    return m > 0 && votes.every(v => Math.abs(v - m) <= m * 1e-6) ? m : null;
+  };
+  return { x: one('x'), y: one('y') };
+}
+
 const EMPTY = { intercepts: { x: [], y: [] }, turning: [], asymptotes: [], intervals: [], labels: [] };
 
 /**
@@ -97,7 +173,7 @@ const EMPTY = { intercepts: { x: [], y: [] }, turning: [], asymptotes: [], inter
  */
 export function readGraphSketch(strokes, { tickValues = {}, labels = [] } = {}) {
   const reasons = [];
-  const { xAxis, yAxis, ticks, dashes, curves } = classifyStrokes(strokes);
+  const { xAxis, yAxis, ticks, dashes, curves } = classifyStrokes(geometryStrokes((strokes || []).filter(s => s?.points?.length >= 2)));
   if (!xAxis || !yAxis) return { ...EMPTY, scale: null, needsConfirmation: true, reasons: ['no pair of axes was found: draw a horizontal and a vertical axis'] };
 
   const origin = { x: mean(yAxis.pts.map(p => p.x)), y: mean(xAxis.pts.map(p => p.y)) };
@@ -169,6 +245,25 @@ export function confirmGraphFeatures(proposal, edits = {}) {
     labels: edits.labels ?? proposal.labels,
     confirmedByStudent: true
   };
+}
+
+/** "(0.5, −3)": a point list, parsed; null when any part is not a point. */
+export function parsePoints(text) {
+  const src = String(text || '').replace(/−/g, '-').trim();
+  if (!src || /^none$/i.test(src)) return [];
+  const found = [...src.matchAll(/\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g)];
+  const rest = src.replace(/\(\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*\)/g, '').replace(/[,;\s]/g, '');
+  if (!found.length || rest) return null;
+  return found.map(m => ({ x: Number(m[1]), y: Number(m[2]) }));
+}
+
+/** "x = 1, y = 2": asymptote lines, parsed; null when any part is not one. */
+export function parseLines(text) {
+  const src = String(text || '').replace(/−/g, '-').trim();
+  if (!src || /^none$/i.test(src)) return [];
+  const parts = src.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+  const out = parts.map(p => p.match(/^([xy])\s*=\s*(-?\d+(?:\.\d+)?)$/i)).map(m => (m ? { axis: m[1].toLowerCase(), value: Number(m[2]) } : null));
+  return out.every(Boolean) ? out : null;
 }
 
 /** "−2, 3": how a list of values is shown to the student for confirmation. */
