@@ -21,7 +21,13 @@ import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
-const SignInPlot = featureEnabled('instrument') ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+const SignInPlot = React.lazy(() =>
+  import('../instrument/SignInPlot.jsx').catch(() => ({
+    // Only the optional graph is allowed to fail during sign-in; the real
+    // account form and all server authority remain independent.
+    default: () => <div className="in-signin-plot" aria-hidden="true" />
+  }))
+);
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -285,12 +291,25 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [visualOnline, setVisualOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine !== false
+  );
   const stepHeadingRef = useRef(null);
   const createPendingRef = useRef(false);
   const accountProfileRef = useRef(null);
 
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const update = () => setVisualOnline(navigator.onLine !== false);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    update();
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
 
   // Returning users open on their saved profiles — once, when the list arrives.
   // After that the picker's "Create another Pri account" may show the card.
@@ -559,9 +578,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     // back, so the code boxes are the only thing asking for attention.
     const atStart = cardStep === 'method';
     return (
-      <div className="auth-wrap">
+      <div className="auth-wrap pri-auth">
         <MathField />
-        {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
+        {visualOnline
+          ? <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>
+          : <div className="in-signin-plot" aria-hidden="true" />}
         <div className="auth-col fade-in">
           <Logo large />
           {atStart && (

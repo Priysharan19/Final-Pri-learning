@@ -118,7 +118,13 @@ export async function requestIdentityToken(provider, { clientId } = {}, { env = 
   let onAbort = null;
   const answer = new Promise((resolve, reject) => {
     timer = setTimeout(() => reject(failure('SOCIAL_TIMEOUT', 'Sign-in took too long.')), timeoutMs);
-    onAbort = () => reject(failure('SOCIAL_CANCELLED', 'Sign-in was cancelled.'));
+    // Close immediately, even while the server nonce is still being fetched.
+    // Otherwise a late nonce can navigate a provider window after the learner
+    // has already pressed Cancel and the form has resumed.
+    onAbort = () => {
+      try { popup.close(); } catch { /* provider may already have closed it */ }
+      reject(failure('SOCIAL_CANCELLED', 'Sign-in was cancelled.'));
+    };
     if (signal?.aborted) onAbort();
     signal?.addEventListener?.('abort', onAbort, { once: true });
     channel.onmessage = event => {
@@ -137,6 +143,7 @@ export async function requestIdentityToken(provider, { clientId } = {}, { env = 
   answer.catch(() => {});
   try {
     const { nonce } = await cloud.identityNonce();
+    if (signal?.aborted) throw failure('SOCIAL_CANCELLED', 'Sign-in was cancelled.');
     if (!nonce) throw failure('SOCIAL_PROVIDER_ERROR', 'The server did not issue a sign-in nonce.');
     popup.location.href = authorizeUrl(provider, { clientId, nonce, state, origin: env.location.origin });
     const idToken = await answer;

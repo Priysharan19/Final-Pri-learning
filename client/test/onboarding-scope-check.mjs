@@ -51,6 +51,7 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
   // lazy chunk of its own with a stylesheet the bundler will not take; it is
   // not what these checks render, so it is stubbed too.
   writeFileSync(join(dir, 'signup-stub.jsx'), "import React from 'react';\nexport default function SignUpFlow() { return null; }\n");
+  writeFileSync(join(dir, 'plot-stub.jsx'), "import React from 'react';\nexport default function SignInPlot() { return null; }\n");
   writeFileSync(join(dir, 'entry.jsx'), [
     "import React from 'react';",
     "import { renderToStaticMarkup } from 'react-dom/server';",
@@ -80,7 +81,7 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
     },
     resolve: {
       modules: [join(CLIENT, 'node_modules')],
-      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx') }
+      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx'), '../instrument/SignInPlot.jsx': join(dir, 'plot-stub.jsx') }
     }
   });
   const { output } = await bundle.generate({ format: 'esm' });

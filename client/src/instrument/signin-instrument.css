@@ -1,0 +1,150 @@
+/* Aurora entry: existing Instrument forms, one precise mathematical canvas.
+   This is an auth-only skin; grading, ink and account authority are unchanged. */
+.pri-auth{
+--in-void:#0d0f14;--in-base:#111319;--in-l1:#191b22;--in-l2:#232630;
+--in-tx:#f5f5f7;--in-tx-2:#bec0cb;--in-tx-3:#a2a5b3;
+--in-edge:rgba(232,234,248,.12);--in-edge-2:rgba(232,234,248,.2);
+--ink:#f5f5f7;--ink-2:#bec0cb;--ink-3:#a2a5b3;--surface:#232630;
+--surface-2:#292c36;--hairline:rgba(232,234,248,.12);
+--hairline-strong:rgba(232,234,248,.26);--control-border:#606575;
+--in-action:#b8adfa;--in-on-action:#15141f;
+--in-ui:var(--font-display, system-ui, sans-serif);
+--in-mono:var(--font-mono, ui-monospace, monospace);--brand-ring:#b8adfa;
+color:var(--in-tx);color-scheme:dark;
+display:grid;place-items:stretch;overflow:visible;padding:0;min-height:100dvh;
+grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr)
+}
+.pri-auth>.auth-col{
+display:flex;flex-direction:column;min-width:0;align-items:flex-start;justify-content:center;
+padding:42px clamp(24px,5vw,80px);background:var(--in-l1)
+}
+.pri-auth .auth-col>:is(.logo,.hero-kicker,.hero-title,.hero-sub,.signin-landing,p.muted){
+width:100%;max-width:430px;min-width:0;text-align:left!important
+}
+.pri-auth .auth-col>.logo{display:flex;justify-content:flex-start;margin-bottom:26px}
+.pri-auth .brand-wordmark{max-width:100%;height:auto}
+.pri-auth .hero-kicker{font:500 10px/1.6 var(--in-mono);letter-spacing:.11em;color:#b9b0df}
+.pri-auth .hero-title{
+font:500 clamp(32px,3.15vw,44px)/1.07 var(--in-ui);letter-spacing:-.05em;
+margin:14px 0 0;color:var(--in-tx);text-wrap:balance
+}
+.pri-auth .hero-sub{margin:9px 0 0;color:var(--in-tx-2)}
+.pri-auth .signin-landing{
+margin-top:24px;padding:0;max-width:430px;border:0;box-shadow:none;background:transparent
+}
+.pri-auth .signin-landing :is(.input,.otp-box){
+min-height:50px;height:auto;padding:12px 14px;font-size:16px;
+color:var(--in-tx);background:var(--in-l2);border:1px solid #696b7c
+}
+.pri-auth .signin-landing :is(.input,.otp-box):focus-visible{
+outline:2px solid #b8adfa;outline-offset:2px;border-color:#b8adfa
+}
+.pri-auth .signup-next{
+min-height:50px;color:var(--in-on-action);background:var(--in-action);
+border-color:var(--in-action);box-shadow:none
+}
+.pri-auth .signup-next:hover:not(:disabled){background:#cdc5ff}
+.pri-auth .signup-social{grid-template-columns:minmax(0,1fr)}
+.pri-auth .signup-social>.btn{
+width:100%;min-height:50px;white-space:normal;color:var(--in-tx);
+background:var(--in-l2);border:1px solid #696b7c
+}
+.pri-auth .signup-alt{
+gap:8px 12px;justify-content:flex-start;margin-top:16px
+}
+.pri-auth .signup-alt :is(a,button){min-height:44px;display:inline-flex;align-items:center;color:var(--in-tx-2)}
+.pri-auth .auth-col>p.muted{
+color:var(--in-tx-3);font-size:12.5px!important;line-height:1.55;overflow-wrap:anywhere
+}
+.pri-auth .login-legal{margin-top:12px!important}
+.pri-auth .auth-col :focus-visible{outline:2px solid #b8adfa;outline-offset:3px}
+
+.pri-auth>* { margin-block:0; }
+.pri-auth>.in-signin-plot{display:block;position:relative;min-width:0;min-height:100%;}
+
+/* The measured illustration uses an exact cubic and an input-driven probe. */
+.pri-auth .in-signin-plot{min-width:0;background:#0d0f14}
+.pri-auth .pri-plot-viewport{position:absolute;inset:0}
+.pri-auth .in-signin-plot canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
+.pri-auth .pri-plot-top,.pri-auth .pri-plot-equation,
+.pri-auth .pri-plot-foot{position:absolute;z-index:1;left:7%;right:7%;pointer-events:none}
+.pri-auth .pri-plot-top{
+top:5%;display:flex;justify-content:space-between;gap:12px;
+font:500 10px/1.4 var(--in-mono);letter-spacing:.1em;color:#a8aabd
+}
+.pri-auth .pri-plot-equation{
+top:18%;font:400 clamp(18px,2vw,26px)/1.2 var(--in-mono);color:#f1f0f7;white-space:nowrap
+}
+.pri-auth .pri-plot-equation small{margin-left:12px;font:500 10px var(--in-mono);letter-spacing:.1em;color:#a2a5b3}
+.pri-auth .pri-plot-foot{
+bottom:6%;display:flex;align-items:flex-end;justify-content:space-between;
+gap:18px;border-top:1px solid var(--in-edge-2);padding-top:18px
+}
+.pri-auth .pri-plot-foot .in-signin-line{
+position:static;margin:0;max-width:12em;color:#f1f0f7;
+font:500 clamp(30px,3.5vw,52px)/1.08 var(--in-ui);letter-spacing:-.055em
+}
+.pri-auth .pri-plot-value{
+color:#c7beff;white-space:nowrap;font:500 11px/1.6 var(--in-mono)
+}
+@media (max-width:699px){
+.pri-auth{grid-template-columns:minmax(0,1fr);grid-template-rows:124px auto}
+.pri-auth>.in-signin-plot{display:block;height:124px;min-height:124px;border-bottom:1px solid var(--in-edge)}
+.pri-auth>.auth-col{
+min-height:calc(100dvh - 124px);padding:22px 20px 30px;
+align-items:center;justify-content:flex-start;box-shadow:none
+}
+.pri-auth .pri-plot-top{top:10px;left:20px;right:20px;font-size:9px}
+.pri-auth .pri-plot-equation{top:31px;left:20px;font-size:16px}
+.pri-auth .pri-plot-equation small,
+.pri-auth .pri-plot-top span:last-child,
+.pri-auth .pri-plot-foot .in-signin-line{display:none}
+.pri-auth .pri-plot-foot{left:20px;right:20px;bottom:5px;padding:0;border:0;justify-content:flex-end}
+.pri-auth .pri-plot-value{font-size:9px}
+.pri-auth .auth-col>.logo{margin-bottom:16px}
+.pri-auth .hero-title{font-size:29px;margin-top:9px}
+.pri-auth .hero-sub{margin-top:6px}
+.pri-auth .signin-landing{margin-top:16px}
+}
+@media (min-width:700px) and (max-width:1020px){
+.pri-auth{grid-template-columns:minmax(0,.83fr) minmax(0,1.17fr)}
+.pri-auth>.in-signin-plot{display:block;min-height:100%}
+.pri-auth .pri-plot-viewport{
+inset:auto 0;top:50%;height:min(54vh,540px);transform:translateY(-50%)
+}
+.pri-auth>.auth-col{padding-inline:clamp(22px,3vw,44px)}
+.pri-auth .pri-plot-foot{display:block}
+.pri-auth .pri-plot-foot .in-signin-line{font-size:clamp(28px,3vw,37px)}
+.pri-auth .pri-plot-value{display:block;margin-top:14px}
+.pri-auth .pri-plot-equation{font-size:17px}
+}
+@media (max-width:280px){
+.pri-auth .pri-plot-value{display:none}
+.pri-auth>.auth-col{padding-inline:12px}
+}
+@media (prefers-reduced-motion:reduce){
+.pri-auth :is(button,input){transition:none}
+}
+@media (forced-colors:active){
+.pri-auth{display:block;color:CanvasText;background:Canvas}
+.pri-auth>.in-signin-plot{display:none}
+.pri-auth>.auth-col{color:CanvasText;background:Canvas}
+}
+
+/* An unavailable action must never look identical to a ready-to-submit one. */
+.pri-auth .signup-next:disabled {
+  background:#464151; border-color:#5b556b; color:#dcd9e8;
+  opacity:1; cursor:not-allowed; box-shadow:none;
+}
+
+/* Do not slide the login form across the page on first paint. Keep animated
+   transitions into the code, password and guardian steps intact. */
+.pri-auth .signup-flow[data-signup-step="method"] .signup-step {
+  animation:none; opacity:1; transform:none;
+}
+
+/* Touch devices can scroll over the illustration but do not support mouse
+   inspection; avoid an instruction the student cannot perform with a finger. */
+@media (pointer: coarse) {
+  .pri-auth .pri-plot-top span:last-child { display: none; }
+}
