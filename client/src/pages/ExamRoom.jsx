@@ -107,6 +107,23 @@ function mmss(totalSeconds) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+// Where the marks went, in figures (local/examAnalysis.js): the mock note above
+// says the paper predicts nothing, so the headline never ranks the student.
+function LostLine({ lost }) {
+  const t = useT();
+  if (!lost) return null;
+  if (!lost.marks) return <p className="sub" data-exam-lost="0">{t('examRoom.lostNone')}</p>;
+  const [a, b] = lost.sections || [];
+  const head = !a ? null : b
+    ? t('examRoom.lostTwo', { count: lost.marks, a: a.lost, sa: a.label, b: b.lost, sb: b.label })
+    : t('examRoom.lostOne', { count: lost.marks, a: a.lost, sa: a.label });
+  return (
+    <p className="sub" data-exam-lost={lost.marks}>
+      {head}{lost.blankMarks > 0 && <> {t('examRoom.lostBlank', { count: lost.blankMarks })}</>}
+    </p>
+  );
+}
+
 export default function ExamRoom() {
   const { id } = useParams();
   const { celebrate, refreshUser, user } = useApp();
@@ -712,12 +729,8 @@ export default function ExamRoom() {
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
           </div>
-          <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })} · {t(
-            shownPct >= 90 ? 'examRoom.verdictOutstanding' :
-              shownPct >= 80 ? 'examRoom.verdictExcellent' :
-                shownPct >= 65 ? 'examRoom.verdictSolid' :
-                  shownPct >= 50 ? 'examRoom.verdictFair' :
-                    'examRoom.verdictLow')}</p>
+          <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })}</p>
+          <LostLine lost={result.analysis?.lost} />
           {result.final?.finalisedBy === 'deadline' && (
             <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>{t(result.final.late ? 'examRoom.finalisedLate' : 'examRoom.finalisedByDeadline')}</p>
           )}
@@ -736,7 +749,7 @@ export default function ExamRoom() {
           </div>
         </div>
 
-        <ExamAnalysis analysis={result.analysis} />
+        <ExamAnalysis analysis={result.analysis} track={exam.indiaExam?.track} />
 
         {result.detail.map((d, i) => d.multipart ? (
           <div className="card" key={d.id}>
