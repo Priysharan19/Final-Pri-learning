@@ -406,7 +406,7 @@ export const flow = {
     await check('History holds that attempt once, marked correct and labelled as handwritten',
       await page.locator('.hist-row').count() === 1 && await histRow.count() === 1 &&
         (await histRow.locator('.hist-verdict .sr-only').innerText()) === 'Correct' &&
-        await histRow.locator('.tag .sr-only').count() >= 1,
+        await histRow.locator('[data-history-via="ink"] .sr-only').count() >= 1,
       (await page.locator('.hist-row').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 80)).join(' | '));
 
     await histRow.locator('.hist-main').click();

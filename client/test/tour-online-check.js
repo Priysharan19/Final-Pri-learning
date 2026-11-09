@@ -508,7 +508,16 @@ export const examOfflineFinish = {
     await check('nothing claims a mark made on this device', !/marked on this device|checked on this device/i.test(await page.locator('main, .shell').first().innerText()));
     // The Exams list tells the same truth. Reached inside the app: a page
     // load with no server is the activation gate's retry screen (issue #477).
-    await page.locator('a[href="/exams"]').first().evaluate(a => a.click());
+    // The Instrument shell keeps Exams in its More menu (a phone keeps it in
+    // the More sheet); either way it is a client-side route change. The exam
+    // room hides the bar while a paper is open, so — as with the sidebar link
+    // this replaced — the controls are pressed from script, not by pointer.
+    if (await page.locator('a[href="/exams"]').count()) await page.locator('a[href="/exams"]').first().evaluate(a => a.click());
+    else {
+      await page.locator('#in-more-btn').evaluate(b => b.click());
+      await page.waitForSelector('#in-more-menu [role="menuitem"]', { state: 'attached', timeout: 15000 });
+      await page.evaluate(() => [...document.querySelectorAll('#in-more-menu [role="menuitem"]')].find(el => /Exams/.test(el.textContent))?.click());
+    }
     await page.waitForSelector('.prio-item', { timeout: 30000 });
     await check('the Exams list shows the paper as waiting to be marked, with no score',
       await page.locator('.prio-item [data-exam-pending]').count() === 1 && !/\d+\/\d+/.test((await page.locator('.prio-item').first().innerText()).replace(/\d{1,2}[:/]\d{2}/g, '')),

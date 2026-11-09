@@ -20,12 +20,13 @@
 //                             Profiles that already hold one of these keep
 //                             working whatever the flag says — it gates new
 //                             selection only.
-//   PRI_FEATURE_INSTRUMENT=1  the v1.1 "instrument" interface
-//                             (docs/design/PRI-V1.1-INSTRUMENT.md): the
-//                             graphite/paper token set, the tab shell, the
-//                             chapter Index and the command bar. ON in staging,
-//                             OFF in production until the owner flips it
-//                             after the v1.0 App Store review.
+//   instrument               NOT a flag any more. The student interface is
+//                             set once, in client/interface.config.mjs (V1
+//                             decision D7), and every build — web, iOS and
+//                             Android — ships the Instrument from it. The
+//                             build still records it here as a constant so
+//                             code can branch on it, and it is true wherever
+//                             Vite builds or serves the app.
 //   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
 //                             (V1 is India-only; existing Australian profiles
 //                             keep working either way)
@@ -52,15 +53,23 @@ const BUILT = {
   // PRI_FEATURE_EXAM_HANDWRITING=1 — handwriting input in timed exams. OFF by
   // default in a production build: a paper then offers Type only.
   examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null,
-  // PRI_FEATURE_INSTRUMENT=1 — the v1.1 interface. Unlike the others it is OFF
-  // in the Node suites (no build constant), so they keep testing the interface
-  // production ships; the instrument tours build with it on.
-  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : false,
+  // The student interface (client/interface.config.mjs): true in every build.
+  // The Node suites, which have no build constant, see the same interface
+  // production ships.
+  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true,
   // PRI_FEATURE_PARENT_REPORT=1 — the parent weekly report's screens. OFF in a
   // production build until counsel has reviewed email about minors (D22); the
   // server is off too unless PRI_PARENT_REPORT=on (server/platform/parentReport.js).
   parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null
 };
+
+// The student interface as a build constant (client/interface.config.mjs).
+// Written so a production build folds it to a literal: Vite replaces the
+// global with true, the conditional collapses, and the bundler can then drop
+// every branch written for the v1.0 shell along with whatever only it imports.
+// featureEnabled('instrument') is a runtime call the bundler cannot see
+// through, so shared pages read this instead.
+export const INSTRUMENT_UI = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true;
 
 const productionBuild = () => {
   try { return import.meta.env?.PROD === true; } catch { return false; }

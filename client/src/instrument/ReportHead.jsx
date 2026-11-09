@@ -6,7 +6,7 @@ import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
 import BarSlot from './BarSlot.jsx';
-import './report.css';
+// report.css is part of the boot stylesheet (main.jsx; #658).
 
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the
@@ -31,13 +31,16 @@ function dateName(key, user, options) {
 }
 const fmtPct = v => (v == null ? '—' : `${Math.round(v)}%`);
 
-/** A signed change, or nothing when there is none to state. */
-function Delta({ n, unit = '' }) {
+/** A signed change, or nothing when there is none to state. The direction is
+ *  said in a word as well as drawn in colour and a sign (a11y-check's rule:
+ *  a verdict colour never carries meaning alone), read by assistive tech and
+ *  hidden from the eye. */
+function Delta({ n, unit = '', t }) {
   if (n == null || !Number.isFinite(n) || n === 0) return null;
   const v = Math.round(n);
   if (!v) return null;
   const text = `${v > 0 ? '+' : '−'}${Math.abs(v)}${unit ? ` ${unit}` : ''}`;
-  return <> <em className={v < 0 ? 'is-down' : undefined} data-report-delta>{text}</em></>;
+  return <> <em className={v < 0 ? 'is-down' : undefined} data-report-delta data-report-delta-sign={v > 0 ? 'up' : 'down'}><span className="sr-only">{t(v > 0 ? 'inst.reportUp' : 'inst.reportDown')} </span>{text}</em></>;
 }
 
 // The chart, drawn as SVG in a fixed 1000×300 frame (the design's .chart).
@@ -202,11 +205,11 @@ export default function ReportHead() {
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
-        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} />}</div>
+        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} t={t} />}</div>
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
-          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
-        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} t={t} />}</div>
+        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} t={t} />}</div>
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">

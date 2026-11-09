@@ -15,11 +15,11 @@ ARG SOURCE_DATE_EPOCH
 ARG PRI_FEATURE_PLACEMENT
 ARG PRI_FEATURE_TUTOR
 ARG PRI_FEATURE_EXTENDED_TRACKS
-ARG PRI_FEATURE_INSTRUMENT
+# The student interface is not a build variable: client/interface.config.mjs
+# sets it for this image, the iOS bundles and the Android app alike (D7).
 ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
     PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
-    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS} \
-    PRI_FEATURE_INSTRUMENT=${PRI_FEATURE_INSTRUMENT}
+    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client

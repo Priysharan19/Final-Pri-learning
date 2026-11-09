@@ -172,8 +172,9 @@ console.log('— every in-app page link uses it —');
     check(`${f} has no raw <Link>`, !/<Link\b/.test(src) && /<PageLink\b/.test(src));
   }
   const app = read('client/src/App.jsx');
-  check('sidebar, mobile nav and More sheet are PageLinks', (app.match(/<PageLink key=\{item\.to\}/g) || []).length === 3);
-  check('the logo decides from the real URL too', app.includes("nav('/', { replace: isCurrentUrl('/') })"));
+  check('the bar tabs, mobile nav and More sheet are PageLinks', (app.match(/<PageLink key=\{item\.to\}/g) || []).length === 3);
+  // The v1.0 top-bar logo is gone; the Instrument bar's mark is the home link now.
+  check('the logo decides from the real URL too', read('client/src/instrument/InstrumentBar.jsx').includes("nav('/', { replace: isCurrentUrl('/') })"));
   check('the instrument bar\'s home mark decides from the real URL too', read('client/src/instrument/InstrumentBar.jsx').includes("nav('/', { replace: isCurrentUrl('/') })"));
   const comp = read('client/src/components/PageLink.jsx');
   check('PageLink routes every click through pageLinkClick', comp.includes('onClick={pageLinkClick({ to, navigate, onClick, target, replace, state })}'));

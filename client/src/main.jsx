@@ -6,6 +6,16 @@ import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
+// The Instrument is the one student interface (client/interface.config.mjs), so
+// its stylesheets are part of the boot stylesheet, after theme.css which they
+// override: the shell, and the Map, Report and Scripts tabs. A tab opened for
+// the first time offline then needs no stylesheet of its own fetched at that
+// moment — Vite's runtime CSS preload was the step that failed there (#658).
+// Every rule is scoped to html.ui-instrument or an .in-* class.
+import './instrument/instrument.css';
+import './instrument/map.css';
+import './instrument/report.css';
+import './instrument/ledger.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { parseParentEmailFragment } from './parent/parentReportApi.js';
