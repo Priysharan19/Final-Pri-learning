@@ -21,9 +21,25 @@
 //   node tools/verify-deployment.mjs --origin https://learn.example.com \
 //     --sha <40-hex main SHA> [--engine postgres|sqlite]
 //
+// Two OPT-IN checks, for a production release (docs/operations/production-config-v1.md).
+// Without them the tool sends exactly the three GETs above and prints exactly
+// the rows it always has (tools/verify-deployment.test.mjs pins that byte for byte):
+//
+//   --require-handwriting   /v1/ready checks.handwriting.state must be `ok`: the
+//                           server reader answers its provider probe. A `probing`
+//                           answer is read again, at most HANDWRITING_REREADS times.
+//   --expect-config <file>  the public, unauthenticated configuration matches the
+//                           manifest: each probe is one more GET (never a write,
+//                           never a credential) whose status and named JSON fields
+//                           must equal the manifest's values, and the manifest's
+//                           public origin must serve this exact release. <file> is
+//                           the manifest Markdown (the block between the
+//                           pri-expected-public-config markers) or a .json file.
+//
 // Run it from a checkout at the nominated SHA, so the expected schema versions
 // are the ones that build was compiled against.
 // ─────────────────────────────────────────────────────────────────────────────
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
@@ -31,19 +47,23 @@ import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schem
 const SHA = /^[0-9a-f]{40}$/;
 // A hanging origin fails the check rather than holding the operator's terminal.
 const REQUEST_TIMEOUT_MS = 15_000;
+/** How often a `probing` handwriting state is read again, and how long apart. */
+export const HANDWRITING_REREADS = 3;
+export const HANDWRITING_REREAD_MS = 2_000;
 
 export function parseArgs(argv) {
-  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false, authEmailProven: false };
+  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false, authEmailProven: false, requireHandwriting: false, expectConfig: null };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--allow-http') { args.allowHttp = true; continue; }
     if (flag === '--persistent-storage-proven') { args.persistentStorageProven = true; continue; }
     // A real deployment (staging, production): email must be proven, not merely configured.
     if (flag === '--auth-email-proven') { args.authEmailProven = true; continue; }
-    if (!['--origin', '--sha', '--engine'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
+    if (flag === '--require-handwriting') { args.requireHandwriting = true; continue; }
+    if (!['--origin', '--sha', '--engine', '--expect-config'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value`);
-    args[flag.slice(2)] = value;
+    args[flag === '--expect-config' ? 'expectConfig' : flag.slice(2)] = value;
     i += 1;
   }
   if (!args.origin) throw new Error('--origin is required');
@@ -69,11 +89,122 @@ async function getJson(fetchImpl, url) {
   return { status: response.status, body };
 }
 
+// ── --expect-config: the manifest's machine-readable block ──────────────────
+export const EXPECTED_CONFIG_FORMAT = 'pri-expected-public-config';
+export const EXPECTED_CONFIG_START = '<!-- pri-expected-public-config:start -->';
+export const EXPECTED_CONFIG_END = '<!-- pri-expected-public-config:end -->';
+// A probe is a GET of a public path: /v1/<segments>, or the two manifests the
+// web build writes beside itself (/release.json, /features.json); no query, no
+// dot segments, no doubled slash. Nothing here can name a write or a host.
+const PROBE_PATH = /^\/(?:v1(?:\/[A-Za-z0-9_-]+)+|release\.json|features\.json)$/;
+const PROBE_ID = /^[a-z0-9][a-z0-9-]{1,63}$/;
+const FIELD_PATH = /^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*$/;
+const CONFIG_KEYS = new Set(['format', 'version', 'environment', 'publicOrigin', 'probes']);
+const PROBE_KEYS = new Set(['id', 'decision', 'path', 'status', 'json']);
+const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+// A matcher: { oneOf: [...] }, optionally with orAbsent: true (the field may be missing, as on a
+// build from before the field existed; when present it must be one of the values).
+const MATCHER_KEYS = new Set(['oneOf', 'orAbsent']);
+const isOneOf = value => isObject(value) && Object.hasOwn(value, 'oneOf') && Object.keys(value).every(key => MATCHER_KEYS.has(key));
+
+/** The problems with an expected-config object; empty when it can be checked. */
+export function expectedConfigProblems(config) {
+  if (!isObject(config)) return ['the expected config must be a JSON object'];
+  const problems = [];
+  for (const key of Object.keys(config)) if (!CONFIG_KEYS.has(key)) problems.push(`unknown key ${JSON.stringify(key)}`);
+  if (config.format !== EXPECTED_CONFIG_FORMAT) problems.push(`format must be ${JSON.stringify(EXPECTED_CONFIG_FORMAT)}`);
+  if (config.version !== 1) problems.push('version must be 1');
+  if (config.environment !== undefined && (typeof config.environment !== 'string' || !config.environment.trim())) problems.push('environment must be a non-empty string');
+  if (config.publicOrigin !== undefined) {
+    let url = null;
+    try { url = new URL(String(config.publicOrigin)); } catch { url = null; }
+    if (!url || !['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || (url.pathname && url.pathname !== '/') || url.origin !== config.publicOrigin) {
+      problems.push('publicOrigin must be a bare origin such as https://app.example.com');
+    }
+  }
+  if (!Array.isArray(config.probes) || config.probes.length === 0) problems.push('probes must be a non-empty array');
+  const ids = new Set();
+  for (const [index, probe] of (Array.isArray(config.probes) ? config.probes : []).entries()) {
+    const where = `probes[${index}]`;
+    if (!isObject(probe)) { problems.push(`${where} must be an object`); continue; }
+    for (const key of Object.keys(probe)) if (!PROBE_KEYS.has(key)) problems.push(`${where}: unknown key ${JSON.stringify(key)}`);
+    if (typeof probe.id !== 'string' || !PROBE_ID.test(probe.id)) problems.push(`${where}: id must be lower-case kebab case`);
+    else if (ids.has(probe.id)) problems.push(`${where}: duplicate id ${probe.id}`);
+    else ids.add(probe.id);
+    if (typeof probe.decision !== 'string' || !probe.decision.trim() || probe.decision.length > 80) problems.push(`${where}: decision must name what the probe proves (1–80 characters)`);
+    if (typeof probe.path !== 'string' || !PROBE_PATH.test(probe.path)) problems.push(`${where}: path must be /v1/…, /release.json or /features.json, with no query`);
+    if (probe.status !== undefined && !(Number.isInteger(probe.status) && probe.status >= 100 && probe.status <= 599)) problems.push(`${where}: status must be an HTTP status code`);
+    if (probe.json !== undefined) {
+      if (!isObject(probe.json) || Object.keys(probe.json).length === 0) problems.push(`${where}: json must map field paths to expected values`);
+      else {
+        for (const [field, expected] of Object.entries(probe.json)) {
+          if (!FIELD_PATH.test(field)) problems.push(`${where}: json field ${JSON.stringify(field)} must be a dotted path`);
+          if (isObject(expected) && (Object.hasOwn(expected, 'oneOf') || Object.hasOwn(expected, 'orAbsent'))
+            && !(isOneOf(expected) && Array.isArray(expected.oneOf) && expected.oneOf.length > 0 && (!Object.hasOwn(expected, 'orAbsent') || expected.orAbsent === true))) {
+            problems.push(`${where}: json ${field} must be { oneOf: [non-empty] } with at most orAbsent: true`);
+          }
+        }
+      }
+    }
+    if (probe.status === undefined && probe.json === undefined) problems.push(`${where}: expects nothing (give status, json or both)`);
+  }
+  return problems;
+}
+
+/**
+ * The expected public config of a manifest: a .json file, or the one fenced
+ * ```json block between the pri-expected-public-config markers of a Markdown
+ * manifest. Throws (a usage error) when it is missing or malformed.
+ */
+export function loadExpectedConfig(file) {
+  let text;
+  try { text = readFileSync(file, 'utf8'); } catch (error) { throw new Error(`--expect-config ${file}: ${error?.code === 'ENOENT' ? 'no such file' : 'unreadable'}`); }
+  let source = text;
+  if (!/\.json$/i.test(file)) {
+    const start = text.indexOf(EXPECTED_CONFIG_START);
+    const end = text.indexOf(EXPECTED_CONFIG_END);
+    if (start < 0 || end < start || text.indexOf(EXPECTED_CONFIG_START, start + 1) >= 0) {
+      throw new Error(`--expect-config ${file}: needs exactly one block between ${EXPECTED_CONFIG_START} and ${EXPECTED_CONFIG_END}`);
+    }
+    const fenced = text.slice(start + EXPECTED_CONFIG_START.length, end).match(/^\s*```json\n([\s\S]*?)\n```\s*$/);
+    if (!fenced) throw new Error(`--expect-config ${file}: the marked block must be one fenced json code block`);
+    source = fenced[1];
+  }
+  let config;
+  try { config = JSON.parse(source); } catch (error) { throw new Error(`--expect-config ${file}: not JSON (${error.message})`); }
+  const problems = expectedConfigProblems(config);
+  if (problems.length) throw new Error(`--expect-config ${file}: ${problems.join('; ')}`);
+  return config;
+}
+
+function field(body, path) {
+  let value = body;
+  for (const key of path.split('.')) {
+    if (!isObject(value) || !Object.hasOwn(value, key)) return undefined;
+    value = value[key];
+  }
+  return value;
+}
+const show = value => (value === undefined ? 'missing' : JSON.stringify(value));
+
+/** Why a probe's answer differs from what it expects (empty when it matches). */
+export function probeMismatches(probe, answer) {
+  const mismatches = [];
+  if (probe.status !== undefined && answer.status !== probe.status) mismatches.push(`status ${answer.status}, expected ${probe.status}`);
+  for (const [path, expected] of Object.entries(probe.json || {})) {
+    const actual = field(answer.body, path);
+    const absentOk = isOneOf(expected) && expected.orAbsent === true && actual === undefined;
+    const ok = absentOk || (isOneOf(expected) ? expected.oneOf.some(item => isDeepStrictEqual(actual, item)) : isDeepStrictEqual(actual, expected));
+    if (!ok) mismatches.push(`${path} ${show(actual)}, expected ${isOneOf(expected) ? `one of ${expected.oneOf.map(show).join(' | ')}${expected.orAbsent ? ' (or absent)' : ''}` : show(expected)}`);
+  }
+  return mismatches;
+}
+
 /**
  * Returns { ok, results: [{ ok, label, detail? }] }. Never throws for a failed
  * check; a network error becomes a failed check with its message.
  */
-export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, authEmailProven = false, fetchImpl = globalThis.fetch }) {
+export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, authEmailProven = false, requireHandwriting = false, expectedConfig = null, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const results = [];
   const check = (ok, label, detail) => { results.push({ ok: !!ok, label, ...(detail ? { detail } : {}) }); return !!ok; };
 
@@ -81,6 +212,10 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   const expectedSha = String(sha || '').toLowerCase();
   if (!check(SHA.test(expectedSha), 'nominated SHA is a full 40-hex commit', sha)) return { ok: false, results };
   if (engine !== null && !['postgres', 'sqlite'].includes(engine)) throw new Error('--engine must be postgres or sqlite');
+  if (expectedConfig) {
+    const problems = expectedConfigProblems(expectedConfig);
+    if (problems.length) throw new Error(`expected config: ${problems.join('; ')}`);
+  }
 
   let health, ready, web, billing;
   try {
@@ -144,16 +279,62 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
     'web checkout is off, as the terms and refund policy say',
     billing.status === 200 ? `configured ${billing.body?.webCheckout?.configured}` : `status ${billing.status}`);
 
+  // ── opt-in: the server reader is up (--require-handwriting) ───────────────
+  if (requireHandwriting) {
+    let reader = r.checks?.handwriting || {};
+    // A cache miss answers `probing` while the provider probe runs in the
+    // background and fills its own cache: read again, a bounded number of times.
+    for (let reread = 0; reader.state === 'probing' && reread < HANDWRITING_REREADS; reread += 1) {
+      await sleep(HANDWRITING_REREAD_MS);
+      try { reader = (await getJson(fetchImpl, `${base}/v1/ready`)).body?.checks?.handwriting || {}; } catch { break; }
+    }
+    check(reader.state === 'ok', 'handwriting reader ready: /v1/ready checks.handwriting.state is ok',
+      `state ${reader.state || 'missing'}, code ${reader.code ?? 'none'}`);
+  }
+
+  // ── opt-in: the public configuration matches the manifest (--expect-config) ─
+  if (expectedConfig) {
+    // The three reads above are reused; every other path is one more GET.
+    const answers = new Map([['/v1/health', health], ['/v1/ready', ready], ['/release.json', web]]);
+    for (const probe of expectedConfig.probes) {
+      if (!answers.has(probe.path)) {
+        try { answers.set(probe.path, await getJson(fetchImpl, `${base}${probe.path}`)); }
+        catch (error) { answers.set(probe.path, { error: error?.message || String(error) }); }
+      }
+      const answer = answers.get(probe.path);
+      const label = `public config ${probe.id} (${probe.decision}): GET ${probe.path}`;
+      if (answer.error) { check(false, label, answer.error); continue; }
+      const mismatches = probeMismatches(probe, answer);
+      check(mismatches.length === 0, label, mismatches.length ? mismatches.join('; ')
+        : [probe.status !== undefined ? `status ${answer.status}` : null, ...Object.keys(probe.json || {}).map(path => `${path} ${show(field(answer.body, path))}`)].filter(Boolean).join('; '));
+    }
+    if (expectedConfig.publicOrigin !== undefined) {
+      const label = `public origin ${expectedConfig.publicOrigin} serves this release`;
+      let publicBase = null;
+      try { publicBase = cleanOrigin(expectedConfig.publicOrigin, allowHttp); } catch (error) { check(false, label, error.message.replace('--origin', 'publicOrigin')); }
+      if (publicBase) {
+        try {
+          const [publicHealth, publicWeb] = publicBase === base ? [health, web]
+            : await Promise.all([getJson(fetchImpl, `${publicBase}/v1/health`), getJson(fetchImpl, `${publicBase}/release.json`)]);
+          const servedSha = publicHealth.body?.releaseIdentity?.releaseSha;
+          check(publicHealth.status === 200 && servedSha === expectedSha && publicWeb.status === 200 && isDeepStrictEqual(publicWeb.body, h.releaseIdentity), label,
+            `server ${servedSha || 'unknown'}, web ${publicWeb.body?.releaseSha || `status ${publicWeb.status}`}${publicBase === base ? ' (the verified origin)' : ''}`);
+        } catch (error) { check(false, label, error?.message || String(error)); }
+      }
+    }
+  }
+
   return { ok: results.every(item => item.ok), results };
 }
 
 async function main() {
   let args;
-  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven] [--auth-email-proven]';
+  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven] [--auth-email-proven] [--require-handwriting] [--expect-config <manifest>]';
   let report;
   try {
     args = parseArgs(process.argv.slice(2));
-    report = await verifyDeployment(args);
+    const { expectConfig, ...options } = args;
+    report = await verifyDeployment({ ...options, expectedConfig: expectConfig ? loadExpectedConfig(expectConfig) : null });
   } catch (error) {
     console.error(`${error.message}\n${usage}`);
     process.exit(2);
