@@ -2642,6 +2642,8 @@ export default {
   'plan.reason.rotation': 'ताज़ा रखने के लिए चक्र में शामिल',
   'plan.reason.mock': '{date} से पहले समयबद्ध पेपर',
   'plan.reason.pinned': 'सुबह की योजना से बरकरार',
+  'plan.reason.slip': "वही चूक बार-बार हो रही है: {slip}",
+  'plan.reason.notebook': { one: "आपकी नोटबुक में दोबारा हल करने के लिए {n} गलती", other: "आपकी नोटबुक में दोबारा हल करने के लिए {n} गलतियाँ" },
   'plan.weekLabel': 'सप्ताह {n}',
   'plan.weekRange': '{start} से {end}',
   'plan.examIn': { one: 'परीक्षा {n} दिन में', other: 'परीक्षा {n} दिनों में' },

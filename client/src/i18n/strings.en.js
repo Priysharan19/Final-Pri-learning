@@ -2579,6 +2579,8 @@ export default {
   'plan.reason.rotation': 'Kept in rotation so it stays fresh',
   'plan.reason.mock': 'Timed paper before {date}',
   'plan.reason.pinned': 'Kept from this morning’s plan',
+  'plan.reason.slip': "The same slip keeps coming back: {slip}",
+  'plan.reason.notebook': { one: "{n} mistake in your notebook to try again", other: "{n} mistakes in your notebook to try again" },
   'plan.weekLabel': 'Week {n}',
   'plan.weekRange': '{start} – {end}',
   'plan.examIn': { one: 'Exam in {n} day', other: 'Exam in {n} days' },
