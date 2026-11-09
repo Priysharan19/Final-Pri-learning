@@ -38,13 +38,13 @@ printed):
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
 | **Session mode only:** not Supavisor's transaction port **6543** (authority, `?port=` or `PGPORT`), no `pgbouncer=` (other than `false`), no `pool_mode=transaction`/`statement` | `config.js assertSessionModeUrl` (from `postgresConnectionSettings`, before any pool exists) | `PLATFORM_DB_TRANSACTION_POOLER` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = **13** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = **14** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
 ### Schema versions and the migrations that set them
 
-`server/platform/schemaVersions.js` is the authority; this table is its reading at schema **13** /
+`server/platform/schemaVersions.js` is the authority; this table is its reading at schema **14** /
 billing **6**. A deployed build boots only against a database at exactly these numbers
 (`PLATFORM_DB_SCHEMA_MISMATCH` otherwise), so a schema-changing merge and its migration are one
 back-to-back operation (§2.6).
@@ -62,9 +62,11 @@ back-to-back operation (§2.6).
 | schema 11 | `20261007000000_security_hardening.sql` | staff MFA, guardian-withdraw credential, append-only `audit_log`, per-account RLS on the sync tables | owner-approved, written at the time |
 | schema 12 | `20261016000000_rls_fail_closed.sql` (#522) | RLS deny-by-default: every `pri` table requires a declared `pri.scope` (`system` or `account`); the 19 account-owned tables admit only system scope or their own account; the store declares the scope on every statement | `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql` |
 | **schema 13** | `20261019000000_rls_account_coverage.sql` (train 10, security P2) | **account RLS on every account-bearing table**: `accounts`, the class/teacher tables, issue reports, the nullable-account billing ledgers, OTP challenges, the audit trail, content authorship, teacher invites and feature-flag provenance get a RESTRICTIVE `pri_account_scope` (system scope, or account scope on the row's own owner column); no row changes | `docs/release/rollback/20261019000000_rls_account_coverage.rollback.sql` |
+| **schema 14** | `20261022000000_parent_report.sql` (parent weekly report) | `parent_report_links` (a parent's double-opt-in address, its state and sealed unsubscribe credential) and `parent_report_sends` (one row per account and week); both account-scoped under RLS (`pri_scope_required` + RESTRICTIVE `pri_account_scope`), cascade with the account | `docs/release/rollback/20261022000000_parent_report.rollback.sql` (drops both tables: deletes the links and the send ledger) |
 
-Applied on staging: all ten up to schema 12, in this order (schema 12 on 2026-10-18 by §2.5); schema 13 is applied right after train 10 merges. Applied on
-production: none.
+Applied on staging: all eleven up to schema 13, in this order (schema 12 on 2026-10-18 by §2.5; schema 13 after train 10). Observed
+live on 2026-11-07, read-only: staging `GET /v1/health` reports `schemaVersion "13"`, `billingSchemaVersion "6"`, Postgres, release
+`a5778a3`. Applied on production: none (production still serves SQLite at schema 12, release `169bcdf`). Schema 14 (parent report) is applied on staging right after its PR merges.
 
 ### Connection: session mode only (mandatory, enforced at boot)
 
@@ -168,7 +170,8 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261007000000_security_hardening.sql           (schema 11: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
 #        20261016000000_rls_fail_closed.sql              (schema 12: every table requires a declared pri.scope; 19 account-owned tables fail closed)
 #        20261019000000_rls_account_coverage.sql         (schema 13: account RLS on the 15 other account-bearing tables)
-#      The list must end at the versions schemaVersions.js states (schema 13 / billing 6);
+#        20261022000000_parent_report.sql                (schema 14: parent weekly report link + send ledger, account-scoped RLS)
+#      The list must end at the versions schemaVersions.js states (schema 14 / billing 6);
 #      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
@@ -352,7 +355,7 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "12"`, `billingSchemaVersion = "6"`;
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "13"` (the version the current build requires; it was "12" before train 10), `billingSchemaVersion = "6"`;
    `GET /v1/ready` → 200 with `database` reported ready (503 + `Retry-After` means the replica
    cannot serve: read its coded state, not the logs' guesses).
 3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
@@ -396,7 +399,7 @@ gate for the next:
 |---|---|---|---|
 | 1 | **Nominate** one `main` SHA: `node scripts/release-nominate.mjs <sha> --candidate` | anyone | prints `CANDIDATE: PASS` — the SHA is on `origin/main`, every workflow on it completed green (the newest run per workflow and event decides, so a flaky scheduled run that a later schedule passed is listed as superseded while a workflow whose newest run is red still refuses), the four required contexts and Production Container are green, staging serves exactly it on Postgres at the schema versions that commit's `schemaVersions.js` states, and `deploy/production → sha` is a fast-forward. The tool pushes nothing and prints no promotion yet: the release-stage run in step 7 requires the evidence of steps 3–5 |
 | 2 | **Verify staging** at that SHA: `npm run verify:deployment -- --origin https://pri-learning-staging-staging.up.railway.app --sha <sha> --engine postgres --auth-email-proven` from a checkout at the SHA | anyone | `DEPLOYMENT VERIFIED: PASS` |
-| 3 | **Staging acceptance A–D**: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"` (`tools/acceptance/README.md`) | a named human at the terminal | `STAGING ACCEPTANCE: PASS`; its report labels each step's evidence class (real mailbox / synthetic picture / test accounts) |
+| 3 | **Staging acceptance S0–S8**: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"` (`tools/acceptance/README.md`) | a named human at the terminal | `STAGING ACCEPTANCE: PASS`; its report labels each step's evidence class (real mailbox / synthetic picture / test accounts) |
 | 4 | **Device matrix** on the TestFlight / Play build of the same SHA (`docs/release/device-matrix.md`) | named testers on real hardware | `node scripts/device-matrix-record.mjs report --sha <sha>`: no `fail`; families without hardware recorded `blocked`, never omitted |
 | 5 | **24 h soak** on staging at that SHA (§4.5) | operator watches | no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 for 24 h, recorded in §7 with the start and end times |
 | 6 | **Production database at the same schema**: first cutover §5.4 (§2–§4 against the production project, backup §6 first); later releases that change `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` use §2.6's back-to-back migrate + redeploy against production | owner (`BLOCKED_EXTERNAL`) | `verify:platform:pg-target` → `POSTGRES TARGET: PASS` against production; owner's explicit "Yes" for the window |
@@ -430,7 +433,7 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 13 / 6; a build from before
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 14 / 6; a build from before
   schema 12 declares no `pri.scope`, so under deny-by-default RLS it reads nothing even where it
   boots). Builds with the
   version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only
@@ -445,7 +448,8 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first: `20261019000000_rls_account_coverage` (schema 13; rollback
+off newest first: `20261022000000_parent_report` (schema 14; rollback
+`docs/release/rollback/20261022000000_parent_report.rollback.sql`, which deletes the report links and send ledger), `20261019000000_rls_account_coverage` (schema 13; rollback
 `docs/release/rollback/20261019000000_rls_account_coverage.rollback.sql`), `20261016000000_rls_fail_closed` (schema 12; its reviewed rollback is
 `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql`, owner-approved only),
 `20261007000000_security_hardening` (schema 11), `20261006000000_otp_sign_in` (schema 10),
@@ -506,26 +510,146 @@ only after: staging is clean (§4.5), the backup in §6 exists and has been rest
 the owner has approved the window. The migrations are additive; the first production `db push`
 runs against an empty `pri` schema.
 
+### 5.5 Step 24 rollback: what undoes each stage of the production cutover
+
+The production cutover (issue #686 step 24; §7a is its log) has five stages. Each one has its own
+way back, and each way back closes at a known point. **Two things must not be deleted until the
+owner closes the rollback window in §7a:** the production SQLite volume (`/data`; write
+`PRI_PLATFORM_DB`'s value in §7a) and the stage-1 SQLite backup file. Production serves `169bcdfe`
+on SQLite at schema 12 until stage 4. Every step below is the owner's, or is done with the owner's
+explicit go-ahead at the time.
+
+| Stage | What changed | Way back | Data lost by going back | The way back closes when |
+|---|---|---|---|---|
+| 1. SQLite frozen and backed up (§6.2) | the production service scaled to 0; a backup file written | scale the service back up | none | — |
+| 2. Migrations pushed to production Supabase (§2 with §2.5) | the `pri` schema created and empty. The `app` and `app_private` schemas already in that project belong to another lane and are not touched | none is needed: the service still reads SQLite. To remove the schema while it holds no student data, run `drop schema pri cascade;` as `postgres` (owner-approved) | none | the first student write to Postgres |
+| 3. SQLite data imported (§6a.2–§6a.4, only if the owner chose "migrate") | `pri` tables hold the imported rows | `import-copy.sql` is one transaction, so a failed import leaves nothing. To drop a finished import, remove the schema as in stage 2, then push the migrations again | none (the SQLite file is still the source) | the first student write to Postgres |
+| 4. Production serves the candidate on Postgres: the §4.1 variables against production (`PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, login role `pri_app_production`) **deployed with** the fast-forward of `deploy/production` (`docs/release/FREEZE-RUNBOOK.md` F16) | the candidate build boots on Postgres; `app.prilearning.com` moves to production (`production-config-v1.md` note 7) | before the first student write: §5.1. Remove `PRI_DATABASE_URL`, set `PRI_PLATFORM_DB` back to its recorded value and redeploy; the candidate build then serves the SQLite volume and migrates that file forward in place. A full return to `169bcdfe` restores the stage-1 backup into the volume and moves `deploy/production` back, which is break-glass (`release-policy.md`): a build may serve only a database at its own schema versions, and `169bcdfe` is schema 12 | none before the first student write; after it, every write since | the owner closes the window in §7a |
+| 5. Real traffic on Postgres | student writes | forward-fix only (§5.2). A data restore (PITR, or a §6.3 dump) is destructive, owner-approved, and discards every later write | everything after the restore point | — |
+
+The order inside stage 4 matters. Deploy the Postgres variables together with the fast-forward,
+or after it. If they are deployed first, `169bcdfe` (schema 12) meets a database at 13 or later
+and refuses it. `/v1/ready` is the deploy healthcheck (`railway.json`), so Railway keeps the
+previous deployment serving. That is safe, but it costs a deploy and looks like an outage on the
+dashboard.
+
+Never point `app.prilearning.com` back at staging once real students use production: staging's
+database is not theirs.
+
 ---
 
-## 6. Backups before production
+## 6. Backups before production (Step 24)
 
-1. Confirm the production project's plan includes daily backups, and enable **Point-in-Time
-   Recovery** before launch (ADR-0001 requires a restore drill before real student data).
-2. Immediately before the production `db push`, take a logical backup from the operator's
-   machine and store it encrypted outside the repository:
+ADR-0001 requires a restore drill before real student data, and a backup that has never been
+restored is not a backup. For the first production cutover there are **two** things to back up,
+and they are backed up at different moments:
 
-   ```bash
-   npx supabase@latest db dump --linked --schema pri -f pri-preflight-schema.sql
-   npx supabase@latest db dump --linked --schema pri --data-only -f pri-preflight-data.sql
-   ```
+- **Production's SQLite file.** It holds whatever production holds today. It is backed up before
+  anything changes (§6.2).
+- **The new Postgres database.** It is backed up once the migrations (and the import, if the owner
+  chose "migrate") are in, and before any student uses it (§6.3). A dump taken before the first
+  `db push` would be a dump of an empty `pri` schema, because production has none yet (#386).
 
-3. **Restore drill:** restore that dump (or a PITR point) into a scratch Supabase project, run
-   §4.2 against it, and record the result. A backup that has not been restored is not a backup.
-4. If SQLite held real data before cutover, keep the final SQLite file
-   (`server/tools/backup.mjs`) as the authoritative pre-cutover copy and carry it across with
-   §6a. ADR-0001 leaves "migrate or start empty" to the owner; §6a is the tooling for the
-   "migrate" answer and is **not run** unless the owner chooses it.
+### 6.1 Owner click-list: Supabase Pro and PITR on the production project
+
+The project is `pri-learning-production-india` (`mgmlvkesbwmipmvnzufk`), in `ap-south-1`
+(Mumbai), on Postgres 17.6. Its `app` and `app_private` schemas belong to another lane and are
+never touched here (#386, read-only inspection of 8 Oct 2026). The owner does each step in the
+Supabase dashboard; no agent does them. Dashboard labels move between releases; the setting names
+are what count. Each step fills a row of §7a.
+
+| # | Where | Do | You should see | §7a row |
+|---|---|---|---|---|
+| 1 | Organization (of the production project) → Billing | Put the organization on **Pro** (or higher) | plan "Pro"; the project listed under it | P1 |
+| 2 | Project → Settings → Compute and Disk | Read the compute size. If step 3 says Point in Time Recovery needs a larger size (Supabase has required at least *Small*), raise it first | the compute size, and no warning on step 3 | P2 |
+| 3 | Project → Settings → Add-ons → Point in Time Recovery | Enable it with a **7-day** retention, which is enough for V1. The dashboard shows the monthly price before you confirm | "Point in Time Recovery: enabled, 7 days" | P3 |
+| 4 | Project → Database → Backups | Open the point-in-time tab | an earliest and a latest recovery point, minutes apart from now | P4 |
+| 5 | Project → Settings → Database → SSL configuration | Turn on **Enforce SSL on incoming connections**; download the CA certificate | enforcement on; the certificate is the PEM for `PRI_DATABASE_SSL_ROOT_CERT` (§1, TLS) | P5 |
+| 6 | Project → Connect | Copy the **session** pooler string (port 5432), never the transaction pooler (6543, §1) | a host like `aws-0-ap-south-1.pooler.supabase.com:5432` (the number varies by project) and user `postgres.mgmlvkesbwmipmvnzufk` | P6 (host only, never the password) |
+| 7 | Project → Settings → (notifications / integrations) | Turn on the database health, connection and disk alerts (`alerts.md` §4) | the owner's address on the alert list | P7 |
+
+Point in Time Recovery restores **in place**: the project's database goes back to the chosen moment
+and every later write is lost. A PITR drill therefore runs only before real students use
+production, or into a new project if the dashboard offers "restore to a new project". It never
+runs in place on a database students are using.
+
+### 6.2 Before anything changes: production's SQLite file (stage 1 of §5.5)
+
+1. Scale the production service to 0 (Railway → production → `/v1` service → Settings), so no
+   write is lost after the backup.
+2. Take a **Railway volume backup** of `pri-learning-data` (`/data`) and name it
+   `pre-cutover-<candidate SHA>`. Railway → volume → Backups → create. This is how
+   `ops-staging-log-2026-10-19.md` took `pre-promotion-169bcdfe7-20261019`. A volume backup is a
+   restore point, not a readable file.
+3. Only if the owner chose **"migrate"** (§6a): take a file copy. `node server/tools/backup.mjs
+   --db /data/pri-learning-platform.db --out /data/backups` runs inside the service container, and
+   bringing the file down needs `railway ssh`, which needs the owner's SSH key registered with
+   Railway (`ops-staging-log-2026-10-20.md` §4). Record `shasum -a 256 <file>` in §7a at once, and
+   keep the file encrypted outside the repository.
+4. If the owner chose **"start empty"**: step 2 is the whole backup. Record the decision in §7a.
+   Students then register again, and the volume backup is kept under
+   `docs/privacy/data-retention.md`.
+
+### 6.3 After the migrations, before any student: the Postgres dump and its restore drill
+
+Take this backup once §2 (with §2.5's placeholder workdir for the remote-only `app` migration
+versions) has built the `pri` schema and §6a has imported the data, if the owner chose that.
+Run the dumps from the operator's machine, and store the files encrypted outside the
+repository:
+
+```bash
+npx supabase@latest db dump --linked --schema pri -f pri-preflight-schema.sql
+npx supabase@latest db dump --linked --schema pri --data-only -f pri-preflight-data.sql
+```
+
+`supabase db dump --dry-run` prints the exact script the CLI runs. With CLI 2.121.0 that is
+`pg_dump --schema-only --quote-all-identifier --role postgres --schema=pri` piped through `sed`
+filters, then `pg_dump --data-only --column-inserts --rows-per-insert 100000 --schema pri`. If the
+CLI cannot run it (it brings its own `pg_dump`), run the printed script with a local `pg_dump` 17.
+
+**The restore drill** goes into a scratch Supabase project. The schema dump contains `GRANT …
+TO "pri_server"` but no `CREATE ROLE`: roles belong to the cluster, not to the dump. The 9 Nov
+rehearsal in §6.5 confirmed this.
+
+```sql
+-- 6.3.1  In the scratch project's SQL editor (or psql as postgres), BEFORE the schema file:
+do $$ begin
+  if not exists (select 1 from pg_roles where rolname = 'pri_server') then create role pri_server nologin; end if;
+end $$;
+```
+
+```bash
+# 6.3.2  Schema, then data, each as one transaction that stops at the first error.
+read -rs PRI_SCRATCH_URL && export PRI_SCRATCH_URL     # scratch project, postgres role, sslmode=verify-full
+psql "$PRI_SCRATCH_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f pri-preflight-schema.sql
+psql "$PRI_SCRATCH_URL" -X -v ON_ERROR_STOP=1 --single-transaction -f pri-preflight-data.sql
+unset PRI_SCRATCH_URL
+```
+
+Then create a login role in the scratch project as in §3, and run §4.2's
+`verify:platform:pg-target` against it: `POSTGRES TARGET: PASS` is the result to record in §7a.
+Delete the scratch project afterwards; it holds a copy of production.
+
+### 6.4 After the cutover: the recovery point exists
+
+Within an hour of stage 4 of §5.5, read Project → Database → Backups again. The latest recovery
+point must be **after** the cutover time. Record it in §7a (row P8). From then on, restoring data
+is §5.5 stage 5: destructive and owner-approved.
+
+### 6.5 The restore, rehearsed locally on 9 Nov 2026 (LOCAL-SYNTHETIC evidence)
+
+Both rehearsals ran on throwaway local Postgres 17 clusters made by `scripts/with-postgres.mjs`,
+never Supabase, under the machine's heavy-job limiter. A real server on a migrated database, as
+`pri_server` under RLS, created two students who answered questions; one held Premium. The data is
+synthetic. The physical and PITR restore of the hosted project is **not** exercised by either; that
+remains §6.3 and §6.4, the owner's.
+
+| Rehearsal | What it restores, and how | Result |
+|---|---|---|
+| **L2:** #731's `server/test/postgres-restore-rehearsal-check.mjs`, run from #731's head `e42231a36` | `pg_dump --format=custom` of the live source, then `pg_restore --single-transaction --exit-on-error` into an empty database. It then compares every `pri` table's rows, RLS and its policies, `pri_server`'s grants, the sync cursor sequence and the schema versions, and runs a real server on the restore: sessions, passwords, histories, Premium, isolation, and a new answer after the restored cursors | **PASS, 34/34**, 9 Nov 2026, on a throwaway Postgres (`scripts/with-postgres.mjs`): every `pri` table's rows, RLS and its policies, `pri_server`'s grants, the cursor sequence and the schema versions came back identical, and the real server on the restore kept sessions, passwords, histories, marks and Premium, kept the accounts apart and marked new answers after the restored cursors. A logical restore only: the hosted project's physical/PITR restore is not exercised |
+| **L3:** the owner's own format | The exact pipelines `supabase db dump --dry-run` prints for `--schema pri` and `--schema pri --data-only` (CLI 2.121.0), then `psql -v ON_ERROR_STOP=1 --single-transaction`, schema first, into an empty database, then the same comparison and the same served checks. It also checks that the schema dump creates no role (`pri_server` must exist first, §6.3.1) and that the data dump carries the cursor sequence | **PASS, 38/38**, 9 Nov 2026, on a throwaway Postgres 17 (the cluster's `postgres` superuser restored the files). Every `pri` table's rows, RLS on every table, the policies, `pri_server`'s grants, its schema and sequence usage, the cursor sequence and the schema versions came back identical. The real server on the restore kept the signed-in device, both passwords, both histories and Premium; it kept the accounts apart and marked a new answer after every restored cursor. The schema dump created `pri` and its grants and **no role**, and the data dump carried `setval` for the cursor sequence |
+
+Both rehearsals are recorded in §7a, rows L2 and L3.
 
 ## 6a. Carrying the SQLite data into Postgres (owner's decision; software complete)
 
@@ -565,6 +689,31 @@ node server/tools/sqlite-to-postgres-export.mjs \
 #          "accountEmailsLowercased":n,"files":[…]}
 #       Read manifest.json: per-table sourceRows == exportedRows, the SHA-256 of every file,
 #       syncCursor.liftTo, auditLogMaxId. Keep it with the cutover log.
+shasum -a 256 ./pri-export-<ts>/manifest.json
+#       → write this digest into §7a row S4 NOW, before the folder moves anywhere. Comparing
+#         the files with a manifest that travelled in the same folder proves nothing (#386, 6 Nov).
+
+# 6a.2b Integrity, on the machine that imports, immediately before 6a.3. Both must pass:
+#       the manifest is the one recorded at export time, and every file is the one it lists
+#       (no changed byte, no missing file, no extra file, no symlink).
+test "$(shasum -a 256 ./pri-export-<ts>/manifest.json | cut -d' ' -f1)" = "<digest from §7a S4>" && echo "manifest: as recorded"
+node -e '
+const fs = require("fs"), crypto = require("crypto"), path = require("path"), dir = process.argv[1];
+const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"));
+const listed = new Set(["manifest.json", ...manifest.files.map(f => f.file)]);
+let bad = 0;
+for (const f of manifest.files) {
+  const file = path.join(dir, f.file);
+  if (!fs.existsSync(file) || fs.lstatSync(file).isSymbolicLink()) { console.error(`MISSING OR LINK ${f.file}`); bad++; continue; }
+  const bytes = fs.readFileSync(file);
+  if (bytes.length !== f.bytes || crypto.createHash("sha256").update(bytes).digest("hex") !== f.sha256) { console.error(`CHANGED ${f.file}`); bad++; }
+}
+for (const name of fs.readdirSync(dir)) if (!listed.has(name)) { console.error(`NOT IN MANIFEST ${name}`); bad++; }
+console.log(bad ? `EXPORT INTEGRITY: FAIL — ${bad} problem(s)` : `EXPORT INTEGRITY: PASS — ${manifest.files.length} files match manifest.json`);
+process.exit(bad ? 1 : 0);' ./pri-export-<ts>
+#       → EXPORT INTEGRITY: PASS. Anything else: stop, export again from the backup copy.
+#       (Interim control. A verifier in server/tools that takes the recorded digest as an
+#        argument is L2's follow-up to #386's finding.)
 
 # 6a.3  Import, as the migration owner (Supabase `postgres`), into the MIGRATED, EMPTY
 #       production schema — after §2 db push, before §4 points the service at it.
@@ -598,7 +747,7 @@ in the cutover log; students then re-register and the SQLite backup is retained 
 | 2.5 `db push --linked` (placeholder workdir), schema 12 | staging | `#522` merge | operator | 2026-10-18 | `/v1/ready` 200 on schema 12 / billing 6 after the redeploy (`LAUNCH-RUNBOOK.md` 2.2a; outage window recorded there) |
 | 4.6 step 1 nominate (candidate) | — | | | | `CANDIDATE: PASS` from `scripts/release-nominate.mjs <sha> --candidate` |
 | 4.6 step 7 nominate (release) + dossier | — | | | | `NOMINATION: PASS` from `scripts/release-nominate.mjs <sha>`; `DOSSIER: GO-READY` from `scripts/release-dossier.mjs <sha>`; path of `docs/release/evidence/go-no-go/<sha>.md`; any override named |
-| 4.6 step 3 staging acceptance A–D | staging | | | | `STAGING ACCEPTANCE: PASS`; report path; tester |
+| 4.6 step 3 staging acceptance S0–S8 | staging | | | | `STAGING ACCEPTANCE: PASS`; report path; tester |
 | 4.6 step 4 device matrix | TestFlight / Play build | | | | `device-matrix-record.mjs report --sha` summary line |
 | 4.6 step 5 soak 24 h | staging | | | start → end (UTC) | no 500 / pool error / unexplained 503 |
 | 2.4 `db push` | staging | | | | |
@@ -609,3 +758,63 @@ in the cutover log; students then re-register and the SQLite backup is retained 
 | 6 backup + restore drill | production | | | | |
 | 6a export + import + verify.sql | production (if SQLite held real data) | | | | `manifest.json` row totals; `verify.sql` all `ok`/`true` |
 | 2–4 | production | | | | |
+
+## 7a. Production cutover log, Step 24 (template, pre-filled 9 Nov 2026)
+
+One copy per cutover window. The owner fills the empty cells on the day; every pre-filled cell is a
+fact read before the window and must be checked again at the start of it. Names and non-secret
+values only: a password, connection string with a password, key or token never goes in here.
+Rows marked LOCAL-SYNTHETIC are rehearsals on throwaway local databases, not evidence about
+production.
+
+**Facts at the start of the window**
+
+| Item | Pre-filled (re-check) | At the window |
+|---|---|---|
+| Production Supabase project | `pri-learning-production-india` (`mgmlvkesbwmipmvnzufk`), `ap-south-1`, Postgres 17.6. No `pri` schema. The `app` (62 tables) and `app_private` (4) schemas are another lane's and are never touched (#386, 8–9 Oct 2026) | |
+| Production Railway | project `profound-spontaneity`, environment `production`, service `Final-Pri-learning`, volume `pri-learning-data` at `/data`. It serves `169bcdfe` on SQLite at schema 12 / billing 6 (read by `release-nominate.mjs` on 9 Nov 2026) | |
+| `PRI_PLATFORM_DB` value (needed by §5.5 stage 4) | the path on `/data`, read by the owner at the window | |
+| Candidate SHA | `docs/release/FREEZE-RUNBOOK.md` F1 | |
+| Migrations at the candidate | `ls supabase/migrations/` at the candidate. On `main` `1d3829103` there are 11 files, ending at schema 13 / billing 6; #743 would add schema 14 | |
+| Login role | `pri_app_production`: a member of `pri_server`, not superuser, not BYPASSRLS (§3) | |
+| Data decision (owner, ADR-0001) | migrate (§6a) or start empty | |
+| Owner's Yes for this window (D27) | — | |
+
+**Steps, in order**
+
+| Id | Step | Command or action | Expected | Result | By | When (UTC) |
+|---|---|---|---|---|---|---|
+| P1–P3 | §6.1 rows 1–3 | Supabase Pro, compute size, PITR 7 days | Pro; PITR enabled | | | |
+| P4–P7 | §6.1 rows 4–7 | recovery window; Enforce SSL and the CA certificate; session pooler host; alerts | recovery points listed; SSL enforced; host on port 5432; alerts on | | | |
+| S1 | §6.2.1 | scale production to 0 | no running deployment | | | |
+| S2 | §6.2.2 | Railway volume backup `pre-cutover-<SHA>` | backup listed, with its size | | | |
+| S3 | §6.2.3 (migrate only) | `backup.mjs` then `railway ssh` copy; `shasum -a 256 <file>` | `{"ok":true,…}`; digest | | | |
+| S4 | §6a.2 (migrate only) | export; `shasum -a 256 manifest.json` | per-table `sourceRows == exportedRows`; digest | | | |
+| M1 | §2.5.3 | placeholder workdir dry run against production | lists **only** this repository's files | | | |
+| M2 | §2.4 / §2.5.4 | `supabase db push` | every file applied, none skipped | | | |
+| M3 | §2.3 | `supabase migration list` | local and remote agree up to the candidate's last file | | | |
+| R1 | §3.1–§3.2 | `create role pri_app_production …`; `\password` | role created (the password goes into Railway only) | | | |
+| R2 | §3.3 | the check query | `rolsuper = false`, `rolbypassrls = false`, `member = true` | | | |
+| I1 | §6a.2b (migrate only) | the manifest digest equals S4; the file check | `manifest: as recorded`; `EXPORT INTEGRITY: PASS` | | | |
+| I2 | §6a.3 (migrate only) | `psql … -f import-copy.sql` | one transaction, committed | | | |
+| I3 | §6a.4 (migrate only) | `psql … -f verify.sql` | every row `ok`; queries 2–5 `true` | | | |
+| B1 | §6.3 | the two `supabase db dump` files | both written; record their SHA-256 | | | |
+| B2 | §6.3.1–§6.3.2 | scratch project: `pri_server`, then schema, then data | both `psql` runs end without error | | | |
+| B3 | §6.3 | `verify:platform:pg-target` against the scratch project | `POSTGRES TARGET: PASS — n/n` | | | |
+| B4 | §6.3 | delete the scratch project | gone from the organization | | | |
+| T1 | §4.2 | `verify:platform:pg-target` against production | `POSTGRES TARGET: PASS — n/n`, including "sequence at or above every cursor" | | | |
+| V1 | §4.1 against production | set `PRI_DATABASE_URL` (session pooler, `sslmode=verify-full`, user `pri_app_production`), `PRI_DATABASE_SSL_ROOT_CERT`; keep `PRI_PLATFORM_DB` | variable names listed; nothing deployed yet (§5.5, order inside stage 4) | | | |
+| D1 | FREEZE-RUNBOOK F16 | fast-forward `deploy/production`; deploy with V1 | boot log `platform_db_open { engine: 'postgres' }`; `/v1/ready` 200 | | | |
+| D2 | §4.4 step 3 | the cursor lift, once no older instance remains | done | | | |
+| D3 | `production-config-v1.md` §2 | `verify:deployment … --engine postgres --auth-email-proven --require-handwriting --expect-config …` | `DEPLOYMENT VERIFIED: PASS` | | | |
+| D4 | §4.6 step 8 | one owner-controlled registration, then delete it | verification email arrives from `verify@mail.prilearning.com`; account gone | | | |
+| P8 | §6.4 | the latest recovery point | later than D1 | | | |
+| W1 | §5.5 | the owner closes the rollback window | date; only after it may the SQLite volume and `PRI_PLATFORM_DB` go | | | |
+
+**Rehearsals (filled 9 Nov 2026; LOCAL-SYNTHETIC, see §6.5)**
+
+| Id | What | Result |
+|---|---|---|
+| L1 | §6a.2b integrity check on a real export of a seeded SQLite platform database | **5/5 as expected**: the untouched export passes (38 files match `manifest.json`); a manifest digest that is not the recorded one fails; a same-size edit of `accounts.csv` (the #386 finding) fails `CHANGED accounts.csv`; the restored file passes again; an extra file fails `NOT IN MANIFEST`. Local, synthetic data, 9 Nov 2026 |
+| L2 | #731's `postgres-restore-rehearsal-check.mjs` (`pg_dump -Fc` → `pg_restore` into an empty database, then served) | **PASS 34/34**, 9 Nov 2026, from #731's head `e42231a36` (LOCAL-SYNTHETIC: a throwaway Postgres and synthetic accounts) |
+| L3 | the owner's own format: the exact `supabase db dump` pipelines → `psql` into an empty database, then served | **PASS 38/38**, 9 Nov 2026 (LOCAL-SYNTHETIC; restored by a superuser — on Supabase the `postgres` role is not a superuser but holds BYPASSRLS, which the data file's `SET row_security = off` needs; the scratch-project drill of §6.3 proves that part) |

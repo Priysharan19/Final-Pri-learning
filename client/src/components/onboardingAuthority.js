@@ -19,6 +19,11 @@
  *                  approved, with a verified contact
  *   waiting      — this account, a child whose guardian has not yet approved
  *   revoked      — this account, a guardian withdrew approval
+ *   unverified   — this account, and the ONE thing missing is a confirmed
+ *                  email: an adult, or a child a guardian already approved,
+ *                  whose address has not been proved. The student confirms it
+ *                  (SignUpFlow.jsx 'verify-email'); nothing here admits them,
+ *                  and the server still refuses practice until it is proved.
  *   changed      — the reply is about a DIFFERENT account (another tab signed in)
  *   unavailable  — not a bound statement (an older server, a malformed or
  *                  self-contradictory reply): refused, never grandfathered in
@@ -43,6 +48,11 @@ export function decideOnboardingAuthority(expectedAccountId, response) {
   if (response.eligible && !permitted) return { outcome: 'unavailable' };
   const consent = { required: response.required, state: response.state };
   if (response.required && response.state === 'withdrawn') return { outcome: 'revoked', consent };
+  // Only the address is unproved (the server's own flag says so, and its
+  // verdict agrees): that is a step the student can take, not missing
+  // authority and not a guardian matter. A child still waiting for a guardian
+  // waits for the guardian first (below); consent is settled before email.
+  if (!response.eligible && !response.emailVerified && (adult || approvedChild)) return { outcome: 'unverified', consent };
   // An adult without a guardian requirement cannot fix an unverified account
   // by inventing a parent. Neither can an already approved but ineligible
   // child. Treat these as missing/contradictory authority, not consent pending.

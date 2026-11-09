@@ -192,7 +192,11 @@ export const ON_DEMAND = [
   // 16 kB of Australian exam questions; a profile that holds the NSW course has
   // it from its first paper on, and backend.js already charges an unreachable
   // fetch to that one paper rather than every paper after it.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // The Class 7 and Class 8 hardest-level (D3) forms are the same case: each
+  // is one class's bank in the registry (generators/index.js), and warmScope()
+  // loads it at sign-in for that class through the generator-to-bank map, so a
+  // Class 7 or 8 student is offline-ready for it and nobody else warms ~157 kB.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|class7-hardest|class7-part2-hardest|class8-hardest|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
   // The source-audited NCERT Class 7–9 production banks: each class's
   // generators, topper notes, worked examples and answer audits. They used to
@@ -261,6 +265,12 @@ export const ON_DEMAND = [
   // and if they cannot be fetched it shows the English — the text that
   // governs — and says so, which legal-pages-check.mjs holds it to.
   [/(^|\/)legalHindi-[^/]*\.js$/, 'Hindi legal notices'],
+
+  // The third-party licence notices, generated from the dependency licences
+  // (tools/third-party-notices.mjs) and reached by import() from Legal.jsx
+  // only when /third-party-notices is opened. Licence prose nobody reads
+  // twice has no place in anyone's install.
+  [/(^|\/)thirdPartyNotices-[^/]*\.js$/, 'third-party licence notices'],
 
   // Staff-only screens. ADR-0001 makes the product online-first, and these are
   // the screens a student never opens, so nothing a student does offline
@@ -439,10 +449,17 @@ export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT']);
+//   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
+//   everywhere, the dev server included: off until a rights opinion exists
+//   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
+//   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
+//   emailed confirm/stop page). Off until counsel has reviewed email about
+//   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
+const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
-  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
   return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
 }
 export function featureDefines(command, env = process.env) {
@@ -453,6 +470,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
+    __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
+    __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin)
   };
 }

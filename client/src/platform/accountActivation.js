@@ -195,6 +195,9 @@ async function activateOnline(pid, { expectedAccountId = null, sync = true } = {
     throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
   }
   if (authority.outcome === 'revoked') throw new ActivationBlocked('GUARDIAN_CONSENT_WITHDRAWN');
+  // The session check above already refuses an unproved contact; the bound
+  // statement saying so too is the same refusal, never a retryable outage.
+  if (authority.outcome === 'unverified') throw new ActivationBlocked('EMAIL_UNVERIFIED');
   if (authority.outcome === 'waiting') {
     throw new ActivationBlocked(statement?.state === 'undeclared' ? 'AGE_DECLARATION_REQUIRED' : 'GUARDIAN_CONSENT_PENDING');
   }

@@ -13,6 +13,11 @@ import { readFileSync } from 'node:fs';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Regression (d) below exercises the past-papers filter end to end. Past papers
+// are OFF for students by default (engine/pastPapers.js, decision D23), pinned
+// by past-papers-flag-check.mjs; the switch is on here so the filter's wiring
+// stays proven while it waits for the rights opinion.
+process.env.PRI_PAST_PAPERS = '1';
 // Online-only grading (owner decision 2026-10-10): the backend sections below
 // run against the real server. Every profile is a real verified account, so
 // its India questions are issued by the server and answered questions are

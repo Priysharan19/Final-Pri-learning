@@ -21,6 +21,7 @@ import { createMfaRouter } from './mfa.js';
 import { isCommonPassword } from './commonPasswords.js';
 import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
 import { maskPhone } from './otpCore.js';
+import { ERASURE_REASONS, scheduleErasure } from './childErasure.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -125,7 +126,7 @@ export async function queueAccountToken(db, accountId, destination, purpose, now
   return tokenId;
 }
 
-async function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
+export async function invalidatePendingTokens(db, accountId, purpose, now = Date.now()) {
   await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND kind = ? AND delivered_at IS NULL', [accountId, purpose]);
   await db.run(`UPDATE account_tokens SET consumed_at = ?
     WHERE account_id = ? AND purpose = ? AND consumed_at IS NULL`, [now, accountId, purpose]);
@@ -252,20 +253,34 @@ export function requireRecentAuth(db, { freshMs = REAUTH_FRESH_MS } = {}) {
  * schema, the retained-but-unlinked rows in docs/privacy/data-retention.md §2,
  * and one personal-data-free audit receipt. `beforeDelete` is the billing hook
  * (cancel a charging web subscription first; refuse if the provider cannot).
+ *
+ * The scheduled erasure of a child's account (childErasure.js, decision D18)
+ * runs through here too, with two options the request paths never pass:
+ * `softDeletedBefore` deletes only an account that was soft-deleted at or
+ * before that time and still exists (another pass may have erased it first),
+ * and `receipt` names its own audit action and personal-data-free metadata.
+ * Resolves true when the account row was deleted by this call.
  */
-export async function deleteAccountRows(db, accountId, { beforeDelete = null, request = null } = {}) {
+export async function deleteAccountRows(db, accountId, { beforeDelete = null, request = null, softDeletedBefore = null, receipt = null } = {}) {
   db = asStore(db);
   if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request });
+  let deleted = false;
   await db.transaction(async () => {
+    if (softDeletedBefore != null) {
+      const due = await db.get('SELECT id FROM accounts WHERE id = ? AND deleted_at IS NOT NULL AND deleted_at <= ?', [accountId, softDeletedBefore]);
+      if (!due) return;
+    }
     // Retained rows (docs/privacy/data-retention.md) lose the account link
     // through ON DELETE SET NULL. An issue report is kept for content
     // quality, so the free text a student typed into it goes first: after
     // deletion it is a category and a question id, nothing they wrote.
     await db.run("UPDATE issue_reports SET note = NULL, context_json = '{}' WHERE account_id = ?", [accountId]);
-    await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
+    deleted = (await db.run('DELETE FROM accounts WHERE id = ?', [accountId])).changes > 0;
+    if (softDeletedBefore != null && !deleted) return;
     // A receipt with no personal data: an opaque id that no longer resolves.
-    await audit(db, null, 'account.delete', 'account', accountId, {}, Date.now());
+    await audit(db, null, receipt?.action || 'account.delete', 'account', accountId, receipt?.metadata || {}, Date.now());
   });
+  return deleted;
 }
 
 // ── What of idempotency_keys an account export carries (P2, train 9) ─────────
@@ -540,6 +555,60 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ ok: true, withdrawn });
   });
 
+  // A guardian asks for the child's account and its data to be erased, without
+  // the child's login (decision D18). The same two bearers as a withdrawal (the
+  // confirmation link, and the long-lived withdrawal credential), because this
+  // is the furthest a withdrawal can go: consent is withdrawn and the account
+  // soft-deleted in one transaction (no sign-in, no session, no link), and the
+  // erasure itself runs ERASURE_GRACE_MS later (childErasure.js). Only an
+  // account recorded as a child: a credential minted for a child must not
+  // erase an account that has since been corrected to an adult's.
+  router.post('/guardian/erase', rateLimit(db, 'guardian-erase', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const raw = String(req.body?.token || '');
+    const now = Date.now();
+    // Only the long-lived withdrawal credential, which is issued solely when
+    // a guardian themself confirms, and only the one issued for the current
+    // confirmation. A consent link is not enough: a child's own session can
+    // send one to any address it types (otp.js /guardian/request), and a
+    // link to a guardian since superseded must not erase (review of #736).
+    const token = raw ? await db.get(`SELECT * FROM account_tokens
+      WHERE token_hash = ? AND purpose = 'guardian-withdraw' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
+    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
+    const consentRow = await db.get('SELECT requested_at, confirmed_at FROM guardian_consents WHERE account_id = ?', [token.account_id]);
+    if (!consentRow || consentRow.confirmed_at == null || Number(token.created_at) < Number(consentRow.confirmed_at)
+      || Number(consentRow.requested_at) > Number(token.created_at)) {
+      return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
+    }
+    const account = await db.get('SELECT age_basis, deleted_at FROM accounts WHERE id = ?', [token.account_id]);
+    if (!account) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This link is invalid.' } });
+    // Already scheduled (a second click, or the retention rule got there
+    // first): the same answer, nothing changes and nothing is rescheduled.
+    if (account.deleted_at != null) return res.json({ ok: true, erasure: 'scheduled', alreadyScheduled: true });
+    if (account.age_basis !== 'child') {
+      return res.status(409).json({ error: { code: 'GUARDIAN_ERASURE_NOT_AVAILABLE', message: 'This account is not recorded as a child’s, so it cannot be erased from this link.' } });
+    }
+    // A charging web subscription is cancelled at the provider first, outside
+    // the transaction, as every deletion does: the parent is not billed for an
+    // account that can no longer be used. A provider that refuses stops the
+    // request here, with nothing changed, as it stops a deletion.
+    if (typeof beforeDelete === 'function') {
+      try { await beforeDelete({ accountId: token.account_id, request: req }); }
+      catch (error) {
+        if (isDatabaseOverload(error) || !error?.status) throw error;
+        return res.status(error.status).json({ error: { code: error.code || 'GUARDIAN_ERASURE_FAILED', message: error.message } });
+      }
+    }
+    let outcome = null;
+    await db.transaction(async () => {
+      const withdrawn = await withdrawConsent(db, token.account_id, now);
+      await invalidatePendingTokens(db, token.account_id, 'guardian-withdraw', now);
+      outcome = await scheduleErasure(db, token.account_id, { reason: ERASURE_REASONS.guardianRequest, now });
+      await audit(db, null, 'guardian.erase-request', 'account', token.account_id, { via: token.purpose, withdrawn, scheduled: outcome.scheduled }, now);
+    });
+    if (!outcome?.scheduled) return res.json({ ok: true, erasure: 'scheduled', alreadyScheduled: true });
+    res.json({ ok: true, erasure: 'scheduled', eraseAfter: outcome.eraseAfter });
+  });
+
   // One statement binds WHO this session is and WHETHER it may enter: the
   // account id, the consent state and `eligible` (no consent blocker and a
   // verified contact) are computed for the same session in the same reply.
@@ -801,6 +870,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
+    // The parent weekly report: who it goes to (masked, as the guardian's
+    // address is) and when each week's report was sent. Never the tokens.
+    const parentLink = await db.get('SELECT recipient_email,status,requested_at,confirmed_at,stopped_at,stopped_by FROM parent_report_links WHERE account_id=?', [accountId]);
+    const parentSends = await db.all('SELECT week_start,status,skip_reason,sent_at FROM parent_report_sends WHERE account_id=? ORDER BY week_start', [accountId]);
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -844,7 +917,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         ? { state: consent.state, guardianEmail: consent.row ? maskEmail(consent.row.guardian_email) : null,
           guardianPhone: consent.row?.guardian_phone ? maskPhone(consent.row.guardian_phone) : null,
           method: consent.row?.method || null, noticeVersion: consent.row?.notice_version || null }
-        : null
+        : null,
+      parentReport: {
+        link: parentLink ? { recipient: maskEmail(parentLink.recipient_email), status: parentLink.status,
+          requestedAt: Number(parentLink.requested_at), confirmedAt: parentLink.confirmed_at == null ? null : Number(parentLink.confirmed_at),
+          stoppedAt: parentLink.stopped_at == null ? null : Number(parentLink.stopped_at), stoppedBy: parentLink.stopped_by || null } : null,
+        sends: parentSends.map(row => ({ weekStart: Number(row.week_start), status: row.status, skipReason: row.skip_reason || null,
+          sentAt: row.sent_at == null ? null : Number(row.sent_at) }))
+      }
     });
   });
 

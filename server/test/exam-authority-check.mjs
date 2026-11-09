@@ -22,6 +22,10 @@
 // seen is flagged a repeat on the paper; and deleting the account removes
 // every exam row.
 import './support/hermetic.mjs';
+// Previous-year items are issued here with their source, so this suite turns
+// the past-papers switch on (engine/pastPapers.js). It is OFF for students by
+// default (decision D23) and client/test/past-papers-flag-check.mjs pins that.
+process.env.PRI_PAST_PAPERS = '1';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -32,6 +36,10 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-exam-authority-'));
 process.env.NODE_ENV = 'test';
+// D12: method marks are off by default — production marks the final answer only
+// until an examiner signs (#499). This suite pins the method rubric itself, so it
+// turns the server switch on; marking-policy-check.mjs pins the default.
+process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_PLATFORM_DB = join(scratch, 'unused.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '7c'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;

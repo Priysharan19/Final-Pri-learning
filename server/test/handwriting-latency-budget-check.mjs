@@ -29,6 +29,7 @@ import { createHandwritingRouter } from '../platform/handwriting.js';
 import { transcribeHandwriting, providerConfig } from '../platform/handwritingProvider.js';
 import { ALERT_RULES, createMetrics, metrics } from '../platform/metrics.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '../..');
@@ -38,7 +39,7 @@ const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
-const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
+const PNG = pngDataUrl('a'.repeat(600));
 const env = {
   PRI_HANDWRITING_API_KEY: 'test-key-not-real', PRI_HANDWRITING_MODEL: 'test-primary', PRI_HANDWRITING_FALLBACK_MODEL: 'test-fallback',
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
@@ -92,7 +93,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 let pictures = 0;
 const read = async () => {
   const res = await fetch(`${base}/handwriting/transcribe`, {
-    method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-lat` }, body: JSON.stringify({ image: 'data:image/png;base64,' + Buffer.from('a'.repeat(600) + `-${pictures += 1}`).toString('base64') })
+    method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-lat` }, body: JSON.stringify({ image: pngDataUrl('a'.repeat(600) + `-${pictures += 1}`) })
   });
   return { status: res.status, json: await res.json().catch(() => null) };
 };

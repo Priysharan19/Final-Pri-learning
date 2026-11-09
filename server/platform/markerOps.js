@@ -16,6 +16,9 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+// The policy is plain data the pool puts into every operation (D12). This
+// module reads no environment itself: markingPolicy.js imports nothing.
+import { policyOf } from './markingPolicy.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -176,6 +179,15 @@ export function tutorEvidence(q, lines) {
 // then stops the worker, the stages already reported are still known: an
 // answer that was marked in time keeps its verdict when only the working ran
 // out of time.
+//
+// MARKING POLICY (D12). Each operation's `policy` (markingPolicy.js, put there
+// by markerPool.js) decides whether working can earn a mark. Without
+// `policy.methodMarks === true` a mark is for the final answer only: the
+// working is still read and its step report returned, because that is
+// feedback, but no method mark is computed into the reply. stepEvidence and
+// examWorkingStage above stay the method rubric as written, so the rubric the
+// examiner is asked to sign (#499, tools/examiner-dossier.mjs) and its suites
+// are unchanged; only the operations the server runs apply the switch.
 export const MARKER_OPS = Object.freeze({
   /**
    * A practice submission: the answer, then (only when the reply could need
@@ -184,17 +196,23 @@ export const MARKER_OPS = Object.freeze({
    * under its transaction and asks again if it turns out to need evidence that
    * was not computed. Blank working costs nothing, so it is always "computed".
    */
-  practice({ q, answer, working, evidenceIfWrong }, emit) {
+  practice({ q, answer, working, evidenceIfWrong, policy }, emit) {
     const result = checkAnswer(q, answer);
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
-    return { result, evidence: wanted ? stepEvidence(q, answer, working, result) : null };
+    if (!wanted) return { result, evidence: null };
+    const evidence = stepEvidence(q, answer, working, result);
+    // Final answer only: the step report stays, the method mark does not.
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null } };
   },
-  /** One examination response: the answer stage, then the working stage. */
-  exam({ q, given, working, grid }, emit) {
+  /** One examination response: the answer stage, then (method marks on) the working stage. */
+  exam({ q, given, working, grid, policy }, emit) {
     const stage = examAnswerStage(q, given, working, grid);
-    emit({ response: stage.response, final: stage.final });
-    return { response: examWorkingStage(q, working, grid, stage) };
+    // Final answer only: the answer stage's response is the whole mark, so it
+    // is reported as final and no working stage runs.
+    const final = stage.final || !policyOf({ policy }).methodMarks;
+    emit({ response: stage.response, final });
+    return { response: final ? stage.response : examWorkingStage(q, working, grid, stage) };
   },
   tutor({ q, lines }) {
     return { evidence: tutorEvidence(q, lines) };

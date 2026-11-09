@@ -7,7 +7,7 @@
 
 - Android writes on the **shared web canvas** (`client/src/ink/InkCanvas.jsx`), the same component browsers use. PointerEvents carry `pointerType` (`touch` / `pen`), pressure and coalesced samples.
 - Palm rejection is the shared rule. Once a pen has been seen, finger touches do not draw (they scroll) until the student turns on **Finger**.
-- Recognition is the shared pipeline: on-device JS, plus the answer-blind cloud reader when switched on. There is **no Kotlin recogniser and no native drawing surface.**
+- Recognition is the shared pipeline: the answer-blind **server reader** (`client/src/ink/cloudReader.js`), read when the student presses "Read my answer"; there is no on-device reading on any platform (owner decision 2026-10-02, default D16). There is **no Kotlin recogniser and no native drawing surface.**
 - The shell reports two capability facts, never a model name:
   - `device.stylusCapable`: an input device advertises stylus input. Some panels do with no pen attached.
   - `device.stylusSeen`: a stylus or eraser pointer has actually been seen. `device.facts` answers live.

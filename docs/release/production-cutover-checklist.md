@@ -155,8 +155,9 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
       verification email, sign in, sync between two devices, teacher class + assignment, account
       export, account deletion. Test accounts only; record results as synthetic evidence.
       Scripted part: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"`
-      runs steps 0 and A–E (one-time-code sign-in with a real mailbox, guardian confirmation,
-      handwriting and photo read + server mark with SYNTHETIC pictures, the A/B isolation probe) and
+      runs steps S0–S7 (one-time-code sign-in with a real mailbox, guardian confirmation and
+      withdrawal, handwriting and photo read + server mark with SYNTHETIC pictures, the returning
+      student's History, the student A / B2 isolation probe; S8 is cleanup) and
       prints a `HUMAN STEP` line for every code a person must read. Device steps are
       `docs/release/device-matrix.md`.
 - [ ] 24 hours with no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 (§4.5).
@@ -164,11 +165,19 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
 ## 5. Production prerequisites — OWNER
 
 - [ ] Production Supabase project in `ap-south-1`, separate from staging; daily backups and
-      Point-in-Time Recovery enabled.
-- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6).
+      Point-in-Time Recovery enabled (the owner's click-list: `postgres-cutover.md` §6.1).
+- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6.2–§6.3;
+      `pri_server` is created in the scratch project before the schema dump is restored).
+- [ ] The rollback stages of `postgres-cutover.md` §5.5 are read before the window, and the
+      Step 24 log (§7a) is copied for this window and filled as it runs.
 - [ ] Production login role `pri_app_production` with its own password (never the staging one).
 - [ ] Production variables: same list as §2 with production values, plus §3's database pair.
       Fresh `PRI_CSRF_SECRET` and `PRI_AUTH_DELIVERY_KEY`.
+- [ ] The V1 decisions are set as `docs/operations/production-config-v1.md` lists them (D4, D12, D18,
+      D21, D22, #653, D5, Apple billing, the auth email sender), and after the promotion
+      `npm run verify:deployment -- --origin https://app.prilearning.com --sha <SHA> --engine postgres
+      --auth-email-proven --require-handwriting --expect-config docs/operations/production-config-v1.md`
+      passes, with its human checks H2–H9 recorded in that file's §4.
 - [ ] If the production SQLite volume holds real accounts, decide (ADR-0001 "Not decided here")
       whether they are migrated or Supabase starts empty. Importing is a separate reviewed
       mission; do not cut over until this is decided.

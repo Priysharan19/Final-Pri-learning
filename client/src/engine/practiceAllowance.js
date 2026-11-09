@@ -26,3 +26,38 @@ export const FREE_PRACTICE_ALLOWANCE = Object.freeze({ perDay: 20, timeZone: 'As
  * the server.
  */
 export const CAPPED_PRACTICE_MODES = Object.freeze(['practice', 'review', 'task']);
+
+/**
+ * Practice content that only Premium may be issued (owner default D19:
+ * "Premium: unlimited questions and papers, plus JEE Advanced, which the
+ * server enforces"). ONE definition, read by the server where a question is
+ * issued (server/platform/practiceAllowance.js) and available to the device.
+ *
+ * The JEE Advanced track serves two kinds of question. Its own generators —
+ * the question department's `jee-advanced-<chapter>` items and the
+ * source-cited archive's `pyq-jee-advanced-<chapter>` items — exist only for
+ * that track, so the server can name them and refuses them to a free account.
+ * Its ordinary chapter questions at difficulty 3–4 are the same items JEE Main
+ * serves on the free plan, so they are not Premium and the server does not
+ * pretend they are: the device's track gate (local/entitlementGate.js) is what
+ * keeps a free student out of the JEE Advanced track as a whole.
+ */
+export const PREMIUM_PRACTICE_CONTENT = Object.freeze([
+  Object.freeze({ capability: 'jee-advanced-content', generator: /^(?:pyq-)?jee-advanced-/ })
+]);
+
+/** The Premium capability a generator's questions need, or null when free. */
+export function premiumCapabilityForGenerator(generator) {
+  const id = String(generator || '');
+  return PREMIUM_PRACTICE_CONTENT.find(rule => rule.generator.test(id))?.capability ?? null;
+}
+
+/**
+ * Owner default D20: reads of the student's own writing (ink, or a photo of
+ * written working) and "Practise this" question photos are Free 5 a day and
+ * Premium 25 a day, PER KIND. ONE definition: the server's per-account
+ * allowance defaults to it (server/platform/aiAllowance.js, configurable per
+ * deployment) and the Premium screen states it. Modelled figures, to be
+ * revisited after real cost data.
+ */
+export const READ_ALLOWANCE = Object.freeze({ free: 5, premium: 25 });

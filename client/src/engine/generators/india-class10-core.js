@@ -33,6 +33,9 @@
 import { ri, rc, nz } from '../qhelpers.js';
 import { exact, frac, fracTex, traps, twoNames, IN_GOODS } from './india-native-helpers.js';
 
+// A negative value written after a minus sign keeps its own brackets: 0 - (-4).
+const sub = v => (v < 0 ? `(${v})` : `${v}`);
+
 /** ax written the way it is read: x, -x, 3x. */
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 
@@ -250,12 +253,12 @@ export const indiaClass10Core = {
         ]),
         hints: [
           `Here $a = 1$, $b = ${b}$ and $c = ${c}$.`,
-          `$b^2 - 4ac = ${b * b} - ${4 * c} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
+          `$b^2 - 4ac = ${b * b} - ${sub(4 * c)} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
           `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{2}$.`
         ],
         steps: [
           { h: 'Identify a, b and c', d: `$a = 1$, $b = ${b}$, $c = ${c}$` },
-          { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${4 * c} = ${disc}$` },
+          { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${sub(4 * c)} = ${disc}$` },
           { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm \\sqrt{${disc}}}{2} = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{2}$` },
           { h: 'Both roots', d: `$x = ${roots[0]}$ or $x = ${roots[1]}$` }
         ]
@@ -279,12 +282,12 @@ export const indiaClass10Core = {
       ]),
       hints: [
         `Here $a = ${a}$, $b = ${b}$ and $c = ${c}$.`,
-        `$b^2 - 4ac = ${b * b} - ${4 * a * c} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
+        `$b^2 - 4ac = ${b * b} - ${sub(4 * a * c)} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
         `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{${2 * a}}$ — simplify each fraction fully.`
       ],
       steps: [
         { h: 'Identify a, b and c', d: `$a = ${a}$, $b = ${b}$, $c = ${c}$` },
-        { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${4 * a * c} = ${disc}$` },
+        { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${sub(4 * a * c)} = ${disc}$` },
         { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{${2 * a}}$` },
         { h: 'Simplify both roots', d: `$x = ${fracTex(r1.n, r1.d)}$ or $x = ${fracTex(r2.n, r2.d)}$` },
         { h: 'Take the larger', d: `$x = ${fracTex(bigger.n, bigger.d)}$` }

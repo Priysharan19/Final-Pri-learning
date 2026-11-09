@@ -17,7 +17,7 @@
     "worstWriterExactAccuracy": 0.90,
     "criticalStructureExactness": 0.995,
     "safeAutoMarkPrecision": 0.999,
-    "recognitionP95Ms": 500
+    "serverReadP95Ms": 4000
   },
   "claimPolicy": "Empirical thresholds are blocking and must never be inferred from deterministic/synthetic tests."
 }

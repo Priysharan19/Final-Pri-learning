@@ -69,6 +69,19 @@ function safeEndpointParts(endpoint) {
   }
 }
 
+/**
+ * The most lines one transcription may hold. The response schema states it and
+ * normalizeResult enforces it: the provider's strict mode is not the only
+ * thing standing between a non-conforming reply and the student.
+ */
+export const MAX_TRANSCRIPTION_LINES = 40;
+/** The longest `text` one line may hold (schema maxLength; enforced, never cut). */
+export const MAX_LINE_TEXT_CHARS = 400;
+/** The longest display-only `latex` one line may hold (schema maxLength). */
+export const MAX_LINE_LATEX_CHARS = 600;
+/** The longest `doubt` label one line may hold (schema maxLength). */
+export const MAX_LINE_DOUBT_CHARS = 120;
+
 /** Deliberately small: a schema the model cannot wander outside. */
 export const TRANSCRIPTION_SCHEMA = Object.freeze({
   type: 'object',
@@ -77,20 +90,20 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
   properties: {
     lines: {
       type: 'array',
-      maxItems: 40,
+      maxItems: MAX_TRANSCRIPTION_LINES,
       items: {
         type: 'object',
         additionalProperties: false,
         required: ['text', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before'],
         properties: {
-          text: { type: 'string', maxLength: 400 },
-          latex: { type: 'string', maxLength: 600 },
+          text: { type: 'string', maxLength: MAX_LINE_TEXT_CHARS },
+          latex: { type: 'string', maxLength: MAX_LINE_LATEX_CHARS },
           confidence: { type: 'number', minimum: 0, maximum: 1 },
           // A symbol on this line could be one of two things. The reader says
           // so here instead of quietly picking one; the student is shown the
           // line as one to check. `doubt` names the two readings.
           uncertain: { type: 'boolean' },
-          doubt: { type: 'string', maxLength: 120 },
+          doubt: { type: 'string', maxLength: MAX_LINE_DOUBT_CHARS },
           // A clearly larger vertical gap above this line than between the
           // other lines: layout only, so a page holding more than one piece
           // of work can be shown to the student in its pieces.
@@ -111,7 +124,8 @@ export const SYSTEM_INSTRUCTIONS = [
   'Write `text` as plain linear mathematics a parser can read: use <= >= != for the relations, / for division, ^ for powers, and ordinary commas between listed values. Write ordinary English words as words.',
   'Write `latex` as a faithful display-only transcription of the same line; when the line has nothing display-worthy, set `latex` to an empty string.',
   '`confidence` is how certain you are that the transcription matches the marks on the page, not whether the mathematics is correct.',
-  'Read every relation sign from its strokes. A "greater than" with a bar under it, even a short, slanted or detached bar, is >= ; without a bar it is > . The same for <= and < . A double-shafted arrow is => , a single arrow is -> , and neither is an equals sign. Tell a minus sign from a dash, a hyphen and a fraction bar; a raised digit (a power) from a digit on the line; and round brackets from set braces and square brackets.',
+  'Read every relation sign from its strokes. A "greater than" with a bar under it, even a short, slanted, doubled or detached bar, is >= ; without a bar it is > . The same for <= and < . Handwritten >= is often drawn like ≥, ⩾ or a ≽-like shape; all of these are >= . != is an equals sign with a single slash drawn through both of its bars; an opening angle (> or <) with a bar beneath it is never != , so when the strokes show an angle that opens with a bar beneath, prefer >= or <= . ',
+  'Write the "therefore" and "because" marks as the symbols ∴ and ∵ at the start of the line, never as the words or as LaTeX commands in `text`. A double-shafted arrow is => , a single arrow is -> , and neither is an equals sign. Tell a minus sign from a dash, a hyphen and a fraction bar; a raised digit (a power) from a digit on the line; and round brackets from set braces and square brackets.',
   'Handwritten letters and digits that look alike (x and n, u and v, z and 2, l and 1, O and 0, s and 5, b and 6, q and 9, t and +) are decided from the strokes on the page, and the same handwritten shape is transcribed the same way every time it recurs. A cursive x drawn as two curves back to back is easily mistaken for n, and the reverse: when a letter could be either, that is a doubt to report, not to settle.',
   'Never choose a symbol because it would make the mathematics true or tidy. You do not know the question, and a student may have written something false.',
   'When you cannot tell which of two symbols was written, do not settle it silently: write the more likely one, set `uncertain` to true for that line, and name both readings in `doubt` as "A or B" (for example ">= or >", "x or n", "- or ="). Otherwise set `uncertain` to false and `doubt` to an empty string.',
@@ -313,47 +327,156 @@ export async function probeHandwritingProvider({
 export const MAX_IMAGE_BYTES = 750_000;
 
 /** A data URL is the only shape accepted, and only for a raster image. */
+// ── What an uploaded picture really is, read from its first bytes ──────────
+// The handwriting reader, the working checker and the question-photo reader
+// accept a base64 data URL whose header says PNG, JPEG or WebP. A header is
+// whatever the caller wrote; the bytes are what the provider is paid to read.
+// Each format opens with a fixed signature, so the first twelve bytes decide
+// whether the payload is a picture at all: text, a PDF, an archive or random
+// bytes behind an image header are refused before any provider is called.
+// The declared type need not match the signature (a browser types a picked
+// file from its extension, so a PNG saved as .jpg arrives as image/jpeg and
+// is still a picture); it must be one of the three formats the readers accept.
+// Kept in this module: provider-answer-blind-check pins its imports to none.
+const SIGNATURES = Object.freeze([
+  // 89 50 4E 47 0D 0A 1A 0A
+  ['png', head => head.length >= 8 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
+    && head[4] === 0x0d && head[5] === 0x0a && head[6] === 0x1a && head[7] === 0x0a],
+  // FF D8 FF
+  ['jpeg', head => head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff],
+  // "RIFF" <size> "WEBP"
+  ['webp', head => head.length >= 12 && head.toString('latin1', 0, 4) === 'RIFF' && head.toString('latin1', 8, 12) === 'WEBP']
+]);
+
+/**
+ * The format the base64 payload's own bytes declare ('png' | 'jpeg' | 'webp'),
+ * or null when they are none of them. Only the first 16 base64 characters
+ * (12 bytes) are decoded.
+ */
+export function imageFormatOf(base64) {
+  const head = Buffer.from(String(base64 || '').slice(0, 16), 'base64');
+  const found = SIGNATURES.find(([, matches]) => matches(head));
+  return found ? found[0] : null;
+}
+
 export function validateImage(dataUrl, { maxBytes = MAX_IMAGE_BYTES } = {}) {
   const value = String(dataUrl || '');
   const match = value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) throw new HandwritingProviderError('The image must be a base64 PNG, JPEG or WebP data URL.', { code: 'HANDWRITING_IMAGE_INVALID', status: 400 });
   const bytes = Math.floor((match[2].length * 3) / 4);
   if (bytes > maxBytes) throw new HandwritingProviderError(`The image is larger than the ${Math.round(maxBytes / 1000)} kB limit.`, { code: 'HANDWRITING_IMAGE_TOO_LARGE', status: 413 });
-  return { mime: `image/${match[1]}`, bytes };
+  // The header is the caller's word; the first bytes are the picture's (imageFormatOf, above).
+  const format = imageFormatOf(match[2]);
+  if (!format) throw new HandwritingProviderError('The image is not a PNG, JPEG or WebP picture.', { code: 'HANDWRITING_IMAGE_INVALID', status: 400 });
+  return { mime: `image/${match[1]}`, bytes, format };
+}
+
+// The reply is untrusted model output, checked here against the same contract
+// the schema states rather than trusted to the provider's strict mode (a custom
+// PRI_HANDWRITING_ENDPOINT, or a provider that drifts, may not enforce it).
+// Every check fails closed:
+//   · more lines than the schema allows, or a line whose `text` is longer than
+//     the schema allows, is not a transcription this reader can produce — the
+//     reply is refused as malformed (HANDWRITING_MALFORMED), so nothing of it is
+//     shown, kept or marked. A line is never cut short: truncated text would be
+//     marked as if the student had written it. These refusals are 422 and not
+//     retryable — the same page would be read the same way again, so the device
+//     must not keep paying to resend it (the student may still press Try again);
+//   · a line whose `text` is not a string is refused as malformed too (502,
+//     retryable: a garbled reply may not recur), rather than coerced or
+//     silently dropped from what the student wrote;
+//   · `latex` is display-only: one longer than the schema allows is dropped
+//     (the line shows its text), never cut into broken mathematics;
+//   · a doubt flag (`needs_confirmation`, a line's `uncertain`) that is not
+//     exactly `false` is a doubt: a string "true", a 1, null or a missing flag
+//     never reads as "no doubt";
+//   · a confidence that is not a finite number in [0, 1] — a string, NaN,
+//     Infinity, 1.5, -0.1, missing — counts as 0, which is below every floor,
+//     so the reading is offered for confirmation and never used as it stands.
+function malformedReply(reason, { overLimit = false } = {}) {
+  return new HandwritingProviderError(`The transcription did not match its response format (${reason}).`, {
+    code: 'HANDWRITING_MALFORMED', status: overLimit ? 422 : 502, retryable: !overLimit
+  });
+}
+
+/** Only an explicit `false` is "no doubt". */
+const doubtFlag = value => value !== false;
+
+/** A stated confidence, or 0 when it is not a finite number in [0, 1]. */
+const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
+
+// JSON Schema maxLength counts code points, not UTF-16 code units: a line of
+// mathematical italic 𝑥 (U+1D465) is one character per letter to the schema
+// and two to String#length. Both helpers walk at most max + 1 code points, so
+// a hostile multi-megabyte string costs no more than a conforming one.
+export function exceedsCodePoints(value, max) {
+  let count = 0;
+  for (const _ of value) { count += 1; if (count > max) return true; }
+  return false;
+}
+export function firstCodePoints(value, max) {
+  if (!exceedsCodePoints(value, max)) return value;
+  let out = '';
+  let count = 0;
+  for (const char of value) { if (count === max) break; out += char; count += 1; }
+  return out;
+}
+
+// The reader sometimes spells the "therefore" / "because" marks as a word or
+// as a LaTeX command ("therefore -6", "\\therefore -6") instead of the symbol
+// the student drew. Left as a word, the line renders as italic prose and a
+// parser can read "therefore - 6" as a subtraction. Only a leading mark is
+// rewritten, to the symbol itself; nothing after it is touched, so this is a
+// change of spelling, never a re-reading of the student's mathematics.
+const LEAD_CONNECTIVES = Object.freeze([
+  [/^(?:\\therefore\b|therefore\b|\u2234)\s*/iu, '\u2234'],
+  [/^(?:\\because\b|because\b|\u2235)\s*/iu, '\u2235']
+]);
+export function normalizeLeadConnective(text) {
+  const value = String(text ?? '');
+  for (const [pattern, symbol] of LEAD_CONNECTIVES) {
+    const match = value.match(pattern);
+    if (!match) continue;
+    const rest = value.slice(match[0].length);
+    return rest ? `${symbol} ${rest}` : symbol;
+  }
+  return value;
 }
 
 function normalizeLines(raw) {
   if (!Array.isArray(raw)) return [];
+  if (raw.length > MAX_TRANSCRIPTION_LINES) throw malformedReply(`${raw.length} lines, at most ${MAX_TRANSCRIPTION_LINES}`, { overLimit: true });
   return raw
-    .map(line => ({
-      text: String(line?.text ?? '').slice(0, 400).trim(),
-      latex: line?.latex ? String(line.latex).slice(0, 600).trim() : null,
-      confidence: Number.isFinite(Number(line?.confidence))
-        ? Math.min(1, Math.max(0, Number(line.confidence)))
-        : 0,
-      // The reader's own per-line doubt, passed on exactly as it was given.
-      // Nothing here re-reads or repairs the line: the text is never changed.
-      uncertain: line?.uncertain === true,
-      doubt: line?.uncertain === true && typeof line?.doubt === 'string' && line.doubt.trim()
-        ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
-        : null,
-      gapBefore: line?.gap_before === true
-    }))
+    .map(line => {
+      if (!line || typeof line !== 'object' || typeof line.text !== 'string') throw malformedReply('a line without text');
+      if (exceedsCodePoints(line.text, MAX_LINE_TEXT_CHARS)) throw malformedReply(`a line of more than ${MAX_LINE_TEXT_CHARS} characters`, { overLimit: true });
+      const uncertain = doubtFlag(line.uncertain);
+      return {
+        text: normalizeLeadConnective(line.text.trim()),
+        latex: typeof line.latex === 'string' && line.latex && !exceedsCodePoints(line.latex, MAX_LINE_LATEX_CHARS) ? line.latex.trim() : null,
+        confidence: unitConfidence(line.confidence),
+        // The reader's own per-line doubt, passed on exactly as it was given.
+        // Nothing here re-reads or repairs the line: the text is never changed.
+        uncertain,
+        doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
+          ? firstCodePoints(line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim(), MAX_LINE_DOUBT_CHARS)
+          : null,
+        gapBefore: line.gap_before === true
+      };
+    })
     .filter(line => line.text.length > 0);
 }
 
 export function normalizeResult(parsed, { model, confidenceFloor }) {
   const lines = normalizeLines(parsed?.lines);
-  const stated = Number.isFinite(Number(parsed?.confidence))
-    ? Math.min(1, Math.max(0, Number(parsed.confidence)))
-    : 0;
+  const stated = unitConfidence(parsed?.confidence);
   // The overall confidence is never allowed to exceed the least confident line:
   // a page is only as readable as its worst line, and the marker reads them all.
   const worstLine = lines.length ? Math.min(...lines.map(l => l.confidence)) : 0;
   const confidence = lines.length ? Math.min(stated, worstLine) : 0;
   // A line the reader marked as uncertain is a doubt about the page, whether
   // or not the reader also raised the page-level flag.
-  const providerNeedsConfirmation = parsed?.needs_confirmation === true || lines.some(line => line.uncertain);
+  const providerNeedsConfirmation = doubtFlag(parsed?.needs_confirmation) || lines.some(line => line.uncertain);
   const needsConfirmation = providerNeedsConfirmation
     || !lines.length
     || confidence < confidenceFloor;

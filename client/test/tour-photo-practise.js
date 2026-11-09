@@ -16,6 +16,8 @@ const QUESTION = 'Find the nature of the roots of 2x^2 - 4x + 3 = 0.';
 
 export const flow = {
   id: 'photo-practise',
+  // Playwright must intercept synthetic /v1/ routes before the service worker.
+  inspectNetwork: true,
   name: 'Practise this · photo a question, practise its skill',
 
   async run({ page, ctx, base, check, goto, createProfile }) {
