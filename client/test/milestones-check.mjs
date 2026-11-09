@@ -38,7 +38,7 @@ const ev = stepEvidence(q, '1/6', working, { correct: false });
 ok(ev.partial?.awarded === direct?.awarded && ev.stepReport.lines[0].status === 'ok', 'method mark identical with the milestone tick shown');
 
 // ── Group 3: questions with no Step Check of their own ──
-const noMeta = { prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [{ h: 'Discriminant', d: '$D = b^2 - 4ac = 25 - 16 = 9$' }] };
+const noMeta = { prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [{ h: 'Discriminant', d: '$D = 25 - 16 = 9$' }] }; // a formula-then-substitution chain (b^2 - 4ac = 9) is not one proven relation, so it yields no milestone
 const r3 = milestoneOnlyReport(noMeta, 'D = 9\nso two roots\nD = 8');
 ok(r3.lines[0].status === 'ok' && r3.lines[1].status === 'note' && r3.lines[2].status === 'note' && r3.firstBreak === -1, 'milestone-only: ticks matches, never calls a line wrong');
 ok(stepEvidence(noMeta, '0', 'D = 9', { correct: true }).stepReport?.lines[0].status === 'ok', 'stepEvidence builds it when there is no check');
@@ -71,30 +71,58 @@ ok(fullyVerifiedWorking(annotateMilestones(q, stepCheck(meta, "f'(x)=6x+1\n6x+1=
 ok(fullyVerifiedWorking(stepCheck(meta, '6x+1=0\nx=-1/6')) === true, 'checked working still counts');
 
 
-// ── Group 3c: every joiner (delta review of #813) ──
+// ── Group 3c: permanent regression fuzz (reviews of #813) ──
+// The rule is structural: a step's span yields statements only when the
+// whole span reads (every TeX command known, every piece a complete
+// LABEL = value chain whose values are all equivalent). Otherwise nothing is
+// ticked. So for every joiner, the WRONG pairing is never ticked; the right
+// line is ticked only where the span is cut at a plain , or ;.
 const tick = (span, line) => stepEvidence({ prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [{ h: 'S', d: `$${span}$` }] }, '0', line, { correct: true }).stepReport?.lines[0].status === 'ok';
-for (const [span, wrong, right] of [
-  ['a = 11, \\quad d + 1 = 8', 'a = 8', 'a = 11'], ['a = 11, \\quad 2d = 14', 'a = 14', 'a = 11'],
-  ['x = 2,\\ y = 3', 'x = 3', 'x = 2'], ['x = 2 \\\\ y = 3', 'x = 3', 'x = 2'],
-  ['x = 2 \\Rightarrow y = 5', 'x = 5', 'x = 2'], ['x = 2 \\implies y = 5', 'x = 5', 'x = 2'], ['x = 2 \\text{ so } y = 5', 'x = 5', 'x = 2'],
-  ['x = 3 \\to y = 4', 'x = 4', 'x = 3'], ['x = 3 \\therefore y = 4', 'x = 4', 'x = 3'], ['x = 3 \\text{ gives } y = 4', 'x = 4', 'x = 3']]) {
-  ok(!tick(span, wrong) && tick(span, right), `joiner: ${span}: ${wrong} not ticked, ${right} ticked`);
-}
-const JOINS = ['\\Rightarrow', '\\Longrightarrow', '\\implies', '\\iff', '\\Leftrightarrow', '\\to', '\\therefore', '\\because', '\\quad', '\\qquad', '\\;', '\\,', '\\:', '\\ ', '\\\\', ',', ';', ', \\quad', ',\\ ', '\\text{ so }', '\\text{ gives }', '\\text{ then }', '\\text{ hence }', '\\text{ and }', '\\text{ i.e. }', '\\text{ thus }', '\\mathrm{ and }', '⇒', '→', '∴'];
-let fuzz = 0, fuzzBad = 0;
-for (const j of JOINS) for (const [l, r, wrong, right] of [['x = 2', 'y = 5', 'x = 5', 'x = 2'], ['a = 11', '2d = 14', 'a = 14', 'a = 11'], ['m = 3', 'y - 1 = 3(x - 2)', 'm = 3(x-2)', 'm = 3'], ['T_n = 7', 'n + 1 = 9', 'T_n = 9', 'T_n = 7']]) {
+const JOINS = [
+  // first and second reviews
+  '\\Rightarrow', '\\Longrightarrow', '\\implies', '\\iff', '\\Leftrightarrow', '\\to', '\\therefore', '\\because', '\\quad', '\\qquad',
+  '\\;', '\\,', '\\:', '\\ ', '\\\\', ', \\quad', ',\\ ', '\\text{ so }', '\\text{ gives }', '\\text{ then }', '\\text{ hence }',
+  '\\text{ and }', '\\text{ i.e. }', '\\text{ thus }', '\\mathrm{ and }', '⇒', '→', '∴',
+  // third review: the 33 variants' joiners
+  '\\text{ also }', '\\text{ while }', '\\text{ when }', '\\text{ where }', '\\text{ if }', '\\text{. Then }', '\\mid', '\\vee',
+  '\\Leftarrow', '\\Longleftarrow', '\\longrightarrow', '\\mapsto', '⟹', '\\enspace', '\\hspace{1em}', '\\text{, }', '\\wedge', '\\land',
+  '\\lor', '\\text{ or }', '\\text{ with }', '\\text{ giving }', '\\qquad\\text{and}\\qquad', ' ', '  ', '\\!', '\\>', '\\medspace', '\\thinspace',
+  // plain separators: here the right line must still be ticked
+  ',', ';', ', ', '; '
+];
+const PLAIN = new Set([',', ';', ', ', '; ']);
+const SHAPES = [['x = 2', 'y = 5', 'x = 5', 'x = 2'], ['a = 11', '2d = 14', 'a = 14', 'a = 11'], ['m = 3', 'y - 1 = 3(x - 2)', 'm = 3(x-2)', 'm = 3'],
+  ['T_n = 7', 'n + 1 = 9', 'T_n = 9', 'T_n = 7'], ['k = 3', 'm = 4', 'k = 4', 'k = 3'], ['a = 11', 'd + 1 = 8', 'a = 8', 'a = 11']];
+let fuzz = 0, falseTicks = 0, plainMissed = 0;
+for (const j of JOINS) for (const [l, r, wrong, right] of SHAPES) {
+  const span = `${l}${/^[,;]/.test(j) ? '' : ' '}${j} ${r}`;
   fuzz += 1;
-  if (tick(`${l} ${j} ${r}`, wrong) || !tick(`${l} ${j} ${r}`, right)) { fuzzBad += 1; console.error('joiner fuzz', j, l, r); }
+  if (tick(span, wrong)) { falseTicks += 1; console.error('false tick', JSON.stringify(span), wrong); }
+  if (PLAIN.has(j) && /^[A-Za-z]/.test(r) && /^[A-Za-z_]+ =/.test(r) && !tick(span, right)) { plainMissed += 1; console.error('missed', JSON.stringify(span), right); }
 }
-ok(fuzzBad === 0, `joiner fuzz: ${fuzzBad} wrong of ${fuzz}`);
-// Real draws the delta review named.
-for (const [gen, d, seeds, line] of [['c11-domain-range-reasoning', 1, [1, 1009, 7919, 16847], 'y(x^2+2x+2) = 0'], ['mex-mechanics', 1, [1], 'x = 8'], ['c12-bijection-reasoning', 1, [7], 'y(5x-2) = (2y+4)/(5y+6)']]) for (const seed of seeds) {
+ok(falseTicks === 0, `joiner fuzz: ${falseTicks} false ticks in ${fuzz}`);
+ok(plainMissed === 0, `plain , and ; separators: ${plainMissed} right lines missed`);
+// Spacing inside an expression is part of the expression (third review).
+for (const [span, wrong, right] of [
+  ['F(2) = 2\\,(4) + 8 = 16', 'F(2) = 2', 'F(2) = 16'], ['y = 3\\,x + 2', 'y = 3', 'y = 3x + 2'], ['A = 2\\ \\pi r', 'A = 2', null],
+  ['v = 4\\;t + 1', 'v = 4', 'v = 4t + 1'], ['k = 3\\text{, } m = 4', 'k = 4', null], ['\\sqrt{-4} = \\sqrt{4}\\,i = 2i', 'i = 2i', null],
+  ['x = 2 y = 5', 'x = 5', null], ['D = b^2 - 4ac = 9', 'D = 9', null], ['i = 2i', 'i = 2i', null], ['x = 1, 2', 'x = 2', null], ['x = 1, 2', 'x = 1', null]]) {
+  ok(!tick(span, wrong), `no tick: ${span} — ${wrong}`);
+  if (right) ok(tick(span, right), `tick: ${span} — ${right}`);
+}
+// Student lines that do not read in full are never ticked.
+const qd = { prompt: 'p', answerType: 'mcq', answer: { correctIndex: 0 }, steps: [{ h: 'D', d: "$f'(x) = 6x + 1$" }] };
+for (const line of ["f'(x) = 6x + 1 so", "f'(x) = 6x + 1 ⟹", "f'(x) = 6x + 1 = 7", "f'(x) == 6x + 1", "f'(x) = 6x + 1 ✓", "f'(x) = (6x + 1"]) {
+  ok(stepEvidence(qd, '0', line, { correct: true }).stepReport?.lines[0].status !== 'ok', `a line that does not read in full: ${line}`);
+}
+// Real draws the reviews named.
+for (const [gen, d, seeds, line] of [['c11-domain-range-reasoning', 1, [1, 1009, 7919, 16847], 'y(x^2+2x+2) = 0'], ['mex-mechanics', 1, [1], 'x = 8'],
+  ['c12-bijection-reasoning', 1, [7], 'y(5x-2) = (2y+4)/(5y+6)'], ['c11-complex-numbers', 4, [1], 'i = 2i'], ['c11-complex-numbers', 4, [1], 'i = 2*i']]) for (const seed of seeds) {
   let g; try { g = generateQuestion(gen, d, seed); } catch { g = null; }
   if (!g) continue;
   ok(stepEvidence({ ...g, stepcheck: undefined, answerType: 'mcq', answer: { correctIndex: 0 } }, '0', line, { correct: true }).stepReport?.lines?.[0]?.status !== 'ok', `${gen} d${d} s${seed}: ${line} not ticked`);
 }
-// Catalogue: in a span with several labelled statements, one label's line
-// carrying another statement's (different) value is never ticked.
+// Catalogue: one label's line carrying another statement's (different) value is never ticked.
 let cross = 0, crossBad = 0, spans = 0;
 for (const gen of Object.keys(GENERATORS)) for (let d = 1; d <= 4; d += 1) for (const seed of [1, 7, 7919, 15838, 23757, 104729]) {
   let g; try { g = generateQuestion(gen, d, seed); } catch { continue; }
@@ -114,8 +142,8 @@ for (const gen of Object.keys(GENERATORS)) for (let d = 1; d <= 4; d += 1) for (
     }
   }
 }
-ok(crossBad === 0 && cross > 0, `catalogue cross-pairing: ${crossBad} of ${cross} pairings ticked, over ${spans} spans`);
-console.log(`joiners: ${fuzzBad}/${fuzz} fuzz failures; cross-pairing ${crossBad}/${cross} over ${spans} spans [SYNTHETIC]`);
+ok(crossBad === 0, `catalogue cross-pairing: ${crossBad} of ${cross} pairings ticked, over ${spans} spans`);
+console.log(`joiners: ${falseTicks} false ticks in ${fuzz} fuzz cases; cross-pairing ${crossBad}/${cross} over ${spans} spans [SYNTHETIC]`);
 
 // ── Group 4: every milestone in the India catalogue, and its corruptions ──
 const cells = new Map();
