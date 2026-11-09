@@ -205,3 +205,16 @@ html.ui-instrument.skin-aurora .pri-auth .auth-col :focus-visible {
     color:CanvasText; background:Canvas;
   }
 }
+
+/* No entrance fade on a security-critical form: the first usable frame is
+   already at full contrast, including when a code field appears. */
+html.ui-instrument.skin-aurora .pri-auth > .auth-col.fade-in {
+  animation:none; opacity:1; transform:none;
+}
+html.ui-instrument.skin-aurora .pri-auth .auth-col > .row[role="group"] {
+  width:100%; max-width:430px; align-self:center;
+  justify-content:flex-start!important;
+}
+html.ui-instrument.skin-aurora .pri-auth .auth-col > .login-legal {
+  text-align:left!important;
+}
