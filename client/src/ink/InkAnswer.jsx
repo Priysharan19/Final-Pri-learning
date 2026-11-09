@@ -100,7 +100,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, expectsInequality = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -716,7 +716,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               )}
               {/* The reader's own doubt about this line, said as a question about the
                   reading; a relation sign is fixed with one tap, not by retyping. */}
-              {!disabled && !stale && line.corrected !== true && (line.doubt || neqWorthCheck(line.text, expectsInequality)) && (
+              {!disabled && !stale && line.corrected !== true && (line.doubt || neqWorthCheck(line.text, promptAsksInequality)) && (
                 <span className="ink-line-symbol-check" role="status" data-line-symbol-doubt={line.doubt || '≠'}>
                   {line.doubt ? t('ink.checkSymbol', { doubt: line.doubt }) : t('ink.checkNotEqual')}
                 </span>

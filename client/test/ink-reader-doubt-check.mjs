@@ -55,9 +55,11 @@ ok(neqWorthCheck('x ≠ 3', true) && !neqWorthCheck('x ≠ 3', false) && !neqWor
 // ── wiring ───────────────────────────────────────────────────────────────────
 const ink = read('client/src/ink/InkAnswer.jsx');
 ok(/t\('ink\.checkSymbol', \{ doubt: line\.doubt \}\)/.test(ink) && /data-relation-swap=\{sign\}/.test(ink) && /correctLine\(li, swapRelation\(line\.text, choice\.at, sign\)\)/.test(ink), 'the reading shows the doubt and one-tap swaps that correct the line');
-ok(/neqWorthCheck\(line\.text, expectsInequality\)/.test(ink), 'and flags ≠ on an inequality question');
+ok(/neqWorthCheck\(line\.text, promptAsksInequality\)/.test(ink), 'and flags ≠ on an inequality question');
+ok((ink.match(/\bpromptAsksInequality\b/g) || []).length === 2, 'the reader UI uses the prompt flag only in its declaration and the ≠ note, never in a reader request');
+ok(asksForInequality('Solve 2x + 3 > 7.') && !asksForInequality('Simplify 3(x + 2).'), 'the flag comes from the visible wording alone');
 const card = read('client/src/components/QuestionCard.jsx');
-ok(/expectsInequality=\{asksForInequality\(question\.prompt\)\}/.test(card), 'the question passes only whether its wording asks for an inequality');
+ok(/promptAsksInequality=\{asksForInequality\(question\.prompt\)\}/.test(card), 'the question passes only whether its wording asks for an inequality');
 ok(/verdict\.checkLineDoubt/.test(card) && /doubt: lines\[doubtedLine\]\.doubt/.test(card), 'the check prompt names the doubted line, where the swaps are');
 const en = read('client/src/i18n/strings.en.js');
 ok(!/Tap it below if I read it wrong/.test(en), 'no prompt points at a symbol that is not there');

@@ -61,4 +61,4 @@ export function relationChoices(line) {
 export function asksForInequality(prompt) {
   return /\binequalit|\b(solve|find)\b[^.]*[<>≤≥]|\bintervals?\b[^.]*\bwhere\b/i.test(String(prompt || ''));
 }
-export const neqWorthCheck = (text, expectsInequality) => !!expectsInequality && relationsIn(text).some(r => r.sign === '≠');
+export const neqWorthCheck = (text, promptAsksInequality) => !!promptAsksInequality && relationsIn(text).some(r => r.sign === '≠');
