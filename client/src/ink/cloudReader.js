@@ -421,7 +421,11 @@ export function toReading(transcription, localReading, { confidenceFloor = null 
     lines: lines.map((line, i) => ({
       text: line.text,
       box: alignable ? localLines[i]?.box : undefined,
-      conf: transcription.lines[i]?.confidence ?? transcription.confidence ?? 0
+      conf: transcription.lines[i]?.confidence ?? transcription.confidence ?? 0,
+      // The reader's own doubt about this line ("≥ or ≠"), kept as the photo path keeps it.
+      ...(transcription.lines[i]?.uncertain === true ? { uncertain: true } : {}),
+      ...(typeof transcription.lines[i]?.doubt === 'string' && transcription.lines[i].doubt.trim()
+        ? { doubt: transcription.lines[i].doubt.trim().slice(0, 120) } : {})
     })),
     text: lines.map(l => l.text).join('\n'),
     engine: transcription.engine || `${CLOUD_ENGINE_PREFIX}-unknown`,
