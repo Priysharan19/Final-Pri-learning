@@ -81,6 +81,30 @@ export const nextRungAfter = level => (rungLevelOf(level) >= HINT_RUNGS.length ?
 const text = v => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const stepText = s => text(s?.d) || text(s?.h);
 
+/** Text reduced to what a student reads: no TeX markup, spacing or case. */
+const plain = t => String(t).replace(/\\(left|right|,|;|!|quad|displaystyle)/g, '').replace(/\\(cdot|times)/g, '*')
+  .replace(/[$\\{}\s]/g, '').replace(/²/g, '^2').replace(/³/g, '^3').toLowerCase();
+/** Does `b` repeat `a`? One contains the other, or they share a run of at least 70% of the shorter. */
+export function repeats(a, b) {
+  const x = plain(a), y = plain(b);
+  if (!x || !y) return false;
+  if (x === y || x.includes(y) || y.includes(x)) return true;
+  const [s, l] = x.length <= y.length ? [x, y] : [y, x];
+  if (s.length < 6) return false;
+  let best = 0;
+  const prev = new Array(l.length + 1).fill(0);
+  for (let i = 1; i <= s.length; i += 1) {
+    let diag = 0;
+    for (let j = 1; j <= l.length; j += 1) {
+      const keep = prev[j];
+      prev[j] = s[i - 1] === l[j - 1] ? diag + 1 : 0;
+      if (prev[j] > best) best = prev[j];
+      diag = keep;
+    }
+  }
+  return best >= 0.7 * s.length;
+}
+
 /**
  * The four rungs for one question payload. Each rung carries `text` (or null
  * when nothing authored reaches it — `thin`), its cost and the weight left.
@@ -93,9 +117,17 @@ export function buildHintLadder(q) {
   // A bank with no authored hints still has its solution's step headings,
   // which are "what to do first" pointers: step 1's heading is the nudge,
   // step 2's the method. Nothing is invented; a rung with no text is thin.
-  const nudge = hints[0] || text(steps[0]?.h) || null;
-  const method = hints[1] || text(steps[1]?.h) || (hints[0] ? text(steps[0]?.h) : null) || null;
-  const worked = stepText(steps[0]) || hints[2] || null;
+  // Each rung must add something: a candidate that repeats an earlier rung
+  // (the method line and the worked line are often the same sum) is skipped
+  // for the next authored text (audit #7). Nothing is invented.
+  const shown = [];
+  const pick = candidates => {
+    for (const c of candidates) if (c && !shown.some(t => repeats(t, c))) { shown.push(c); return c; }
+    return null;
+  };
+  const nudge = pick([hints[0], text(steps[0]?.h)]);
+  const method = pick([hints[1], text(steps[1]?.h), hints[0] ? text(steps[0]?.h) : null]);
+  const worked = pick([stepText(steps[0]), hints[2], ...steps.slice(1).map(stepText), ...hints.slice(3)]);
   const texts = { nudge, method, worked, solution: null };
   return HINT_RUNGS.map((rung, i) => ({
     rung, level: i + 1, text: texts[rung], thin: rung !== 'solution' && !texts[rung],
@@ -127,4 +159,21 @@ export function ladderEvidence(level) {
     markWeight: markWeightAfter(n),
     hintHelpUnits: helpUnitsAfter(n)
   };
+}
+
+/**
+ * A first rung built from the student's own working (audit #13): how many of
+ * their lines check out, which line first breaks, and the diagnoser's general
+ * fix for that kind of slip. No value of the answer or of the right line is
+ * named: the fix text is the rule, not the result. Null when the report has
+ * no break to point at (the authored rung is then used, as before).
+ */
+export function workingHint(report) {
+  const lines = Array.isArray(report?.lines) ? report.lines : [];
+  const at = Number.isInteger(report?.firstBreak) ? report.firstBreak : -1;
+  if (at < 0 || at >= lines.length) return null;
+  const good = lines.slice(0, at).filter(l => l?.status === 'ok').length;
+  const fix = text(lines[at]?.diagnosis?.fix);
+  const lead = good === 0 ? '' : good === 1 ? 'Your first line checks out. ' : `Your first ${good} lines check out. `;
+  return `${lead}Look again at line ${at + 1}${fix ? `: ${fix}` : ' — compare it carefully with the line above.'}`;
 }

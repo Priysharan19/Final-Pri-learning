@@ -1,0 +1,55 @@
+// Hint rungs each add something (audit #7); a first rung from the student's
+// own working (#13); specific praise and a next step for a right answer (#5).
+// Run: node client/test/hint-rungs-praise-check.mjs   [SYNTHETIC: direct engine]
+const SRC = new URL('../src/', import.meta.url).href;
+const { buildHintLadder, repeats, workingHint } = await import(`${SRC}engine/hintLadder.js`);
+const { praiseFor, ANSWER_ONLY_NOTE } = await import(`${SRC}engine/praise.js`);
+const { stepCheck } = await import(`${SRC}engine/checker.js`);
+const { generateQuestion, GENERATORS, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { IN_CHAPTERS } = await import(`${SRC}engine/curriculum-in.js`);
+await loadAllBanks();
+
+let pass = 0, fail = 0;
+const ok = (c, l) => { if (c) pass += 1; else { fail += 1; console.error('FAIL', l); } };
+
+// ── Group 1: rungs ──
+const pyth = { hints: ['Use Pythagoras.', '$c^2 = 3^2 + 4^2 = 9 + 16$', '$c = \\sqrt{25}$'], steps: [{ h: 'Square and add', d: '$3^2 + 4^2 = 9 + 16 = 25$' }, { h: 'Root', d: '$c = \\sqrt{25} = 5$' }] };
+const L = buildHintLadder(pyth);
+ok(L[1].text === '$c^2 = 3^2 + 4^2 = 9 + 16$' && L[2].text === '$c = \\sqrt{25}$', 'Pythagoras: the worked rung moves on to c = √25');
+ok(repeats('$c^2 = 3^2 + 4^2 = 9 + 16$', '$3^2 + 4^2 = 9 + 16 = 25$'), 'the near-repeat is detected');
+ok(!repeats('Use Pythagoras.', 'Take the square root.'), 'different text is not a repeat');
+ok(buildHintLadder({ hints: ['A', 'A'], steps: [] })[1].thin === true, 'a rung with only a repeat is thin, not a repeat');
+ok(buildHintLadder({ hints: ['Expand the bracket.', 'Collect like terms.', 'Divide by 3.'], steps: [] }).slice(0, 3).map(r => r.text).join('|') === 'Expand the bracket.|Collect like terms.|Divide by 3.', 'distinct hints keep their order');
+// Catalogue: no ladder shows the same thing twice.
+const cells = new Map();
+for (const ch of IN_CHAPTERS) for (const c of ch.covers || []) if (GENERATORS[c.gen]) for (const d of c.diff || [1, 2, 3, 4]) cells.set(`${c.gen}|${d}`, { gen: c.gen, d });
+let ladders = 0, dup = 0, lostRung = 0;
+for (const { gen, d } of cells.values()) for (const seed of [7919, 15838]) {
+  let q; try { q = generateQuestion(gen, d, seed); } catch { continue; }
+  if (!q) continue;
+  const t = buildHintLadder(q).filter(r => r.rung !== 'solution').map(r => r.text).filter(Boolean);
+  ladders += 1;
+  for (let i = 0; i < t.length; i += 1) for (let j = i + 1; j < t.length; j += 1) if (repeats(t[i], t[j])) dup += 1;
+  if (!t.length && ((q.hints || []).length || (q.steps || []).length)) lostRung += 1;
+}
+ok(dup === 0 && lostRung === 0, `catalogue: ${dup} repeated rungs, ${lostRung} ladders emptied, in ${ladders}`);
+console.log(`hint ladders: ${dup} repeated rungs in ${ladders} India ladders [SYNTHETIC]`);
+
+// ── Group 2: a rung from the student's own working ──
+const rep = stepCheck({ kind: 'equation', variable: 'x', solutions: [3] }, '2x + 4 = 10\n2x = 14\nx = 7');
+const h = workingHint(rep);
+ok(/^Your first line checks out\. Look again at line 2/.test(h), 'names the first break and the good lines');
+ok(!/\b3\b|\b6\b/.test(h), 'no value of the answer or the right line');
+ok(workingHint(stepCheck({ kind: 'equation', variable: 'x', solutions: [3] }, '2x + 4 = 10\n2x = 6')) === null, 'no break: no working hint');
+ok(workingHint(null) === null, 'no report: none');
+
+// ── Group 3: praise ──
+const p1 = praiseFor({ attempt: 1, hintLevel: 0, difficulty: 2, stepReport: { lines: [{ status: 'ok' }, { status: 'ok', milestone: { step: 1 } }] } });
+ok(p1.text === 'Correct — first try, with no hints and all 2 checked lines of working hold. Ready for a harder one on the same idea?' && p1.next.difficulty === 3, 'first try, unaided, working holds, step up');
+ok(praiseFor({ attempt: 2, hintLevel: 1, difficulty: 2 }).text === 'Correct.' && praiseFor({ attempt: 2, hintLevel: 1, difficulty: 2 }).next === null, 'second try with a hint: plain, no step up');
+ok(praiseFor({ attempt: 1, hintLevel: 0, difficulty: 4 }).next === null, 'top difficulty: no step up');
+ok(!praiseFor({ attempt: 1, hintLevel: 0, stepReport: { lines: [{ status: 'ok' }, { status: 'break' }] } }).kinds.includes('working-checks-out'), 'a break: no working praise');
+ok(!/not verified/.test(ANSWER_ONLY_NOTE), 'the answer-only note is neutral');
+
+console.log(`HINT RUNGS AND PRAISE: ${pass}/${pass + fail}`);
+if (fail) process.exit(1);
