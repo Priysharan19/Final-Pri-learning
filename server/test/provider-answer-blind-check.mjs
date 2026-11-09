@@ -237,6 +237,20 @@ const badAdapter = "import { questionById } from './content.js';\nimport { sha25
 eq(importsOf(badAdapter), ['./content.js', './security.js'], 'the import parser reads static imports');
 ok(QUESTION_MODULE.test('./content.js') && /\bimport\s*\(/.test(badAdapter), 'and the scanner would refuse a content import and a dynamic import');
 
+// ── 5 · The relation-sign guidance is stroke-only ─────────────────────────────
+// The reader's guidance on >=, <= and != (and the therefore mark) may describe
+// strokes only: it must never mention an expected answer or a solution.
+{
+  const { SYSTEM_INSTRUCTIONS } = await import('../platform/handwritingProvider.js');
+  const relation = SYSTEM_INSTRUCTIONS.split('\n').filter(l => /!=|>=|∴/.test(l));
+  ok(relation.length >= 2, 'the reader carries relation-sign and therefore guidance');
+  for (const line of relation) {
+    ok(!/expected|answer|solution|mark scheme|correct/i.test(line), `relation guidance is answer-blind: ${line.slice(0, 60)}`);
+  }
+  ok(/You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'the reader is still told it does not know the question');
+  for (const canary of [...HIDDEN_CANARIES, PROMPT_CANARY]) ok(!SYSTEM_INSTRUCTIONS.includes(canary), 'no canary in the instructions');
+}
+
 // ── report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
   console.log(`PROVIDER ANSWER-BLIND: FAIL — ${pass}/${pass + failures.length} checks`);
