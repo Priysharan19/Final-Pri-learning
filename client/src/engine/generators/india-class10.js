@@ -13,17 +13,8 @@ import { currentLinearSolutionConditions, currentQuadraticDiscriminant, currentT
 import { indiaClass10Core } from './india-class10-core.js';
 // Hardest-level (D3) forms, tranche 1 — see curriculum-in-hardest-covers.js.
 import { class10HardestForms } from './india-class10-hardest.js';
-import {
-  competencyInverseApRows,
-  competencyTicketSystem,
-  competencyTriangleArea
-} from './india-class10-competency-2026.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
-
-// Original competency-based CBSE D3 generators are separate keys, not overrides of
-// existing forms. A previously issued seed keeps its original question/answer
-// and content identity, and the syllabus explicitly opts into these new keys.
 
 function polynomialZeroes(rng, diff) {
   // D1–D2 cover the current outcome "find zeroes graphically and algebraically".
@@ -34,9 +25,6 @@ function polynomialZeroes(rng, diff) {
 export const indiaClass10 = Object.freeze({
   ...baseIndiaClass10,
   ...indiaClass10Core,
-  'c10-ap-inverse-competency': competencyInverseApRows,
-  'c10-linear-ticket-competency': competencyTicketSystem,
-  'c10-quadratic-triangle-competency': competencyTriangleArea,
   'c10-polynomial-zeroes': polynomialZeroes,
   'c10-triangles-current': currentTriangles,
   'c10-irrationality-proofs': currentIrrationalityProof,

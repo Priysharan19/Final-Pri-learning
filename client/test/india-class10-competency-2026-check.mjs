@@ -7,7 +7,7 @@ import { indiaClass10 as originalBank } from '../src/engine/generators/india-cla
 import { indiaClass10 } from '../src/engine/generators/india-class10.js';
 import { indiaClass10Core } from '../src/engine/generators/india-class10-core.js';
 import { currentQuadraticContext } from '../src/engine/generators/india-class10-quadratic-context.js';
-import { loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion, bankOf } from '../src/engine/generators/index.js';
 import { checkAnswer } from '../src/engine/checker.js';
 import { inspect } from '../../server/test/selfcheck.mjs';
 import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
@@ -80,6 +80,8 @@ function independentAnswer(q) {
 }
 
 for (const { id, family } of families) {
+  assert.equal(bankOf(id), 'india-class10-competency', 'new content is lazy loaded outside base Class 10');
+  assert.ok(!Object.hasOwn(indiaClass10, id), 'old Class 10 generator remains byte-for-byte unchanged');
   const prompts = new Set();
   let found = 0;
   for (let seed = 1; seed <= 1600; seed++) {

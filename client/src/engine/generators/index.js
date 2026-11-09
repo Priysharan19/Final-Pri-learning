@@ -35,6 +35,8 @@ const BANKS = {
   // source-audited NCERT Class 8 Chapter 1 and Chapter 2 skill generators.
   'india-junior': () => import('./india-junior-overlay.js').then(m => m.indiaJunior),
   'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
+  // Additional original Class X competencies load only on selection.
+  'india-class10-competency': () => import('./india-class10-competency-bank.js').then(m => m.indiaClass10Competency),
   'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior),
   // The Class 11 and Class 12 chapters that used to borrow an NSW Year 10/11/12
   // or Extension generator for their central dot points. They are their own
@@ -166,9 +168,9 @@ const INDIA_BANK_OF = {
   'c10-quadratic-discriminant': 'india-class10',
   'c10-trig-boundary-relations': 'india-class10',
   'c10-quadratic-context': 'india-class10',
-  'c10-ap-inverse-competency': 'india-class10',
-  'c10-linear-ticket-competency': 'india-class10',
-  'c10-quadratic-triangle-competency': 'india-class10',
+  'c10-ap-inverse-competency': 'india-class10-competency',
+  'c10-linear-ticket-competency': 'india-class10-competency',
+  'c10-quadratic-triangle-competency': 'india-class10-competency',
   'c10-surface-area-combo': 'india-class10',
   'c10-trigonometry-current': 'india-class10',
   'c10-trig-applications-current': 'india-class10',
