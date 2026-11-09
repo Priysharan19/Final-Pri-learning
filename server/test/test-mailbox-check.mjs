@@ -174,7 +174,7 @@ try {
   const sent = [];
   const send = async message => { sent.push(message); return { providerMessageId: `msg_${sent.length}` }; };
   const drained = await drainAuthDeliveryOutbox(h.db, { send, publicOrigin: ORIGIN });
-  c.ok(drained.sent >= 2, `the delivery worker handles both (${JSON.stringify(drained)})`);
+  c.deq([drained.sent, drained.keptForTest], [1, 1], 'the worker counts the normal address as sent and the reserved one as kept, never as sent');
   c.deq(sent.map(m => m.to).sort(), ['normal.student@mailbox-check.example'], 'only the normal address reaches the email transport');
   r = await latest(linkStudent, '&kind=link');
   const link = r.data;

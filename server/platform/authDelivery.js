@@ -372,6 +372,7 @@ export async function drainAuthDeliveryOutbox(db, {
 
   let sent = 0;
   let failed = 0;
+  let kept_ = 0;
   for (const row of rows) {
     const attempt = Number(row.attempt_count || 0) + 1;
     // Claim this attempt. The count we read is part of the condition, so when
@@ -396,7 +397,8 @@ export async function drainAuthDeliveryOutbox(db, {
       // STAGING ONLY: a reserved test address (testMailboxPolicy.js) gets the
       // link in the test mailbox instead of an email — the same single-use,
       // one-hour bearer, recorded as delivered like any other.
-      const result = testMailboxAccepts(env, row.destination)
+      const kept = testMailboxAccepts(env, row.destination);
+      const result = kept
         ? (await depositTestMail(db, { to: row.destination, kind: 'link', purpose: row.kind, link: actionUrl, ...pick(authEmailMessage(row.kind, actionUrl)), now }),
           { providerMessageId: 'test-mailbox' })
         : await send({
@@ -410,8 +412,10 @@ export async function drainAuthDeliveryOutbox(db, {
       await db.run(`UPDATE auth_delivery_outbox
         SET delivered_at=?, token_ciphertext='', provider_message_id=?, next_attempt_at=NULL, last_error_code=NULL
         WHERE id=? AND delivered_at IS NULL`, [now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id]);
-      sent += 1;
-      recordAuthEmail({ ok: true });
+      // Kept in the staging test mailbox is not sent: it never reaches the
+      // provider, so it is neither a send nor an email-delivery metric.
+      if (kept) kept_ += 1;
+      else { sent += 1; recordAuthEmail({ ok: true }); }
     } catch (error) {
       const terminal = attempt >= MAX_ATTEMPTS;
       const code = safeCode(error?.code);
@@ -425,7 +429,7 @@ export async function drainAuthDeliveryOutbox(db, {
       rawToken = null;
     }
   }
-  return { enabled: true, sent, failed, purged };
+  return { enabled: true, sent, failed, purged, ...(kept_ ? { keptForTest: kept_ } : {}) };
 }
 
 export function startAuthDeliveryWorker(db, {
