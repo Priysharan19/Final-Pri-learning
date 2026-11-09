@@ -122,7 +122,7 @@ eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1
 
 // ── Review of #729 (#300): sibling generators, a new answer, a backup restore ──
 {
-  const { indiaChapter, indiaScope } = await import(`${SRC}engine/indiaProduct.js`);
+  const { indiaChapter, indiaScope, indiaDotpointKey } = await import(`${SRC}engine/indiaProduct.js`);
   const gensOf = c => [...new Set((c.covers || []).map(x => x.gen))];
   const scope = indiaScope('cbse', 10) || [];
   const ids = (Array.isArray(scope) ? scope : Object.values(scope)).map(x => (typeof x === 'string' ? x : x?.id)).filter(Boolean);
@@ -145,7 +145,7 @@ eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1
     // 1 · sibling-generator legacy rows ALONGSIDE a current chapter row (one new answer).
     let id = await fresh('Sibling');
     await put('ratings', { key: `${id}:${other}`, pid: id, subtopic: other, rating: 1300, attempts: 7, correct: 5, last_at: NOW - 7200e3 });
-    const dpKey = `${sib.id}#${otherOrdinals[0]}`;
+    const dpKey = indiaDotpointKey(sib.id, otherOrdinals[0]);
     await put('ratings', { key: `${id}:${sib.id}`, pid: id, subtopic: sib.id, rating: 1210, attempts: 1, correct: 1, last_at: NOW, dp: { [dpKey]: { rating: 1210, attempts: 1, correct: 1, last_at: NOW } } });
     let { ch, u } = await view();
     eq('sibling: the chapter total adds the sibling generator\'s legacy answers to its own (7 + 1)', ch?.attempts, 8);
@@ -153,29 +153,46 @@ eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1
     const dpOf = (c, ord) => (c?.dotpoints || [])[ord]?.attempts || 0;
     ok('sibling: the dot points the sibling generator covers carry its answers', otherOrdinals.every(o => dpOf(ch, o) >= 7), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
 
-    // 2 · a chapter-keyed legacy row that has since gained a dp map from one new answer.
+    // 2 · a pre-cutover chapter-id row written again by one new answer: its legacy totals are frozen in `legacy`.
     id = await fresh('After answer');
     const ownOrdinals = [...new Set((sib.covers || []).filter(x => x.gen === sib.id).flatMap(x => x.dp))];
-    if (ownOrdinals.length) {
-      const k = `${sib.id}#${ownOrdinals[0]}`;
-      await put('ratings', { key: `${id}:${sib.id}`, pid: id, subtopic: sib.id, rating: 1300, attempts: 13, correct: 10, last_at: NOW, dp: { [k]: { rating: 1220, attempts: 1, correct: 1, last_at: NOW } } });
-      ({ ch, u } = await view());
-      eq('after a new answer: the chapter still shows all 13 answers', ch?.attempts, 13);
-      ok('after a new answer: the 12 legacy answers still reach its dot points, not just the new one', ownOrdinals.some(o => dpOf(ch, o) >= 12), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
-    } else ok('(the chapter has no generator of its own id; case 2 covered by case 3)', true);
+    const legacyRow = ownOrdinals.length ? sib.id : other;
+    const legacyOrdinals = ownOrdinals.length ? ownOrdinals : otherOrdinals;
+    const { legacyBaselineOf } = await import(`${SRC}local/backend.js`);
+    const before = { rating: 1300, attempts: 12, correct: 9, last_at: NOW - 3600e3 };
+    eq('a row with no dot-point map is pre-cutover: its totals are frozen when it is written again', legacyBaselineOf(before), { attempts: 12, correct: 9, rating: 1300, last_at: NOW - 3600e3 });
+    eq('a current row (it has a dot-point map) has no legacy totals', legacyBaselineOf({ attempts: 3, correct: 2, dp: {} }), null);
+    const k = indiaDotpointKey(sib.id, legacyOrdinals[0]);
+    await put('ratings', { key: `${id}:${legacyRow}`, pid: id, subtopic: legacyRow, rating: 1300, attempts: 13, correct: 10, last_at: NOW,
+      dp: { [k]: { rating: 1220, attempts: 1, correct: 1, last_at: NOW } }, legacy: legacyBaselineOf(before) });
+    ({ ch, u } = await view());
+    eq('after a new answer: the chapter still shows all 13 answers', ch?.attempts, 13);
+    ok('after a new answer: the 12 legacy answers still reach its dot points', legacyOrdinals.some(o => dpOf(ch, o) >= 12), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
 
-    // 3 · a backup restore that wrote an empty dp map onto a legacy row.
+    // 3 · a backup restore keeps the marker: the restored legacy row still has no dot-point map.
     id = await fresh('After restore');
-    const row = ownOrdinals.length ? sib.id : other;
-    await put('ratings', { key: `${id}:${row}`, pid: id, subtopic: row, rating: 1300, attempts: 9, correct: 6, last_at: NOW - 3600e3, dp: {} });
+    await put('ratings', { key: `${id}:${legacyRow}`, pid: id, subtopic: legacyRow, rating: 1300, attempts: 9, correct: 6, last_at: NOW - 3600e3 });
     ({ ch } = await view());
-    eq('after a restore with an empty dp map: the chapter shows the 9 answers', ch?.attempts, 9);
+    eq('after a restore: the chapter shows the 9 answers', ch?.attempts, 9);
     ok('and its dot points carry them, not "untouched"', dpAnswers(ch || {}) >= 9, JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
+
+    // 4 · answers recorded TODAY without a dot point are current evidence, never spread over dot points.
+    for (const [label, extra] of [['a notebook twin', 2], ['a past-paper question', 3]]) {
+      id = await fresh(label);
+      const dpOnly = 1;
+      await put('ratings', { key: `${id}:${sib.id}`, pid: id, subtopic: sib.id, rating: 1250, attempts: dpOnly + extra, correct: 2, last_at: NOW,
+        dp: { [indiaDotpointKey(sib.id, legacyOrdinals[0])]: { rating: 1220, attempts: dpOnly, correct: 1, last_at: NOW } } });
+      ({ ch } = await view());
+      eq(`today, ${label}: the chapter total counts every answer (${dpOnly + extra})`, ch?.attempts, dpOnly + extra);
+      eq(`today, ${label}: the dot points carry only the answer that named one`, dpAnswers(ch || {}), dpOnly);
+    }
   }
   // The importer keeps the legacy marker: a row restored without a dp map stays without one.
   const backend = await import(`${SRC}local/backend.js`);
   const src = (await import('node:fs')).readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
   ok('the backup importer writes a dp map only when the backed-up row had one', /\.\.\.\(r\.dp && typeof r\.dp === 'object' \? \{ dp: safeDotpointStats\(r\.dp\) \} : \{\}\)/.test(src) && !!backend);
+  ok('and carries the frozen legacy totals across a restore', /r\.legacy && typeof r\.legacy === 'object' \? \{ legacy:/.test(src));
+  ok('the answer path freezes a pre-cutover row\'s totals before adding to it', /\.\.\.\(legacyBaselineOf\(st\) \? \{ legacy: legacyBaselineOf\(st\) \} : \{\}\)/.test(src));
 }
 
 console.log(`india-legacy-rows-check: ${pass}/${pass + failures.length} checks passed`);

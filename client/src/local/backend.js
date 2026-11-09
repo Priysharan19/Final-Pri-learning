@@ -1015,11 +1015,28 @@ function indiaState(chapter, ratings, now = Date.now()) {
  */
 function unattributedOf(row) {
   if (!row) return null;
-  const dp = row.dp && typeof row.dp === 'object' ? Object.values(row.dp) : [];
-  const attempts = (row.attempts || 0) - dp.reduce((n, d) => n + (d?.attempts || 0), 0);
+  // Legacy is decided by what the row IS, never by a missing dot point: a row
+  // written before rows recorded dot points has no dp map at all; once such a
+  // row is written again its pre-cutover totals are frozen in `legacy`
+  // (legacyBaselineOf). An answer recorded today without a dot point (a
+  // notebook twin, a past-paper question) is current evidence and is never
+  // spread over dot points.
+  const frozen = row.legacy && typeof row.legacy === 'object' ? row.legacy
+    : (!row.dp || typeof row.dp !== 'object') ? row : null;
+  const attempts = Number(frozen?.attempts) || 0;
   if (attempts <= 0) return null;
-  const correct = Math.max(0, Math.min(attempts, (row.correct || 0) - dp.reduce((n, d) => n + (d?.correct || 0), 0)));
-  return { rating: row.rating || START_RATING, attempts, correct, last_at: row.last_at || null };
+  return { rating: Number(frozen.rating) || START_RATING, attempts, correct: Math.max(0, Math.min(attempts, Number(frozen.correct) || 0)), last_at: frozen.last_at || null };
+}
+
+/**
+ * The pre-cutover totals of a rating row written before rows recorded dot
+ * points, frozen the first time it is written again (#300); null for a
+ * current row. Kept on the row as `legacy`.
+ */
+export function legacyBaselineOf(st) {
+  if (!st || (st.dp && typeof st.dp === 'object')) return st?.legacy || null;
+  if (!(Number(st.attempts) > 0)) return null;
+  return { attempts: Number(st.attempts) || 0, correct: Number(st.correct) || 0, rating: Number(st.rating) || START_RATING, last_at: st.last_at || null };
 }
 
 /**
@@ -2279,7 +2296,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
       rating: ratingAfter, attempts: st.attempts + 1,
       correct: st.correct + (correct ? 1 : 0), last_at: now,
-      dp, traps, recent
+      dp, traps, recent,
+      ...(legacyBaselineOf(st) ? { legacy: legacyBaselineOf(st) } : {})
     };
   }
 
@@ -2735,6 +2753,9 @@ const IMPORT_ROWS = {
       correct: safeInt(r.correct, 0, 1e7, 0), last_at: safeTime(r.last_at),
       // A row restored without a dot-point map stays without one (#300).
       ...(r.dp && typeof r.dp === 'object' ? { dp: safeDotpointStats(r.dp) } : {}), traps: safeTrapLedger(r.traps),
+      ...(r.legacy && typeof r.legacy === 'object' ? { legacy: {
+        attempts: safeInt(r.legacy.attempts, 0, 1e7, 0), correct: safeInt(r.legacy.correct, 0, 1e7, 0),
+        rating: safeNum(r.legacy.rating, START_RATING), last_at: safeTime(r.legacy.last_at) } } : {}),
       recent: (Array.isArray(r.recent) ? r.recent : []).slice(0, RECENT_WINDOW).map(v => (v ? 1 : 0))
     };
   },

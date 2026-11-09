@@ -115,7 +115,7 @@ jobs:
           # #300: legacy generator-keyed rows count on the chapter, its dot points and the
           # predicted paper — sibling generators, after a new answer, after a restore.
           node client/test/india-legacy-rows-check.mjs | tee india-legacy-rows.log
-          grep -Fq 'india-legacy-rows-check: 77/77 checks passed' india-legacy-rows.log
+          grep -Fq 'india-legacy-rows-check: 85/85 checks passed' india-legacy-rows.log
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs
