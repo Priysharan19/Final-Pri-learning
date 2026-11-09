@@ -13,6 +13,7 @@
 import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import { PAYWALL_ROUTE } from '../paywall/route.js';
 
 function whenItResets(resetsAt, timeZone) {
   if (!Number.isFinite(resetsAt)) return null;
@@ -68,7 +69,10 @@ export default function FreeCapNotice({ gate, onRetry }) {
         </p>
 
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <PageLink className="btn btn-primary" to="/settings#cloud-account-title">
+          {/* A device whose Premium needs reconnecting is sent to its account;
+              everyone else to the one Premium screen, which says why they came. */}
+          <PageLink className="btn btn-primary" to={gate.refreshRequired ? '/settings#cloud-account-title' : PAYWALL_ROUTE}
+            state={gate.refreshRequired ? undefined : { from: isExam ? 'exams' : 'practice' }}>
             {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
           </PageLink>
           {onRetry && (

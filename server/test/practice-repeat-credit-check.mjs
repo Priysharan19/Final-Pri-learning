@@ -137,7 +137,7 @@ try {
   // come in. Keyed on a hash that includes the order, "seen" let one reveal
   // buy full first-sitting credit on every reshuffled copy.
   const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
-  const { contentIdentityOf, seenKeysOf, triedKeyOf, opaqueContentHash } = await import('../platform/contentSeen.js');
+  const { contentIdentityOf, legacyContentIdentityOf, seenKeysOf, triedKeyOf, opaqueContentHash } = await import('../platform/contentSeen.js');
   await loadAllBanks();
   const MCQ = 'c9-euclid-geometry';
   // Fixed seeds of ONE prompt whose options come out in four different orders.
@@ -219,6 +219,54 @@ try {
   await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
     [legacy.account.id, 'seen-' + opaqueContentHash(d3.q.contentHash), '{}', 'legacy-row', stamp, stamp + 86_400_000]);
   eq([(await issueMcq(legacy.jar, d3)).data.repeat, (await issueMcq(legacy.jar, d5)).data.repeat ?? false], [true, false], 'a record under the old key alone still makes that copy a repeat (and, as before, only that copy)');
+
+  // ── keys written before the canonical identity (v2): read exactly, honoured, reported ──
+  // A record under the version-1 identity alone (what every record carried
+  // between the identity existing and v2) still makes the content a repeat —
+  // on every deal, because lv already keyed a multiple-choice question by its
+  // option text — and the server writes no legacy key again. Where the lv key
+  // cannot prove which question it was written for — and no lv key can, since
+  // lv left out alternatives and answer-box labels whatever the question —
+  // the repeat is reported as `repeatEvidence: 'legacy'` on the issue, the
+  // receipt and the attempt, until a canonical record replaces it.
+  const lv = await account('lv');
+  await h.db.run('DELETE FROM rate_limits');
+  await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
+    [lv.account.id, 'seen-c' + legacyContentIdentityOf(d0.q), '{}', 'legacy-v1-row', stamp, stamp + 86_400_000]);
+  const lvIssue = await issueMcq(lv.jar, d4);
+  eq([lvIssue.status, lvIssue.data?.repeat, lvIssue.data?.repeatEvidence], [201, true, 'legacy'], 'a question recorded under its version-1 identity alone is a repeat in another deal, reported as resting on legacy evidence');
+  const lvGrade = await grade(lv.jar, lvIssue.data.question.id, right(d4));
+  const lvEvent = await eventOf(lvIssue.data.question.id);
+  eq([lvGrade.data.correct, lvGrade.data.repeat, lvGrade.data.repeatEvidence, lvEvent.repeat, lvEvent.repeatEvidence], [true, true, 'legacy', true, 'legacy'], 'marked as a repeat, recorded as one, the receipt and the attempt carrying the legacy flag; the mark itself is unchanged');
+  const lvRows = await h.db.all("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-content'", [lv.account.id]);
+  eq([lvRows.filter(r => r.key === seenKeysOf(d0.q)[0]).length, lvRows.filter(r => r.key.startsWith('seen-c') && !r.key.startsWith('seen-c2:')).length, lvRows.filter(r => /^seen-[0-9a-f]{16}$/.test(r.key)).length],
+    [1, 1, 0], 'resolving it recorded the canonical key once; the only legacy-shaped row is the one inserted here; no engine-hash key was written');
+  eq([(await issueMcq(lv.jar, d5)).data.repeat, 'repeatEvidence' in (await issueMcq(lv.jar, d1)).data], [true, false], 'and every later deal is a repeat on the canonical record');
+  // A labelled question: the version-1 key left the unit out, so a match on it is ambiguous and says so.
+  let labelled = null;
+  for (const generator of ['c7-decimals-current', 'c7-triangles-current', 'c10-triangles-current']) {
+    for (let difficulty = 1; difficulty <= 3 && !labelled; difficulty++) for (let seed = 1; seed < 300 && !labelled; seed++) {
+      let q; try { q = generateQuestion(generator, difficulty, seed); } catch { break; }
+      if (q?.answerType === 'numeric' && String(q.answerSuffix || q.answerPrefix || '').trim()) labelled = { generator, difficulty, seed, q };
+    }
+  }
+  eq(!!labelled, true, `a practice question with a label on its answer box (${labelled?.generator} d${labelled?.difficulty} seed ${labelled?.seed}: "${String(labelled?.q.answerPrefix || '').trim()}…${String(labelled?.q.answerSuffix || '').trim()}")`);
+  const lab = await account('lab');
+  // (Issue is rate-limited per caller; this suite has issued hundreds by now, and that limit is not what it is testing.)
+  const issueLabelled = async jar => { await h.db.run('DELETE FROM rate_limits'); return post('/v1/practice/issue', { generator: labelled.generator, difficulty: labelled.difficulty, seed: labelled.seed, curriculum: 'in' }, jar); };
+  const labFresh = await issueLabelled(lab.jar);
+  eq([labFresh.status, labFresh.data?.repeat ?? false, 'repeatEvidence' in (labFresh.data || {})], [201, false, false], `with no record it is new work (${labFresh.status})`);
+  await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
+    [lab.account.id, 'seen-c' + legacyContentIdentityOf(labelled.q), '{}', 'legacy-v1-row', stamp, stamp + 86_400_000]);
+  const labIssue = await issueLabelled(lab.jar);
+  eq([labIssue.status, labIssue.data.repeat, labIssue.data.repeatEvidence], [201, true, 'legacy'], 'under its version-1 key alone it is a repeat, reported as resting on legacy evidence (v1 could not tell it from the same number in another unit)');
+  const labGrade = await grade(lab.jar, labIssue.data.question.id, (await sealedAnswer(labIssue.data.question.id)).value);
+  const labEvent = await eventOf(labIssue.data.question.id);
+  eq([labGrade.data.correct, labGrade.data.repeat, labGrade.data.repeatEvidence, labEvent.repeat, labEvent.repeatEvidence], [true, true, 'legacy', true, 'legacy'], 'the receipt and the recorded attempt carry the same evidence');
+  eq([labGrade.data.marksEarned === labGrade.data.marksPossible, labGrade.data.marksPossible > 0], [true, true], 'a right answer on it is still full marks: a repeat changes no mark');
+  const labAgain = await issueLabelled(lab.jar);
+  eq([labAgain.data.repeat, 'repeatEvidence' in labAgain.data], [true, false], 'once resolved under the canonical key the next copy is a repeat on canonical evidence, with no flag');
+  eq(((await issueLabelled(b.jar)).data.repeat) ?? false, false, 'and another account\'s first sitting of it is its own');
 
   // a record past its expiry is not a record, and seeing the content again renews it
   const lapsed = await account('lapsed');

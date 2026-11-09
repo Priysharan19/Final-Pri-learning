@@ -264,7 +264,8 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(cloudReply.status === 200 && JSON.parse(cloudReply.body).path === '/v1/me', 'cloud.request works end to end');
   await rejects(priNative.ink.post({ op: 'mount' }) ? Promise.resolve() : Promise.reject(new PriNativeError('UNSUPPORTED')), 'UNSUPPORTED',
     'an unadvertised capability (ink) is unavailable');
-  await rejects(priNative.photo.recognize('not-a-data-url'), 'BAD_REQUEST', 'photo input is validated before it is sent');
+  ok(priNative.photo.available() && priNative.photo.ocr() === false && priNative.photo.recognize === undefined,
+    'photo is a capability fact with no on-device read op (photos are read on the server; the Vision OCR bridge is retired)');
   await rejects(priNative.share.print(), 'UNSUPPORTED', 'an op the fake host does not implement is reported UNSUPPORTED');
 
   const states = [];
@@ -314,17 +315,17 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   respond({ id: sentId, ok: true, result: { status: 'verified', transactionId: 'late-1', signedTransaction: 'jws' } });
   ok(recovered.some(t => t.transactionId === 'late-1'), 'a late StoreKit result is recovered as a transaction update');
 
-  ok(priNative.ink.post({ op: 'recognize', reqId: 1, overrides: {} }) === true, 'a normal ink request is posted');
+  ok(priNative.ink.post({ op: 'setStrokes', strokes: [{ points: [{ x: 1, y: 2 }] }] }) === true, 'a normal ink message (strokes onto the surface) is posted');
   ok(priNative.ink.facts()?.fingerDefault === false, 'a legacy (pre-CP-04) shell never claims finger-default ink');
-  ok(priNative.ink.post({ op: 'recognize', reqId: 2, overrides: {}, expectedAnswer: '42' }) === false,
+  ok(priNative.ink.post({ op: 'setStrokes', strokes: [], expectedAnswer: '42' }) === false,
     'an ink message carrying any non-allowlisted field (an expected answer) is refused');
-  const longHybrid = `h3_${Array.from({ length: 12 }, (_, i) => 101 + i).join('_')}`; // a real 12-stroke group id
-  ok(longHybrid.length > 40 && priNative.ink.post({ op: 'recognize', reqId: 3, overrides: { [longHybrid]: 'theta', bad: 'x'.repeat(200), 'no spaces': 'y' } }) === true,
-    'a long real stroke-group override is kept and the request still goes (native recognition never silently switches off)');
-  const posted3 = posts.priInk[posts.priInk.length - 1];
-  ok(posted3.overrides[longHybrid] === 'theta' && !('bad' in posted3.overrides) && !('no spaces' in posted3.overrides),
-    'malformed override entries are dropped individually');
-  ok(!JSON.stringify(posts.priInk).includes('42'), 'no expected answer ever reached the native recogniser');
+  // The on-device readers are retired (owner decision 2026-10-02, D16): there
+  // is no read op on either side of the bridge, so one is refused before it is
+  // posted, and no correction map ("overrides") travels any more.
+  ok(priNative.ink.post({ op: 'recognize', reqId: 3, overrides: {} }) === false && priNative.ink.post({ op: 'foundationRecognize', reqId: 4 }) === false,
+    'a native read op no longer exists and is refused before it is posted');
+  ok(posts.priInk.length === 1 && !('overrides' in posts.priInk[0]), 'only the strokes message reached the shell, with no overrides field');
+  ok(!JSON.stringify(posts.priInk).includes('42'), 'no expected answer ever reached the native shell');
 
   priNative.dispose();
   for (const k of ['__PRI_NATIVE__', '__PRI_NATIVE_INK__', '__PRI_NATIVE_BILLING__', 'webkit', 'addEventListener', 'removeEventListener', 'dispatchEvent']) delete globalThis[k];
@@ -509,15 +510,22 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
 }
 
 // ── 13 · Answer-blind ink through the real ink module ────────────────────────
+// The shell has no read op any more (reading is on the server, D16): nothing
+// the page knows about the question can reach it, because the only messages
+// are surface messages and the allowlist refuses any other key.
 {
   const posted = [];
   globalThis.window = { __PRI_NATIVE_INK__: true, webkit: { messageHandlers: { priInk: { postMessage: m => posted.push(m) } } } };
   const { nativeInk } = await import(`../src/ink/native.js?answer-blind=${Date.now()}`);
   const secret = 'SECRET-ANSWER-7731';
-  const reading = nativeInk.recognize({}, { expectedAnswer: secret, solution: secret, alphabet: ['x'] });
-  ok(posted.length === 1 && !JSON.stringify(posted).includes(secret), 'recognition context stays on the web side; the answer never crosses');
-  window.__priInkReceive({ type: 'reading', reqId: posted[0].reqId, text: 'x', lines: [], engine: 'native-rescue' });
-  ok((await reading).text === 'x', 'and the reading still comes back');
+  ok(nativeInk.recognize === undefined && nativeInk.foundationRecognize === undefined, 'the ink module offers no native read');
+  nativeInk.setStrokes([{ points: [{ x: 1, y: 2 }] }]);
+  ok(posted.length === 1 && posted[0].op === 'setStrokes' && posted[0].strokes.length === 1, 'strokes are posted to the surface (the shell draws them; it reads nothing)');
+  ok(priNative.ink.post({ op: 'recognize', reqId: 1, overrides: {}, context: { expectedAnswer: secret } }) === false
+    && priNative.ink.post({ op: 'setStrokes', strokes: [], expectedAnswer: secret }) === false,
+    'a read op, or any message carrying a key outside the surface allowlist, is refused before it is posted');
+  ok(posted.length === 1, 'the refused messages never reached the shell');
+  priNative.dispose();
   delete globalThis.window;
 }
 

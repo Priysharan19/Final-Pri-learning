@@ -1,6 +1,8 @@
 // 'guardian-withdraw' is the long-lived link a guardian receives after confirming
 // (server/platform/accounts.js): it can only ever withdraw consent.
-const ACTIONS = new Set(['verify-email', 'reset-password', 'guardian-consent', 'guardian-withdraw']);
+// 'guardian-erase' is the second link in that same email, carrying the same
+// bearer: it opens the page that asks for the account to be erased (D18).
+const ACTIONS = new Set(['verify-email', 'reset-password', 'guardian-consent', 'guardian-withdraw', 'guardian-erase']);
 
 export function parseAccountActionFragment(fragment = '') {
   const raw = String(fragment || '').replace(/^#/, '');

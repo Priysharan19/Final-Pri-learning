@@ -31,6 +31,7 @@ import {
   indiaExamClaim
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText, paperSpecOf } from '../engine/indiaExamComposer.js';
+import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../engine/boardMock.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence, withExamLock } from './backend.js';
 import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
@@ -136,7 +137,11 @@ function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
 async function createIndiaExam(profile, body = {}) {
   const grade = Number(profile.year);
   const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', grade);
-  const variant = body.variant === 'basic' ? 'basic' : 'standard';
+  // A board mock (engine/boardMock.js, D22) is the Standard paper of a board
+  // class only, sat typed.
+  const mock = body.mock === true;
+  const variant = !mock && body.variant === 'basic' ? 'basic' : 'standard';
+  if (mock && !boardMockOf({ track, grade, variant })) throw error('Board mocks are set for CBSE Class X and Class XII.', 409, 'MOCK_NOT_AVAILABLE');
   const blueprint = indiaExamBlueprint({ track, grade, variant });
   const spec = indiaExamPaperSpec({ track, grade, variant });
   if (!spec) {
@@ -148,7 +153,7 @@ async function createIndiaExam(profile, body = {}) {
   await loadBanksFor([...new Set(chapters.flatMap(c => (c.covers || []).map(x => x.gen)))]);
   const pyqCells = await pyqCellsByChapter(track, chapters);
   const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
-  const title = titleFor(spec, count + 1);
+  const title = mock ? mockTitleOf({ track, grade, variant }) : titleFor(spec, count + 1);
   let seed = null;
   let paper = null;
   let issued = null;
@@ -183,8 +188,8 @@ async function createIndiaExam(profile, body = {}) {
     // What goes to the server is the recipe of each item; the server chooses the
     // questions, and no answer to any of them comes back until it has marked.
     try {
-      issued = await issueServerExam(profile.id, paperSpecOf(paper, { track, grade, variant }),
-        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`,
+      issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), ...(mock ? { mock: true } : {}) },
+        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}${mock ? ':mock' : ''}`,
         { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
     } catch (err) {
       // EXAM_LAYOUT_NOT_ISSUED: the layout was spent meanwhile (another device
@@ -229,6 +234,7 @@ async function createIndiaExam(profile, body = {}) {
     year: profile.year,
     pathway: null,
     title,
+    ...(mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
     durationMin: issued.durationMin,
     questionIds,
     createdAt: now,
@@ -350,6 +356,8 @@ async function examView(profile, id) {
     // this device. Only the first is a certified result.
     markedBy: markedByOf(exam),
     serverIssued: isServerPaper(exam),
+    // A board mock (D22) is labelled on every surface and sat typed.
+    ...(exam.mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
     indiaExam: exam.indiaExam
   };
 }
@@ -370,6 +378,7 @@ async function listExams(profile) {
       // Marks not yet decided: handwriting saved at the close and not read.
       pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0,
       provisional: !!e.finishedAt && (e.provisional === true || pendingSummary(e.detail).any),
+      ...(e.mock ? { mock: true, mock_label: MOCK_LABEL } : {}),
       indiaExam: e.indiaExam
     }))
   };
@@ -428,6 +437,8 @@ async function saveResponses(profile, id, body = {}) {
  */
 async function adoptResult(exam, serverResult, { record = true } = {}) {
   const result = localResult(exam, serverResult);
+  // A board mock sat on another device is known as one from its result.
+  if (serverResult?.mock === true) { exam.mock = true; exam.mockLabel = MOCK_LABEL; }
   const detail = [];
   for (const d of result.detail) {
     const row = await get('questions', d.id);

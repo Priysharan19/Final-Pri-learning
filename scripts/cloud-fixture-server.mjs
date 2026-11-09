@@ -57,6 +57,9 @@ const readerEnv = syntheticReader ? {
   PRI_HANDWRITING_FALLBACK_MODEL: 'synthetic-reader',
   PRI_HANDWRITING_ENDPOINT: '', PRI_HANDWRITING_PROBE_ENDPOINT: '', PRI_HANDWRITING_CONFIDENCE_FLOOR: '',
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000',
+  // The per-account read allowance (D20: 5 a day free) is proved at its
+  // defaults by server/test/premium-authority-check.mjs, not by browser flows.
+  PRI_AI_DAILY_FREE: '100000', PRI_AI_DAILY_PREMIUM: '100000',
   PRI_SYNTHETIC_READER_LOG: readerLog, PRI_SYNTHETIC_READER_SCRIPT: readerScript
 } : {};
 const outboxFile = join(dir, 'test-outbox.jsonl');

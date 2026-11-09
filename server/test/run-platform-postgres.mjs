@@ -41,6 +41,9 @@ export const ENGINE_SUITES = [
   // Examination papers: sealed paper, answer snapshots, exactly-once
   // finalisation and the deadline rule, account-scoped under Row-Level Security.
   'exam-authority-check.mjs',
+  // D22: typed board mocks — the typed-only refusal and the shared free
+  // window under the exam-create lock, on Postgres as pri_server.
+  'board-mock-check.mjs',
   // Handwriting not read when a paper closed: frozen by digest, pending, and
   // read a bounded number of times — the attempt reservation and the result
   // amendment under the account lock, on the Postgres store.
@@ -55,6 +58,10 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
+  // Learning-state identity (v2) and monotonic expiry (#689, #690, #691): the
+  // canonical keys, the exact legacy lookups, the real housekeeping sweep and
+  // account isolation under RLS, on the Postgres store as pri_server.
+  'learning-state-identity-check.mjs',
   // #723 (Step 14): exact numbers, points, sets, units and false-credit
   // persistence over authenticated HTTP, as the pri_server role.
   'step14-decimal-authenticated-check.mjs',
@@ -66,6 +73,15 @@ export const ENGINE_SUITES = [
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
   'practice-daily-cap-check.mjs',
+  // An account's questions pass over content it has resolved, read from its
+  // own records on whichever engine holds them (not the device's avoid list).
+  'practice-seen-aware-pick-check.mjs',
+  // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
+  // question of the free day — decided under the same lock and RLS scope.
+  'premium-practice-content-check.mjs',
+  // D22: the mistake notebook — derived from the server-grader's own events,
+  // read account-scoped under RLS.
+  'mistake-notebook-check.mjs',
   // Security P2s (train 10): admin MFA on class and assignment routes, the
   // account export is complete, and every account-owned table is under RLS
   // for the pri_server role — proved live on Postgres.
@@ -81,13 +97,45 @@ export const ENGINE_SUITES = [
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'account-deletion-session-binding-check.mjs',
+  // Races the request thread cannot serialise on its own, and the cutover end
+  // to end: a reveal against a correct answer, a deletion against a mark in
+  // flight, two billing events of one subscription, SQLite -> Postgres served.
+  'practice-reveal-submit-race-check.mjs',
+  'account-deletion-midflight-check.mjs',
+  'billing-out-of-order-concurrency-check.mjs',
+  'postgres-cutover-rehearsal-check.mjs',
   // The data export behind fresh proof of the credential, and the new-device
   // sign-in notice: session rows, audit rows and the step-up on Postgres too.
   'export-reauth-check.mjs',
   'password-set-check.mjs',
   'session-alerts-check.mjs',
+  // Sign-in and a guardian's consent, proved on Postgres and not only on
+  // SQLite: the one-time-code card contract and lifecycle (expiry, single use,
+  // the attempt ceiling, no enumeration, the pre-registration takeover rule,
+  // a parent's approval and withdrawal by code) and the consent state machine
+  // and gate, each as pri_server under RLS.
+  'otp-sign-in-check.mjs',
+  'otp-lifecycle-check.mjs',
+  'guardian-consent-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  // A parent who approves by email code is sent the long-lived withdrawal
+  // credential, as the link path does (otp.js /guardian/approve).
+  'guardian-code-approval-withdraw-check.mjs',
+  // Pending, given and withdrawn consent through the production /v1 chain:
+  // telemetry, classes, assignments and reports refuse a child and write
+  // nothing, never touch an adult, and leave staff routes open (#292).
+  'guardian-consent-coverage-check.mjs',
+  // The staging test mailbox: reserved-domain codes and links kept in
+  // platform_meta and read back, every other address sent — as pri_server.
+  'test-mailbox-check.mjs',
   'guardian-notice-version-check.mjs',
+  // D18: a child's account no guardian stands behind is soft-deleted and, after
+  // the grace, erased through the one deletion transaction; a guardian's own
+  // request — on Postgres as pri_server, the erasure in system scope under RLS.
+  'child-erasure-check.mjs',
+  // The parent weekly report: account-scoped reads under RLS, the send ledger
+  // and the lease on Postgres.
+  'parent-report-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

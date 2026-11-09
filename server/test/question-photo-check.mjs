@@ -11,6 +11,7 @@
 // No network call is made: the provider is a stub, so this runs with no key.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
+import { jpegDataUrl } from './support/test-image.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
@@ -27,7 +28,7 @@ const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
-const JPEG = 'data:image/jpeg;base64,' + Buffer.from('q'.repeat(900)).toString('base64');
+const JPEG = jpegDataUrl('q'.repeat(900));
 
 // ── 1 · OpenAI strict mode: every object closed, every key required ─────────
 export function strictSchemaProblems(schema, path = '$') {

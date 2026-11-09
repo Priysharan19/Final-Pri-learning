@@ -168,9 +168,10 @@ import {
 import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engine/curriculum.js';
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
+import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
-import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
+import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 import { recognitionOpsFor } from './recognitionOps.js';
 import { transcribeHandwriting, validateImage } from './handwritingProvider.js';
 
@@ -198,7 +199,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -293,7 +294,7 @@ function publicQuestion(sq) {
 
 function publicPaper(paper, now) {
   return {
-    id: paper.id, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+    id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL, typedOnly: true } : {}), title: paper.title, durationMin: paper.durationMin,
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
@@ -520,6 +521,13 @@ function readSpec(body) {
   }
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
+  // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
+  // full blueprint paper on a board blueprint, sat typed, under its own title.
+  // For the plan it is a timed paper like any other (D19).
+  if (body.mock !== undefined) {
+    if (body.mock !== true || read.kind !== 'india' || !boardMockOf(read.blueprint)) return INVALID('A board mock is a CBSE Class X Standard or Class XII paper.');
+    return { ...read, mock: true, title: mockTitleOf(read.blueprint) };
+  }
   // The title of a certified paper is the server's, from the blueprint. A
   // device may call the paper what it likes locally; that name is never here.
   return { ...read, title: read.defaultTitle };
@@ -730,6 +738,9 @@ function readResponses(body, paper) {
   const times = readTimes(body.times, paper);
   const modes = readModes(body.modes, keys);
   const ink = readInk(body.ink, keys);
+  // A board mock is a typed paper (D22): a handwritten answer, or a page of
+  // ink left to read, does not belong on it.
+  if (paper.mock && ((modes && Object.values(modes).includes('ink')) || (ink && Object.keys(ink).length))) return null;
   return answers && workings && times && modes && ink ? { answers, workings, times, modes, ink } : null;
 }
 
@@ -875,7 +886,12 @@ function summarise(paper, detail, totalMs) {
  */
 export function markPaper(paper, responses, { now, totalMs, seen = null, mark }) {
   const { answers, workings, times, modes } = responses;
-  const isRepeat = item => !!seen && seen.size > 0 && seenKeysOf(item).some(key => seen.has(key));
+  // Why an item is a repeat (contentSeen.js), or null. A repeat decided on a
+  // record written before the canonical identity, under a key that could not
+  // have told this item from another, is reported as `repeatEvidence: 'legacy'`
+  // beside its `repeat: true`: honoured, never passed off as a canonical match.
+  const repeatOf = item => (seen && seen.size > 0 ? repeatEvidenceOf(item, seen) : null);
+  const evidenceFlag = evidence => (evidence?.ambiguous ? { repeatEvidence: 'legacy' } : {});
   const timed = Object.keys(times).length > 0;
   const nQ = Math.max(1, paper.questions.length);
   const detail = [];
@@ -896,6 +912,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       ...(sq.chapterId ? { chapterId: sq.chapterId } : {}),
       ...(extra.part ? { part: extra.part } : {}),
       ...(extra.repeat ? { repeat: true } : {}),
+      ...(extra.repeat && extra.repeatEvidence ? { repeatEvidence: extra.repeatEvidence } : {}),
       mode: 'exam', inputMode: extra.inputMode, ms: extra.ms,
       // The server offers an exam question no hint, tutor or second try, but it
       // cannot see what else was open beside the paper. As with practice, an
@@ -917,7 +934,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
     let out;
     if (q.multipart) {
       const partsOut = [];
-      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false, repeatParts = 0;
+      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false, repeatParts = 0, legacyParts = 0;
       const parts = q.parts || [];
       for (const part of parts) {
         const mainKey = `${sq.id}::${part.key}`;
@@ -928,8 +945,10 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         const grid = { correct: part.marks, incorrect: 0, unanswered: 0 };
         const r = mark(synth, answers[key], workings[key], grid, key);
         if (r.pending) pendingKeys.push(key);
-        const repeat = isRepeat(chosen);
+        const evidence = repeatOf(chosen);
+        const repeat = evidence !== null;
         if (repeat) repeatParts++;
+        if (evidence?.ambiguous) legacyParts++;
         qMarks += part.marks; qAwarded += r.awarded;
         if (!r.correct) allCorrect = false;
         let attemptId = null;
@@ -939,7 +958,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           // own evidence. A structured Section II question is one piece of work
           // with no single subtopic, so it is recorded on the paper only.
           if (paper.kind === 'india') {
-            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
+            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
           }
         }
         partsOut.push({
@@ -950,7 +969,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           working: blank(workings[key]) ? null : String(workings[key]),
           // Withheld while the part is pending on handwriting (see solution below).
           ...(r.pending ? {} : { answerText: keyedAnswer(chosen), steps: chosen.steps || [] }), subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
-          ...(repeat ? { repeat: true } : {}),
+          ...(repeat ? { repeat: true } : {}), ...evidenceFlag(evidence),
           ...cutOffFlags(r),
           // Both versions of a part that offered a choice, now that it is marked.
           ...(part.alt && !r.pending ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
@@ -966,7 +985,12 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         // A part is waiting on handwriting: the question's marks are not final.
         ...(partsOut.some(part => part.pending) ? { pending: true } : {}),
         // The whole question again, or every part of it: nothing on it is new work.
-        ...(isRepeat(q) || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {})
+        ...(whole => ({
+          ...(whole || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {}),
+          // Legacy evidence when the whole-question match is ambiguous, or when
+          // the flag rests on every part and any of those rested on legacy.
+          ...(whole ? evidenceFlag(whole) : (parts.length > 0 && repeatParts === parts.length && legacyParts > 0 ? { repeatEvidence: 'legacy' } : {}))
+        }))(repeatOf(q))
       };
     } else {
       const useAlt = blank(answers[sq.id]) && q.alt && (!blank(answers[`${sq.id}::or`]) || (inked(`${sq.id}::or`) && !inked(sq.id)));
@@ -976,13 +1000,14 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       if (r.pending) pendingKeys.push(key);
       const marks = Number(sq.marking.correct);
       // The question answered (the alternative, when that is the one taken).
-      const repeat = isRepeat(useAlt ? q.alt : q);
+      const evidence = repeatOf(useAlt ? q.alt : q);
+      const repeat = evidence !== null;
       // A blueprint paper leaves a question it never saw an answer to out of
       // the evidence: not attempted is not wrong. A practice paper has always
       // counted a blank as a wrong attempt, and still does.
       // An answer the marker was stopped on is recorded on no paper as an
       // attempt: unreadable is not wrong. Neither is handwriting not yet read.
-      const attemptId = r.unreadable || r.pending || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
+      const attemptId = r.unreadable || r.pending || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms });
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
         figure: chosen.figure || null, choiceTaken: useAlt ? 'or' : (q.alt ? 'main' : null),
@@ -994,7 +1019,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         // the result carries no solution, no keyed answer, no marking criteria
         // and no distractor explanations for it — nothing to decide by.
         ...(r.pending ? {} : { solution: solutionOf(chosen, marks, sq.marking) }), attemptId,
-        ...(repeat ? { repeat: true } : {}),
+        ...(repeat ? { repeat: true } : {}), ...evidenceFlag(evidence),
         ...cutOffFlags(r),
         // Both questions of an internal choice, now that the paper is marked.
         ...(q.alt && !r.pending ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
@@ -1214,13 +1239,15 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     // marked: those items are repeats. Then every item of this paper joins
     // them, because the result below discloses all of its solutions. Read
     // here, under the lock: which items are repeats does not affect any mark,
-    // so it needs no second marking.
-    const contentKeys = paper.questions.flatMap(sq => examItemsOf(sq.payload).flatMap(seenKeysOf));
-    const seen = await seenAmong(db, accountId, contentKeys);
+    // so it needs no second marking. Read under every key an item may hold a
+    // record of (the canonical identity and the keys that predate it); written
+    // below under the canonical key alone.
+    const items = paper.questions.flatMap(sq => examItemsOf(sq.payload));
+    const seen = await seenAmong(db, accountId, items.flatMap(seenKeysOf));
     let next = 0;
     const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
-      authoritative: true, examId: id, kind: paper.kind, title: paper.title,
+      authoritative: true, examId: id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title,
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1250,14 +1277,14 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     };
     const json = JSON.stringify(result);
     await db.run(INSERT, [accountId, 'exam-result', id, json, digest(json), now, now + RECORD_TTL]);
-    await markSeen(db, accountId, contentKeys, now);
+    await markSeen(db, accountId, items.map(seenKeyOf), now);
     // Progress is committed in the same transaction as the immutable result.
     const event = await serverEvents(db, accountId, now);
     for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
     await event(id, 'exam-result', id, {
-      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), title: paper.title, durationMin: paper.durationMin,
       year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
@@ -1701,6 +1728,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
+      ...(spec.mock ? { mock: true } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };

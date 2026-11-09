@@ -9,7 +9,7 @@ The server table `entitlement_snapshots` is written only by `applyVerifiedEntitl
 | Source | Verification |
 |---|---|
 | App Store | Apple-signed JWS, certificate chain, bundle/app id, product, server-issued `appAccountToken` (`server/platform/appleBilling.js`) |
-| Google Play | **Not on `main` at the time of this change.** The Google verifier is CP-08, a separate PR. Until it merges there is no Google verifier: `/v1/billing/restore/google` and `/v1/billing/webhook/google` answer 503, and Google **cannot** grant Premium. |
+| Google Play | The purchase token is re-fetched from the Play Developer API with the deployment's service account; package name, a configured product and base plan, and the server-issued `obfuscatedAccountId` must all match, and the server acknowledges the purchase itself (`server/platform/googleBilling.js`, CP-08). Real-time notifications are verified as Google-signed OIDC. Unconfigured, `/v1/billing/*/google` answer 503 and Google cannot grant Premium. |
 | Razorpay (web) | Webhook signature over the raw body; server-created checkout bound to the account (`server/platform/razorpay.js`) |
 | Support grant | Admin/support role, audited, unique event id (`server/platform/entitlements.js`) |
 
@@ -23,9 +23,9 @@ No route accepts a plan, status or capability from a client. Clients cannot push
 
 | Capability | What it unlocks | Enforced at | Class |
 |---|---|---|---|
-| `unlimited-practice` | more than 20 practice questions/day | **server** (`server/platform/practiceAllowance.js` in `POST /v1/practice/issue` and `POST /v1/practice/:id/repeat`, #537); the local backend (`client/src/local/entitlementGate.js`) keeps a courtesy pre-check | **server-issued question** |
+| `unlimited-practice` | more than 20 practice questions/day | **server** (`server/platform/practiceAllowance.js` in `POST /v1/practice/issue`, `POST /v1/practice/:id/repeat` and `POST /v1/practice/notebook/:attemptId/twin`, #537, D19); the local backend (`client/src/local/entitlementGate.js`) keeps a courtesy pre-check | **server-issued question** |
 | `premium-exams` | more than 1 exam simulation / 30 days | **server** (`server/platform/exams.js` counts the account's sealed papers in `POST /v1/exams`); local backend pre-check | **server-issued paper** |
-| `jee-advanced-content` | the JEE Advanced track | local backend, on the resolved track | offline, bundled content |
+| `jee-advanced-content` | the JEE Advanced track | **server** for what is the track's own: its papers (`exams.js`) and its own question banks (`jee-advanced-*`, `pyq-jee-advanced-*`; `practiceAllowance.js` at issue, bind, repeat and twin, D19). Local backend for the track as a whole, on the resolved track | **server-issued paper / question**, plus the device's track gate |
 | `advanced-pri-explain` | adaptive teaching plan / checkpoints | client (`PriExplainV5`) | offline, bundled logic |
 | `advanced-analytics` | progress priorities, knowledge map, teacher export | client | offline, derived from local data |
 | `additional-ai-usage` | a larger daily allowance of cloud handwriting reading and working checks | **server** (`server/platform/aiAllowance.js` in `POST /v1/handwriting/transcribe` and `POST /v1/working/check`) | **server-paid operation** |
@@ -41,12 +41,22 @@ No route accepts a plan, status or capability from a client. Clients cannot push
 
 **Evidence:** `server/test/practice-daily-cap-check.mjs` (SQLite and Postgres under RLS: 20 issued, the 21st refused with `Retry-After`; replays never counted twice; two devices racing for the last question; a capped bind leaves the prepared token for another account; repeat counted; Rush/Match/placement uncounted; Premium unlimited, a lapsed period free; the day turning over at midnight IST), `client/test/server-daily-cap-client-check.mjs` (the device meets the server's refusal through the real dispatcher, does not fall back, cannot bind a prepared question, a second device is refused at a count of zero, Premium lifts it) and `client/test/tour-free-cap.js` (the cap screen in a browser after a second device used the day's questions; a capped account cannot have a signed-out question checked).
 
-**Why the remaining three are local.** Their content and logic ship inside the app, so it works with no network: explanations, analytics over local data, the JEE Advanced track's bundled questions. A device that rewrites its own IndexedDB can unlock them **on that device only**. Nothing reaches the server, no other account is affected, and no server cost is incurred. Preventing that would need DRM over bundled content. That is a commercial trade-off, not a security boundary, and it is recorded here rather than hidden.
+**JEE Advanced (D19, "which the server enforces").** The server refuses to a free account everything that is the JEE Advanced track's own:
+- **its papers:** `POST /v1/exams` with a `jee-advanced` blueprint is `402 PREMIUM_REQUIRED` (`exams.js`);
+- **its own question banks:** a generator named `jee-advanced-<chapter>` (the question department) or `pyq-jee-advanced-<chapter>` (the source-cited archive) is `402 PREMIUM_REQUIRED` at `POST /v1/practice/issue`, at the bind of a prepared question (which keeps its token), at "the same question again" and at a notebook twin. It is decided from `entitlement_snapshots` before anything is generated, escrowed or counted, and never at submission. One definition, `PREMIUM_PRACTICE_CONTENT` in `client/src/engine/practiceAllowance.js`.
+
+What it does **not** refuse, stated so nobody relies on it: the JEE Advanced track's ordinary chapter questions at difficulty 3–4 are the same items JEE Main serves on the free plan. They are free content, and the server issues them to anyone; a modified client that asks for them gets nothing JEE Main does not already give a free account. The device's track gate (`entitlementGate.js`, on the resolved track) is what keeps a free student out of the JEE Advanced track as a whole. Today the server does not yet carry the track's own banks at all (they are loaded on demand on the device only), so a Premium request for one answers `422 PRACTICE_CONTENT_UNSUPPORTED`; the gate is in place for when they are served.
+
+**Notebook twins count.** A twin (`POST /v1/practice/notebook/:attemptId/twin`) is a question issued in the capped `review` mode, so it counts toward the free day and is refused at the cap like a History repeat. Before D19 it was issued uncounted, which made a filed wrong answer an unlimited free supply of server-marked questions. Rush, Match and the placement check remain uncounted, as the free plan's copy has always said ("everything else unlimited"); the owner should confirm that reading of D19's "20 questions a day".
+
+**Evidence:** `server/test/premium-practice-content-check.mjs` (SQLite and Postgres under RLS).
+
+**Why the remaining three are local.** Their content and logic ship inside the app, so it works with no network: explanations, analytics over local data, and the device's gate on the JEE Advanced track as a whole (its server-issued parts are above). A device that rewrites its own IndexedDB can unlock them **on that device only**. Nothing reaches the server, no other account is affected, and no server cost is incurred. Preventing that would need DRM over bundled content. That is a commercial trade-off, not a security boundary, and it is recorded here rather than hidden.
 
 **Why AI usage is on the server.** Cloud readings and working checks are paid provider calls. Each account gets an allowance per kind over a rolling 24-hour window:
 - **Unit:** one request. One ink reading sent when the writing settles, one photo reading, or one working check. A request that escalates to the fallback model is two provider calls but one unit; the deployment spend ceiling counts provider calls.
-- **Defaults:** free 120 and Premium 1200. The free figure leaves room for the 20 free practice questions a day with several readings each. These are starting values, not measured figures; size them from production telemetry.
-- **Configuration:** `PRI_AI_DAILY_FREE` / `PRI_AI_DAILY_PREMIUM`. A value that is not a positive integer, or Premium below free, stops a production boot. Premium is never applied below free.
+- **Defaults (owner default D20):** reads of the student's own writing (ink, or a photo of written working, both through `/v1/handwriting/transcribe`) **5 a day free and 25 a day Premium**; "Practise this" question photos (`/v1/question-photo`) **5 and 25**, as their own kind; working checks, which are not reads and are not named by D20, keep **120 and 1200**. A read happens only when the student asks for it (Read, or Submit binding a read they were shown; a kept or in-flight read reused by Submit costs nothing). These are modelled defaults, not measured figures, to be revisited after real cost data. The deployment-wide paid-call ceiling is unchanged (D21: 120 an hour, 300 a day, `spendCeiling.js`).
+- **Configuration:** per kind, `PRI_AI_DAILY_FREE_HANDWRITING` / `PRI_AI_DAILY_PREMIUM_HANDWRITING`, `PRI_AI_DAILY_FREE_PHOTO` / `PRI_AI_DAILY_PREMIUM_PHOTO`, `PRI_AI_DAILY_FREE_WORKING` / `PRI_AI_DAILY_PREMIUM_WORKING`. The older `PRI_AI_DAILY_FREE` / `PRI_AI_DAILY_PREMIUM` still apply to every kind a per-kind variable does not name, so **a deployment that set them does not get D20 until they are unset**. A value that is not a positive integer, or Premium below free for any kind, stops a production boot. Premium is never applied below free.
 
 The allowance is decided **only** from `entitlement_snapshots`, through `serverEntitlementCapabilities`: a paid plan, a paying status (active/trialing, or grace until it ends) and an unexpired period. It ignores the client's offline window, because the server is the authority.
 
@@ -55,8 +65,7 @@ It is counted after the request has been validated and before anything reaches t
 **Refunds:** a unit is given back when the request delivered nothing and cost nothing, i.e. the deployment ceiling refused it or the provider is not configured. Provider errors and timeouts are not refunded, because the provider may have been charged.
 
 **When the allowance is used up**, the response is `429 AI_ALLOWANCE_EXHAUSTED` with `resetAt`. The client (`client/src/ink/cloudReader.js`) then stops sending requests until `resetAt` (or 30 minutes, if the reset time is implausible). An entitlement change, such as an upgrade, clears that at once. The student sees honest copy:
-- **Handwriting:** the on-device reading stays on screen and keeps working.
-- **Photos:** on the web there is no on-device photo reader, so the student is told the allowance is used and asked to type the working. In the Apple shell, Vision still reads the photo on device.
+- **Handwriting and photos:** the shipped path has no on-device reader (D16), so the student is told today's reads are used, when they come back, and that a typed answer is still checked. The server's refusal says the same, names the kind (`kind`) and, on the free plan, Premium's figure.
 
 Cloud sync and classes are account features, not Premium. They need a signed-in, verified account (and guardian consent for children), never a Premium claim.
 
@@ -68,7 +77,8 @@ Cloud sync and classes are account features, not Premium. They need a signed-in,
 
 ## 4. Adversarial evidence
 
-`server/test/premium-authority-check.mjs`, run in CI (44 unconditional checks; the suite fails if the count changes):
+`server/test/premium-authority-check.mjs`, run in CI (52 unconditional checks; the suite fails if the count changes):
+- **D20 at its defaults, over HTTP:** a free account gets exactly 5 reads of its writing and, separately, exactly 5 question photos; Premium exactly 25 of each; the refusal promises no on-device reader. The configuration rules per kind, the older global override and Premium-below-free are checked without a server.
 - **Claimed Premium:** premium claims in the body are refused before anything is counted. A free account gets **exactly** the free allowance, with exactly that many provider calls. With the allowance used up, every header or cookie claim (`x-pri-entitlement`, `x-pri-plan`, `x-pri-capabilities`, an extra entitlement cookie, a native client id) is still refused as free with the free limit, and nothing reaches the provider.
 - **Premium:** active Premium, a trial, grace before it ends, and a support grant all get exactly the Premium allowance. An upgrade in the middle of a window takes effect at once.
 - **Expired or revoked records:** an expired period, an expired grace, a revoked purchase, or a "premium" label with a non-paying status all get exactly the free allowance.
@@ -82,4 +92,4 @@ Related: `client/test/entitlement-enforcement-check.mjs` (free tier and the capa
 
 ## 5. Provider semantics preserved
 
-Apple and Razorpay grant, renew, cancel and refund exactly as before. This change only **reads** the snapshot they write. Google Play is not on `main` yet (see §1).
+Apple, Google Play and Razorpay grant, renew, cancel and refund exactly as before. This change only **reads** the snapshot they write.

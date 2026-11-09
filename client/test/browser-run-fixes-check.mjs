@@ -72,6 +72,27 @@ ok(/\{featureEnabled\('australia'\) && \(\s*<div className="field" style=\{\{ ma
 ok(/id="cloud-name"[\s\S]{0,400}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === \(user\?\.name \|\| ''\)\) e\.target\.select\(\); \}\}/.test(cloudPanel),
   'focusing the prefilled account name selects it');
 
+// ── 8 · WebKit Playwright stubs see requests ahead of the service worker ─────
+// These two tours intercept *synthetic* /v1/ responses. With an installed
+// service worker, WebKit can satisfy a request before context.route sees it,
+// making a test claim no request happened while a real reading may finish.
+// inspectNetwork is only used in the e2e context; it never changes app code.
+const e2eHarness = read('client/test/e2e.mjs');
+ok(/flow\.inspectNetwork\s*\?\s*\{\s*serviceWorkers:\s*['"]block['"]\s*\}/.test(e2eHarness),
+  'inspectNetwork excludes service workers from stub-network Playwright contexts');
+function hasVisibleStubRequests(src, id) {
+  const pos = src.indexOf("id: '" + id + "'");
+  return pos >= 0 && /inspectNetwork:\s*true\s*,/.test(src.slice(pos, pos + 250)) &&
+    /ctx\.route\(/.test(src);
+}
+for (const [file, id] of [['client/test/tour-stale-cloud.js', 'stale-cloud'], ['client/test/tour-photo-practise.js', 'photo-practise']]) {
+  const source = read(file);
+  ok(hasVisibleStubRequests(source, id), `${id} opts into network-visible intercepts`);
+  // Negative control: removing the opt-in has to make the guard fail.
+  const disabled = source.replace(/inspectNetwork:\s*true\s*,/, '');
+  ok(!hasVisibleStubRequests(disabled, id), `${id} loses eligibility when the opt-in is removed`);
+}
+
 if (failures.length) {
   for (const f of failures) console.log('  ✖ ' + f);
   console.log(`BROWSER RUN FIXES: FAIL — ${pass}/${pass + failures.length} checks`);

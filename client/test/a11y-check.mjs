@@ -66,6 +66,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
+import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -135,7 +136,8 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
+    // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too.)
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -551,6 +553,9 @@ async function run() {
 
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    // D17: the walk's reads accept the one-time prompt naming OpenAI when it
+    // appears (the prompt's own flow is tour-ink-reader-permission.js).
+    await ctx.addInitScript(acceptReaderPermissionOnSight);
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));
@@ -1124,6 +1129,23 @@ async function run() {
       await wait(page, 800);
     });
 
+    // The Premium screen (D22): the plans, the store's own prices, Restore,
+    // the renewal disclosure and the legal links, with a working close button.
+    await step('premium · plans, renewal terms and close', '/premium', async () => {
+      await goTo(page, BASE, '/premium');
+      await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The parent weekly report (#743, D22): built only with PRI_FEATURE_PARENT_REPORT=1,
+    // which this walk sets, so its route is rendered and audited like the others.
+    await step('parent report · the week, or why there is none', '/parent-report', async () => {
+      await goTo(page, BASE, '/parent-report');
+      await page.waitForSelector('.parent-page h1', { timeout: 20000 });
+      await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
@@ -1209,7 +1231,8 @@ async function run() {
     // ── the documents a store, a payment provider and the DPDP Act require ──
     // A parent reading a privacy notice on a phone with a screen reader is
     // exactly the reader these pages have to work for.
-    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance']) {
+    // /third-party-notices fetches its licence texts by import() on first open.
+    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance', '/third-party-notices']) {
       await step(`legal · ${path.slice(1)}`, path, async () => {
         await goTo(page, BASE, path);
         await wait(page, 500);

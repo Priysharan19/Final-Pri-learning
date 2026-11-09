@@ -39,6 +39,7 @@ import { createWorkingRouter } from '../platform/working.js';
 import { transcribeHandwriting } from '../platform/handwritingProvider.js';
 import { checkWorkingWithModel } from '../platform/workingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLATFORM = join(HERE, '../platform');
@@ -83,7 +84,7 @@ ok(HIDDEN_CANARIES.length === 11 && new Set(HIDDEN_CANARIES).size === 11, 'eleve
 ok(JSON.stringify(QUESTION).split('CANARY_').length - 1 === HIDDEN_CANARIES.length + 1, 'every canary in the fixture is in the search list (plus the prompt)');
 
 // Student ink and working, as a client would send them: nothing from the fixture.
-const PNG = 'data:image/png;base64,' + Buffer.from('ink-bytes-'.repeat(60)).toString('base64');
+const PNG = pngDataUrl('ink-bytes-'.repeat(60));
 const WORKING_LINES = ['2x + 3 = 11', '2x = 8', 'x = 4'];
 
 const env = {
@@ -106,7 +107,7 @@ function recorder(via) {
       : parsed?.text?.format?.name ? 'working' : 'unknown';
     wire.push({ via, kind, url: String(url), headers: { ...(init?.headers || {}) }, body });
     const reply = kind === 'transcription'
-      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97 }], confidence: 0.97, needs_confirmation: false }
+      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }
       : {
           lines: WORKING_LINES.map((_, index) => ({ index, status: 'ok', carried: false, why: '' })),
           first_break: -1, hint: '', confidence: 0.9, misconception_id: null, needs_confirmation: false
@@ -235,6 +236,20 @@ ok(!/label|explanation|detector|prompt/i.test(idsSource.replace(/\/\/[^\n]*/g, '
 const badAdapter = "import { questionById } from './content.js';\nimport { sha256 } from './security.js';\nconst x = await import('./store.js');";
 eq(importsOf(badAdapter), ['./content.js', './security.js'], 'the import parser reads static imports');
 ok(QUESTION_MODULE.test('./content.js') && /\bimport\s*\(/.test(badAdapter), 'and the scanner would refuse a content import and a dynamic import');
+
+// ── 5 · The relation-sign guidance is stroke-only ─────────────────────────────
+// The reader's guidance on >=, <= and != (and the therefore mark) may describe
+// strokes only: it must never mention an expected answer or a solution.
+{
+  const { SYSTEM_INSTRUCTIONS } = await import('../platform/handwritingProvider.js');
+  const relation = SYSTEM_INSTRUCTIONS.split('\n').filter(l => /!=|>=|∴/.test(l));
+  ok(relation.length >= 2, 'the reader carries relation-sign and therefore guidance');
+  for (const line of relation) {
+    ok(!/expected|answer|solution|mark scheme|correct/i.test(line), `relation guidance is answer-blind: ${line.slice(0, 60)}`);
+  }
+  ok(/You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'the reader is still told it does not know the question');
+  for (const canary of [...HIDDEN_CANARIES, PROMPT_CANARY]) ok(!SYSTEM_INSTRUCTIONS.includes(canary), 'no canary in the instructions');
+}
 
 // ── report ───────────────────────────────────────────────────────────────────
 if (failures.length) {

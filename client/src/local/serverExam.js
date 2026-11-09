@@ -38,6 +38,14 @@ import { cloud } from '../platform/cloudTransport.js';
 import { profileCloudAccountId } from './entitlementGate.js';
 import { checkUnavailable, withExamLock } from './backend.js';
 import { examMarkingInputs, ensureExamClock } from './examSession.js';
+import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
+
+/**
+ * D17: a frozen exam page is a picture of the student's writing, read by
+ * OpenAI through the server. It is sent only when the paper's profile has
+ * accepted the one-time prompt; otherwise it stays on the device, pending.
+ */
+export const examReadPermitted = exam => readerPermission({ id: exam?.pid }) === READER_PERMISSION.ACCEPTED;
 
 /** How long after a local autosave its checkpoint is sent. */
 export const CHECKPOINT_DEBOUNCE_MS = 1500;
@@ -447,8 +455,10 @@ function frozenImages(exam, pages) {
  * Present every frozen page that is waiting and may be asked for now. Returns
  * the latest result the server gave; the one passed in when nothing changed.
  */
-export async function resolveFrozenHandwriting(examId, result, images, { now = Date.now(), limit = INLINE_PAGE_READS, transport = cloud, refused = null, refusedNow = null } = {}) {
+export async function resolveFrozenHandwriting(examId, result, images, { now = Date.now(), limit = INLINE_PAGE_READS, transport = cloud, refused = null, refusedNow = null, permitted = false } = {}) {
   let latest = result;
+  // D17: nothing leaves the device unless the student accepted (fails closed).
+  if (permitted !== true) return latest;
   let asked = 0;
   for (const key of Object.keys(result?.handwriting?.pages || {})) {
     const page = latest.handwriting?.pages?.[key];
@@ -481,7 +491,7 @@ async function settleFrozenPages(exam, result, pages) {
   if (!result?.handwriting?.pages) return result;
   const images = frozenImages(exam, pages);
   const refusedNow = new Set();
-  const settled = await resolveFrozenHandwriting(exam.server.examId, result, images, { refusedNow });
+  const settled = await resolveFrozenHandwriting(exam.server.examId, result, images, { refusedNow, permitted: examReadPermitted(exam) });
   keepFrozenPages(exam, settled, images);
   noteRefused(exam, refusedNow);
   return settled;
@@ -591,8 +601,9 @@ const lastRecovery = new Map();   // local exam id → monotonic ms
  * date. Returns true when the paper changed and must be written back. The
  * caller holds the paper's lock.
  */
-export async function recoverHandwriting(exam, { force = false, transport = cloud } = {}) {
+export async function recoverHandwriting(exam, { force = false, transport = cloud, permitted = examReadPermitted(exam) } = {}) {
   const images = exam?.server?.handwriting?.pages;
+  if (permitted !== true) return false;
   if (!isServerPaper(exam) || !exam.finishedAt || !images || !Object.keys(images).length) return false;
   const key = String(exam.id);
   if (!force && lastRecovery.has(key) && monotonic() - lastRecovery.get(key) < HANDWRITING_RECOVERY_EVERY_MS) return false;
@@ -601,7 +612,7 @@ export async function recoverHandwriting(exam, { force = false, transport = clou
   try { remote = await transport.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return false; }
   if (remote?.state !== 'finished' || remote.result?.authoritative !== true || !Array.isArray(remote.result.detail)) return false;
   const refusedNow = new Set();
-  const settled = await resolveFrozenHandwriting(exam.server.examId, remote.result, images, { transport, refused: exam.server.handwriting.refused, refusedNow });
+  const settled = await resolveFrozenHandwriting(exam.server.examId, remote.result, images, { transport, refused: exam.server.handwriting.refused, refusedNow, permitted });
   const before = JSON.stringify([exam.score, exam.detail, exam.server.handwriting]);
   keepFrozenPages(exam, settled, images);
   noteRefused(exam, refusedNow);
@@ -616,11 +627,15 @@ export async function recoverHandwriting(exam, { force = false, transport = clou
  * EXAM_PAGE_NOT_ON_DEVICE when this device no longer holds the picture. The
  * caller holds the paper's lock and writes `exam` back.
  */
-export async function retryHandwriting(exam, key, { transport = cloud } = {}) {
+export async function retryHandwriting(exam, key, { transport = cloud, permitted = examReadPermitted(exam) } = {}) {
   const images = exam?.server?.handwriting?.pages || {};
   const image = images[String(key)];
   if (!isServerPaper(exam) || !exam.finishedAt || typeof image !== 'string') {
     throw Object.assign(new Error('The saved page for this answer is not on this device, so it cannot be checked from here.'), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
+  }
+  // D17: a page that is here is sent only once the profile has allowed the reader.
+  if (permitted !== true) {
+    throw Object.assign(new Error('Your handwriting is kept on this device. It is sent to be read only after you allow it (Settings → Handwriting).'), { status: 409, code: 'READER_PERMISSION_REQUIRED' });
   }
   let reply;
   try { reply = await transport.resolveExamHandwriting(exam.server.examId, { key: String(key), image, retry: true }); }

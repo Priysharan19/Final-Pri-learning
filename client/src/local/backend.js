@@ -4062,7 +4062,16 @@ const routes = {
         dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
       }))
     }));
-    return { entries, available: true };
+    // The mistake notebook (engine/mistakeNotebook.js on the server): every
+    // wrong resolution with its first broken line, fixed and due states. This
+    // device only names chapters and dot points; it decides nothing.
+    const book = out?.notebook && typeof out.notebook === 'object' ? out.notebook : null;
+    const notebook = book ? { ...book, groups: (Array.isArray(book.groups) ? book.groups : []).map(g => ({
+      ...g, chapterName: namedDotpoint(p, g.subtopic, null).chapterName,
+      misconception: g.misconception ? { ...g.misconception, nameKey: misconceptionById(g.misconception.id)?.name || null } : null,
+      items: (Array.isArray(g.items) ? g.items : []).map(item => ({ ...item, dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text }))
+    })) } : null;
+    return { entries, notebook, available: true };
   },
 
   // A twin is drawn and issued by the server; this device keeps the row it
@@ -4071,7 +4080,9 @@ const routes = {
     const p = await requireProfile();
     const linked = await profileCloudAccountId(p.id).catch(() => null);
     if (!linked) throw checkUnavailable('sign-in');
-    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    // A twin counts toward the free day and JEE Advanced stays Premium (D19):
+    // the server's refusal is explained by the one paywall, like a repeat's.
+    const out = await viaServer(() => cloud.notebookTwin(params.id)).catch(cause => { throw serverGateRefusal(cause) || cause; });
     const q = out?.question;
     if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
     const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;
@@ -4743,6 +4754,44 @@ const routes = {
         ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
       };
     });
+    // Answers this ACCOUNT gave on another device (§22.2: History on a second
+    // device). Sync restores each of them as an attempt row only
+    // (platform/cloudSyncRestore.js): the question itself and the typed answer
+    // never travel through the replica, so this device has no question row
+    // for them and the list above, built from question rows, left them out —
+    // History read "Nothing here yet" on a second device that had restored
+    // every marked attempt. They are listed from the restored attempt itself:
+    // the chapter, difficulty, the verdict, the server-certified marks when
+    // the server sent them, and when — newest restored attempt per question,
+    // only for a question this device has no row of its own for. Nothing is
+    // invented: no prompt (it never arrived), no answer, no retry (there is no
+    // question to retry), no detail to open.
+    const local = new Set(allRows.map(r => r.id));
+    const restoredByQ = {};
+    for (const a of attempts) {
+      if (!a.remoteEventId || !a.questionId || local.has(a.questionId)) continue;
+      restoredByQ[a.questionId] = a;   // latest wins (answer order)
+    }
+    for (const a of Object.values(restoredByQ)) {
+      const inChapter = indiaChapter(a.subtopic);
+      const certified = Number.isInteger(a.marksEarned) && Number.isInteger(a.marksPossible);
+      list.push({
+        id: a.questionId, subtopic: inChapter ? inChapter.id : a.subtopic,
+        subtopicName: inChapter?.name || SUBTOPIC_BY_ID[a.subtopic]?.name || a.subtopic,
+        year: inChapter ? indiaChapterGrade(inChapter) : undefined,
+        multipart: false, prompt: '',
+        difficulty: a.difficulty, mode: a.mode,
+        correct: !!a.correct, answerGiven: '',
+        viaInk: !!a.viaInk, hasInk: false, hasPhoto: false, hasScribble: false,
+        bookmarked: marked.has(a.questionId),
+        needsLook: false,
+        canRetry: false,
+        fromAnotherDevice: true,
+        answeredAt: a.createdAt,
+        ...(certified ? { marksEarned: a.marksEarned, marksPossible: a.marksPossible, markRows: [] } : {}),
+        ...(a.repeat ? { repeat: true } : {})
+      });
+    }
     // Counts per filter, inside the chapter asked for (before paging).
     if (subtopic) list = list.filter(x => x.subtopic === subtopic);
     const counts = Object.fromEntries(Object.entries(HISTORY_FILTERS).map(([k, f]) => [k, list.filter(f).length]));

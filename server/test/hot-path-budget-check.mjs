@@ -39,6 +39,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'pri-hot-path-'));
 // --report: print the counts without pinning them (used to measure a build
@@ -50,7 +51,7 @@ const LEGACY_ONLY = process.argv.includes('--legacy');
 // ── The synthetic reader ─────────────────────────────────────────────────────
 // A picture is a tagged byte string; the reader answers with the text it holds.
 const picture = (text, salt = '') =>
-  'data:image/png;base64,' + Buffer.from(`SYNTHETIC|${JSON.stringify(text)}|${salt}|` + 'a'.repeat(300)).toString('base64');
+  pngDataUrl(`SYNTHETIC|${JSON.stringify(text)}|${salt}|` + 'a'.repeat(300));
 const provider = { calls: 0, sent: [] };
 const fake = createServer((req, res) => {
   let raw = '';
@@ -61,7 +62,7 @@ const fake = createServer((req, res) => {
     const sent = JSON.parse(raw);
     const image = sent.input[1].content.find(part => part.type === 'input_image').image_url;
     const [, text] = Buffer.from(image.split(',')[1], 'base64').toString('utf8').split('|');
-    const lines = String(JSON.parse(text)).split('\n').map(line => ({ text: line, latex: '', confidence: 0.97 }));
+    const lines = String(JSON.parse(text)).split('\n').map(line => ({ text: line, latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }));
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end(JSON.stringify({
       model: sent.model,
@@ -83,6 +84,12 @@ Object.assign(process.env, {
   PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000'
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_SERVER_TIMING']) delete process.env[name];
+// This suite is about dedupe and round trips, not the per-account allowance
+// (D20 defaults: 5 reads a day free), which premium-authority-check.mjs proves
+// at its defaults. Raised by configuration, as marking suites raise the cap.
+const RAISED_AI_ALLOWANCE = '100000';
+process.env.PRI_AI_DAILY_FREE = RAISED_AI_ALLOWANCE;
+process.env.PRI_AI_DAILY_PREMIUM = RAISED_AI_ALLOWANCE;
 
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');

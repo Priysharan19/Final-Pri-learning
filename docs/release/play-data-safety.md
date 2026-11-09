@@ -1,11 +1,12 @@
 # Google Play Data safety form — answers derived from the code
 
-**Status:** engineering draft, reconciled with the code at `795c00568` (2026-10-19; first reconciled at `7bef402f7`, 2026-10-18).
+**Status:** engineering draft, reconciled with the code at `1d3829103` (2026-11-08, §6c; earlier at `a5778a319`, 2026-11-02, `795c00568`, 2026-10-19, and `7bef402f7`, 2026-10-18).
 **Not submitted, not legally reviewed.** Every row cites the code path that justifies it; a row
 marked **OWNER** is a decision the repository cannot make. Companions:
 `docs/release/app-store-privacy-labels.md` (the Apple equivalent), `docs/legal/privacy.md` (what
-the reader is told — currently outdated, see `docs/legal/counsel/COUNSEL-INFORMATION-PACK.md` §8),
-`docs/privacy/data-retention.md` (what the server keeps and for how long).
+the reader is told; corrected against the code on 2 Nov 2026 and unreviewed by counsel until
+`docs/legal/review-status.json` says otherwise), `docs/privacy/data-retention.md` (what the server
+keeps and for how long).
 
 If the code changes what leaves the device, change this file, the Apple label document,
 `PrivacyInfo.xcprivacy` and the privacy notice together. **This file is machine-checked** by
@@ -13,6 +14,8 @@ If the code changes what leaves the device, change this file, the Apple label do
 posture, the SDK dependency lists, the telemetry event allowlist, the answer-blind request fields
 or the deletion route drift from what is declared here. The check cannot see server environment
 variables (for example whether `PRI_SENTRY_DSN` is set) or contracts; those stay **OWNER** rows.
+`node tools/store-readiness-check.mjs` also holds the Crash logs and Phone number rows, Step 3 and
+Step 4 to the code, the Apple label and both privacy manifests.
 
 Android phones and tablets are in V1 since the owner's scope change of 2026-10-16
 (`docs/release/PRI_V1_RELEASE_SCOPE.md` §22, #504). The data flows are the same server flows the
@@ -24,8 +27,8 @@ iPhone and iPad apps use.
 |---|---|---|
 | Does your app collect or share any of the required user data types? | **Yes** | Grading is online-only: every checked answer is issued and graded by the server for a signed-in account (`server/platform/practice.js`, `exams.js`). Sign-in, sync, reading and telemetry also send data. Signed out, nothing carrying user data is sent (`client/src/platform/cloudTransport.js`) and nothing is marked. |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | HTTPS/HSTS in production (`server/platform/headers.js`, `server/test/security-headers-check.mjs`); the Android manifest refuses cleartext (`android/app/src/main/AndroidManifest.xml`, `usesCleartextTraffic="false"`). |
-| Do you provide a way for users to request that their data is deleted? | **Yes** | In-app: Settings → Account → Delete (`DELETE /v1/account`, every sign-in method). Public URL: **`<PRI_PUBLIC_ORIGIN>/account/delete-request`** (`AccountDeleteRequest.jsx`, `otp.js`). Immediate (`deleteAccountRows()`). |
-| Account deletion URL | **OWNER:** the production origin (expected `https://prilearning.com`). The path is fixed: `/account/delete-request`. | `client/src/main.jsx`; `server/app.js` serves the SPA for non-`/v1` paths. |
+| Do you provide a way for users to request that their data is deleted? | **Yes** | In-app: Settings → Account → Delete (`DELETE /v1/account`, every sign-in method). Public form: **`https://app.prilearning.com/account/delete-request`** (`AccountDeleteRequest.jsx`, `otp.js`). Immediate (`deleteAccountRows()`). |
+| Account deletion URL | **`https://prilearning.com/delete-account`** (D5; **OWNER** confirms D5 before the first signed build). The site page names Pri Learning and its developer, gives the in-app steps, links to the form at `https://app.prilearning.com/account/delete-request`, and shows what is removed and kept, rendered word for word from `docs/legal/privacy.md`. The site is **not deployed** and DNS is untouched: the URL must resolve before it is entered. | `site/` (generator and check, `tools/site-check.mjs`); `client/src/main.jsx`; `server/app.js` serves the SPA for non-`/v1` paths on the app host. |
 | Target audience and Families policy | **OWNER / counsel — see `docs/release/store/play-listing.md` §5.** Class 7 students are about 12, so a truthful target audience includes the 9–12 band; on our reading (for counsel to confirm) that brings the app under the Families policy. | Child accounts are gated server-side until a guardian confirms (`requireGuardianConsent` in `router.js`); the confirmation is not DPDP-verifiable (`guardianConsent.js` header). |
 
 ## 2. Data types collected
@@ -42,13 +45,13 @@ Every type below is **linked to the account**, **not used for tracking or advert
 | Play data type | Collected? | Shared? | Required / optional | Purpose | Why (code) |
 |---|---|---|---|---|---|
 | **Personal info → Name** | Yes | No | Required for an account | Account management, App functionality | `accounts.name`; guardian name (`guardian_consents`). |
-| **Personal info → Email address** | Yes (unless the account signed up by phone) | Yes — email delivery provider (Resend) | Required (email or phone) | Account management; Fraud prevention, security, and compliance | `accounts.js`; `authDelivery.js`; `otpEmail.js`. A guardian's email for a child's account. A new-device sign-in notice goes to the account's own address through the same Resend account (`sessionAlerts.js`, `securityEmail.js`); the notice carries no address, token, link or code. |
-| **Personal info → Phone number** | Yes, if the student or guardian uses an SMS code | Yes — SMS provider (MSG91 or Twilio Verify; **OWNER** names it) | Optional (alternative to email) | Account management | `otp.js` (`account_phones.phone_e164`), `smsProvider.js`; only when `PRI_SMS_PROVIDER` is configured. |
+| **Personal info → Email address** | Yes, from every account (SMS is off at launch, D3, so no account signs up by phone) | Yes — email delivery provider (Resend) | Required | Account management; Fraud prevention, security, and compliance | `accounts.js`; `authDelivery.js`; `otpEmail.js`. A guardian's email for a child's account. A new-device sign-in notice goes to the account's own address through the same Resend account (`sessionAlerts.js`, `securityEmail.js`); the notice carries no address, token, link or code. |
+| **Personal info → Phone number** | **No at launch.** SMS sign-in and guardian phone codes are off (owner decision D3); the client shows the SMS option only when `GET /v1/account/otp/channels` reports `sms: true`, which needs `PRI_SMS_PROVIDER`, and both environments report `false` | — | — | — | `otp.js` (`account_phones.phone_e164`), `smsProvider.js`, `SignUpFlow.jsx` (`channels.sms`). The notice describes no mobile-number route. **If SMS is ever turned on:** tick Phone number here (shared with the SMS provider), add `PhoneNumber` to the Apple manifest and label, and describe it in `docs/legal/privacy.md`, before `PRI_SMS_PROVIDER` is set. |
 | **Personal info → User IDs** | Yes | No | Required | Account management, App functionality | Opaque `acct_…` id (`security.js`). |
-| **Personal info → Other info** | Yes, from every account (the "18 or older" declaration, class and track); plus, for an under-18 account, the guardian-consent record | Guardian email/phone with the delivery provider (child accounts only) | Age declaration, class and track: required for every account. Consent record: required for a child's account | App functionality (age gate, which maths to set, guardian confirmation) | `accounts.age_basis` (a registration with no age decision is refused, `AGE_DECLARATION_REQUIRED`); class/track in the synced profile (`syncWorker.js safeProfile`); the consent record (`guardianConsent.js`). Matches the Apple "Other Data" row. |
+| **Personal info → Other info** | Yes, from every account (the "18 or older" declaration, class and track); plus, for an under-18 account, the guardian-consent record | Guardian email with the delivery provider (child accounts only) | Age declaration, class and track: required for every account. Consent record: required for a child's account | App functionality (age gate, which maths to set, guardian confirmation) | `accounts.age_basis` (a registration with no age decision is refused, `AGE_DECLARATION_REQUIRED`); class/track in the synced profile (`syncWorker.js safeProfile`); the consent record (`guardianConsent.js`). Matches the Apple "Other Data" row. |
 | **Financial info → Purchase history** | Yes, if the student subscribes | No | Optional | App functionality | `appleBilling.js`, `googleBilling.js`, `billing.js`; `billing_payments` retained unlinked after deletion. Card details never reach Pri. |
-| **Photos and videos → Photos** | Yes, when the student photographs paper working or a textbook question | **Yes — OpenAI**, `store: false`; the provider may retain for abuse monitoring under its own terms; Pri keeps no copy of the image | Optional (the student can type instead; Settings → Handwriting switches reading off) | App functionality | `PractisePhoto.jsx` (`capture="environment"`); `practice.js` `/:id/recognize`; `questionPhoto.js` → `questionPhotoProvider.js`. The whole frame is sent, answer-blind. |
-| **App activity → Other user-generated content** | Yes | **Yes — OpenAI** (handwriting image; working lines + question text only if the opt-in working check is on) | Handwriting reading: optional (on by default, switchable off; then answers are typed). Typed answers for grading: required to be marked | App functionality | (a) Ink image: `cloudRaster.js` → `/v1/handwriting/transcribe` or `/v1/practice/:id/recognize` (answer-blind, `FORBIDDEN_FIELDS`). (b) Answers and working submitted for grading (`practice.js`, `exams.js exam-answers`). (c) The returned transcription and any student correction, kept 90 days with the recognition receipt (`practice.js` `practice-recognition`). (d) Problem reports (`reports.js`); synced settings/bookmarks/tasks/custom questions (`syncContract.js`). |
+| **Photos and videos → Photos** | Yes, when the student photographs paper working or a textbook question | **Yes — OpenAI**, `store: false`; the provider may retain for abuse monitoring under its own terms; Pri keeps no copy of the image | Optional: the D17 prompt naming OpenAI asks once before the first photo, and nothing is sent until the student agrees; declining, or Settings → Handwriting, keeps the student on typed answers (`readerPermission.js`, #737) | App functionality | `PractisePhoto.jsx` (`capture="environment"`); `practice.js` `/:id/recognize`; `questionPhoto.js` → `questionPhotoProvider.js`. The whole frame is sent, answer-blind. |
+| **App activity → Other user-generated content** | Yes | **Yes — OpenAI** (handwriting image; working lines + question text only if the opt-in working check is on) | Handwriting reading: optional (the D17 prompt asks once before the first read and nothing is sent until the student agrees; the setting is on by default for a signed-in account and switchable off; then answers are typed). Typed answers for grading: required to be marked | App functionality | (a) Ink image: `cloudRaster.js` → `/v1/handwriting/transcribe` or `/v1/practice/:id/recognize` (answer-blind, `FORBIDDEN_FIELDS`). (b) Answers and working submitted for grading (`practice.js`, `exams.js exam-answers`). (c) The returned transcription and any student correction, kept 90 days with the recognition receipt (`practice.js` `practice-recognition`). (d) Problem reports (`reports.js`); synced settings/bookmarks/tasks/custom questions (`syncContract.js`). |
 | **App activity → Other actions** | Yes | No | Required to be marked | App functionality | Graded-attempt records (`learning_events` kind `graded-attempt`) kept until deletion; exam papers and results (`exams.js`, 5-year record TTL, deleted with the account). |
 | **App activity → App interactions** | Yes (blocked for a child until a guardian confirms) | No | Required for a signed-in adult | Analytics, App functionality | `telemetry.js`: `feature-used`, `exam-completed`, `trial-started`, `subscription-state`; allow-listed metadata; 90 days. |
 | **App info and performance → Crash logs** | Yes (blocked for a child until a guardian confirms) | **OWNER:** No while `PRI_SENTRY_DSN` is unset (the current state, `docs/operations/alerts.md`); if the owner sets it, the coded report is forwarded to that Sentry project — declare Sentry then (or treat it as a service provider, §5 item 3) | Optional — Settings → Crash reports, on by default for a signed-in account, off with one tap, per device | Analytics (app stability) | Coded crash reports, `POST /v1/telemetry/error` (`telemetry.js` `cleanErrorReport`; client `reportCrash`, `errorReportsEnabled`): platform, surface slug, upper-case error code, scope, a hex fingerprint and the client build SHA — never the message, stack, URL or anything typed; stored as a `client-error` row for 90 days. No crash SDK in the app; the optional forward is server-side (`errorSink.js`). |
@@ -89,7 +92,7 @@ to the privacy notice before release.
 |---|---|---|
 | Is this data processed ephemerally? | The **handwriting image and photo** are ephemeral on Pri's server (memory for the request only; `handwritingProvider.js`, `data-retention.md` §4). The **transcription** of them is not (90 days). Everything else is stored against the account until deletion or its stated TTL. | — |
 | Is this data required or optional? | See the column in §2. Answers cannot be marked without an account, so account data is required for the core feature. | `router.js` (`/practice`, `/exams` need a session and, for a child, guardian consent). |
-| Can users request deletion? | **Yes** — immediate; `data-retention.md` §2 lists the retained, unlinked categories (payment ledger, de-texted problem reports, an `account.delete` audit row). | `deleteAccountRows()`; `server/test/account-lifecycle-journey-check.mjs`. |
+| Can users request deletion? | **Yes** — immediate; `data-retention.md` §2 lists the retained, unlinked categories (payment ledger, de-texted problem reports, an `account.delete` audit row). The privacy notice also promises that an under-18 account no guardian confirmed, or whose guardian withdrew, is erased after 30 days, and that a guardian can ask for erasure without the child's login (D18): **not yet in the code** at `1d3829103`; `scripts/release-nominate.mjs` refuses a production nomination until it is (`tools/legal-promises.mjs`). | `deleteAccountRows()`; `server/test/account-lifecycle-journey-check.mjs`. |
 | Independent security review? | **No** (not claimed). | `docs/security/accepted-risks.md` R-12 (external penetration test not yet scheduled). |
 
 ## 4. Third parties the server sends data to
@@ -98,7 +101,7 @@ to the privacy notice before release.
 |---|---|---|---|---|
 | OpenAI (default endpoint `api.openai.com`; configurable) | Handwriting image; photo; working lines + question text (opt-in); tutor (if enabled) | Outside India; **OWNER / counsel** confirm the contracting entity, region and retention terms | `handwritingProvider.js`, `questionPhotoProvider.js`, `workingProvider.js`, `tutorProvider.js` | `PRI_HANDWRITING_ENDPOINT` and related server variables |
 | Resend | Address + message for links and codes | US provider (sending domain `mail.prilearning.com`) | `authDelivery.js`, `otpEmail.js` | `PRI_AUTH_EMAIL_PROVIDER` |
-| MSG91 or Twilio Verify | Phone number + code | Provider-dependent | `smsProvider.js` | `PRI_SMS_PROVIDER` — **OWNER** |
+| MSG91 or Twilio Verify (**off at launch**, D3) | Phone number + code, only if SMS is ever turned on | Provider-dependent | `smsProvider.js` | `PRI_SMS_PROVIDER` — unset; see the Phone number row before setting it |
 | Google Play Billing / App Store | Subscription state; an opaque account token | Provider | `googleBilling.js`, `appleBilling.js` | billing env |
 | Razorpay (**code present, outside V1** — web purchasing is out of scope, §12) | If web checkout were enabled: the account's email (`notify_info.notify_email`) and the opaque account id in subscription notes | Provider (India) | `server/platform/razorpay.js` (~line 380) | Razorpay env; not configured for V1. Native clients are refused web checkout (`BILLING_WEB_CHECKOUT_NATIVE_REFUSED`) |
 | Supabase (processor) | The platform database after cutover | Mumbai (`ap-south-1`) | `docs/architecture/adr-0001-online-first-runtime.md` | `PRI_DATABASE_URL` |
@@ -111,17 +114,20 @@ the providers' own identity endpoints only when the student taps them.
 
 ## 5. Owner decisions before submission
 
-1. The production origin for the deletion URL.
+1. The production origin for the deletion URL: D5 sets `https://prilearning.com/delete-account`;
+   confirm it, deploy the site and point DNS.
 2. Target audience / Families policy (`docs/release/store/play-listing.md` §5).
 3. Whether service-provider transfers are declared as "shared" (this draft: yes).
-4. Which SMS provider is live.
+4. SMS stays off at launch (D3); confirm `PRI_SMS_PROVIDER` is unset on production at submission.
 4a. Whether problem-report free text (`issue_reports.note`, `reports.js`) is declared as user-generated content (this draft) or under a support/communications category. **OWNER / counsel.**
 5. Whether the AI tutor flag is on.
 6. Whether a zero-data-retention arrangement exists with OpenAI.
-7. Rewrite and counsel review of `docs/legal/privacy.md`.
+7. Counsel review of `docs/legal/privacy.md` (corrected 2 Nov 2026), recorded in `docs/legal/review-status.json`.
 8. Whether `PRI_SENTRY_DSN` will be set for release; if so, Crash logs → Shared (or service provider) and the notice names Sentry.
 9. Confirm Google's Play services / Billing library data practices (§2 Android permissions) need no additional declaration.
 10. Whether "Fraud prevention, security, and compliance" is ticked for Email address (new-device notices; this draft: yes).
+11. D17: the one-time prompt naming OpenAI is in the code (#737); counsel approves its wording, and the release build is checked to show it before the first read or photo. Google's prominent-disclosure rule is the reason it matters here.
+12. D18: the 30-day erasure and the guardian's erasure request are in the release build (the nomination gate checks this); counsel sets the period.
 
 ## 6. Mismatches found and fixed on 2026-10-18
 
@@ -147,7 +153,31 @@ the providers' own identity endpoints only when the student taps them.
 | 13 | Library permissions were not recorded; the merged manifest carries `com.android.vending.BILLING`, `ACCESS_NETWORK_STATE` (datatransport, via Play services) and androidx.core's internal receiver permission | Added "Android permissions in the shipped app" under §2; Google-library practices flagged OWNER |
 | 14 | "This file is not machine-checked" | `tools/play-data-safety-check.mjs` now checks it |
 
+## 6b. Mismatches found and fixed on 2026-11-02 (re-verified at `a5778a319`)
+
+| # | Mismatch | Fix |
+|---|---|---|
+| 15 | Phone number declared as collected and shared, for an SMS path that is off at launch (D3) and hidden by the client unless the server reports it live; the Apple label and manifest carried the same row | Row → No at launch with the re-enable procedure; removed from Step 3 and Step 4; Apple label and both manifests changed the same way |
+| 16 | Crash logs were declared here but not on the Apple label or in the manifest | Apple label → Crash Data Yes; `CrashData` added to both manifests; the three now agree |
+| 17 | The header called the privacy notice "currently outdated" | The notice was corrected on 2 Nov 2026; its review state is `docs/legal/review-status.json` |
+| 18 | Step 2 assumed Sign in with Google / Apple ship in the first Android build | Owner decision D3 recorded: email code and password only in the first submission |
+
+Re-verified and unchanged on 2026-11-02: the telemetry allowlist, `FORBIDDEN_FIELDS`, the deletion
+routes, the Android permissions table and the absence of any tracking, crash or ads SDK.
+
 Re-verified and unchanged on 2026-10-19: the daily free-plan cap (#563/#537, `practiceAllowance.js`) stores a per-account daily count in `idempotency_keys` — account data already covered by App activity; the privacy/consent copy change (#283/#284) does not change what is sent; the guardian-consent record still carries `notice_version`; the telemetry event allowlist is unchanged; no provider module (`handwritingProvider.js`, `questionPhotoProvider.js`, `workingProvider.js`, `tutorProvider.js`) changed what it sends; `FORBIDDEN_FIELDS` still exclude the expected answer, solution and marks.
+
+## 6c. Re-checked on 2026-11-08 at `1d3829103`
+
+`main` moved 62 commits from `a5778a319`; none changed what leaves the device. Re-verified and
+unchanged: the telemetry allowlist, `FORBIDDEN_FIELDS`, `store: false`, the deletion routes, the
+Android permissions, `channels.sms: false`, and the absence of any tracking, crash or ads SDK.
+
+| # | What was stale | Fix |
+|---|---|---|
+| 19 | The deletion URL was a public-origin placeholder followed by `/account/delete-request` | D5: `https://prilearning.com/delete-account`, which links to the form at `https://app.prilearning.com/account/delete-request`; `tools/store-readiness-check.mjs` now refuses the placeholder and holds store URLs to the D5 hosts |
+| 20 | Email address said "unless the account signed up by phone" and "Required (email or phone)" | SMS is off at launch (D3): every account has an email address |
+| 21 | The D18 erasure promise and the D17 prompt were not owner items here | §5 items 11 and 12 |
 
 ## 7. Play Console entry sheet
 
@@ -165,14 +195,14 @@ Read the overview and press **Next**.
 |---|---|
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** |
-| Which of the following methods of account creation does your app support? | **Username and password**, **Username and other authentication** (one-time code by email or SMS), **OAuth** (Sign in with Google / Apple) — tick each method the release actually enables. **[OWNER: confirm which sign-in methods are live in the Android build]** |
-| Account deletion URL / Add a link that users can use to request that their account and associated data is deleted | **[OWNER: production origin]**`/account/delete-request` (expected `https://prilearning.com/account/delete-request`) |
+| Which of the following methods of account creation does your app support? | **Username and password**, **Username and other authentication** (one-time code by email). Not OAuth in the first submission: owner decision D3 ships email code and password only, with Sign in with Google and Apple arriving together in an update — tick OAuth when that update is the one being submitted. **[OWNER: confirm production `/v1/account/identity/providers` matches at submission]** |
+| Account deletion URL / Add a link that users can use to request that their account and associated data is deleted | **`https://prilearning.com/delete-account`** (D5) **[OWNER: confirm D5 and that the page resolves]** |
 | Do you provide a way for users to request that some or all of their data is deleted, without requiring them to delete their account? | **No** (deletion is whole-account; in-app Settings → Account → Delete). **[OWNER: answer Yes only if support will delete partial data on request]** |
 | Has your app successfully completed an independent security review (MASA)? | **No** |
 
 ### Step 3 — Data types (tick these, leave every other box unticked)
 
-- **Personal info:** Name; Email address; User IDs; Phone number; Other info
+- **Personal info:** Name; Email address; User IDs; Other info (not Phone number: SMS is off at launch, D3)
 - **Financial info:** Purchase history
 - **Photos and videos:** Photos
 - **App activity:** App interactions; Other user-generated content; Other actions
@@ -180,7 +210,7 @@ Read the overview and press **Next**.
 - **Device or other IDs:** Device or other IDs
 
 Not ticked: Location, Financial info → User payment info / Credit score / Other financial info,
-Personal info → Address / Race and ethnicity / Political or religious beliefs / Sexual orientation,
+Personal info → Phone number / Address / Race and ethnicity / Political or religious beliefs / Sexual orientation,
 Health and fitness, Messages, Audio, Files and docs, Calendar, Contacts, App activity → Web
 browsing / Installed apps / In-app search history, Web browsing.
 
@@ -196,10 +226,9 @@ provider.]**
 | Data type | Collected | Shared | Ephemeral? | Required / optional | Collected for | Shared for |
 |---|---|---|---|---|---|---|
 | Name | ✓ | — | No | Required | App functionality; Account management | — |
-| Email address | ✓ | ✓ (Resend) | No | Required **[OWNER: answer "Users can choose" if phone-only sign-up is live, since email is then optional]** | App functionality; Account management; Fraud prevention, security, and compliance **[OWNER §5 item 10]** | Account management; Fraud prevention, security, and compliance |
+| Email address | ✓ | ✓ (Resend) | No | Required (SMS is off, so every account has an email address) | App functionality; Account management; Fraud prevention, security, and compliance **[OWNER §5 item 10]** | Account management; Fraud prevention, security, and compliance |
 | User IDs | ✓ | — | No | Required | App functionality; Account management | — |
-| Phone number | ✓ | ✓ (SMS provider) | No | Users can choose | Account management | Account management |
-| Other info | ✓ | ✓ (Resend/SMS — guardian contact, child accounts only) | No | Required | App functionality; Account management | Account management |
+| Other info | ✓ | ✓ (Resend — guardian contact, child accounts only) | No | Required | App functionality; Account management | Account management |
 | Purchase history | ✓ | — | No | Users can choose | App functionality | — |
 | Photos | ✓ | ✓ (OpenAI) | **Yes** | Users can choose | App functionality | App functionality |
 | App interactions | ✓ | — | No | Required | Analytics; App functionality | — |
@@ -211,6 +240,6 @@ provider.]**
 
 ### Step 5 — Preview and submit
 
-Check the preview against §2 and §4. **Do not submit** while any of these is open: §5 items 1–10,
+Check the preview against §2 and §4. **Do not submit** while any of these is open: §5 items 1–12,
 `docs/release/store/play-listing.md` §5 (target audience / Families), and the privacy-notice
 rewrite. Submitting is the owner's action.

@@ -28,6 +28,15 @@ import {
 } from '../platform/guardianConsent.js';
 import { authEmailMessage, buildAuthActionUrl } from '../platform/authDelivery.js';
 import { SESSION_COOKIE, csrfGuard, sha256 } from '../platform/security.js';
+import { openTestStore, requestedEngine } from './support/engine.mjs';
+
+// SQLite by default; `--engine=postgres` runs §3-§4 (the state machine and the
+// gate over HTTP) on a migrated Postgres as the pri_server role
+// (server/test/run-platform-postgres.mjs). §8 is the SQLite schema rebuild, so
+// it runs on a SQLite file on either engine; the Postgres schema is migrated
+// by supabase/migrations and checked by the Postgres schema suites.
+const engine = requestedEngine();
+console.log(`engine: ${engine}`);
 
 let pass = 0;
 const failures = [];
@@ -57,17 +66,17 @@ const good = validateGuardian({ guardianName: '  Meera Rao ', guardianEmail: ' M
 eq([good.ok, good.name, good.email], [true, 'Meera Rao', 'meera@example.test'], 'a real one is trimmed and lower-cased');
 
 // ── 3 · The state machine ────────────────────────────────────────────────────
-const db = createPlatformDb(':memory:');
+const testStore = await openTestStore(engine, { label: 'guardian_consent' });
+const db = testStore.store;
 const now = Date.now();
-const mk = (id, email, basis) => db.prepare('INSERT INTO accounts(id,email,name,role,age_basis,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)')
-  .run(id, email, 'S', 'student', basis, now, now, now);
-mk('acct-child', 'child@example.test', 'child');
-mk('acct-adult', 'adult@example.test', 'adult');
-mk('acct-legacy', 'legacy@example.test', 'legacy');
-mk('acct-silent', 'silent@example.test', null);
+const mk = async (id, email, basis) => (await db.run('INSERT INTO accounts(id,email,name,role,age_basis,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)', [id, email, 'S', 'student', basis, now, now, now]));
+await mk('acct-child', 'child@example.test', 'child');
+await mk('acct-adult', 'adult@example.test', 'adult');
+await mk('acct-legacy', 'legacy@example.test', 'legacy');
+await mk('acct-silent', 'silent@example.test', null);
 for (const id of ['acct-child', 'acct-adult', 'acct-legacy', 'acct-silent']) {
-  db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
-    VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000);
+  (await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
+    VALUES (?,?,?,?,?,?,?,?)`, [`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000]));
 }
 
 eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account created as an adult, with no consent row, needs none');
@@ -76,10 +85,10 @@ eq((await consentState(db, 'acct-silent')).state, 'undeclared', 'regression: an 
 eq(consentBlockerCode(await consentState(db, 'acct-silent')), 'AGE_DECLARATION_REQUIRED', 'the state exposes the exact account action needed');
 await recordConsentRequest(db, { accountId: 'acct-adult', name: 'Historical Guardian', email: 'history@example.test', tokenHash: 'old', now });
 eq((await consentState(db, 'acct-adult')).state, 'not-required', 'age basis is authoritative: a preserved historical pending guardian row does not keep an adult account blocked');
-ok(!!db.prepare('SELECT 1 AS x FROM guardian_consents WHERE account_id=?').get('acct-adult'), 'the historical row remains stored rather than being erased to make the gate pass');
+ok(!!(await db.get('SELECT 1 AS x FROM guardian_consents WHERE account_id=?', ['acct-adult'])), 'the historical row remains stored rather than being erased to make the gate pass');
 ok(await withdrawConsent(db, 'acct-adult', now + 1), 'a guardian can still withdraw after that adult correction/history state');
 eq((await consentState(db, 'acct-adult')).state, 'withdrawn', 'guardian withdrawal always wins over adult age basis, regardless of ordering');
-db.prepare('UPDATE guardian_consents SET withdrawn_at = NULL WHERE account_id = ?').run('acct-adult');
+(await db.run('UPDATE guardian_consents SET withdrawn_at = NULL WHERE account_id = ?', ['acct-adult']));
 eq((await consentState(db, 'acct-adult')).state, 'not-required', 'without a withdrawal, the corrected adult basis resumes as authority');
 await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
 eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
@@ -124,7 +133,7 @@ try {
   const withdrawn = await call('acct-child');
   eq([withdrawn.status, withdrawn.json?.error?.code], [403, 'GUARDIAN_CONSENT_WITHDRAWN'], 'a withdrawn account is refused');
 
-  db.prepare('UPDATE guardian_consents SET withdrawn_at = NULL, confirmed_at = NULL WHERE account_id = ?').run('acct-child');
+  (await db.run('UPDATE guardian_consents SET withdrawn_at = NULL, confirmed_at = NULL WHERE account_id = ?', ['acct-child']));
   const pending = await call('acct-child');
   eq([pending.status, pending.json?.error?.code], [403, 'GUARDIAN_CONSENT_PENDING'], 'and so is a pending one');
   ok(/stays on this device/i.test(pending.json?.error?.message || ''),
@@ -220,6 +229,7 @@ eq(migrated.prepare("SELECT age_basis FROM accounts WHERE id='acct-1'").get().ag
 eq(migrated.pragma('foreign_keys', { simple: true }), 1, 'and foreign keys are switched back on afterwards');
 migrated.close();
 try { unlinkSync(dbFile); } catch { /* already gone */ }
+await testStore.close();
 
 console.log(failures.length
   ? `GUARDIAN CONSENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

@@ -33,6 +33,7 @@
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
 import './support/hermetic.mjs';
+import { pngDataUrl } from './support/test-image.mjs';
 const shaped = (prefix, body) => `${prefix}${body}`;
 const SECRETS = {
   PRI_HANDWRITING_API_KEY: shaped('sk-', 'proj-ACCEPTANCEhandwritingSECRET0123456789abcdef'),
@@ -84,7 +85,9 @@ const { decryptJoinCode } = await import('../platform/classes.js');
 const inventory = loadInventory();
 
 const c = checks();
-const h = await startApp({ engine: requestedEngine(), log: () => {} });
+// The parent report is off by default (D22), but every inventoried route —
+// its included — is held to the same fail-closed floor, so it is on here.
+const h = await startApp({ engine: requestedEngine(), log: () => {}, parentReport: { enabled: true } });
 const db = h.db;
 const responses = [];
 
@@ -482,7 +485,7 @@ try {
     c.ok(exported.data.receipts.every(row => !('request_digest' in row) && !('requestDigest' in row)), 'no receipt carries its request digest');
     const ownPhones = (await db.all('SELECT phone_e164 FROM account_phones WHERE account_id=?', [alice.id])).length;
     c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
@@ -768,7 +771,7 @@ try {
     c.eq(health.status, 200, 'health');
     const status = await h.request('/v1/handwriting/status', { jar: reader.jar });
     c.eq(status.status, 200, 'handwriting status');
-    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64') } });
+    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: pngDataUrl('a'.repeat(600)) } });
     c.ok(transcribe.status >= 500 && transcribe.data?.error?.code, `a failing provider is answered with a coded error (${transcribe.status} ${transcribe.data?.error?.code})`);
     const working = await h.request('/v1/working/check', { method: 'POST', jar: reader.jar, body: { lines: ['x = 2', 'x + 1 = 3'], prompt: 'Solve' } });
     c.ok(working.status >= 400 && working.data?.error?.code, `a failing working provider is answered with a coded error (${working.status} ${working.data?.error?.code})`);
