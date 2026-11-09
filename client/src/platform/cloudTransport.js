@@ -591,6 +591,10 @@ export const cloud = Object.freeze({
   // reach here: the local backend refuses them first.
   tutorHelp: (body, { signal = null, timeoutMs = 25000 } = {}) =>
     cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
+  // "Check this line so far": the server's Step Check of an open issued
+  // question's lines; names a step, never a value. Sends only the id and lines.
+  tutorLineCheck: (body, { signal = null, timeoutMs = 20000 } = {}) =>
+    cloudRequest('/v1/tutor/line-check', { method: 'POST', body, signal, timeoutMs }),
   // The same body, answered as server-sent events (see cloudStreamRequest).
   tutorStream: (body, { onEvent, signal = null, timeoutMs = 45000 } = {}) =>
     cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),

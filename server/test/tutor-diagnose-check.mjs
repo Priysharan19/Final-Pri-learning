@@ -30,7 +30,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
 import {
-  createTutorRouter, deterministicDiagnosis, diagnosisIssues, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
+  createTutorRouter, deterministicDiagnosis, diagnosisIssues, lineCheckReply, lineStatusFrom, nextStepIndex, tutorCacheKey, validateTutorRequest
 } from '../platform/tutor.js';
 import {
   DIAGNOSIS_SCHEMA, MAX_TIMEOUT_MS, TutorProviderError, askTutorModel, providerBody, providerConfig, systemInstructions, userMessage
@@ -182,6 +182,23 @@ ok(/आपके हल में पहली गलती पंक्ति 2
   ok(!/not placed a break/.test(du.wentWrong), 'and is never presented as "no break found"');
 }
 
+// ── 4b · "Check this line so far": names a step, never a value ───────────────
+{
+  const steps = QUESTION.steps;
+  const partial = lineCheckReply(QUESTION, [LINES[0]], { firstBreak: -1, verifiedLines: 1 }, 'en');
+  eq(partial.status, 'ok', 'a correct partial line is credited');
+  ok(/Find cos A and cos B/.test(partial.message), 'with the plan\'s next step named');
+  const broken = lineCheckReply(QUESTION, LINES, { firstBreak: 1, verifiedLines: 1 }, 'en');
+  ok(broken.status === 'break' && /line 2/.test(broken.message), 'a broken line is named by the engine');
+  const unplaced = lineCheckReply(QUESTION, ['something'], { firstBreak: -1, verifiedLines: 0 }, 'en');
+  ok(unplaced.status === 'unplaced' && !/match/.test(unplaced.message), 'lines the engine did not verify are never called a match');
+  eq(lineCheckReply(QUESTION, LINES, { firstBreak: -1, verifiedLines: 0, unchecked: true }).message, 'Couldn’t check your working this time — try again.', 'a cooled-down or timed-out check says so plainly');
+  for (const r of [partial, broken, unplaced]) ok(!/[0-9]{2}|56|65|12\/13|4\/5/.test(r.message.replace(/line \d+/, '')), `no value in "${r.message}"`);
+  const valued = { ...QUESTION, steps: [{ h: 'Get $\\cos A = \\frac{12}{13}$', d: steps[0].d }, steps[1], steps[2]] };
+  ok(!/12/.test(lineCheckReply(valued, [LINES[0]], { firstBreak: -1, verifiedLines: 1 }).message), 'a step heading that carries a value is never shown');
+  ok(/हल|पंक्ति|विधि/.test(lineCheckReply(QUESTION, [LINES[0]], { firstBreak: -1, verifiedLines: 1 }, 'hi').message), 'Hindi copy');
+}
+
 // ── 5 · The route ─────────────────────────────────────────────────────────────
 const engine = requestedEngine();
 const test = await openTestStore(engine, { label: 'tutor-diagnose' });
@@ -289,6 +306,25 @@ try {
   const overCeiling = await ceiling('acct-b', R({}, { typedAnswer: '23' }));
   eq([overCeiling.status, overCeiling.json?.tutor?.reason, calls.length], [200, 'PAID_CAPACITY_REACHED', n + 1], 'over the paid-call ceiling, the deterministic diagnosis is served without a model call');
   eq(await dayBucket('acct-b'), dayBefore, 'and spends none of the daily allowance (F5)');
+
+  // The line-check route refuses before any spend.
+  {
+    const app = express(); app.use(express.json()); app.use(cookieParser());
+    app.use('/tutor', createTutorRouter(db, { ask: stubAsk, env }));
+    const s = await new Promise(r => { const x = app.listen(0, '127.0.0.1', () => r(x)); }); servers.push(s);
+    const lc = async (who, payload) => {
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', ...(who ? { cookie: `${SESSION_COOKIE}=raw-${who}` } : {}) }, body: JSON.stringify(payload) });
+      return { status: r.status, code: (await r.json().catch(() => null))?.error?.code };
+    };
+    const ID = '00000000-0000-4000-8000-000000000000';
+    eq((await lc(null, { context: 'practice', serverQuestionId: ID, lines: ['x'] })).status, 401, 'line check: never anonymous');
+    eq((await lc('acct-a', { context: 'exam', serverQuestionId: ID, lines: ['x'] })).code, 'TUTOR_EXAM_LOCKED', 'line check: exam-locked');
+    eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE', 'line check: empty work refused');
+    eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: ['x'] })).code, 'TUTOR_QUESTION_NOT_FOUND', 'line check: only this account\'s issued questions');
+    eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: ['x'], question: {} })).code, 'TUTOR_BODY_INVALID', 'line check: no solution may be sent');
+  }
+  const darkLc = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
+  void darkLc;
 
   // Dark: the route does not exist.
   const dark = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });

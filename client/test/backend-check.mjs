@@ -1583,6 +1583,8 @@ async function run() {
     await rejects('and so are captions', POST(`/practice/${dark.question.id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 404 });
     const darkDiag = await rejects('and so is "What went wrong?"', POST(`/practice/${dark.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] } }), { status: 404 });
     eq('— as disabled', darkDiag?.code, 'TUTOR_DISABLED');
+    const darkLine = await rejects('and so is "Check this line so far"', POST(`/practice/${dark.question.id}/tutor/line-check`, { lines: ['x = 1'] }), { status: 404 });
+    eq('— as disabled', darkLine?.code, 'TUTOR_DISABLED');
     eq('the bridge itself refuses to call out', (await requestTutorHelp({ level: 'nudge' })).error?.code, 'TUTOR_DISABLED');
     eq('nothing reached /v1/tutor', tutorCalls.length, 0);
     eq('and nothing was charged to the question', (await idb.get('questions', dark.question.id)).tutorLevel || 0, 0);
@@ -1706,6 +1708,26 @@ async function run() {
     const diagDown = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
     eq('an outage gives no diagnosis and says why', [diagDown.source, diagDown.code, diagDown.diagnosis], ['deterministic', 'TUTOR_UNAVAILABLE', null]);
     eq('and charges nothing more', (await idb.get('questions', openDiag.question.id)).tutorLevel, 1);
+    // "Check this line so far": charged like a tutor level, two per question.
+    const { setLineCheckTransportForTests } = await import(`${SRC}local/tutorBridge.js`);
+    const lcCalls = [];
+    let lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };
+    setLineCheckTransportForTests(async body => { lcCalls.push(body); return lcReply; });
+    const lcQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const lcId = lcQ.question.id;
+    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time — try again.' } };
+    const lcSilent = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a line check that did not run says so and charges nothing', [lcSilent.lineCheck?.status, (await idb.get('questions', lcId)).tutorLevel || 0], ['unchecked', 0]);
+    lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };
+    const lc1 = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a line check names a step and is charged like a tutor level', [lc1.lineCheck?.status, lc1.tutorLevel, lc1.checksLeft], ['ok', 1, 1]);
+    eq('it sends only the issued id and the lines', Object.keys(lcCalls.at(-1)).sort(), ['context', 'lines', 'locale', 'serverQuestionId']);
+    await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a second check charges a second level', (await idb.get('questions', lcId)).tutorLevel, 2);
+    const lcLimit = await rejects('a third line check is refused', POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] }), { status: 409 });
+    eq('— with the limit code', lcLimit?.code, 'LINE_CHECK_LIMIT');
+    eq('empty lines are refused before any charge', (await POST(`/practice/${openDiag.question.id}/tutor/line-check`, { lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE');
+    setLineCheckTransportForTests(null);
     const emptyDiag = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: [] } });
     eq('with nothing written there is nothing to diagnose', emptyDiag.code, 'TUTOR_NOTHING_TO_DIAGNOSE');
 
@@ -1961,6 +1983,7 @@ async function run() {
       await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
       await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
       await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
+      await locked(`a ${label} active exam question cannot take a line check`, POST(`/practice/${id}/tutor/line-check`, { lines: ['x = 1'] }));
       await locked(`a ${label} active exam question cannot be diagnosed by the tutor`, POST(`/practice/${id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' }));
       await locked(`a ${label} active exam question cannot be asked about in the tutor conversation`, POST(`/practice/${id}/tutor/ask`, { message: 'what is the answer?' }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));

@@ -21,6 +21,14 @@ export function showDiagnoseButton({ tutorEnabled, diagnostic = false, resolved 
   return gradedRetry === true && res.correct !== true;
 }
 
+/**
+ * "Check this line so far": under a server reading in Write mode, before the
+ * question is resolved, with the tutor on, never on a placement check.
+ */
+export function showLineCheckButton({ tutorEnabled, diagnostic = false, writeMode = false, resolved = false, hasLines = false, checksLeft = 2 } = {}) {
+  return tutorEnabled === true && !diagnostic && writeMode === true && !resolved && hasLines === true && checksLeft > 0;
+}
+
 /** The final-answer status the diagnosis is told: the engine's, as the card holds it. */
 export function finalAnswerStatus(res) {
   if (res?.correct === true) return 'correct';

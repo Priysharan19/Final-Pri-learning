@@ -442,6 +442,10 @@ export default {
   'tutor.unavailable': 'अभी मदद लोड नहीं हो सकी। संकेत बल्ब अब भी काम करते हैं।',
   // NEEDS NATIVE REVIEW: the tutor.diagnose.* strings ("What went wrong?") were
   // written without a native-speaker pass; check them before a Hindi release.
+  'tutor.lineCheck.button': 'अब तक की पंक्ति जाँचें',
+  'tutor.lineCheck.asking': 'आपकी पंक्तियाँ जाँची जा रही हैं…',
+  'tutor.lineCheck.unavailable': 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+  'tutor.lineCheck.limit': 'इस प्रश्न पर आप दोनों पंक्ति-जाँच इस्तेमाल कर चुके हैं।',
   'tutor.diagnose.button': 'क्या गलत हुआ?',
   'tutor.diagnose.title': 'क्या गलत हुआ',
   'tutor.diagnose.close': 'बंद करें',

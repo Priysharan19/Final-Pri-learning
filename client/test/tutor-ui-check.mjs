@@ -279,6 +279,23 @@ const fakeStream = events => async (body, { onEvent }) => { for (const [event, d
   ok(/if \(!tutorFeatureEnabled\(\)\) throw tutorDisabledError\(\);/.test(route) && /assertPracticeRow\(row\);/.test(route), 'the local route refuses with the tutor off and refuses an exam row');
   ok(!/row\.(correct|answered|score|marks?)\s*=/.test(route), 'and never writes a mark or a verdict');
 
+  // "Check this line so far": only with the tutor on, under an open reading.
+  const { showLineCheckButton } = await import('../src/tutor/diagnoseGate.js');
+  const on = { tutorEnabled: true, writeMode: true, resolved: false, hasLines: true };
+  ok(showLineCheckButton(on), 'with the tutor on, an open reading offers "Check this line so far"');
+  ok(!showLineCheckButton({ ...on, tutorEnabled: false }), 'with the tutor OFF nothing is shown');
+  ok(!showLineCheckButton({ ...on, resolved: true }) && !showLineCheckButton({ ...on, hasLines: false }) && !showLineCheckButton({ ...on, diagnostic: true }) && !showLineCheckButton({ ...on, checksLeft: 0 }),
+    'never once resolved, with nothing read, on a placement check, or after both checks');
+  const lcGate = card.indexOf('showLineCheckButton({ tutorEnabled, diagnostic, writeMode, resolved');
+  ok(lcGate > 0 && card.indexOf('data-line-check') > lcGate && card.indexOf('data-line-check') - lcGate < 600, 'QuestionCard renders the line check only inside its tutor gate');
+  for (const key of ['tutor.lineCheck.button', 'tutor.lineCheck.asking', 'tutor.lineCheck.unavailable', 'tutor.lineCheck.limit']) {
+    ok(typeof en[key] === 'string' && typeof hi[key] === 'string' && en[key] !== hi[key], `${key} is in both catalogues`);
+  }
+  const { requestLineCheck } = await import('../src/local/tutorBridge.js');
+  globalThis.__PRI_TUTOR_OVERRIDE__ = false;
+  eq((await requestLineCheck({ lines: ['x'] })).error?.code, 'TUTOR_DISABLED', 'with the tutor off, no line check is sent');
+  globalThis.__PRI_TUTOR_OVERRIDE__ = true;
+
   // The bridge: off means nothing is sent; a diagnosis may ask for longer.
   const { requestTutorHelp, setTutorTransportForTests } = await import('../src/local/tutorBridge.js');
   let seen = null;

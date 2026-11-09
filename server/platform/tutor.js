@@ -564,6 +564,47 @@ export function diagnosisIssues(reply, request) {
 
 const diagnosisMessage = d => [d.didRight, d.wentWrong, d.nextStep].filter(Boolean).join(' ');
 
+export const LINE_CHECK_TEXT = Object.freeze({
+  en: Object.freeze({
+    ok: 'Your lines match the method so far.', unplaced: 'The checker could not place these lines against the method.', next: 'Next: {step}.', nextGeneric: 'Keep going with the next step of the method.',
+    breakAt: 'First break at line {n} — this line should reach: {step}.', breakGeneric: 'First break at line {n} — redo the step from the line before.',
+    unchecked: 'Couldn’t check your working this time — try again.'
+  }),
+  hi: Object.freeze({
+    ok: 'अब तक आपकी पंक्तियाँ विधि से मेल खाती हैं।', unplaced: 'जाँचकर्ता इन पंक्तियों को विधि से नहीं मिला सका।', next: 'अगला क़दम: {step}।', nextGeneric: 'विधि के अगले क़दम के साथ आगे बढ़ें।',
+    breakAt: 'पहली गलती पंक्ति {n} में — इस पंक्ति को यहाँ पहुँचना चाहिए: {step}।', breakGeneric: 'पहली गलती पंक्ति {n} में — पिछली पंक्ति से यह क़दम फिर करें।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।'
+  })
+});
+
+/**
+ * The "Check this line so far" reply: the engine's evidence put in words, a
+ * step NAME (heading) only. A heading that states the answer or the next
+ * result is replaced by the generic wording, so no value ever leaves.
+ */
+export function lineCheckReply(question, lines, evidence, locale = 'en') {
+  const copy = LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en;
+  if (evidence?.unchecked) return { status: 'unchecked', message: copy.unchecked };
+  const request = { question, studentWork: { lines, firstBreak: evidence.firstBreak, verifiedLines: evidence.verifiedLines } };
+  const guard = buildGuard(question, {});
+  const named = index => {
+    const heading = String(question.steps[index]?.h || '').trim();
+    if (!heading || /[0-9०-९=]/.test(heading) || leakedExpressions(heading, guard, { prompt: question.prompt }).length) return null;
+    return heading;
+  };
+  const step = named(nextStepIndex(request));
+  if (evidence.firstBreak >= 0 && evidence.firstBreak < lines.length) {
+    const n = evidence.firstBreak + 1;
+    return { status: 'break', line: evidence.firstBreak, message: step ? copy.breakAt.replace('{n}', n).replace('{step}', step) : copy.breakGeneric.replace('{n}', n) };
+  }
+  // "Matches" only when the engine verified every line; otherwise say nothing
+  // about correctness, only what to do next.
+  if (!(Number(evidence.verifiedLines) >= lines.length)) {
+    return { status: 'unplaced', message: `${copy.unplaced} ${step ? copy.next.replace('{step}', step) : copy.nextGeneric}` };
+  }
+  return { status: 'ok', message: `${copy.ok} ${step ? copy.next.replace('{step}', step) : copy.nextGeneric}` };
+}
+
 /**
  * The open-attempt diagnosis: engine-only, one shape, no code, no model, no
  * spend. Its fields are the same whatever the student wrote, so a right guess
@@ -827,6 +868,38 @@ export function createTutorRouter(db, {
         }
         res.status(502).json({ error: { code: 'TUTOR_FAILED', message: 'The tutor could not help this time.', retryable: true } });
       }
+    });
+
+  // ── "Check this line so far" ───────────────────────────────────────────────
+  // The server's own Step Check of the student's lines against its escrowed
+  // solution, for an OPEN server-issued question. The reply names a step of the
+  // method — never a value, never a mark — and is help: the device charges it
+  // like a tutor level and allows at most LINE_CHECKS_PER_QUESTION per question,
+  // and here it spends one unit of the per-account daily allowance. No model.
+  router.post('/line-check',
+    requireSession(db),
+    requireVerifiedEmail,
+    rateLimit(db, 'tutor-line-check', TUTOR_RATE_LIMIT),
+    async (req, res) => {
+      const refuse = (status, code, message) => res.status(status).json({ error: { code, message } });
+      const b = req.body;
+      if (!plain(b) || closed(b, ['context', 'serverQuestionId', 'lines', 'locale']).length) return refuse(400, 'TUTOR_BODY_INVALID', 'Send { context, serverQuestionId, lines }.');
+      if (b.context !== 'practice') return refuse(b.context === 'exam' ? 403 : 400, b.context === 'exam' ? 'TUTOR_EXAM_LOCKED' : 'TUTOR_CONTEXT_REQUIRED', 'Line checks are for practice only.');
+      if (!(typeof b.serverQuestionId === 'string' && ISSUED_ID.test(b.serverQuestionId))) return refuse(400, 'TUTOR_BODY_INVALID', 'serverQuestionId is the id of a question this server issued.');
+      if (!Array.isArray(b.lines) || b.lines.length > LIMITS.lines || !b.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line)) return refuse(400, 'TUTOR_BODY_INVALID', 'lines are the student\'s working lines.');
+      const lines = b.lines.map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return refuse(400, 'TUTOR_NOTHING_TO_DIAGNOSE', 'Write a line to check.');
+      const locale = b.locale === 'hi' ? 'hi' : 'en';
+      const at = now();
+      const accountId = req.platformSession.account_id;
+      const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
+      if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+      if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
+      const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+        { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+      if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
+      const evidence = await issued.workEvidence(lines);
+      res.json({ lineCheck: lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale) });
     });
 
   // ── Streaming ──────────────────────────────────────────────────────────────

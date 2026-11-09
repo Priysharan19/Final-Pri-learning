@@ -53,7 +53,7 @@ import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
-import { finalAnswerStatus, showDiagnoseButton } from '../tutor/diagnoseGate.js';
+import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
 import { featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
@@ -328,6 +328,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showTutor, setShowTutor] = useState(false);
   // The diagnosis panel is keyed by the attempt it explains; a new attempt closes it.
   const [diagnoseFor, setDiagnoseFor] = useState(null);
+  const [lineCheck, setLineCheck] = useState(null);
+  const [lineCheckBusy, setLineCheckBusy] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
   // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
@@ -461,7 +463,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
-    setShowTutor(false); setDiagnoseFor(null); setTutorUsed(question.tutorLevel || 0);
+    setShowTutor(false); setDiagnoseFor(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     // An old photo must never follow the student into a new question.
@@ -3129,6 +3131,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </span>
           {INSTRUMENT && writeMode && !resolved && (
             <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote', { key: CHECK_KEY_GLYPH })}</span>
+          )}
+          {/* "Check this line so far": the server's Step Check of the lines read,
+              naming a step of the method — never a value, never a mark. Help,
+              charged like a tutor level; two per question; tutor on only. */}
+          {showLineCheckButton({ tutorEnabled, diagnostic, writeMode, resolved, hasLines: !!inkResult?.lines?.length && !inkStale, checksLeft: lineCheck?.checksLeft ?? 2 }) && (
+            <span className="ws-line-check no-print">
+              <button type="button" className="btn btn-ghost btn-sm" data-line-check disabled={lineCheckBusy}
+                onClick={async () => {
+                  setLineCheckBusy(true);
+                  try {
+                    const lines = (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40);
+                    const r = await api.post(`/practice/${question.id}/tutor/line-check`, { lines, locale: language === 'hi' ? 'hi' : 'en' });
+                    if (Number.isInteger(r?.tutorLevel)) setTutorUsed(u => Math.max(u, r.tutorLevel));
+                    setLineCheck({ message: r?.lineCheck?.message || null, key: 'tutor.lineCheck.unavailable', status: r?.lineCheck?.status || 'none', checksLeft: r?.checksLeft ?? lineCheck?.checksLeft ?? 2 });
+                  } catch (e) {
+                    setLineCheck({ message: null, key: e?.code === 'LINE_CHECK_LIMIT' ? 'tutor.lineCheck.limit' : 'tutor.lineCheck.unavailable', status: 'none', checksLeft: e?.code === 'LINE_CHECK_LIMIT' ? 0 : (lineCheck?.checksLeft ?? 2) });
+                  } finally { setLineCheckBusy(false); }
+                }}>
+                {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
+              </button>
+            </span>
+          )}
+          {writeMode && !resolved && (lineCheck?.message || lineCheck?.key) && (
+            <span className="ws-line-check-result muted" role="status" data-line-check-status={lineCheck.status}>{lineCheck.message || t(lineCheck.key)}</span>
           )}
           {submitReasonKey && (
             <span className="ws-submit-reason muted" id={`submit-reason-${question.id}`} role="status" data-submit-reason={submitReasonKey}>{t(submitReasonKey)}</span>

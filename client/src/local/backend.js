@@ -61,7 +61,7 @@ import {
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
-import { requestTutorHelp } from './tutorBridge.js';
+import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
@@ -3822,6 +3822,40 @@ const routes = {
       source: outcome?.tutor?.source === 'model' ? 'tutor' : 'deterministic',
       code: outcome?.tutor?.source === 'model' ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
       tutorLevel: Number(row.tutorLevel) || 0
+    };
+  },
+
+  // "Check this line so far": the server's Step Check of the lines on an OPEN
+  // server-issued question. It names a step of the method, never a value, and
+  // never marks. It is help, so it is charged like a tutor level (one level
+  // per check, never past 2 so the walkthrough stays its own rung), and a
+  // question allows at most two, so it cannot be used to test guesses.
+  'POST /practice/:id/tutor/line-check': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    if (!row.serverQuestionId) throw Object.assign(new Error('Only a question the server issued can be checked.'), { status: 409, code: 'LINE_CHECK_UNAVAILABLE' });
+    const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+    if (!lines.length) return { lineCheck: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: Number(row.tutorLevel) || 0 };
+    const usedChecks = Math.max(0, Number(row.lineChecks) || 0);
+    if (usedChecks >= 2) throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
+    const outcome = await requestLineCheck({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines, locale: body?.locale === 'hi' ? 'hi' : 'en' });
+    const lc = outcome?.lineCheck;
+    if (!lc || typeof lc.message !== 'string') return { lineCheck: null, code: outcome?.error?.code || 'TUTOR_FAILED', tutorLevel: Number(row.tutorLevel) || 0 };
+    // Charged only when the server actually checked (an 'unchecked' reply costs nothing).
+    if (lc.status !== 'unchecked') {
+      row.lineChecks = usedChecks + 1;
+      const level = Math.max(0, Number(row.tutorLevel) || 0);
+      row.tutorLevel = Math.max(level, Math.min(2, level + 1));
+      await put('questions', row);
+    }
+    return {
+      lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
+      tutorLevel: Number(row.tutorLevel) || 0, checksLeft: Math.max(0, 2 - (Number(row.lineChecks) || 0))
     };
   },
 
