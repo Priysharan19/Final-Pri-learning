@@ -207,7 +207,7 @@ try {
   // One client at a fixed address: one bucket whichever edge node carries it.
   const fixed = [...Array(12)].map((_, i) => sample(nodes[i % 3], open));
   const clean = classify([...fixed, ...[...Array(4)].map((_, i) => sample(nodes[i % 3], open, true))], t0);
-  ok(clean.verdict === 'PER-CLIENT', 'one bucket across edge nodes, forged headers inside it: PER-CLIENT');
+  ok(clean.verdict === 'SINGLE-BUCKET', 'one bucket across edge nodes, forged headers inside it: SINGLE-BUCKET (consistent with per-client, not proof)');
   const spoofed = classify([...fixed, sample('sin1.a', open, true), sample('sin1.b', open + 3, true)], t0);
   ok(spoofed.verdict === 'SPOOFABLE', 'a forged X-Forwarded-For that gets a bucket of its own is SPOOFABLE');
   // The staging measurement of 8 Nov 2026: one bucket per edge node.
@@ -223,6 +223,19 @@ try {
   ok(stale.verdict === 'INCONCLUSIVE' && stale.facts.counted === 0, 'buckets opened before the run are not counted');
   const once = classify([sample('sin1.a', open), sample('sin1.b', open + 1), ...[...Array(8)].map(() => sample('sin1.c', open + 2))], t0);
   ok(once.verdict !== 'PER-EDGE-NODE', 'a node seen once is not enough to call the identity per node');
+  // Review of #738: two per-node buckets opened in the same second share a Reset; Remaining shows it.
+  const rem = (node, reset, remaining, forged = false) => ({ node, reset, remaining, forged });
+  const collide = classify([rem('sin1.a', open, 59), rem('sin1.b', open, 59), rem('sin1.a', open, 58), rem('sin1.b', open, 58), rem('sin1.a', open, 57), rem('sin1.b', open, 57), rem('sin1.a', open, 56), rem('sin1.b', open, 56), rem('sin1.a', open, 55, true)], t0);
+  ok(collide.verdict !== 'SINGLE-BUCKET' && collide.facts.collided, 'buckets sharing a Reset second (Remaining repeats) are never read as one bucket');
+  const plainRun = [...Array(9)].map((_, i) => rem(nodes[i % 3], open, 59 - i));
+  const staleForged = classify([...plainRun, rem('sin1.a', t0 + 5, 40, true)], t0);
+  ok(staleForged.verdict === 'SPOOFABLE', 'a forged request landing in an older bucket of its own is an escape, even though its window is not fresh');
+  const realIpOnly = classify([...plainRun, { node: 'sin1.a', reset: open, remaining: 49, realIpOnly: true }], t0);
+  ok(realIpOnly.verdict === 'INCONCLUSIVE' && /no forged/.test(realIpOnly.reason), 'X-Real-IP samples never satisfy the forged-request guard');
+  ok(classify(plainRun.slice(0, 5).concat(rem('sin1.a', open, 50, true)), t0).verdict === 'INCONCLUSIVE', 'too few plain samples is INCONCLUSIVE, never a pass');
+  ok(/'SINGLE-BUCKET' \? 0 : out\.verdict === 'INCONCLUSIVE' \? 2 : 1/.test(readFileSync(join(ROOT, 'tools', 'verify-deployment-proxy.mjs'), 'utf8')), 'only SINGLE-BUCKET exits 0');
+  const staging = readFileSync(join(ROOT, '.github', 'workflows', 'release-staging-proof.yml'), 'utf8');
+  ok(/set \+e\n\s+node tools\/verify-deployment-proxy\.mjs/.test(staging), 'the advisory step turns off bash -e before the probe, so a red verdict cannot fail the proof');
   const proxySource = readFileSync(join(ROOT, 'tools', 'verify-deployment-proxy.mjs'), 'utf8');
   ok(/agent: false/.test(proxySource) && !/method: '(POST|PUT|PATCH|DELETE)'/.test(proxySource) && /'\/v1\/content\/published-index'/.test(proxySource),
     'the proxy probe only sends anonymous GETs to the published content index, each on a new connection');

@@ -39,10 +39,10 @@ Railway states that the hop count is not fixed and publishes no proxy address ra
    node tools/verify-deployment-proxy.mjs --origin https://pri-learning-staging-staging.up.railway.app
    ```
 
-   - `PER-CLIENT` (exit 0): fixed. Record the value here and on #653, then set production to the same value as part of the production cutover (owner action; production is not touched by this lane).
+   - `SINGLE-BUCKET` (exit 0): consistent with per-client keying, not proof of it (one bucket shared by all traffic looks the same from one address). Confirm from a second fixed address (e.g. the runner's proof and a shell elsewhere) before recording the value here and on #653 and copying it to production at the cutover (owner action).
    - `PER-EDGE-NODE` (exit 1) at value + 1 as well: explanation 2. Put staging back to the recorded value and open an L2/security change that keys anonymous limits on the edge-set client address.
    - `SPOOFABLE` (exit 1): put staging back to the recorded value at once.
    - `INCONCLUSIVE` (exit 2): the client's own address changed between connections (a VPN or carrier NAT), or only one edge node answered. Run it from a fixed address.
-4. Once a value gives `PER-CLIENT`, make the advisory step blocking (remove the `exit 0`) in the PR that closes #653.
+4. Once two addresses both give `SINGLE-BUCKET` with distinct buckets, a later reviewed change makes the advisory step blocking; #653 is resolved by that change, not by this one.
 
 Production remains untouched until the owner's cutover. Never read production variables or logs from a lane session.

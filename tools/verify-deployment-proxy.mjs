@@ -25,8 +25,9 @@
 //     too few for the real chain, or the edge leaks its own address.
 //   · SPOOFABLE (FAIL): this client's plain requests share one bucket, but a
 //     forged header lands in a different one.
-//   · PER-CLIENT (PASS): one bucket for this client across several edge
-//     nodes, and no forged header escapes it.
+//   · SINGLE-BUCKET (exit 0): one bucket for this client across several edge
+//     nodes, no forged header escapes it. Consistent with per-client keying but
+//     not proof (one global bucket looks the same): confirm from a second address.
 //   · INCONCLUSIVE: one edge node only, a client whose own address changes
 //     between connections (some VPNs and carrier NATs), or too few samples
 //     from windows opened during the run. Run it from a fixed address, for
@@ -44,12 +45,14 @@ const PATH = '/v1/content/published-index';
 const WINDOW_SECONDS = 60;
 // Fewer than the 60-a-minute limit even if every request shares one bucket.
 const PLAIN_REQUESTS = 24;
-const FORGED = [
-  { 'x-forwarded-for': '203.0.113.7' },
-  { 'x-forwarded-for': '203.0.113.7, 198.51.100.9' },
-  { 'x-forwarded-for': '203.0.113.7, 198.51.100.9, 192.0.2.44' },
-  { 'x-real-ip': '203.0.113.8' }
-];
+// Forged addresses are fresh every run (a bucket left by an earlier run must
+// never hide an escape). X-Real-IP is sent too but never counts as proof: Express
+// does not read it, so it can never escape a bucket.
+const doc = () => `203.0.113.${1 + Math.floor(Math.random() * 254)}`;
+const forgedSet = () => {
+  const [a, b, c] = [doc(), `198.51.100.${1 + Math.floor(Math.random() * 254)}`, `192.0.2.${1 + Math.floor(Math.random() * 254)}`];
+  return [{ 'x-forwarded-for': a }, { 'x-forwarded-for': `${a}, ${b}` }, { 'x-forwarded-for': `${a}, ${b}, ${c}` }, { 'x-real-ip': doc() }];
+};
 const FORGED_ROUNDS = 2;
 const REQUEST_TIMEOUT_MS = 15_000;
 // A run must finish inside one window, or a bucket could roll over mid-run.
@@ -63,8 +66,10 @@ const RUN_BUDGET_MS = 50_000;
  */
 export function classify(samples, startedAtSeconds) {
   const fresh = samples.filter(s => s.node && Number.isFinite(s.reset) && s.reset >= startedAtSeconds + WINDOW_SECONDS - 1);
-  const plain = fresh.filter(s => !s.forged);
-  const forged = fresh.filter(s => s.forged);
+  const plain = fresh.filter(s => !s.forged && !s.realIpOnly);
+  // Forged X-Forwarded-For samples count whether or not their window is fresh:
+  // a bucket that a forged address already owned is still an escape.
+  const forged = samples.filter(s => s.forged && s.node && Number.isFinite(s.reset));
   const nodes = new Map();      // node → Set(bucket)
   const buckets = new Map();    // bucket → Set(node)
   const seen = new Map();       // node → plain samples
@@ -75,9 +80,15 @@ export function classify(samples, startedAtSeconds) {
     buckets.get(s.reset).add(s.node);
     seen.set(s.node, (seen.get(s.node) || 0) + 1);
   }
+  // RateLimit-Reset is in whole seconds, so two buckets opened in the same
+  // second share it. One real bucket's Remaining falls strictly, request by
+  // request; a repeat or a rise under one Reset means two buckets collided.
+  const byReset = new Map();
+  for (const s of [...plain, ...forged]) { if (!Number.isFinite(s.remaining)) continue; if (!byReset.has(s.reset)) byReset.set(s.reset, []); byReset.get(s.reset).push(s.remaining); }
+  const collided = [...byReset.values()].some(r => r.some((v, i) => i > 0 && !(v < r[i - 1])));
   const facts = {
     samples: samples.length, counted: fresh.length, plain: plain.length, forged: forged.length,
-    nodes: nodes.size, buckets: buckets.size
+    nodes: nodes.size, buckets: buckets.size, collided
   };
   if (plain.length < 8) return { verdict: 'INCONCLUSIVE', reason: 'too few samples from windows opened during the run (wait a minute and run again)', facts };
   if (nodes.size < 2) return { verdict: 'INCONCLUSIVE', reason: 'every request reached the same edge node, so node and client cannot be told apart', facts };
@@ -85,15 +96,18 @@ export function classify(samples, startedAtSeconds) {
     const [only] = buckets.keys();
     const escaped = forged.filter(s => s.reset !== only);
     if (escaped.length) return { verdict: 'SPOOFABLE', reason: `${escaped.length} of ${forged.length} forged requests got a bucket of their own`, facts };
-    if (!forged.length) return { verdict: 'INCONCLUSIVE', reason: 'no forged request was counted', facts };
-    return { verdict: 'PER-CLIENT', reason: `one bucket for this client across ${nodes.size} edge nodes; no forged header escaped it`, facts };
+    if (collided) return { verdict: 'INCONCLUSIVE', reason: 'buckets opened in the same second share one Reset (its Remaining did not fall strictly); run again', facts };
+    if (!forged.length) return { verdict: 'INCONCLUSIVE', reason: 'no forged X-Forwarded-For request was counted', facts };
+    // One vantage point cannot tell per-client keying from one bucket that all
+    // traffic shares; a second address must confirm before production copies it.
+    return { verdict: 'SINGLE-BUCKET', reason: `one bucket for this client across ${nodes.size} edge nodes and no forged header escaped it: consistent with per-client keying, NOT proof of it; confirm from a second address`, facts };
   }
   const oneToOne = [...nodes.values()].every(set => set.size === 1) && [...buckets.values()].every(set => set.size === 1);
-  const repeated = [...seen.values()].every(n => n >= 2);
-  if (oneToOne && repeated) {
+  if (oneToOne && [...seen.values()].every(n => n >= 2)) {
     return { verdict: 'PER-EDGE-NODE', reason: `${nodes.size} edge nodes, ${buckets.size} buckets, one bucket per node: the server counts the Railway edge, not the client`, facts };
   }
-  return { verdict: 'INCONCLUSIVE', reason: 'buckets vary within an edge node: this client\'s own address changes between connections; run from a fixed address', facts };
+  if (oneToOne || collided) return { verdict: 'INCONCLUSIVE', reason: 'buckets look per edge node, but a node was seen once or buckets shared a Reset second; run again', facts };
+  return { verdict: 'INCONCLUSIVE', reason: 'buckets vary within an edge node: either this client\'s address changes between connections or buckets are keyed some other way; run from a fixed address', facts };
 }
 
 function probe(origin, headers = {}) {
@@ -117,11 +131,11 @@ export async function verifyProxyIdentity({ origin }) {
   const samples = [];
   const order = [];
   for (let i = 0; i < PLAIN_REQUESTS; i++) order.push(null);
-  for (let r = 0; r < FORGED_ROUNDS; r++) for (const h of FORGED) order.push(h);
+  for (let r = 0; r < FORGED_ROUNDS; r++) for (const h of forgedSet()) order.push(h);
   for (const headers of order) {
     if (Date.now() - started > RUN_BUDGET_MS) break;
     const s = await probe(origin, headers || {});
-    samples.push({ ...s, forged: !!headers, forgedWith: headers ? Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('') : null });
+    samples.push({ ...s, forged: !!headers && !!headers['x-forwarded-for'], realIpOnly: !!headers && !headers['x-forwarded-for'], forgedWith: headers ? Object.entries(headers).map(([k, v]) => `${k}: ${v}`).join('') : null });
   }
   const result = classify(samples, startedAt);
   return { ...result, samples, elapsedMs: Date.now() - started };
@@ -150,5 +164,5 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   if (errors.length) console.log(`  ${errors.length} request(s) did not answer 200: ${[...new Set(errors.map(s => s.status || s.error))].join(', ')}`);
   console.log(`  ${JSON.stringify(out.facts)} in ${Math.round(out.elapsedMs / 1000)} s`);
   console.log(`PROXY IDENTITY: ${out.verdict} — ${out.reason} (${origin}, ${new Date().toISOString()})`);
-  process.exit(out.verdict === 'PER-CLIENT' ? 0 : out.verdict === 'INCONCLUSIVE' ? 2 : 1);
+  process.exit(out.verdict === 'SINGLE-BUCKET' ? 0 : out.verdict === 'INCONCLUSIVE' ? 2 : 1);
 }

@@ -117,10 +117,12 @@ jobs:
       - name: Proxy identity of the anonymous rate limiters (advisory, #653)
         shell: bash
         run: |
-          set -uo pipefail
+          # GitHub runs bash with -e: a non-zero probe must not abort the step.
+          set +e
           node tools/verify-deployment-proxy.mjs --origin "$STAGING_ORIGIN" \
             > "$RUNNER_TEMP/release-audit/proxy-identity.txt" 2>&1
           status=$?
+          set -e
           cat "$RUNNER_TEMP/release-audit/proxy-identity.txt"
           echo "$(tail -n 1 "$RUNNER_TEMP/release-audit/proxy-identity.txt") — exit $status, advisory until #653 is closed" >> "$GITHUB_STEP_SUMMARY"
           exit 0
