@@ -212,14 +212,16 @@ enum BridgeSelfCheck {
                 out = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
             }
             let s = ink.surfaceState
-            // The reload policy, as a table: more than 2 ends inside 30 s stop reloading.
+            // The reload policy, as a table: a run of more than 2 ends, each within 30 s of the last, stops reloading.
             let now = Date()
             let policy = WebShell.Coordinator.self
             let policyOK =
                 policy.recovery(after: [], at: now) == ([now], true) &&
                 policy.recovery(after: [now - 10], at: now).reload &&
                 !policy.recovery(after: [now - 10, now - 5], at: now).reload &&
-                policy.recovery(after: [now - 40, now - 5], at: now) == ([now - 5, now], true)
+                policy.recovery(after: [now - 40, now - 5], at: now) == ([now - 5, now], true) &&
+                // A slow crash loop, each end 20 s after the last, still stops.
+                !policy.recovery(after: [now - 40, now - 20], at: now).reload
             let checks: [(String, Bool)] = [
                 ("pageAliveAfterContentEnd", out["pageAlive"] as? Bool == true),
                 ("bridgeAfterContentEnd", out["bridge"] as? Bool == true),
