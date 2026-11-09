@@ -156,7 +156,7 @@
     "test:exam:handwriting": "node client/test/exam-unread-handwriting-check.mjs",
     "test:platform:exam-handwriting": "node server/test/exam-handwriting-check.mjs",
     "test:exam:analysis": "node client/test/exam-analysis-check.mjs",
-    "test:india:pyq": "node client/test/india-pyq-check.mjs && node client/test/past-papers-flag-check.mjs",
+    "test:india:pyq": "node client/test/india-pyq-check.mjs && node client/test/past-papers-flag-check.mjs && node client/test/pyq-figure-check.mjs",
     "test:teacher:targeting": "node server/test/india-syllabus-snapshot-check.mjs && node server/test/assignment-targeting-check.mjs",
     "syllabus:server": "node tools/generate-server-syllabus.mjs",
     "test:platform:contracts": "node server/test/account-lifecycle-contract-check.mjs && node server/test/account-lifecycle-journey-check.mjs && node server/test/billing-payment-retention-migration-check.mjs && node server/test/apple-billing-check.mjs && node server/test/premium-authority-check.mjs && node server/test/google-billing-check.mjs && node server/test/auth-delivery-config-check.mjs && node server/test/auth-delivery-worker-check.mjs && node server/test/platform-migration-check.mjs && node server/test/platform-schema-check.mjs && node server/test/platform-sync-pagination-check.mjs && node server/test/production-db-bootstrap-check.mjs && node server/test/production-storage-config-check.mjs && node server/test/razorpay-billing-check.mjs",
