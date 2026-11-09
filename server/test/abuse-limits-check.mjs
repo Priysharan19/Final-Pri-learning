@@ -19,6 +19,7 @@ import './support/hermetic.mjs';
 delete process.env.PRI_HANDWRITING_API_KEY;
 // The AI tutor ships dark (PRI_FEATURE_TUTOR); its declared limit is measured with it on.
 process.env.PRI_FEATURE_TUTOR = '1';
+process.env.PRI_FEATURE_LINE_CHECK = '1';
 
 const { startApp, registerAccount, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');

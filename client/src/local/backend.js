@@ -6358,6 +6358,8 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/tutor'
+    || key === 'POST /practice/:id/tutor/diagnose'
+    || key === 'POST /practice/:id/tutor/line-check'
     || key === 'POST /practice/:id/discard'
     || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);
