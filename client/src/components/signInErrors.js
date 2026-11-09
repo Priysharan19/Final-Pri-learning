@@ -28,6 +28,12 @@ export function signInErrorCopy(error, { expired = false } = {}) {
   const code = typeof error?.code === 'string' ? error.code : '';
   const status = Number(error?.status) || 0;
   if (isNetworkFailure(error)) return { key: 'signup.offlineError', kind: 'network' };
+  // All browser mutations pass the server's Origin and session-CSRF guards.
+  // Treat these as distinct actionable failures, never as an incorrect email
+  // or a broken mail provider. Keep the guards enabled; fix the origin at
+  // deployment time rather than retrying from an untrusted address.
+  if (code === 'ORIGIN_REJECTED') return { key: 'signup.originRejected', kind: 'configuration' };
+  if (code === 'CSRF_REJECTED') return { key: 'signup.sessionNeedsRefresh', kind: 'expired' };
   if (code === 'OTP_INVALID') {
     if (expired) return { key: 'signup.codeExpired', kind: 'expired' };
     const left = Number.isFinite(error?.attemptsRemaining) ? Number(error.attemptsRemaining) : null;
