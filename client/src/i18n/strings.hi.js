@@ -921,6 +921,10 @@ export default {
   'review.dueToday': { one: '{n} बिंदु दोहराने का समय है', other: '{n} बिंदु दोहराने का समय है' },
   'review.dueTodayWhy': 'हर बिंदु को आपने पिछली बार कब और कैसे किया, उससे लगाया गया अनुमान। यह अनुमान है, परीक्षा का परिणाम नहीं।',
   'review.recall': 'अनुमानित याद {percent}%',
+  'review.history': "पिछली बार {attempts} में से {correct} सही, {when}",
+  'review.lastToday': "आज",
+  'review.lastDays': { one: "{n} दिन पहले", other: "{n} दिन पहले" },
+  'home.reason.reviews': "अनुमान इस पर आधारित है कि आपने हर एक का अभ्यास आखिरी बार कब किया। अभी थोड़ा दोहराने से वह याद रहेगा।",
   'review.overdue': { one: '{n} दिन पहले देय', other: '{n} दिन पहले देय' },
   'review.practise': 'दोहराएँ',
   // ── The error notebook ─────────────────────────────────────────────────────
@@ -1242,7 +1246,6 @@ export default {
   'home.thisWeek': "यह सप्ताह",
   'home.todayCount': "आज {goal} में से {done}",
   'home.weekSummary': { one: "पिछले 7 में से {n} दिन पढ़ाई की", other: "पिछले 7 में से {n} दिन पढ़ाई की" },
-  'home.reviewDue': { one: 'अंतराल पुनरावृत्ति के लिए आपका {n} टॉपिक बाकी है।', other: 'अंतराल पुनरावृत्ति के लिए आपके {n} टॉपिक बाकी हैं।' },
   'home.kicker.next': "अगला",
   'home.kicker.continue': "जारी रखें",
   'home.kicker.exam': "परीक्षा चल रही है",

@@ -9,6 +9,18 @@ import TermGloss from '../components/TermGloss.jsx';
 // (engine/reviewQueue.js); signed out or offline it is null and this card
 // renders nothing. It is a support card: it never holds the page's primary
 // action, and says plainly that recall is an estimate.
+// "Last time 1 of 3 right, 12 days ago · ": the record the recall estimate is
+// read from. Said only when the server sent the counts.
+export function reviewHistory(r, t, now) {
+  const attempts = Number(r?.attempts) || 0;
+  const lastAt = Number(r?.lastAt) || 0;
+  if (attempts < 1 || lastAt <= 0) return '';
+  const correct = Math.min(attempts, Math.max(0, Number(r.correct) || 0));
+  const days = Math.max(0, Math.floor((now - lastAt) / 86400000));
+  const when = days < 1 ? t('review.lastToday') : t('review.lastDays', { n: days, count: days });
+  return t('review.history', { correct, attempts, when }) + ' · ';
+}
+
 export default function ReviewQueueCard({ user, limit = 4 }) {
   const t = useT();
   const nav = useNavigate();
@@ -20,6 +32,7 @@ export default function ReviewQueueCard({ user, limit = 4 }) {
   }, [user?.id]);
   if (!queue || !queue.due?.length) return null;
   const n = queue.dueCount || queue.due.length;
+  const now = Date.now();
   return (
     <article className="home-card review-queue" data-review-queue-card aria-labelledby="review-queue-title">
       <span className="sc-label">{t('review.dueTodayKicker')}</span>
@@ -32,6 +45,7 @@ export default function ReviewQueueCard({ user, limit = 4 }) {
               <span lang="en"><TermGloss text={r.chapterName || r.subtopic} /></span>
               {r.text && <span className="muted review-queue-text" lang="en">{r.text}</span>}
               <span className="muted review-queue-recall">
+                {reviewHistory(r, t, now)}
                 {t('review.recall', { percent: Math.round(r.recall * 100) })}
                 {r.overdueDays >= 1 ? ` · ${t('review.overdue', { n: Math.round(r.overdueDays), count: Math.round(r.overdueDays) })}` : ''}
               </span>

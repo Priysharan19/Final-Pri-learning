@@ -860,6 +860,10 @@ export default {
   'review.dueToday': { one: '{n} dot point is due for review', other: '{n} dot points are due for review' },
   'review.dueTodayWhy': 'Estimated from when you last practised each dot point and how it went. An estimate, not a test result.',
   'review.recall': 'estimated recall {percent}%',
+  'review.history': "Last time {correct} of {attempts} right, {when}",
+  'review.lastToday': "today",
+  'review.lastDays': { one: "{n} day ago", other: "{n} days ago" },
+  'home.reason.reviews': "Estimated from when you last practised each one. A short review now keeps it from fading.",
   'review.overdue': { one: 'due {n} day ago', other: 'due {n} days ago' },
   'review.practise': 'Review',
   // ── The error notebook ─────────────────────────────────────────────────────
@@ -1180,7 +1184,6 @@ export default {
   'home.thisWeek': "This week",
   'home.todayCount': "{done} of {goal} today",
   'home.weekSummary': { one: "Studied on {n} of the last 7 days", other: "Studied on {n} of the last 7 days" },
-  'home.reviewDue': { one: 'You have {n} topic due for spaced review.', other: 'You have {n} topics due for spaced review.' },
   'home.kicker.next': "Next",
   'home.kicker.continue': "Continue",
   'home.kicker.exam': "Exam in progress",
