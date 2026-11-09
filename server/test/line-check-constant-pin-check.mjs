@@ -64,6 +64,16 @@ if (sv) {
   eq(prefixRight.attemptAt, 1, '— and the line before the constant is what is judged');
 }
 
+// ── 2b · Re-review: any one-letter relation determines that letter ──────────
+for (const [r, w] of [['n*n = 19*n', 'n*n = 18*n'], ['2n + 3 = 41', '2n + 3 = 43'], ['n^2 - 19n = 0', 'n^2 - 18n = 0'], ['N = 19', 'n = 18'], ['2n + 3 > 7', '2n + 3 > 9'], ['x + x = 38', 'x + x = 36']]) {
+  eq([firstFinalAttempt([r], cForm), firstFinalAttempt([w], cForm)], [0, 0], `"${r}" and "${w}" both determine one letter: both attempts`);
+}
+if (sv) {
+  eq(lineCheckEvidence(sv.q, ['n*n = 19*n'], sv.answerText), lineCheckEvidence(sv.q, ['n*n = 18*n'], sv.answerText), 'reviewer case on the real path: identical evidence');
+  eq(lineCheckEvidence(sv.q, ['V = l b h', 'n*n = 19*n', 'V = 36036'], sv.answerText), lineCheckEvidence(sv.q, ['V = l b h', 'n*n = 18*n', 'V = 40000'], sv.answerText),
+    'after the first attempt everything reads the same — no "could not place" versus "break" difference');
+}
+
 // ── 3 · An arithmetic progression ────────────────────────────────────────────
 const ap = probe('c10-arithmetic-progressions', 2, 2);
 if (ap) {

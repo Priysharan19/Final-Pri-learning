@@ -202,9 +202,10 @@ function claimIsAttempt(text, form) {
   if (form.constant) {
     // Decided by which letters each side carries, never by the value.
     if (c.shape === 'expr') return c.symbols.size === 0;
-    const [l, r] = c.sides;
-    const nl = vars(l).length, nr = vars(r).length;
-    return (nl === 0 && nr <= 1) || (nr === 0 && nl <= 1);
+    // STRUCTURAL: any equation or inequality whose free symbols are all one
+    // letter (case-folded) determines that letter — "V = 36036", "n*n = 19*n",
+    // "2n + 3 > 7" — so it is an attempt whatever its form.
+    return new Set([...c.symbols].map(s => String(s).toLowerCase())).size <= 1;
   }
   // VALUE SIDE: any side of the line (or the line itself) that depends on
   // exactly the letters the answer's value side depends on — case-folded,
