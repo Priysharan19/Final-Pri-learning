@@ -123,6 +123,7 @@ html.ui-instrument.skin-aurora .in-signin-plot {
   min-width: 0; background: #0d0e12; color: #f4f3f7;
   overflow: hidden; border: 0;
 }
+html.ui-instrument.skin-aurora .pri-plot-viewport { position: absolute; inset: 0; }
 html.ui-instrument.skin-aurora .in-signin-plot canvas {
   position: absolute; inset: 0; display: block;
   width: 100%; height: 100%; touch-action: pan-y;
@@ -245,6 +246,12 @@ html.ui-instrument.skin-aurora .pri-plot-value {
    Keep the form wider than the plot in portrait orientation. */
 @media (min-width: 700px) and (max-width: 1020px) {
   html.ui-instrument.skin-aurora .auth-wrap > .in-signin-plot { display: block; min-height: 100%; }
+  /* A portrait iPad gets a correctly proportioned plotting window instead
+     of vertically stretching the function to fill a 1180px-tall column. */
+  html.ui-instrument.skin-aurora .pri-plot-viewport {
+    inset: auto 0; top: 50%; height: min(54vh, 540px);
+    transform: translateY(-50%);
+  }
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
     grid-template-columns: minmax(0,.83fr) minmax(0,1.17fr);
   }
