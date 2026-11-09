@@ -81,6 +81,27 @@ export const nextRungAfter = level => (rungLevelOf(level) >= HINT_RUNGS.length ?
 const text = v => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const stepText = s => text(s?.d) || text(s?.h);
 
+/** The answer as text, in the forms a rung could state it. */
+function answerTexts(q) {
+  const a = q?.answer || {};
+  const out = [];
+  const num = v => (Number.isFinite(v) ? String(Number.isInteger(v) ? v : Number(v.toPrecision(12))) : null);
+  if (q?.answerType === 'mcq' && Array.isArray(q.mcqOptions)) {
+    const o = q.mcqOptions[a.correctIndex];
+    out.push(typeof o === 'string' ? o : o?.text);
+  }
+  out.push(num(a.value), a.canonicalInput, a.expr, ...(Array.isArray(a.values) ? a.values.map(num) : []));
+  if (a.simplestFraction) out.push(`${a.simplestFraction.n}/${a.simplestFraction.d}`);
+  return out.filter(v => typeof v === 'string' && v.trim());
+}
+/** Does a rung's text state this answer? A number as a whole token; other forms by plain containment. */
+export function containsAnswer(rung, answer) {
+  const r = plain(rung), a = plain(answer);
+  if (!a) return false;
+  if (/^-?\d+(\.\d+)?$/.test(a)) return new RegExp(`(?<![\\d.])${a.replace(/[.\-]/g, m => `\\${m}`)}(?![\\d.])`).test(r);
+  return r.includes(a);
+}
+
 /** Text reduced to what a student reads: no TeX markup, spacing or case. */
 const plain = t => String(t).replace(/\\(left|right|,|;|!|quad|displaystyle)/g, '').replace(/\\(cdot|times)/g, '*')
   .replace(/[$\\{}\s]/g, '').replace(/²/g, '^2').replace(/³/g, '^3').toLowerCase();
@@ -121,13 +142,26 @@ export function buildHintLadder(q) {
   // (the method line and the worked line are often the same sum) is skipped
   // for the next authored text (audit #7). Nothing is invented.
   const shown = [];
-  const pick = candidates => {
-    for (const c of candidates) if (c && !shown.some(t => repeats(t, c))) { shown.push(c); return c; }
-    return null;
+  const answers = answerTexts(q);
+  // A fall-through candidate (beyond the text the rung used before) must not
+  // be the final step, must not contain the answer, and is never taken on an
+  // MCQ, where a later step can be the keyed option. If no such candidate
+  // adds anything, the rung keeps its old text: a rung the student pays for
+  // is never emptied by this rule.
+  const safe = c => c && !answers.some(a => containsAnswer(c, a));
+  const pick = (original, fallThrough) => {
+    const first = original.find(Boolean) || null;
+    if (first && !shown.some(t => repeats(t, first))) { shown.push(first); return first; }
+    if (q?.answerType !== 'mcq') {
+      for (const c of fallThrough) if (safe(c) && !shown.some(t => repeats(t, c))) { shown.push(c); return c; }
+    }
+    if (first) shown.push(first);
+    return first;
   };
-  const nudge = pick([hints[0], text(steps[0]?.h)]);
-  const method = pick([hints[1], text(steps[1]?.h), hints[0] ? text(steps[0]?.h) : null]);
-  const worked = pick([stepText(steps[0]), hints[2], ...steps.slice(1).map(stepText), ...hints.slice(3)]);
+  const middle = steps.slice(1, -1).map(stepText);
+  const nudge = pick([hints[0], text(steps[0]?.h)], []);
+  const method = pick([hints[1], text(steps[1]?.h), hints[0] ? text(steps[0]?.h) : null], [text(steps[2]?.h)]);
+  const worked = pick([stepText(steps[0]), hints[2]], [hints[2], ...middle, ...hints.slice(3)]);
   const texts = { nudge, method, worked, solution: null };
   return HINT_RUNGS.map((rung, i) => ({
     rung, level: i + 1, text: texts[rung], thin: rung !== 'solution' && !texts[rung],

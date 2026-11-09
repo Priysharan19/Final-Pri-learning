@@ -21,7 +21,8 @@ export function praiseFor(a = {}) {
   const milestones = lines.filter(l => l?.status === 'ok' && l.milestone).length;
   if (ok && !lines.some(l => l?.status === 'break')) {
     kinds.push('working-checks-out');
-    parts.push(ok === 1 ? 'and your working line checks out' : `and all ${ok} checked lines of working hold`);
+    const lead = parts.length ? 'and ' : '';
+    parts.push(ok === 1 ? `${lead}your working line checks out` : `${lead}all ${ok} checked lines of working hold`);
     if (milestones) kinds.push('method-steps');
   }
   const d = Number(a.difficulty), max = Number(a.maxDifficulty) || 4;
