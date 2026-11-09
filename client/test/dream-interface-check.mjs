@@ -495,8 +495,6 @@ check('a symbol correction never outlives the strokes it was made on, and finger
 
 check('no bar over scrolling content is blurred', () => {
   // The exam head's rule lives with the exam room's styles (workspace.css).
-  // The v1.0 top bar is gone; the Instrument's bar is opaque in the plain skin.
-  // (The Aurora skin's glass on chrome is V1 decision D9, held by
   // aurora-skin-check, which also keeps it off the practice bars below.)
   assert.doesNotMatch(themeCss, /\.topbar\b/, 'no rule styles the retired v1.0 top bar');
   assert.match(readFileSync(join(ROOT, 'src/instrument/instrument.css'), 'utf8'), /\.in-bar \{[^}]*background: var\(--in-base\);/);
