@@ -668,10 +668,12 @@ html.ui-instrument .set-v > .btn[aria-pressed]::after {
 html.ui-instrument .set-v > .btn[aria-pressed="true"] { background: var(--in-tx); }
 html.ui-instrument .set-v > .btn[aria-pressed="true"]::after { transform: translateX(16px); }
 html.ui-instrument .set-v > .btn[aria-pressed]:disabled { opacity: 0.45; }
-/* On touch the switch itself is the 44px target (a box, not only a hit area:
-   the Android and iPhone shell audits measure the control's own box) and the
-   38 x 22 track is drawn inside it, so it looks the same. */
-@media (pointer: coarse) {
+/* The switch itself is the 44px target on every device (a box, not only a
+   hit area: the Android and iPhone shell audits measure the control's own
+   box), and the 38 x 22 track is drawn inside it, so it looks the same. Not
+   keyed on (pointer: coarse): an Android 13 WebView can report a fine pointer
+   on a touch screen, and the switch was then 22 px tall. */
+@media all {
   html.ui-instrument .set-v > .btn[aria-pressed] { width: 44px; min-width: 44px; height: 44px; min-height: 44px !important; background: transparent; }
   html.ui-instrument .set-v > .btn[aria-pressed]::before { content: ''; position: absolute; inset: 11px 3px; border-radius: 4px; background: var(--in-l5); transition: background 160ms cubic-bezier(.2, 0, 0, 1); }
   html.ui-instrument .set-v > .btn[aria-pressed="true"] { background: transparent; }
