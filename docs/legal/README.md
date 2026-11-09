@@ -27,6 +27,16 @@ and `counsel/README.md` says how the owner sends them:
   `npm run test:legal`) fails if a quote or a location drifts from the tree.
 - `counsel/COUNSEL-INFORMATION-PACK.md` — the background and all 35 questions.
 
+## Status, 9 November 2026 (D17, with #737)
+
+- The privacy notice (EN + HI), the store disclosures, the public site and
+  the counsel sheet describe the D17 prompt that #737 adds: before the first
+  picture is sent, the app asks once, naming OpenAI, and nothing is sent until
+  the student agrees. This change belongs in the same train as #737:
+  `client/test/legal-pages-check.mjs` and `tools/counsel-pack-check.mjs` fail
+  without its code, and `tools/legal-promises.mjs` refuses a nomination where
+  the notice says "Nothing is sent until you agree" and the prompt is absent.
+
 ## Status, 9 November 2026
 
 - The privacy notice's D18 sentences (EN + HI) now say what the accounts

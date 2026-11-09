@@ -1,7 +1,8 @@
 # Questions only Indian counsel can answer — Pri Learning
 
 **Prepared:** 8 November 2026 by the engineering team (an AI coding agent working for the owner),
-from `main` at `1d3829103` plus the notice corrections on `task/l7-legal-notices`. **This is not
+from `main` at `1d3829103` plus the notice corrections on `task/l7-legal-notices`; §4 quotes
+the D17 prompt from pull request #737 and holds once #737 is in the same tree. **This is not
 legal advice and records no legal conclusion.** Nobody qualified in Indian law has reviewed any
 notice yet.
 
@@ -194,12 +195,70 @@ person is an adult or the child's parent, and both the code and the notice say s
 Nothing leaves the device until it is accepted, and declining keeps the student on typed answers."
 Counsel sets the wording.
 
-**What the code does at `1d3829103`:** there is no prompt. Reading is on by default for a signed-in
-account and can be switched off in Settings → Handwriting; it stays off for a child until a guardian
-confirms, because the server refuses reading to an unconfirmed child account. The Settings text
-names "an outside AI reading service" and not OpenAI; the privacy notice and the guardian notice
-name OpenAI. Every notice and store disclosure describes default-on, because that is what the code
-does, and all of them change in the same release as the prompt.
+**What the code does with pull request #737 (lane L4):** before the first handwriting read, photo
+of working or photo of a question, the app shows a one-time prompt naming OpenAI. Nothing is sent
+until the student presses "Send it to be read". "No, I'll type my answers" turns server reading
+off in Settings → Handwriting; turning it back on asks again before the next read. The answer is
+kept **on the device only**, per local profile and per wording version (`pri-reader-permission-v1`
+in local storage); there is no server record of it. A change to what the student agrees to must
+bump `READER_PERMISSION_VERSION`, which asks every student again. The setting itself is still on by
+default for a signed-in account, and stays off for a child until a guardian confirms. The wording is
+a draft pending your answer; the Hindi is a draft pending a native-speaker review (D11).
+
+**Not covered by the prompt:** the optional "check my working" feature (its own setting, which
+sends the working lines and the question text and calls the provider "an outside AI service"), and
+exam handwriting, which is switched off in shipped builds and must be gated before it is switched
+on. The Settings → Handwriting text also says "an outside AI reading service" rather than naming
+OpenAI.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.title`
+
+> Before Pri reads your writing
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.leadInk`
+
+> To read your handwriting, Pri’s server sends a picture of it to OpenAI, an AI company. OpenAI reads the picture and sends back the text it sees.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.leadPhoto`
+
+> To read a photo of your working, Pri’s server sends the photo to OpenAI, an AI company. OpenAI reads it and sends back the text it sees.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.leadQuestionPhoto`
+
+> To find the question in your photo, Pri’s server sends the photo to OpenAI, an AI company. OpenAI reads it and sends back the text it sees.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.what`
+
+> For handwriting, only a picture drawn from your strokes is sent: not the question, not the answer, not your name. A photo is sent as you took it, so keep your name and anything private out of the frame.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.keep`
+
+> Pri does not keep the picture. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.marks`
+
+> The reading only suggests what you wrote. You check it, and Pri’s own marker decides the mark, never the AI.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.choice`
+
+> Nothing is sent until you choose. If you would rather not, you can type every answer instead, and change this later in Settings → Handwriting.
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.accept`
+
+> Send it to be read
+
+**Current text** · `client/src/i18n/strings.en.js` · `readerPermission.decline`
+
+> No, I’ll type my answers
+
+**Current text** · `docs/legal/privacy.md`
+
+> **Nothing is sent until you agree.** The first time a picture would be sent —
+> your handwriting, a photo of your working or a photo of a question — the app
+> asks your permission once, naming OpenAI. If you say no, reading is turned
+> off and you type your answers; if you turn it back on, you are asked again
+> before the next picture. Your answer is kept on your device, for that
+> profile, and the app asks again whenever what it tells you changes.
 
 **Current text** · `client/src/i18n/strings.en.js` · `settings.cloudHandwritingCopy`
 
@@ -207,47 +266,34 @@ does, and all of them change in the same release as the prompt.
 
 **Current text** · `docs/legal/privacy.md`
 
-> This is on by default for a signed-in account
-> and you can turn it off at any time in Settings → Handwriting, after which you
-> type your answers; it stays off for an account under 18 until a parent or
-> guardian has confirmed it, and it never runs without an account.
-
-**Current text** · `docs/legal/privacy.md`
-
 > It is your camera's picture, resized and re-encoded but not
 > otherwise altered — so whatever is in the frame is sent, which can include the
 > printed question, a name written on the page, or anything else on the paper.
 
-**Lives in** · `client/src/ink/cloudReader.js` · `export function cloudReadingWanted`
+**Lives in** · `client/src/ink/readerPermission.js` · `export const READER_PERMISSION_VERSION = 1;`
+**Lives in** · `client/src/ink/readerPermission.js` · `pri-reader-permission-v1`
+**Lives in** · `client/src/ink/ReaderPermission.jsx` · `role="dialog" aria-modal="true"`
+**Lives in** · `client/src/i18n/strings.hi.js` · `'readerPermission.leadInk'`
 **Lives in** · `client/src/ink/cloudReader.js` · `export function cloudReadingEnabled`
 **Lives in** · `server/platform/handwriting.js` · `FORBIDDEN_FIELDS`
 
-**Not yet in the code:** the prompt itself, its text in English and Hindi, and the record that it
-was accepted. Lane L4 (handwriting) builds it; when it lands, this section quotes its text and names
-its file, and the privacy notice, the store disclosures and the public site's home page are
-rewritten with it.
-
-What engineering understands the prompt has to state, for counsel to put into words (facts, not
-proposed wording): that OpenAI reads the writing; that what is sent is a picture drawn from the
-strokes, or the whole photograph with whatever is in the frame; that the question, the expected
-answer and the student's name are not sent with it; that OpenAI processes it outside India; that
-Pri keeps no copy of the picture and keeps the returned text for 90 days; that OpenAI may hold the
-request for abuse monitoring under its own terms; that declining keeps typed answers working; and
-where to change the choice later.
-
 **For counsel:**
 
-1. What should the prompt say, in English and Hindi, and is it the "explicit permission" Apple
-   Guideline 5.1.2(i) asks for before personal data goes to a third-party AI? (Q14)
-2. For an adult student, is a prompt with an accept button the right lawful basis, or does
-   contract performance or a legitimate use apply? Is today's default-on with disclosure acceptable
-   until the prompt ships? (Q13)
-3. For a child, who must accept it: the child, the guardian, or both, and must the guardian's
-   confirmation cover it? (Q14)
-4. Is OpenAI's abuse-monitoring retention (no zero-data-retention agreement is on record) acceptable
+1. Is the prompt's wording above right, in English and in Hindi, and is it the "explicit
+   permission" Apple Guideline 5.1.2(i) asks for before personal data goes to a third-party AI?
+   (Q14)
+2. Is a record kept only on the device (per profile and wording version, no server copy) enough
+   evidence that the student agreed, or must the server record the acceptance?
+3. For an adult student, is an accept button the right lawful basis, or does contract performance
+   or a legitimate use apply? (Q13)
+4. For a child, the student accepts the prompt after the guardian has confirmed the account. Must
+   the guardian accept it as well, or does the guardian's confirmation (whose notice names OpenAI)
+   cover it? (Q14)
+5. Must "check my working", which also sends the question text, have its own prompt naming OpenAI,
+   and must the Settings text name OpenAI rather than "an outside AI reading service"? (Q17)
+6. Is OpenAI's abuse-monitoring retention (no zero-data-retention agreement is on record) acceptable
    for children's data, given OpenAI's own under-18 guidance? (Q15)
-5. Is the photograph warning sufficient, and does the optional "check my working" feature, which
-   also sends the question text, need its own prompt? (Q16, Q17)
+7. Is the photograph warning sufficient? (Q16)
 
 ## 5. Erasure of an unconfirmed or withdrawn child account [D18]
 
