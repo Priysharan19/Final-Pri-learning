@@ -78,6 +78,8 @@ const readsAs = async (page, text) => {
 
 export const flow = {
   id: 'stale-cloud',
+  // Playwright must intercept synthetic /v1/ routes before the service worker.
+  inspectNetwork: true,
   name: 'Cloud · late results never rewrite an attempt',
   online: true,
 

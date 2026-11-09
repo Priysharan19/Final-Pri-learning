@@ -16,11 +16,12 @@ import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
+import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
@@ -41,7 +42,7 @@ import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 // The free plan's daily cap is decided here, per account, where a creditable
 // question is issued (#537): practiceAllowance.js reads the server's own
 // entitlement record and its own count, inside the issue transaction.
-import { practiceAllowanceVerdict, practiceModeCounted, recordPracticeIssue, refusePracticeCap } from './practiceAllowance.js';
+import { practiceAllowanceVerdict, practiceModeCounted, premiumContentRefusal, recordPracticeIssue, refusePracticeCap, refusePremiumContent } from './practiceAllowance.js';
 import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
 
@@ -349,30 +350,96 @@ function readQuestionRequest(body, fields) {
 }
 
 /**
+ * The seek, shared by both pickers below: draw seeds and keep the first
+ * question that is fresh and, when asked for, springs the misconception or is
+ * written out. A generator: it yields each batch of drawn questions and is
+ * sent back, for each, whether the account has already resolved it (null when
+ * no account is known). "Fresh" is neither in the request's `avoid` list (what
+ * this device has just been served) nor resolved by the account.
+ *
+ * When nothing fresh is found the fallback is the best of what was drawn:
+ * unresolved before resolved (an unresolved question can still earn credit; a
+ * resolved one is a repeat and cannot), then not avoided before avoided, then
+ * the earliest drawn. Every resolved question met adds to the budget exactly
+ * as an avoided one does, since it rules out one more item of the pool.
+ */
+function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), trap, written = false }, { draw, tries, batches }) {
+  // `written` asks for a form the student writes out; a multiple-choice
+  // item can be guessed, which a diagnostic must avoid where it can.
+  const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
+  const resolvedElsewhere = new Set();
+  const budget = () => tries ?? seekBudget(avoid.size + resolvedElsewhere.size);
+  let fallback = null, drawn = 0;
+  for (let round = 0; drawn < budget(); round++) {
+    const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
+    const batch = [];
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint));
+    const resolved = yield batch;
+    for (const [i, q] of batch.entries()) {
+      const hash = opaqueContentHash(q.contentHash);
+      const avoided = avoid.has(hash);
+      const done = resolved?.[i] === true;
+      if (done && !avoided) resolvedElsewhere.add(hash);
+      if (!avoided && !done && springs(q)) return { q, repeat: false, trapDelivered: !!trap };
+      const rank = (done ? 0 : 2) + (avoided ? 0 : 1);
+      if (!fallback || rank > fallback.rank) fallback = { q, rank };
+    }
+  }
+  return { q: fallback.q, repeat: fallback.rank < 3, trapDelivered: !!(trap && carriesTrap(trap.owner, fallback.q, trap.key)) };
+}
+
+/**
  * The server picks the question: a fresh random seed, re-drawn (seekBudget)
  * to avoid content the student has just seen and, when a misconception is
  * being worked on, to find a form that can spring it. `seed` is given only by
  * the test suites. `draw` is where each seed comes from — crypto.randomInt in
  * the product; a test may hand in a seeded one. Throws when the generator has
  * no such form.
+ *
+ * This one knows no account (signed-out preparation, and the seek-budget
+ * suite): it draws one seed at a time, exactly as before. An account's
+ * questions are picked by chooseQuestionFor, which also passes over what the
+ * account has resolved.
  */
-function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null,
-  { draw = () => randomInt(0x80000000), tries = seekBudget(avoid?.size || 0) } = {}) {
+function chooseQuestion(request, seed = null, { draw = () => randomInt(0x80000000), tries } = {}) {
+  const { generator, difficulty, dotpoint, trap } = request;
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
-  let fallback = null;
-  for (let i = 0; i < tries; i++) {
-    const q = generateQuestion(generator, difficulty, draw(), dotpoint);
-    const fresh = !avoid.has(opaqueContentHash(q.contentHash));
-    // `written` asks for a form the student writes out; a multiple-choice
-    // item can be guessed, which a diagnostic must avoid where it can.
-    const springs = (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
-    if (fresh && springs) return { q, repeat: false, trapDelivered: !!trap };
-    if (!fallback || (fresh && !fallback.fresh)) fallback = { q, fresh };
+  const seek = seekQuestion(request, { draw, tries, batches: [1] });
+  let step = seek.next();
+  while (!step.done) step = seek.next(null);
+  return step.value;
+}
+
+// An account's seek asks its records once per batch: a small first batch,
+// since nearly every issue ends on its first fresh draw, then larger ones
+// when the cell is nearly exhausted (the 300-draw cap is five reads).
+const ACCOUNT_SEEK_BATCHES = [8, 32, 96];
+
+/**
+ * chooseQuestion for a signed-in account. The request's `avoid` list is what
+ * this DEVICE has just been served, held in its memory: empty after a relaunch
+ * and on any other device. The account's seen records are the server's own
+ * and are what the repeat verdict reads, so the seek passes over everything
+ * they hold too. Otherwise a relaunched app could be handed content it had
+ * already resolved, marked a repeat for no credit, while fresh questions were
+ * left in the pool. A repeat is served only when the cell has nothing fresh
+ * left for this account (or the budget could not find it), and it is flagged
+ * one, as before. Reads only; the verdict is still decided where it was.
+ */
+async function chooseQuestionFor(db, accountId, request, now, { draw = () => randomInt(0x80000000), tries } = {}) {
+  const seek = seekQuestion(request, { draw, tries, batches: ACCOUNT_SEEK_BATCHES });
+  let step = seek.next();
+  while (!step.done) {
+    const keys = step.value.map(q => seenKeysOf(q));
+    // A failed read is the store's failure, not an unsupported question: it is
+    // tagged so the routes rethrow it rather than answer 422.
+    const known = await seenAmong(db, accountId, keys.flat(), now).catch(error => { throw Object.assign(error, { pickerStore: true }); });
+    step = seek.next(keys.map(itemKeys => itemKeys.some(key => known.has(key))));
   }
-  return { q: fallback.q, repeat: !fallback.fresh, trapDelivered: !!(trap && carriesTrap(trap.owner, fallback.q, trap.key)) };
+  return step.value;
 }
 
 /**
@@ -452,6 +519,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const sealed = readPrepared(body.prepared);
       if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
       if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      // JEE Advanced's own questions are Premium (D19). Decided from the
+      // server's entitlement record before anything is generated or written,
+      // so a refused bind leaves the prepared token for an account that may.
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: sealed.g, now });
+      if (premiumGap) return refusePremiumContent(res, premiumGap);
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
@@ -461,6 +533,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     } else {
       const request = readQuestionRequest(body, ISSUE_FIELDS);
       if (request.error) return reject(res, ...request.error);
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
+      if (premiumGap) return refusePremiumContent(res, premiumGap);
       let seed = null;
       if (body.seed !== undefined) {
         if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
@@ -470,8 +544,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         seedGiven = true;
       }
-      try { ({ q, repeat, trapDelivered } = chooseQuestion(request, seed)); }
-      catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+      // A test's fixed seed is that question; otherwise the account's own records steer the seek.
+      try { ({ q, repeat, trapDelivered } = seed !== null ? chooseQuestion(request, seed) : await chooseQuestionFor(db, accountId, request, now)); }
+      catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
       q._generator = request.generator;
     }
@@ -486,18 +561,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Sealed with the question, so the receipt and the attempt carry it
     // whatever the device does or does not send.
     // (Seen and tried are records of one scope: one statement answers both.)
-    const seenKeys = seenKeysOf(q);
-    const triedKey = triedKeyOf(q);
-    const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
-    if (seenKeys.some(key => known.has(key))) { q._repeat = true; repeat = true; }
+    const triedKeys = triedKeysOf(q);
+    const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
+    const evidence = repeatEvidenceOf(q, known);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     // A try already spent on another copy of this content is spent on this one
     // (decided again, authoritatively, when it is marked). Content that has
     // resolved is a repeat and starts over with both tries: it earns nothing.
-    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && known.has(triedKey);
+    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && triedKeys.some(key => known.has(key));
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     // The free plan's daily cap counts the Practice surface's own modes; Rush,
     // Match and the placement check are "everything else", unlimited.
     const counted = practiceModeCounted(practiceMode);
@@ -575,6 +650,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // toward the free day exactly as a retry from History does on the device
     // (#537) — decided and counted under the account's issue lock.
     const outcome = await db.transaction(async () => {
+      // A JEE Advanced question seen while Premium was live is not repeated
+      // once it has lapsed (D19): the repeat is a new issue.
+      const premiumGap = await premiumContentRefusal(db, { accountId, generator: typeof q._generator === 'string' ? q._generator : q.subtopic, now });
+      if (premiumGap) return { premium: premiumGap };
       const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
       if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
@@ -582,6 +661,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await recordPracticeIssue(db, { accountId, now });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    if (outcome.premium) return refusePremiumContent(res, outcome.premium);
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
   });
@@ -724,7 +804,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const q = JSON.parse(escrow.response_json);
     // Decided now, not only at issue: copies issued before the first of them
     // was resolved are repeats the moment its solution has been shown.
-    if (await contentSeen(db, accountId, q, now)) q._repeat = true;
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     await markContentSeen(db, accountId, q, now);
     const ladder = ladderEvidence(viaHint ? HINT_RUNGS.length : await hintLevelOf(accountId, qid));
     const attemptId = randomUUID();
@@ -732,7 +813,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       marksEarned: 0, marksPossible: marksPossibleFor(q), creditedMarks: 0,
       hintLevel: ladder.hintLevel, markWeight: 0,
       questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
-      ...(q._repeat === true ? { repeat: true } : {}) };
+      ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}) };
     const hash = digest({ qid, operation: 'reveal' });
     for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
@@ -744,7 +825,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
       [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
         revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         contentId: opaqueContentId(q.contentId),
         subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
         dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
@@ -949,20 +1030,20 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // Whether this content has been resolved before, and whether a try has
       // been spent on any copy of it: both are records of one scope, asked for
       // together (they were two statements).
-      const seenKeys = seenKeysOf(q);
-      const triedKey = triedKeyOf(q);
-      const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
+      const triedKeys = triedKeysOf(q);
+      const known = await seenAmong(db, accountId, [...seenKeysOf(q), ...triedKeys], now);
       // Decided now, not only at issue: several copies of one question can be
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
-      if (seenKeys.some(key => known.has(key))) q._repeat = true;
+      const evidence = repeatEvidenceOf(q, known);
+      if (evidence) { q._repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
       const priorTry = held.get('practice-tries') || null;
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // A try spent on ANY copy of this content is spent on this one: the
       // first try is not renewed by asking for the question again. Content
       // already resolved is a repeat, which earns nothing and keeps its own
       // two tries.
-      const spent = tries >= 1 || (q._repeat !== true && known.has(triedKey));
+      const spent = tries >= 1 || (q._repeat !== true && triedKeys.some(key => known.has(key)));
       // The hint rungs served so far, as the server charged them.
       const hintLevel = await hintLevelOf(accountId, qid);
       return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel };
@@ -1190,7 +1271,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(notRead ? { workingNotRead: true } : {}),
         ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
-        ...(q._repeat === true ? { repeat: true } : {}),
+        ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
         stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
@@ -1252,11 +1333,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           [cursor, attemptId, accountId, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct,
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
-            ...(q._repeat === true ? { repeat: true } : {}),
+            ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
             contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
             mode: q._practiceMode || 'practice', inputMode: mode,
+            // The mistake notebook's evidence (engine/mistakeNotebook.js): for
+            // a wrong resolution, the student's own first broken line and the
+            // examiner's note on it, exactly as the deterministic step check
+            // reported them — nothing about the mark changes. A notebook twin
+            // names the mistake it retries, so a right answer here fixes it.
+            ...(!response.correct && !invalid ? firstErrorOf(stepReport) : {}),
+            ...(typeof q._twinOf === 'string' && q._twinOf ? { twinOf: q._twinOf } : {}),
             // Hint rungs are now server-committed (`hintLevel`, `hintRungs`,
             // `markWeight`, `creditedMarks`); tutor levels are still
             // client-observed, so restored progress must not claim independent
@@ -1301,11 +1389,32 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
   const filed = a => a.correct !== true && a.revealed !== true && typeof a.misconception === 'string' && a.misconception &&
     NOTEBOOK_MODES.has(a.mode || 'practice') && typeof a.subtopic === 'string' && a.subtopic;
 
+  // The prompts of this account's resolved questions, by id, in one read per
+  // hundred: the student's own history, from this account's escrow, gone once
+  // that has expired.
+  const promptsOf = async (accountId, ids, now) => {
+    const out = new Map();
+    const wanted = [...new Set(ids.filter(id => typeof id === 'string' && UUID.test(id)))];
+    for (let i = 0; i < wanted.length; i += 100) {
+      const chunk = wanted.slice(i, i + 100);
+      // Only `?` placeholders are joined into the statement; every value is bound.
+      const rows = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND expires_at>? AND key IN (" + chunk.map(() => '?').join(',') + ')',
+        [accountId, now, ...chunk]);
+      for (const row of rows) {
+        try { out.set(row.key, JSON.parse(row.response_json)); } catch { /* unreadable escrow: no prompt */ }
+      }
+    }
+    return out;
+  };
+
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const now = Date.now();
+    const attempts = await serverAttempts(accountId, NOTEBOOK_SCAN);
+    // `entries`: the misconception groups builds already installed read. Kept
+    // unchanged so a device that has not updated still shows its notebook.
     const groups = new Map();
-    for (const a of await serverAttempts(accountId, NOTEBOOK_SCAN)) {
+    for (const a of attempts) {
       if (!filed(a)) continue;
       const g = groups.get(a.misconception) || (groups.size < NOTEBOOK_GROUPS ? groups.set(a.misconception, {
         key: a.misconception, misconception: { id: a.misconception, nameKey: misconceptionById(a.misconception)?.name || null,
@@ -1318,20 +1427,29 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (g.items.length < NOTEBOOK_ITEMS) g.items.push({ id: a.id, questionId: a.questionId, subtopic: a.subtopic,
         dotpoint: a.dotpoint || null, difficulty: Number(a.difficulty) || 2, answeredAt: a.at });
     }
-    // The prompt of a resolved question is the student's own history; it is
-    // read from this account's escrow and is gone once that has expired.
-    for (const g of groups.values()) {
-      for (const item of g.items) {
-        const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
-          [accountId, item.questionId, now]);
-        let q = null;
-        try { q = sealed ? JSON.parse(sealed.response_json) : null; } catch { q = null; }
-        item.prompt = q ? String(q.prompt || '') : null;
-        item.canTwin = !!q && !q.multipart && !q.custom;
-      }
+    // `notebook`: every wrong resolution, with the first broken line, fixed by
+    // a correct twin, on a spaced review schedule — the shared pure engine
+    // (engine/mistakeNotebook.js) over the same graded-attempt events. The
+    // same on every plan (D19, D22).
+    const book = buildNotebook(attempts.map(a => ({ ...a, attemptId: a.attemptId || a.id })), { now });
+    const prompts = await promptsOf(accountId, [...[...groups.values()].flatMap(g => g.items.map(i => i.questionId)), ...book.entries.map(e => e.questionId)], now);
+    const promptFields = questionId => {
+      const q = prompts.get(questionId) || null;
+      return { prompt: q ? String(q.prompt || '') : null, canTwin: !!q && !q.multipart && !q.custom };
+    };
+    for (const g of groups.values()) for (const item of g.items) Object.assign(item, promptFields(item.questionId));
+    for (const g of book.groups) if (g.misconception) g.misconception = { ...g.misconception, nameKey: misconceptionById(g.misconception.id)?.name || null };
+    for (const item of book.entries) {
+      Object.assign(item, promptFields(item.questionId));
+      if (item.misconception) item.misconception = { ...item.misconception, nameKey: misconceptionById(item.misconception.id)?.name || null };
     }
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt) });
+    return res.status(200).json({
+      entries: [...groups.values()].sort((a, b) => b.count - a.count || b.lastAt - a.lastAt),
+      notebook: { total: book.total, shown: book.shown, dueCount: book.dueCount, nextDueAt: book.nextDueAt,
+        groups: book.groups.map(g => ({ key: g.key, subtopic: g.subtopic, misconception: g.misconception, count: g.count, open: g.open, lastAt: g.lastAt,
+          items: g.items.map(i => book.entries.find(e => e.id === i.id) || i) })) }
+    });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same
@@ -1350,36 +1468,54 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const row = await db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='graded-attempt'", [accountId, attemptId]);
     let attempt = null;
     try { attempt = row ? JSON.parse(row.payload_json) : null; } catch { attempt = null; }
-    if (!attempt || !filed(attempt)) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
+    // Every wrong resolution is in the notebook (engine/mistakeNotebook.js),
+    // so every one can be retried; one with a diagnosed slip is retried with
+    // a form drawn, where it can be, to spring the same slip.
+    if (!attempt || !isMistake({ ...attempt, attemptId: attempt.attemptId || attemptId })) return reject(res, 404, 'NOTEBOOK_ENTRY_NOT_FOUND', 'This notebook entry does not belong to this account.');
     const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, attempt.questionId, now]);
     if (!sealed) return reject(res, 410, 'NOTEBOOK_TWIN_EXPIRED', 'The original question is no longer held, so no twin can be drawn.');
     const original = JSON.parse(sealed.response_json);
     if (original.multipart || original.custom) return reject(res, 409, 'NOTEBOOK_TWIN_UNAVAILABLE', 'This question has no generated twin.');
     await ensureBanks();
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
+    const premiumGap = await premiumContentRefusal(db, { accountId, generator, now });
+    if (premiumGap) return refusePremiumContent(res, premiumGap);
     let chosen;
     try {
-      chosen = chooseQuestion({ generator, difficulty: Number(original.difficulty) || 2,
+      chosen = await chooseQuestionFor(db, accountId, { generator, difficulty: Number(original.difficulty) || 2,
         dotpoint: typeof original.dotpoint === 'string' ? original.dotpoint : undefined,
         avoid: new Set([opaqueContentHash(original.contentHash)]),
-        trap: { owner: original.subtopic, key: attempt.misconception } });
-    } catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+        trap: typeof attempt.misconception === 'string' && attempt.misconception ? { owner: original.subtopic, key: attempt.misconception } : null }, now);
+    } catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
     const q = chosen.q;
     q._practiceMode = 'review';
     q._generator = generator;
+    // Sealed with the question: its graded attempt names the mistake it
+    // retries, and a right answer fixes that mistake in the notebook.
+    q._twinOf = attemptId;
     let repeat = chosen.repeat;
-    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    const evidence = await contentSeenEvidence(db, accountId, q, now);
+    if (evidence) { q._repeat = true; repeat = true; if (evidence.ambiguous) q._repeatEvidence = 'legacy'; }
     const trySpent = !repeat && await contentTried(db, accountId, q, now);
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    await db.transaction(async () => {
+    // A twin is a question the account is issued in a capped mode ('review'),
+    // so it counts toward the free day like a History repeat (D19: 20
+    // questions a day) and is refused at the cap; before this it was issued
+    // uncounted, so a wrong answer's twins were an unlimited free supply.
+    const outcome = await db.transaction(async () => {
+      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+      if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+      await recordPracticeIssue(db, { accountId, now });
+      return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
+    if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);
     return res.status(201).json({ question: safeQuestion(id, q), accountId: String(accountId),
-      twin: { of: attemptId, misconception: attempt.misconception, trapDelivered: chosen.trapDelivered === true,
+      twin: { of: attemptId, misconception: attempt.misconception || null, trapDelivered: chosen.trapDelivered === true,
         sameDotpoint: !original.dotpoint || q.dotpoint === original.dotpoint || (q.dotpoints || []).includes(original.dotpoint) },
-      ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
+      ...(repeat ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}), ...(trySpent ? { triesLeft: 1 } : {}) });
   });
 
   // ── The spaced review queue, per dot point ──────────────────────────────
@@ -1408,4 +1544,4 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 // The same server-owned question choice, public projection and rubric, for the
 // examination router (server/platform/exams.js). One implementation, so a
 // paper and a practice question can never be chosen or marked by two rules.
-export { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash };
+export { ensureBanks, chooseQuestion, chooseQuestionFor, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash };

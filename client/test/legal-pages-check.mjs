@@ -220,6 +220,20 @@ ok(/off unless you turn it on/i.test(privacy),
   'and that sending handwriting to a server is off unless the student turns it on');
 ok(/not the question, not the expected answer/i.test(privacy),
   'and names what is never sent alongside the image');
+// D17 (lane L4, #737): a one-time prompt naming OpenAI comes before the first
+// picture of handwriting, a photo of working or a question photo, and nothing
+// is sent until the student agrees. The notice says so only because the code
+// does: the prompt's record and gate, and its catalogue text naming OpenAI.
+const permissionModule = join(ROOT, 'client/src/ink/readerPermission.js');
+const catalogueEn = readFileSync(join(ROOT, 'client/src/i18n/strings.en.js'), 'utf8');
+ok(/Nothing is sent until you agree/.test(privacy) && /asks your permission once, naming OpenAI/.test(privacy)
+  && /your handwriting, a photo of your working or a photo of a question/.test(privacy),
+  'the notice describes the D17 prompt: once, naming OpenAI, before handwriting, a photo of working or a question photo, nothing sent until the student agrees');
+ok(existsSync(permissionModule) && /export const READER_PERMISSION_VERSION\s*=/.test(readFileSync(permissionModule, 'utf8')),
+  'and the prompt it describes exists: client/src/ink/readerPermission.js keeps the versioned record and gate (#737)');
+ok(['leadInk', 'leadPhoto', 'leadQuestionPhoto'].every(k => new RegExp(`'readerPermission\\.${k}':[^\\n]*OpenAI`).test(catalogueEn))
+  && /'readerPermission\.choice':[^\n]*Nothing is sent until you choose/.test(catalogueEn),
+  'and its text names OpenAI for handwriting, a photo of working and a question photo, and says nothing is sent until the student chooses');
 // ── The translation may not fall behind the original ────────────────────────
 // The Hindi was translated before the photo disclosure was added to the
 // English, and every existing check still passed: they compare placeholders and
@@ -607,8 +621,8 @@ for (const [slug] of PAGES) {
 // The fold itself, asserted on a sentence that spans lines in each language.
 const foldedEnglish = blocksOf(readDoc('privacy', 'en'))
   .find(b => b.kind === 'p' && b.text.includes('Your handwriting and photos are read online'));
-ok(foldedEnglish && /in\s+which case you type your answers instead\. A second setting, off unless you turn\s+it on/.test(foldedEnglish.text),
-  'a paragraph wrapped across six source lines renders as one paragraph');
+ok(foldedEnglish && /in\s+which case you type your answers instead\. The first time, the app asks your\s+permission, naming OpenAI, and nothing is sent until you agree\. A second setting/.test(foldedEnglish.text),
+  'a paragraph wrapped across seven source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))
   .find(b => b.kind === 'p' && b.text.includes(ENGLISH_GOVERNS));
 ok(foldedHindi && (REVIEWED || foldedHindi.text.includes(NOT_REVIEWED)),

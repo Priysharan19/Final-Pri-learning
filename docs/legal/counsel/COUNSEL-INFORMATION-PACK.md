@@ -159,10 +159,11 @@ Source: `server/platform/guardianConsent.js`, `server/platform/otp.js`,
    (Q12 asks counsel whether that was right).
 8. Handwriting reading is **on by default** for a signed-in account, but stays off for a child
    until the guardian confirms (`client/src/ink/cloudReader.js` rule 1). After confirmation it is
-   on unless switched off in Settings. **Owner default D17:** a one-time prompt naming OpenAI
-   before the first read or photo, with nothing sent until it is accepted and a declined path that
-   stays typed-only. It is being built; the notice describes default-on until it lands, and will
-   be changed with it (Q14 asks counsel for the wording).
+   on unless switched off in Settings. **Owner default D17**, built in #737: a one-time prompt
+   naming OpenAI before the first handwriting read, photo of working or question photo; nothing is
+   sent until it is accepted, and declining keeps the student on typed answers. The acceptance is
+   kept on the device only. The notice describes it in the same train (`QUESTIONS-FOR-COUNSEL.md`
+   §4 quotes the prompt; Q14 asks counsel for the wording).
 9. **Owner default D18:** an under-18 account that no guardian has confirmed 30 days after it was
    created, or 30 days after a withdrawal, is closed then and erased 7 days later, and a guardian
    can request erasure without the child's login. It is being built (#736), with the automatic
@@ -240,11 +241,11 @@ Points for counsel:
 |---|---|---|
 | Apple Guideline 1.3 / Kids Category | Category for apps designed for ages 11 and under | Recommended **not** to enter the Kids Category (`docs/release/store/app-store-listing.md` §5) |
 | Apple Guideline 5.1.4 (Kids) | Applies to apps that collect data from children, in or out of the Kids Category | Counsel to review the guardian flow against it |
-| Apple Guideline 5.1.2(i) — sharing personal data with third-party AI | Apple asks apps to disclose and obtain explicit permission before sharing personal data with third-party AI | Today: default-on with in-app disclosure. Owner default D17: a one-time prompt naming OpenAI before the first read, being built. Counsel to confirm the wording and whether it is the "explicit permission" Apple asks for |
+| Apple Guideline 5.1.2(i) — sharing personal data with third-party AI | Apple asks apps to disclose and obtain explicit permission before sharing personal data with third-party AI | Owner default D17, built in #737: a one-time prompt naming OpenAI before the first read or photo; nothing sent until accepted. Counsel to confirm the wording and whether it is the "explicit permission" Apple asks for (`QUESTIONS-FOR-COUNSEL.md` §4) |
 | Apple Guideline 5.1.1(v) — account deletion | In-app deletion required | Implemented, immediate; also a public no-login page |
 | Apple Guideline 3.1.2 — subscriptions | Disclosure of terms | Terms and refund policy now describe App Store and Google Play purchases, auto-renewal, cancellation in the store, and that account deletion does not cancel a subscription |
 | Google Play Families policy | Applies if any target age group is under 13 | Class 7 students are about 12; see `docs/release/store/play-listing.md` §5 |
-| Google Play User Data policy / prominent disclosure | Disclosure of data not reasonably expected | Images to OpenAI should be disclosed in-app before first use (D17) |
+| Google Play User Data policy / prominent disclosure | Disclosure of data not reasonably expected | Images to OpenAI are disclosed in-app before first use by the D17 prompt (#737) |
 | Google Play AI-generated content policy | If the tutor is enabled | Off in production builds (D4) |
 | App Privacy label, Play Data safety, iOS privacy manifest | Must agree with each other and the code | Reconciled on 2026-11-02 (`docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b): crash reports declared in all three; no phone number while SMS is off |
 
@@ -264,7 +265,7 @@ must be made to both languages in the same change.
 | # | Statement | Basis in code | For counsel |
 |---|---|---|---|
 | 1 | An account and a connection are needed for any answer to be marked; marking is by a deterministic engine on the server; the on-device copy never sets a mark | `practice.js`, `markerOps.js`, ADR-0001 | — |
-| 2 | Handwriting and photos are read online by OpenAI; on by default for a signed-in account, switchable off, off for a child until a guardian confirms, never without an account; the request carries no question, answer or name; the whole photo frame is sent | `cloudReader.js`, `handwriting.js` `FORBIDDEN_FIELDS`, `cloudRaster.js`, `PractisePhoto.jsx` | Q13–Q14 (lawful basis, D17 prompt wording); changes when D17 lands |
+| 2 | Handwriting and photos are read online by OpenAI; the setting is on by default for a signed-in account, switchable off, off for a child until a guardian confirms, never without an account; **nothing is sent until the student agrees to a one-time prompt naming OpenAI** (D17); the request carries no question, answer or name; the whole photo frame is sent | `cloudReader.js`, `readerPermission.js` (#737), `handwriting.js` `FORBIDDEN_FIELDS`, `cloudRaster.js`, `PractisePhoto.jsx` | Q13–Q14 (lawful basis, D17 prompt wording) |
 | 3 | Pri keeps no copy of the image; the transcription and any correction live 90 days; OpenAI may hold a copy for a limited time for abuse monitoring; a sent picture cannot be recalled | `handwritingProvider.js` `store: false`, `practice.js` `MAX_AGE`, `data-retention.md` §4 | Q15 (zero data retention) |
 | 4 | Data is stored on Railway in Amsterdam today; a move to Supabase Mumbai is planned; OpenAI processes outside India; Resend and the stores in their own regions | `production-cutover-checklist.md`, ADR-0001 | Q19–Q21 (cross-border, processors) |
 | 5 | No sign-in by SMS is offered; the notice will describe it first if it is added | `otp.js` `channels`, `SignUpFlow.jsx`; D3 | — |
@@ -313,8 +314,9 @@ and re-confirmation), Q14 (whether it must also carry the OpenAI consent).
 ### 8.6 Known gaps between the notices and the code at `a5778a319`
 
 - The 30-day erasure of unconfirmed child accounts (8.1 row 7) is promised and not yet built.
-- The D17 permission prompt is planned and not yet built; the notice describes default-on, which
-  is what the code does today.
+- The D17 permission prompt is built in #737 and the notice describes it in the same train; its
+  acceptance is recorded on the device only, and "check my working" and exam handwriting are
+  outside it (`QUESTIONS-FOR-COUNSEL.md` §4).
 - The notice names the owner's home address; the operator decision (Q1) may change every name
   and address in all eight documents.
 

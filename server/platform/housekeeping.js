@@ -1,5 +1,6 @@
-// Housekeeping: purge rows that can no longer authorise anything, and close
-// examination papers nobody finished. Runs at startup, every six hours, and on
+// Housekeeping: purge rows that can no longer authorise anything, close
+// examination papers nobody finished, and erase the child accounts decision
+// D18 says go (childErasure.js). Runs at startup, every six hours, and on
 // demand via server/tools/housekeeping.mjs. The last run is recorded in
 // platform_meta so /v1/health can report it.
 
@@ -9,13 +10,14 @@ import { asStore } from './store.js';
 import { logEvent, safeCode } from './observability.js';
 import { encryptJoinCode, isLegacyPlainJoinCode } from './classes.js';
 import { sweepExpiredExams } from './exams.js';
+import { runChildErasure } from './childErasure.js';
 
 export const HOUSEKEEPING_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const REVOKED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const CONSUMED_TOKEN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const RATE_BUCKET_MAX_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-export async function runHousekeeping(db, now = Date.now()) {
+export async function runHousekeeping(db, now = Date.now(), { beforeErase, childErasureMode } = {}) {
   db = asStore(db);
   const startedAt = Date.now();
   // A paper abandoned past its deadline and grace is finalised on the answers
@@ -29,6 +31,19 @@ export async function runHousekeeping(db, now = Date.now()) {
   let examsFinalised = null, examsFailed = null;
   try { ({ finalised: examsFinalised, failed: examsFailed } = await sweepExpiredExams(db, { now })); }
   catch (error) { logEvent('error', 'housekeeping_error', { code: safeCode(error?.code, 'EXAM_FINALISE_ERROR') }); }
+  // A child's account no guardian stands behind (decision D18,
+  // childErasure.js): scheduled accounts whose grace has run out are erased,
+  // and the 30-day rule schedules more only in enforce mode (PRI_CHILD_ERASURE);
+  // otherwise it reports how many it would. Outside the purge below, like the
+  // exam sweep, so a failure here never stops the purge.
+  let childErasure = null;
+  try {
+    childErasure = await runChildErasure(db, {
+      now,
+      ...(beforeErase !== undefined ? { beforeDelete: beforeErase } : {}),
+      ...(childErasureMode ? { mode: childErasureMode } : {})
+    });
+  } catch (error) { logEvent('error', 'housekeeping_error', { code: safeCode(error?.code, 'CHILD_ERASURE_ERROR') }); }
   const summary = await db.transaction(async () => ({
     sessions: (await db.run('DELETE FROM account_sessions WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)', [now, now - REVOKED_SESSION_RETENTION_MS])).changes,
     // A guardian's withdrawal credential ('guardian-withdraw') is long-lived
@@ -43,7 +58,7 @@ export async function runHousekeeping(db, now = Date.now()) {
     loginAttempts: await purgeStaleLoginAttempts(db, now),
     joinCodesEncrypted: await encryptLegacyJoinCodes(db)
   }));
-  const record = { ranAt: now, durationMs: Date.now() - startedAt, ...summary, examsFinalised, examsFailed };
+  const record = { ranAt: now, durationMs: Date.now() - startedAt, ...summary, examsFinalised, examsFailed, childErasure };
   await db.run(`INSERT INTO platform_meta(key, value) VALUES ('housekeeping_last_run', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [JSON.stringify(record)]);
   return record;

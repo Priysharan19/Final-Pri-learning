@@ -94,6 +94,12 @@ function sizeOf(node) {
   return size;
 }
 
+/**
+ * Charge `units` of other deterministic work (exact BigInt arithmetic) to the
+ * check's one budget. False once the budget is spent; outside a check, free.
+ */
+export function chargeEvaluation(units) { return spend(units); }
+
 /** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
 export function withEvaluationBudget(units, fn) {
   if (evaluationBudget !== null) return fn();
@@ -253,7 +259,8 @@ function tokenize(input) {
       }
       const numStr = src.slice(i, j);
       if ((numStr.match(/\./g) || []).length > 1) throw new Error('Malformed number');
-      tokens.push({ t: 'num', v: parseFloat(numStr) });
+      // The literal as written rides along so exact.js can read it exactly.
+      tokens.push({ t: 'num', v: parseFloat(numStr), s: numStr });
       i = j;
       continue;
     }
@@ -364,7 +371,7 @@ class Parser {
   parseAtom() {
     const tok = this.next();
     if (!tok) throw new Error('Unexpected end of expression');
-    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v });
+    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v, ...(tok.s !== undefined ? { s: tok.s } : {}) });
     if (tok.t === 'const') return this.maybePower({ t: 'const', v: tok.v });
     if (tok.t === 'var') return this.maybePower({ t: 'var', v: tok.v });
     if (tok.t === 'lp') {
@@ -1036,14 +1043,22 @@ export function numsClose(a, b, tol) {
   // A rounded decimal is right only when it is the target rounded to the
   // places it was written to: 141.43 is not 100√2 to two places (141.42),
   // though it sits inside the relative band (#518).
-  const band = Number.isInteger(b) ? numericBand(b) : Math.min(numericBand(b), 0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9));
+  // The places of an evaluated exact form (17496√2) cap at twelve, and half a
+  // unit of the twelfth place is below binary64 noise once |b| passes ~2000,
+  // so the band never falls under four units of b's last binary place.
+  const band = Number.isInteger(b) ? numericBand(b)
+    : Math.min(numericBand(b), Math.max(0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9), Math.abs(b) * 4 * Number.EPSILON));
   return Math.abs(a - b) <= band;
 }
 
 /** The default band numsClose allows around a target b. */
 export function numericBand(b) {
+  // A whole-number target is exact: its band only absorbs floating-point
+  // noise — 1e-9 near zero, two units of the last binary place at any size
+  // (#680: a |b|·1e-9 band, capped at 0.25, accepted 21149700.019 for a key of
+  // 21149700 and 3840000000000.2 for 3840000000000).
   return Number.isInteger(b)
-    ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
+    ? Math.max(1e-9, Math.abs(b) * 2 * Number.EPSILON)
     : Math.min(decimalCap(b), relativeBand(b));
 }
 

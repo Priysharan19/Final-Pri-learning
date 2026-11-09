@@ -26,7 +26,7 @@
 // free plan's copy is "20 practice questions a day, and everything else
 // unlimited" (CAPPED_PRACTICE_MODES).
 // ─────────────────────────────────────────────────────────────────────────────
-import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE } from '../../client/src/engine/practiceAllowance.js';
+import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE, premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { asStore } from './store.js';
 
@@ -140,6 +140,54 @@ export function refusePracticeCap(res, verdict, now = Date.now()) {
       timeZone: verdict.timeZone,
       retryable: true,
       window: 'day'
+    }
+  });
+}
+
+// ── Premium-only practice content (D19: JEE Advanced, server-enforced) ───────
+// A question from a generator that exists only for the JEE Advanced track is
+// issued to an account whose server entitlement record grants
+// `jee-advanced-content`, and to no one else: at issue, at the bind of a
+// prepared question, at "the same question again" and at a notebook twin. It
+// is decided before anything is generated or written (a refused bind never
+// burns a prepared token), and never at submission (a question issued while
+// Premium was live is still marked after it lapses).
+//
+// What this does NOT cover, stated so nobody relies on it: the JEE Advanced
+// track's ordinary chapter questions at difficulty 3–4 are the same items JEE
+// Main serves on the free plan, so they are free content and are issued to
+// anyone; only the device's track gate keeps a free student out of the track
+// itself. The track's papers are gated by the exam router (exams.js).
+
+export { premiumCapabilityForGenerator };
+
+/**
+ * Null when `generator`'s questions may be issued to this account now;
+ * otherwise the refusal. Read only. Nothing the device sends is consulted.
+ */
+export async function premiumContentRefusal(db, { accountId, generator, now = Date.now() }) {
+  const capability = premiumCapabilityForGenerator(generator);
+  if (!capability) return null;
+  db = asStore(db);
+  const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+  if (serverEntitlementCapabilities(snapshot, now).includes(capability)) return null;
+  return { capability };
+}
+
+/**
+ * The refusal, in the code and copy the device's own gate uses (402
+ * PREMIUM_REQUIRED, local/entitlementGate.js CAPABILITY_COPY and the exam
+ * router's JEE Advanced refusal), so the one paywall explains it.
+ */
+export function refusePremiumContent(res, refusal) {
+  res.set('Cache-Control', 'no-store');
+  return res.status(402).json({
+    error: {
+      code: 'PREMIUM_REQUIRED',
+      message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
+      capability: refusal.capability,
+      plan: 'free',
+      retryable: false
     }
   });
 }

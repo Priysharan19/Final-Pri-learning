@@ -1,5 +1,11 @@
 # COPY.md — Pri Learning Instagram ad
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage,
+> accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims. The
+> rendered files under `out/` (MP4s, contact sheets, cover, `vo-report.json`) predate this
+> revision and must be re-rendered (`node scripts/render-all.mjs`) and re-voiced before use.
+> `client/test/marketing-claims-check.mjs` holds the list of retired phrases and enforces it.
+
 Register: Indian English, dry and confident, no American idiom, no forced Hinglish,
 no exclamation marks, no shame hooks. The app's own voice ("Not quite." / "The maths
 breaks on this line.") sets the temperature.
@@ -8,7 +14,7 @@ breaks on this line.") sets the temperature.
 
 | Variant | Line | Why |
 |---|---|---|
-| **A — blunt (HERO)** | **Stop memorising maths.** | Imperative, category-breaking, survives a thumb at speed. Coaching ads never tell you to stop doing the thing they sell. |
+| **A — blunt (HERO)** | **Stop memorising maths.** | Imperative, category-breaking, survives a thumb at speed. |
 | B — mathematical | One idea beats four hundred formulas. | States the film's thesis as arithmetic; slower but smarter. |
 | C — emotional | You are not a rank. | The anti-factory line; strongest for parents, softer for students. |
 
@@ -23,27 +29,27 @@ breaks on this line.") sets the temperature.
 | 5 | 9.20–11.60 | Watch the secant become the tangent. | 6 |
 | 6 | 12.90–14.90 | The derivative isn't a rule. / It's what you're watching. | 9 |
 | 7 | 15.30–17.40 | Understand one idea. / Solve what you've never seen. | 8 |
-| 8 | 18.60–20.00 | Marked like an examiner. | 4 |
-| 9 | 20.40–23.20 | Three lakh questions, on your iPad. / Your misconceptions, traced. | 10 |
-| 10 | 23.50–26.20 | Percentile predicted. Rivals raced. / Mocks marked. | 6 |
-| 11 | 25.60–26.45 | All of it offline. | 4 |
-| 12 | 27.10–32.80 | Class 7 to Olympiad. / The same mathematics, at different pressures. | 10 |
+| 8 | 18.60–20.00 | Marked by the engine. It can be wrong. | 7 |
+| 9 | 20.40–23.20 | Generated questions, fresh every time. / Your misconceptions, traced. | 8 |
+| 10 | 23.50–26.20 | Timed papers, marked. / Rivals raced. | 5 |
+| 11 | 25.60–26.45 | Sign in. Connect. Practise. | 4 |
+| 12 | 27.10–32.80 | Class 7 to JEE Advanced. / The same mathematics, at different pressures. | 11 |
 | 13 | 33.20–35.60 | ℙri Learning · **Join the change.** · Follow @pri.learning · coming soon | — |
 
-Feature-panel labels (small caps, in-panel): QUESTION BANK · GENERATED ON-DEVICE /
-KNOWLEDGE MAP · EVERY TOPIC, ONE WEB / PRIORITIES · WHY THIS NEXT / PREDICTED
-PERCENTILE · FROM YOUR PRACTICE / MATCH MODE · RACE LIVE RIVALS / FULL MOCKS ·
-CRITERIA MARKING — with in-frame disclaimers on percentile and rivals.
+Feature-panel labels (small caps, in-panel): QUESTION BANK · GENERATED FRESH /
+KNOWLEDGE MAP · CHAPTERS, ONE WEB / PRIORITIES · WHY THIS NEXT / CHAPTERS PRACTISED ·
+FROM YOUR PRACTICE / MATCH MODE · RACE LIVE RIVALS / TIMED PAPERS · AUTOMATIC MARKING — with
+in-frame disclaimers on progress and rivals (illustrative; needs an account).
 
 Plus scene kickers in small caps (not spoken, structural): THE FACTORY · THE IDEA ·
-CLASS 7 · CLASS 10 · CLASS 12 · JEE · OLYMPIAD · QUESTION 1 · UNSEEN / SOLVED.
+CLASS 7 · CLASS 10 · CLASS 12 · JEE · JEE ADVANCED · QUESTION 1 · UNSEEN / SOLVED.
 
 Maths set in frame (all KaTeX, all verified in `src/math`): d/dx x² = 2x · the factory's
 formula cards · "Prove that eˣ ≥ 1 + x for every real x." · secant slope table (h = 1 → 3,
 h = 0.5 → 2.5, h = 0.1 → 2.1) · lim_{h→0} ((1+h)²−1)/h = 2 · y = 2x − 1 · y = 1 + x tangent at 0 ·
 x − y + 1 = 0 tangent to y² = 4x at (1,2).
 
-## VO lines (ElevenLabs studio voice; each is also a burned caption)
+## VO lines (studio voice; each is also a burned caption)
 
 The gap at 11.7–13.2 s is authored: the music owns the tangent lock.
 
@@ -53,18 +59,18 @@ The gap at 11.7–13.2 s is authored: the music owns the tangent lock.
 | 2.60–6.05 | Four hundred formulas. The same drill, the same batch, every day. |
 | 6.10–7.35 | Until the question is new. |
 | 9.00–11.70 | Watch the secant become the tangent. |
-| 13.20–14.90 | That's the derivative — not a rule, a reason. |
-| 15.40–19.60 | Understand one idea, and you can solve what you've never seen. Marked like an examiner. |
-| 20.30–23.30 | Over three lakh questions, generated on your iPad. Your misconceptions, traced. |
-| 23.40–26.30 | Percentile predicted. Rivals raced. Mocks marked. All of it offline. |
-| 27.30–32.60 | Class seven to Olympiad. The same mathematics, at different pressures. |
+| 13.00–15.30 | Not a rule. A reason. |
+| 15.40–19.60 | Understand one idea, and you can solve what you've never seen. Marked by the engine; it can be wrong. |
+| 20.30–23.20 | Generated questions, fresh every time. Your misconceptions, traced. |
+| 23.50–26.10 | Timed papers, marked. Rivals raced. |
+| 27.30–32.60 | Class seven to JEE Advanced. The same mathematics, at different pressures. |
 | 33.30–35.20 | Pri Learning. Join the change. |
 
 ## 15 s cut — on-screen lines
 
-Stop memorising maths. → Until the question is new. → The derivative isn't a rule. It's what
-you're watching. → Marked like an examiner. → Class 7 to Olympiad. → ℙri Learning · Join the
-change. · @pri.learning
+Stop memorising maths. → Until the question is new. → The derivative isn't a rule. → Your
+working, marked by the engine. → Class 7 to JEE Advanced. → ℙri Learning · Join the change. ·
+@pri.learning
 
 ## Feed primary text (~125 chars visible)
 
@@ -78,31 +84,12 @@ change. · @pri.learning
 
 ## CTA button
 
-**"Learn more"** — the product is pre-launch (no app-store listing exists); "Sign up" or
-"Download" would over-promise. "Learn more" → the @pri.learning profile/landing keeps the
-invitation honest and matches "Coming soon."
+Learn more → the public site, once it exists (decision D5: `prilearning.com`).
 
-## Captions
+## What the ad may not say
 
-**Short:**
-> Not another formula sheet. Pri Learning teaches the idea underneath the technique — then marks
-> your handwritten working like an examiner, step by step, entirely on your iPad. Class 7 to
-> Olympiad. Join the change. 🔔 Follow @pri.learning for launch.
-
-**Long:**
-> India's maths education runs on pattern-recall: four hundred formulas, one batch, the same
-> drill every day. It works until the question is new.
->
-> Pri Learning is built the other way around. It shows you the idea before the technique — watch
-> the secant become the tangent and the derivative stops being a rule you memorised. Then you
-> write the solution by hand, and it's marked on your own ink like an examiner would: step by
-> step, method marks and all, with the exact line where the maths breaks pointed out. It learns
-> your handwriting. Everything stays on your iPad.
->
-> One mathematics, Class 7 to Olympiad — at different pressures.
->
-> Join the change. Follow @pri.learning — coming soon.
-
-## Hashtags (7 — not spam)
-
-`#JEE #JEEAdvanced #Olympiad #Class11 #Class12 #MathsWithUnderstanding #PriLearning`
+The retired claims are listed, one regular expression each with its reason, in
+`client/test/marketing-claims-check.mjs`; that suite runs over this folder in CI. In short: no
+coverage or completeness claim, no accuracy figure or marking-authority comparison, no rank
+prediction, no connectivity claim, no track outside V1, no question count, and no price
+comparison with coaching.

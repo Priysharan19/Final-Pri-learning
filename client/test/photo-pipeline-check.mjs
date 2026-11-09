@@ -20,6 +20,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import { installBrowserEnv, rawRows, resetStorage } from './backend-check.mjs';
+import { setReaderPermissionPrompt } from '../src/ink/readerPermission.js';
+// D17: every read below is of a student who accepted the one-time prompt naming
+// OpenAI. The prompt itself, and that nothing is sent without it, is
+// client/test/ink-reader-permission-check.mjs.
+setReaderPermissionPrompt(async () => 'accepted');
 
 installBrowserEnv(); resetStorage();
 const { answerFromLine, proposeFinalAnswer, readsAsAnswer, readsAsWritten, stripSentence } = await import('../src/photo/finalAnswer.js');
@@ -134,6 +139,33 @@ const FINALS = [
 ];
 for (const [lines, question, want] of FINALS) {
   eq(only(proposeFinalAnswer(lines, question)), want, `final answer of ${JSON.stringify(lines.join(' ⏎ '))} as ${question.answerType}`);
+}
+// The label on a photographed final line is judged as the typed field judges it
+// (#670): a label naming something other than what was asked proposes nothing,
+// so the student is asked; before, whatever followed the last "=" was proposed.
+{
+  const B2 = { answerType: 'numeric', prompt: 'Find $b^2$.' };
+  eq(only(proposeFinalAnswer(['b^2 = 25 + 25', 'b = 50'], B2)), { status: 'none' }, 'photo label: "b = 50" under "Find b²" proposes nothing');
+  eq(only(proposeFinalAnswer(['b^2 = 25 + 25 = 50'], B2)), proposed('50'), 'photo label: "b^2 = … = 50" proposes 50');
+  const AREA = { answerType: 'numeric', prompt: 'Find the area of triangle ABC.' };
+  eq(only(proposeFinalAnswer(['Perimeter = 72'], AREA)), { status: 'none' }, 'photo label: "Perimeter = 72" under "Find the area" proposes nothing');
+  eq(only(proposeFinalAnswer(['Area = 72'], AREA)), proposed('72'), 'photo label: "Area = 72" proposes 72');
+  const SUM = { answerType: 'numeric', prompt: 'Find $a + b$.' };
+  eq(only(proposeFinalAnswer(['a = 7'], SUM)), { status: 'none' }, 'photo label: "a = 7" under "Find a + b" proposes nothing');
+  eq(only(proposeFinalAnswer(['x = 5'], { answerType: 'numeric', prompt: 'Find $x$.' })), proposed('5'), 'photo label: "x = 5" under "Find x" proposes 5');
+  for (const line of ['Ans: Perimeter = 72', 'Perimeter: 72', 'Perimeter → 72', 'Perimeter => 72', 'Perimeter is 72']) eq(only(proposeFinalAnswer([line], AREA)), { status: 'none' }, `photo label: "${line}" under "Find the area" proposes nothing`);
+  for (const line of ['Area of PQR = 72', 'Area: 72', 'Ans: 72', 'Hence area = 72', 'The area is 72']) eq(only(proposeFinalAnswer([line], AREA)), proposed('72'), `photo label: "${line}" proposes 72`);
+  // "Total …" is not dropped from a label ("Total cost" is not "the cost of one
+  // kilogram"), so "Total area" proposes nothing and the student is asked.
+  eq(only(proposeFinalAnswer(['Total area = 72'], AREA)), { status: 'none' }, 'photo label: "Total area = 72" is not read as the area; the student is asked');
+  // A phrase that points back names nothing new: "What is that number?" leaves the label to the student.
+  eq(only(proposeFinalAnswer(['CF = 23.5'], { answerType: 'numeric', prompt: 'The median class is 20–30. What is that number?' })), proposed('23.5'), 'photo label: "that number" names nothing, so "CF = 23.5" is proposed');
+  const ENCLOSED = { answerType: 'numeric', prompt: 'Find the area enclosed between the curve and the x-axis.' };
+  for (const line of ['Area = 72', 'Area: 72', 'Ans: Area = 72']) eq(only(proposeFinalAnswer([line], ENCLOSED)), proposed('72'), `photo label: "${line}" under "the area enclosed between" proposes 72`);
+  eq(only(proposeFinalAnswer(['Probability = 23/40'], { answerType: 'numeric', prompt: 'Find the probability the Hawks win.' })), proposed('23/40'), 'photo label: "Probability = 23/40" names the asked probability');
+  eq(only(proposeFinalAnswer(['Value: 20890'], { answerType: 'numeric', prompt: 'Find its value after 4 years.' })), proposed('20890'), 'photo label: "Value: 20890" names its value');
+  eq(only(proposeFinalAnswer(['Answer: b = 50'], B2)), { status: 'none' }, 'photo label: "Answer: b = 50" under "Find b²" proposes nothing');
+  eq(only(proposeFinalAnswer(['3x = -18', 'x = -6'], { answerType: 'numeric', prompt: 'Solve $3x = -18$.' })), proposed('-6'), 'photo label: "x = -6" answers "Solve 3x = -18"');
 }
 // Whatever is proposed is something the typed field's own parser reads, and it
 // is never a sentence and never ends in a sentence's full stop.
@@ -461,6 +493,11 @@ const REFUSALS = [
   [{ status: 404, code: 'QUESTION_NOT_FOUND' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
   [{ status: 409, code: 'QUESTION_ALREADY_GRADED' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
   [{ status: 413, code: 'HANDWRITING_IMAGE_TOO_LARGE' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
+  // #196 review N4: a reply over the schema's limits (too many lines, a line too
+  // long) is a 422 the same page would earn again — offered as one Try again,
+  // never resent (and paid for) by itself. A garbled reply is a 502 and may be.
+  [{ status: 422, code: 'HANDWRITING_MALFORMED' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
+  [{ status: 502, code: 'HANDWRITING_MALFORMED' }, 'unreachable', 'try-again', true, true, 'verdict.photoReadingServiceDown', 'ink.waitingServiceDown'],
   [{ status: 429, code: 'RATE_LIMITED' }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimited', 'ink.waitingRateLimited'],
   [{ status: 429, code: 'RATE_LIMITED', resetAt: IN_AN_HOUR }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimitedUntil', 'ink.waitingRateLimitedUntil', true],
   [{ status: 429 }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimited', 'ink.waitingRateLimited'],

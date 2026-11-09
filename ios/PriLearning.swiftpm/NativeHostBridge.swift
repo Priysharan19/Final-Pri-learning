@@ -48,7 +48,10 @@ final class NativeHostBridge: NSObject {
             ],
             "capabilities": [
                 "ink": ["versions": [1], "transport": "legacy", "stylus": stylusCapable, "finger": true, "fingerDefault": !stylusCapable],
-                "photo": ["versions": [1], "transport": "legacy", "ocr": true],
+                // Photos come in through the page's own file input (camera or
+                // library) and are read on the server; there is no on-device
+                // photo reader (owner decision 2026-10-02, default D16).
+                "photo": ["versions": [1], "capture": true, "library": true, "ocr": false],
                 "billing": ["versions": [1], "transport": "legacy", "store": "app-store"],
                 "cloud": ["versions": [1], "transport": "legacy", "configured": cloudConfigured],
                 "share": ["versions": [1], "transport": "bridge", "binary": true, "print": true],

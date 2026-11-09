@@ -11,6 +11,7 @@ import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
 import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
+import { createParentReportRecipientRouter, createParentReportRouter, parentReportEnabled } from './parentReport.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
@@ -26,10 +27,17 @@ import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
 import { readinessReport } from './readiness.js';
+import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
 import { metrics, metricsAccess, recordDatabaseError, recordServerError } from './metrics.js';
 import { captureError } from './errorSink.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
+
+/** 'staging' | 'production' | another short [a-z0-9-] token | null, from the deployment's own environment. */
+export function deploymentEnvironment(env = process.env) {
+  const raw = String(env.PRI_DEPLOYMENT_ENVIRONMENT || env.RAILWAY_ENVIRONMENT_NAME || env.RAILWAY_ENVIRONMENT || '').trim().toLowerCase();
+  return /^[a-z0-9-]{1,32}$/.test(raw) ? raw : null;
+}
 
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
 export const HEALTH_DB_TIMEOUT_MS = 1_500;
@@ -49,8 +57,11 @@ const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 // Sign in with Apple form-posts its answer from appleid.apple.com, so it can
 // never carry this origin; the route only relays it to the callback page.
 const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
+// RFC 8058 one-click unsubscribe: the mailbox provider POSTs it with no Origin
+// and no cookie. Its token can only stop parent reports (parentReport.js).
+const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -118,6 +129,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       billingSchemaVersion,
       // Which driver serves /v1 — never the URL, host, user or file path.
       database: { engine: db.dialect, reachable },
+      // Which deployment this is, as it declares itself (Railway sets the name),
+      // so a native archive's release evidence can tell staging from
+      // production behind https://app.prilearning.com. A short token, never a URL.
+      environment: deploymentEnvironment(),
       // The per-account storage cap every device is held to: two numbers a
       // client may show, never a per-account figure.
       syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },
@@ -154,7 +169,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // and authenticate with provider signatures instead of a browser Origin. The
   // Apple sign-in callback is the other: it changes nothing server-side.
   router.use((req, res, next) => {
-    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path))) return next();
+    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path) || ONE_CLICK_UNSUBSCRIBE.test(req.path))) return next();
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);
@@ -199,6 +214,16 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
+  // The parent weekly report. The recipient's confirm/unsubscribe routes carry
+  // their own token and no session, so they come first; everything the
+  // account itself does is behind the guardian gate and premium (parentReport.js).
+  // Not mounted at all unless the deployment turns it on (D22: off until
+  // counsel has reviewed email about minors): every path answers 404.
+  const { enabled: parentReportOn = parentReportEnabled(process.env), ...parentReportOptions } = parentReport;
+  if (parentReportOn === true) {
+    router.use('/parent-report', createParentReportRecipientRouter(db));
+    router.use('/parent-report', requireGuardianConsent(db), createParentReportRouter(db, parentReportOptions));
+  }
   // A signed-out student may be shown a question to start working on. The
   // route takes no session and writes no account data; binding it to an
   // account later goes through the guarded /practice/issue below.
@@ -216,6 +241,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
   router.use('/telemetry', requireGuardianConsent(db), createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
+  // STAGING ONLY: reserved-domain test mail (testMailbox.js). Off — and then
+  // indistinguishable from an unknown path — in production and by default.
+  router.use('/test-mailbox', createTestMailboxRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
   router.use((err, req, res, next) => {

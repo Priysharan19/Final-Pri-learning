@@ -1,0 +1,125 @@
+# Deployed journey gate: the student journey on Railway STAGING, end to end,
+# in real browsers (WebKit phone, Chromium tablet), after every merge train's
+# Release Staging Proof. Nothing here changes Railway, the database, branches
+# or secrets. It makes synthetic test accounts on staging only (the owner's
+# authorization, 9 Nov 2026) and deletes every one it makes.
+# The verdict is the harness's: PROVEN (exit 0), INCOMPLETE (exit 3, a step is
+# BLOCKED, e.g. no test inbox yet) or FAIL (exit 1). Only PROVEN is green.
+# The test inbox settings come from the 'staging-journey' environment's
+# secrets, which the owner adds; until then the account steps that need an
+# email code are BLOCKED (mailbox) and the run is INCOMPLETE, as it should be.
+name: Staging Journey Proof
+
+on:
+  workflow_run:
+    workflows: ["Release Staging Proof"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: "Exact 40-character SHA already merged into main and deployed to staging"
+        required: true
+      profile:
+        description: "train (each merge train) or full (adds isolation and free-limit probes)"
+        required: true
+        default: train
+        type: choice
+        options: [train, full]
+
+permissions:
+  contents: read
+
+# One journey at a time: runs share staging's per-identity rate limits.
+concurrency:
+  group: staging-journey-proof
+  cancel-in-progress: false
+
+jobs:
+  journey:
+    name: Deployed journey gate (staging)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    environment: staging-journey
+    timeout-minutes: 45
+    env:
+      CANDIDATE_SHA: ${{ github.event.workflow_run.head_sha || inputs.candidate_sha }}
+      PROFILE: ${{ inputs.profile || 'train' }}
+    steps:
+      - name: Validate input
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::candidate must be one full SHA"; exit 1; }
+          [[ "$PROFILE" == train || "$PROFILE" == full ]] || { echo "::error::profile must be train or full"; exit 1; }
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            [[ "${{ github.ref }}" == "refs/heads/main" ]] || { echo "::error::dispatch this from main"; exit 1; }
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The candidate is on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git merge-base --is-ancestor "$CANDIDATE_SHA" origin/main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies (Playwright)
+        run: npm ci --prefix client
+      - name: Install WebKit and Chromium
+        run: npx --prefix client playwright install --with-deps chromium webkit
+      - name: Test inbox settings (owner-only file, mode 600, never printed)
+        shell: bash
+        env:
+          INBOX_ADDRESS: ${{ secrets.PRI_STAGING_INBOX_ADDRESS }}
+          INBOX_HOST: ${{ secrets.PRI_STAGING_INBOX_IMAP_HOST }}
+          INBOX_PORT: ${{ secrets.PRI_STAGING_INBOX_IMAP_PORT }}
+          INBOX_USER: ${{ secrets.PRI_STAGING_INBOX_USER }}
+          INBOX_PASSWORD: ${{ secrets.PRI_STAGING_INBOX_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$INBOX_ADDRESS" || -z "$INBOX_PASSWORD" ]]; then
+            echo "No test inbox secrets in the staging-journey environment: the code steps will be BLOCKED (mailbox)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          umask 077
+          mkdir -p "$HOME/Developer/.pri-fleet"
+          {
+            printf 'PRI_STAGING_INBOX_ADDRESS=%s\n' "$INBOX_ADDRESS"
+            printf 'PRI_STAGING_INBOX_IMAP_HOST=%s\n' "$INBOX_HOST"
+            printf 'PRI_STAGING_INBOX_IMAP_PORT=%s\n' "$INBOX_PORT"
+            printf 'PRI_STAGING_INBOX_USER=%s\n' "$INBOX_USER"
+            printf 'PRI_STAGING_INBOX_PASSWORD=%s\n' "$INBOX_PASSWORD"
+          } > "$HOME/Developer/.pri-fleet/staging-inbox.env"
+          chmod 600 "$HOME/Developer/.pri-fleet/staging-inbox.env"
+      - name: Deployed journey
+        id: journey
+        shell: bash
+        run: |
+          set -uo pipefail
+          node tools/staging-journey-proof.mjs --sha "$CANDIDATE_SHA" --profile "$PROFILE" --accounts \
+            --out "$RUNNER_TEMP/staging-journey" 2>&1 | tee "$RUNNER_TEMP/staging-journey.log"
+          status=${PIPESTATUS[0]}
+          tail -n 1 "$RUNNER_TEMP/staging-journey.log" >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$HOME/Developer/.pri-fleet/staging-inbox.env"
+          exit "$status"
+      - name: Archive the journey evidence (report, results, screenshots)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: staging-journey-${{ github.run_id }}
+          path: ${{ runner.temp }}/staging-journey/
+          if-no-files-found: warn
+          retention-days: 30

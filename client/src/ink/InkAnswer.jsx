@@ -46,6 +46,7 @@ import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature } from './strokeSignature.js';
+import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
@@ -178,7 +179,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, []);
 
-  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false } = {}) => {
+  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false, readMs = null } = {}) => {
     setRec(r);
     setStale(isStale && r.lines.length > 0);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
@@ -205,6 +206,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       attested: r.attested || null,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
+      // How long the read the student waited for took, device to device: from
+      // the press of "Read my answer" to this transcription landing, measured
+      // here around the one readWithCloud call. Null when this publish is not
+      // a fresh read (a correction, a kept reading, a page that changed).
+      readMs: Number.isFinite(readMs) ? Math.max(0, readMs) : null,
       // The reading is of EARLIER writing: shown, labelled, never submitted.
       stale: isStale && r.lines.length > 0,
       // What the card keeps with the ink so a reload restores the transcript
@@ -234,7 +240,32 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
    * Send the page to the server reader — ONE recognition operation, because
    * the student asked. Its reading is the only reading.
    */
-  const readNow = useCallback(() => {
+  const askingRef = useRef(false);
+  const readNow = useCallback(async () => {
+    if (disabledRef.current || !strokesRef.current.length) return;
+    if (flyingRef.current === strokeSignature(strokesRef.current)) return;
+    const asker = userRef.current;
+    const known = knownBlock(asker);
+    if (known && known.kind !== 'capacity' && known.kind !== 'rate-limited') {
+      setStatus(known.kind === 'allowance' ? { kind: 'allowance', key: known.inkKey, block: known } : { kind: 'waiting', key: known.inkKey, block: known });
+      return;
+    }
+    // D17: before the first read, the student is told the picture of their
+    // writing goes to OpenAI, and nothing is sent unless they say yes. The
+    // press that opened the prompt is the press that reads, once accepted.
+    if (readerPermission(asker) !== READER_PERMISSION.ACCEPTED) {
+      if (askingRef.current) return;
+      askingRef.current = true;
+      let permitted;
+      try { permitted = await askReaderPermission(asker, { kind: 'ink' }); } finally { askingRef.current = false; }
+      if (permitted !== PROMPT_ANSWER.ACCEPTED) {
+        // Closing the prompt chooses nothing: "Read my answer" stays.
+        if (permitted !== PROMPT_ANSWER.DISMISSED) waitFor(asker, { reason: permitted === PROMPT_ANSWER.DECLINED ? 'declined' : 'not-permitted' });
+        return;
+      }
+    }
+    // The page as it stands NOW is what is read: the student may have gone on
+    // writing, or the card closed, while the prompt was open.
     const strokes = strokesRef.current;
     if (disabledRef.current || !strokes.length) return;
     const signature = strokeSignature(strokes);
@@ -254,6 +285,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
     focusAfterRead.current = typeof document !== 'undefined' && !!document.activeElement?.closest?.('.ink-read-action, .ink-status-action');
     setStatus({ kind: 'reading' });
+    const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+    const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
     readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
@@ -294,7 +327,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           before.lines.forEach((line, i) => { if (line.corrected === true) landed = applyLineCorrection(landed, i, line.text); });
         }
         expiredSigRef.current = null;
-        publish(landed, now, { stale: nowSignature !== signature });
+        publish(landed, now, { stale: nowSignature !== signature, readMs: sincePress() });
         setStatus(null);
         return;
       }
@@ -632,7 +665,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           so it carries its own way back: one press asks once more. A reason
           the device already knows (signed out, offline, switched off) does
           not — its own action is the way forward. */}
-      {status?.kind === 'waiting' && !disabled && status.block?.kind !== 'session' && status.block?.kind !== 'offline' && status.block?.kind !== 'turned-off' && status.block?.kind !== 'not-available' && (
+      {status?.kind === 'waiting' && !disabled && status.block?.kind !== 'session' && status.block?.kind !== 'offline' && status.block?.kind !== 'turned-off' && status.block?.kind !== 'declined' && status.block?.kind !== 'not-available' && (
         <div className="ink-status-action">
           <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={shownStatus.block?.kind || undefined}
             onClick={() => {

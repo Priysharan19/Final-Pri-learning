@@ -61,8 +61,9 @@ production-ready claims.
 > sends the image to an outside AI reading service (OpenAI); it is never sent with the question,
 > the answer or your name, and Pri keeps no copy of the image. If you turn on the optional
 > working check, the lines of your working and the text of the question are also sent to the
-> same service to find where a mistake is. You can switch server reading off
-> and type your answers instead. You can delete your account in the app or at
+> same service to find where a mistake is. Before anything is read the first time, the app asks
+> your permission, naming OpenAI, and nothing is sent until you agree. You can say no, or switch
+> server reading off later, and type your answers instead. You can delete your account in the app or at
 > https://prilearning.com/delete-account.
 >
 > Pri Learning offers maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced:
@@ -171,11 +172,10 @@ owner private photo, no claims beyond what the screen shows.
 | 1 | A public-origin placeholder stood for the privacy and deletion URLs | D5 origins: `https://prilearning.com/privacy` and `https://prilearning.com/delete-account` (the site in `site/`, not deployed, DNS untouched), and the form itself at `https://app.prilearning.com/account/delete-request`. None resolves until the site is deployed; the owner confirms D5 before the first signed build |
 | 2 | The privacy-policy row said the notice "must be rewritten first" | It was corrected against the code on 2 November 2026; what it still needs is counsel's review, recorded only in `docs/legal/review-status.json` |
 | 3 | §5 pointed at counsel question 26 for the Families question | It is question 33 in the current pack |
-| 4 | "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only |
+| 4 | Retired (D24): "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only |
 | 5 | Nothing said when Android ships | D1: the Android software is finished, but the public launch is iPhone and iPad first, because a new personal developer account needs a 14-day closed test with 12 testers (§7) |
 
-**Before this description is published:** the D17 one-time prompt naming OpenAI must be in the
-release build and the PRIVACY paragraph rewritten to describe it (today it says reading can be
-switched off, which is what the code does), and the site URLs above must resolve. D18 (erasure of
+**Before this description is published:** the release build must include the D17 prompt (#737),
+whose wording counsel approves, and the site URLs above must resolve. D18 (erasure of
 an unconfirmed or withdrawn under-18 account after 30 days) is in the privacy notice and not yet in
 the code; a production nomination is refused until it is (`tools/legal-promises.mjs`).

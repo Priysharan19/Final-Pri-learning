@@ -32,9 +32,9 @@ const nativeSource = fs.readFileSync(new URL('../src/ink/native.js', import.meta
 // boundary before it becomes bridge-owned state.
 assert.match(nativeSource, /strokes:\s*latestStrokes/);
 assert.match(nativeSource, /latestStrokes\s*=\s*snapshotInkStrokes\(strokes\)/);
-assert.match(nativeSource, /fuseNativeStrokeReading\(\s*payload,\s*entry\.strokes,/s);
-assert.match(nativeSource, /invalidatePending\('surface-remounted'\)/);
-assert.match(nativeSource, /entry\.surfaceEpoch !== surfaceEpoch/);
+// D16: native readings (and their fusion with the line-stroke reader, their
+// pending queue and surface epochs) are gone; the shell reads nothing.
+assert.doesNotMatch(nativeSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1'), /fuseNativeStrokeReading|foundationRecognize|type === 'reading'/);
 const setSource = fs.readFileSync(new URL('../src/ink/setNotation.js', import.meta.url), 'utf8');
 assert.ok(!/ctx\.expected|expectedAnswer|answerText|markScheme/.test(setSource));
 console.log('SET NOTATION + REQUEST LIFECYCLE — PASS');

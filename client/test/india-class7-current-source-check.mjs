@@ -67,7 +67,7 @@ const part2Set = new Set(PART2_IDS);
 for (const chapter of live.chapters) {
   same(`${chapter.id} has no uncovered product outcome`, uncoveredDotpoints(chapter), []);
   const status = indiaProductionStatus(chapter, 7);
-  ok(`${chapter.id} is source reviewed`, status.sourceReviewed === true);
+  ok(`${chapter.id} is agent-audited and claims no human review`, status.agentAudited === true && status.humanReviewed === false);
   ok(`${chapter.id} is source-authored quality A`, status.quality === 'A');
   ok(`${chapter.id} is selectable`, status.selectable === true);
   const expectedSource = part2Set.has(chapter.id) ? PART2_SOURCE : PART1_SOURCE;

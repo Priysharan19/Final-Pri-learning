@@ -18,5 +18,14 @@ for(const q of pack.questions){
  assert.ok(q.reviewState.includes('blind-difficulty-review-pending'));
 }
 assert.equal(ids.size,20);assert.equal(archetypes.size,20);
+// #408/#485: "purely imaginary" was ambiguous at z=1, where w=0. The item now
+// states the real-part condition and that w=0 is included, both ways round.
+{
+ const q3=pack.questions.find(q=>q.id==='pri-jee-adv-cplx-03');
+ assert.ok(q3,'pri-jee-adv-cplx-03 exists');
+ assert.ok(!/purely imaginary/i.test(q3.question),'cplx-03 does not use the ambiguous "purely imaginary"');
+ assert.ok(/Re\(w\)=0/.test(q3.question)&&/w=0 included/.test(q3.question)&&/converse/.test(q3.question),'cplx-03 states Re(w)=0, includes w=0 and asks for the converse');
+ assert.notEqual(q3.version,'2026.10.14.1','cplx-03 carries a new item version after its wording change');
+}
 console.log('PASS JEE 20/20 answer-blind original questions: 20 stable identities/archetypes; zero private solutions; no answer-revealing Argand figures; no false D4 certification.');
 console.log('Restricted mathematical and difficulty assessments remain mandatory.');

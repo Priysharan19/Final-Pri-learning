@@ -18,14 +18,17 @@ and the notice disagree, the code is checked and one of them is wrong.
 
 ## 1. Account states
 
-There is no deletion grace period. `accounts.deleted_at` exists in the schema but is never set:
-deletion is a hard `DELETE` in one transaction, effective immediately.
+A deletion the account asks for has no grace period: it is a hard `DELETE` in one transaction,
+effective immediately. `accounts.deleted_at` is set in one case only: the erasure of a child's
+account that no guardian stands behind (decision D18, §5), which soft-deletes first and erases
+through the same deletion transaction seven days later.
 
 | State | How an account enters it | API behaviour | UI behaviour |
 | --- | --- | --- | --- |
 | **Unverified** | `POST /v1/account/register` (201, `verificationRequired: true`) | Signed in. `/me` reports `emailVerified: false`. `POST /sync/push`, `POST /classes`, `POST /classes/join`, `POST /billing/checkout/web`, `POST /handwriting/transcribe`, `POST /working/check` answer **403 `EMAIL_UNVERIFIED`**. Export, devices, logout, logout-all, password change, deletion and resend all work. | Cloud panel shows the verification prompt. Grading is online-only, so nothing is marked and no handwriting is read until the address is verified; typed and written work waits on the device. |
 | **Active** | The one-time link from the `verify-email` outbox row is spent (`POST /email/verify`) | Every route the role allows. | Normal. |
-| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older"); a registration that sends neither a boolean `isAdult` nor a school class is refused with 400 `AGE_DECLARATION_REQUIRED` — and the same holds for a new account made by Google/Apple sign-in. Every account records its age decision (`accounts.age_basis`: adult / child, or legacy for accounts that predate it); an account with none recorded is refused by the gate with 403 `AGE_DECLARATION_REQUIRED` | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address. Nothing is marked and no handwriting or photo is read until the guardian confirms; the work waits on the device. **Owner default D18 (2026-11-01), being built in the accounts stream (#736):** an account no guardian has confirmed 30 days after creation, or 30 days after a withdrawal, is closed then and erased 7 days later, and a guardian can request erasure without the child's login. The privacy notice promises this (since 9 Nov 2026 in those words); the automatic rule needs `PRI_CHILD_ERASURE=enforce` on production. Until the code lands this row records the gap. |
+| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older"); a registration that sends neither a boolean `isAdult` nor a school class is refused with 400 `AGE_DECLARATION_REQUIRED` — and the same holds for a new account made by Google/Apple sign-in. Every account records its age decision (`accounts.age_basis`: adult / child, or legacy for accounts that predate it); an account with none recorded is refused by the gate with 403 `AGE_DECLARATION_REQUIRED` | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address. Nothing is marked and no handwriting or photo is read until the guardian confirms; the work waits on the device. |
+| **Scheduled for erasure** (under 18, D18) | A child account (`age_basis = 'child'`, role student) whose guardian never confirmed, 30 days after it was created, or whose guardian withdrew, 30 days after the withdrawal — **only when the operator sets `PRI_CHILD_ERASURE=enforce`**; otherwise housekeeping only counts these (`childErasure.candidates` in the housekeeping record). Or, in any mode, a guardian's own request (`POST /v1/account/guardian/erase` with the withdrawal credential issued at their confirmation), which also withdraws consent | `deleted_at` is set; every session is revoked; every link and code is spent and unsent mail is dropped; sign-in answers 401 as for a deleted account; a guardian confirmation can no longer land (`confirmConsent` refuses it). An `account.erasure.scheduled` audit row records the reason and the date after which it is erased. Seven days later (`ERASURE_GRACE_MS`) housekeeping erases it through `deleteAccountRows()`: the same cascade, retained rows and billing hook as **Deleted**, with an `account.erase` receipt naming the reason. Until then an operator can restore it by clearing `deleted_at`. | Signed out; local profiles on the device are untouched. The guardian's page says it stops working at once and is erased a week later. |
 | **Deleted** | `DELETE /v1/account` with fresh proof (current password; a fresh Apple/Google identity token + server nonce; or, for an account with no password, a fresh one-time code sent to its own email/phone via `POST /v1/account/otp/reauth-request`) — or, with no session at all, the public page `/account/delete-request` (`POST /v1/account/otp/delete-request` → `/delete-confirm`, proof by a code to the account's email; the same `deleteAccountRows()` transaction and billing hook; `server/test/account-deletion-public-check.mjs`) | Every session token is dead (401 `AUTH_REQUIRED`); login answers 401 `BAD_CREDENTIALS` exactly as for a wrong password; every outstanding verification/reset/guardian link answers 400 `TOKEN_INVALID`. The address is free: registering it again creates a new, empty, unverified account with a new id. | Signed out; local profiles on the device are untouched (they were never the server's). |
 
 A web subscription is cancelled at the provider (immediately, not at cycle end) **before** the rows
@@ -85,6 +88,8 @@ person. Location for every row is the platform database: SQLite on the Railway v
 | `account_mfa_recovery_codes` | SHA-256 hashes of the account's recovery codes |
 | `auth_delivery_outbox` | encrypted link envelopes and destination addresses (including a guardian's) |
 | `guardian_consents` | guardian name and email, notice version, confirmation/withdrawal times |
+| `parent_report_links` | the parent weekly report's recipient email, status (pending / active / stopped), request, confirmation and stop times and who stopped it; the confirmation link's hash and expiry; the unsubscribe credential's hash and its sealed envelope (`deliveryCrypto.js`) |
+| `parent_report_sends` | one row per week a report was due: status (sent / skipped / failed), skip reason, attempts, the provider's message id. The report's content is never stored: it is recomputed from `graded-attempt` rows |
 | `learning_events` | synced attempts, progress and mastery events |
 | `sync_entities` | synced profile, settings, bookmarks, favourites, tasks, custom questions |
 | `idempotency_keys` | cached sync responses; server-issued practice questions, grade responses, completions and reading receipts — a `practice-recognition` receipt holds the **transcription text** of a handwriting/photo read and any correction the student typed, and lives 90 days (`practice.js` `MAX_AGE`); exam papers, saved exam answers and results (`exams.js` `RECORD_TTL`, 5 years); and, under scope `recognition-read`, the transcript of a handwriting/photo read kept for 15 minutes so the same picture is not paid for twice (never the image; `docs/operations/recognition-cost.md` §7). Expired rows are purged by housekeeping (`housekeeping.js`) |
@@ -109,7 +114,7 @@ removes their students' memberships, submissions and feedback for those classes 
 | `billing_refunds` | provider refund id, payment id, amount, status | Same ledger. Never had an account column. | As `billing_payments`. |
 | `billing_events` | provider, event id, event type, verified flag, SHA-256 digest of the payload, timestamps. `account_id` → `NULL`. | Webhook idempotency (a replayed event must not re-apply) and an audit trail of what the provider told us. The payload itself is never stored. | As `billing_payments`. |
 | `issue_reports` | category, content/question id, app and curriculum version, status. `account_id` → `NULL`; **`note` and `context_json` are cleared in the deletion transaction** (they can hold free text the student typed). | Content-quality: a "wrong answer" report about a question stays useful after the reporter leaves. | Until resolved/dismissed and pruned (no automated purge yet). |
-| `audit_log` | action, target kind/id, non-personal metadata, timestamp. `actor_account_id` → `NULL`. One `account.delete` row whose `target_id` is the deleted (now unresolvable) account id and whose metadata is `{}`. | Security and billing audit trail; proof a deletion happened. Metadata never carries email, name or free text (checked by the PII scan). Besides `account.delete`, the account-security rows are `session.new-device` (a sign-in from a device the account had not used; metadata `{}`), `account.reauth` (fresh proof given for a sensitive action; metadata names the method only) and `account.export` (a data export; metadata is the format name and per-section row counts only). Some rows may carry the deleted account's opaque id as `target_id` or `studentId`; with the account row gone it resolves to nobody. **Append-only:** no server code updates or deletes a row, and on Postgres `pri_server` holds no UPDATE/DELETE on it (schema v9); the `SET NULL` on deletion is a referential action run as the table owner. | *Proposed:* 2 years. No automated purge yet (and a purge would need the migration owner, not the server role). |
+| `audit_log` | action, target kind/id, non-personal metadata, timestamp. `actor_account_id` → `NULL`. One `account.delete` row whose `target_id` is the deleted (now unresolvable) account id and whose metadata is `{}`. | Security and billing audit trail; proof a deletion happened. Metadata never carries email, name or free text (checked by the PII scan). A child account erased under D18 (§5) leaves `account.erasure.scheduled` (metadata: reason and erase-after date), `account.erase` (metadata: reason) and, for a guardian's request, `guardian.erase-request` (metadata: which bearer, whether consent was withdrawn) instead. Besides `account.delete`, the account-security rows are `session.new-device` (a sign-in from a device the account had not used; metadata `{}`), `account.reauth` (fresh proof given for a sensitive action; metadata names the method only) and `account.export` (a data export; metadata is the format name and per-section row counts only). Some rows may carry the deleted account's opaque id as `target_id` or `studentId`; with the account row gone it resolves to nobody. **Append-only:** no server code updates or deletes a row, and on Postgres `pri_server` holds no UPDATE/DELETE on it (schema v9); the `SET NULL` on deletion is a referential action run as the table owner. | *Proposed:* 2 years. No automated purge yet (and a purge would need the migration owner, not the server role). |
 | `teacher_invites.used_by`, `content_revisions.author/reviewer_account_id`, `feature_flags.updated_by` | Set to `NULL`. | Staff tooling history. | Indefinite. |
 
 ### Short-lived rows keyed by a hash, not by the account
@@ -149,7 +154,7 @@ never the provider subject), learning events, sync entities, current class membe
 assignment submissions, teacher feedback on the account's work (without the teacher's id), the
 account's own allow-listed telemetry, the account's own issue reports, an entitlement summary (plan, status,
 provider, period end) and, for an under-18 account, the consent state with the guardian address
-masked. It never contains password, token or user-agent hashes, delivery envelopes, the session
+masked, and the parent weekly report's link (recipient masked, status, times) and its per-week send record. It never contains password, token or user-agent hashes, delivery envelopes, the session
 cookie, or anything of another account (teacher, classmates, guardian in full) — asserted on both
 engines.
 
@@ -220,6 +225,26 @@ requires one), `settings.accountsValue`, `settings.cloudOffFor`, `settings.handw
 
 ## 5. Under-18 accounts
 
+**Unconfirmed or withdrawn child accounts are erased (decision D18, provisional; counsel sets the
+period).** `server/platform/childErasure.js`, run by housekeeping every six hours:
+
+- **Who:** only a student account recorded as a child (`accounts.age_basis = 'child'`). Never
+  confirmed counts from the account's creation (a re-request does not restart the clock; an account a guardian once confirmed, recorded as a `guardian.confirm` audit row, is never "never confirmed", even after a renewal clears `confirmed_at`);
+  withdrawn counts from the withdrawal. An adult, a `legacy` account, an account with no age on
+  record, a staff account, and a child whose guardian confirmed an older notice (renewal pending)
+  are never selected.
+- **When:** 30 days (`UNCONSENTED_CHILD_RETENTION_MS`), then a 7-day grace
+  (`ERASURE_GRACE_MS`) between the soft delete and the erasure. The automatic rule acts only with
+  `PRI_CHILD_ERASURE=enforce`; the default reports how many accounts it would schedule.
+- **A guardian's request**, without the child's login: the withdrawal email carries a second link
+  (`/account-action#action=guardian-erase`, the same bearer). Only that credential erases, and only the one issued for the current confirmation: a consent link (which a child's session can send to any address) or a superseded guardian's credential cannot.
+  It is honoured in either mode. A parent who approves by email code is now sent the withdrawal
+  credential as well (it used to go only to a parent who approved by link).
+- **Trail:** `account.erasure.scheduled` (reason, erase-after date), `guardian.erase-request`
+  (which bearer), `account.erase` (reason). No email, name or free text.
+- **Enforced by:** `server/test/child-erasure-check.mjs` (SQLite and Postgres as `pri_server`) and
+  `client/test/account-action-guardian-erase-check.mjs`.
+
 The confirmation shows only that someone with access to the guardian's mailbox followed a link
 (`guardian_consents.method = 'guardian-email-confirmation'`). It is not verifiable parental consent
 under DPDP Rule 10 (commencing 14 May 2027) and must not be described as such. The consent notice
@@ -235,6 +260,17 @@ clear a withdrawal. A version is added to the accepted list only when the change
 alter what a guardian agreed to. The 2 November 2026 change to `signup.noticeWithdraw` (it now says
 withdrawal stops marking, reading, exams and sync, not only sync) describes the existing behaviour
 more completely and adds no processing, so the version was not bumped and no re-consent is asked.
+
+**The parent weekly report is off (owner default D22).** Nothing below happens unless the deployment sets `PRI_PARENT_REPORT=on`, which waits for counsel's review of email about minors (`docs/privacy/parent-report-counsel-review.md`); until then its two tables exist and stay empty, and the published privacy notice and store disclosures do not describe it. When it is turned on, it is a separate consent, not a notice change. Emailing a child's
+weekly summary is a new purpose, so it is not folded into the account notice: the guardian
+confirms it separately, by following a link in an email that describes exactly what the report
+contains (`parentReport.js parentReportConfirmMessage`), and nothing is sent before that. For an
+under-18 account the only address that can be linked is the guardian whose account consent is
+`given` (`recipientDecision`), and it is re-checked when the link is confirmed and before every
+send; a withdrawal of the account consent stops the report link for good (`stopped_by =
+'consent'`), and re-linking needs a fresh confirmation. Every report carries a one-click
+unsubscribe (RFC 8058) that needs no sign-in. The report is data-minimised: chapter names,
+counts and percentages, no question text, answers, ink, photos or the child's name.
 
 ---
 
@@ -255,13 +291,6 @@ more completely and adds no processing, so the version was not bumped and no re-
   they delete in-app with a code to their phone. There is no signed-out path for them yet
   (an SMS variant of `/delete-request` is a candidate follow-up). SMS is off at launch (owner
   decision D3), so no such account can be created in the first release.
-- **Child accounts never confirmed or withdrawn** are not yet erased automatically. Owner default
-  D18 (closed 30 days after creation or withdrawal, erased 7 days later; a guardian may request
-  erasure without the child's login) is promised in the notice and is being built in the accounts
-  stream (#736), whose automatic rule runs only with `PRI_CHILD_ERASURE=enforce`; counsel sets
-  the final period.
-  A production nomination is refused until that code is at the nominated SHA
-  (`tools/legal-promises.mjs`, called by `scripts/release-nominate.mjs`).
 - **Coded crash reports** (`POST /v1/telemetry/error`) are `client-error` rows under the 90-day
   telemetry retention; they are forwarded to Sentry only if `PRI_SENTRY_DSN` is set, which it is
   not at launch.
