@@ -8,7 +8,9 @@ import { indiaClass10 } from '../src/engine/generators/india-class10.js';
 import { indiaClass10Core } from '../src/engine/generators/india-class10-core.js';
 import { currentQuadraticContext } from '../src/engine/generators/india-class10-quadratic-context.js';
 import { loadAllBanks, generateQuestion, bankOf } from '../src/engine/generators/index.js';
-import { checkAnswer } from '../src/engine/checker.js';
+import { checkAnswer, methodMarks, stepCheck } from '../src/engine/checker.js';
+import { marksPossibleFor, stepEvidence } from '../../server/platform/markerOps.js';
+import { publicQuestionFields } from '../src/engine/publicQuestion.js';
 import { inspect } from '../../server/test/selfcheck.mjs';
 import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from '../src/engine/ncert/class10-2026-27-production.js';
@@ -79,6 +81,38 @@ function independentAnswer(q) {
   throw new Error(`Unexpected family: ${q.contentFamily}`);
 }
 
+
+function independentlyDerivedWorking(q, oracle) {
+  const nums = numbersInMath(q.prompt);
+  if (q.contentFamily === 'original-cbse-x-2026-inverse-ap') {
+    const [first, difference, total] = nums;
+    return {
+      source: `${difference}*n^2+${2 * first - difference}*n-${2 * total}=0`,
+      working: `${difference}*n^2+${2 * first - difference}*n-${2 * total}=0
+(n-${oracle})*(${difference}*n+${2 * first + (oracle - 1) * difference})=0
+n=${oracle}`
+    };
+  }
+  if (q.contentFamily === 'original-cbse-x-2026-ticket-system') {
+    const [studentFare, adultFare, revenue] = [...q.prompt.matchAll(/₹(\d+)/g)].map(m => Number(m[1]));
+    const tickets = nums[0];
+    return {
+      source: `${studentFare}*x+${adultFare}*(${tickets}-x)=${revenue}`,
+      working: `${studentFare}*x+${adultFare}*(${tickets}-x)=${revenue}
+${adultFare - studentFare}*x=${adultFare * tickets - revenue}
+x=${oracle}`
+    };
+  }
+  const [area, extra] = nums;
+  return {
+    source: `x*(x+${extra})=${2 * area}`,
+    working: `x*(x+${extra})=${2 * area}
+x^2+${extra}*x-${2 * area}=0
+(x-${oracle})*(x+${oracle + extra})=0
+x=${oracle}`
+  };
+}
+
 for (const { id, family } of families) {
   assert.equal(bankOf(id), 'india-class10-competency', 'new content is lazy loaded outside base Class 10');
   assert.ok(!Object.hasOwn(indiaClass10, id), 'old Class 10 generator remains byte-for-byte unchanged');
@@ -94,11 +128,39 @@ for (const { id, family } of families) {
     prompts.add(q.prompt);
     const oracle = independentAnswer(q);
     assert.equal(q.answer.value, oracle, `independently solved ${id} seed ${seed}`);
+    const publicIssue = publicQuestionFields(q);
+    assert.ok(!Object.hasOwn(publicIssue, 'answer') && !Object.hasOwn(publicIssue, 'stepcheck') && !Object.hasOwn(publicIssue, 'seed'), 'issued student prompt excludes both the key and server-side marking source');
     assert.deepEqual(inspect(q), [], `question inspection ${id} seed ${seed}`);
     assert.equal(checkAnswer(q, String(oracle)).correct, true, 'real checker accepts oracle');
     assert.equal(checkAnswer(q, String(oracle + 1)).correct, false, 'real checker rejects +1');
     assert.equal(checkAnswer(q, String(oracle - 1)).correct, false, 'real checker rejects -1');
     assert.equal(checkAnswer(q, String(-oracle)).correct, false, 'real checker rejects sign error');
+    // Grading is server-authoritative and must credit mathematically valid
+    // intermediate algebra when the final answer is wrong, while refusing
+    // an isolated final root or a wrong root as "method" work.
+    if (seed <= 100) {
+      const { source, working } = independentlyDerivedWorking(q, oracle);
+      assert.equal(q.stepcheck?.source, source, 'server source equation follows the student-visible prompt');
+      assert.ok(!source.includes('undefined'), 'no missing coefficients in the authored source');
+      const report = stepCheck(q.stepcheck, working, { prompt: q.prompt });
+      assert.ok(report.lines.every(line => line.status === 'ok'), `independent worked solution checked: ${id} seed ${seed}`);
+      const marks = marksPossibleFor(q);
+      assert.equal(marks, 3, 'D3 should have a genuine three-mark method contract');
+      const graded = methodMarks({ meta: q.stepcheck, working, marks, prompt: q.prompt, report });
+      assert.equal(graded?.awarded, 2, `two valid method marks with a wrong final answer: ${id} seed ${seed}`);
+      const wrongFinal = String(oracle + 1);
+      const authority = stepEvidence(q, wrongFinal, working, checkAnswer(q, wrongFinal));
+      assert.equal(authority.partial?.awarded, 2, 'server-owned marking must retain credit for verified steps under a wrong final answer');
+      assert.equal(authority.stepReport?.firstBreak, -1, 'the verified intermediate method must contain no false step');
+      const rootAlone = methodMarks({
+        meta: q.stepcheck, working: `${q.stepcheck.variable}=${oracle}`, marks, prompt: q.prompt
+      });
+      assert.equal(rootAlone?.awarded ?? 0, 0, 'bare correct root must not masquerade as derivation');
+      const wrongRoot = methodMarks({
+        meta: q.stepcheck, working: `${q.stepcheck.variable}=${oracle + 1}`, marks, prompt: q.prompt
+      });
+      assert.equal(wrongRoot?.awarded ?? 0, 0, 'incorrect root must not receive method credit');
+    }
     const replay = generateQuestion(id, 3, seed * 311 + 17);
     assert.deepEqual(q, replay, 'same seed yields same complete item');
     for (const hint of q.hints) {

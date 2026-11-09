@@ -16,7 +16,11 @@ export function competencyInverseApRows(rng) {
     prompt: `A ${venue} has $${first}$ seats in its first row. Each following row has $${increment}$ more seats than the previous row. All rows together have $${total}$ seats. How many rows are there?`,
     answerType: 'numeric',
     answer: { value: rows },
-    stepcheck: { kind: 'equation', variable: 'n', solutions: [rows] },
+    stepcheck: {
+      kind: 'equation', variable: 'n', solutions: [rows],
+      // Server-held source: the AP total converted to a quadratic in the row count.
+      source: `${increment}*n^2+${2 * first - increment}*n-${2 * total}=0`
+    },
     traps: [
       { value: rows - 1, why: 'There is one fewer increase than the number of rows; the question asks for the number of rows.' },
       { value: rows + 1, why: 'Check the full sum, not just the number of successive increases.' }
@@ -50,7 +54,11 @@ export function competencyTicketSystem(rng) {
     prompt: `At a ${place}, a student ticket costs ₹${studentFare} and an adult ticket costs ₹${adultFare}. A group buys $${tickets}$ tickets for ₹${revenue} in total. How many student tickets were bought?`,
     answerType: 'numeric',
     answer: { value: students },
-    stepcheck: { kind: 'equation', variable: 'x', solutions: [students] },
+    stepcheck: {
+      kind: 'equation', variable: 'x', solutions: [students],
+      // The two-ticket system after substituting y = total - x.
+      source: `${studentFare}*x+${adultFare}*(${tickets}-x)=${revenue}`
+    },
     traps: [
       { value: adults, why: 'That is the number of adult tickets, whereas the question asks for student tickets.' },
       { value: tickets, why: 'That is the total of both ticket types, not the student count.' }
@@ -82,7 +90,11 @@ export function competencyTriangleArea(rng) {
     answerType: 'numeric',
     answer: { value: height },
     answerSuffix: 'cm',
-    stepcheck: { kind: 'equation', variable: 'x', solutions: [height] },
+    stepcheck: {
+      kind: 'equation', variable: 'x', solutions: [height],
+      // Twice the stated area equals perpendicular height × base.
+      source: `x*(x+${extra})=${2 * area}`
+    },
     traps: [
       { value: base, why: 'That is the base, but the question asks for the perpendicular height.' },
       { value: 2 * area, why: 'Twice the area is the product of base and height, not the height alone.' }
