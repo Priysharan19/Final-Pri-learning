@@ -33,7 +33,7 @@
 import { pathToFileURL } from 'node:url';
 import { onlinePlatform } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
 const FREE_PER_DAY = 20;

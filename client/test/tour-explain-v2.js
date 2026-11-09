@@ -3,7 +3,7 @@
 // no test fixture injects a solution, diagnosis or fake handwriting payload.
 import { pathToFileURL } from 'node:url';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const FIRST_WRONG = '-987654';
 const SECOND_WRONG = '-987655';
 const SUBMIT = { name: 'Submit Answer' };
