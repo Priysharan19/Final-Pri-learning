@@ -32,8 +32,9 @@ export default function SignInPlot() {
       ctx.clearRect(0, 0, w, h);
       const compact = h < 240;
       const px = compact ? 16 : Math.min(88, w * .10);
-      const py = compact ? 15 : Math.min(180, h * .24);
-      const gw = w - 2 * px, gh = h - 2 * py;
+      const py = compact ? 52 : Math.min(180, h * .24);
+      const lower = compact ? 29 : py;
+      const gw = w - 2 * px, gh = h - py - lower;
       if (gw < 20 || gh < 20) return;
       const sx = x => px + (x - range[0]) / (range[1] - range[0]) * gw;
       const sy = y => py + (5 - y) / 10 * gh;

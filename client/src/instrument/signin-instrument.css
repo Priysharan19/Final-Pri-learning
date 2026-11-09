@@ -167,14 +167,14 @@ html.ui-instrument.skin-aurora .pri-plot-value {
    its equation and coordinate probe are identical to the desktop plot. */
 @media (max-width: 860px) {
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
-    grid-template-columns: minmax(0,1fr); grid-template-rows: 146px auto;
+    grid-template-columns: minmax(0,1fr); grid-template-rows: 178px auto;
   }
   html.ui-instrument.skin-aurora .auth-wrap > .in-signin-plot {
-    display: block; height: 146px; min-height: 146px;
+    display: block; height: 178px; min-height: 178px;
     border-bottom: 1px solid rgba(234,234,249,.16);
   }
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) > .auth-col {
-    min-height: calc(100dvh - 146px); box-shadow: none;
+    min-height: calc(100dvh - 178px); box-shadow: none;
     padding: 28px clamp(20px,6vw,52px) 32px;
     align-items: center; justify-content: flex-start;
   }
@@ -200,13 +200,13 @@ html.ui-instrument.skin-aurora .pri-plot-value {
 }
 @media (max-width: 420px) {
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
-    grid-template-rows: 126px auto;
+    grid-template-rows: 166px auto;
   }
   html.ui-instrument.skin-aurora .auth-wrap > .in-signin-plot {
-    height: 126px; min-height: 126px;
+    height: 166px; min-height: 166px;
   }
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) > .auth-col {
-    min-height: calc(100dvh - 126px); padding: 23px 20px 30px;
+    min-height: calc(100dvh - 166px); padding: 23px 20px 30px;
   }
   html.ui-instrument.skin-aurora .pri-plot-equation { top: 35px; }
   html.ui-instrument.skin-aurora .pri-plot-foot { bottom: 8px; }
@@ -234,4 +234,9 @@ html.ui-instrument.skin-aurora .pri-plot-value {
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) > .auth-col {
     background: Canvas; color: CanvasText;
   }
+}
+
+@media (max-width: 420px) {
+  html.ui-instrument.skin-aurora .pri-plot-foot .in-signin-line { display: none; }
+  html.ui-instrument.skin-aurora .pri-plot-foot { justify-content: flex-end; }
 }
