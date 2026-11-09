@@ -27,7 +27,14 @@
 // forms instead of NCERT-numbered items; typesetting defects (double signs,
 // unit coefficients, +0 terms) fixed across 16 generators; past papers behind
 // a default-off switch (content honesty stream, Nov 2026).
-export const CONTENT_VERSION = '2026.11.6';
+// 2026.11.1 — Class 9 mastery generators widened: wide integer ranges and two
+// or three shapes per cell (some cells served 2–8 questions in all); the skill,
+// answer type, hints and worked solution of every cell are unchanged in kind.
+// 2026.11.2 — Class 9 factorising MCQ: equivalent factorisations are one
+// option, written in one factor order; no wrong option expands to the key.
+// 2026.11.7 — Merge Train 8: the JEE archive (#795, 2026.11.6) and the Class 9
+// widening (#812, 2026.11.2 above) together; neither version alone describes it.
+export const CONTENT_VERSION = '2026.11.7';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

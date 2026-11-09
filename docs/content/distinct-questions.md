@@ -8,7 +8,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 |---|---|---|---|---|---|
 | Class 7 | 103 | ≥ 2.98×10^8 | 2 | 74 | met |
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
-| Class 9 | 32 | 4.14×10^4 | 0 | 32 | not met |
+| Class 9 | 32 | 8.26×10^7 | 0 | 9 | not met |
 | Class 10 | 92 | 3.61×10^7 | 0 | 69 | not met |
 | Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
 | Class 12 | 93 | ≥ 3.83×10^8 | 2 | 69 | met |
@@ -186,38 +186,15 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c9-probability-ncert-mastery` | 3 | 2000 | 2 | 2 |
-| `c9-circles-ncert-mastery` | 4 | 2000 | 4 | 4 |
-| `c9-perimeter-area-ncert-mastery` | 1 | 2000 | 4 | 4 |
-| `c9-perimeter-area-ncert-mastery` | 4 | 2000 | 4 | 4 |
-| `c9-circles-ncert-mastery` | 2 | 2000 | 6 | 6 |
-| `c9-number-systems-ncert-mastery` | 4 | 2000 | 8 | 8 |
-| `c9-circles-ncert-mastery` | 3 | 2000 | 8 | 8 |
-| `c9-perimeter-area-ncert-mastery` | 2 | 2000 | 9 | 9 |
-| `c9-circles-ncert-mastery` | 1 | 2000 | 13 | 13 |
-| `c9-perimeter-area-ncert-mastery` | 3 | 2000 | 25 | 25 |
-| `c9-probability-ncert-mastery` | 2 | 2000 | 25 | 25 |
-| `c9-algebraic-identities-ncert-mastery` | 1 | 2000 | 45 | 45 |
-| `c9-probability-ncert-mastery` | 4 | 2000 | 64 | 64 |
-| `c9-sequences-progressions-ncert-mastery` | 4 | 2000 | 64 | 64 |
-| `c9-algebraic-identities-ncert-mastery` | 3 | 2000 | 65 | 65 |
-| `c9-probability-ncert-mastery` | 1 | 2000 | 72 | 72 |
-| `c9-linear-polynomials-ncert-mastery` | 1 | 2000 | 96 | 96 |
-| `c9-number-systems-ncert-mastery` | 1 | 2000 | 120 | 120 |
-| `c9-number-systems-ncert-mastery` | 3 | 2000 | 120 | 120 |
-| `c9-sequences-progressions-ncert-mastery` | 3 | 2000 | 192 | 192 |
-| `c9-algebraic-identities-ncert-mastery` | 2 | 2000 | 575 | 597 |
-| `c9-coordinate-geometry-ncert-mastery` | 1 | 2000 | 944 | 1134 |
-| `c9-sequences-progressions-ncert-mastery` | 1 | 2000 | 1078 | 1516 |
-| `c9-algebraic-identities-ncert-mastery` | 4 | 2000 | 1120 | 1539 |
-| `c9-sequences-progressions-ncert-mastery` | 2 | 2000 | 1237 | 1969 |
-| `c9-linear-polynomials-ncert-mastery` | 2 | 2000 | 1326 | 2263 |
-| `c9-coordinate-geometry-ncert-mastery` | 3 | 2000 | 1354 | 2293 |
-| `c9-linear-polynomials-ncert-mastery` | 4 | 2000 | 1647 | 4857 |
-| `c9-coordinate-geometry-ncert-mastery` | 2 | 2000 | 1634 | 4972 |
-| `c9-linear-polynomials-ncert-mastery` | 3 | 2000 | 1650 | 5147 |
-| `c9-coordinate-geometry-ncert-mastery` | 4 | 2000 | 1709 | 6117 |
-| `c9-number-systems-ncert-mastery` | 2 | 2000 | 1773 | 8033 |
+| `c9-circles-ncert-mastery` | 2 | 2000 | 170 | 170 |
+| `c9-circles-ncert-mastery` | 4 | 2000 | 214 | 228 |
+| `c9-perimeter-area-ncert-mastery` | 1 | 2000 | 280 | 280 |
+| `c9-perimeter-area-ncert-mastery` | 4 | 2000 | 679 | 711 |
+| `c9-perimeter-area-ncert-mastery` | 2 | 2000 | 917 | 1077 |
+| `c9-circles-ncert-mastery` | 3 | 2000 | 545 | 1273 |
+| `c9-probability-ncert-mastery` | 3 | 2000 | 627 | 1707 |
+| `c9-circles-ncert-mastery` | 1 | 2000 | 1249 | 1943 |
+| `c9-sequences-progressions-ncert-mastery` | 4 | 2000 | 1505 | 3491 |
 
 ### Class 10
 

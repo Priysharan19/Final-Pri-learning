@@ -199,7 +199,7 @@ jobs:
           # Distinct questions per class (L5): measured against the owner's 10^8-per-class target (lower bounds marked ≥).
           # The pin is the measurement; widening generators moves it and the report together.
           grep -Fq 'DISTINCT QUESTIONS REPORT: PASS' suites.log
-          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 4.14×10^4, Class 10 3.61×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
+          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 3.61×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
@@ -224,10 +224,10 @@ jobs:
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406703 wrong answers marked correct across 18072 questions' suites.log
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 406804 wrong answers marked correct across 18072 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
-          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 30679 right answers over 11740 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 31792 right answers over 11932 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
