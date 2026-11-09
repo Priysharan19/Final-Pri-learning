@@ -2,6 +2,8 @@ import { decryptDeliveryToken } from './deliveryCrypto.js';
 import { asStore, assertNoOpenTransaction, sqliteHandle } from './store.js';
 import { recordAuthEmail } from './metrics.js';
 import { logEvent, safeCode as logCode } from './observability.js';
+import { testMailboxAccepts } from './testMailboxPolicy.js';
+import { depositTestMail } from './testMailbox.js';
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_BATCH = 20;
@@ -119,12 +121,26 @@ export function authEmailMessage(kind, actionUrl) {
     };
   }
   if (kind === 'guardian-withdraw') {
+    // The same bearer opens a second, single-purpose page that asks for the
+    // account to be erased (decision D18): /account-action#action=guardian-erase.
+    const eraseUrl = (() => {
+      try {
+        const link = new URL(url);
+        const params = new URLSearchParams(link.hash.replace(/^#/, ''));
+        params.set('action', 'guardian-erase');
+        link.hash = params.toString();
+        return link.toString();
+      } catch { return null; }
+    })();
+    const eraseText = eraseUrl ? `\n\nIf you want their Pri Learning account and what it holds erased, open this link instead:\n\n${eraseUrl}\n\nThe account stops working at once and is erased a week later. This cannot be undone.` : '';
+    const eraseHtml = eraseUrl ? `<p>If you want their Pri Learning account and what it holds erased, open this link instead: <a href="${escapeHtml(eraseUrl)}">Erase their account</a>. The account stops working at once and is erased a week later. This cannot be undone.</p>` : '';
     // Sent once a guardian has confirmed. The link does not expire and can only
-    // ever withdraw; it is revoked by the withdrawal it performs.
+    // ever reduce permission: withdraw, or ask for the account to be erased
+    // (decision D18, POST /v1/account/guardian/erase); either revokes it.
     return {
       subject: 'Your child’s Pri Learning account is confirmed — keep this email',
-      text: `Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.\n\nKeep this email. If you ever want to withdraw your consent, open this link:\n\n${url}\n\nIt does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.`,
-      html: `<p>Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.</p><p>Keep this email. If you ever want to withdraw your consent, open this link:</p><p><a href="${escapeHtml(url)}">Withdraw consent</a></p><p>It does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.</p>`
+      text: `Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.\n\nKeep this email. If you ever want to withdraw your consent, open this link:\n\n${url}\n\nIt does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once.${eraseText}\n\nTheir work on their own device stays there either way.`,
+      html: `<p>Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.</p><p>Keep this email. If you ever want to withdraw your consent, open this link:</p><p><a href="${escapeHtml(url)}">Withdraw consent</a></p><p>It does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once.</p>${eraseHtml}<p>Their work on their own device stays there either way.</p>`
     };
   }
   throw new Error('Unsupported auth delivery kind');
@@ -334,11 +350,14 @@ function retryDelay(attempt) {
   return Math.min(15 * 60_000, 60_000 * (2 ** Math.max(0, Math.min(4, attempt - 1))));
 }
 
+const pick = message => ({ subject: message.subject, text: message.text });
+
 export async function drainAuthDeliveryOutbox(db, {
   send,
   publicOrigin = process.env.PRI_PUBLIC_ORIGIN,
   now = Date.now(),
-  batchSize = DEFAULT_BATCH
+  batchSize = DEFAULT_BATCH,
+  env = process.env
 } = {}) {
   db = asStore(db);
   ensureAuthDeliverySchema(db);
@@ -367,6 +386,7 @@ export async function drainAuthDeliveryOutbox(db, {
 
   let sent = 0;
   let failed = 0;
+  let kept_ = 0;
   for (const row of rows) {
     const attempt = Number(row.attempt_count || 0) + 1;
     // Claim this attempt. The count we read is part of the condition, so when
@@ -388,19 +408,28 @@ export async function drainAuthDeliveryOutbox(db, {
 
     try {
       const actionUrl = buildAuthActionUrl(publicOrigin, row.kind, rawToken);
-      const result = await send({
-        outboxId: row.id,
-        accountId: row.account_id,
-        tokenId: row.token_id,
-        to: row.destination,
-        kind: row.kind,
-        actionUrl
-      });
+      // STAGING ONLY: a reserved test address (testMailboxPolicy.js) gets the
+      // link in the test mailbox instead of an email — the same single-use,
+      // one-hour bearer, recorded as delivered like any other.
+      const kept = testMailboxAccepts(env, row.destination);
+      const result = kept
+        ? (await depositTestMail(db, { to: row.destination, kind: 'link', purpose: row.kind, link: actionUrl, ...pick(authEmailMessage(row.kind, actionUrl)), now }),
+          { providerMessageId: 'test-mailbox' })
+        : await send({
+          outboxId: row.id,
+          accountId: row.account_id,
+          tokenId: row.token_id,
+          to: row.destination,
+          kind: row.kind,
+          actionUrl
+        });
       await db.run(`UPDATE auth_delivery_outbox
         SET delivered_at=?, token_ciphertext='', provider_message_id=?, next_attempt_at=NULL, last_error_code=NULL
         WHERE id=? AND delivered_at IS NULL`, [now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id]);
-      sent += 1;
-      recordAuthEmail({ ok: true });
+      // Kept in the staging test mailbox is not sent: it never reaches the
+      // provider, so it is neither a send nor an email-delivery metric.
+      if (kept) kept_ += 1;
+      else { sent += 1; recordAuthEmail({ ok: true }); }
     } catch (error) {
       const terminal = attempt >= MAX_ATTEMPTS;
       const code = safeCode(error?.code);
@@ -414,7 +443,7 @@ export async function drainAuthDeliveryOutbox(db, {
       rawToken = null;
     }
   }
-  return { enabled: true, sent, failed, purged };
+  return { enabled: true, sent, failed, purged, ...(kept_ ? { keptForTest: kept_ } : {}) };
 }
 
 export function startAuthDeliveryWorker(db, {

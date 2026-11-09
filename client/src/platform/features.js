@@ -45,7 +45,7 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
@@ -56,7 +56,11 @@ const BUILT = {
   // The student interface (client/interface.config.mjs): true in every build.
   // The Node suites, which have no build constant, see the same interface
   // production ships.
-  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true
+  instrument: typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true,
+  // PRI_FEATURE_PARENT_REPORT=1 — the parent weekly report's screens. OFF in a
+  // production build until counsel has reviewed email about minors (D22); the
+  // server is off too unless PRI_PARENT_REPORT=on (server/platform/parentReport.js).
+  parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null
 };
 
 // The student interface as a build constant (client/interface.config.mjs).

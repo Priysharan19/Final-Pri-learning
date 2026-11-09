@@ -1,13 +1,26 @@
-// Pri Ink · physical production-evidence session helpers
+// Pri Ink · physical production-evidence session helpers (server reader)
 //
 // This module is deliberately answer-blind. It decides only whether the
-// production recogniser would auto-use, confirm or abstain from a reading. The
+// production path would mark a server reading as it stands (auto), ask the
+// student to confirm it first (confirm) or has no reading (abstain). The
 // target transcription is never an input to authority selection.
+//
+// The reader under study is the server reader (client/src/ink/cloudReader.js):
+// the only reader in a student's path since the owner's decision of
+// 2026-10-02 (default D16, 2026-11-01). The on-device readers are retired and
+// a reading from one of them can never be production evidence.
 
 export const CONFIRM_CONF = 0.55;
 export const CONFIRM_MARGIN = 0.15;
 export const SPLIT_ALGORITHM = 'fnv1a32-v1:70/10/10/10';
 export const CONSENT_VERSION = '2026-08-23-v1';
+/** Schema of the evidence file the scorer accepts (client/test/ink-physical-release-evidence.mjs). */
+export const PHYSICAL_EVIDENCE_SCHEMA_VERSION = 2;
+/** Labels the server reader returns start with this (cloudReader.js CLOUD_ENGINE_PREFIX). */
+export const SERVER_ENGINE_PREFIX = 'cloud';
+/** How a build under study reached its server. */
+export const BUILD_KINDS = Object.freeze(['development', 'testflight']);
+export const SERVERS = Object.freeze(['staging', 'production']);
 
 export const REAL_PENCIL_PROMPTS = Object.freeze([
   ['2x + 5 = 17','2x+5=17'],['7y - 3 = 25','7y-3=25'],['4a + 9 = 33','4a+9=33'],['n = 48','n=48'],['k = 106','k=106'],
@@ -61,25 +74,41 @@ function readingLines(reading) {
   return String(reading?.text || '').split(/\n+/);
 }
 
-function nonProductionEngine(engine) {
+/** A label of a reader no student reaches, or of a debug/research path. */
+export function nonProductionEngine(engine) {
   const e = String(engine || '').toLowerCase();
-  return /research|debug|v4-dev|v4-unavailable/.test(e);
+  if (!e) return true;
+  if (/research|debug|v4-dev|v4-unavailable/.test(e)) return true;
+  if (/vision|foundation|native-rescue|native-primary|pri-js|consensus|line-stroke-fusion/.test(e)) return true;
+  return !e.startsWith(SERVER_ENGINE_PREFIX);
 }
 
 /**
  * Answer-blind authority decision equivalent to the production confirmation
- * boundary. `nativeAvailable` is supplied by the evidence page so a browser
- * fallback can never be mislabeled as physical production evidence.
+ * boundary the card applies to a server reading (QuestionCard.jsx):
+ *
+ *   · the server said it is unsure (needsConfirmation) → confirm;
+ *   · the reading does not read as maths → confirm;
+ *   · the server's confidence is under its own floor (confidenceFloor, else
+ *     CONFIRM_CONF) → confirm;
+ *   · a rival within CONFIRM_MARGIN → confirm;
+ *   · otherwise the card would mark it as it stands → auto.
+ *
+ * `nativeAvailable` is supplied by the evidence page so a browser session can
+ * never be mislabeled as physical production evidence; `productionReady` is
+ * what InkAnswer publishes (true only for a reading the server made).
  */
 export function productionAuthorityOf(reading, { nativeAvailable = false } = {}) {
   const text = String(reading?.text || '').trim();
   const engine = String(reading?.engine || '');
-  const productionReady = Boolean(nativeAvailable && reading?.researchOnly !== true && !nonProductionEngine(engine));
+  const productionReady = Boolean(nativeAvailable && reading?.productionReady === true && reading?.researchOnly !== true && !nonProductionEngine(engine));
   if (!productionReady) return { authority: 'abstain', productionReady: false, reason: 'non-production-path' };
   if (!text) return { authority: 'abstain', productionReady: true, reason: 'no-reading' };
-  if (engine.toLowerCase().includes('disagreement')) return { authority: 'confirm', productionReady: true, reason: 'engine-disagreement' };
+  if (reading?.needsConfirmation === true) return { authority: 'confirm', productionReady: true, reason: 'server-doubt' };
   if (!readingLines(reading).every(readsAsMaths)) return { authority: 'confirm', productionReady: true, reason: 'shape' };
-  if (typeof reading?.minConf === 'number' && reading.minConf < CONFIRM_CONF) return { authority: 'confirm', productionReady: true, reason: 'glyph-confidence' };
+  const configuredFloor = Number(reading?.confidenceFloor);
+  const floor = Number.isFinite(configuredFloor) && configuredFloor > 0 && configuredFloor <= 1 ? configuredFloor : CONFIRM_CONF;
+  if (typeof reading?.minConf === 'number' && reading.minConf < floor) return { authority: 'confirm', productionReady: true, reason: 'confidence' };
   if (typeof reading?.margin === 'number' && reading.margin < CONFIRM_MARGIN) return { authority: 'confirm', productionReady: true, reason: 'rival-margin' };
   return { authority: 'auto', productionReady: true, reason: 'safe-reading' };
 }
@@ -98,15 +127,21 @@ export function buildPhysicalEvidenceRun(meta, samples) {
   const writerId = canonicalEvidenceWriter(meta.writerId);
   const split = assignedEvidenceSplit(writerId);
   return {
-    schemaVersion: 1,
+    schemaVersion: PHYSICAL_EVIDENCE_SCHEMA_VERSION,
     physicalHardware: true,
+    reader: 'server',
     runId: meta.runId,
     recordedAt: meta.recordedAt,
-    build: { commit: meta.buildCommit, appVersion: meta.appVersion },
+    build: {
+      commit: meta.buildCommit,
+      appVersion: meta.appVersion,
+      kind: BUILD_KINDS.includes(meta.buildKind) ? meta.buildKind : 'development',
+      server: SERVERS.includes(meta.server) ? meta.server : 'staging'
+    },
     device: { model: meta.deviceModel, osVersion: meta.osVersion, pencil: meta.pencil },
     writer: { id: writerId, split, ...(split === 'final-holdout' ? { holdoutLocked: true } : {}) },
     consent: { granted: true, version: CONSENT_VERSION, scope: 'anonymous-handwriting-model-training-and-evaluation', recordedAt: meta.startedAt },
-    collector: { name: 'pri-production-evidence-session', version: 1, productionRecognition: true, pencilKit: true, predictedTouchesStored: false },
+    collector: { name: 'pri-production-evidence-session', version: 2, productionRecognition: 'server', pencilKit: true, predictedTouchesStored: false },
     samples
   };
 }
@@ -125,8 +160,8 @@ export function buildCorpusFromPhysicalRun(run) {
     predictedTouchesStored: false,
     consent: run.consent,
     collector: {
-      name: 'pri-production-evidence-session', version: 1,
-      productionRecognition: true, pencilKit: true, predictedEvents: false,
+      name: 'pri-production-evidence-session', version: 2,
+      productionRecognition: 'server', pencilKit: true, predictedEvents: false,
       pencilOnly: true, predictedTouchesStored: false
     },
     writer: {

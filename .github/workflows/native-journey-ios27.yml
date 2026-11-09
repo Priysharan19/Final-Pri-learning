@@ -1,0 +1,180 @@
+# Native iPhone + iPad journey on iOS 27 — the shipping OS.
+#
+# iOS 27 is what students install and Xcode 27.1 is what archives the store
+# build, yet until this lane existed the only macOS lane (native-ink.yml) ran
+# on whatever runtime its image carried (Xcode 16.4 and iOS 26.2 as late as
+# 31 October 2026), and the iOS 27 regression of #676 was found by hand. This
+# lane runs the capture-fidelity gate (Gate A) and the student journey on
+# iPhone and iPad on the hosted `xcode-27` image (actions/runner-images
+# "macOS 27", Xcode 27.1 default, iOS 27.0 simulator runtime; checked on
+# 2026-11-02 against images/macos/xcode-27-arm64-Readme.md).
+#
+# The runtime is NAMED here and enforced by every harness script
+# (PRI_SIM_RUNTIME → scripts/simulator-fleet.mjs requiredRuntime): if the image
+# stops carrying iOS 27.0, or Xcode 27.1, this lane fails by name. It never
+# runs on another iOS silently. Change the pin in a reviewed commit that says
+# why, together with native-ink.yml's own pin.
+#
+# Same path filter and the same one-macOS-job-per-PR-commit rule as the Native
+# Ink lane (tools/ci-runner-policy-check.mjs): pull requests validate through
+# `pull_request` alone; `push` runs on main only; superseded heads are
+# cancelled. The hosted Mac runner (pri-mac-v1-acceptance.yml) is not used.
+#
+# Everything here is SIMULATOR + SYNTHETIC READER evidence: a simulator, strokes
+# placed programmatically, a scripted reader. It is never device, Pencil,
+# real-provider or real-writer evidence.
+name: Native Journey iOS 27
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - 'client/src/ink/**'
+      - 'client/src/platform/native/**'
+      - 'client/test/native-ink-check.mjs'
+      - 'scripts/native-bridge-selfcheck.mjs'
+      - 'scripts/iphone-journey.mjs'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/journey-oracle.mjs'
+      - 'scripts/synthetic-reader-server.mjs'
+      - 'scripts/apple-shipping-target.mjs'
+      - 'scripts/ci-provision-simulators.mjs'
+      - 'scripts/simulator-fleet.mjs'
+      - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
+      - '.github/workflows/native-journey-ios27.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'client/src/ink/**'
+      - 'client/src/platform/native/**'
+      - 'client/test/native-ink-check.mjs'
+      - 'scripts/native-bridge-selfcheck.mjs'
+      - 'scripts/iphone-journey.mjs'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/journey-oracle.mjs'
+      - 'scripts/synthetic-reader-server.mjs'
+      - 'scripts/apple-shipping-target.mjs'
+      - 'scripts/ci-provision-simulators.mjs'
+      - 'scripts/simulator-fleet.mjs'
+      - 'scripts/ink-native-check.mjs'
+      - 'scripts/check-native-package-sync.mjs'
+      - '.github/workflows/native-journey-ios27.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-journey-ios27-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The pins. Both are asserted below before anything builds.
+  PRI_XCODE_APP: /Applications/Xcode_27.1.app
+  PRI_XCODE_VERSION: '27.1'
+  PRI_SIM_RUNTIME: '27.0'
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+
+jobs:
+  native-journey-ios27:
+    name: Capture gate and student journey on iOS 27 (iPhone + iPad)
+    runs-on: xcode-27
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Canonical native source has no stale duplicate
+        run: node scripts/check-native-package-sync.mjs
+
+      # The web bundle inside the package is generated, never tracked (D28):
+      # build the client and sync it into both packages before the one
+      # xcodebuild below, and prove the sync is complete. Without this the
+      # simulator app carries an empty Web folder and the journey fails at the
+      # first page.
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Build the web client and generate the iOS web bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      # The toolchain is what this lane says it is, or the lane stops here.
+      - name: Pinned toolchain (Xcode 27.1, iOS 27.0 simulator runtime)
+        run: |
+          set -euo pipefail
+          test -d "$PRI_XCODE_APP" || { echo "::error::$PRI_XCODE_APP is not on this image; the xcode-27 image changed. Re-pin deliberately."; ls /Applications | grep -i xcode; exit 1; }
+          xcodebuild -version | tee xcode-version.txt
+          grep -Eq "^Xcode ${PRI_XCODE_VERSION//./\\.}(\.[0-9]+)?$" xcode-version.txt || { echo "::error::xcodebuild is not Xcode $PRI_XCODE_VERSION"; exit 1; }
+          xcrun simctl list runtimes | tee runtimes.txt
+          grep -Eq "^iOS ${PRI_SIM_RUNTIME//./\\.}(\.[0-9]+)? " runtimes.txt || { echo "::error::the iOS $PRI_SIM_RUNTIME simulator runtime is not installed on this image. Install it (xcodebuild -downloadPlatform iOS) or re-pin deliberately; this lane never runs on another iOS."; exit 1; }
+
+      # One device of each family on the pinned runtime, the iPad booted first.
+      - name: iPad and iPhone simulators on iOS ${{ env.PRI_SIM_RUNTIME }}
+        run: node scripts/ci-provision-simulators.mjs --boot ipad
+
+      - name: JS ↔ Swift ink contract
+        run: npm run test:ink:bridge
+
+      - name: Build the simulator app (canonical iPhone + iPad package)
+        run: |
+          set -euo pipefail
+          (cd ios/PriLearning.swiftpm && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
+          test -n "$APP"
+          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
+
+      # Gate A: every stroke placed on the PencilKit surface comes back with
+      # every point and the Pencil signal intact; the surface sits where the
+      # page said. Nothing native reads ink.
+      - name: Native PencilKit capture self-check (iPad, iOS 27)
+        run: node scripts/ink-native-check.mjs --app "$PRI_SIM_APP"
+
+      - name: priNative bridge self-check (iPad simulator)
+        run: node scripts/native-bridge-selfcheck.mjs --family ipad --app "$PRI_SIM_APP"
+
+      - name: Apple shipping target is iPhone + iPad (V1)
+        run: node scripts/apple-shipping-target.mjs --check-v1
+
+      - name: priNative bridge self-check (iPhone simulator)
+        run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
+
+      - name: Server dependencies for the local Pri server
+        run: npm ci --prefix server
+
+      - name: iPhone certification journey (simulator, iOS 27)
+        run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone-ios27.json
+
+      - name: iPad journey (simulator, iOS 27)
+        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad-ios27.json
+
+      - name: The evidence names the pinned runtime
+        if: always()
+        run: |
+          set -euo pipefail
+          for f in journey-iphone-ios27.json journey-ipad-ios27.json; do
+            test -s "$f" || continue
+            node -e "const e=require('./$f'); if (e.simulator.runtimePinned !== true || e.simulator.pinnedRuntime !== process.env.PRI_SIM_RUNTIME || !/^iOS-27-0$/.test(e.simulator.runtime)) { console.error('$f ran on', e.simulator.runtime, 'pinned', e.simulator.pinnedRuntime); process.exit(1); } console.log('$f: ' + e.simulator.name + ' on ' + e.simulator.runtime + ' (pinned ' + e.simulator.pinnedRuntime + ') ' + e.result);"
+          done
+
+      - name: Simulator evidence records (iOS 27)
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-simulator-evidence-ios27
+          path: |
+            journey-*-ios27.json
+            xcode-version.txt
+            runtimes.txt
+          if-no-files-found: warn

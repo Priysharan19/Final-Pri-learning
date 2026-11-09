@@ -29,7 +29,10 @@ const STATE_KEY = {
   'not-maths': 'snap.notMaths',
   unreadable: 'snap.unreadable',
   'no-match': 'snap.noMatch',
-  'bad-photo': 'snap.badPhoto'
+  'bad-photo': 'snap.badPhoto',
+  // D17: the student declined (or closed) the prompt naming OpenAI; nothing was sent.
+  declined: 'snap.declined',
+  'not-permitted': 'snap.notPermitted'
 };
 
 function readFile(file, signal) {
@@ -96,7 +99,7 @@ export default function PractisePhoto() {
       const dataUrl = await readFile(file, signal);
       if (!gate.current(epoch)) return;
       stage = 'identifying';
-      const read = await identifyQuestionPhoto(dataUrl, { signal });
+      const read = await identifyQuestionPhoto(dataUrl, { signal, user });
       if (!gate.current(epoch)) return;
       setReading({ accountId, result: read });
       setChapterId(read.candidates?.[0]?.chapterId || '');

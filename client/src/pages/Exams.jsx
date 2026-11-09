@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { printPage } from '../lib/files.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
+import { boardMockOf, MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
@@ -52,13 +53,22 @@ export default function Exams() {
 
   useEffect(() => { api.get('/exams').then(r => setExams(r.exams)).catch(() => setExams([])); }, []);
 
-  async function start() {
+  // `mock`: a board mock (D22, engine/boardMock.js) — a typed, timed CBSE
+  // Class X Standard or Class XII paper, labelled "Pri mock in board format".
+  // The refusal's Retry (after signing in, say) starts the same kind of paper
+  // again: while a refusal is on screen, a start that does not name a kind
+  // repeats the last one. (For a CBSE Class X/XII student the only start
+  // button on the page is the mock's.)
+  const lastStart = useRef(false);
+  async function start(options) {
+    const mock = options?.mock === true || (options?.mock === undefined && refusal !== null && lastStart.current);
+    lastStart.current = mock;
     setBusy(true);
     setError('');
     setRefusal(null);
     setStillOpen(null);
     try {
-      const body = user.course === 'in' ? { year: user.year } : cfg;
+      const body = user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}) } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
@@ -170,9 +180,16 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
           {track === 'jee-advanced' && <p className="muted">
             {t('exams.jeeAdvancedNote')}
           </p>}
-          <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
-            {t('exams.notReleased')}
-          </button>
+          {boardMockOf({ track, grade: user.year, variant: 'standard' })
+            ? <div data-exam-board-mock-offer style={{ marginTop: 16 }}>
+              <p className="muted">{t('mock.intro')}</p>
+              <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => start({ mock: true })} disabled={busy} data-exam-board-mock>
+                {busy ? t('exams.building') : t('mock.start')}
+              </button>
+            </div>
+            : <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
+              {t('exams.notReleased')}
+            </button>}
         </>}
         {startRefused}
         {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}
@@ -199,6 +216,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
           <div className="prio-item" key={e.id}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 640, fontSize: 14 }}>{e.title}</div>
+              {e.mock && <div className="muted" data-exam-mock-label style={{ fontSize: 12 }}>{t('mock.notOfficial', { label: MOCK_LABEL })}</div>}
               <div className="muted" style={{ fontSize: 12.5 }}>
                 {t(india ? 'exams.paperMetaIndia' : 'exams.paperMeta', { date: new Date(e.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), n: e.duration_min })}
                 {/* A score the server did not certify says where it came from. */}

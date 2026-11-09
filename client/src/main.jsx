@@ -18,6 +18,7 @@ import './instrument/report.css';
 import './instrument/ledger.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
+import { parseParentEmailFragment } from './parent/parentReportApi.js';
 import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -25,7 +26,7 @@ import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js
 import { priNative } from './platform/native/index.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
-import { featureSnapshot } from './platform/features.js';
+import { featureEnabled, featureSnapshot } from './platform/features.js';
 
 // Where the boot has got to, for public/boot-guard.js (which says so on screen
 // when the app never renders) and for the browser suites. Reaching this line
@@ -68,6 +69,17 @@ if (ACCOUNT_ACTION_MODE) {
   if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
 }
 
+// The parent's own page for the weekly report email (confirm / stop): no
+// profile, no session; the token is in the fragment and stripped the same way.
+// Off in a production build until counsel has reviewed email about minors (D22).
+const PARENT_EMAIL_MODE = featureEnabled('parentReport') && window.location.pathname === '/parent/report-email';
+let parentEmailData = null;
+if (PARENT_EMAIL_MODE) {
+  parentEmailData = parseParentEmailFragment(window.location.hash);
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
+
 // Physical iPad LAN testing must never be controlled by an older offline shell.
 // A production Vite build normally registers the service worker below, which is
 // exactly what we want for the shipped offline app but the opposite of what we
@@ -101,8 +113,17 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
-if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE) bootPhase('render');
-if (GUARDIAN_MODE) {
+if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
+if (PARENT_EMAIL_MODE) {
+  const ParentReportEmailAction = React.lazy(() => import('./parent/ParentReportEmailAction.jsx'));
+  root.render(
+    <ErrorBoundary scope="parent report email">
+      <React.Suspense fallback={null}>
+        <ParentReportEmailAction data={parentEmailData} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (GUARDIAN_MODE) {
   // Outside StrictMode for the same reason as account actions: one-time codes.
   const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
   root.render(

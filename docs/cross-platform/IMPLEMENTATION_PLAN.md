@@ -35,7 +35,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Goal:** one platform-neutral `priNative` contract in shared JavaScript. Product code stops touching `window.webkit.messageHandlers` directly. The Apple shell speaks the versioned envelope **and** keeps its legacy protocol during migration.
 - **Files:**
   - **New:** `client/src/platform/native/{index.js,host.js,envelope.js,errors.js,fakeHost.js}`.
-  - **Modified:** `client/src/ink/native.js`, `client/src/native/photo.js`, `client/src/platform/nativeBilling.js`, `client/src/platform/cloudTransport.js`, `client/src/lib/files.js`, `client/src/components/InkPhysicalEvidenceSession.jsx`, `client/src/components/CloudAccountSecurity.jsx`, `client/src/main.jsx`, `client/src/local/offlineWarm.js`, `client/src/local/backend.js`, `client/src/components/CloudAccountPanel.jsx`, `client/src/pages/SettingsLegacy.jsx`, `client/src/ink/InkAnswer.jsx`, `Calibrate.jsx` (since removed with the calibration feature, m-finish-12); Swift `ios/PriLearning.swiftpm/WebShell.swift` (`__PRI_HOST__` injection, `priBridge` handler, main-frame/origin checks, lifecycle events, binary share); the mirror `ios/PriLearning 2.swiftpm`.
+  - **Modified:** `client/src/ink/native.js`, client/src/native/photo.js (since removed with the on-device photo reader, D16), `client/src/platform/nativeBilling.js`, `client/src/platform/cloudTransport.js`, `client/src/lib/files.js`, `client/src/components/InkPhysicalEvidenceSession.jsx`, `client/src/components/CloudAccountSecurity.jsx`, `client/src/main.jsx`, `client/src/local/offlineWarm.js`, `client/src/local/backend.js`, `client/src/components/CloudAccountPanel.jsx`, `client/src/pages/SettingsLegacy.jsx`, `client/src/ink/InkAnswer.jsx`, `Calibrate.jsx` (since removed with the calibration feature, m-finish-12); Swift `ios/PriLearning.swiftpm/WebShell.swift` (`__PRI_HOST__` injection, `priBridge` handler, main-frame/origin checks, lifecycle events, binary share); the mirror `ios/PriLearning 2.swiftpm`.
   - **Tests:** `client/test/native-host-contract-check.mjs` (new), plus `client/test/cross-platform-architecture-check.mjs` (allowlist shrinks).
 - **Scope:**
   - `__PRI_HOST__` handshake, envelope v1, closed error set, timeouts/cancel via `AbortSignal`, event bus, lazy capability detection.
@@ -47,7 +47,7 @@ CP-03 and CP-06 can run in parallel after CP-02, with different owners. Under th
 - **Dependencies:** CP-01 (this audit).
 - **Acceptance tests:**
   - Fake-host unit tests for every capability: success, error, timeout, cancel, unsupported, version-too-new.
-  - The existing `test:ink:bridge`, `test:photo:bridge`, `native-cloud-transport-check`, `native-storekit-boundary-check` stay green **unchanged**.
+  - The existing `test:ink:bridge`, `native-cloud-transport-check`, `native-storekit-boundary-check` stay green **unchanged** (`test:photo:bridge` became `test:photo:no-device-ocr` when the on-device photo reader was retired).
   - The iPad simulator `--ink-selfcheck` stays green.
   - A message from a subframe is ignored (simulator self-check).
 - **Automated gates:** `npm test`, `npm run test:browser`, `npm run check:ios`, `npm run test:ink:native` (iPad sim), the architecture check with direct `messageHandlers` access allowed **only** in `client/src/platform/native/`.

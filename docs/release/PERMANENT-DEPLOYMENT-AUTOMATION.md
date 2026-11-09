@@ -94,7 +94,7 @@ production-promotion proposal, not a way around release approval.
 - [ ] A full **24-hour clean staging soak** after that actual deploy is
       recorded, with error-budget, restart and recovery metrics observed;
       absence of alarms is not sufficient evidence by itself.
-- [ ] `tools/acceptance/staging-acceptance.mjs` A–F completes with tester
+- [ ] `tools/acceptance/staging-acceptance.mjs` S0–S8 completes with tester
       evidence: adult OTP, child age-basis/guardian consent, cross-device sync,
       offline/retry, accounting/authorization isolation, typed and photo/ink
       grading, correction provenance, and account deletion/export.

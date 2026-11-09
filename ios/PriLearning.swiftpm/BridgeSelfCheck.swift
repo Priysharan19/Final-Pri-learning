@@ -20,6 +20,26 @@
 import WebKit
 
 enum BridgeSelfCheck {
+
+    // Every PRIBRIDGE line goes to the unified log AND to Documents/PRIBRIDGE.log
+    // in the app's own container: on the hosted iOS 27 image `log show` returns
+    // nothing for the app, and scripts/native-bridge-selfcheck.mjs reads this
+    // file first (via `simctl get_app_container`), falling back to the log.
+    static let reportURL: URL? = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("PRIBRIDGE.log")
+
+    static func say(_ line: String, reset: Bool = false) {
+        NSLog("%@", line)
+        guard let url = reportURL, let data = (line + "\n").data(using: .utf8) else { return }
+        if !reset, let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
     static var requested: Bool { ProcessInfo.processInfo.arguments.contains("--bridge-selfcheck") }
 
     private static let script = """
@@ -80,22 +100,22 @@ enum BridgeSelfCheck {
     """
 
     @MainActor
-    static func run(in webView: WKWebView) {
-        NSLog("PRIBRIDGE bridge self-check started")
+    static func run(in webView: WKWebView, ink: InkBridge) {
+        say("PRIBRIDGE bridge self-check started", reset: true)
         webView.callAsyncJavaScript(script, arguments: [:], in: nil, in: .page) { result in
             switch result {
             case .success(let value):
                 guard let text = value as? String,
                       let data = text.data(using: .utf8),
                       let out = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    NSLog("PRIBRIDGE FAIL unreadable self-check result")
+                    say("PRIBRIDGE FAIL unreadable self-check result")
                     return
                 }
                 var failures = 0
                 for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused", "subframeReachThroughRefused"] {
                     let ok = out[key] as? Bool == true
                     if !ok { failures += 1 }
-                    NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
+                    say(String(format: "PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key))
                 }
                 // Native ink placement math under a page scale (Dynamic Type through the
                 // viewport, or pinch; zoom = pageZoom × scrollView.zoomScale): zoom 1 must
@@ -113,18 +133,108 @@ enum BridgeSelfCheck {
                     zoomed.surfaceCenter == CGPoint(x: 375, y: 337.5) && zoomed.scale == 1.5 &&
                     zoomed.surfaceBounds.size == frame.size
                 if !placementOK { failures += 1 }
-                NSLog("PRIBRIDGE %@ inkPlacementZoom", placementOK ? "ok" : "FAIL")
+                say(String(format: "PRIBRIDGE %@ inkPlacementZoom", placementOK ? "ok" : "FAIL"))
                 let subframeHost = out["subframeHasHost"] as? Bool == true
                 if subframeHost { failures += 1 }
-                NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
+                say(String(format: "PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok"))
                 // Informational: whether the shell CSP stopped the child frame from
                 // loading (expected: subframe navigations are cancelled); the gate above is the pass/fail.
-                NSLog("PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false")
-                NSLog("PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? "")
-                NSLog("PRIBRIDGE summary %d failure(s)", failures)
+                say(String(format: "PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false"))
+                say(String(format: "PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? ""))
+                say(String(format: "PRIBRIDGE summary %d failure(s)", failures))
+                if contentEndRequested { armContentEnd(ink: ink) }
             case .failure(let error):
-                NSLog("PRIBRIDGE FAIL script error %@", String(describing: error))
+                say(String(format: "PRIBRIDGE FAIL script error %@", String(describing: error)))
             }
+        }
+    }
+
+    // ── The page's WebContent process ends (`--bridge-content-end`) ──
+    // scripts/native-bridge-selfcheck.mjs ends the real WebContent process from
+    // the host (SIGKILL, as iOS's memory pressure does) once the native ink
+    // surface is mounted with a stroke on it. Every load after that runs
+    // runRecovery: the page is the app again, the bridge answers, and the ink
+    // surface of the page that ended is gone. Before WebShell handled
+    // webViewWebContentProcessDidTerminate, WebKit reloaded the page on its own
+    // and the surface stayed mounted, with the old ink, above the new page.
+
+    static var contentEndRequested: Bool { ProcessInfo.processInfo.arguments.contains("--bridge-content-end") }
+    static var awaitingContentEnd = false
+    private static var recoveries = 0
+
+    @MainActor
+    static func armContentEnd(ink: InkBridge) {
+        ink.handle(["op": "mount",
+                    "frame": ["x": 40, "y": 160, "width": 600, "height": 300],
+                    "clip": ["x": 0, "y": 0, "width": 800, "height": 800],
+                    "scrollX": 0, "scrollY": 0])
+        ink.handle(["op": "setStrokes",
+                    "strokes": [["points": [["x": 10, "y": 10], ["x": 200, "y": 120], ["x": 320, "y": 40]]]]])
+        let s = ink.surfaceState
+        let ok = s.mounted && s.visible && s.strokes == 1
+        say("PRIBRIDGE \(ok ? "ok" : "FAIL") inkMountedBeforeContentEnd")
+        awaitingContentEnd = true
+        say("PRIBRIDGE ready for content process end")
+    }
+
+    static func contentProcessEnded(count: Int, reloading: Bool, inkMounted: Bool) {
+        guard requested else { return }
+        say("PRIBRIDGE contentProcessEnded n=\(count) action=\(reloading ? "reload" : "stopped") inkMounted=\(inkMounted)")
+    }
+
+    static func contentStoppedShown() {
+        guard requested else { return }
+        say("PRIBRIDGE contentStopped shown")
+    }
+
+    private static let recoveryScript = """
+    const out = {};
+    const h = window.__PRI_HOST__;
+    const root = document.getElementById('root');
+    out.pageAlive = document.readyState === 'complete' && !!h && h.protocol === 1 && !!root && root.childElementCount > 0;
+    let reply = null;
+    const original = window.__priNativeReceive;
+    window.__priNativeReceive = msg => { if (msg && msg.id === 'recovery-main') reply = msg; if (original) original(msg); };
+    window.webkit.messageHandlers.priBridge.postMessage({ v: 1, id: 'recovery-main', cap: 'storage', op: 'status', payload: {} });
+    for (let i = 0; i < 30 && !reply; i++) await new Promise(r => setTimeout(r, 100));
+    window.__priNativeReceive = original;
+    out.bridge = reply?.ok === true;
+    return JSON.stringify(out);
+    """
+
+    @MainActor
+    static func runRecovery(in webView: WKWebView, ink: InkBridge) {
+        recoveries += 1
+        let n = recoveries
+        webView.callAsyncJavaScript(recoveryScript, arguments: [:], in: nil, in: .page) { result in
+            var out: [String: Any] = [:]
+            if case .success(let value) = result, let text = value as? String, let data = text.data(using: .utf8) {
+                out = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            }
+            let s = ink.surfaceState
+            // The reload policy, as a table: more than 2 ends inside 30 s stop reloading.
+            let now = Date()
+            let policy = WebShell.Coordinator.self
+            let policyOK =
+                policy.recovery(after: [], at: now) == ([now], true) &&
+                policy.recovery(after: [now - 10], at: now).reload &&
+                !policy.recovery(after: [now - 10, now - 5], at: now).reload &&
+                policy.recovery(after: [now - 40, now - 5], at: now) == ([now - 5, now], true)
+            let checks: [(String, Bool)] = [
+                ("pageAliveAfterContentEnd", out["pageAlive"] as? Bool == true),
+                ("bridgeAfterContentEnd", out["bridge"] as? Bool == true),
+                ("inkDroppedAfterContentEnd", !s.mounted && !s.visible && s.strokes == 0),
+                ("recoveryPolicy", policyOK),
+            ]
+            var failures = 0
+            for (key, ok) in checks {
+                if !ok { failures += 1 }
+                say("PRIBRIDGE \(ok ? "ok" : "FAIL") \(key) (load \(n))")
+            }
+            if !s.mounted && !s.visible && s.strokes == 0 {} else {
+                say("PRIBRIDGE info ink after load \(n): mounted=\(s.mounted) visible=\(s.visible) strokes=\(s.strokes)")
+            }
+            say("PRIBRIDGE recovery \(n) summary \(failures) failure(s)")
         }
     }
 }

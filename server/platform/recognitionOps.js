@@ -90,8 +90,14 @@ export const RECOGNITION_SCOPE = 'recognition-read';
  * transcript this reader can produce and is served without being stored.
  */
 export const RECOGNITION_MAX_TRANSCRIPT_BYTES = 64 * 1024;
-/** Bump when something that changes a read is not covered by the digest below. */
-export const RECOGNITION_OPS_VERSION = 1;
+/**
+ * Bump when something that changes a read is not covered by the digest below.
+ * 2 (#196): normalizeResult now holds the reply to its schema and fails closed
+ * (over-long replies refused, non-boolean doubt flags and out-of-range
+ * confidences read as doubt), so a read kept under the old normalisation is
+ * not served after the change.
+ */
+export const RECOGNITION_OPS_VERSION = 2;
 
 // The prompt and schema, by content. A change to either (they are owned by
 // handwritingProvider.js) changes every operation identity without anyone

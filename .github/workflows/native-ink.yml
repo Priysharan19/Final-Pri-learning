@@ -2,9 +2,16 @@
 # Canonical Swift source, duplicate-package drift, JS↔Swift transport and the
 # installed simulator app are all gated independently.
 #
-# This is the one macOS lane. It is path-filtered to the native shell, the ink
-# runtime and its own harness scripts so a docs-only or curriculum PR does not
-# queue a 60-minute macOS run; superseded heads on the same ref are cancelled.
+# This is the iOS 26 macOS lane (native-journey-ios27.yml is the iOS 27 one,
+# the shipping OS). It runs on the hosted macos-26 image PINNED to Xcode 26.6
+# and the iOS 26.5 simulator runtime: the pin is asserted before anything
+# builds and enforced by every harness script (PRI_SIM_RUNTIME →
+# scripts/simulator-fleet.mjs), so a runner-image change fails this lane by
+# name instead of moving it to another iOS silently (#676 went unseen that
+# way, with the lane on Xcode 16.4 / iOS 26.2 as late as 31 October 2026).
+# It is path-filtered to the native shell, the ink runtime and its own harness
+# scripts so a docs-only or curriculum PR does not queue a 60-minute macOS
+# run; superseded heads on the same ref are cancelled.
 # Pull requests validate through `pull_request` alone and `push` runs only on
 # main: the push + pull_request pair cost two macOS jobs per PR commit and, on
 # 2026-10-17, saturated the macOS queue for seven hours (Pri App Health on main
@@ -67,10 +74,18 @@ concurrency:
   group: native-ink-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # The pins (actions/runner-images images/macos/macos-26-arm64-Readme.md,
+  # checked 2026-11-02: Xcode 26.6 default; iOS 26.2, 26.4 and 26.5 runtimes).
+  PRI_XCODE_APP: /Applications/Xcode_26.6.app
+  PRI_XCODE_VERSION: '26.6'
+  PRI_SIM_RUNTIME: '26.5'
+  DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
 jobs:
   native-ink:
-    name: Swift build, native benchmark and bridge smoke test
-    runs-on: macos-15
+    name: Swift build, capture gate and bridge smoke test (iOS 26)
+    runs-on: macos-26
     timeout-minutes: 60
 
     steps:
@@ -100,17 +115,24 @@ jobs:
           npm run sync:ios
           npm run check:ios
 
-      # V1 needs both families (#504). Hosted images do not always ship an
-      # iPad device, so create any missing one from the installed iOS runtime.
-      # Only the iPad is booted here — the first simulator steps use it — and
-      # each later step boots its own family and shuts the other down, so the
-      # runner never carries two booted simulators. Fails only when no
-      # runtime/device type exists.
-      - name: Apple toolchain, iPad and iPhone simulators
+      # The toolchain is what this lane says it is, or the lane stops here.
+      - name: Pinned toolchain (Xcode 26.6, iOS 26.5 simulator runtime)
         run: |
           set -euo pipefail
-          xcodebuild -version
-          node scripts/ci-provision-simulators.mjs --boot ipad
+          test -d "$PRI_XCODE_APP" || { echo "::error::$PRI_XCODE_APP is not on this image; the macos-26 image changed. Re-pin deliberately."; ls /Applications | grep -i xcode; exit 1; }
+          xcodebuild -version | tee xcode-version.txt
+          grep -Eq "^Xcode ${PRI_XCODE_VERSION//./\\.}(\.[0-9]+)?$" xcode-version.txt || { echo "::error::xcodebuild is not Xcode $PRI_XCODE_VERSION"; exit 1; }
+          xcrun simctl list runtimes | tee runtimes.txt
+          grep -Eq "^iOS ${PRI_SIM_RUNTIME//./\\.}(\.[0-9]+)? " runtimes.txt || { echo "::error::the iOS $PRI_SIM_RUNTIME simulator runtime is not installed on this image. Install it or re-pin deliberately; this lane never runs on another iOS."; exit 1; }
+
+      # V1 needs both families (#504). Hosted images do not always ship an
+      # iPad device, so create any missing one on the PINNED iOS runtime.
+      # Only the iPad is booted here — the first simulator steps use it — and
+      # each later step boots its own family and shuts the other down, so the
+      # runner never carries two booted simulators. Fails when the pinned
+      # runtime or a device type of a family is missing.
+      - name: iPad and iPhone simulators on iOS ${{ env.PRI_SIM_RUNTIME }}
+        run: node scripts/ci-provision-simulators.mjs --boot ipad
 
       - name: JS ↔ Swift ink contract
         run: npm run test:ink:bridge
@@ -126,7 +148,10 @@ jobs:
           test -n "$APP"
           echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
 
-      - name: Native PencilKit + Vision self-check
+      # Gate A: every stroke placed on the PencilKit surface comes back with
+      # every point and the Pencil signal intact; the surface sits where the
+      # page said. Nothing native reads ink (owner decision 2026-10-02, D16).
+      - name: Native PencilKit capture self-check (iPad)
         run: node scripts/ink-native-check.mjs --app "$PRI_SIM_APP"
 
       # CP-02: the priNative contract inside real WebKit — deep-frozen host
@@ -179,10 +204,22 @@ jobs:
       - name: iPad journey (simulator)
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
 
+      - name: The evidence names the pinned runtime
+        if: always()
+        run: |
+          set -euo pipefail
+          for f in journey-iphone.json journey-ipad.json; do
+            test -s "$f" || continue
+            node -e "const e=require('./$f'); if (e.simulator.runtimePinned !== true || e.simulator.pinnedRuntime !== process.env.PRI_SIM_RUNTIME || !/^iOS-26-5$/.test(e.simulator.runtime)) { console.error('$f ran on', e.simulator.runtime, 'pinned', e.simulator.pinnedRuntime); process.exit(1); } console.log('$f: ' + e.simulator.name + ' on ' + e.simulator.runtime + ' (pinned ' + e.simulator.pinnedRuntime + ') ' + e.result);"
+          done
+
       - name: Simulator evidence records
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-simulator-evidence
-          path: journey-*.json
+          path: |
+            journey-*.json
+            xcode-version.txt
+            runtimes.txt
           if-no-files-found: warn

@@ -30,10 +30,13 @@
 //
 // The numbers, and why:
 //   • DEADLINE_MS 1500 — one answer plus its working. Ordinary marking takes
-//     single-digit milliseconds; the engine's own cooperative backstop for a
-//     page of working is 750 ms (checker.js WORKING_LIMITS.backstopMs), so
-//     honest work the engine itself accepts finishes with room to spare, and
-//     1.5 s is the longest any one operation can hold one worker.
+//     single-digit milliseconds. The engine bounds a page of working by size
+//     and by counted work, never by the clock (checker.js WORKING_LIMITS: 200
+//     characters a line, 100 lines, a fixed work budget, and expr.js's one evaluation budget, which exact.js's
+//     BigInt steps are also charged to), so the same page gets
+//     the same verdict under any load; honest work within those bounds finishes
+//     with room to spare, and 1.5 s is the longest any one operation can hold
+//     one worker. This deadline is the only clock, and it never yields a verdict.
 //   • EXAM_PAPER_BUDGET_MS 8000 — a whole paper's marking time, summed across
 //     its parts (each part is still stopped at DEADLINE_MS). A paper is not
 //     "parts × 1.5 s": once the budget is spent the remaining parts are not
@@ -51,6 +54,7 @@ import { asStore, assertNoOpenTransaction } from './store.js';
 import { consumeRateLimit, sha256 } from './security.js';
 import { logEvent } from './observability.js';
 import { metrics } from './metrics.js';
+import { markingPolicy, methodMarksRefusal } from './markingPolicy.js';
 
 export const MARKING_TOO_COMPLEX = 'MARKING_TOO_COMPLEX';
 export const MARKING_BUSY = 'MARKING_BUSY';
@@ -121,6 +125,10 @@ export function createMarkerPool({
   if (env.NODE_ENV === 'production' && (inline || entry !== DEFAULT_ENTRY)) {
     throw Object.assign(new Error('The marker pool runs only its shipped worker in production.'), { code: 'MARKER_POOL_CONFIG_INVALID' });
   }
+  // A method-mark switch that is not honoured is said once, at start: marking
+  // stays on the final answer only (markingPolicy.js), never open.
+  const refusal = methodMarksRefusal(env);
+  if (refusal) logEvent('warn', 'platform_error', { code: refusal.code });
   const slots = [];
   const queue = [];
   const activeKeys = new Set();
@@ -254,6 +262,9 @@ export function createMarkerPool({
     // opens its transaction afterwards.
     assertNoOpenTransaction('Marking');
     if (closed) return Promise.resolve({ ok: false, code: MARKING_BUSY, reason: 'closed', partials: [], ms: 0 });
+    // D12: the server's marking policy rides with every operation, over
+    // whatever the caller put there — a request can never choose it.
+    args = { ...args, policy: markingPolicy(env) };
     if (inline) return runInline(op, args);
     return new Promise((resolve, reject) => {
       const job = { id: nextId++, op, args, key: key === null ? null : String(key), deadlineMs: Math.max(1, Math.round(limit)),

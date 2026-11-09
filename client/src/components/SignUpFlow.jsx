@@ -6,6 +6,10 @@
 //        → name & age → class → signed in (a new address: the account is made
 //                                          and verified by the code just typed)
 //        → a parent's approval, explained where it is needed, if under 18
+//        → "Confirm your email", when the only thing missing is a proved
+//          address (a password account registered before it was confirmed):
+//          a code to that address, through the same /otp routes, then into
+//          the app once the server's statement says the account may enter
 //
 // New and returning students take the same road; nobody chooses "sign up" or
 // "sign in" first, and nobody types an email twice. Below the email field the
@@ -403,6 +407,23 @@ export default function SignUpFlow({
     } catch (err) { fail(err); }
   }
 
+  /**
+   * "Use a different email" on the confirm-your-email step: this session's
+   * address cannot be proved here, so the card signs it out and starts again
+   * at the email field. The answers already given on this card are kept.
+   */
+  async function useDifferentEmail() {
+    if (busy) return;
+    setBusy('signout');
+    await cloud.logout().catch(() => {});
+    setAccount(null); setConsent(null); setChallenge(null); setCode(''); setTicket(''); setResendAt(0);
+    setPassword(''); setDestination('');
+    // The signed-out account's name must not follow into the next one.
+    setName(String(initialName || '').slice(0, 80));
+    setBusy('');
+    go('method', 'back');
+  }
+
   async function finish(signedInAccount = account) {
     if (finishing.current) return finishing.current;
     setBusy('finish');
@@ -426,10 +447,25 @@ export default function SignUpFlow({
           return;
         }
         if (authority.outcome === 'unavailable') {
-          setError(tLater('signup.consentCheckUnavailable'));
+          // Not a bound statement (an older server, a malformed or
+          // self-contradictory reply). Nothing here is known to be about a
+          // guardian, so the sentence does not say it is.
+          setError(tLater('signup.accountCheckUnavailable'));
           return;
         }
         setConsent(authority.consent);
+        if (authority.outcome === 'unverified') {
+          // Everything is settled except a proved address (an adult, or a
+          // child a guardian approved). The student proves it here with a code
+          // to that address; the server, not this card, then says they may
+          // enter, and practice stays refused there until it does.
+          const address = String(signedInAccount?.email || '').trim().toLowerCase();
+          setChannel('email');
+          if (EMAIL_RE.test(address)) setDestination(address);
+          setChallenge(null); setCode(''); setResendAt(0);
+          if (step !== 'verify-email') go('verify-email');
+          return;
+        }
         if (authority.outcome === 'revoked') {
           if (step !== 'parent-wait') go('parent-wait');
           setError(tLater('signup.parentRevoked'));
@@ -696,6 +732,29 @@ export default function SignUpFlow({
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
           <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-check">{t('signup.checkApproval')}</button>
+        </div>
+      </>
+    );
+  } else if (step === 'verify-email') {
+    body = (
+      <>
+        {heading('signup.verifyEmailTitle')}
+        <p className="signup-lead" id="signup-verify-email-lead">
+          {destination.trim()
+            ? tx('signup.verifyEmailLead', { email: <strong className="signup-destination">{destination.trim()}</strong> })
+            : t('signup.verifyEmailLeadNoAddress')}
+        </p>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void sendCode(); }}>
+          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy}
+            data-testid="signup-verify-email-send" aria-describedby="signup-verify-email-lead">
+            {busy === 'send' ? t('signup.sending') : t('signup.verifyEmailSend')}
+          </button>
+        </form>
+        <p className="signup-hint" data-testid="signup-verify-email-password">{t('signup.verifyEmailPassword')}</p>
+        <div className="signup-alt">
+          <button type="button" className="linklike" disabled={!!busy} onClick={useDifferentEmail} data-testid="signup-verify-email-change">
+            {t('signup.verifyEmailChange')}
+          </button>
         </div>
       </>
     );

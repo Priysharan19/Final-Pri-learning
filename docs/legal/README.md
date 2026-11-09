@@ -1,16 +1,97 @@
 # Legal pages
 
-These four documents are **templates**, not legal advice, and the app renders
-them with a banner saying so. Every `{{PLACEHOLDER}}` must be completed, and the
-whole set reviewed by a lawyer qualified in Indian law, before the banner is
-removed and the app is offered to the public.
+Five pages ship inside the app and are rendered by `client/src/pages/Legal.jsx`
+from the files in this directory, so there is one copy of each and it cannot
+drift from the repository. **No lawyer has reviewed any of them.** The app says
+so above every notice, in the reader's language, and will stop saying so only
+when a person records a lawyer's review in `review-status.json` (below).
 
 | File | Route | Required by |
 |---|---|---|
-| `privacy.md` | `/privacy` | Apple App Store, Google Play, Razorpay onboarding, and India's Digital Personal Data Protection Act 2023 |
-| `terms.md` | `/terms` | Apple App Store, Razorpay onboarding |
-| `refund-policy.md` | `/refund-policy` | Razorpay onboarding; Apple handles its own refunds |
+| `privacy.md` | `/privacy` | Apple App Store, Google Play, and India's Digital Personal Data Protection Act 2023 |
+| `terms.md` | `/terms` | Apple App Store, Google Play |
+| `refund-policy.md` | `/refund-policy` | Google Play and Apple handle their own refunds; the page says what Pri itself does and where to ask |
 | `grievance.md` | `/grievance` | The DPDP Act's requirement to publish a grievance contact |
+| `third-party/NOTICES.md` | `/third-party-notices` | The licences of the open-source software the app ships; **generated**, see below |
+
+The counsel pack (`counsel/`) is not a public page. It sits in a subdirectory
+because `tools/legal-status.mjs` treats every Markdown file directly in this
+directory as a public notice that must have a Hindi twin. It has two documents,
+and `counsel/README.md` says how the owner sends them:
+
+- `counsel/QUESTIONS-FOR-COUNSEL.md` — the short sheet to send: each question
+  only Indian counsel can answer (the operator, the DPDP notices, consent and
+  the guardian flow, the D17 OpenAI prompt, the D18 erasure period, D22 parent
+  email about minors, D23 past-paper rights), with the exact current text and
+  where it lives in the code. `tools/counsel-pack-check.mjs` (in
+  `npm run test:legal`) fails if a quote or a location drifts from the tree.
+- `counsel/COUNSEL-INFORMATION-PACK.md` — the background and all 35 questions.
+
+## Status, 9 November 2026 (D17, with #737)
+
+- The privacy notice (EN + HI), the store disclosures, the public site and
+  the counsel sheet describe the D17 prompt that #737 adds: before the first
+  picture is sent, the app asks once, naming OpenAI, and nothing is sent until
+  the student agrees. This change belongs in the same train as #737:
+  `client/test/legal-pages-check.mjs` and `tools/counsel-pack-check.mjs` fail
+  without its code, and `tools/legal-promises.mjs` refuses a nomination where
+  the notice says "Nothing is sent until you agree" and the prompt is absent.
+
+## Status, 9 November 2026
+
+- The privacy notice's D18 sentences (EN + HI) now say what the accounts
+  stream's code does (#736): an unconfirmed or withdrawn child account is
+  closed 30 days after creation or withdrawal and erased 7 days later, and a
+  guardian's request closes it at once and erases it 7 days later. The
+  nomination gate recognises that code's names and prints
+  `PRI_CHILD_ERASURE=enforce` as a production setting the notice depends on.
+
+## Status, 8 November 2026
+
+- The terms no longer say the app "follows the NCERT syllabus": they use the
+  D24 wording only, in both languages, and `client/test/legal-pages-check.mjs`
+  refuses the coverage claims D24 forbids in all eight notices.
+- The counsel question sheet was added (above).
+
+## Status, 2 November 2026
+
+- Every placeholder was filled on 19 October 2026 (owner's name and address,
+  grievance officer, support mailbox, jurisdiction New Delhi) and
+  `node tools/legal-status.mjs` reports none left.
+- The notices were corrected against the code on 2 November 2026: store
+  purchases on iPhone, iPad and Android instead of website purchases; grievance
+  timing without a claim about what the Act "allows"; the DPDP commencement
+  stated as an expectation with its basis; no claim to "follow" the Act; the
+  inline counsel-review note removed from the student pages; crash reports,
+  the 90-day answer record, the five-year exam record and the 30-day erasure of
+  an unconfirmed child account disclosed; SMS and the on-device handwriting
+  model no longer described, because neither ships.
+- **Not reviewed by a lawyer.** `review-status.json` is `reviewed: false`.
+  The questions for counsel, operator first, are in the counsel pack §11.
+
+## The review switch
+
+`review-status.json` is the one fact behind the "not yet reviewed by a lawyer"
+banner. Until 1 November 2026 the banner was tied to placeholders being left in
+the documents, so filling them removed the banner although nobody had reviewed
+anything. Now:
+
+- `Legal.jsx` shows the banner whenever `reviewed` is not exactly `true`.
+- `client/test/legal-pages-check.mjs` refuses `reviewed: true` unless
+  `reviewer`, `qualification` (in Indian law), `reviewedOn` (an ISO date that
+  has happened), `languages` (`en` and `hi`) and `evidence` (where the sign-off
+  is kept, outside the repository) are all filled; refuses it if any English
+  notice's "Last updated" is later than `reviewedOn`, so an edit after the
+  review reopens it; and requires the "no advocate has checked" sentence to be
+  removed from the Hindi notices, and the "has not yet been reviewed by a
+  lawyer" sentence from the English, in the same change.
+- While `reviewed` is false the same suite requires those sentences to be
+  present, in both languages, in every notice.
+- A document that still contains a `{{PLACEHOLDER}}` gets a separate template
+  banner, whatever the switch says.
+
+Nothing in the code and no agent may set the switch. The person who does
+should be able to point at the lawyer's written sign-off.
 
 ## The Hindi versions
 
@@ -23,97 +104,101 @@ offers a control to read either.
 
 **The English governs.** Every Hindi document says so in Hindi, in its own
 first paragraph, together with the fact that no lawyer has checked either
-version. That paragraph is not decoration: `legal-pages-check.mjs` asserts it
-verbatim in all four, above the first section, and the suite fails without it.
-Nobody may be able to close the page believing they have read the operative
-text when they have read a translation of it.
+version. `legal-pages-check.mjs` asserts both sentences verbatim in all four,
+above the first section, and the suite fails without them. Nobody may be able
+to close the page believing they have read the operative text when they have
+read a translation of it.
 
-Both languages carry the **same placeholders**, so one fill serves both;
-`legal-status.mjs` exits non-zero if they ever disagree. The suite also holds
-the pair to the same sections and the same internal links, so a paragraph
-added to one language and not the other is a build failure rather than a
-notice that says different things depending on who is reading it.
+Both languages carry the **same placeholders**, the same sections and the same
+internal links, so a paragraph added to one language and not the other is a
+build failure rather than a notice that says different things depending on who
+is reading it. The Hindi documents are loaded through
+`client/src/i18n/legalHindi.js`, behind an `import()`, for the reason the Hindi
+string catalogue is: an English reader does not download them.
 
-The Hindi documents are loaded through `client/src/i18n/legalHindi.js`, behind
-an `import()`, for the reason the Hindi string catalogue is: an English reader
-does not download them.
+The third-party notices are not translated: licence texts are reproduced as
+their authors published them, and the page says so in both languages.
 
-## Completing them
+## Third-party notices
 
-Fill in every placeholder, in both languages — the same seven appear in each:
+`docs/legal/third-party/NOTICES.md` is written by
+`node tools/third-party-notices.mjs` (`npm run legal:notices`) from
+`client/package-lock.json` (every production package, with the licence text
+found in its installed copy) and `android/gradle/libs.versions.toml` (the
+libraries the Android app declares, with their publishers' licences). The page
+says that those libraries' own dependencies ship too and are not listed one by
+one; listing them needs a committed Gradle lockfile for the release classpath.
+The iPhone and iPad app uses Apple's own frameworks only. Server dependencies
+are not distributed and are not listed.
 
-```
-{{OWNER_LEGAL_NAME}}        the entity that will hold the data and take the money
-{{OWNER_ADDRESS}}           its registered address
-{{GRIEVANCE_OFFICER_NAME}}  a named person
-{{GRIEVANCE_OFFICER_EMAIL}} a monitored mailbox
-{{SUPPORT_EMAIL}}           where a customer writes about their subscription
-{{JURISDICTION_CITY}}       whose courts the terms name
-{{LAST_UPDATED}}            the date the filled version was published
-```
-
-`node tools/legal-status.mjs` lists which placeholders are still unfilled, in
-which document and which language, and refuses to report a count at all while
-the two languages disagree about what has to be filled.
-`client/test/legal-pages-check.mjs` fails if a page is missing in either
-language, if a route does not render one, if the two languages have drifted
-apart, or if the "not yet reviewed" banner has been removed while placeholders
-remain.
+`npm run test:legal` runs the generator's `--check`, so a dependency change
+without a regenerated page fails CI. The page is reached by `import()` from
+`Legal.jsx` only when `/third-party-notices` is opened.
 
 ## What the code does, which the text must match
 
 The privacy notice describes real behaviour, and these are the facts it rests
 on. If the code changes, the notice is wrong until it is changed too.
 
-- The learning engine runs on the device. Questions, handwriting recognition and
-  marking need no network.
-- A cloud account is optional. Without one, nothing leaves the device except
-  files the person exports themselves.
-- With an account, what syncs is listed in `client/src/platform/syncContract.js`.
-- Handwriting strokes stay on the device. Only when a student switches on
-  server reading is a picture rasterised from them (or a photo of paper
-  working) sent through the server to the reading provider; the server keeps
-  no copy, and `store: false` is not zero retention at the provider
-  (`docs/privacy/data-retention.md` §4).
+- Grading is online-only and server-authoritative (ADR-0001). An account and a
+  connection are needed for any answer to be marked; signed out or offline the
+  work waits on the device. The deterministic engine on the server decides every
+  mark; the copy on the device only displays notation and old results.
+- Handwriting strokes stay on the device. A picture rasterised from them, or a
+  photo of paper working, is sent through the server to OpenAI to be read. That
+  is on by default for a signed-in account, switchable off in Settings, off for
+  an under-18 account until a guardian confirms, and never runs without an
+  account (`client/src/ink/cloudReader.js`). The request is answer-blind
+  (`FORBIDDEN_FIELDS` in `server/platform/handwriting.js`). `store: false` is
+  not zero retention at the provider (`docs/privacy/data-retention.md` §4).
+- The transcription and any correction live 90 days with the answer's receipt
+  (`server/platform/practice.js` `MAX_AGE`); exam records up to five years
+  (`server/platform/exams.js` `RECORD_TTL`); telemetry and coded crash reports
+  90 days (`server/platform/telemetry.js`). All are deleted with the account.
+  The `graded-attempt` learning event outlives the 90 days and is kept until
+  deletion: question id, whether it was right, marks, chapter and how it was
+  practised, never what the student wrote. The notice states both halves.
 - Account deletion is immediate; what survives it, unlinked, is listed in
   `docs/privacy/data-retention.md` §2 and enforced by
   `server/test/account-lifecycle-journey-check.mjs`. It is available in-app for
-  every sign-in method (password, Apple/Google, one-time code) and, for someone
-  without the app, at the public page `/account/delete-request`
-  (`client/src/pages/AccountDeleteRequest.jsx`,
-  `server/test/account-deletion-public-check.mjs`, `client/test/tour-account-deletion.js`).
-- The reading provider is named (OpenAI, `server/platform/handwritingProvider.js`);
-  the transcription it returns never sets a mark — the deterministic engine on
-  the device does.
-- Sign-in by one-time code (email or SMS) and the parent's code-based approval
-  on `/guardian/consent` are described under Children (`docs/release/otp-sign-in.md`).
-- Telemetry is allow-listed and retained for 90 days
-  (`server/platform/telemetry.js`).
+  every sign-in method and, for someone without the app, at
+  `/account/delete-request`.
+- Guardian confirmation is by email link or email code
+  (`server/platform/guardianConsent.js`, `otp.js`); it is recorded as
+  `guardian-email-confirmation` and is not verifiable parental consent. SMS is
+  off at launch (owner decision D3): the sign-up flow shows the SMS option only
+  when the server reports `channels.sms: true`, which needs `PRI_SMS_PROVIDER`.
+- The 30-day erasure of an unconfirmed or withdrawn child account, and a
+  guardian's erasure request without the child's login, are owner default D18
+  and are being built in the accounts stream; the notice promises them from
+  2 November 2026 and the counsel pack records the gap. **That code must reach
+  production no later than these pages.** `scripts/release-nominate.mjs` refuses
+  a SHA whose notice makes the promise while its code lacks the job or the
+  guardian route (`tools/legal-promises.mjs`).
 - Password-protected profiles are encrypted at rest on the device; profiles
-  without a password are not. Both limits are documented in
-  `client/src/local/idb.js` and `client/src/local/auth.js`.
+  without a password are not (`client/src/local/idb.js`, `client/src/local/auth.js`).
+- Subscriptions are sold only through the App Store and Google Play
+  (`PRI_V1_RELEASE_SCOPE.md` §12); Razorpay is dormant and refused to native
+  clients. Deleting an account does not cancel a store subscription.
+- "There is no purchase on the website" (terms and refund policy) holds only
+  while the server reports `webCheckout.configured: false`, because the web
+  client offers Razorpay whenever it reports it configured
+  (`CloudAccountPanel.jsx`). `tools/verify-deployment.mjs` fails a deployment
+  that reports it configured. Leave the Razorpay variables unset; turning web
+  checkout on is a change to the notices first.
 
-## Launch checklist (status 2026-10-02 — `BLOCKED_EXTERNAL`, owner and counsel only)
+## Launch checklist (owner and counsel only)
 
-Engineering cannot complete any line below: each needs a real legal entity, a named person, a
-monitored mailbox or a qualified lawyer. Nothing here is filled in by code or by an agent. The
-executable path is `docs/release/LAUNCH-RUNBOOK.md` §4; the gate that consumes it is
-`client/test/legal-pages-check.mjs` (today: `LEGAL PAGES: PASS — 233/233 checks … while 38
-placeholders remain`) together with `node tools/legal-status.mjs` (today: 7 placeholders across
-4 notices in 2 languages, 8 documents).
+Engineering cannot complete any line below. The gate that consumes them is
+`client/test/legal-pages-check.mjs` together with `node tools/legal-status.mjs`.
 
-| # | Action (owner / counsel) | Where | Evidence it produces | Consumed by |
-|---|---|---|---|---|
-| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | `{{OWNER_LEGAL_NAME}}`, `{{OWNER_ADDRESS}}` in all 8 documents | `node tools/legal-status.mjs` no longer lists them | `legal-pages-check.mjs` (placeholder count falls in both languages together) |
-| 2 | Appoint the grievance officer (a named person) and a monitored mailbox, as the DPDP Act requires to be published | `{{GRIEVANCE_OFFICER_NAME}}`, `{{GRIEVANCE_OFFICER_EMAIL}}` (`grievance.md`, `privacy.md`, both languages) | same | same; App Store / Play privacy contact |
-| 3 | Open the customer support mailbox for subscription questions | `{{SUPPORT_EMAIL}}` | same | same; Razorpay onboarding (web billing is out of V1) and App Store review contact |
-| 4 | Choose the jurisdiction whose courts the terms name | `{{JURISDICTION_CITY}}` (`terms.md`, `terms.hi.md`) | same | same |
-| 5 | Have the English set reviewed by a lawyer qualified in Indian law (DPDP Act 2023 and its rules, Consumer Protection (E-Commerce) Rules, IT Rules grievance requirements); have the Hindi set checked against the English | review letter / sign-off kept outside the repository | written sign-off referenced in the launch record | `PRI_V1_RELEASE_SCOPE.md` §18 blocker #9; ADR-0001 "legal sign-off remains an external authority" |
-| 6 | Confirm the privacy notice still matches the code's data path at the release SHA (cloud handwriting image and photo, working check, telemetry, deletion survivors) — the facts list above and `docs/privacy/data-retention.md` | `privacy.md` / `privacy.hi.md` | reviewer's confirmation in the launch record | blocker #10 (`PRI_V1_RELEASE_SCOPE.md` §18); `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` must agree |
-| 7 | Set the publication date of the filled version, in both languages | `{{LAST_UPDATED}}` | `node tools/legal-status.mjs` → 0 placeholders | `legal-pages-check.mjs` then expects the "not yet reviewed" banner to be gone; its pinned count line changes and must be updated in `.github/workflows/ci.yml` in the same PR |
-| 8 | Publish the processor list named in ADR-0001 (Railway, Supabase, the model provider, the email provider) in the privacy notice's "Who else sees your data" if counsel requires named processors | `privacy.md` §"Who else sees your data" | counsel's instruction | blocker #9 |
-
-Order matters only in one place: fill the placeholders (1–4, 7) **after** the review (5–6) has
-settled the wording, so the lawyer reads the operative text once. Until every row has evidence,
-the app keeps showing the banner and blocker #9 stays open. Hindi translation of counsel's
-changes must land in the same PR as the English, or `legal-pages-check.mjs` fails on drift.
+| # | Action (owner / counsel) | Status | Evidence it produces |
+|---|---|---|---|
+| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | Filled 19 Oct 2026 with the owner as an individual at a home address; **operator decision still open** (counsel pack §11 Q1–Q4) | the notices name the operator |
+| 2 | Appoint the grievance officer and a monitored mailbox | Filled 19 Oct 2026 (the owner; personal iCloud address) | `grievance.md` |
+| 3 | Open the customer support mailbox | Same address; a `prilearning.com` mailbox has no MX record yet | `refund-policy.md` |
+| 4 | Choose the jurisdiction whose courts the terms name | New Delhi, 19 Oct 2026 | `terms.md` |
+| 5 | Have the English set reviewed by a lawyer qualified in Indian law; have the Hindi checked against it | **Open.** Record it in `review-status.json` | the banner goes; `legal-pages-check.mjs` enforces the paperwork |
+| 6 | Confirm the notice matches the code's data path at the release SHA | Reconciled by engineering 2 Nov 2026 against `a5778a319`; counsel's confirmation open | `docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b |
+| 7 | Set the publication date of the filled version | 19 Oct 2026; revised 2 Nov 2026 | `**Last updated**` in all eight documents |
+| 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Supabase (planned), OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |

@@ -6,6 +6,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 let checks=0;
 const eq=(actual,expected,reason)=>{assert.equal(actual,expected,reason);checks++;};
@@ -30,7 +31,7 @@ function waitingProvider(){
 }
 function finish(res){
  res.writeHead(200,{'content-type':'application/json'});
- res.end(JSON.stringify({output_text:JSON.stringify({lines:[{text:'x = 9',confidence:0.96}],confidence:0.96,needs_confirmation:false})}));
+ res.end(JSON.stringify({output_text:JSON.stringify({lines:[{text:'x = 9',latex:'',confidence:0.96,uncertain:false,doubt:'',gap_before:false}],confidence:0.96,needs_confirmation:false})}));
 }
 const vars=['NODE_ENV','PRI_PLATFORM_DB','PRI_AUTH_DELIVERY_KEY','PRI_PUBLIC_ORIGIN',
   'PRI_HANDWRITING_API_KEY','PRI_HANDWRITING_ENDPOINT','PRI_HANDWRITING_MODEL','PRI_HANDWRITING_FALLBACK_MODEL',
@@ -47,7 +48,7 @@ const {startApp,registerAccount,verifyEmail} = await import('./support/app-harne
 const {requestedEngine} = await import('./support/engine.mjs');
 const {decryptDeliveryToken}=await import('../platform/deliveryCrypto.js');
 const h=await startApp({engine:requestedEngine()});
-const image='data:image/png;base64,'+Buffer.from('a'.repeat(600)).toString('base64');
+const image=pngDataUrl('a'.repeat(600));
 const issue=jar=>h.request('/v1/practice/issue',{method:'POST',jar,body:{generator:'c8-linear-equations-both-sides',difficulty:2,seed:104729,curriculum:'in'}});
 const recognize=(jar,qid)=>h.request('/v1/practice/'+qid+'/recognize',{method:'POST',jar,body:{mode:'photo',image}});
 // Submit never starts a provider read (review 17, F3): it binds the read the
