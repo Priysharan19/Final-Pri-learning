@@ -191,8 +191,9 @@ jobs:
           # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
-          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39253/39253 checks' suites.log
-          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 389/389 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39533/39533 checks' suites.log
+          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 415/415 checks' suites.log
+          grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
           grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
           grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
@@ -204,6 +205,9 @@ jobs:
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
+          # The opposite direction: every right answer to every India question (the key, the box's unit in every
+          # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29829 right answers over 11282 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -425,7 +429,7 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 860/860 checks' photo-pipeline.log
+          grep -Fq 'PHOTO PIPELINE: PASS — 885/885 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs

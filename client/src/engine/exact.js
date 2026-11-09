@@ -12,10 +12,27 @@
 // Anything that is not a written number or + − × ÷ and a whole-number power of
 // one — a function, a constant (π, e), a letter, a factorial — has no exact
 // value here and returns null; the caller keeps its existing numeric rule.
-// Every result is bounded: powers up to 64 and numbers up to 4096 bits, beyond
-// which the value is reported as not exact (null), never approximated.
+// Every result is bounded: powers up to 64 and numbers up to 4096 bits. Past a
+// bound the answer is too large to check exactly, and that is not the same as
+// "has no exact value": it throws ExactLimit, which the marker reports as
+// unread — never a fall-back to the binary64 band, which would credit
+// "3840000000000.001*1^65" (#723 review P1). Every BigInt step is also charged
+// to the check's one evaluation budget (expr.js), by the size of its numbers,
+// so the cost of a check is counted, never timed (#723 review P1).
 // ─────────────────────────────────────────────────────────────────────────────
-import { normalize, parse } from './expr.js';
+import { normalize, parse, chargeEvaluation } from './expr.js';
+
+/** Thrown when an exact value exists but is past this module's bounds or budget. */
+export class ExactLimit extends Error {
+  constructor() { super('This answer is too large to check exactly.'); this.name = 'ExactLimit'; }
+}
+const tooBig = () => { throw new ExactLimit(); };
+/** Charge a step on numbers of these sizes: one unit per 64-bit word pair, squared. */
+function charge(...ns) {
+  let words = 1;
+  for (const n of ns) words += Number(bits(n) / 64n);
+  if (!chargeEvaluation(words * words)) tooBig();
+}
 
 const MAX_BITS = 4096n;
 const MAX_POWER = 64n;
@@ -27,9 +44,12 @@ function bits(n) { return BigInt((n < 0n ? -n : n).toString(2).length); }
 export function fraction(n, d = 1n) {
   if (d === 0n) return null;
   if (d < 0n) { n = -n; d = -d; }
+  // bounded before Euclid runs, so the gcd itself is never unbounded work
+  if (bits(n) > 2n * MAX_BITS + 64n || bits(d) > 2n * MAX_BITS + 64n) tooBig();
+  charge(n, d);
   const g = gcd(n, d) || 1n;
   n /= g; d /= g;
-  if (bits(n) > MAX_BITS || bits(d) > MAX_BITS) return null;
+  if (bits(n) > MAX_BITS || bits(d) > MAX_BITS) tooBig();
   return { n, d };
 }
 
@@ -39,7 +59,7 @@ export function literalFraction(text) {
   if (!m || (m[1] === '' && !m[2])) return null;
   const int = m[1] || '0', frac = m[2] || '';
   let exp = BigInt(m[3] || '0') - BigInt(frac.length);
-  if (exp > 4096n || exp < -4096n) return null;
+  if (exp > 4096n || exp < -4096n) tooBig();
   const digits = BigInt(int + frac);
   return exp >= 0n ? fraction(digits * 10n ** exp) : fraction(digits, 10n ** -exp);
 }
@@ -51,16 +71,24 @@ const div = (a, b) => (b.n === 0n ? null : fraction(a.n * b.d, a.d * b.n));
 function pow(a, b) {
   if (b.d !== 1n) return null;                       // only whole-number powers are exact here
   const e = b.n < 0n ? -b.n : b.n;
-  if (e > MAX_POWER) return null;
-  if (bits(a.n) * e > MAX_BITS || bits(a.d) * e > MAX_BITS) return null;
+  if (e > MAX_POWER) tooBig();
+  if (bits(a.n) * e > MAX_BITS || bits(a.d) * e > MAX_BITS) tooBig();
   if (b.n < 0n && a.n === 0n) return null;
   const r = fraction(a.n ** e, a.d ** e);
   return r && b.n < 0n ? fraction(r.d, r.n) : r;
 }
 
 /** The exact value of a parse tree, or null when it has none here. */
+const exactMemo = new WeakMap();
 export function exactOf(ast) {
   if (!ast || typeof ast !== 'object') return null;
+  // radicalOf asks for every subtree's value: each is worked out once.
+  if (exactMemo.has(ast)) return exactMemo.get(ast);
+  const value = exactOfNode(ast);
+  exactMemo.set(ast, value);
+  return value;
+}
+function exactOfNode(ast) {
   switch (ast.t) {
     case 'num':
       if (typeof ast.s === 'string') return literalFraction(ast.s);
@@ -84,9 +112,11 @@ export function exactOf(ast) {
   }
 }
 
-/** The exact value of an answer written only in numbers, or null. Never throws. */
+/** The exact value of an answer written only in numbers, or null; throws ExactLimit past the bounds. */
 export function exactValue(text) {
-  try { return exactOf(parse(normalize(String(text ?? '')))); } catch { return null; }
+  let ast;
+  try { ast = parse(normalize(String(text ?? ''))); } catch { return null; }
+  return exactOf(ast);                               // ExactLimit propagates: too large is not "no value"
 }
 
 /** The exact value of a finite binary64 that is a safe whole number; null otherwise. */
@@ -200,7 +230,9 @@ function radicalOf(ast) {
 }
 /** A proof-capable exact radical expression or null; no approximation. */
 export function exactRadical(text) {
-  try { return radicalOf(parse(normalize(String(text ?? '')))); } catch { return null; }
+  let ast;
+  try { ast = parse(normalize(String(text ?? ''))); } catch { return null; }
+  return radicalOf(ast);                             // ExactLimit propagates
 }
 /** Compare exact radical coefficients, including a rational-only operand. */
 export function sameRadical(a, b) {

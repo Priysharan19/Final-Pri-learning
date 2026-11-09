@@ -94,6 +94,12 @@ function sizeOf(node) {
   return size;
 }
 
+/**
+ * Charge `units` of other deterministic work (exact BigInt arithmetic) to the
+ * check's one budget. False once the budget is spent; outside a check, free.
+ */
+export function chargeEvaluation(units) { return spend(units); }
+
 /** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
 export function withEvaluationBudget(units, fn) {
   if (evaluationBudget !== null) return fn();

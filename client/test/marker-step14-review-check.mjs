@@ -40,6 +40,10 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
     const k = fmt(q.answer.value);
     for (const input of [k, `₹${k}`, `₹ ${k}`, `Rs ${k}`, `Rs. ${k}`]) check(G, verdict(q, input).correct === true, `d${d} s${s} (box "${q.answerSuffix}"): "${input}" is the amount, and correct`);
     check(G, verdict(q, `₹${fmt(q.answer.value + 1)}`).correct === false, `d${d} s${s}: a rupee mark does not make a wrong amount right`);
+    // The box's own word written out is the box's unit (the correct-answer sweep);
+    // a unit the box is not, beside a word that is no unit, is a different quantity.
+    check(G, verdict(q, `₹${k} ${q.answerSuffix}`).correct === true, `d${d} s${s}: "₹${k} ${q.answerSuffix}" — the box's word written out — is correct`);
+    check(G, verdict(q, `${k} kg`).correct === false, `d${d} s${s}: "${k} kg" beside "${q.answerSuffix}" is not the amount`);
   }
   // Every rupee-scale box the banks serve, at D1–D3.
   let seen = 0;
@@ -50,6 +54,25 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
     check(G, verdict(q, `₹${fmt(q.answer.value)}`).correct === true && verdict(q, `Rs ${fmt(q.answer.value)}`).correct === true, `${id} d${d} s${s}: ₹/Rs before the right amount is credited`);
   }
   check(G, seen >= 20, `the sweep reached the rupee-scale boxes (${seen})`);
+}
+
+// ── P1b · ₹ on a count is a wrong unit (the correct-answer sweep's audit) ───
+{
+  const G = 'p1-rupee-count';
+  let seen = 0;
+  for (const [id, d] of [['c7-equation-context-reasoning', 3], ['c7-formula-evaluation-reasoning', 3]]) for (let s = 1; s <= 40; s++) {
+    const q = generateQuestion(id, d, s);
+    if (q.answerType !== 'numeric' || q.answerSuffix || !/₹|\bRs\b|rupee/i.test(q.prompt)) continue;
+    const ask = String(q.prompt).replace(/\$/g, ' ').split(/(?<=[.?!])\s+/).pop();
+    if (!/\bhow many\b|\bnumber of\b/i.test(ask)) continue;
+    seen++;
+    const k = fmt(q.answer.value);
+    check(G, verdict(q, k).correct === true, `${id} d${d} s${s}: the count ${k} is correct`);
+    check(G, verdict(q, `₹${k}`).correct !== true && verdict(q, `Rs ${k}`).correct !== true, `${id} d${d} s${s}: "₹${k}" on "${ask.slice(0, 50)}" is not the count`);
+  }
+  check(G, seen >= 10, `the sweep reached the counts asked in rupee-priced questions (${seen})`);
+  const notes = { answerType: 'numeric', answer: { value: 500 }, prompt: 'Uday saves ₹50 a week. How many rupees does he save in 10 weeks?' };
+  check(G, verdict(notes, '₹500').correct === true, '"How many rupees …" asks for money: ₹500 is correct');
 }
 
 // ── P2 · a written unit is credited only in the asked dimension ─────────────
@@ -155,6 +178,88 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
     }
   }
   check(G, seen >= 20, `the sweep reached the %-box questions (${seen})`);
+}
+
+// ── The delta review of #723 (comments 6723897703 and the 021e5ae1d review) ──
+{
+  // R1: a unit box takes its spellings from units.js alone — "ms" is not metres.
+  const G = 'delta-unit-box';
+  for (let s = 1; s <= 6; s++) {
+    const q = generateQuestion('c7-decimals-current', 4, s);
+    if (String(q.answerSuffix).trim() !== 'm') continue;
+    const k = fmt(q.answer.value);
+    for (const input of [`${k} ms`, `${k} hs`, `${k} mm`]) check(G, verdict(q, input).correct !== true, `c7-decimals-current d4 s${s} (box "m"): "${input}" is not credited`);
+    for (const input of [k, `${k} m`, `${k} metres`, `${k} mts`]) check(G, verdict(q, input).correct === true, `c7-decimals-current d4 s${s}: "${input}" is credited`);
+  }
+  // A word box still takes its singular and plural.
+  const box = { answerType: 'numeric', prompt: 'How old is she?', answerSuffix: ' years', answer: { value: 12 } };
+  for (const input of ['12 years', '12 year']) check(G, verdict(box, input).correct === true, `"${input}" beside "years" is credited`);
+}
+{
+  // R2: ₹ on interest and discount amounts is the answer's unit, whatever rate the sentence gives.
+  const G = 'delta-rupee-rate';
+  const money = (prompt, value) => ({ answerType: 'numeric', prompt, answer: { value } });
+  for (const [p, v] of [
+    ['Find the simple interest on ₹500 at 5% per annum for 2 years.', 50],
+    ['Find the amount on ₹500 for 2 years at 10% per annum compounded annually.', 605],
+    ['What sum of money will amount to ₹605 in 2 years at 10% per annum compounded annually?', 550],
+    ['Find the selling price of a shirt marked ₹500 after a 20% discount.', 400]
+  ]) {
+    check(G, verdict(money(p, v), `₹${v}`).correct === true, `"${p}": ₹${v} is credited`);
+    check(G, verdict(money(p, v), `₹${v + 1}`).correct !== true, `"${p}": ₹${v + 1} is not credited`);
+  }
+  for (const [p, v] of [
+    ['A shirt costs ₹500 and sells for ₹600. Find the profit percentage.', 20],
+    ['A shirt costs ₹500 and sells for ₹600. What is the profit as a percentage of the cost?', 20],
+    ['Ravi has ₹600 and Sita ₹400. Find the ratio of Ravi\'s money to Sita\'s.', 1.5],
+    ['A sum of ₹500 becomes ₹605 in 2 years. Find the rate of interest per annum.', 10],
+    ['How many ₹20 notes make ₹320?', 16]
+  ]) check(G, verdict(money(p, v), `₹${v}`).correct !== true, `"${p}": ₹${v} on an asked percentage, ratio, rate or count is not credited`);
+}
+{
+  // P1: a unit named mid-sentence is the asked unit ("How far, in cm, …").
+  const G = 'delta-mid-sentence-unit';
+  let seen = 0;
+  for (let s = 1; s <= 80; s++) {
+    const q = generateQuestion('c11-radian-unit-circle-reasoning', 3, s);
+    if (!/,\s*in cm,/.test(q.prompt)) continue;
+    seen++;
+    const k = fmt(q.answer.value);
+    for (const input of [`${k} cm`, `${k} centimetres`, k]) check(G, verdict(q, input).correct === true, `c11-radian-unit-circle-reasoning d3 s${s}: "${input}" is credited`);
+    for (const input of [`${k} kg`, `${k} s`]) check(G, verdict(q, input).correct !== true, `c11-radian-unit-circle-reasoning d3 s${s}: "${input}" is not credited`);
+  }
+  check(G, seen >= 3, `the "how far, in cm" items were reached (${seen})`);
+}
+{
+  // P1: past the exact bounds an answer is unread — never the binary64 band —
+  // and the same input always gets the same verdict.
+  const G = 'delta-exact-limit';
+  const n = v => ({ answerType: 'numeric', prompt: 'Find the value.', answer: { value: v } });
+  const iv = region => ({ answerType: 'interval', answer: { region, variable: 'x' } });
+  const rows = [[n(3840000000000), '3840000000000.001*1^65'], [n(21149700), '21149700.000000004*1^65'],
+    [n(1), '1+10^-65'], [iv('x > sqrt(2)'), 'x > sqrt(2)+0.000000000000001*1^65'], [iv('x > 1'), 'x > 1+10^-65']];
+  for (const [q, input] of rows) {
+    const first = verdict(q, input);
+    check(G, first.correct !== true && first.invalid === true, `"${input}" is left unread, never credited (got ${state(first)})`);
+    for (let i = 0; i < 3; i++) check(G, state(verdict(q, input)) === state(first), `"${input}" gets the same verdict every time`);
+  }
+  // A long chain of large exact steps is charged to the budget and stops, quickly and the same way.
+  const big = `${'-'.repeat(40)}(123456789/987654321)^60${'*1'.repeat(30)}`;
+  const t = Date.now();
+  const r = verdict(n(1), big);
+  check(G, r.correct !== true, `a chain of large exact steps is not credited (got ${state(r)})`);
+  check(G, Date.now() - t < 1000, 'a chain of large exact steps finishes inside the budget');
+}
+{
+  // P2: paise on a crore or million box are not the box's unit.
+  const G = 'delta-paise-scale';
+  for (const [d, s] of [[1, 1], [1, 2], [2, 1], [3, 1]]) {
+    const q = generateQuestion('c7-place-value-systems-reasoning', d, s);
+    if (!/crore|million/i.test(String(q.answerSuffix))) continue;
+    const k = q.answer.value;
+    check(G, verdict(q, `${Math.round(k * 100)} paise`).correct !== true, `d${d} s${s} (box "${q.answerSuffix}"): "${Math.round(k * 100)} paise" is not credited`);
+    check(G, verdict(q, fmt(k)).correct === true, `d${d} s${s}: the key is credited`);
+  }
 }
 
 const pass = Object.values(groups).reduce((n, g) => n + g.pass, 0);
