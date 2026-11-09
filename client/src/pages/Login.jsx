@@ -565,7 +565,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     // back, so the code boxes are the only thing asking for attention.
     const atStart = cardStep === 'method';
     return (
-      <div className="auth-wrap">
+      <div className="auth-wrap pri-auth">
         <MathField />
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         <div className="auth-col fade-in">
