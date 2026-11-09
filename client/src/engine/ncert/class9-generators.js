@@ -134,6 +134,8 @@ const numbers = (rng,diff) => {
 };
 
 // ── Algebraic identities ────────────────────────────────────────────────────
+/** (x - r)(x - s) for roots r, s, in one canonical factor order (smaller root first). */
+export const factorised = (r, s) => { const fac = t => `(x${t > 0 ? '-' : '+'}${Math.abs(t)})`; const [a, b] = r <= s ? [r, s] : [s, r]; return `${fac(a)}${fac(b)}`; };
 const identities = (rng,diff) => {
   if(diff===1){
     const a=ri(rng,1,999)*10,b=ri(rng,1,9),form=pick(rng,['plus','minus','product']);
@@ -153,9 +155,18 @@ const identities = (rng,diff) => {
     return q(`Evaluate $${a}^2-${b}^2$ using a factor identity.`,v,['Recognise a difference of squares.','Use $a^2-b^2=(a-b)(a+b)$.','Multiply the two factors.'],[['Identity','$a^2-b^2=(a-b)(a+b)$'],['Factors',`$(${a}-${b})(${a}+${b})$`],['Answer',`$${a-b}\\times${a+b}=${v}$`]]);
   }
   const r1=nzi(rng,-15,15),r2=nzi(rng,-15,15),sum=r1+r2,prod=r1*r2;
-  const fac=r=>`(x${r>0?'-':'+'}${Math.abs(r)})`;
-  const right=`${fac(r1)}${fac(r2)}`;
-  return qMcq(rng,`Factor $x^2${tailv(-sum,'x')}${tail(prod)}$.`,right,[[`${fac(-r1)}${fac(-r2)}`,'These factors give the opposite middle coefficient.'],[`${fac(r1)}${fac(-r2)}`,'Check the constant term: the product has the wrong sign or size.'],[`x(x${tail(-sum)})${tail(prod)}`,'This is not a product of factors.']],['For $x^2+bx+c$, seek two numbers with sum b and product c.','Mind the signs of the two numbers.','Check by expansion.'],[['Need',`two numbers with sum $${-sum}$ and product $${prod}$: $${-r1}$ and $${-r2}$`],['Factors',`$${right}$`],['Check','Expanding reproduces the quadratic.']]);
+  const right=factorised(r1,r2);
+  // Distractors are other factorisations, deduplicated by the quadratic they
+  // expand to (so (x-3)(x+3) and (x+3)(x-3) are one option), never equal to
+  // the right one, plus a not-a-product trap when it reads sensibly.
+  const wrong=[]; const seenPoly=new Set([`${sum}|${prod}`]);
+  for(const [a,b,why] of [[-r1,-r2,'These factors give the opposite middle coefficient.'],[r1,-r2,'Check the constant term: the product has the wrong sign or size.'],[-r1,r2,'Check the constant term: the product has the wrong sign or size.'],[r1+1,r2-1,'Expand: the constant term does not match.'],[r1,r2+1,'Expand: neither coefficient matches.']]){
+    if(a===0||b===0) continue;
+    const key=`${a+b}|${a*b}`; if(seenPoly.has(key)) continue; seenPoly.add(key);
+    wrong.push([factorised(a,b),why]);
+  }
+  if(sum!==0) wrong.splice(2,0,[`x(x${tail(-sum)})${tail(prod)}`,'This is not a product of factors.']);
+  return qMcq(rng,`Factor $x^2${tailv(-sum,'x')}${tail(prod)}$.`,right,wrong.slice(0,3),['For $x^2+bx+c$, seek two numbers with sum b and product c.','Mind the signs of the two numbers.','Check by expansion.'],[['Need',`two numbers with sum $${-sum}$ and product $${prod}$: $${-r1}$ and $${-r2}$`],['Factors',`$${right}$`],['Check','Expanding reproduces the quadratic.']]);
 };
 
 // ── Circles ─────────────────────────────────────────────────────────────────

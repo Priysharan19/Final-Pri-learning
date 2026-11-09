@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.11.1",
+ "contentVersion": "2026.11.2",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -241,7 +241,7 @@
   "c8-squares-roots-ncert-mastery": "f4f063f973f8bfd4",
   "c8-standard-form-reasoning": "d9b67b00d5bf36c3",
   "c8-surface-area-reasoning": "8ddda38753af81c4",
-  "c9-algebraic-identities-ncert-mastery": "14206d816f8725fc",
+  "c9-algebraic-identities-ncert-mastery": "3fb86d4a302297b1",
   "c9-circles-ncert-mastery": "fd894a4e83a1ed01",
   "c9-coordinate-geometry-ncert-mastery": "0728baa99410a768",
   "c9-linear-polynomials-ncert-mastery": "4c8bcaefef4762b2",

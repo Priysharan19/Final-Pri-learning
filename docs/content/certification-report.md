@@ -6,7 +6,7 @@ This report certifies what the **runtime serves** on every V1 launch path (CBSE/
 
 `client/test/content-report-fresh-check.mjs` fails CI when this report is older than the content it describes: a different CONTENT_VERSION, a changed generator digest, a different path or exam count, or a different past-papers default.
 
-- Content version: `2026.11.1`
+- Content version: `2026.11.2`
 - Mode: full, 40 seeded draws per (path, difficulty); 6 paper(s) per exam selection
 - Paths: **793/793 pass** (746 advertised)
 - Past papers: OFF by default (rights-opinion-pending; decision D23) — 47 archive paths enumerated, 0 advertised; the declared state of each is the INDIA_PYQ_UNAVAILABLE refusal, and no timed paper holds a previous-year item

@@ -30,7 +30,9 @@
 // 2026.11.1 — Class 9 mastery generators widened: wide integer ranges and two
 // or three shapes per cell (some cells served 2–8 questions in all); the skill,
 // answer type, hints and worked solution of every cell are unchanged in kind.
-export const CONTENT_VERSION = '2026.11.1';
+// 2026.11.2 — Class 9 factorising MCQ: equivalent factorisations are one
+// option, written in one factor order; no wrong option expands to the key.
+export const CONTENT_VERSION = '2026.11.2';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
