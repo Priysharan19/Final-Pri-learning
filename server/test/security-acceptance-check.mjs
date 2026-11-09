@@ -313,8 +313,17 @@ try {
       }
       c.deq([badOrigin.status, badOrigin.data?.error?.code], [403, 'ORIGIN_REJECTED'], 'logout-all from a foreign Origin is 403');
       c.eq((await h.request('/v1/account/me', { jar: phone })).status, 200, 'refused logout-all attempts revoke nothing');
-      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: {} });
-      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all revokes both sessions');
+      // #481: the client names the account it means. The cookie is device-wide
+      // and can change hands, so a session for any other account is refused
+      // before anything is revoked (as DELETE /v1/account, #521).
+      const liveOf = async id => Number((await db.get('SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=? AND revoked_at IS NULL', [id])).n);
+      const mismatch = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: { accountId: bystander.id } });
+      c.deq([mismatch.status, mismatch.data?.error?.code], [409, 'ACCOUNT_MISMATCH'], 'logout-all naming another account is 409 ACCOUNT_MISMATCH');
+      c.deq([await liveOf(owner.id), await liveOf(bystander.id)], [2, 1], 'and revokes nothing, on either account');
+      c.eq((await h.request('/v1/account/me', { jar: owner.jar })).status, 200, 'the mismatched caller is still signed in');
+      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: { accountId: owner.id } });
+      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all naming its own account revokes both sessions');
+      c.eq(await liveOf(owner.id), 0, 'and no session of that account is left');
       c.eq((await h.request('/v1/account/me', { jar: ownerCopy })).status, 401, 'logout-all signs out the current device');
       c.eq((await h.request('/v1/account/me', { jar: phone })).status, 401, 'logout-all signs out the other device');
       c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'logout-all leaves another account signed in');

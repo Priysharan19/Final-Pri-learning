@@ -506,6 +506,77 @@ async function run() {
     eq('a payload with no figure in it at all comes back empty', sanitizeFigure('<script>alert(1)</script>'), '');
   } catch (err) { crashed(err); }
 
+  // ── The scanning fallback is linear (CodeQL js/redos) ─────────────────────
+  // Without DOMParser (Node, a Web Worker) figures go through the TAG scanner.
+  // An unterminated tag full of quote pairs once backtracked exponentially:
+  // 22 pairs held it for 25 s. The small case runs first so a regression fails
+  // in seconds instead of hanging the suite on the large one.
+  section('scanning fallback stays linear');
+  try {
+    const savedParser = globalThis.DOMParser;
+    delete globalThis.DOMParser;
+    try {
+      const timed = pairs => {
+        const input = '<svg><A' + '""'.repeat(pairs);
+        const started = performance.now();
+        const out = sanitizeFigure(input);
+        return { ms: performance.now() - started, out };
+      };
+      const small = timed(22);
+      ok('an unterminated tag with 22 quote pairs is scanned at once (it took 25 s before)', small.ms < 250, `${small.ms.toFixed(0)} ms`);
+      if (small.ms < 250) {
+        const big = timed(9000);
+        ok('18,000 quote characters in an unterminated tag are still scanned in linear time', big.ms < 250, `${big.ms.toFixed(0)} ms`);
+        ok('and the unterminated tag comes back as inert, escaped text', violations(big.out).length === 0 && !/<a\b/i.test(big.out) && big.out.includes('&lt;A'), show(big.out));
+      }
+      eq('a tag with an unbalanced quote is escaped as text, never emitted as a tag',
+        sanitizeFigure(`<svg><text x='1>hi</text></svg>`), `<svg>&lt;text x='1&gt;hi</text></svg>`);
+      eq('a quoted attribute containing ">" still parses as one tag (same output as before the fix)',
+        sanitizeFigure('<svg><text x="1" font-family="a > b">t</text></svg>'), '<svg><text x="1">t</text></svg>');
+
+      // Every shape the independent review of #726 found, at the full figure
+      // limit (MAX_FIGURE, 20,000 characters). Before this fix a run of '<a'
+      // was cubic (2,000 characters took 2–4 s, 4,000 over 20 s), and one long
+      // unterminated tag, '</a' and '<a=' runs, a long attribute name with no
+      // '=' and a run of unclosed '<!--' were quadratic. Each family is timed at
+      // 2,000 characters first, so a regression fails here in seconds instead
+      // of hanging on the full size. Best of three, against a 100 ms bound: the
+      // linear scanner needs a few ms on a loaded runner, and every family but
+      // the comment guard took far longer on the old head (0248ef76c).
+      const LIMIT = 20000;
+      const BOUND_MS = 100;
+      const best = input => {
+        let ms = Infinity, out = '';
+        for (let i = 0; i < 3; i++) { const t = performance.now(); out = sanitizeFigure(input); ms = Math.min(ms, performance.now() - t); }
+        return { ms, out };
+      };
+      const sized = (lead, unit, tail = '') => n => (lead + unit.repeat(Math.ceil(n / unit.length))).slice(0, n - tail.length) + tail;
+      for (const [label, make] of [
+        ["a run of '<a' with no closing '>' (was cubic)", sized('<svg>', '<a')],
+        ["a run of '</a'", sized('', '</a')],
+        ["a run of '<a='", sized('', '<a=')],
+        ['one unterminated tag with a 20,000-character name', sized('<a', 'a')],
+        ["one closed tag holding a 20,000-character attribute name with no '='", sized('<svg ', 'a', '>')],
+        ["a run of unclosed '<!--' (guard)", sized('', '<!--')]
+      ]) {
+        const probe = best(make(2000));
+        if (probe.ms >= BOUND_MS) { ok(`${label}: scanned in linear time`, false, `${probe.ms.toFixed(0)} ms at 2,000 characters`); continue; }
+        const full = best(make(LIMIT));
+        ok(`${label}: ${LIMIT.toLocaleString('en')} characters scanned in linear time`, full.ms < BOUND_MS && make(LIMIT).length === LIMIT, `${full.ms.toFixed(1)} ms`);
+        ok(`${label}: comes back inert`, violations(full.out).length === 0, show(full.out));
+      }
+      // The scanner's reading of markup the engine never draws, pinned: a bare
+      // '<' inside a tag ends it (escaped as text, never a longer tag name), and
+      // an attribute name starts only at the start of a name run.
+      eq("a '<' inside a tag is text, and the tag after it is cleaned as usual",
+        sanitizeFigure('<svg><text x="1">a<b</text></svg>'), '<svg><text x="1">a&lt;b</text></svg>');
+      eq('an attribute name never starts in the middle of a longer run',
+        sanitizeFigure('<svg><text 1x="5" y="2">t</text></svg>'), '<svg><text y="2">t</text></svg>');
+    } finally {
+      if (savedParser) globalThis.DOMParser = savedParser;
+    }
+  } catch (err) { crashed(err); }
+
   // ── The edges of the sanitiser ─────────────────────────────────────────────
   section('sanitiser edges');
   try {
