@@ -39,6 +39,7 @@ import { createWorkingRouter } from '../platform/working.js';
 import { transcribeHandwriting } from '../platform/handwritingProvider.js';
 import { checkWorkingWithModel } from '../platform/workingProvider.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PLATFORM = join(HERE, '../platform');
@@ -83,7 +84,7 @@ ok(HIDDEN_CANARIES.length === 11 && new Set(HIDDEN_CANARIES).size === 11, 'eleve
 ok(JSON.stringify(QUESTION).split('CANARY_').length - 1 === HIDDEN_CANARIES.length + 1, 'every canary in the fixture is in the search list (plus the prompt)');
 
 // Student ink and working, as a client would send them: nothing from the fixture.
-const PNG = 'data:image/png;base64,' + Buffer.from('ink-bytes-'.repeat(60)).toString('base64');
+const PNG = pngDataUrl('ink-bytes-'.repeat(60));
 const WORKING_LINES = ['2x + 3 = 11', '2x = 8', 'x = 4'];
 
 const env = {
@@ -106,7 +107,7 @@ function recorder(via) {
       : parsed?.text?.format?.name ? 'working' : 'unknown';
     wire.push({ via, kind, url: String(url), headers: { ...(init?.headers || {}) }, body });
     const reply = kind === 'transcription'
-      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97 }], confidence: 0.97, needs_confirmation: false }
+      ? { lines: [{ text: '2x = 8', latex: '2x = 8', confidence: 0.97, uncertain: false, doubt: '', gap_before: false }], confidence: 0.97, needs_confirmation: false }
       : {
           lines: WORKING_LINES.map((_, index) => ({ index, status: 'ok', carried: false, why: '' })),
           first_break: -1, hint: '', confidence: 0.9, misconception_id: null, needs_confirmation: false

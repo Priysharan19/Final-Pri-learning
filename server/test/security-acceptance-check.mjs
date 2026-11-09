@@ -33,6 +33,7 @@
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
 import './support/hermetic.mjs';
+import { pngDataUrl } from './support/test-image.mjs';
 const shaped = (prefix, body) => `${prefix}${body}`;
 const SECRETS = {
   PRI_HANDWRITING_API_KEY: shaped('sk-', 'proj-ACCEPTANCEhandwritingSECRET0123456789abcdef'),
@@ -768,7 +769,7 @@ try {
     c.eq(health.status, 200, 'health');
     const status = await h.request('/v1/handwriting/status', { jar: reader.jar });
     c.eq(status.status, 200, 'handwriting status');
-    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64') } });
+    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: pngDataUrl('a'.repeat(600)) } });
     c.ok(transcribe.status >= 500 && transcribe.data?.error?.code, `a failing provider is answered with a coded error (${transcribe.status} ${transcribe.data?.error?.code})`);
     const working = await h.request('/v1/working/check', { method: 'POST', jar: reader.jar, body: { lines: ['x = 2', 'x + 1 = 3'], prompt: 'Solve' } });
     c.ok(working.status >= 400 && working.data?.error?.code, `a failing working provider is answered with a coded error (${working.status} ${working.data?.error?.code})`);

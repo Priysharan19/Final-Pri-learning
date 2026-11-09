@@ -33,9 +33,11 @@
 //      the exercise.
 //
 // It returns per-line judgements for DISPLAY, never marks. Every mark a student
-// sees comes from the client's bundled deterministic engine
-// (client/src/engine/checker.js methodMarks), which runs on the device with or
-// without this server; a provider verdict is shown beside the working as a
+// sees is decided by the SERVER, which runs the deterministic engine
+// (checkAnswer / stepCheck / methodMarks from client/src/engine/checker.js, in
+// server/platform/markerOps.js) on a question it issued, for a verified
+// eligible signed-in account (ADR-0001: marking is online-only and
+// server-authoritative). A provider verdict is shown beside the working as a
 // hint and is never fed into that computation, so marking policy stays in one
 // deterministic place and cannot drift with a model.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +158,25 @@ export function validateWorking(lines) {
   return clean;
 }
 
+// The reply is untrusted model output, held to the schema here rather than
+// trusted to the provider's strict mode, and every check fails closed: more
+// judgements than the schema allows is a malformed reply (WORKING_MALFORMED,
+// 422 and not retryable: the same working would be judged the same way, so it
+// must not be resent and paid for again by itself); an index that is not an integer lands on
+// no line; feedback that is not a string is dropped, never stringified; and a
+// confidence that is not a finite number in [0, 1] counts as 0, so the
+// judgement is a second opinion that puts no cross on any line.
+const unitConfidence = value => (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1 ? value : 0);
+// Bounded by code points, as the schema's maxLength is (a code-unit slice can
+// also split a surrogate pair into a lone half). Walks at most max code points.
+const textOr = (value, max) => {
+  if (typeof value !== 'string') return '';
+  let out = '';
+  let count = 0;
+  for (const char of value) { if (count === max) break; out += char; count += 1; }
+  return out.trim();
+};
+
 /**
  * Bring a model's judgement back inside the rules, whatever it returned.
  *
@@ -165,15 +186,21 @@ export function validateWorking(lines) {
  * calculation expects. There is exactly one break per request, ever.
  */
 export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
+  const judgements = Array.isArray(parsed?.lines) ? parsed.lines : [];
+  if (judgements.length > MAX_LINES) {
+    throw new WorkingProviderError(`The step check did not match its response format (${judgements.length} judgements, at most ${MAX_LINES}).`, {
+      code: 'WORKING_MALFORMED', status: 422, retryable: false
+    });
+  }
   const byIndex = new Map();
-  for (const raw of Array.isArray(parsed?.lines) ? parsed.lines : []) {
-    const index = Number(raw?.index);
-    if (!Number.isInteger(index) || index < 0 || index >= lineCount) continue;
+  for (const raw of judgements) {
+    const index = raw?.index;
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0 || index >= lineCount) continue;
     if (byIndex.has(index)) continue;                       // first judgement wins
     byIndex.set(index, {
       status: ['ok', 'break', 'note'].includes(raw?.status) ? raw.status : 'note',
       carried: raw?.carried === true,
-      why: String(raw?.why ?? '').slice(0, 240).trim()
+      why: textOr(raw?.why, 240)
     });
   }
 
@@ -197,10 +224,8 @@ export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
     lines.push({ index: i, ...judged });
   }
 
-  const stated = Number.isFinite(Number(parsed?.confidence))
-    ? Math.min(1, Math.max(0, Number(parsed.confidence)))
-    : 0;
-  const hint = firstBreak === -1 ? '' : String(parsed?.hint ?? '').slice(0, 300).trim();
+  const stated = unitConfidence(parsed?.confidence);
+  const hint = firstBreak === -1 ? '' : textOr(parsed?.hint, 300);
   // Only a listed ID survives, and only alongside a break. "other", null, an
   // unlisted string and a proposal with no break all leave nothing to show.
   const proposed = typeof parsed?.misconception_id === 'string' ? parsed.misconception_id : null;

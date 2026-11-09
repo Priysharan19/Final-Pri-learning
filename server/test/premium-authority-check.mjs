@@ -24,6 +24,7 @@ import { createWorkingRouter } from '../platform/working.js';
 import { consumeAiAllowance, aiAllowance, aiAllowanceConfigProblems, AI_ALLOWANCE_DEFAULTS } from '../platform/aiAllowance.js';
 import { serverEntitlementCapabilities } from '../platform/entitlements.js';
 import { sha256 } from '../platform/security.js';
+import { pngDataUrl } from './support/test-image.mjs';
 
 let n = 0;
 const ok = (cond, label) => { assert.ok(cond, label); n += 1; };
@@ -35,7 +36,7 @@ const env = {
   PRI_AI_DAILY_FREE: '5', PRI_AI_DAILY_PREMIUM: '12'
 };
 const EXPECTED_CHECKS = 44; // every check is unconditional
-const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
+const PNG = pngDataUrl('a'.repeat(600));
 
 // ── configuration ────────────────────────────────────────────────────────────
 ok(aiAllowance({}).free === AI_ALLOWANCE_DEFAULTS.free && aiAllowance({}).premium === AI_ALLOWANCE_DEFAULTS.premium, 'defaults apply when unset');
@@ -100,7 +101,7 @@ const post = async (path, account, body, headers = {}) => {
 // A different picture each time: this account's SAME picture is read once and
 // then served from memory (recognitionOps.js), which is not what is counted here.
 let pictures = 0;
-const freshPicture = () => 'data:image/png;base64,' + Buffer.from('a'.repeat(600) + `-${pictures += 1}`).toString('base64');
+const freshPicture = () => pngDataUrl('a'.repeat(600) + `-${pictures += 1}`);
 const read = (account, extra = {}, headers = {}, path = '/handwriting/transcribe') => post(path, account, { image: freshPicture(), ...extra }, headers);
 const used = (account, kind = 'handwriting') => db.prepare('SELECT count FROM rate_limits WHERE bucket=?').get(`ai-daily:${kind}:${sha256(account).slice(0, 24)}`)?.count ?? 0;
 const until429 = async account => { let n = 0; for (let i = 0; i < 40; i++) { const r = await read(account); if (r.status !== 200) return { n, r }; n += 1; } return { n, r: null }; };

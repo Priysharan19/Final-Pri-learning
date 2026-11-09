@@ -20,6 +20,7 @@ import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'pri-recognition-dedupe-'));
 
@@ -27,7 +28,7 @@ const dir = mkdtempSync(join(tmpdir(), 'pri-recognition-dedupe-'));
 // A picture is a tagged byte string, so the provider can be told how to behave
 // by the picture alone — exactly the only thing the adapter sends it.
 const picture = (label, behaviour = 'ok', filler = 'a') =>
-  'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
+  pngDataUrl(`PICTURE|${behaviour}|${label}|` + filler.repeat(300));
 
 const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), failedOnce: new Set(), models: [] };
 const callsFor = label => provider.calls.get(label) || 0;
@@ -57,9 +58,9 @@ const fake = createServer((req, res) => {
     provider.total += 1;
     provider.calls.set(label, callsFor(label) + 1);
     provider.models.push(sent.model);
-    const read = { lines: [{ text: label, latex: '', confidence: 0.96 }], confidence: 0.96, needs_confirmation: false };
+    const read = { lines: [{ text: label, latex: '', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }], confidence: 0.96, needs_confirmation: false };
     const blank = { lines: [], confidence: 0, needs_confirmation: true };
-    const unsure = { lines: [{ text: label, latex: '', confidence: 0.4 }], confidence: 0.4, needs_confirmation: true };
+    const unsure = { lines: [{ text: label, latex: '', confidence: 0.4, uncertain: false, doubt: '', gap_before: false }], confidence: 0.4, needs_confirmation: true };
     if (behaviour === 'blank') return reply(res, { model: sent.model, reading: blank });
     if (behaviour === 'failonce' && !provider.failedOnce.has(label)) {
       provider.failedOnce.add(label);
