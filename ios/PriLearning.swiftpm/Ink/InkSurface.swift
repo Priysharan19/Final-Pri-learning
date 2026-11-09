@@ -132,9 +132,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     // MARK: - History
 
     func canvasViewDidBeginUsingTool(_ canvasView: PKCanvasView) {
-        // A new mark makes any whole-page read immediately stale. Invalidate at
-        // Pencil-down rather than waiting for pen-up so Vision/Foundation work
-        // cannot continue burning CPU while the student is actively writing.
+        // A new mark makes any server reading the page holds a reading of
+        // earlier ink. The page learns of the change at pen-up (strokes); this
+        // pen-down hook stays so the bridge sees the mark begin.
         delegate?.inkSurfaceDidBeginStroke(self)
         pushHistory()
     }
@@ -178,6 +178,7 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     /// in Undo/Redo, and the reset is not emitted as a user stroke change.
     func resetForNewSheet() {
         clearHistory()
+        restored = StrokeCodec.Restored()
         replaceDrawing(PKDrawing(), notify: false)
     }
 
@@ -192,7 +193,11 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
 
     // MARK: - Strokes
 
-    var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing) }
+    /// What the last restore wrote, so unchanged restored strokes are handed
+    /// back exactly as the page sent them (see StrokeCodec.Restored).
+    private var restored = StrokeCodec.Restored()
+
+    var strokes: [InkStroke] { StrokeCodec.strokes(from: canvas.drawing, restored: restored) }
 
     /// Programmatic restoration establishes the baseline for the current
     /// question. It must not make the previous sheet reachable through Undo.
@@ -200,7 +205,9 @@ final class InkSurfaceView: UIView, PKCanvasViewDelegate {
     /// new question's first undo point.
     func setStrokes(_ strokes: [InkStroke]) {
         clearHistory()
-        replaceDrawing(StrokeCodec.drawing(from: strokes, color: inkColor))
+        let (drawing, written) = StrokeCodec.restore(strokes, color: inkColor)
+        restored = written
+        replaceDrawing(drawing)
     }
 
     var isEmpty: Bool { canvas.drawing.strokes.isEmpty }

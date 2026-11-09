@@ -22,6 +22,10 @@
 // seen is flagged a repeat on the paper; and deleting the account removes
 // every exam row.
 import './support/hermetic.mjs';
+// Previous-year items are issued here with their source, so this suite turns
+// the past-papers switch on (engine/pastPapers.js). It is OFF for students by
+// default (decision D23) and client/test/past-papers-flag-check.mjs pins that.
+process.env.PRI_PAST_PAPERS = '1';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

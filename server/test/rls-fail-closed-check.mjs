@@ -441,8 +441,12 @@ if (engine === 'postgres') {
   // pins below describe exactly 20261016000000; the one later migration
   // (account RLS for the shared account-bearing tables) is proven by
   // rls-account-coverage-check.mjs. A further migration must be added here deliberately.
-  ok(!!forward && all.at(-1).name === '20261019000000_rls_account_coverage.sql' && all.findIndex(m => m.name === FORWARD) === all.length - 2,
-    `${FORWARD} runs after every earlier migration; only 20261019000000_rls_account_coverage.sql follows it`);
+  // Later migrations, each proven by its own suite: account RLS for the shared
+  // tables (rls-account-coverage-check.mjs) and the parent report's two
+  // account-scoped tables (parent-report-check.mjs; pgSchemaParity pins them).
+  const LATER = ['20261019000000_rls_account_coverage.sql', '20261022000000_parent_report.sql'];
+  ok(!!forward && JSON.stringify(all.slice(all.findIndex(m => m.name === FORWARD) + 1).map(m => m.name)) === JSON.stringify(LATER),
+    `${FORWARD} runs after every earlier migration; only ${LATER.join(', ')} follow it`);
   const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });
   const su = scratch.client;
   const url = await serverRoleUrl(scratch.name);

@@ -103,7 +103,7 @@ function Hook({T,CU}){
     <MathField T={T} opacity={clamp((T+0.4)/0.9,0,1)}/>
     <div style={{position:'absolute',left:'50%',top:900,width:1500,height:1200,transform:'translate(-50%,-50%)',background:'radial-gradient(50% 50% at 50% 50%, rgba(201,173,99,0.085), transparent 70%)'}}></div>
     <div style={{position:'absolute',left:0,right:0,top:250,textAlign:'center',...MOTION.enter(T,0.1)}}>
-      <Kicker T={T} at={0.1}>IIT JEE · Olympiad Maths · iPad + Pencil</Kicker></div>
+      <Kicker T={T} at={0.1}>CBSE · JEE Main · JEE Advanced · iPad + Pencil</Kicker></div>
     <div style={{position:'absolute',left:60,right:60,top:690,textAlign:'center',fontFamily:SERIF,fontSize:104,lineHeight:1.22,color:C.ink}}>
       <div>{w1.map((w,i)=><span key={i} style={{display:'inline-block',marginRight:26,...MOTION.enter(T,0.2+i*0.1,0.7,50)}}>{w}</span>)}</div>
       <div>{w2.map((w,i)=><span key={i} style={{display:'inline-block',...MOTION.enter(T,0.5,0.7,50)}}>{w}</span>)}</div>
@@ -202,18 +202,18 @@ function Device({T,CU}){
 function Bank({T,CU}){
   const t0=CU.Bank;
   const e=Easing.easeOutExpo(MOTION.draw(T,t0+0.2,1.6));
-  const n=Math.round(344798*e);
+  const n=Math.round(77*e);
   const settle=1+0.05*(1-Easing.easeOutBack(clamp((T-t0-1.7)/0.5,0,1)))*(T>t0+1.7?1:0);
-  const tags=[['L1','NCERT','#79b97f'],['L2','JEE Main','#a8b06a'],['L3','JEE Advanced','#cf8f3e'],['L4','Olympiad','#c9695f']];
+  const tags=[['L1','CBSE / NCERT','#79b97f'],['L2','JEE Main','#a8b06a'],['L3','JEE Advanced','#cf8f3e']];
   return <div style={{position:'absolute',inset:0,background:C.page,transform:`scale(${1+0.013*(T-t0)})`,opacity:fadeIO(T,t0,CU.Map,0.001,0.35)}}>
     <MathField T={T} opacity={0.7}/>
     <div style={{position:'absolute',left:0,right:0,top:560,textAlign:'center',...MOTION.enter(T,t0+0.1)}}>
-      <Kicker T={T} at={t0+0.1}>Exam-style question bank</Kicker></div>
+      <Kicker T={T} at={t0+0.1}>Generated question bank</Kicker></div>
     <div style={{position:'absolute',left:'50%',top:770,width:12,height:12,borderRadius:'50%',border:`2px solid ${C.goldBord}`,transform:`translate(-50%,-50%) scale(${1+80*MOTION.draw(T,t0+1.75,0.8)})`,opacity:0.5*(1-MOTION.draw(T,t0+1.75,0.8))}}></div>
     <div style={{position:'absolute',left:0,right:0,top:660,textAlign:'center',fontFamily:SERIF,fontSize:172,color:C.ink,fontVariantNumeric:'tabular-nums',letterSpacing:'0.01em',transform:`scale(${settle})`,filter:e<0.985?`blur(${(1-e)*2.5}px)`:'none',...(T<t0+2.3?{opacity:MOTION.enter(T,t0+0.2,0.8).opacity}:{})}}>
       {n.toLocaleString('en-IN')}</div>
     <div style={{position:'absolute',left:0,right:0,top:900,textAlign:'center',fontFamily:SERIF,fontSize:37,color:C.ink2,...MOTION.enter(T,t0+0.7)}}>
-      distinct questions · Class 9–12 · <span style={{color:C.gold}}>NCERT → Olympiad</span></div>
+      chapters · Classes 7–12 · <span style={{color:C.gold}}>fresh numbers every time</span></div>
     <div style={{position:'absolute',left:0,right:0,top:1040,display:'flex',gap:18,justifyContent:'center'}}>
       {tags.map((t,i)=><div key={i} style={{border:`1px solid ${C.hairS}`,borderRadius:4,padding:'12px 26px',fontFamily:SERIF,fontSize:26,color:t[2],background:C.surface,...MOTION.pop(T,t0+1.4+i*0.12)}}>{t[0]} <span style={{color:C.ink3,fontSize:22}}>{t[1]}</span></div>)}
     </div>
@@ -239,28 +239,28 @@ function Map({T,CU}){
       </div>
     </div>
     <div style={{position:'absolute',left:0,right:0,bottom:330,textAlign:'center',fontFamily:SERIF,fontSize:34,color:C.ink2,...MOTION.enter(T,t0+1.55)}}>
-      Every topic, NCERT to Olympiad. <span style={{color:C.gold}}>All of it, mapped.</span></div>
+      Chapters mapped to outcomes, <span style={{color:C.gold}}>CBSE / NCERT to JEE Advanced.</span></div>
   </div>;
 }
 
 function Band({T,CU}){
   const t0=CU.Band;
-  const pn=(84+15.4*Easing.easeOutQuart(MOTION.draw(T,t0+0.3,1.15))).toFixed(1);
-  const fill=0.94*Easing.easeInOutCubic(MOTION.draw(T,t0+0.6,1.1));
+  const pn=Math.round(23*Easing.easeOutQuart(MOTION.draw(T,t0+0.3,1.15)));
+  const fill=(23/27)*Easing.easeInOutCubic(MOTION.draw(T,t0+0.6,1.1));
   const numPop=1+0.08*(1-Easing.easeOutBack(clamp((T-t0-1.45)/0.4,0,1)))*(T>t0+1.45?1:0);
   return <div style={{position:'absolute',inset:0,background:C.page,opacity:fadeIO(T,t0,CU.Match,0.35,0.001)}}>
     <div style={{position:'absolute',left:140,right:140,top:600,border:`1px solid ${C.hairS}`,borderRadius:6,background:`linear-gradient(180deg,${C.goldSoft},transparent 40%),${C.surface}`,padding:'54px 60px 60px',...MOTION.enter(T,t0+0.1,0.85,54)}}>
-      <div style={{fontSize:24,letterSpacing:'0.3em',textTransform:'uppercase',color:C.ink3,fontFamily:SERIF}}>Predicted JEE percentile</div>
+      <div style={{fontSize:24,letterSpacing:'0.3em',textTransform:'uppercase',color:C.ink3,fontFamily:SERIF}}>Chapters practised · JEE Main</div>
       <div style={{fontFamily:SERIF,fontSize:300,lineHeight:1.05,color:C.ink,textAlign:'center',transform:`scale(${numPop})`}}>
-        {pn}<span style={{fontSize:64,color:C.ink2,marginLeft:16}}>%ile</span>
+        {pn}<span style={{fontSize:64,color:C.ink2,marginLeft:16}}>/ 27</span>
       </div>
       <div style={{height:7,background:C.s3,borderRadius:3,overflow:'hidden',marginTop:26}}>
         <div style={{height:'100%',width:`${fill*100}%`,background:`linear-gradient(90deg,${C.gold},${C.goldB})`,borderRadius:3,boxShadow:`0 0 14px ${C.goldBord}`}}></div>
       </div>
       <div style={{marginTop:22,fontFamily:SERIF,fontSize:26,color:C.ink2,...MOTION.enter(T,t0+1.15)}}>
-        calibrated to JEE Main · confidence ±0.4 · trajectory ↗</div>
+        attempts and worked solutions, chapter by chapter</div>
       <div style={{marginTop:12,fontFamily:SERIF,fontSize:17,color:C.ink3,...MOTION.enter(T,t0+1.35,0.6,10)}}>
-        Estimate from your practice data — not a guarantee of results.</div>
+        Pri shows what you have practised. It does not predict a rank.</div>
     </div>
   </div>;
 }
@@ -332,7 +332,7 @@ function Exam({T,CU}){
       <div style={{position:'absolute',right:52,top:44,border:'2.5px solid #a33228',color:'#a33228',borderRadius:6,padding:'8px 18px',fontFamily:SERIF,fontSize:34,transform:'rotate(6deg)',...MOTION.pop(T,t0+1.95)}}>12 / 15</div>
     </div>
     <div style={{position:'absolute',left:0,right:0,bottom:290,textAlign:'center',fontFamily:SERIF,fontSize:30,color:C.ink2,...MOTION.enter(T,t0+1.7)}}>
-      multipart (a)(b)(c) · worked solutions · <span style={{color:C.gold}}>step marks, like a real examiner</span></div>
+      multipart (a)(b)(c) · worked solutions · <span style={{color:C.gold}}>marked automatically when you submit</span></div>
   </div>;
 }
 
@@ -367,7 +367,7 @@ function Kit({T,CU}){
       {cards.map((_,i)=>{const grow=i===idx?dotP:(i===idx-1?1-dotP:0);
         return <div key={i} style={{width:10+24*grow,height:10,borderRadius:5,background:i===idx?C.gold:C.hairS}}></div>;})}
     </div>
-    <div style={{position:'absolute',left:0,right:0,top:1330,textAlign:'center',fontFamily:SERIF,fontSize:27,color:C.ink3}}>8 tools · all offline · all included</div>
+    <div style={{position:'absolute',left:0,right:0,top:1330,textAlign:'center',fontFamily:SERIF,fontSize:27,color:C.ink3}}>8 tools · needs an account and a connection</div>
   </div>;
 }
 
@@ -381,10 +381,10 @@ function Price({T,CU}){
     <div style={{position:'absolute',left:0,right:0,top:410,textAlign:'center',...MOTION.enter(T,t0+0.05)}}>
       <Kicker T={T} at={t0+0.05}>The maths of the price</Kicker></div>
     <div style={{position:'absolute',left:0,right:0,top:540,textAlign:'center',opacity:dim,transform:`translateY(${up}px)`}}>
-      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink3,...MOTION.enter(T,t0+0.15)}}>Big-brand coaching</div>
+      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink3,...MOTION.enter(T,t0+0.15)}}>Free: 20 questions a day</div>
       <div style={{marginTop:10,...MOTION.enter(T,t0+0.3)}}>
         <span style={{position:'relative',display:'inline-block',fontFamily:SERIF,fontSize:120,color:C.ink,fontVariantNumeric:'tabular-nums'}}>
-          ₹2,00,000<span style={{fontSize:42,color:C.ink2}}> / year</span>
+          ₹0<span style={{fontSize:42,color:C.ink2}}> / month</span>
           <span style={{position:'absolute',left:'-2%',top:'55%',height:6,width:`${strike*104}%`,background:C.gold,boxShadow:`0 0 16px ${C.goldBord}`,borderRadius:3}}></span>
         </span>
       </div>
@@ -392,15 +392,15 @@ function Price({T,CU}){
     <div style={{position:'absolute',left:'50%',top:1080,width:12,height:12,borderRadius:'50%',border:`2px solid ${C.goldBord}`,transform:`translate(-50%,-50%) scale(${1+70*MOTION.draw(T,t0+1.6,0.7)})`,opacity:0.55*(1-MOTION.draw(T,t0+1.6,0.7))}}></div>
     <div style={{position:'absolute',left:0,right:0,top:900,textAlign:'center',...MOTION.pop(T,t0+1.5,0.6)}}>
       <div style={{fontFamily:SERIF,fontSize:26,letterSpacing:'0.26em',textTransform:'uppercase',color:C.gold}}>Pri Learning</div>
-      <div style={{fontFamily:SERIF,fontSize:170,color:C.gold,lineHeight:1.15,textShadow:'0 0 60px rgba(201,173,99,0.25)'}}>₹999<span style={{fontSize:48,color:C.ink2}}> / month</span></div>
-      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink2,marginTop:14,...MOTION.enter(T,t0+2.1)}}>under ₹34 a day · cancel anytime</div>
+      <div style={{fontFamily:SERIF,fontSize:170,color:C.gold,lineHeight:1.15,textShadow:'0 0 60px rgba(201,173,99,0.25)'}}>₹199<span style={{fontSize:48,color:C.ink2}}> / month</span></div>
+      <div style={{fontFamily:SERIF,fontSize:30,color:C.ink2,marginTop:14,...MOTION.enter(T,t0+2.1)}}>or ₹1,499 a year · cancel anytime</div>
     </div>
     <div style={{position:'absolute',left:0,right:0,top:1390,display:'flex',gap:20,justifyContent:'center'}}>
-      {[['save ₹1,88,012 a year',1],['100% offline',0],['no lock-in',0]].map(([c,g],i)=>
+      {[['no daily cap on Premium',1],['JEE Advanced included',0],['no lock-in',0]].map(([c,g],i)=>
         <div key={i} style={{border:`1px solid ${g?C.goldBord:C.hairS}`,borderRadius:4,padding:'11px 24px',fontFamily:SERIF,fontSize:22,letterSpacing:'0.12em',textTransform:'uppercase',color:g?C.gold:C.ink2,background:g?C.goldSoft:C.surface,...MOTION.pop(T,t0+2.5+i*0.12)}}>{c}</div>)}
     </div>
     <div style={{position:'absolute',left:0,right:0,top:1478,textAlign:'center',fontFamily:SERIF,fontSize:17,color:C.ink3,...MOTION.enter(T,t0+2.8,0.6,10)}}>
-      Savings vs a typical big-brand two-year JEE classroom programme.</div>
+      Prices in India. Marking is automatic and can be wrong.</div>
   </div>;
 }
 
@@ -412,7 +412,7 @@ function Close({T,CU,total}){
     <MathField T={T} opacity={0.6*clamp(MOTION.draw(T,t0,1),0,1)}/>
     {[[150,520,0],[912,560,2.1],[236,1480,4.2]].map(([x,y,ph],i)=><span key={'tw'+i} style={{position:'absolute',left:x,top:y,fontSize:26,color:C.gold,opacity:clamp(MOTION.draw(T,t0+0.6,0.8),0,1)*(0.25+0.75*Math.max(0,Math.sin(T*2.4+ph)))}}>✦</span>)}
     <div style={{position:'absolute',left:0,right:0,top:620,textAlign:'center',...MOTION.enter(T,t0+0.4)}}>
-      <Kicker T={T} at={t0+0.4} style={{color:C.gold,fontSize:23,whiteSpace:'nowrap'}}>Write it by hand · marked like an examiner</Kicker></div>
+      <Kicker T={T} at={t0+0.4} style={{color:C.gold,fontSize:23,whiteSpace:'nowrap'}}>Write it by hand · marked automatically</Kicker></div>
     <div style={{position:'absolute',left:0,right:0,top:740,textAlign:'center',...MOTION.pop(T,t0+0.1,0.7)}}>
       <span style={{fontFamily:AMS,fontSize:168,color:C.ink}}>P</span>
       <span style={{fontFamily:SERIF,fontSize:132,color:C.ink}}>ri Learning</span>
@@ -421,7 +421,7 @@ function Close({T,CU,total}){
       <span style={{display:'inline-block',whiteSpace:'nowrap',background:C.cream,color:C.creamInk,fontFamily:SERIF,fontSize:44,letterSpacing:'0.04em',padding:'26px 64px',borderRadius:5,boxShadow:`0 0 ${glow}px rgba(244,241,224,0.28)`,transform:`scale(${1+0.014*Math.sin(T*3)})`}}>Coming soon</span>
     </div>
     <div style={{position:'absolute',left:0,right:0,top:1305,textAlign:'center',fontFamily:SERIF,fontSize:27,color:C.ink3,whiteSpace:'nowrap',...MOTION.enter(T,t0+1.25)}}>
-      Class 9–12 · JEE Main & Advanced · Olympiad · iPad + Pencil</div>
+      Classes 7–12 · JEE Main & Advanced · iPad + Pencil</div>
     <div style={{position:'absolute',left:0,right:0,top:1390,textAlign:'center',...MOTION.enter(T,t0+1.6)}}>
       <span style={{display:'inline-block',border:`1px solid ${C.goldBord}`,background:C.goldSoft,color:C.gold,borderRadius:4,padding:'9px 26px',fontFamily:SERIF,fontSize:24,letterSpacing:'0.14em',textTransform:'uppercase'}}>Follow @pri.learning for launch</span>
     </div>
@@ -435,8 +435,8 @@ function Supers({T,CU,on}){
     {at:CU.Write+0.3,until:CU.Write+2.3,t:<span>A real <em style={{color:C.gold}}>JEE Advanced</em> integral.</span>},
     {at:CU.Write+2.3,until:CU.Marked,t:<span>Read live, <em style={{color:C.gold}}>symbol by symbol.</em></span>},
     {at:CU.Marked+0.2,until:CU.Marked+1.9,t:<span>Step marks: <em style={{color:C.gold}}>M1 · M1 · A1.</em></span>},
-    {at:CU.Marked+1.9,until:CU.Bank-0.1,t:<span>Like a real examiner.</span>},
-    {at:CU.Map+0.25,until:CU.Band-0.1,t:<span>Every topic on the syllabus.</span>},
+    {at:CU.Marked+1.9,until:CU.Bank-0.1,t:<span>Marked by the engine. It can be wrong.</span>},
+    {at:CU.Map+0.25,until:CU.Band-0.1,t:<span>Chapters mapped to outcomes.</span>},
     {at:CU.Match+0.25,until:CU.Exam-0.05,t:<span>Race rivals in <em style={{color:C.gold}}>Match Mode.</em></span>},
   ];
   const a=items.find(it=>T>=it.at&&T<it.until);
@@ -456,15 +456,15 @@ function AudioRig({musicOn,voOn,CU}){
   const baked=audioSrc.indexOf('vo-mix')>=0;
   const VO=useMemo(()=>[
     {at:CU.Hook+0.05,text:'What if your handwriting, marked itself?'},
-    {at:CU.Write+0.15,text:'A real J E E Advanced integral. Watch it read every symbol, live.'},
-    {at:CU.Marked+0.1,text:'Marked step by step, like a real examiner. Full marks.'},
-    {at:CU.Bank+0.1,text:'Over three lakh J E E style questions.'},
-    {at:CU.Map+0.1,text:'Every topic on the syllabus, mapped.'},
-    {at:CU.Band+0.1,text:'Your J E E percentile? Predicted.'},
+    {at:CU.Write+0.15,text:'A J E E Advanced integral. Pri reads your handwriting.'},
+    {at:CU.Marked+0.1,text:'Marked automatically. The solution shows every step.'},
+    {at:CU.Bank+0.1,text:'Seventy seven chapters of generated questions, fresh numbers every time.'},
+    {at:CU.Map+0.1,text:'Chapters mapped to outcomes, C B S E to J E E Advanced.'},
+    {at:CU.Band+0.1,text:'Your chapters, tracked. No rank is predicted.'},
     {at:CU.Match+0.1,text:'Race your rivals in Match Mode.'},
-    {at:CU.Exam+0.1,text:'Full mocks. Real marking.'},
+    {at:CU.Exam+0.1,text:'Timed papers. Automatic marking.'},
     {at:CU.Kit+0.1,text:'Smart practice, hints, photo answers, rush rounds, streaks, task packs, backups.'},
-    {at:CU.Price+0.1,text:'Two lakhs a year for coaching. This? Nine ninety nine a month.'},
+    {at:CU.Price+0.1,text:'Free, twenty questions a day. Premium, one ninety nine a month.'},
     {at:CU.Close+0.15,text:'Pri Learning. Coming soon.'},
   ],[CU]);
   let ai=-1;for(let i=0;i<VO.length;i++){const until=i+1<VO.length?VO[i+1].at:VO[i].at+3.8;if(T>=VO[i].at&&T<until)ai=i;}

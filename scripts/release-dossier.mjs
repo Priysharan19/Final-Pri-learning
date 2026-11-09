@@ -13,16 +13,21 @@
 //     in the operator's record is at least 24 h, staging served the SHA before
 //     it began, no incident is recorded, and origin/main has not moved past the
 //     SHA (a later merge redeploys staging and voids the soak, §4.6);
-//   · staging acceptance A–D by a named human (tools/acceptance);
+//   · staging acceptance S0–S8 by a named human (tools/acceptance);
 //   · the physical-device matrix rows for the SHA (PHYSICAL-HUMAN /
 //     BLOCKED-EXTERNAL) and the real-human reader evaluation naming the SHA;
 //   · step 23 — the gates only people can close (examiner, counsel, security,
 //     native build, store, production data), each PASS with a named person or
-//     else NO-GO;
+//     else NO-GO. The production-data gate is the owner's D27 Yes for the
+//     cutover window, so it is authenticated like the GO: gates.data.approval
+//     links a GitHub comment or issue by a repository admin, unedited, posted
+//     after the freeze and no later than the gate's own sign-off (gates.data.at:
+//     the Yes comes before the data step it authorises), whose first line is
+//     `Pri-Production-Data-YES: <sha> target=production-postgres`;
 //   · step 28 — the owner's GO, recorded in the record for exactly this SHA by
-//     a named human AND posted as a GitHub comment by a repository admin that
-//     contains the line `Pri-Release-GO: <sha> target=deploy/production`
-//     (go.approval links it, go.githubLogin names the account). The comment is
+//     a named human AND posted as a GitHub comment or issue by a repository
+//     admin whose first line is `Pri-Release-GO: <sha> target=deploy/production`
+//     (go.approval links it, go.githubLogin names the account). The post is
 //     the authority, not the file: it must be unedited and posted after the
 //     soak ended and after the candidate was frozen (a GO given before the
 //     evidence existed is stale). The generator never writes a GO; it verifies
@@ -55,7 +60,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
   APPROVAL_EVIDENCE_CLASS, DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, GREEN, PRODUCTION_ORIGIN, STAGING_ORIGIN,
-  deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
+  dataYesMarker, defaultGhGraphql, deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
 } from './release-nominate.mjs';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, reportMarkdown } from './device-matrix-record.mjs';
 
@@ -86,7 +91,7 @@ export function recordTemplate(sha) {
     stagingProof: { result: '', runUrl: '', at: '' },
     soak: { startedAt: '', endedAt: '', watchedBy: '', incidents: 'none', mergeFreezeDeclaredBy: '' },
     acceptance: { result: '', report: '', tester: '', at: '' },
-    gates: Object.fromEntries(EXTERNAL_GATES.map(g => [g.id, { ...gate }])),
+    gates: Object.fromEntries(EXTERNAL_GATES.map(g => [g.id, g.id === 'data' ? { ...gate, githubLogin: '', approval: '' } : { ...gate }])),
     overrides: null,
     reviews: [],
     go: { decision: null, by: '', githubLogin: '', approval: '', at: '', sha, statement: '' }
@@ -168,6 +173,7 @@ export async function buildDossier({
   fetchOrigin = true,
   git = defaultGit,
   gh = defaultGh,
+  ghGraphql = defaultGhGraphql,
   fetchImpl = globalThis.fetch,
   nominateImpl = nominate,
   now = Date.now()
@@ -185,12 +191,19 @@ export async function buildDossier({
 
   // ── step 21: candidate frozen ──────────────────────────────────────────────
   const frozenAt = iso(rec.candidate?.frozenAt), frozenBy = human(rec.candidate?.by);
-  row(21, frozenAt !== null && frozenBy !== null && frozenAt <= now, 'candidate SHA frozen and the merge freeze declared by a named person',
-    frozenAt !== null && frozenBy ? `${rec.candidate.frozenAt} by ${frozenBy}` : 'candidate.frozenAt / candidate.by not recorded', { who: frozenBy || '' });
+  // Say which half is wrong: a typed agent name is refused, not "not recorded".
+  const typedBy = String(rec.candidate?.by || '').trim();
+  const frozenProblems = [
+    frozenAt === null ? (String(rec.candidate?.frozenAt || '').trim() ? 'candidate.frozenAt is not an ISO date-time' : 'candidate.frozenAt not recorded') : null,
+    frozenAt !== null && frozenAt > now ? `candidate.frozenAt ${rec.candidate.frozenAt} is in the future` : null,
+    frozenBy === null ? (typedBy ? `candidate.by ${JSON.stringify(typedBy)} does not name a human (an agent, CI or placeholder name is refused)` : 'candidate.by not recorded') : null
+  ].filter(Boolean);
+  row(21, frozenProblems.length === 0, 'candidate SHA frozen and the merge freeze declared by a named person',
+    frozenProblems.length ? frozenProblems.join('; ') : `${rec.candidate.frozenAt} by ${frozenBy}`, { who: frozenBy || '' });
 
   // ── nomination at the release stage ────────────────────────────────────────
   const overridePath = rec.overrides ? resolve(ROOT, String(rec.overrides)) : null;
-  const nomination = await nominateImpl({ sha: expected, stage: 'release', repo, stagingOrigin, productionOrigin, productionEngine, overridePath, deviceLedger, readerEvalDir, fetchOrigin, git, gh, fetchImpl, now });
+  const nomination = await nominateImpl({ sha: expected, stage: 'release', repo, stagingOrigin, productionOrigin, productionEngine, overridePath, deviceLedger, readerEvalDir, fetchOrigin, git, gh, ghGraphql, fetchImpl, now });
   row('nominate', nomination.ok, 'release-stage nomination passes (scripts/release-nominate.mjs)',
     `${nomination.results.filter(r => r.ok === true).length}/${nomination.results.filter(r => r.ok !== null).length} checks${nomination.ok ? '' : '; failed: ' + nomination.results.filter(r => r.ok === false).map(r => r.label).join('; ')}`);
 
@@ -199,8 +212,11 @@ export async function buildDossier({
   try {
     runsOnSha = await ghAll(gh, `repos/${repo}/actions/runs?head_sha=${expected}&per_page=${GH_PAGE}`, 'workflow_runs');
     const proof = evaluateRuns(runsOnSha.filter(run => run?.name === PROOF_WORKFLOW));
-    const green = proof.latest.filter(run => run.status === 'completed' && GREEN.has(run.conclusion));
-    row(25, green.length > 0 && proof.red.length === 0 && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
+    // `success` only: a skipped proof verified nothing. Release Staging Proof is skipped whenever Main
+    // Integrity did not pass on the merge (63deeb757, Train 1: 18 cancelled PR workflows), and a
+    // skipped run must never stand in for the 14/14 it did not run.
+    const green = proof.latest.filter(run => run.status === 'completed' && run.conclusion === 'success');
+    row(25, green.length > 0 && green.length === proof.latest.length && proof.pending.length === 0, `${PROOF_WORKFLOW} concluded success on this SHA (verify:deployment 14/14 on staging)`,
       proof.latest.length ? proof.latest.map(run => `${run.event || 'run'}: ${run.status}/${run.conclusion || '…'}${run.html_url ? ' ' + run.html_url : ''}`).join('; ') : `no ${PROOF_WORKFLOW} run has this head SHA (dispatch it, or wait for Main Integrity to trigger it)`);
   } catch (error) {
     if (error?.code === 'ENOENT') throw Object.assign(new Error('gh (GitHub CLI) is not installed or not on PATH'), { code: 'DEPENDENCY' });
@@ -233,9 +249,9 @@ export async function buildDossier({
       ahead === 0 ? 'origin/main is this SHA' : `${ahead} commit(s) on origin/main after the SHA (tip ${tip.slice(0, 12)}); the soak clock belongs to one SHA (§4.6)`);
   } catch (error) { row(25, false, 'merge freeze held: origin/main has not moved past the SHA', error?.message || String(error)); }
 
-  // ── §4.6 step 3: staging acceptance A–D ────────────────────────────────────
+  // ── §4.6 step 3: staging acceptance S0–S8 ──────────────────────────────────
   const tester = human(rec.acceptance?.tester);
-  row('acceptance', rec.acceptance?.result === 'PASS' && tester !== null, 'staging acceptance A–D passed, run by a named human (tools/acceptance/staging-acceptance.mjs)',
+  row('acceptance', rec.acceptance?.result === 'PASS' && tester !== null, 'staging acceptance S0–S8 passed, run by a named human (tools/acceptance/staging-acceptance.mjs)',
     rec.acceptance?.result ? `${rec.acceptance.result}${tester ? ' by ' + tester : ' (tester not a named human)'}${rec.acceptance.report ? ' · ' + rec.acceptance.report : ''}${rec.acceptance.at ? ' · ' + rec.acceptance.at : ''}` : 'acceptance not recorded',
     { who: tester || '', evidenceClass: 'real mailbox / synthetic pictures / test accounts (the report labels each step)' });
 
@@ -250,8 +266,25 @@ export async function buildDossier({
   for (const gate of EXTERNAL_GATES) {
     const entry = rec.gates?.[gate.id] || {};
     const by = human(entry.by), at = iso(entry.at);
-    const ok = entry.status === 'PASS' && by !== null && at !== null && at <= now;
-    row(23, ok, gate.label, ok ? `PASS by ${by} at ${entry.at}${entry.evidence ? ' · ' + entry.evidence : ''}` : `${entry.status || 'NOT_RECORDED'}${entry.status === 'PASS' && !by ? ' (by does not name a human)' : ''}${entry.status === 'PASS' && at === null ? ' (at is not an ISO date-time)' : ''}${entry.evidence ? ' · ' + entry.evidence : ''} — ${gate.ref}`, { who: by || '' });
+    let ok = entry.status === 'PASS' && by !== null && at !== null && at <= now;
+    let approvalNote = '';
+    let evidenceClass = '';
+    if (gate.id === 'data' && ok) {
+      // D27: the owner's Yes for the irreversible data step, authenticated on GitHub, for this SHA,
+      // given after the candidate was frozen (a Yes before the freeze approved another window) and no
+      // later than this gate's sign-off: the data step it authorises comes between the two.
+      const auth = await verifyApproval({ approval: entry.approval, githubLogin: entry.githubLogin, sha: expected, marker: dataYesMarker(expected), repo, gh, ghGraphql, git, now });
+      const premature = auth.ok && frozenAt !== null && auth.createdAt < frozenAt;
+      const late = auth.ok && auth.createdAt > at;
+      ok = auth.ok && !premature && !late;
+      evidenceClass = APPROVAL_EVIDENCE_CLASS;
+      const yesAt = auth.ok ? new Date(auth.createdAt).toISOString() : '';
+      approvalNote = !auth.ok ? ` · the owner's D27 Yes does not hold: ${auth.problems.join('; ')}`
+        : premature ? ` · the owner's Yes (${yesAt}) predates the candidate freeze; post a new one for this window`
+        : late ? ` · the owner's Yes (${yesAt}) came after the data gate was signed (${entry.at}); the Yes must come before the data step it authorises`
+        : ` · owner's Yes ${auth.url} by ${auth.login} at ${yesAt}`;
+    }
+    row(23, ok, gate.label, ok ? `PASS by ${by} at ${entry.at}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote}` : `${entry.status || 'NOT_RECORDED'}${entry.status === 'PASS' && !by ? ' (by does not name a human)' : ''}${entry.status === 'PASS' && at === null ? ' (at is not an ISO date-time)' : ''}${entry.evidence ? ' · ' + entry.evidence : ''}${approvalNote} — ${gate.ref}`, { who: by || '', evidenceClass });
   }
 
   // ── step 26: no release controller; the promotion is an owner fast-forward ─
@@ -262,7 +295,7 @@ export async function buildDossier({
   const goBy = human(go.by), goAt = iso(go.at);
   const goRecorded = go.decision === 'GO' && String(go.sha || '').toLowerCase() === expected && goBy !== null && goAt !== null && goAt <= now && String(go.statement || '').trim().length > 0;
   let goAuth = null;
-  if (go.decision === 'GO') goAuth = await verifyApproval({ approval: go.approval, githubLogin: go.githubLogin, sha: expected, marker: goMarker(expected), repo, gh, git, now });
+  if (go.decision === 'GO') goAuth = await verifyApproval({ approval: go.approval, githubLogin: go.githubLogin, sha: expected, marker: goMarker(expected), repo, gh, ghGraphql, git, now });
   // A GO is an answer to the evidence: given before the soak ended or before the SHA was frozen,
   // it approved something that did not exist yet.
   const approvedAt = goAuth?.ok ? goAuth.createdAt : null;
@@ -272,7 +305,7 @@ export async function buildDossier({
     go.decision === 'GO'
       ? (goOk ? `GO by ${goBy} (${goAuth.login}, ${goAuth.url} at ${new Date(approvedAt).toISOString()}): ${String(go.statement).trim()}`
         : `GO recorded but ${[String(go.sha || '').toLowerCase() !== expected ? `for sha ${go.sha || '(none)'}, not this one` : null, !goBy ? 'go.by does not name a human' : null, goAt === null ? 'go.at is not an ISO date-time' : null, goAt !== null && goAt > now ? 'go.at is in the future' : null, !String(go.statement || '').trim() ? 'go.statement is empty' : null, goAuth && !goAuth.ok ? `the GitHub approval does not hold: ${goAuth.problems.join('; ')}` : null, goPremature ? `the GitHub approval (${new Date(approvedAt).toISOString()}) predates ${soakEnd !== null && approvedAt < soakEnd ? 'the end of the soak' : 'the candidate freeze'}: a GO given before the evidence existed is stale` : null].filter(Boolean).join('; ')}`)
-      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file and as a GitHub comment, for this exact SHA',
+      : go.decision === 'NO-GO' ? `NO-GO by ${go.by || '?'} at ${go.at || '?'}: ${go.statement || ''}` : 'not recorded (go.decision is null); only the owner records it, in the record file and as a GitHub post (an issue from the prefilled link, or a comment), for this exact SHA',
     { who: goBy || '', evidenceClass: go.decision === 'GO' ? APPROVAL_EVIDENCE_CLASS : '' });
 
   // ── step 30: after the promotion, the pipeline works unaided ───────────────
@@ -333,7 +366,7 @@ export function renderMarkdown(result, { device, reader } = {}) {
   lines.push('## Release-stage nomination (`scripts/release-nominate.mjs`)', '', table(by('nominate')), '');
   lines.push('| | Nomination row | Detail |', '|---|---|---|', ...nomination.results.map(r => `| ${r.ok === null ? '·' : r.ok ? '✓' : '✗'} | ${cell(r.label)} | ${cell(r.detail || '')} |`), '');
   lines.push('## Step 25 — staging proof and the 24 h soak under a merge freeze', '', table(by(25)), '');
-  lines.push('## Staging acceptance A–D (§4.6 step 3)', '', table(by('acceptance')), '');
+  lines.push('## Staging acceptance S0–S8 (§4.6 step 3)', '', table(by('acceptance')), '');
   lines.push('## Physical-device matrix for this SHA', '', ...by('device').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');
   if (device?.summary) lines.push(reportMarkdown(device.summary), '');
   lines.push('## Server reader evidence for this SHA', '', ...by('reader').map(r => `${para(r.detail)} — evidence class: ${inline(r.evidenceClass)}`), '');

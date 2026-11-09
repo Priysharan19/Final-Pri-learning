@@ -20,6 +20,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import { installBrowserEnv, rawRows, resetStorage } from './backend-check.mjs';
+import { setReaderPermissionPrompt } from '../src/ink/readerPermission.js';
+// D17: every read below is of a student who accepted the one-time prompt naming
+// OpenAI. The prompt itself, and that nothing is sent without it, is
+// client/test/ink-reader-permission-check.mjs.
+setReaderPermissionPrompt(async () => 'accepted');
 
 installBrowserEnv(); resetStorage();
 const { answerFromLine, proposeFinalAnswer, readsAsAnswer, readsAsWritten, stripSentence } = await import('../src/photo/finalAnswer.js');
@@ -488,6 +493,11 @@ const REFUSALS = [
   [{ status: 404, code: 'QUESTION_NOT_FOUND' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
   [{ status: 409, code: 'QUESTION_ALREADY_GRADED' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
   [{ status: 413, code: 'HANDWRITING_IMAGE_TOO_LARGE' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
+  // #196 review N4: a reply over the schema's limits (too many lines, a line too
+  // long) is a 422 the same page would earn again — offered as one Try again,
+  // never resent (and paid for) by itself. A garbled reply is a 502 and may be.
+  [{ status: 422, code: 'HANDWRITING_MALFORMED' }, 'request', 'try-again', false, true, 'verdict.photoReadingRequest', 'ink.waitingRequest'],
+  [{ status: 502, code: 'HANDWRITING_MALFORMED' }, 'unreachable', 'try-again', true, true, 'verdict.photoReadingServiceDown', 'ink.waitingServiceDown'],
   [{ status: 429, code: 'RATE_LIMITED' }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimited', 'ink.waitingRateLimited'],
   [{ status: 429, code: 'RATE_LIMITED', resetAt: IN_AN_HOUR }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimitedUntil', 'ink.waitingRateLimitedUntil', true],
   [{ status: 429 }, 'rate-limited', 'try-again', false, true, 'verdict.photoReadingRateLimited', 'ink.waitingRateLimited'],

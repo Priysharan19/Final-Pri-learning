@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · asking a server to read the ink
+// Pri Learning · asking the server to read the ink
 //
-// The on-device reader has 58 classes and no comma, so a line like
-// "−1, 0, 1, 2, 4" cannot come back right however well it is written. This is
-// the other route, and it runs only when the student has turned it on.
+// The server reader is the ONLY reader in a student's path (owner decision
+// 2026-10-02, default D16 2026-11-01): the on-device recogniser is retired from
+// the shipped product, and nothing is read or marked offline. The ink is the
+// student's and is kept whatever happens to reading.
 //
 // Four rules hold it in place:
 //
@@ -14,12 +15,15 @@
 //      stays off. An explicit "off" in Settings is always respected; a profile
 //      that never chose is the only one the default applies to.
 //   2. It never replaces a reading the student has corrected by hand. A tap to
-//      fix a glyph is the most reliable signal on the page.
-//   3. It only supersedes when the server says it is confident. An unconfident
-//      server read is offered for confirmation, never marked.
-//   4. The local reading is published first and always. The student writes and
-//      sees their working immediately; the server read arrives after, or not
-//      at all, and the app is usable either way.
+//      fix a line is the most reliable signal on the page.
+//   3. An unconfident server read is offered for confirmation, never marked.
+//      The deterministic engine marks what the student confirms.
+//   4. A read happens only when the student presses "Read my answer", and its
+//      round trip is measured by InkAnswer (readMs) so the physical evidence
+//      can record the latency the student actually waited.
+//   5. Nothing is sent until the student has accepted the one-time prompt
+//      that names OpenAI (D17, readerPermission.js). Declining, closing the
+//      prompt, or a page with no prompt to ask with sends nothing.
 //
 // The picture is drawn from the student's own strokes by cloudRaster.js. This
 // module adds nothing to it, and sends nothing beside it.
@@ -30,6 +34,7 @@ import { onCloudSessionChange, onEntitlementChange } from '../platform/cloudSess
 import { preparePhoto } from './photoRaster.js';
 import { confidenceFloorOf } from './readingCorrection.js';
 import { classifyReaderFailure, READER_FAILURE } from './readerFailure.js';
+import { askReaderPermission, notPermittedOutcome, PROMPT_ANSWER } from './readerPermission.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -444,9 +449,13 @@ export async function readWithCloud(strokes, {
   readiness = cloudHandwritingReadiness,
   // True on the first read after the account changed (signed in, verified,
   // consented): the server is asked again however fresh the cached answer is.
-  freshReadiness = false
+  freshReadiness = false,
+  // D17: the student's own yes, asked once, before anything is sent.
+  permission = askReaderPermission
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  const permitted = await permission(user, { kind: 'ink' });
+  if (permitted !== PROMPT_ANSWER.ACCEPTED) return notPermittedOutcome(permitted);
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   if (readerPaused()) return pausedOutcome(readerPaused());
@@ -556,9 +565,13 @@ export async function readPhotoWithCloud(dataUrl, {
   transport = cloud,
   prepare = preparePhoto,
   available = cloudAvailable,
-  readiness = cloudHandwritingReadiness
+  readiness = cloudHandwritingReadiness,
+  // D17: the student's own yes, asked once, before anything is sent.
+  permission = askReaderPermission
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  const permitted = await permission(user, { kind: 'photo' });
+  if (permitted !== PROMPT_ANSWER.ACCEPTED) return notPermittedOutcome(permitted);
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   if (readerPaused()) return pausedOutcome(readerPaused());
@@ -637,6 +650,11 @@ const browserOnline = () => typeof navigator === 'undefined' || navigator.onLine
 export function readerBlock(user, { outcome = null, online = browserOnline, available = cloudAvailable, now = Date.now() } = {}) {
   const fixed = (kind, action, key, inkKey, more = {}) => Object.freeze({ kind, action, key, inkKey, autoRetry: false, manualRetry: false, retryAt: null, ...more });
   if (cloudReadingChoice(user) === 'off') return fixed('turned-off', 'settings', 'verdict.photoReadingTurnedOff', 'ink.waitingTurnedOff');
+  // D17: the student said no to sending their writing to OpenAI just now (the
+  // profile's Settings choice turns off with it), or closed the prompt
+  // without choosing. Nothing was sent, and typing is the way on.
+  if (outcome?.reason === 'declined') return fixed('declined', 'settings', 'verdict.photoReadingDeclined', 'ink.waitingDeclined');
+  if (outcome?.reason === 'not-permitted') return fixed('not-permitted', 'type', 'verdict.photoReadingNotPermitted', 'ink.waitingNotPermitted', { manualRetry: true });
   let configured = false;
   try { configured = available() === true; } catch { configured = false; }
   if (!configured) return fixed(READER_FAILURE.NOT_AVAILABLE, 'type', 'verdict.photoReadingNotOnThisInstall', 'ink.waitingNotOnThisInstall');

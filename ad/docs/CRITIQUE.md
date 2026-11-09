@@ -1,5 +1,7 @@
 # CRITIQUE.md — self-critique passes
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 Grading scale: /10 per criterion. Anything below 8 gets rebuilt, not patched.
 Criteria: hook strength · typographic craft · motion quality · cinematography
 (lens, light, focus, grade) · sound design & dynamic range · reveal craft ·
@@ -59,7 +61,7 @@ would survive in the Titanium reel.
   longer breaks its inequality mid-expression; "No ideas." is its own line.
 - *Honesty*: "Class 7 · SLOPE" would have handed sceptical parents an error —
   relabelled PROPORTION ("y is always double of x"), which is Class 7 truth.
-- *Structure*: the Olympiad station now closes the wound explicitly with a
+- *Structure*: the JEE Advanced station now closes the wound explicitly with a
   "QUESTION 1 · SOLVED" chip mirroring the seize card's kicker.
 
 **Judged and deliberately not changed:**
@@ -132,17 +134,17 @@ as the weakest thing in HANDOFF.md rather than patched cosmetically.
 The 30 s argument film gained what it deliberately withheld: the product's
 breadth. Rather than a card montage, THE INSTRUMENT is a depth corridor —
 six lit panels fly through the focal plane, one crossing per beat, each a
-plausible Dark-LaTeX surface: question bank (the measured 3,44,798), knowledge
+plausible Dark-LaTeX surface: question bank (the measured 77 chapters), knowledge
 map, misconception diagnosis (the anti-factory feature, given the emphasis),
-predicted percentile (disclaimed in-frame), Match Mode (rivals labelled
-illustrative), criteria-marked mocks — capped by "All of it offline." set
+chapters practised (disclaimed in-frame), Match Mode (rivals labelled
+illustrative), criteria-marked mocks — capped by "Sign in. Connect. Practise." set
 alone as the corridor empties. Master extended 30 → 36 s (house precedent:
 the shipped reel is 36.4 s); the 15 s cut stays the tight argument edit.
 
 Verified on the final renders: ALL GATES PASS on the 36 s grid (three new
 text beats pixel-linted and contrast-checked); the mix keeps its architecture
 (lock still loudest at −7.3 dB; groove under the run; strip-back for the
-offline line; silence by 35.5 s). One rebuild inside the pass: the knowledge
+sign-in line; silence by 35.5 s). One rebuild inside the pass: the knowledge
 map's constellation was too faint at feed scale — nodes/edges brightened to
 full gold.
 
@@ -165,7 +167,7 @@ through dark where a launch film hands objects across the edit. Built this pass:
   curve is born at 8.0 — the film's object handed across its biggest cut.
 - Marked → Instrument: the product panel recedes into depth (scale + blur) and
   the corridor inherits it.
-- Instrument → Ladder: "All of it offline." exits upward as the first station
+- Instrument → Ladder: "Sign in. Connect. Practise." exits upward as the first station
   rises — z-momentum converted to y.
 
 **Impact physics**

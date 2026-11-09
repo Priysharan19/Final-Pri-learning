@@ -137,6 +137,98 @@ it. What to do next, per failure, is `docs/operations/runbook.md`.
    provider key. Unset, the sink is a no-op and `error_sink_total{outcome=noop}` says so; a
    malformed value makes production refuse to boot (`platformConfigStatus`).
 
+## 3a. Paste-ready configuration and a 15-minute test (owner)
+
+This sets up all ten alerts and proves their routes in about 15 minutes. Nine rules are evaluated
+inside the server and mailed by `alertNotifier.js`, so one block of variables turns all nine on.
+`SERVER_DOWN` needs a monitor outside Railway, because a dead process cannot report itself. Staging
+comes first. Production gets the same block at its cutover, and is never drilled (`drills.md` §3).
+
+**Before you start:** have the address that should receive alerts ready. Staging must already
+send auth email: `PRI_AUTH_EMAIL_PROVIDER=resend`, `PRI_RESEND_API_KEY` and `PRI_AUTH_EMAIL_FROM`
+are set there (`/v1/ready` reports `authEmail` `ok`). Alert emails use the same sender.
+
+**Step 1 — staging variables (3 minutes).** If staging has no `PRI_METRICS_TOKEN` yet, generate one
+on your machine with `openssl rand -base64 48 | tr -d '/+=\n'; echo`. Then open Railway → `staging`
+→ `/v1` service → Variables → Raw Editor, paste the lines below with your values, and deploy the
+staged change:
+
+```dotenv
+PRI_ALERT_EMAIL=<the address that receives alerts>
+PRI_ALERT_ENVIRONMENT=staging
+# only if staging does not already have one:
+PRI_METRICS_TOKEN=<the token you generated>
+# optional, for the error sink and ERROR_SINK_FAILURES (without it that rule can never fire):
+PRI_SENTRY_DSN=<the DSN of your Sentry project>
+```
+
+The token goes into Railway and into your shell for the next step, and nowhere else: not a file,
+the repository or a chat.
+
+**Step 2 — the rules are live (1 minute).** In a terminal, type the token at a hidden prompt, then
+list the rules staging evaluates:
+
+```bash
+read -rs PRI_METRICS_TOKEN && export PRI_METRICS_TOKEN
+curl -s -H "Authorization: Bearer $PRI_METRICS_TOKEN" https://pri-learning-staging-staging.up.railway.app/v1/metrics \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);console.log(m.alerts.length+" rules: "+m.alerts.map(a=>a.id+(a.firing?" (FIRING)":"")).join(", "))})'
+```
+
+You should see `9 rules:` and the nine ids of §2, with none firing. A `401` means the token in
+your shell is not staging's.
+
+**Step 3 — fire one rule, end to end (5 minutes).** From a checkout of `main`, with the token still
+exported, run:
+
+```bash
+node tools/release-alert-drill.mjs
+```
+
+The drill trips `CLIENT_ERROR_SPIKE`, the one rule that can be fired without breaking anything. It
+registers one adult test account at a Resend sink address (never a person) and sends exactly the
+rule's 20 crash reports, each coded `ALERT_DRILL`. It then waits until `/v1/metrics` shows the rule
+firing and the notifier counting a FIRING email, and deletes the test account even if something
+failed. If staging's `PRI_PUBLIC_ORIGIN` is already `https://app.prilearning.com`, add
+`--public-origin https://app.prilearning.com`.
+
+Expect `ALERT DRILL: FIRED`, and within about two minutes an email with the subject
+`[Pri staging] FIRING CLIENT_ERROR_SPIKE (warning)`. A `RESOLVED` email follows about 15 minutes
+later; you need not wait for it. The drill names what is wrong if the rule fires but no email was
+counted: the notifier is off (`PRI_ALERT_EMAIL`), or the send failed (the Resend variables).
+
+All nine server rules share this route: evaluation in `metrics.js`, then the notifier, then Resend,
+then your inbox. Their thresholds are proven in CI by `server/test/observability-check.mjs`.
+
+**Step 4 — `SERVER_DOWN`, outside Railway (5 minutes).** In an uptime tool that can check every
+minute and alert on a second failure (§2 names some), create these two monitors. Point them at the
+production service's own Railway address: it stays the production service when
+`app.prilearning.com` moves (`production-config-v1.md` note 7). After the promotion, add a third,
+identical to A, on `https://app.prilearning.com/v1/health`.
+
+| Monitor | URL (GET) | Every | Up when | Alert when | Notify |
+|---|---|---|---|---|---|
+| A · Pri production health | `https://final-pri-learning-production.up.railway.app/v1/health` | 1 minute, 10 s timeout | status 200 **and** the body contains `"service":"pri-learning-platform"` | 2 checks in a row fail | the alert address and a phone push (it pages) |
+| B · Pri production ready | `https://final-pri-learning-production.up.railway.app/v1/ready` | 1 minute, 10 s timeout | status 200 | 3 checks in a row fail (a 503 for 3 minutes or more) | the alert address |
+
+To prove the route, add a throw-away monitor, C · "Pri alert test, delete me", on
+`https://pri-learning-staging-staging.up.railway.app/v1/alert-drill-404`. Every unknown `/v1` path
+answers 404, so the monitor fails on its first two checks. When its alert arrives (about two
+minutes), delete C. If the tool has a "send a test alert" button, that is equivalent.
+
+**Step 5 — production, at its cutover.** Paste the same block on Railway → `production` with
+`PRI_ALERT_ENVIRONMENT=production`, and a **new** token (never staging's). Run Step 2 against the
+production address. Do not run the drill on production: its notifier is the same code with the
+same variables, and the staging drill at the same SHA is the proof.
+
+**Step 6 — record it in §5.** Write what each step showed in that row's "Configured by / date" and
+"Tool and check name" cells. Step 3 is the staging drill for `CLIENT_ERROR_SPIKE`; monitor C is the
+drill for `SERVER_DOWN`'s route. The column "fired once in a drill" still needs each alert's own
+drill. Four alerts have no drill yet: `HTTP_5XX_SPIKE`, `DB_SATURATION`, `HANDWRITING_LATENCY_P95`
+and `ERROR_SINK_FAILURES`. Until one exists, their rows say "route proven by the
+`CLIENT_ERROR_SPIKE` drill on <date>; threshold proven in CI", and they stay short of "fired once"
+(`drills.md` covers `SERVER_DOWN`, `DB_CONNECTIVITY`, `AUTH_EMAIL_FAILURES`,
+`PROVIDER_FAILURE_SPIKE` and `WEBHOOK_FAILURES`).
+
 ## 4. Supabase configuration (owner action)
 
 1. Enable the project's email/Slack alerts for database health, connection saturation and

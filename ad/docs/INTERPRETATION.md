@@ -1,5 +1,7 @@
 # INTERPRETATION.md — the ideal Pri Learning
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 **Creative platform (one sentence):** *A student who understands can solve a problem they have
 never seen; a student who memorised cannot.*
 
@@ -30,10 +32,10 @@ this repo's own design language (near-black paper, Computer Modern, hairlines, g
   is the interface.
 - **It treats one idea as a ladder, not four products.** The same mathematical object — a line
   touching a curve — is a Class 7 slope, a Class 10 circle theorem, a Class 12 derivative, a JEE
-  conic tangent, and an Olympiad tangent-line trick. The ideal product surfaces that continuity;
+  conic tangent, and an JEE Advanced tangent-line trick. The ideal product surfaces that continuity;
   the film's Act III is that interface.
 - **It closes the loop on the student's own ink.** You watch the idea, then you *write* the proof
-  by hand, and examiner-style marks land on your handwriting, step by step. (Real capability,
+  by hand, and the engine's marks land on your handwriting. (Real capability,
   shown at the moment it means most.)
 
 All interface moments in the film are plausible extensions of `theme.css` v4 — hairline-ruled
@@ -46,6 +48,6 @@ The existing 36.4 s reel (marketing/reel) is a strong feature tour: what the pro
 This film argues what the product *believes* — India's maths education runs on pattern-recall,
 and recall dies on first contact with an unseen problem. The film stages that death (the factory
 seizes on "prove eˣ ≥ 1 + x"), then shows understanding resolving it, then shows the same idea
-scaling Class 7 → Olympiad, and closes on invitation, not fear. One mathematical object carries
+scaling Class 7 → JEE Advanced, and closes on invitation, not fear. One mathematical object carries
 all thirty seconds. The ad practises what the product preaches: one idea, understood deeply,
 instead of four hundred memorised.

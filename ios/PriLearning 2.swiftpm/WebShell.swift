@@ -29,6 +29,13 @@ final class ShellContainerView: UIView {
         subviews.first?.frame = bounds
         onLayout?()
     }
+
+    // Rotation, a status bar that appears or the Dynamic Island's region all
+    // change the safe area without always changing the bounds.
+    override func safeAreaInsetsDidChange() {
+        super.safeAreaInsetsDidChange()
+        onLayout?()
+    }
 }
 
 struct WebShell: UIViewRepresentable {
@@ -51,7 +58,7 @@ struct WebShell: UIViewRepresentable {
         let cloudConfigured = NativeCloudBridge.isConfigured ? "true" : "false"
         let nativeReleaseIdentity = NativeReleaseIdentity.javaScriptLiteral
         let nativeFlag = WKUserScript(
-            source: NativeHostBridge.hostScript(cloudConfigured: NativeCloudBridge.isConfigured) + " window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_PHOTO__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
+            source: NativeHostBridge.hostScript(cloudConfigured: NativeCloudBridge.isConfigured) + " window.__PRI_NATIVE__ = true; window.__PRI_NATIVE_INK__ = true; window.__PRI_NATIVE_BILLING__ = true; window.__PRI_NATIVE_CLOUD__ = true; window.__PRI_NATIVE_CLOUD_CONFIGURED__ = \(cloudConfigured); window.__PRI_NATIVE_RELEASE_IDENTITY__ = \(nativeReleaseIdentity);",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
@@ -67,10 +74,23 @@ struct WebShell: UIViewRepresentable {
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
+        // Safe area from the first paint (#release-blocker 2026-10-20): the web
+        // view is full screen with contentInsetAdjustmentBehavior = .never, so
+        // WebKit's env(safe-area-inset-*) is 0 here and the page would draw
+        // under the status bar and the Dynamic Island. The shell states the
+        // real insets as --pri-inset-* on <html>; Coordinator.applySafeArea()
+        // keeps them current on rotation and size changes.
+        let launchInsets = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow?.safeAreaInsets }.first ?? .zero
+        config.userContentController.addUserScript(WKUserScript(
+            source: Coordinator.safeAreaScript(launchInsets, viewWidth: UIScreen.main.bounds.width,
+                                               category: UIApplication.shared.preferredContentSizeCategory),
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
-        config.userContentController.add(context.coordinator, name: "priPhoto")
         config.userContentController.add(context.coordinator, name: "priBilling")
         config.userContentController.add(context.coordinator, name: "priCloud")
 
@@ -101,9 +121,10 @@ struct WebShell: UIViewRepresentable {
         context.coordinator.attachBilling(to: webView)
         context.coordinator.attachCloud(to: webView)
         context.coordinator.attachHost(to: webView)
-        container.onLayout = { [weak coordinator = context.coordinator] in
+        container.onLayout = { [weak coordinator = context.coordinator, weak container] in
             coordinator?.ink.webViewDidResize()
             coordinator?.applyTextSize()
+            if let container { coordinator?.applySafeArea(container.safeAreaInsets) }
         }
 
         webView.load(URLRequest(url: URL(string: "prilearning://app/")!))
@@ -132,7 +153,6 @@ struct WebShell: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler, WKDownloadDelegate {
         private var downloadDestination: URL?
         private weak var shellWebView: WKWebView?
-        private let photoOCR = PhotoOCRBridge()
         private let billing = StoreKitBillingBridge()
         private let cloud = NativeCloudBridge()
         private let host = NativeHostBridge()
@@ -145,6 +165,7 @@ struct WebShell: UIViewRepresentable {
 
         func attachInk(to webView: WKWebView, in container: UIView) {
             shellWebView = webView
+            shellContainer = container
             ink.attach(to: webView, in: container)
             // Scrolling is followed from the web view's own offset rather than
             // from messages: the page tells us where the writing area IS, and
@@ -207,7 +228,10 @@ struct WebShell: UIViewRepresentable {
             }
             contentSizeObserver = NotificationCenter.default.addObserver(
                 forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
-            ) { [weak self] _ in self?.applyTextSize() }
+            ) { [weak self, weak webView] _ in
+                self?.applyTextSize()
+                if let container = webView?.superview { self?.applySafeArea(container.safeAreaInsets) }
+            }
             applyTextSize()
         }
 
@@ -305,9 +329,17 @@ struct WebShell: UIViewRepresentable {
             webView.load(URLRequest(url: target))
         }
 
-        /// Dynamic Type: the page is laid out in CSS pixels, so the system text
-        /// size scales the whole page. It is capped so the CSS viewport never
-        /// drops below 360px wide (the narrowest layout the product is tested at).
+        /// Text size. The page is laid out in CSS pixels, so the system text
+        /// size SCALES THE WHOLE PAGE through the viewport; it is capped so the
+        /// CSS viewport never drops below 360 px wide (the narrowest layout the
+        /// product is tested at). This is not system Dynamic Type: text does
+        /// not reflow at the system's metrics, and on a 402 pt iPhone the
+        /// largest accessibility size reaches only about 1.12× (1.5× on iPad).
+        /// Do not declare Larger Text / Dynamic Type support for the app
+        /// (RELEASE.md §8); the device matrix records what the sizes really
+        /// do (docs/release/device-matrix.md, TEXTSIZE cases). Making it real
+        /// means the web app's type scale following a text-size token, which
+        /// is a product change recorded for the owner, not a shell setting.
         ///
         /// The scale is applied through the viewport (`width = view width ÷
         /// scale`), not `pageZoom`: WKWebView's page zoom magnifies without
@@ -346,6 +378,37 @@ struct WebShell: UIViewRepresentable {
                 completionHandler: nil)
         }
 
+        /// The CSS px the page is laid out in per point: below 1 when large
+        /// Dynamic Type narrows the viewport (viewportContent above).
+        static func cssPerPoint(viewWidth: CGFloat, category: UIContentSizeCategory) -> CGFloat {
+            let content = viewportContent(width: viewWidth, category: category)
+            guard let range = content.range(of: "width="), !content.hasPrefix("width=device-width"),
+                  let css = Double(content[range.upperBound...].prefix { $0.isNumber }), viewWidth > 0 else { return 1 }
+            return CGFloat(css) / viewWidth
+        }
+
+        /// Sets --pri-inset-top/right/bottom/left on <html>. Only four numbers
+        /// reach this script. An inline custom property beats the :root
+        /// fallback (env(), which is 0 inside this shell) in theme.css.
+        static func safeAreaScript(_ insets: UIEdgeInsets, viewWidth: CGFloat, category: UIContentSizeCategory) -> String {
+            let k = cssPerPoint(viewWidth: viewWidth, category: category)
+            func px(_ v: CGFloat) -> String { String(format: "%.2fpx", max(0, Double(v * k))) }
+            return "(function(t,r,b,l){var s=document.documentElement.style;"
+                + "s.setProperty('--pri-inset-top',t);s.setProperty('--pri-inset-right',r);"
+                + "s.setProperty('--pri-inset-bottom',b);s.setProperty('--pri-inset-left',l);})"
+                + "('\(px(insets.top))','\(px(insets.right))','\(px(insets.bottom))','\(px(insets.left))');"
+        }
+
+        private var appliedSafeArea: String?
+        func applySafeArea(_ insets: UIEdgeInsets) {
+            guard let webView = shellWebView else { return }
+            let script = Self.safeAreaScript(insets, viewWidth: webView.bounds.width,
+                                             category: UIApplication.shared.preferredContentSizeCategory)
+            guard script != appliedSafeArea else { return }
+            appliedSafeArea = script
+            webView.evaluateJavaScript(script, completionHandler: nil)
+        }
+
         func detachHost() {
             if let openURLObserver { NotificationCenter.default.removeObserver(openURLObserver) }
             if let contentSizeObserver { NotificationCenter.default.removeObserver(contentSizeObserver) }
@@ -373,10 +436,6 @@ struct WebShell: UIViewRepresentable {
             }
             if message.name == "priInk" {
                 ink.handle(message.body)
-                return
-            }
-            if message.name == "priPhoto" {
-                photoOCR.handle(message.body, webView: shellWebView)
                 return
             }
             if message.name == "priBilling" {
@@ -413,15 +472,113 @@ struct WebShell: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             // Simulator/CI only: prove the bridge contract inside real WebKit.
             applyTextSize()
+            appliedSafeArea = nil
+            if let container = webView.superview { applySafeArea(container.safeAreaInsets) }
             #if DEBUG
+            if BridgeSelfCheck.awaitingContentEnd {
+                // A load after the page's WebContent process ended (whoever reloaded it).
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.runRecovery(in: webView, ink: self.ink) }
+                return
+            }
             guard !bridgeSelfCheckRan else { return }
             if BridgeSelfCheck.requested {
                 bridgeSelfCheckRan = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { BridgeSelfCheck.run(in: webView, ink: self.ink) }
             } else if JourneySelfCheck.phase != nil {
                 bridgeSelfCheckRan = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { JourneySelfCheck.run(in: webView) }
             }
+            #endif
+        }
+
+        // ── The page's WebContent process ended ──
+        // iOS ends the page's WebContent process under memory pressure, and
+        // WebKit ends it when it crashes. Without this method WebKit reloaded
+        // the page on its own and told the shell nothing: the native PencilKit
+        // surface stayed mounted, with the ended page's ink, above the new
+        // page, and a second end a few seconds later left a blank screen with
+        // no way back but force-quitting (both measured on an iOS 27 simulator
+        // by killing the real WebContent process; scripts/native-bridge-
+        // selfcheck.mjs now does this on every run). The page is reloaded here:
+        // drafts live in its own storage and checked work on Pri's server. The
+        // ink surface and any cloud request belonged to the page that ended,
+        // so they are dropped first. A page that keeps dying gets a native
+        // screen instead of a reload loop: the same policy as Android's
+        // onRenderProcessGone (MainActivity.kt, more than 2 within 30 s).
+        static let maxContentTerminations = 2
+        static let contentTerminationWindow: TimeInterval = 30
+        private var contentTerminations: [Date] = []
+        private weak var shellContainer: UIView?
+        private var stoppedView: UIView?
+
+        /// The terminations still inside the window (this one included), and
+        /// whether the page may be reloaded once more.
+        static func recovery(after earlier: [Date], at now: Date) -> (recent: [Date], reload: Bool) {
+            let recent = earlier.filter { now.timeIntervalSince($0) <= contentTerminationWindow } + [now]
+            return (recent, recent.count <= maxContentTerminations)
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            ink.pageDidTerminate()
+            cloud.cancelAll()
+            let (recent, reload) = Self.recovery(after: contentTerminations, at: Date())
+            contentTerminations = recent
+            #if DEBUG
+            BridgeSelfCheck.contentProcessEnded(count: recent.count, reloading: reload, inkMounted: ink.isMounted)
+            #endif
+            if reload { reloadPage(webView) } else { showStopped(over: webView) }
+        }
+
+        private func reloadPage(_ webView: WKWebView) {
+            if webView.url != nil {
+                webView.reload()
+            } else {
+                webView.load(URLRequest(url: URL(string: "prilearning://app/")!))
+            }
+        }
+
+        private func showStopped(over webView: WKWebView) {
+            guard stoppedView == nil, let container = shellContainer else { return }
+            let label = UILabel()
+            // The same words as Android's renderer_crash_body / renderer_crash_retry.
+            label.text = "Pri Learning stopped unexpectedly a few times. Your saved work is kept on this device."
+            label.numberOfLines = 0
+            label.textAlignment = .center
+            label.textColor = UIColor(white: 0.88, alpha: 1)
+            label.font = .preferredFont(forTextStyle: .body)
+            label.adjustsFontForContentSizeCategory = true
+            let retry = UIButton(configuration: .bordered(), primaryAction: UIAction(title: "Try again") { [weak self, weak webView] _ in
+                guard let self, let webView else { return }
+                self.contentTerminations.removeAll()
+                self.stoppedView?.removeFromSuperview()
+                self.stoppedView = nil
+                self.reloadPage(webView)
+            })
+            retry.accessibilityIdentifier = "pri.contentStopped.retry"
+            // The shell is dark whatever the system appearance; a light-mode
+            // tint drew the button's title black on a dark fill.
+            retry.tintColor = UIColor(white: 0.92, alpha: 1)
+            let stack = UIStackView(arrangedSubviews: [label, retry])
+            stack.axis = .vertical
+            stack.alignment = .center
+            stack.spacing = 24
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            let overlay = UIView(frame: container.bounds)
+            overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            overlay.backgroundColor = webView.backgroundColor
+            overlay.overrideUserInterfaceStyle = .dark
+            overlay.accessibilityIdentifier = "pri.contentStopped"
+            overlay.addSubview(stack)
+            NSLayoutConstraint.activate([
+                stack.centerYAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.centerYAnchor),
+                stack.leadingAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+                stack.trailingAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.trailingAnchor, constant: -32),
+                retry.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            ])
+            container.addSubview(overlay)
+            stoppedView = overlay
+            #if DEBUG
+            BridgeSelfCheck.contentStoppedShown()
             #endif
         }
 

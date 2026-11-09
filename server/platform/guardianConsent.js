@@ -244,8 +244,20 @@ export async function confirmConsent(db, accountId, noticeVersion, now = Date.no
   // Withdrawal is terminal for the current consent ceremony. Confirmation must
   // never clear a withdrawal or re-grant sync permission from the same bearer;
   // a future re-consent flow must create a new request/authority explicitly.
+  // An account scheduled for erasure (childErasure.js, D18: soft-deleted) is
+  // past the point a confirmation can reach: it cannot sign in again, so a
+  // confirmation would grant nothing but must not look as if it had.
   const changed = (await db.run(`UPDATE guardian_consents SET confirmed_at = ?, notice_version = ?
-    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL`, [now, noticeVersion, accountId])).changes;
+    WHERE account_id = ? AND confirmed_at IS NULL AND withdrawn_at IS NULL
+      AND EXISTS (SELECT 1 FROM accounts WHERE accounts.id = guardian_consents.account_id AND accounts.deleted_at IS NULL)`,
+  [now, noticeVersion, accountId])).changes;
+  // The fact that a guardian confirmed outlives the row's confirmed_at, which
+  // a renewal request clears: childErasure.js never treats an account a
+  // guardian once confirmed as "never confirmed" (review of #736, P1).
+  if (changed > 0) {
+    await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
+      [null, 'guardian.confirm', 'account', accountId, JSON.stringify({ noticeVersion }), now]);
+  }
   return changed > 0;
 }
 

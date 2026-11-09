@@ -47,8 +47,30 @@
 import WebKit
 
 enum JourneySelfCheck {
+
+    // Every PRIJOURNEY line goes to the unified log AND is appended to
+    // Documents/PRIJOURNEY.log in the app's own container: on the hosted iOS 27
+    // image `log show` returns nothing for the app. scripts/iphone-journey.mjs
+    // reads only what each launch appends (it records the file's size first),
+    // falling back to the log.
+    static let reportURL: URL? = FileManager.default
+        .urls(for: .documentDirectory, in: .userDomainMask).first?
+        .appendingPathComponent("PRIJOURNEY.log")
+
+    static func say(_ line: String) {
+        NSLog("%@", line)
+        guard let url = reportURL, let data = (line + "\n").data(using: .utf8) else { return }
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: data)
+        } else {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
     static var phase: String? {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--journey-staging") { return "staging" }
         if args.contains("--journey-marking-relaunch") { return "markingRelaunch" }
         if args.contains("--journey-marking") { return "marking" }
         if args.contains("--journey-offline-draft") { return "offlineDraft" }
@@ -286,6 +308,21 @@ enum JourneySelfCheck {
       await sleep(1500);   // the gate's first check settles
       return assertHeld('launch') + ' at ' + location.pathname;
     });
+    await step('wordmarkClearsStatusBar', async () => {
+      // The shell states the real safe area as --pri-inset-top (WebShell.swift
+      // applySafeArea): at scroll top the welcome wordmark sits at or below it,
+      // never under the status bar or the Dynamic Island. Every iPhone has a
+      // status-bar inset, so on a phone-width page it is at least 20px.
+      window.scrollTo(0, 0); await sleep(300);
+      const inset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pri-inset-top')) || 0;
+      // A phone's status bar is at least 20pt; a smaller value is a mis-scaled inset.
+      if (innerWidth < 600 && !(inset >= 20)) throw new Error('--pri-inset-top is ' + inset + 'px on a phone');
+      const mark = q('.logo.logo-lg');
+      if (!mark) throw new Error('no welcome wordmark on ' + location.pathname);
+      const top = mark.getBoundingClientRect().top;
+      if (top + 0.5 < inset) throw new Error('wordmark top ' + top.toFixed(1) + 'px is under the ' + inset.toFixed(1) + 'px status-bar inset');
+      return 'wordmark top ' + top.toFixed(1) + 'px ≥ inset ' + inset.toFixed(1) + 'px';
+    });
     await step('noEntryWithoutAccount', async () => {
       // With no server the card cannot send a code (its field is disabled and
       // it says so) or the gate cannot reach the server ("retry"). Either way
@@ -459,13 +496,36 @@ enum JourneySelfCheck {
         at = 'unread'; await sleep(1500);
         if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
         at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
-        at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
+        // D17: the first read of a profile meets the one-time prompt naming
+        // OpenAI. Nothing is read while it is open; the accept is the go-ahead.
+        at = 'permission';
+        let permission = 'accepted earlier on this device';
+        let kept = {};
+        try { kept = JSON.parse(localStorage.getItem('pri-reader-permission-v1') || '{}') || {}; } catch (e) { kept = {}; }
+        if (!Object.values(kept).some(r => r && r.choice === 'accepted' && r.version === 1)) {
+          const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
+          if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
+          await sleep(1000);
+          if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+          q('[data-reader-permission="accept"]').click();
+          permission = 'asked first, naming OpenAI (D17), and accepted';
+        }
+        at = 'reading';
+        try { await waitFor(() => q('.ink-preview .ink-line'), 60000); }
+        catch (e) {
+          // Say what the page shows instead of a reading: the reader's status
+          // line, a prompt still open, the recorded permission, the Read button.
+          let record = null;
+          try { record = localStorage.getItem('pri-reader-permission-v1'); } catch (x) { record = 'unreadable'; }
+          throw new Error('no reading in 60 s: status "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '" sheet=' + (q('[data-reader-permission-sheet]') ? 'open' : 'closed') +
+            ' read=' + (q('[data-ink-read]') ? 'offered' : 'absent') + ' retry=' + (q('[data-ink-retry-reading]') ? 'offered' : 'absent') + ' permission=' + String(record).slice(0, 120) + ' online=' + navigator.onLine);
+        }
         const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
         if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
         if (!lines[0].low || !q('.ink-line .ink-correct-btn')) throw new Error('a doubtful line is not editable');
         assertUnmarked('reading');
         inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink' });
-        return echoed + ' strokes read by the server (synthetic reader): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
+        return echoed + ' strokes read by the server (synthetic reader) after the permission prompt (' + permission + '): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
       }
       throw new Error('no handwriting question with a statable numeric answer in 12: ' + passed.join(','));
     });
@@ -497,6 +557,82 @@ enum JourneySelfCheck {
       const verdicts = await historyVerdicts(graded.map(g => g.id));
       if (verdicts.join() !== 'Correct,Correct') throw new Error('History shows ' + verdicts.join());
       return 'History: typed Correct, handwritten Correct ' + JSON.stringify(graded.map(g => g.server));
+    });
+    return JSON.stringify(steps);
+    """#
+
+    // `--journey-staging` (scripts/journey-staging.mjs): the DEPLOYED staging
+    // service (PRI_CLOUD_ORIGIN, a DEBUG build only), a real emailed code read
+    // from the owner's test inbox by the test process, and the REAL reader.
+    // There is no answer oracle on staging: the leg proves the journey works
+    // end to end on the deployed service — the D17 prompt, a reading, a
+    // server mark, History — not that any answer is right. It ends by
+    // deleting the test account it made.
+    private static let staging = helpers + cardHelpers + oracleHelpers + #"""
+    let inkId = null;
+    async function openSettings() {
+      history.pushState({}, '', '/settings'); dispatchEvent(new PopStateEvent('popstate'));
+      await waitFor(() => q('#cloud-account-title'), 30000);
+    }
+    await step('stagingCardOnboarding', async () => cardOnboard(email));
+    await step('stagingInkRead', async () => {
+      at = 'practice'; await route('/practice'); await waitFor(() => q('.q-prompt') && qid(), 60000); await sleep(800);
+      const passed = [];
+      for (let i = 0; i < 12; i++) {
+        at = 'question ' + (i + 1);
+        await nextQuestion();
+        if (!byLabel('Write: answer by handwriting')) { passed.push('no-write-tab'); continue; }
+        const id = qid();
+        at = 'write'; await writeMode();
+        const echoed = await writeOnNativeSurface();
+        at = 'saved'; await inkSavedTruthfully(id);
+        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
+        at = 'permission'; const sheet = await waitFor(() => q('[data-reader-permission-sheet="ink"]'), 20000);
+        if (!/OpenAI/.test(sheet.textContent || '')) throw new Error('the prompt before the first read does not name OpenAI');
+        await sleep(1000);
+        if (q('.ink-preview .ink-line')) throw new Error('the page was read while the permission prompt was open');
+        q('[data-reader-permission="accept"]').click();
+        at = 'reading';
+        try { await waitFor(() => q('.ink-preview .ink-line') || q('[data-ink-retry-reading]'), 120000); } catch (e) { throw new Error('no reading in 120 s: status "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"'); }
+        if (!q('.ink-preview .ink-line')) throw new Error('the deployed reader refused: "' + seen('.ink-answer .ink-status-line').slice(0, 160) + '"');
+        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => n.getAttribute('data-text'));
+        inkId = id;
+        return echoed + ' strokes; after the D17 prompt the deployed reader returned ' + lines.length + ' line(s): ' + JSON.stringify(lines).slice(0, 60);
+      }
+      throw new Error('no handwriting question in 12: ' + passed.join(','));
+    });
+    await step('stagingConfirmedMarked', async () => {
+      if (!inkId) throw new Error('nothing was read to confirm');
+      // The student's own final answer when the reading proposes none.
+      const field = q('[data-ink-final-answer]');
+      if (field && !field.value) { setValue(field, '7'); await sleep(300); }
+      let got = null;
+      for (let press = 0; press < 3 && !['evaluated', 'miss'].includes(got); press++) {
+        got = await checked(pressSubmit, 90000);
+        if (got !== 'confirm') break;
+      }
+      if (!['evaluated', 'miss'].includes(got)) throw new Error('expected the deployed server to mark the confirmed reading, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 120));
+      return 'the deployed server marked the confirmed reading: ' + (got === 'evaluated' ? (q('.eval-card').getAttribute('data-outcome') + ' ' + seen('.eval-marks')) : '"' + seen('.verdict .verdict-title') + '", a try left');
+    });
+    await step('stagingHistory', async () => {
+      if (!inkId) throw new Error('no handwritten attempt to find');
+      await route('/review');
+      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 60000);
+      await sleep(800);
+      if (!q('.hist-row[data-question-id="' + inkId + '"]')) throw new Error('History does not hold the handwritten attempt');
+      return 'History holds the handwritten attempt';
+    });
+    await step('stagingDeleteAccount', async () => {
+      at = 'settings'; await openSettings();
+      at = 'phrase'; setValue(await waitFor(() => q('#cloud-delete-phrase'), 30000), 'DELETE'); await sleep(150);
+      at = 'send'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-send-code]'); return b && !b.disabled && b; })).click();
+      at = 'code box'; await waitFor(() => q('#cloud-delete-code-0'), 60000);
+      at = 'code'; const sent = await oracle({ kind: 'emailCode', to: email, purpose: 'reauth' });
+      if (!/^\d{6}$/.test(sent.code || '')) throw new Error('no six-digit deletion code arrived: ' + (sent.reason || 'none'));
+      setValue(q('#cloud-delete-code-0'), sent.code); await sleep(300);
+      at = 'delete'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-with-code]'); return b && !b.disabled && b; })).click();
+      at = 'deleted'; await waitFor(() => /Cloud account deleted/.test(document.body.innerText) || q(GATE), 60000);
+      return 'the test account deleted itself on staging with the emailed code';
     });
     return JSON.stringify(steps);
     """#
@@ -608,8 +744,9 @@ enum JourneySelfCheck {
     });
     await step('photoDraft', async () => {
       // The product reads photos only on the server (ADR-0001). Attach one and
-      // prove the device neither reads nor marks it: the native Vision bridge
-      // is never asked, and no transcript appears.
+      // prove the device neither reads nor marks it: there is no on-device
+      // photo reader any more (the legacy receiver is wrapped only to prove
+      // nothing answers on it), and no transcript appears.
       let nativeReads = 0;
       const original = window.__priPhotoReceive;
       window.__priPhotoReceive = p => { nativeReads += 1; if (original) original(p); };
@@ -1018,11 +1155,12 @@ enum JourneySelfCheck {
     @MainActor
     static func run(in webView: WKWebView) {
         guard let phase else { return }
-        NSLog("PRIJOURNEY started %@", phase)
+        say(String(format: "PRIJOURNEY started %@", phase))
         let script: String
         switch phase {
         case "relaunch": script = relaunch
         case "marking": script = marking
+        case "staging": script = staging
         case "markingRelaunch": script = markingRelaunch
         case "offlineDraft": script = offlineDraft
         case "offlineRelaunch": script = offlineRelaunch
@@ -1049,18 +1187,18 @@ enum JourneySelfCheck {
             case .success(let value):
                 guard let text = value as? String, let data = text.data(using: .utf8),
                       let steps = try? JSONSerialization.jsonObject(with: data) as? [String: [String: Any]] else {
-                    NSLog("PRIJOURNEY FAIL unreadable result")
+                    say("PRIJOURNEY FAIL unreadable result")
                     return
                 }
                 var failures = 0
                 for (name, info) in steps.sorted(by: { $0.key < $1.key }) {
                     let ok = info["ok"] as? Bool == true
                     if !ok { failures += 1 }
-                    NSLog("PRIJOURNEY %@ %@ %@", ok ? "ok" : "FAIL", name, info["detail"] as? String ?? "")
+                    say(String(format: "PRIJOURNEY %@ %@ %@", ok ? "ok" : "FAIL", name, info["detail"] as? String ?? ""))
                 }
-                NSLog("PRIJOURNEY summary %@ %d failure(s)", phase, failures)
+                say(String(format: "PRIJOURNEY summary %@ %d failure(s)", phase, failures))
             case .failure(let error):
-                NSLog("PRIJOURNEY FAIL script error %@", String(describing: error))
+                say(String(format: "PRIJOURNEY FAIL script error %@", String(describing: error)))
             }
         }
     }

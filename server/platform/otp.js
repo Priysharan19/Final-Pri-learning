@@ -23,9 +23,11 @@ import {
   normalizeDestination, normalizeEmail, normalizePhone, retireChallenge, verifyChallenge
 } from './otpCore.js';
 import { createSmsProviderFromEnv } from './smsProvider.js';
-import { createOtpEmailSenderFromEnv } from './otpEmail.js';
+import { createOtpEmailSenderFromEnv, otpEmailMessage } from './otpEmail.js';
+import { testMailboxAccepts } from './testMailboxPolicy.js';
+import { depositTestMail } from './testMailbox.js';
 import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
-import { deleteAccountRows, queueAccountToken } from './accounts.js';
+import { WITHDRAW_CREDENTIAL_MS, deleteAccountRows, invalidatePendingTokens, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
 import { logEvent, safeCode } from './observability.js';
@@ -86,12 +88,23 @@ export function createOtpRouter(db, {
 
   async function deliver({ channel, destination, purpose, accountId = null, intent = null, now = Date.now() }) {
     if (channel === 'sms' && !sms) throw Object.assign(new Error('Phone codes are not available yet.'), { code: 'OTP_SMS_NOT_CONFIGURED', status: 503 });
-    if (channel === 'email' && !sendEmail) throw Object.assign(new Error('Email codes are not available yet.'), { code: 'OTP_EMAIL_NOT_CONFIGURED', status: 503 });
+    // STAGING ONLY: a reserved test address (testMailboxPolicy.js) gets its
+    // code in the test mailbox instead of an email. The challenge is the same
+    // one — same expiry, single use, attempt ceiling and send limits.
+    const keptForTest = channel === 'email' && testMailboxAccepts(env, destination);
+    if (channel === 'email' && !sendEmail && !keptForTest) throw Object.assign(new Error('Email codes are not available yet.'), { code: 'OTP_EMAIL_NOT_CONFIGURED', status: 503 });
     const providerName = channel === 'sms' ? sms.name : 'email';
     const delegated = channel === 'sms' && sms.generatesCode;
     const challenge = await createChallenge(db, { channel, purpose, destination, accountId, providerName, providerGeneratesCode: delegated, now });
     try {
-      if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
+      if (keptForTest) {
+        // The email this address would have been sent, word for word.
+        const mail = otpEmailMessage(challenge.code, purpose, env.PRI_PUBLIC_ORIGIN, { intent });
+        await depositTestMail(db, {
+          to: destination, kind: 'code', code: challenge.code, subject: mail.subject, text: mail.text, now,
+          purpose: intent === 'account-delete' ? 'delete' : purpose === 'guardian-consent' ? 'guardian' : 'sign-in'
+        });
+      } else if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
       else if (delegated) await sms.start({ to: destination, purpose });
       else await sms.send({ to: destination, code: challenge.code, purpose, publicOrigin });
     } catch (error) {
@@ -215,7 +228,11 @@ export function createOtpRouter(db, {
           await db.transaction(async () => {
             await db.run('UPDATE accounts SET email_verified_at = ?, password_hash = NULL, updated_at = ? WHERE id = ?', [now, now, existing.id]);
             await db.run('UPDATE account_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL', [now, existing.id]);
-            await db.run('DELETE FROM auth_delivery_outbox WHERE account_id = ? AND delivered_at IS NULL', [existing.id]);
+            // Only the unproven registrant's own mail goes: a guardian's
+            // withdrawal credential or consent link was asked for by someone
+            // else and must still reach them.
+            await db.run(`DELETE FROM auth_delivery_outbox WHERE account_id = ? AND delivered_at IS NULL
+              AND kind IN ('verify-email','reset-password')`, [existing.id]);
             await db.run(`UPDATE account_tokens SET consumed_at = ? WHERE account_id = ? AND consumed_at IS NULL
               AND purpose IN ('verify-email','reset-password')`, [now, existing.id]);
             await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
@@ -504,7 +521,19 @@ export function createOtpRouter(db, {
     const row = await db.get('SELECT guardian_email, guardian_phone, withdrawn_at FROM guardian_consents WHERE account_id = ?', [live.account_id]);
     const named = row && (channel === 'sms' ? row.guardian_phone === destination : normalizeEmail(row.guardian_email) === destination);
     if (!named || row.withdrawn_at) return invalidCode(res);
-    const confirmed = await confirmConsent(db, live.account_id, req.body.noticeVersion, now);
+    // An email parent who approves by code gets the same long-lived withdrawal
+    // credential as one who approves by link (accounts.js /guardian/confirm):
+    // the link expires within the hour and is purged, so without it a parent
+    // who approved by code could neither withdraw later nor ask for the
+    // account to be erased (decision D18). A phone parent withdraws by SMS.
+    let confirmed = false;
+    await db.transaction(async () => {
+      confirmed = await confirmConsent(db, live.account_id, req.body.noticeVersion, now);
+      if (confirmed && channel === 'email') {
+        await invalidatePendingTokens(db, live.account_id, 'guardian-withdraw', now);
+        await queueAccountToken(db, live.account_id, destination, 'guardian-withdraw', now, { ttlMs: WITHDRAW_CREDENTIAL_MS });
+      }
+    });
     const child = await db.get('SELECT name FROM accounts WHERE id = ?', [live.account_id]);
     res.json({ ok: true, confirmed, childName: child?.name || null });
   });

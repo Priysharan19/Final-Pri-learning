@@ -1,7 +1,9 @@
 # Five-feature carousel — Instagram
 
-One all-in-one 4:5 slide, plus a seven-slide carousel, covering what the app does: on-device handwriting recognition,
-examiner-style marking, boards → JEE Advanced, Class 7–12, and the unlimited bank.
+One all-in-one 4:5 slide, plus a seven-slide carousel, covering what the app does: handwriting read by Pri's
+server, automatic marking of the final answer by Pri's engine, three tracks from boards to JEE Advanced,
+Classes 7–12 (77 chapters), and generated practice. Copy revised 2 November 2026 under owner decision D24;
+`client/test/marketing-claims-check.mjs` holds and enforces the retired phrases.
 
 | File | What it is |
 |---|---|
@@ -23,5 +25,5 @@ Colours come from `client/src/theme.css` v4 "Dark LaTeX", same as the reel and t
 poster. The student's ink uses whatever script face the render machine has — Caveat is the
 reel's hand but lives on a font host, so locally `Bradley Hand` is what lands.
 
-Every figure on a slide is a measured one and carries its command in `POST.md`. Do not put
-a number on a slide that README's "Measured accuracy" block does not carry.
+The only figure on a slide is the chapter count, which is `IN_CURRICULUM`'s. Do not put a
+number on a slide that CI does not measure, and never an accuracy figure.
