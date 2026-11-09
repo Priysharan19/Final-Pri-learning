@@ -31,6 +31,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
 import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled } from './tutor.js';
 import { markRowsFor } from './markRows.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
@@ -506,6 +507,39 @@ function readPrepared(token) {
   } catch { return null; }
 }
 
+// ── The nudge from the student's work: bounds and words ──────────────────────
+const HINT_WORK_LIMITS = Object.freeze({ lines: 40, line: 400 });
+const HINT_WORK_TEXT = Object.freeze({
+  en: {
+    breakFirst: 'Look again at line {line}: that is where your working first stops following.',
+    breakAfter: { one: 'Your first line holds. Look again at line {line}.', other: 'Your first {n} lines hold. Look again at line {line}.' },
+    held: { one: 'Your line so far holds. Carry on from there.', other: 'Your {n} lines so far hold. Carry on from there.' },
+    final: 'Your working already reaches an answer, so it is not checked line by line here. Submit it to have it marked.',
+    limit: 'This question has had its line checks. The hint below still applies.',
+    unchecked: 'Your working could not be checked this time. The hint below still applies.',
+    unread: 'Your lines could not be matched to a step yet. The hint below still applies.'
+  },
+  hi: {
+    breakFirst: 'पंक्ति {line} को फिर से देखें: वहीं से आपका हल पहली बार भटकता है।',
+    breakAfter: { one: 'आपकी पहली पंक्ति सही है। पंक्ति {line} को फिर से देखें।', other: 'आपकी पहली {n} पंक्तियाँ सही हैं। पंक्ति {line} को फिर से देखें।' },
+    held: { one: 'अब तक की आपकी पंक्ति सही है। वहीं से आगे बढ़ें।', other: 'अब तक की आपकी {n} पंक्तियाँ सही हैं। वहीं से आगे बढ़ें।' },
+    final: 'आपका हल पहले ही उत्तर तक पहुँच गया है, इसलिए यहाँ उसकी पंक्ति-दर-पंक्ति जाँच नहीं होती। अंक के लिए उसे जमा करें।',
+    limit: 'इस प्रश्न की पंक्ति-जाँच पूरी हो चुकी है। नीचे का संकेत अब भी काम का है।',
+    unchecked: 'इस बार आपके हल की जाँच नहीं हो सकी। नीचे का संकेत अब भी काम का है।',
+    unread: 'आपकी पंक्तियाँ अभी किसी चरण से मेल नहीं खा सकीं। नीचे का संकेत अब भी काम का है।'
+  }
+});
+export function hintWorkNote(work, locale = 'en') {
+  const T = HINT_WORK_TEXT[locale] || HINT_WORK_TEXT.en;
+  const fill = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
+  const plural = (o, n) => (n === 1 ? o.one : o.other);
+  if (!work?.status) return null;
+  if (work.status === 'break') return work.verifiedLines > 0
+    ? fill(plural(T.breakAfter, work.verifiedLines), { n: work.verifiedLines, line: work.line }) : fill(T.breakFirst, { line: work.line });
+  if (work.status === 'held') return fill(plural(T.held, work.verifiedLines), { n: work.verifiedLines });
+  return T[work.status] || null;
+}
+
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env } = {}) {
   db = asStore(db);
   // Start the marker workers now, so the first submission does not wait for
@@ -861,6 +895,26 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
   }
 
   // The rungs this account has opened on this question (0–4), as committed.
+  // The guarded line-check evidence for a nudge (see the hint route). Returns
+  // null when there is nothing to say (no such open question), else
+  // { reply, charge, capBucket } or { status, ... } for a check that did not run.
+  async function hintWorkEvidence(accountId, qid, lines, now) {
+    const issued = await issuedQuestionForTutor(db, accountId, qid, now);
+    if (!issued || issued.resolved) return null;
+    const capBucket = `line-check:${sha256(`${accountId}:${qid}`).slice(0, 32)}`;
+    const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
+    if (capRow && Number(capRow.count) >= LINE_CHECKS_PER_QUESTION && now - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
+      return { status: 'limit' };
+    }
+    const evidence = await issued.lineCheckEvidence(lines);
+    if (evidence.unchecked) return { status: 'unchecked' };
+    if (evidence.attemptAt >= 0) return { status: 'final' };
+    const verifiedLines = Math.max(0, Math.min(lines.length, Number(evidence.verifiedLines) || 0));
+    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
+    if (verifiedLines > 0) return { charge: true, capBucket, reply: { status: 'held', verifiedLines } };
+    return { status: 'unread' };
+  }
+
   async function hintLevelOf(accountId, qid) {
     const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-hints' AND key=?", [accountId, qid]);
     if (!row) return 0;
@@ -888,16 +942,35 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
   // a correct answer is credited with the weight left after the rungs
   // actually served. The solution rung is a reveal: the question resolves as
   // revealed, never correct. Another account's question is 404.
+  //
+  // The nudge from the student's own work (audit #13, K2). A nudge request may
+  // carry the student's current working `lines`. When the line check is on
+  // (PRI_FEATURE_LINE_CHECK, the same switch as "Check this line so far"), the
+  // server runs that same guarded Step Check in the marker pool — never on a
+  // line that is a final-answer attempt, never by value — and adds `work`:
+  // how many lines hold and the first line that breaks. It names a line
+  // number, never a value or a mark, and it is one of the question's
+  // LINE_CHECKS_PER_QUESTION (the same bucket as the line check), so a hint
+  // cannot be used as an extra, uncapped checker. A check that did not run,
+  // or a final attempt, costs nothing and says only that. The authored nudge
+  // is always served as before; nothing about the charge changes.
   router.post('/:id/hint', rateLimit(db, 'practice-hint', { limit: 400, windowMs: 3600000 }), async (req, res) => {
     const qid = String(req.params.id || '');
     const body = req.body ?? {};
     if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
-    if (!plain(body) || unknown(body, new Set(['rung'])).length || !HINT_RUNGS.includes(body.rung)) {
+    if (!plain(body) || unknown(body, new Set(['rung', 'lines', 'locale'])).length || !HINT_RUNGS.includes(body.rung)) {
       return reject(res, 400, 'HINT_RUNG_INVALID', 'Choose a hint rung: nudge, method, worked or solution.');
     }
+    if (body.lines !== undefined && (body.rung !== 'nudge' || !Array.isArray(body.lines) || body.lines.length > HINT_WORK_LIMITS.lines
+      || !body.lines.every(l => typeof l === 'string' && l.length <= HINT_WORK_LIMITS.line))) {
+      return reject(res, 400, 'HINT_WORK_INVALID', 'Working lines ride only on the nudge: at most 40 lines of 400 characters.');
+    }
+    if (body.locale !== undefined && !['en', 'hi'].includes(body.locale)) return reject(res, 400, 'HINT_WORK_INVALID', 'locale is en or hi.');
     const accountId = req.platformSession.account_id;
     const now = Date.now();
     const want = HINT_RUNGS.indexOf(body.rung) + 1;
+    const workLines = Array.isArray(body.lines) ? body.lines.map(l => l.trim()).filter(Boolean) : [];
+    const work = workLines.length && lineCheckFeatureEnabled(env) ? await hintWorkEvidence(accountId, qid, workLines, now) : null;
     const result = await db.transaction(async () => {
       const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
       if (!escrow) return { status: 404, code: 'QUESTION_NOT_FOUND' };
@@ -922,6 +995,17 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
         markWeight: markWeightAfter(reached), next: nextRungAfter(reached) } };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
+    if (!result.status && work) {
+      // Charged only after the rung was served, and only for a check that ran.
+      let shown = work;
+      if (work.charge) {
+        const cap = await consumeRateLimit(db, work.capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, now);
+        shown = cap.allowed ? work.reply : { status: 'limit' };
+      }
+      const locale = body.locale === 'hi' ? 'hi' : 'en';
+      result.response.work = shown;
+      result.response.workNote = hintWorkNote(shown, locale);
+    }
     if (result.status) {
       const message = result.code === 'HINT_RUNG_ORDER' ? 'Open the hint rungs in order.'
         : result.code === 'HINT_NOT_AVAILABLE' ? 'This question offers no hints.'
