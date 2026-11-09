@@ -94,9 +94,9 @@ export default function SignInPlot() {
   },[]);
   return (
     <div className="in-signin-plot" aria-hidden="true">
-      <div className="pri-plot-top"><span>FUNCTION STUDY</span><span>MOVE POINTER TO INSPECT</span></div>
+      <div className="pri-plot-top"><span>{t('login.functionStudy')}</span><span>{t('login.movePointer')}</span></div>
       <div className="pri-plot-viewport"><canvas ref={canvasRef}/></div>
-      <span className="pri-plot-equation">f(x) = x³ − 3x <small>ILLUSTRATION</small></span>
+      <span className="pri-plot-equation">f(x) = x³ − 3x <small>{t('login.exampleLabel')}</small></span>
       <div className="pri-plot-foot">
         <p className="in-signin-line">{t('login.instrumentHeadline')}</p>
         <span className="pri-plot-value" ref={readoutRef}>x 1.15 / f(x) −1.93 / f′(x) 0.97</span>

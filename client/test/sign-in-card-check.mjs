@@ -145,9 +145,19 @@ ok(/\.brand-wordmark \{[^}]*max-width: 100%/.test(instrumentCss),
 // First-impression contracts: one visible privacy note, honest sample,
  // non-blocking social popup and a clear expectation for email codes.
 const plot = read('instrument/SignInPlot.jsx');
-ok(/in-signin-example/.test(plot) && /login\.exampleLabel/.test(plot)
-  && /2x \+ 7 = 19/.test(plot) && /2x = 12/.test(plot) && /x = 6/.test(plot),
-  'the welcome illustration shows a mathematically correct example, explicitly labelled as illustrative');
+const example = x => x * x * x - 3 * x;
+const derivative = x => 3 * x * x - 3;
+ok(/const fn = x => x \* x \* x - 3 \* x/.test(plot)
+  && /const slope = 3 \* x \* x - 3/.test(plot)
+  && /login\.exampleLabel/.test(plot)
+  && /login\.functionStudy/.test(plot)
+  && /login\.movePointer/.test(plot)
+  && [en, hi].every(c => ['login.exampleLabel','login.functionStudy','login.movePointer'].every(k => !!c[k]))
+  && Math.abs(example(-Math.sqrt(3))) < 1e-12
+  && Math.abs(example(Math.sqrt(3))) < 1e-12
+  && example(-1) === 2 && example(1) === -2
+  && derivative(-1) === 0 && derivative(1) === 0,
+  'the welcome illustration is a true cubic with exact roots, derivative, and localised illustrative labelling');
 ok(/signup\.methodHint/.test(card) && /signup-method-hint/.test(card) && typeof en['signup.methodHint'] === 'string'
   && typeof hi['signup.methodHint'] === 'string',
   'the email road explains one-time code and no password before submitting');

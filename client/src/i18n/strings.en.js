@@ -2937,6 +2937,8 @@ export default {
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to Pri Learning",
   'login.welcomeSub': "Write your working. Get each step checked.",
+  'login.functionStudy': 'FUNCTION STUDY',
+  'login.movePointer': 'MOVE POINTER TO INSPECT',
   'login.exampleLabel': 'ILLUSTRATIVE EXAMPLE',
   'login.examplePrompt': 'Solve for x',
   'login.exampleFoot': 'One step at a time. The method matters.',

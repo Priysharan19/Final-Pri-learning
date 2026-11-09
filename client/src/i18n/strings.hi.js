@@ -3000,6 +3000,8 @@ export default {
   // ── एक साइन-इन कार्ड और सक्रियण द्वार (खाता पहले) ──
   'login.welcomeTitle': "Pri Learning में आपका स्वागत है",
   'login.welcomeSub': "अपना हल लिखें। हर चरण की जाँच कराएँ।",
+  'login.functionStudy': 'फलन का अध्ययन',
+  'login.movePointer': 'बिंदु देखने के लिए सूचक हिलाएँ',
   'login.exampleLabel': 'उदाहरण मात्र',
   'login.examplePrompt': 'x का मान निकालें',
   'login.exampleFoot': 'हर चरण महत्त्वपूर्ण है। तरीका भी महत्त्वपूर्ण है।',
