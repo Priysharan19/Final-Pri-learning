@@ -501,6 +501,31 @@ export function nextStepIndex(request) {
   return first < 0 ? steps.length - 1 : first;
 }
 
+/** The step AFTER the last one the student verifiably reached (line check, G3); step 0 when none. */
+export function stepAfterLastReached(request) {
+  const steps = request.question.steps;
+  const good = request.studentWork.lines.slice(0, Math.max(0, Number(request.studentWork.verifiedLines) || 0)).map(normalizeMath);
+  let last = -1;
+  steps.forEach((step, j) => {
+    const spans = mathSpans(step.d);
+    const result = spans.length ? normalizeMath(spans[spans.length - 1]) : '';
+    if (result && good.includes(result)) last = j;
+  });
+  return Math.min(last + 1, steps.length - 1);
+}
+
+/**
+ * A line that could be the student's final answer: its right-hand side (after
+ * the last "=") carries a digit and no letter, once LaTeX commands are
+ * stripped. Decided by FORM only — never by whether it is right — so a right
+ * and a wrong final value are treated identically (G1).
+ */
+export function looksLikeFinalValue(line) {
+  const s = String(line ?? '').replace(/\\[a-z]+/gi, ' ');
+  const rhs = s.split('=').pop();
+  return /[0-9०-९]/.test(rhs) && !/\p{L}/u.test(rhs);
+}
+
 /**
  * The diagnosis with no model: the engine's first break, the lines it verified,
  * and the verified solution's next step. While the attempt is open the next
@@ -564,16 +589,20 @@ export function diagnosisIssues(reply, request) {
 
 const diagnosisMessage = d => [d.didRight, d.wentWrong, d.nextStep].filter(Boolean).join(' ');
 
+export const LINE_CHECKS_PER_QUESTION = 2;
+export const LINE_CHECK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export const LINE_CHECK_TEXT = Object.freeze({
   en: Object.freeze({
     ok: 'Your lines match the method so far.', unplaced: 'The checker could not place these lines against the method.', next: 'Next: {step}.', nextGeneric: 'Keep going with the next step of the method.',
     breakAt: 'First break at line {n} — this line should reach: {step}.', breakGeneric: 'First break at line {n} — redo the step from the line before.',
-    unchecked: 'Couldn’t check your working this time — try again.'
+    unchecked: 'Couldn’t check your working this time — try again.',
+    final: 'Press Check to mark your answer.'
   }),
   hi: Object.freeze({
     ok: 'अब तक आपकी पंक्तियाँ विधि से मेल खाती हैं।', unplaced: 'जाँचकर्ता इन पंक्तियों को विधि से नहीं मिला सका।', next: 'अगला क़दम: {step}।', nextGeneric: 'विधि के अगले क़दम के साथ आगे बढ़ें।',
     breakAt: 'पहली गलती पंक्ति {n} में — इस पंक्ति को यहाँ पहुँचना चाहिए: {step}।', breakGeneric: 'पहली गलती पंक्ति {n} में — पिछली पंक्ति से यह क़दम फिर करें।',
-    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।'
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+    final: 'अपना उत्तर जँचवाने के लिए Check दबाएँ।'
   })
 });
 
@@ -592,7 +621,7 @@ export function lineCheckReply(question, lines, evidence, locale = 'en') {
     if (!heading || /[0-9०-९=]/.test(heading) || leakedExpressions(heading, guard, { prompt: question.prompt }).length) return null;
     return heading;
   };
-  const step = named(nextStepIndex(request));
+  const step = named(stepAfterLastReached(request));
   if (evidence.firstBreak >= 0 && evidence.firstBreak < lines.length) {
     const n = evidence.firstBreak + 1;
     return { status: 'break', line: evidence.firstBreak, message: step ? copy.breakAt.replace('{n}', n).replace('{step}', step) : copy.breakGeneric.replace('{n}', n) };
@@ -895,11 +924,29 @@ export function createTutorRouter(db, {
       const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
       if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
       if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
+      // G1: a line that could be the final answer is never judged here. Decided
+      // by form alone, so a right and a wrong final value get the same reply,
+      // and nothing is run or charged for it. The answer is marked by Check.
+      if (lines.some(looksLikeFinalValue)) {
+        return res.json({ lineCheck: { status: 'final', message: (LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en).final } });
+      }
+      // G1: two checks per issued question per account, held HERE, not only on
+      // the device. Peeked before the check runs, taken only after it ran.
+      const capBucket = `line-check:${sha256(`${accountId}:${b.serverQuestionId}`).slice(0, 32)}`;
+      const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
+      if (capRow && Number(capRow.count) >= LINE_CHECKS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
+        return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
+      }
+      const evidence = await issued.workEvidence(lines);
+      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale);
+      // G2: a check that did not run costs nothing — no cap, no allowance.
+      if (reply.status === 'unchecked') return res.json({ lineCheck: reply });
+      const cap = await consumeRateLimit(db, capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
+      if (!cap.allowed) return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
       const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
-      const evidence = await issued.workEvidence(lines);
-      res.json({ lineCheck: lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale) });
+      res.json({ lineCheck: { ...reply, checksLeft: cap.remaining } });
     });
 
   // ── Streaming ──────────────────────────────────────────────────────────────

@@ -187,7 +187,7 @@ ok(/आपके हल में पहली गलती पंक्ति 2
   const steps = QUESTION.steps;
   const partial = lineCheckReply(QUESTION, [LINES[0]], { firstBreak: -1, verifiedLines: 1 }, 'en');
   eq(partial.status, 'ok', 'a correct partial line is credited');
-  ok(/Find cos A and cos B/.test(partial.message), 'with the plan\'s next step named');
+  ok(/Substitute and simplify/.test(partial.message), 'with the step AFTER the last verified one named (G3)');
   const broken = lineCheckReply(QUESTION, LINES, { firstBreak: 1, verifiedLines: 1 }, 'en');
   ok(broken.status === 'break' && /line 2/.test(broken.message), 'a broken line is named by the engine');
   const unplaced = lineCheckReply(QUESTION, ['something'], { firstBreak: -1, verifiedLines: 0 }, 'en');
@@ -322,6 +322,27 @@ try {
     eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE', 'line check: empty work refused');
     eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: ['x'] })).code, 'TUTOR_QUESTION_NOT_FOUND', 'line check: only this account\'s issued questions');
     eq((await lc('acct-a', { context: 'practice', serverQuestionId: ID, lines: ['x'], question: {} })).code, 'TUTOR_BODY_INVALID', 'line check: no solution may be sent');
+
+    // G1 — a seeded issued question: a right and a wrong final value are indistinguishable.
+    const QID = '11111111-1111-4111-8111-111111111111';
+    const sealed = { prompt: 'Solve $t - 4 = 7$.', steps: [{ h: 'Add four to both sides', d: '$t = 11$' }], answer: '11', hints: [] };
+    await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
+      ['acct-b', QID, JSON.stringify(sealed), 'seed', now, now + 86400000]);
+    const lcFull = async (lines) => {
+      const r = await fetch(`http://127.0.0.1:${s.address().port}/tutor/line-check`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-b` }, body: JSON.stringify({ context: 'practice', serverQuestionId: QID, lines }) });
+      return { status: r.status, json: await r.json().catch(() => null) };
+    };
+    const right = await lcFull(['t - 4 = 7', 't = 11']);
+    const wrong = await lcFull(['t - 4 = 7', 't = 12']);
+    eq(JSON.stringify(right.json), JSON.stringify(wrong.json), 'line check: a RIGHT and a WRONG final value get byte-identical replies');
+    eq(right.json?.lineCheck?.message, 'Press Check to mark your answer.', '— both told to press Check');
+    ok(!/11|12|match|break/i.test(JSON.stringify(right.json)), '— with no value and no verdict');
+    // Server-side cap: two checks per issued question per account; the third is refused.
+    const c1 = await lcFull(['7 + 4 = t']);
+    const c2 = await lcFull(['7 + 4 = t']);
+    const c3 = await lcFull(['7 + 4 = t']);
+    eq([c1.status, c2.status, c3.status, c3.json?.error?.code], [200, 200, 409, 'LINE_CHECK_LIMIT'], 'line check: the server refuses a third check on the same question');
+    ok(!('checksLeft' in (right.json?.lineCheck || {})), 'final-value replies spend no check');
   }
   const darkLc = await mount({ ask: stubAsk, env: { ...env, PRI_FEATURE_TUTOR: undefined } });
   void darkLc;

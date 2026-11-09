@@ -3845,16 +3845,17 @@ const routes = {
     if (usedChecks >= 2) throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
     const outcome = await requestLineCheck({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines, locale: body?.locale === 'hi' ? 'hi' : 'en' });
     const lc = outcome?.lineCheck;
+    if (outcome?.error?.code === 'LINE_CHECK_LIMIT') throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
     if (!lc || typeof lc.message !== 'string') return { lineCheck: null, code: outcome?.error?.code || 'TUTOR_FAILED', tutorLevel: Number(row.tutorLevel) || 0 };
     // Charged only when the server actually checked (an 'unchecked' reply costs nothing).
-    if (lc.status !== 'unchecked') {
+    if (lc.status !== 'unchecked' && lc.status !== 'final') {
       row.lineChecks = usedChecks + 1;
       const level = Math.max(0, Number(row.tutorLevel) || 0);
       row.tutorLevel = Math.max(level, Math.min(2, level + 1));
       await put('questions', row);
     }
     return {
-      lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
+      lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked', 'final'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
       tutorLevel: Number(row.tutorLevel) || 0, checksLeft: Math.max(0, 2 - (Number(row.lineChecks) || 0))
     };
   },
