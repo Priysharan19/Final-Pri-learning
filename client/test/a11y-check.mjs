@@ -136,7 +136,7 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1', PRI_FEATURE_PARENT_REPORT: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -1132,6 +1132,15 @@ async function run() {
     await step('premium · plans, renewal terms and close', '/premium', async () => {
       await goTo(page, BASE, '/premium');
       await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The parent weekly report (#743, D22): built only with PRI_FEATURE_PARENT_REPORT=1,
+    // which this walk sets, so its route is rendered and audited like the others.
+    await step('parent report · the week, or why there is none', '/parent-report', async () => {
+      await goTo(page, BASE, '/parent-report');
+      await page.waitForSelector('.parent-page h1', { timeout: 20000 });
+      await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
       await wait(page, 600);
     });
 
