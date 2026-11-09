@@ -484,6 +484,7 @@ jobs:
       - name: Rate-limit identity, sync idempotency, grants, body size, compressed-body survival and catalogue exposure
         run: |
           node server/test/proxy-identity-contract-check.mjs
+          node server/test/client-ip-header-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
           node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs

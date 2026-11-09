@@ -307,6 +307,25 @@ export function trustedProxyHops(env = process.env) {
   return Number(raw);
 }
 
+/**
+ * The request header a trusted edge sets to the caller's address, used as the
+ * anonymous rate-limit identity instead of req.ip. Optional, and allowlisted:
+ * only `x-real-ip`, which Railway's public edge overwrites on every request
+ * (a caller cannot set it through the edge). Measured 8-9 Nov 2026 (#653):
+ * on Railway staging req.ip resolved to the edge node, so every anonymous user
+ * behind one node shared a bucket. Unset keeps req.ip. Never set it for a
+ * deployment reachable without that edge.
+ */
+const CLIENT_IP_HEADERS = new Set(['x-real-ip']);
+export function clientIpHeader(env = process.env) {
+  const raw = String(env.PRI_CLIENT_IP_HEADER ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  if (!CLIENT_IP_HEADERS.has(raw)) {
+    throw Object.assign(new Error(`PRI_CLIENT_IP_HEADER may only be ${[...CLIENT_IP_HEADERS].join(', ')}.`), { code: 'CLIENT_IP_HEADER_INVALID' });
+  }
+  return raw;
+}
+
 function webMonthlyConfigured() {
   return nonEmpty('PRI_RAZORPAY_MONTHLY_PLAN_ID') || nonEmpty('PRI_WEB_MONTHLY_PRICE_ID');
 }
