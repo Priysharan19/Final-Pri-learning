@@ -66,6 +66,14 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-09-07',
     note: 'The authority publishes the questions and the final answer on the same page of this document; both were read from it.'
   }),
+  'jeeadv-2026-p2-answers': Object.freeze({
+    authority: 'Joint Admission Board · JEE (Advanced)',
+    title: 'JEE (Advanced) 2026 · Paper 2 · question paper with final answers',
+    kind: 'official-final-answer-key',
+    url: 'https://jeeadv.ac.in/documents/p2_solutions_final.pdf',
+    retrieved: '2026-11-09',
+    note: 'The authority prints each question and its final answer on the same page of this document; both were read from it (sha256 1cbf4be256594129810ba247681a4b7a96df7344c428a8194c77684d98094e38 on retrieval).'
+  }),
   'jeeadv-2025-p1-answers': Object.freeze({
     authority: 'Joint Admission Board · JEE (Advanced)',
     title: 'JEE (Advanced) 2025 · Paper 1 · Final Answer Key (question paper with answers)',
