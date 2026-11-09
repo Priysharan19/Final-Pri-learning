@@ -105,6 +105,38 @@ export function stripUnits(text) {
   return clean(text).replace(LEADING_CURRENCY, '').replace(/=\s*(?:₹|rs\.?)\s*/i, '= ').replace(TRAILING_UNITS, '$1').trim();
 }
 
+// A numeric expression: digits, a decimal point or separator, operators,
+// brackets, roots and π — and nothing that names anything.
+const NUMERIC_ONLY = /^[-−+]?[\d.,\s()+\-−*×·/÷^√π²³]*\d[\d.,\s()+\-−*×·/÷^√π²³]*$/u;
+// Where a line says "this is the value": a relation sign, a colon, or the
+// words that do the same job in English and Hindi.
+const SAYS_VALUE = /\s*(?:<=|>=|!=|=|<|>|≤|≥|≠|≈|:|\bis\b|\bequals\b|\bequal to\b|\bare\b|\bwas\b|\bgives\b|\bcomes to\b|है|हैं|बराबर)\s*/iu;
+
+/**
+ * With a CONSTANT answer, does this line state a constant — whatever labels
+ * it? FORM ONLY, never the value:
+ *   · any segment between relation signs, colons or "is"-words that is, after
+ *     units are stripped, a bare numeric expression ("area = 462",
+ *     "the area is 462", "ans: 462", "Total volume = 462 sq units",
+ *     "क्षेत्रफल = 462", "A_1 = 462", "f(r) = 462");
+ *   · a line that is only words and one number ("उत्तर 462 है", "462 square units").
+ * A side that relates letters ("A = l b") holds no bare number and is not caught.
+ */
+export function statesAConstant(line) {
+  const text = clean(line).replace(/[०-९]/g, d => String(d.charCodeAt(0) - 0x0966));
+  if (!/[\d०-९]/.test(text)) return false;
+  // Units the stripper does not know (any script: "वर्ग सेमी") are words AFTER
+  // the number; they are dropped too. This only ever widens what counts as an
+  // attempt — the safe direction.
+  const segments = text.split(SAYS_VALUE)
+    .map(s => stripUnits(s).replace(/(\d)(?:\s+[\p{L}\p{M}][\p{L}\p{M}.²³^\d]*)+\s*$/u, '$1').trim())
+    .filter(Boolean);
+  if (segments.some(s => NUMERIC_ONLY.test(s))) return true;
+  // Words and one number: drop every word (any script) and see what is left.
+  const bare = stripUnits(text.replace(/[\p{L}\p{M}][\p{L}\p{M}.'’_]*/gu, ' ')).replace(/[\s:,.;!?"'“”‘’()-]+$/u, '').trim();
+  return NUMERIC_ONLY.test(bare) && !/[=<>≤≥]/.test(text);
+}
+
 /** Is the escrowed answer a bare constant once its units are stripped? */
 export function isConstantAnswer(answerText) {
   const parts_ = parts(stripUnits(answerText));
@@ -246,6 +278,7 @@ export function firstFinalAttempt(lines, form) {
   if (!Array.isArray(lines)) return 0;
   for (let i = 0; i < lines.length; i += 1) {
     if (!form) return i;
+    if (form.constant && statesAConstant(lines[i])) return i;
     const claims = parts(clean(lines[i]));
     if (!claims.length || claims.some(p => claimIsAttempt(p, form))) return i;
   }

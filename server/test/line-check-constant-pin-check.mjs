@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
 import { lineCheckEvidence } from '../platform/markerOps.js';
-import { answerForm, firstFinalAttempt, isConstantAnswer, stripUnits } from '../platform/finalAttempt.js';
+import { answerForm, firstFinalAttempt, isConstantAnswer, statesAConstant, stripUnits } from '../platform/finalAttempt.js';
 import { answerTextFor } from '../platform/practice.js';
 
 let pass = 0;
@@ -42,6 +42,17 @@ for (const s of SPELLED) {
   eq(firstFinalAttempt(['A = 48'], answerForm({ answerText: s })), 0, `with "${s}" as the answer, "A = 48" is an attempt`);
 }
 eq(stripUnits('area = l b'), 'area = l b', 'words that are not after a number are left alone');
+
+// Word labels (#831 review round 3): with a constant answer, a line stating a constant is an attempt whatever labels it.
+for (const line of ['area = 462', 'Area = 462', 'total area = 462', 'Total surface area = 462 sq units', 'the area is 462', 'The answer is 462 cm²',
+  'ans: 462', 'Ans : 462 sq. units', '= 462 sq units', '462 sq units', 'A_1 = 462', 'f(r) = 462', 'area(ABCD) = 462',
+  'क्षेत्रफल = 462', 'कुल क्षेत्रफल = 462 वर्ग सेमी', 'उत्तर ४६२ है', 'उत्तर: 462', 'area = 120/360 * 22/7 * 21^2']) {
+  ok(statesAConstant(line), `"${line}" states a constant`);
+  eq(firstFinalAttempt([line], answerForm({ answerText: '462 cm²' })), 0, `with a constant answer, "${line}" is an attempt`);
+}
+for (const line of ['A = l b', 'area = l * b', '2l + 2b = P', 'area = π r^2', 'V = l*b*h + 2*r*h']) {
+  ok(!statesAConstant(line), `"${line}" relates letters: not a stated constant`);
+}
 eq(stripUnits('m = 2'), 'm = 2', 'a variable named like a unit is never stripped');
 ok(['36036 cm³', '₹ 450', '56/65', '-3'].every(isConstantAnswer), 'a bare constant answer is recognised through its unit');
 ok(!['y = 2x + 1', 'x^2 + 2x + 1'].some(isConstantAnswer), 'an answer with a symbol is not a constant');

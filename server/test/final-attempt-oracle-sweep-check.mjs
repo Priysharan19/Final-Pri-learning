@@ -45,7 +45,31 @@ const SHAPES = [
   v => [`A = ${v} square metres`],
   v => [`2*A = 2*${v}`],
   v => [`A = l * b`, `A = ${v}`],
-  v => [`A = l * b`, `A = ${v}`, `A + l = ${v} + l`]
+  v => [`A = l * b`, `A = ${v}`, `A + l = ${v} + l`],
+  // Word labels (#831 review round 3): any label, any script, any spacing.
+  v => [`area = ${v}`],
+  v => [`Area = ${v}`],
+  v => [`volume = ${v}`],
+  v => [`total = ${v}`],
+  v => [`total area = ${v}`],
+  v => [`Total surface area = ${v} sq units`],
+  v => [`area of the shaded region = ${v} square units`],
+  v => [`the area is ${v}`],
+  v => [`The answer is ${v} cm²`],
+  v => [`answer is ${v}`],
+  v => [`ans: ${v}`],
+  v => [`Ans : ${v} sq. units`],
+  v => [`= ${v} sq units`],
+  v => [`${v} sq units`],
+  v => [`A_1 = ${v}`],
+  v => [`f(r) = ${v}`],
+  v => [`area(ABCD) = ${v}`],
+  v => [`क्षेत्रफल = ${v}`],
+  v => [`कुल क्षेत्रफल = ${v} वर्ग सेमी`],
+  v => [`उत्तर ${v} है`],
+  v => [`उत्तर: ${v}`],
+  v => [`area = l * b`, `area = ${v}`],
+  v => [`area = l * b`, `the area is ${v}`, `so area = ${v}`]
 ];
 
 const SPELLED_UNITS = ['square units', 'sq units', 'sq. units', 'cubic units', 'units', 'square metres', 'sq. cm', 'cubic centimetres'];
