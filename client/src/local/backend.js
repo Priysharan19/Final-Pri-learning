@@ -992,25 +992,70 @@ function aggregateRows(rows, now) {
  */
 function indiaState(chapter, ratings, now = Date.now()) {
   const own = chapter?.id ? ratings[chapter.id] : null;
+  // Generator-keyed rows a device recorded before chapters had rows (#300).
+  // An India answer is recorded under its chapter id only, so a sibling
+  // generator's row (any id other than the chapter's own) is frozen legacy
+  // evidence: it is added to the chapter, never double-counted. A generator
+  // that shares the chapter's id already lives in `own`.
+  const siblings = indiaGeneratorIds(chapter).filter(id => id !== chapter?.id).map(id => ratings[id]).filter(Boolean);
   if (own) {
-    return {
-      ...own, rating: own.rating || START_RATING, attempts: own.attempts || 0, correct: own.correct || 0,
-      mastery: masteryOf(own.rating, own.attempts, own.last_at, now), legacy: false
-    };
+    const base = { ...own, rating: own.rating || START_RATING, attempts: own.attempts || 0, correct: own.correct || 0 };
+    if (!siblings.length) return { ...base, mastery: masteryOf(own.rating, own.attempts, own.last_at, now), legacy: false };
+    return { ...base, ...aggregateRows([base, ...siblings], now), legacy: true };
   }
-  const rows = indiaGeneratorIds(chapter).map(id => ratings[id]).filter(Boolean);
-  if (!rows.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0, last_at: null, legacy: false };
-  return { ...aggregateRows(rows, now), legacy: true };
+  if (!siblings.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0, last_at: null, legacy: false };
+  return { ...aggregateRows(siblings, now), legacy: true };
 }
 
-/** The rating state of one Indian dot point: its own row under the chapter, or the legacy generator aggregate. */
+/**
+ * The answers on a rating row that no dot point accounts for: what a row keyed
+ * by a generator that shares its chapter's id held before chapters recorded
+ * dot points, kept whether or not the row has since gained a `dp` map (a new
+ * answer, a backup restore) (#300).
+ */
+function unattributedOf(row) {
+  if (!row) return null;
+  // Legacy is decided by what the row IS, never by a missing dot point: a row
+  // written before rows recorded dot points has no dp map at all; once such a
+  // row is written again its pre-cutover totals are frozen in `legacy`
+  // (legacyBaselineOf). An answer recorded today without a dot point (a
+  // notebook twin, a past-paper question) is current evidence and is never
+  // spread over dot points.
+  const frozen = row.legacy && typeof row.legacy === 'object' ? row.legacy
+    : (!row.dp || typeof row.dp !== 'object') ? row : null;
+  const attempts = Number(frozen?.attempts) || 0;
+  if (attempts <= 0) return null;
+  return { rating: Number(frozen.rating) || START_RATING, attempts, correct: Math.max(0, Math.min(attempts, Number(frozen.correct) || 0)), last_at: frozen.last_at || null };
+}
+
+/**
+ * The pre-cutover totals of a rating row written before rows recorded dot
+ * points, frozen the first time it is written again (#300); null for a
+ * current row. Kept on the row as `legacy`.
+ */
+export function legacyBaselineOf(st) {
+  if (!st || (st.dp && typeof st.dp === 'object')) return st?.legacy || null;
+  if (!(Number(st.attempts) > 0)) return null;
+  return { attempts: Number(st.attempts) || 0, correct: Number(st.correct) || 0, rating: Number(st.rating) || START_RATING, last_at: st.last_at || null };
+}
+
+/**
+ * The rating state of one Indian dot point: its own state under the chapter,
+ * plus the legacy generator evidence that covers it — sibling generators'
+ * rows, and the unattributed answers of a generator row sharing the
+ * chapter's id (#300).
+ */
 function indiaDotpointState(chapter, ordinal, chapterRow, ratings, now = Date.now()) {
-  if (chapterRow) return dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal));
   const ids = [...new Set((chapter.covers || []).filter(c => c.dp.includes(ordinal)).map(c => c.gen))];
-  const rows = ids.map(id => ratings[id]).filter(Boolean);
-  if (!rows.length) return EMPTY_DP();
-  const { rating, attempts, correct, last_at } = aggregateRows(rows, now);
-  return { rating, attempts, correct, last_at };
+  const own = chapterRow ? dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal)) : null;
+  const parts = [];
+  if (own?.attempts) parts.push(own);
+  if (chapterRow && ids.includes(chapter.id)) { const rest = unattributedOf(chapterRow); if (rest) parts.push(rest); }
+  for (const id of ids) if (id !== chapter.id && ratings[id]) parts.push(ratings[id]);
+  if (!parts.length) return own || EMPTY_DP();
+  if (parts.length === 1 && parts[0] === own) return own;
+  const { rating, attempts, correct, last_at } = aggregateRows(parts, now);
+  return { ...(own || {}), rating, attempts, correct, last_at };
 }
 
 /**
@@ -1540,7 +1585,10 @@ async function indiaStats(p, ratings, now) {
     examPrediction: (() => {
       const blueprint = indiaExamBlueprint({ track: trackId, grade: p.year, variant: p.indiaVariant || 'standard' });
       if (!blueprint?.units?.length) return null;
-      try { return predictExamMark(blueprint, ratings, { nowMs: now }); } catch { return null; }
+      // Evidence per chapter as every other India surface reads it: the
+      // chapter's row plus its legacy generator rows (#300).
+      const evidenceFor = id => { const c = indiaChapter(id); return c ? indiaState(c, ratings, now) : ratings[id]; };
+      try { return predictExamMark(blueprint, ratings, { nowMs: now, evidenceFor }); } catch { return null; }
     })(),
     priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
     activity: days.slice(-120), totals, byDiff,
@@ -2248,7 +2296,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
       rating: ratingAfter, attempts: st.attempts + 1,
       correct: st.correct + (correct ? 1 : 0), last_at: now,
-      dp, traps, recent
+      dp, traps, recent,
+      ...(legacyBaselineOf(st) ? { legacy: legacyBaselineOf(st) } : {})
     };
   }
 
@@ -2702,7 +2751,11 @@ const IMPORT_ROWS = {
       key: `${pid}:${subtopic}`, pid, subtopic,
       rating: safeNum(r.rating, START_RATING), attempts: safeInt(r.attempts, 0, 1e7, 0),
       correct: safeInt(r.correct, 0, 1e7, 0), last_at: safeTime(r.last_at),
-      dp: safeDotpointStats(r.dp), traps: safeTrapLedger(r.traps),
+      // A row restored without a dot-point map stays without one (#300).
+      ...(r.dp && typeof r.dp === 'object' ? { dp: safeDotpointStats(r.dp) } : {}), traps: safeTrapLedger(r.traps),
+      ...(r.legacy && typeof r.legacy === 'object' ? { legacy: {
+        attempts: safeInt(r.legacy.attempts, 0, 1e7, 0), correct: safeInt(r.legacy.correct, 0, 1e7, 0),
+        rating: safeNum(r.legacy.rating, START_RATING), last_at: safeTime(r.legacy.last_at) } } : {}),
       recent: (Array.isArray(r.recent) ? r.recent : []).slice(0, RECENT_WINDOW).map(v => (v ? 1 : 0))
     };
   },

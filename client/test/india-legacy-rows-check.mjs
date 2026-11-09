@@ -1,0 +1,202 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · India evidence on legacy (generator-keyed) rating rows (#300)
+//
+// A device that answered before Indian chapters had their own rating rows —
+// an older install, the seeded demo — holds rows keyed by
+// GENERATOR id, with no per-dot-point `dp` map. Some generators share their
+// chapter's id. Two surfaces read those rows wrongly (found on PR #300,
+// ported via #506):
+//
+//   1. The dot points of a chapter WITH answers read as untouched: a
+//      generator row that merely shares the chapter's id was taken for a
+//      chapter row, and its missing `dp` map read as "no answers on any dot
+//      point". The dot-point targeter then ranks answered ground as new.
+//   2. The predicted paper read ratings[chapterId] alone, so a unit whose
+//      chapters had dozens of legacy answers was "nothing attempted yet".
+//
+// The converse is held too: a chapter never practised has no answers on any
+// dot point and leaves its unit uncovered (the untouched-dot contract).
+//
+// Driven through the real local backend (GET /curriculum, GET /stats, and
+// POST /practice/next for the dot-point picker) on the demo history and on a
+// minimal hand-written legacy row.
+//
+// Usage: node client/test/india-legacy-rows-check.mjs
+// ─────────────────────────────────────────────────────────────────────────────
+import { installBrowserEnv, resetStorage } from './backend-check.mjs';
+
+const SRC = new URL('../src/', import.meta.url).href;
+
+let pass = 0;
+const failures = [];
+const ok = (name, cond, detail = '') => { if (cond) pass++; else failures.push(`${name}${detail ? `\n      ${detail}` : ''}`); };
+const eq = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.stringify(expected), `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+
+installBrowserEnv();
+resetStorage();
+const { dispatch } = await import(`${SRC}local/backend.js`);
+const { loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { indiaExamBlueprint } = await import(`${SRC}engine/indiaExams.js`);
+const { put } = await import(`${SRC}local/idb.js`);
+await loadAllBanks();
+
+const dpAnswers = c => (c.dotpoints || []).reduce((n, d) => n + (d.attempts || 0), 0);
+
+/** Every surface's view of one India profile, checked against GET /curriculum. */
+async function checkProfile(label, { grade, expectAnswered = 1 }) {
+  const curriculum = await dispatch('GET', '/curriculum');
+  const stats = await dispatch('GET', '/stats');
+  const me = (await dispatch('GET', '/me')).user;
+  const scope = (curriculum.years || []).find(s => Number(s.year) === grade);
+  ok(`${label}: a Class ${grade} scope`, !!scope?.subtopics?.length);
+  const chapters = scope?.subtopics || [];
+  const answered = chapters.filter(c => c.attempts > 0);
+  ok(`${label}: at least ${expectAnswered} answered chapter(s)`, answered.length >= expectAnswered, `${answered.length} answered`);
+
+  // 1 · a chapter with answers has answers on its dot points
+  for (const c of answered) {
+    ok(`${label}: ${c.id} has answers on its dot points (${c.attempts} on the chapter)`, dpAnswers(c) > 0,
+      `${c.attempts} chapter answers, ${dpAnswers(c)} on dot points`);
+  }
+  // the converse: a chapter never practised shows no dot-point answers
+  for (const c of chapters.filter(ch => ch.attempts === 0)) {
+    ok(`${label}: ${c.id} was never practised, so no dot point shows an answer`, dpAnswers(c) === 0,
+      JSON.stringify((c.dotpoints || []).map(d => d.attempts)));
+  }
+
+  // 2 · the predicted paper counts the answers Progress shows
+  const blueprint = indiaExamBlueprint({ track: me.indiaTrack || 'cbse', grade, variant: me.indiaVariant || 'standard' });
+  const units = stats.examPrediction?.units || [];
+  ok(`${label}: a predicted paper`, units.length > 0 && !!blueprint?.units?.length);
+  const byId = new Map(chapters.map(c => [c.id, c]));
+  for (const u of units) {
+    const unit = blueprint.units.find(b => b.id === u.unitId);
+    const fromCurriculum = (unit?.chapters || []).reduce((n, id) => n + (byId.get(id)?.attempts || 0), 0);
+    eq(`${label}: unit ${u.unitId} counts the answers its chapters show`, u.attempts, fromCurriculum);
+    eq(`${label}: unit ${u.unitId} is covered exactly when its chapters have answers`, u.covered, fromCurriculum > 0);
+  }
+  return { chapters, units };
+}
+
+// ── A · the seeded demo history (generator-keyed rows, Class 10 CBSE) ────────
+await dispatch('POST', '/profiles/demo', {});
+await checkProfile('demo', { grade: 10, expectAnswered: 8 });
+
+// ── B · one hand-written legacy row that shares its chapter's id ─────────────
+// Exactly the shape an older device holds: no `dp` map, keyed by generator.
+resetStorage();
+const created = await dispatch('POST', '/profiles', { name: 'Legacy Learner', year: 10, course: 'in' });
+const pid = created?.user?.id;
+ok('legacy: an India Class 10 profile', !!pid, JSON.stringify(created).slice(0, 160));
+const CHAPTER = 'c10-real-numbers';
+const NOW = Date.now();
+await put('ratings', { key: `${pid}:${CHAPTER}`, pid, subtopic: CHAPTER, rating: 1350, attempts: 12, correct: 9, last_at: NOW - 3600e3 });
+const { chapters, units } = await checkProfile('legacy', { grade: 10 });
+const real = chapters.find(c => c.id === CHAPTER);
+eq('legacy: the chapter shows the 12 legacy answers', real?.attempts, 12);
+ok('legacy: its dot points carry those answers, not "untouched"', dpAnswers(real || {}) > 0, JSON.stringify(real?.dotpoints));
+eq('legacy: every other chapter is untouched', chapters.filter(c => c.id !== CHAPTER && c.attempts > 0).map(c => c.id), []);
+eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1);
+
+// ── C · the dot-point picker reads the legacy evidence (R3 learning logic) ──
+// indiaDotpointState also feeds the practice picker and the difficulty basis
+// (backend.js, POST /practice/next). Real Numbers has two dot points: the
+// generator c10-real-numbers covers dot point 0 and c10-irrationality-proofs
+// dot point 1. With 12 legacy answers on dot point 0 and none on dot point 1,
+// the picker (adaptive.js pickDotpoint) must treat 0 as practised ground and
+// serve 1, the new ground — a margin about twice the picker's ±10 % jitter.
+// Reading the legacy row as an empty chapter row (the #300 bug) made both
+// look untouched and the choice a coin toss: on that code ten fresh profiles
+// picking dot point 1 every time happens about once in a thousand runs.
+{
+  const picks = [];
+  for (let i = 0; i < 10; i++) {
+    resetStorage();
+    const fresh = (await dispatch('POST', '/profiles', { name: `Legacy Picker ${i}`, year: 10, course: 'in' }))?.user?.id;
+    await put('ratings', { key: `${fresh}:${CHAPTER}`, pid: fresh, subtopic: CHAPTER, rating: 1350, attempts: 12, correct: 9, last_at: Date.now() - 3600e3 });
+    const served = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: CHAPTER });
+    picks.push(served?.question?.dotpoint ?? null);
+  }
+  eq('picker: with legacy answers on dot point 0 only, ten fresh profiles are each served dot point 1 (new ground)', picks, Array(10).fill(1));
+}
+
+// ── Review of #729 (#300): sibling generators, a new answer, a backup restore ──
+{
+  const { indiaChapter, indiaScope, indiaDotpointKey } = await import(`${SRC}engine/indiaProduct.js`);
+  const gensOf = c => [...new Set((c.covers || []).map(x => x.gen))];
+  const scope = indiaScope('cbse', 10) || [];
+  const ids = (Array.isArray(scope) ? scope : Object.values(scope)).map(x => (typeof x === 'string' ? x : x?.id)).filter(Boolean);
+  const sib = ids.map(id => indiaChapter(id)).find(c => c && gensOf(c).some(g => g !== c.id));
+  ok('a Class 10 chapter has a sibling generator (a generator other than its own id)', !!sib, JSON.stringify(ids.slice(0, 5)));
+  if (sib) {
+    const other = gensOf(sib).find(g => g !== sib.id);
+    const otherOrdinals = [...new Set((sib.covers || []).filter(x => x.gen === other).flatMap(x => x.dp))];
+    const fresh = async label => { resetStorage(); return (await dispatch('POST', '/profiles', { name: label, year: 10, course: 'in' }))?.user?.id; };
+    const view = async () => {
+      const cur = await dispatch('GET', '/curriculum');
+      const ch = (cur.years || []).flatMap(y => y.subtopics || []).find(c => c.id === sib.id);
+      const stats = await dispatch('GET', '/stats');
+      const bp = indiaExamBlueprint({ track: 'cbse', grade: 10, variant: 'standard' });
+      const unit = bp.units.find(u => (u.chapters || []).includes(sib.id));
+      const u = (stats.examPrediction?.units || []).find(x => x.unitId === unit?.id);
+      return { ch, u };
+    };
+
+    // 1 · sibling-generator legacy rows ALONGSIDE a current chapter row (one new answer).
+    let id = await fresh('Sibling');
+    await put('ratings', { key: `${id}:${other}`, pid: id, subtopic: other, rating: 1300, attempts: 7, correct: 5, last_at: NOW - 7200e3 });
+    const dpKey = indiaDotpointKey(sib.id, otherOrdinals[0]);
+    await put('ratings', { key: `${id}:${sib.id}`, pid: id, subtopic: sib.id, rating: 1210, attempts: 1, correct: 1, last_at: NOW, dp: { [dpKey]: { rating: 1210, attempts: 1, correct: 1, last_at: NOW } } });
+    let { ch, u } = await view();
+    eq('sibling: the chapter total adds the sibling generator\'s legacy answers to its own (7 + 1)', ch?.attempts, 8);
+    ok('sibling: the predicted paper\'s unit counts them too', (u?.attempts || 0) >= 8, JSON.stringify(u));
+    const dpOf = (c, ord) => (c?.dotpoints || [])[ord]?.attempts || 0;
+    ok('sibling: the dot points the sibling generator covers carry its answers', otherOrdinals.every(o => dpOf(ch, o) >= 7), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
+
+    // 2 · a pre-cutover chapter-id row written again by one new answer: its legacy totals are frozen in `legacy`.
+    id = await fresh('After answer');
+    const ownOrdinals = [...new Set((sib.covers || []).filter(x => x.gen === sib.id).flatMap(x => x.dp))];
+    const legacyRow = ownOrdinals.length ? sib.id : other;
+    const legacyOrdinals = ownOrdinals.length ? ownOrdinals : otherOrdinals;
+    const { legacyBaselineOf } = await import(`${SRC}local/backend.js`);
+    const before = { rating: 1300, attempts: 12, correct: 9, last_at: NOW - 3600e3 };
+    eq('a row with no dot-point map is pre-cutover: its totals are frozen when it is written again', legacyBaselineOf(before), { attempts: 12, correct: 9, rating: 1300, last_at: NOW - 3600e3 });
+    eq('a current row (it has a dot-point map) has no legacy totals', legacyBaselineOf({ attempts: 3, correct: 2, dp: {} }), null);
+    const k = indiaDotpointKey(sib.id, legacyOrdinals[0]);
+    await put('ratings', { key: `${id}:${legacyRow}`, pid: id, subtopic: legacyRow, rating: 1300, attempts: 13, correct: 10, last_at: NOW,
+      dp: { [k]: { rating: 1220, attempts: 1, correct: 1, last_at: NOW } }, legacy: legacyBaselineOf(before) });
+    ({ ch, u } = await view());
+    eq('after a new answer: the chapter still shows all 13 answers', ch?.attempts, 13);
+    ok('after a new answer: the 12 legacy answers still reach its dot points', legacyOrdinals.some(o => dpOf(ch, o) >= 12), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
+
+    // 3 · a backup restore keeps the marker: the restored legacy row still has no dot-point map.
+    id = await fresh('After restore');
+    await put('ratings', { key: `${id}:${legacyRow}`, pid: id, subtopic: legacyRow, rating: 1300, attempts: 9, correct: 6, last_at: NOW - 3600e3 });
+    ({ ch } = await view());
+    eq('after a restore: the chapter shows the 9 answers', ch?.attempts, 9);
+    ok('and its dot points carry them, not "untouched"', dpAnswers(ch || {}) >= 9, JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
+
+    // 4 · answers recorded TODAY without a dot point are current evidence, never spread over dot points.
+    for (const [label, extra] of [['a notebook twin', 2], ['a past-paper question', 3]]) {
+      id = await fresh(label);
+      const dpOnly = 1;
+      await put('ratings', { key: `${id}:${sib.id}`, pid: id, subtopic: sib.id, rating: 1250, attempts: dpOnly + extra, correct: 2, last_at: NOW,
+        dp: { [indiaDotpointKey(sib.id, legacyOrdinals[0])]: { rating: 1220, attempts: dpOnly, correct: 1, last_at: NOW } } });
+      ({ ch } = await view());
+      eq(`today, ${label}: the chapter total counts every answer (${dpOnly + extra})`, ch?.attempts, dpOnly + extra);
+      eq(`today, ${label}: the dot points carry only the answer that named one`, dpAnswers(ch || {}), dpOnly);
+    }
+  }
+  // The importer keeps the legacy marker: a row restored without a dp map stays without one.
+  const backend = await import(`${SRC}local/backend.js`);
+  const src = (await import('node:fs')).readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
+  ok('the backup importer writes a dp map only when the backed-up row had one', /\.\.\.\(r\.dp && typeof r\.dp === 'object' \? \{ dp: safeDotpointStats\(r\.dp\) \} : \{\}\)/.test(src) && !!backend);
+  ok('and carries the frozen legacy totals across a restore', /r\.legacy && typeof r\.legacy === 'object' \? \{ legacy:/.test(src));
+  ok('the answer path freezes a pre-cutover row\'s totals before adding to it', /\.\.\.\(legacyBaselineOf\(st\) \? \{ legacy: legacyBaselineOf\(st\) \} : \{\}\)/.test(src));
+}
+
+console.log(`india-legacy-rows-check: ${pass}/${pass + failures.length} checks passed`);
+if (failures.length) {
+  console.log(`\n${failures.length} failed:\n  ${failures.join('\n  ')}`);
+  process.exit(1);
+}
