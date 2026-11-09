@@ -20,6 +20,7 @@ import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { PNG_HEAD_B64 } from './support/test-image.mjs';
 
 const names = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_HANDWRITING_API_KEY', 'PRI_PAID_CALLS_PER_HOUR', 'PRI_PAID_CALLS_PER_DAY'];
 const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
@@ -46,7 +47,8 @@ const c = checks();
 /** What the client rasters to; the server ceiling must not sit below it. */
 const CLIENT_RASTER_BUDGET = 700_000;
 /** A data URL whose decoded payload is `bytes` long. */
-const image = bytes => `data:image/png;base64,${'A'.repeat(Math.ceil(bytes / 3) * 4)}`;
+// A real PNG head, then zeros, at the same encoded length as before.
+const image = bytes => `data:image/png;base64,${PNG_HEAD_B64}${'A'.repeat(Math.max(0, Math.ceil(bytes / 3) * 4 - PNG_HEAD_B64.length))}`;
 const bodyBytes = dataUrl => Buffer.byteLength(JSON.stringify({ image: dataUrl }));
 
 // ── 1 · The advertised ceiling is reachable ──────────────────────────────────

@@ -76,6 +76,18 @@ const existing = {
 };
 ok((await legalPromiseGaps(reader(existing))).length === 2, 'the account holder\'s delete routes and the existing purges do not count as the erasure path');
 
+// D17 (#737): a notice that says nothing is sent until the student agrees
+// needs the prompt's record and its text naming OpenAI at the same commit.
+const d17Notice = { 'docs/legal/privacy.md': '**Nothing is sent until you agree.** The first time a picture would be sent' };
+const d17Code = {
+  'client/src/ink/readerPermission.js': 'export const READER_PERMISSION_VERSION = 1;',
+  'client/src/i18n/strings.en.js': "  'readerPermission.leadInk': 'To read your handwriting, Pri’s server sends a picture of it to OpenAI, an AI company.',"
+};
+ok((await legalPromiseGaps(reader({ ...d17Notice, ...d17Code }))).length === 0, 'the D17 notice with the prompt and its OpenAI text has no gap');
+ok((await legalPromiseGaps(reader(d17Notice))).length === 2, 'the D17 notice without the prompt is two gaps');
+ok((await legalPromiseGaps(reader({ ...d17Notice, ...d17Code, 'client/src/i18n/strings.en.js': "  'readerPermission.leadInk': 'Pri’s server sends a picture to an outside service.'," }))).length === 1,
+  'prompt text that does not name OpenAI is a gap');
+
 // ── the nomination reads the commit, and refuses on a gap ───────────────────
 const report = async files => nominate({
   sha: SHA,

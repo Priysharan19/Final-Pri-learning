@@ -4151,7 +4151,16 @@ const routes = {
         dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
       }))
     }));
-    return { entries, available: true };
+    // The mistake notebook (engine/mistakeNotebook.js on the server): every
+    // wrong resolution with its first broken line, fixed and due states. This
+    // device only names chapters and dot points; it decides nothing.
+    const book = out?.notebook && typeof out.notebook === 'object' ? out.notebook : null;
+    const notebook = book ? { ...book, groups: (Array.isArray(book.groups) ? book.groups : []).map(g => ({
+      ...g, chapterName: namedDotpoint(p, g.subtopic, null).chapterName,
+      misconception: g.misconception ? { ...g.misconception, nameKey: misconceptionById(g.misconception.id)?.name || null } : null,
+      items: (Array.isArray(g.items) ? g.items : []).map(item => ({ ...item, dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text }))
+    })) } : null;
+    return { entries, notebook, available: true };
   },
 
   // A twin is drawn and issued by the server; this device keeps the row it
@@ -4160,7 +4169,9 @@ const routes = {
     const p = await requireProfile();
     const linked = await profileCloudAccountId(p.id).catch(() => null);
     if (!linked) throw checkUnavailable('sign-in');
-    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    // A twin counts toward the free day and JEE Advanced stays Premium (D19):
+    // the server's refusal is explained by the one paywall, like a repeat's.
+    const out = await viaServer(() => cloud.notebookTwin(params.id)).catch(cause => { throw serverGateRefusal(cause) || cause; });
     const q = out?.question;
     if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
     const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;

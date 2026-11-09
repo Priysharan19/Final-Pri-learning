@@ -167,27 +167,50 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '2712000/2712000 self-checks passed across 339 subtopics' suites.log
+          grep -Fq '2840000/2840000 self-checks passed across 355 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 2588/2588 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2678/2678 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
           grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
           grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
+          # #483: the CBSE X/XII answer-blind pilot stays review-only and unwired.
+          grep -Fq 'PASS 12 original CBSE X/XII questions, 12 distinct archetype identities, 6 each by grade' suites.log
           grep -Fq 'PASS JEE 20/20 answer-blind original questions' suites.log
           grep -Fq 'JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)' suites.log
           grep -Eq 'JEE ESCROW LANE: PASS — ([0-9]+)/\1 checks — 20 public questions answer-blind, 0 issuable without escrow' suites.log
           grep -Fq 'ADVERTISED LEVELS: PASS — 52/52 advertised' suites.log
           grep -Fq 'CBSE 2026–27 CROSSWALK: PASS — 77 app chapters' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 564326/564326 checks — 126 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 126 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 162724 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
+          # #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic
+          # form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks.
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
+          # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
+          # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
+          grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
+          grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39533/39533 checks' suites.log
+          grep -Fq 'REVIEW FOLLOW-UPS: PASS — 415/415 checks' suites.log
+          grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
+          grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
+          grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
+          grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
+          # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
+          # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
+          # The opposite direction: every right answer to every India question (the key, the box's unit in every
+          # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29829 right answers over 11282 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -195,7 +218,7 @@ jobs:
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'VERIFIED STEP MARKS: PASS' suites.log
           grep -Fq 'VERIFIED STEP MARKS CLIENT: PASS' suites.log
-          grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
+          grep -Fq 'METHOD PROGRESS: PASS — 1011/1011 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,
           # the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show.
@@ -215,10 +238,12 @@ jobs:
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
+          grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
-          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 55/55 checks' suites.log
+          # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -234,18 +259,33 @@ jobs:
           # crash-report disclosures, and the generated third-party notices page.
           # 374 (L7): no notice makes a coverage claim D24 forbids, in either language.
           # 375 (L7): the D18 wording matches the accounts stream's code (#736).
-          grep -Fq 'LEGAL PAGES: PASS — 375/375 checks' suites.log
+          # 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737).
+          grep -Fq 'LEGAL PAGES: PASS — 378/378 checks' suites.log
           # 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination.
-          grep -Fq 'LEGAL PROMISES GATE: PASS — 16/16 checks' suites.log
+          # 19 (L7): the D17 prompt promise.
+          grep -Fq 'LEGAL PROMISES GATE: PASS — 19/19 checks' suites.log
           # L7: the counsel question sheet quotes the current text and code locations.
           grep -Fq 'COUNSEL QUESTIONS: PASS — 13/13 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
+          # 186 → 192 (#196): a remembered read is dropped when the cloud account changes, so
+          # account A's transcript and read receipt are never handed to account B on the same device.
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 192/192 checks' suites.log
+          # Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad,
+          # promotion and store copy carry none of the retired claims; past papers are off by default (D23).
+          grep -Fq 'CONTENT HONESTY: PASS' suites.log
+          grep -Fq 'MARKETING CLAIMS: PASS' suites.log
+          grep -Fq 'PAST PAPERS SWITCH: PASS' suites.log
+          # Hints and worked steps carry no double sign, unit/zero coefficient or algebraic +0 term (#700's follow-up).
+          grep -Fq 'WORKED STEPS TYPESETTING: PASS' suites.log
           # A marked handwritten attempt says only what the server established
           # (synthetic evidence: scripted transcripts, the server's marking function).
           grep -Fq 'TRUTHFUL FEEDBACK: PASS — 101/101 checks' suites.log
-          grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
+          # 23 + 5 (#705): the e2e harness blocks service workers for inspectNetwork
+          # flows, and stale-cloud / photo-practise each opt in, with a negative control.
+          grep -Fq 'BROWSER RUN FIXES: PASS — 28/28 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
+          # 65 → 73 (#196): the camera file (and its EXIF/GPS) is never what is sent; every photo is
+          # redrawn and the canvas encoding is sent, with no fall back to the original.
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
           grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
@@ -254,7 +294,9 @@ jobs:
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 70 files scanned, 0 hard-coded strings' suites.log
+          # 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt).
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 74 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
           # Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy.
@@ -266,18 +308,26 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 186/186 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 192/192 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 73/73 checks' suites.log
           grep -Fq 'ACCOUNT DELETION LINK: PASS — 111/111 checks' suites.log
-          grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
+          # 42 → 53 (#196): the predicted mark stays display-only — imported only by the progress
+          # summary and page, never by the server or a marking module, and a pure read of the evidence.
+          grep -Fq 'MARK PREDICTOR: PASS — 53/53 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
+          # #196: the hostile-PDF bounds of #204 (pre-parser size, canvas allocation, parse/render
+          # timeouts with cleanup) had a regression suite that no script or workflow ran.
+          grep -Fq 'INK PDF RESOURCE — PASS: pre-parser bytes, raster allocation, timeouts and cleanup bounded' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
           grep -Eq 'INSTALL BUDGET: PASS — 68/68 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
-          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
+          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
+          grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
+          grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
+          grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -300,6 +350,8 @@ jobs:
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
+          # The committed certification report describes the content in the tree (version, digest, scope, result).
+          grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
@@ -353,7 +405,8 @@ jobs:
           set -o pipefail
           node server/test/provider-answer-blind-check.mjs 2>&1 | tee blind.log
           node server/test/handwriting-latency-budget-check.mjs 2>&1 | tee -a blind.log
-          grep -Fq 'PROVIDER ANSWER-BLIND: PASS — 132/132 checks' blind.log
+          # 132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks).
+          grep -Fq 'PROVIDER ANSWER-BLIND: PASS — 150/150 checks' blind.log
           grep -Fq 'HANDWRITING LATENCY BUDGET: PASS' blind.log
       - name: Cloud reader evaluation tool self-test (fake provider, no spend)
         run: npm run test:ink:cloud-eval
@@ -385,6 +438,15 @@ jobs:
           # A parent who approves by email code is sent the withdrawal credential too.
           node server/test/guardian-code-approval-withdraw-check.mjs | tee guardian-code-approval.log
           grep -Fq 'GUARDIAN CODE APPROVAL WITHDRAWAL: PASS — 14/14 checks' guardian-code-approval.log
+          # The staging test mailbox: on only on staging and in the harness, only for
+          # @e2e.prilearning.test; every other address is sent; off, the route is a 404.
+          node server/test/test-mailbox-check.mjs | tee test-mailbox.log
+          grep -Fq 'TEST MAILBOX: PASS — 94/94 checks' test-mailbox.log
+          # D18: a child's account no guardian stands behind is soft-deleted after 30
+          # days (enforce mode only), erased after a 7-day grace, and a guardian can ask
+          # for erasure without the child's login. Also on Postgres below.
+          node server/test/child-erasure-check.mjs | tee child-erasure.log
+          grep -Fq 'CHILD ERASURE: PASS — 107/107 checks' child-erasure.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -402,6 +464,8 @@ jobs:
           node server/test/working-check-check.mjs
           node server/test/area-working-rubric-check.mjs
           node server/test/question-photo-check.mjs
+          # An upload behind an image header must be a PNG, JPEG or WebP by its own bytes; a non-picture never reaches a reader.
+          node server/test/image-signature-check.mjs
           node server/test/tutor-help-check.mjs
           node server/test/tutor-device-journey-check.mjs
           node server/test/tutor-issued-grounding-check.mjs
@@ -420,12 +484,19 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 860/860 checks' photo-pipeline.log
+          # 860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED)
+          # is offered as one Try again and never resent by itself; a garbled 502 may be.
+          # 880 → 905 (Train 4, #739's 25 checks on top; re-derived by running the suite on the merged tree).
+          grep -Fq 'PHOTO PIPELINE: PASS — 905/905 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs
           node server/test/guardian-notice-version-check.mjs
           node client/test/task03-guardian-notice-check.mjs
+          # The parent weekly report (D22): off by default — no route mounted,
+          # no job — and, switched on for the test, double opt-in under RLS.
+          node server/test/parent-report-check.mjs 2>&1 | tee parent-report.log
+          grep -Fq 'parent-report-check (sqlite): 90 checks passed' parent-report.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
@@ -442,6 +513,9 @@ jobs:
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
+          # Learning-state identity (v2), exact legacy lookups and monotonic expiry (#689, #690, #691) on SQLite; Postgres below.
+          node server/test/learning-state-identity-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'LEARNING STATE IDENTITY: PASS — 179/179 checks' practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
@@ -449,8 +523,14 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
+          # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
+          node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
+          grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
+          grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
@@ -462,12 +542,29 @@ jobs:
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
           grep -Fq 'PRACTICE TRAP SEEK: PASS — 66/66 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+          # 295 → 306: legacy-only repeats over HTTP, flagged repeatEvidence: 'legacy' on issue, receipt and event.
+          grep -Fq 'REPEAT CREDIT: PASS — 306/306 checks' practice-http.log
+          grep -Fq 'PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks' practice-http.log
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
           set -o pipefail
           node server/test/marker-isolation-check.mjs 2>&1 | tee marker-isolation.log
           grep -Fq 'MARKER ISOLATION: PASS — 152/152 checks' marker-isolation.log
+      # Races the request thread cannot serialise on its own, and the guardian
+      # gate across every router holding a child's data. Real /v1 routes, real
+      # marker; the same suites run on Postgres below.
+      - name: Reveal/submit race, deletion mid-mark, billing event order and guardian-consent coverage (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/practice-reveal-submit-race-check.mjs 2>&1 | tee races.log
+          node server/test/account-deletion-midflight-check.mjs 2>&1 | tee -a races.log
+          node server/test/billing-out-of-order-concurrency-check.mjs 2>&1 | tee -a races.log
+          node server/test/guardian-consent-coverage-check.mjs 2>&1 | tee -a races.log
+          # The reveal race's check count follows which request wins each round; its pass line does not.
+          grep -Fq 'PRACTICE REVEAL/SUBMIT RACE: PASS' races.log
+          grep -Fq 'ACCOUNT DELETION MID-FLIGHT: PASS — 54/54 checks' races.log
+          grep -Fq 'BILLING OUT-OF-ORDER CONCURRENCY: PASS — 151/151 checks' races.log
+          grep -Fq 'GUARDIAN CONSENT COVERAGE — PASS — 38/38 checks' races.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -535,7 +632,7 @@ jobs:
           node server/test/rls-account-coverage-check.mjs 2>&1 | tee -a security-p2.log
           node server/test/otp-delete-asymmetry-check.mjs 2>&1 | tee -a security-p2.log
           grep -Fq 'admin-mfa-class-routes-check: 77/77 checks passed (sqlite)' security-p2.log
-          grep -Fq 'account-export-completeness-check (sqlite): 71 checks passed' security-p2.log
+          grep -Fq 'account-export-completeness-check (sqlite): 78 checks passed' security-p2.log
           grep -Fq 'RLS ACCOUNT COVERAGE: PASS — 20/20 checks' security-p2.log
           grep -Fq 'OTP DELETE ASYMMETRY: PASS — 15/15 checks' security-p2.log
       - name: Server-authoritative examination papers (SQLite)
@@ -543,6 +640,11 @@ jobs:
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
           grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
+      - name: Board mock papers — typed, labelled, one timed paper in 30 days free (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/board-mock-check.mjs 2>&1 | tee board-mock.log
+          grep -Fq 'BOARD MOCK AUTHORITY: PASS — 40/40 checks' board-mock.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -571,8 +673,37 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 62/62 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 83/83 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
+          # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
+          # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
+          # 66 → 67: the question picker passes over content the account has resolved, on Postgres too.
+          # 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres.
+          grep -Fq '✓ practice-reveal-submit-race-check.mjs' platform-postgres.log
+          grep -Fq '✓ account-deletion-midflight-check.mjs' platform-postgres.log
+          grep -Fq '✓ billing-out-of-order-concurrency-check.mjs' platform-postgres.log
+          grep -Fq '✓ postgres-cutover-rehearsal-check.mjs' platform-postgres.log
+          grep -Fq '✓ guardian-consent-coverage-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-seen-aware-pick-check.mjs' platform-postgres.log
+          grep -Fq '✓ learning-state-identity-check.mjs' platform-postgres.log
+          # 61 → 64: sign-in (the one-time-code card contract and lifecycle) and the
+          # guardian-consent state machine and gate, on Postgres as well as SQLite.
+          grep -Fq '✓ otp-sign-in-check.mjs' platform-postgres.log
+          grep -Fq '✓ otp-lifecycle-check.mjs' platform-postgres.log
+          grep -Fq '✓ guardian-consent-check.mjs' platform-postgres.log
+          # 61 → 62: the staging test mailbox, kept and read back as pri_server.
+          grep -Fq '✓ test-mailbox-check.mjs' platform-postgres.log
+          # 61 → 62 (D18): the child-account erasure, as pri_server under RLS.
+          grep -Fq '✓ child-erasure-check.mjs' platform-postgres.log
+          # 61 → 62 (L6): JEE Advanced's own content and notebook twins under the free day, on Postgres.
+          # 62 → 63 (L6): the mistake notebook on Postgres.
+          grep -Fq '✓ premium-practice-content-check.mjs' platform-postgres.log
+          grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
+          # 61 → 62 (L6): typed board mocks on Postgres.
+          grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
+          # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
+          # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
+          grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -655,6 +786,53 @@ jobs:
   # unless every group succeeded, and runs the unchanged invariant block
   # against the concatenated group logs. tools/ci-runner-policy-check.mjs
   # proves every command of npm run test:e2e is in exactly one group.
+  # The restore drill postgres-cutover.md §6 and ADR-0001 require, rehearsed
+  # on throwaway databases: a pg_dump of a live platform restored into an EMPTY
+  # database must carry every row, RLS policy, pri_server grant and the cursor
+  # sequence, and the real server on it must keep sessions, passwords,
+  # histories, marks and Premium. pg_dump refuses a newer server, so the job
+  # installs the client tools of the service's major version. A job of its own:
+  # the apt step never sits inside a required check.
+  postgres-restore:
+    name: Postgres backup restore rehearsal
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: PostgreSQL 17 client tools (pg_dump and pg_restore at the server's major version)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q --no-install-recommends postgresql-client-17
+          /usr/lib/postgresql/17/bin/pg_dump --version
+      - name: pg_dump of a live platform restored into an empty database, then served as pri_server
+        run: |
+          set -o pipefail
+          node scripts/with-postgres.mjs node server/test/postgres-restore-rehearsal-check.mjs 2>&1 | tee restore.log
+          grep -Fq 'POSTGRES RESTORE REHEARSAL: PASS — 34/34 checks' restore.log
+
   browser-shard:
     name: Browser shard (${{ matrix.group }})
     runs-on: ubuntu-24.04
@@ -815,11 +993,14 @@ jobs:
             node client/test/tour-otp-onboarding.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-account-deletion.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-unverified-email.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-progress-truth.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-write-sign-in.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
+            # D17 (L4): asked once, naming OpenAI, before the first read — phone finger, tablet, photo, offline ink.
+            node client/test/tour-ink-reader-permission.js --no-build 2>&1 | tee -a browser.log
             # Task 02: mounted server-authoritative method credit and stale receipt rejection.
             node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
@@ -935,7 +1116,8 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*434/434.*13 flows' browser.log
+          # tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40).
+          grep -Eq 'E2E SUITE.*438/438.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -972,6 +1154,11 @@ jobs:
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
           grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
+          # An adult whose email was never confirmed signs in with a password and is
+          # taken to "Confirm your email" (a code to that address), not to a false
+          # guardian dead end; the server still refuses practice until it is proved.
+          grep -Fq 'Account · an adult with an unconfirmed email confirms it with a code on the card, then opens Practice' browser.log
+          grep -Eq 'E2E SUITE.*23/23 checks across 1 flows' browser.log
           # Account first (issue #477): a child signs up on the one card and a
           # parent approves on their own page; the gate journey in both engines.
           grep -Fq 'Account · email code sign-up, a parent approves by SMS on their own page, first question' browser.log
@@ -986,6 +1173,10 @@ jobs:
           # when the SESSION ENDS mid-work or at a start, offline inside the
           # app, and a prepared question taken up elsewhere. tour-activation-
           # gate.js proves the gate itself.
+          # D17 (L4): asked once, naming OpenAI, before the first read; nothing sent before an accept.
+          grep -Fq 'D17 · asked once before anything is read — phone finger, tablet, decline, accept, same-revision grade' browser.log
+          grep -Fq 'D17 · a photo is asked about first; ink written offline is kept and read on return' browser.log
+          grep -Fq 'E2E SUITE PASSED — 38/38 checks across 2 flows' browser.log
           grep -Fq 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
           grep -Fq 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry' browser.log
           grep -Fq 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked' browser.log
@@ -1030,14 +1221,16 @@ jobs:
           # The v1.1 instrument tour ran (Chromium, flag-on build).
           test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          # Preserve evidence that the interface tour ran in both engines.
-          # Their measured coverage counts differ, so verify each separately.
-          # Chromium asserts 196 baseline interface-quality checks. Four more
-          # are exercised when the responsive Practice tab is present across
-          # the light/dark phone/tablet matrix (200/200). Both represent
-          # complete measured coverage; neither permits any failed assertion.
+          # Chromium's interface-quality tour runs exactly 209 checks. Practice
+          # shows a pinned written question (seeded test server), so its
+          # Type → Write → Type switch is timed in all four cases (phone 390×844
+          # and tablet 820×1180, light and dark) and is never skipped. The old
+          # 196/196 escape, a Practice screen with nothing to time, is gone
+          # (#684). The sentinel prints only when all four cases timed both
+          # presses inside MAX_INPUT_MS (100, unchanged).
           # The separate ink-canvas 200/200 invariant remains enforced above.
-          grep -Eq 'E2E SUITE PASSED — (196/196|200/200) checks across 1 flows' browser.log
+          grep -Fq 'E2E SUITE PASSED — 209/209 checks across 1 flows' browser.log
+          grep -Fq 'PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms' browser.log
           grep -Fq 'E2E SUITE PASSED — 129/129 checks across 1 flows' browser.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2

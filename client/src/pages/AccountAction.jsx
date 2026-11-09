@@ -23,6 +23,27 @@ export async function performGuardianWithdraw(token, transport = cloud) {
   }
 }
 
+/**
+ * Ask for the child's account to be erased with the same bearer (decision
+ * D18). The server withdraws consent and soft-deletes the account at once and
+ * erases it a week later. Resolves the screen state and the catalogue key:
+ * 'done' (scheduled now, or already being erased) or 'error' (an invalid or
+ * used link, an account not recorded as a child's, or a failure — in which
+ * case nothing changed). Exported for client/test/account-action-guardian-erase-check.mjs.
+ */
+export async function performGuardianErase(token, transport = cloud) {
+  try {
+    const result = await transport.guardianErase(token);
+    return result?.alreadyScheduled
+      ? { state: 'done', key: 'accountAction.eraseAlready' }
+      : { state: 'done', key: 'accountAction.eraseDone' };
+  } catch (error) {
+    if (error?.code === 'TOKEN_INVALID') return { state: 'error', key: 'accountAction.eraseInvalid' };
+    if (error?.code === 'GUARDIAN_ERASURE_NOT_AVAILABLE') return { state: 'error', key: 'accountAction.eraseNotAvailable' };
+    return { state: 'error', key: 'accountAction.eraseFailed' };
+  }
+}
+
 function Shell({ children }) {
   return (
     <div className="auth-wrap">
@@ -115,6 +136,37 @@ export default function AccountAction({ actionData }) {
             <div className="row" style={{ gap: 10, marginTop: 16 }}>
               <button className="btn primary" type="button" data-guardian-withdraw disabled={state === 'working'} onClick={withdraw}>
                 {t('accountAction.withdrawButton')}
+              </button>
+            </div>
+          )}
+      </Shell>
+    );
+  }
+
+  // ── A guardian asking for the account to be erased (decision D18) ────────
+  // The second link in the withdrawal email, with the same bearer. Its own
+  // page and one button, so it is never a second choice beside withdrawal:
+  // what erasing does, and that it cannot be undone, is said before it is done.
+  if (action === 'guardian-erase') {
+    const erase = async () => {
+      setState('working');
+      setMessage('');
+      const outcome = await performGuardianErase(token);
+      setState(outcome.state === 'error' ? 'error' : 'done');
+      setMessage(tLater(outcome.key));
+    };
+    return (
+      <Shell>
+        <h1 style={{ marginTop: 0 }}>{t('accountAction.eraseTitle')}</h1>
+        {state !== 'done' && <p className="muted" style={{ marginTop: 0 }}>{t('accountAction.eraseIntro')}</p>}
+        {state === 'working' && <Status>{t('accountAction.recording')}</Status>}
+        {state === 'error' && <Status kind="error">{message}</Status>}
+        {state === 'done'
+          ? <Status>{message}</Status>
+          : (
+            <div className="row" style={{ gap: 10, marginTop: 16 }}>
+              <button className="btn primary" type="button" data-guardian-erase disabled={state === 'working'} onClick={erase}>
+                {t('accountAction.eraseButton')}
               </button>
             </div>
           )}

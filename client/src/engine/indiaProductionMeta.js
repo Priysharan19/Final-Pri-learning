@@ -4,7 +4,15 @@
 // A chapter can have excellent maths generators while still being an unreviewed
 // mapping to the current Indian curriculum. Product surfaces must use this file
 // when describing provenance/readiness so we never turn "a generator exists"
-// into "NCERT source-reviewed" by accident.
+// into a review claim by accident.
+//
+// Every state here is an AGENT audit: an in-repository check of the mapping
+// against the recorded source, done by software and by the autonomous
+// engineering fleet. No human examiner has reviewed any chapter (audit item 10,
+// Nov 2026; #499 is still open). A surface may say "reviewed", "verified" or
+// "audited" without qualification only when `humanReviewed` is true, and that
+// is true only when a named human reviewer has signed the chapter. Nothing in
+// this file sets it today.
 
 import { IN_CURRICULUM, uncoveredDotpoints } from './curriculum-in.js';
 import { NCERT_CLASS7_2026_27_IDS, NCERT_CLASS7_2026_27_SOURCE } from './ncert/class7-2026-27-syllabus.js';
@@ -22,10 +30,17 @@ export const INDIA_CONTENT_QUALITY = Object.freeze({
 });
 
 export const INDIA_RELEASE_STATE = Object.freeze({
-  REVIEWED: 'published-reviewed',
+  AGENT_AUDITED: 'published-agent-audited',
   UNREVIEWED: 'published-unreviewed',
   PARTIAL: 'published-partial',
   MISSING: 'missing'
+});
+
+/** The review states a source record may carry. Every one is an agent audit. */
+export const INDIA_REVIEW_STATE = Object.freeze({
+  CURRENT_SOURCE: 'agent-audited-current-source',
+  IN_REPOSITORY: 'agent-audited-in-repository',
+  CURRENT_MAPPING: 'agent-audited-current-mapping'
 });
 
 const CLASS7_PART1_SOURCE_IDS = Object.freeze(new Set(NCERT_CLASS7_2026_27_IDS));
@@ -54,38 +69,46 @@ const CLASS9_SOURCE_IDS = Object.freeze(new Set(
   (IN_CURRICULUM.find(group => group.grade === 9)?.chapters || []).map(ch => ch.id)
 ));
 
+// The honest labels Classes 8 and 9 carry until their rebuild is reviewed
+// (decision D24): the book Class 8 follows, and how much of the official Class
+// 9 list is live.
+export const CLASS8_BOOK_NOTE = 'follows the earlier NCERT book (Reprint 2024–25); the current Ganita Prakash Grade 8 rebuild is pending';
+export const CLASS9_CHAPTER_NOTE = '8 of the 15 chapters in the CBSE 2026–27 Class IX list';
+
 const SOURCES = Object.freeze({
   class7Part1: Object.freeze({
-  quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
-  kind: 'ncert-textbook',
-  edition: NCERT_CLASS7_2026_27_SOURCE.curriculumVersion,
-  isbn: NCERT_CLASS7_2026_27_SOURCE.isbn,
-  ncertTextbook: NCERT_CLASS7_2026_27_SOURCE.prelims,
-  evidence: NCERT_CLASS7_2026_27_SOURCE.evidence,
-  reviewState: 'current-source-authored-in-repository'
-}),
-class7Part2: Object.freeze({
-  quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
-  kind: 'ncert-textbook',
-  edition: NCERT_CLASS7_PART2_2026_27_SOURCE.curriculumVersion,
-  isbn: NCERT_CLASS7_PART2_2026_27_SOURCE.isbn,
-  ncertTextbook: NCERT_CLASS7_PART2_2026_27_SOURCE.prelims,
-  evidence: NCERT_CLASS7_PART2_2026_27_SOURCE.evidence,
-  reviewState: 'current-source-authored-in-repository'
-}),
+    quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+    kind: 'ncert-textbook',
+    edition: NCERT_CLASS7_2026_27_SOURCE.curriculumVersion,
+    isbn: NCERT_CLASS7_2026_27_SOURCE.isbn,
+    ncertTextbook: NCERT_CLASS7_2026_27_SOURCE.prelims,
+    evidence: NCERT_CLASS7_2026_27_SOURCE.evidence,
+    reviewState: INDIA_REVIEW_STATE.CURRENT_SOURCE
+  }),
+  class7Part2: Object.freeze({
+    quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
+    kind: 'ncert-textbook',
+    edition: NCERT_CLASS7_PART2_2026_27_SOURCE.curriculumVersion,
+    isbn: NCERT_CLASS7_PART2_2026_27_SOURCE.isbn,
+    ncertTextbook: NCERT_CLASS7_PART2_2026_27_SOURCE.prelims,
+    evidence: NCERT_CLASS7_PART2_2026_27_SOURCE.evidence,
+    reviewState: INDIA_REVIEW_STATE.CURRENT_SOURCE
+  }),
   class8: Object.freeze({
     quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
     kind: 'ncert-textbook-and-answer-key',
     edition: 'NCERT Mathematics Class 8 Reprint 2024–25',
-    evidence: 'Source-authored modules preserve exercise/source audit metadata and dedicated mastery generators.',
-    reviewState: 'source-audited-in-repository'
+    evidence: 'Source-authored modules preserve exercise/source audit metadata and dedicated mastery generators; the audit is the repository agent\'s, not a human reviewer\'s.',
+    note: CLASS8_BOOK_NOTE,
+    reviewState: INDIA_REVIEW_STATE.IN_REPOSITORY
   }),
   class9: Object.freeze({
     quality: INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
     kind: 'ncert-textbook',
     edition: 'Ganita Manjari Grade 9 Part I, 2026–27',
-    evidence: 'The Grade 9 curriculum is replaced atomically by the dedicated source-oriented eight-chapter implementation.',
-    reviewState: 'source-audited-in-repository'
+    evidence: 'The Grade 9 curriculum is replaced atomically by the dedicated source-oriented eight-chapter implementation; the audit is the repository agent\'s, not a human reviewer\'s.',
+    note: CLASS9_CHAPTER_NOTE,
+    reviewState: INDIA_REVIEW_STATE.IN_REPOSITORY
   }),
   class10: Object.freeze({
     quality: INDIA_CONTENT_QUALITY.REVIEWED_MAPPING,
@@ -96,8 +119,8 @@ class7Part2: Object.freeze({
     cbseMathematicsPdf: CBSE_CLASS10_2026_27_SOURCE.cbseMathematicsPdf,
     ncertTextbook: CBSE_CLASS10_2026_27_SOURCE.ncertTextbook,
     ncertEdition: CBSE_CLASS10_2026_27_SOURCE.ncertEdition,
-    evidence: 'Current Class X outcomes were overlaid from the 2026–27 CBSE syllabus and NCERT textbook; only form-by-form audited chapter mappings are promoted.',
-    reviewState: 'current-source-reviewed-mapping'
+    evidence: 'Current Class X outcomes were overlaid from the 2026–27 CBSE syllabus and NCERT textbook; only form-by-form agent-audited chapter mappings are promoted.',
+    reviewState: INDIA_REVIEW_STATE.CURRENT_MAPPING
   })
 });
 
@@ -110,13 +133,18 @@ function sourceRecord(chapter) {
   return null;
 }
 
+// No chapter has a human reviewer today. When one signs, the signature is
+// recorded here by name and date; until then every status says so.
+const HUMAN_REVIEW = Object.freeze({ humanReviewed: false, humanReviewer: null, humanReviewedOn: null });
+
 export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
   if (!chapter) {
     return Object.freeze({
       quality: INDIA_CONTENT_QUALITY.MISSING,
       releaseState: INDIA_RELEASE_STATE.MISSING,
       selectable: false,
-      sourceReviewed: false,
+      agentAudited: false,
+      ...HUMAN_REVIEW,
       generatorComplete: false,
       reason: 'Chapter is absent from the live India curriculum.'
     });
@@ -129,14 +157,15 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
   if (source && generatorComplete) {
     return Object.freeze({
       quality: source.quality || INDIA_CONTENT_QUALITY.SOURCE_AUTHORED,
-      releaseState: INDIA_RELEASE_STATE.REVIEWED,
+      releaseState: INDIA_RELEASE_STATE.AGENT_AUDITED,
       selectable: true,
-      sourceReviewed: true,
+      agentAudited: true,
+      ...HUMAN_REVIEW,
       generatorComplete: true,
       source,
       reason: source.quality === INDIA_CONTENT_QUALITY.REVIEWED_MAPPING
-        ? 'Current curriculum outcomes and the mapped production forms were reviewed against the recorded source set.'
-        : 'Dedicated source-oriented production implementation is present for every product dot point.'
+        ? 'Current curriculum outcomes and the mapped production forms were checked against the recorded source set by the repository agent audit; no human examiner has reviewed them.'
+        : 'Dedicated source-oriented production implementation is present for every product dot point, checked by the repository agent audit; no human examiner has reviewed it.'
     });
   }
 
@@ -145,7 +174,8 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
       quality: INDIA_CONTENT_QUALITY.MISSING,
       releaseState: missing.length === chapter.dotpoints.length ? INDIA_RELEASE_STATE.MISSING : INDIA_RELEASE_STATE.PARTIAL,
       selectable: missing.length < chapter.dotpoints.length,
-      sourceReviewed: false,
+      agentAudited: false,
+      ...HUMAN_REVIEW,
       generatorComplete: false,
       missingDotpoints: Object.freeze([...missing]),
       reason: 'One or more declared product outcomes have no generator behind them.'
@@ -153,17 +183,18 @@ export function indiaProductionStatus(chapter, grade = chapter?.grade ?? null) {
   }
 
   // A complete generator mapping is not automatically a current-curriculum
-  // review. Classes 11/12 remain C until an explicit source review promotes
-  // the specific chapter; Class 10 deliberately uses a narrow reviewed allowlist.
+  // audit. Classes 11/12 remain C until an explicit source audit promotes
+  // the specific chapter; Class 10 deliberately uses a narrow audited allowlist.
   return Object.freeze({
     quality: INDIA_CONTENT_QUALITY.WEAK_MAPPING,
     releaseState: INDIA_RELEASE_STATE.UNREVIEWED,
     selectable: true,
-    sourceReviewed: false,
+    agentAudited: false,
+    ...HUMAN_REVIEW,
     generatorComplete: true,
     source: null,
     grade,
-    reason: 'Generator-complete mapping exists, but current source review/provenance has not yet been recorded for this chapter.'
+    reason: 'Generator-complete mapping exists, but no source audit or provenance has been recorded for this chapter yet.'
   });
 }
 
@@ -178,7 +209,8 @@ export function indiaProductionCensus() {
         chapter: chapter.name,
         quality: status.quality,
         releaseState: status.releaseState,
-        sourceReviewed: status.sourceReviewed,
+        agentAudited: status.agentAudited,
+        humanReviewed: status.humanReviewed,
         generatorComplete: status.generatorComplete,
         missingDotpoints: status.missingDotpoints || Object.freeze([])
       }));
@@ -193,9 +225,10 @@ export function indiaProductionSummary() {
   const byGrade = {};
   for (const row of rows) {
     byQuality[row.quality] += 1;
-    const bucket = byGrade[row.grade] ||= { total: 0, reviewed: 0, unreviewed: 0, missing: 0 };
+    const bucket = byGrade[row.grade] ||= { total: 0, agentAudited: 0, unreviewed: 0, missing: 0, humanReviewed: 0 };
     bucket.total += 1;
-    if (row.quality === 'A' || row.quality === 'B') bucket.reviewed += 1;
+    if (row.humanReviewed) bucket.humanReviewed += 1;
+    if (row.quality === 'A' || row.quality === 'B') bucket.agentAudited += 1;
     else if (row.quality === 'D') bucket.missing += 1;
     else bucket.unreviewed += 1;
   }

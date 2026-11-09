@@ -96,6 +96,18 @@ if (uploadSigning.isEmpty && !uploadSigningFile.isFile) {
     }
 }
 
+// Every signed store bundle talks to exactly the public origin (Director
+// decision 9 Nov 2026 under owner default D5, "test what you ship"): until GO
+// https://app.prilearning.com fronts the staging service at the candidate SHA,
+// at promotion it is re-pointed to production, and the bundle is the same
+// either way. The iOS archive gate (scripts/check-native-archive.mjs) holds the
+// Apple build to the same origin. Compile-only checks (-Ppri.unsignedRelease)
+// may leave it empty; a signed bundle may not name any other origin.
+val candidateOrigin = "https://app.prilearning.com"
+require(!bundleRequested || unsignedRelease || cloudOrigin.trimEnd('/') == candidateOrigin) {
+    "a signed release bundle needs -Ppri.cloudOrigin=$candidateOrigin (got '${cloudOrigin.ifEmpty { "(empty)" }}')"
+}
+
 android {
     namespace = "com.prilearning.app"
     compileSdk = 36

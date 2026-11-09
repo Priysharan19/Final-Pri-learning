@@ -3,7 +3,7 @@
 // These questions cover the current outcome "formulate and solve situational
 // problems leading to a quadratic equation". Each problem has one physically
 // meaningful positive solution and an explicit modelling step.
-import { ri, rc } from '../qhelpers.js';
+import { ri, rc, term } from '../qhelpers.js';
 
 function rectangleProblem(rng, harder = false) {
   const width = ri(rng, harder ? 7 : 4, harder ? 16 : 11);
@@ -20,12 +20,12 @@ function rectangleProblem(rng, harder = false) {
     hints: [
       'Let the width be $x$ metres.',
       `Then the length is $x+${gap}$ and area gives $x(x+${gap})=${area}$.`,
-      `Solve $x^2+${gap}x-${area}=0$ and keep the positive length.`
+      `Solve $x^2+${term(gap)}-${area}=0$ and keep the positive length.`
     ],
     steps: [
       { h: 'Choose the variable', d: 'Let the width be $x$ m.' },
       { h: 'Model the area', d: `$x(x+${gap})=${area}$` },
-      { h: 'Form the quadratic', d: `$x^2+${gap}x-${area}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(gap)}-${area}=0$` },
       { h: 'Solve and interpret', d: `$(x-${width})(x+${length})=0$, so $x=${width}$ or $x=-${length}$. Reject the negative length.` },
       { h: 'Answer', d: `Width $=${width}$ m.` }
     ],
@@ -50,7 +50,7 @@ function consecutiveProblem(rng, even = false) {
     steps: [
       { h: 'Represent the integers', d: `$x$ and $x+${step}$` },
       { h: 'Use their product', d: `$x(x+${step})=${product}$` },
-      { h: 'Form the quadratic', d: `$x^2+${step}x-${product}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(step)}-${product}=0$` },
       { h: 'Factorise', d: `$(x-${first})(x+${second})=0$` },
       { h: 'Interpret', d: `$x=${first}$ or $x=-${second}$; the positive context gives $x=${first}$.` }
     ],
@@ -78,7 +78,7 @@ function speedProblem(rng) {
       { h: 'Model the two times', d: `$\\dfrac{${distance}}{x}$ and $\\dfrac{${distance}}{x+${increase}}$ hours` },
       { h: 'Use the one-hour difference', d: `$\\dfrac{${distance}}{x}-\\dfrac{${distance}}{x+${increase}}=1$` },
       { h: 'Clear denominators', d: `$${distance * increase}=x(x+${increase})$` },
-      { h: 'Form the quadratic', d: `$x^2+${increase}x-${distance * increase}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(increase)}-${distance * increase}=0$` },
       { h: 'Solve and interpret', d: `$(x-${slow})(x+${fast})=0$, so the positive speed is $${slow}$ km/h.` }
     ],
     modelKind: 'speed-time'

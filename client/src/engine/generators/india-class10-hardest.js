@@ -33,7 +33,7 @@
 // coverage entry claims these generators below or above D3, and the check
 // fails if one ever does, so the label a student sees is always D3.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
+import { ri, rc, nz, gcd, makeRng, term, poly } from '../qhelpers.js';
 import { exact as exactForm, frac, fracTex, traps, twoNames } from './india-native-helpers.js';
 import { formulaPlan, ANGLE_ALIASES } from './workingRubrics.js';
 
@@ -56,6 +56,14 @@ function exact(f, suffix) {
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
 /** "x + 3", "x - 2", "x". */
 const lin = (k, v = 'x') => (k === 0 ? v : `${v} ${sg(k)}`);
+/** The section-formula numerator ak + b: "8k - 3", "k + 2", "8k" — never "1k", "0k" or "+ 0". */
+const kExpr = (a, b) => {
+  const head = term(a, 'k');
+  if (b === 0) return head || '0';
+  return head ? `${head} ${sg(b)}` : `${b}`;
+};
+/** (t - 2)^2, or t^2 when the shift is zero (never (t + 0)^2). */
+const sqShift = (v, k) => (k === 0 ? `${v}^2` : `(${lin(k, v)})^2`);
 
 /** Descending-power polynomial from integer coefficients [a_n, …, a_0]. */
 function polyTex(coeffs, v = 'x') {
@@ -150,7 +158,7 @@ function agesSituation(rng) {
       steps: [
         { h: 'First condition', d: `$x - ${ago} = ${k}(y - ${ago})$, so $x - ${k}y = ${ago - k * ago}$` },
         { h: 'Second condition', d: `$x + ${ahead} = ${m}(y + ${ahead})$, so $x - ${m}y = ${m * ahead - ahead}$` },
-        { h: 'Eliminate x', d: `Subtracting: $${k - m}y = ${m * ahead - ahead - (ago - k * ago)}$, so $y = ${B}$` },
+        { h: 'Eliminate x', d: `Subtracting: $${term(k - m, 'y')} = ${m * ahead - ahead - (ago - k * ago)}$, so $y = ${B}$` },
         { h: 'Back-substitute', d: `$x = ${k}(${B} - ${ago}) + ${ago} = ${A}$` },
         { h: 'Answer', d: `${older} is ${A} years old now (and ${younger} is ${B}).` }
       ],
@@ -172,7 +180,7 @@ function digitsSituation(rng) {
       ? `A two-digit number is ${k} times the sum of its digits.`
       : `The sum of the digits of a two-digit number is ${x + y}.`;
     const second = `The number obtained by reversing its digits is ${D} ${R > N ? 'more' : 'less'} than the original number.`;
-    const eq1 = byMultiple ? `${10 - k}x - ${k - 1}y = 0` : `x + y = ${x + y}`;
+    const eq1 = byMultiple ? `${term(10 - k)} - ${term(k - 1, 'y')} = 0` : `x + y = ${x + y}`;
     const eq1Raw = byMultiple ? `10x + y = ${k}(x + y)` : `x + y = ${x + y}`;
     const eq2 = R > N ? `y - x = ${D / 9}` : `x - y = ${D / 9}`;
     if (byMultiple && k === 1) continue;
@@ -330,7 +338,7 @@ function apSumReasoning(rng) {
       ],
       steps: [
         { h: 'Identify a and d', d: `$a = ${a}$, $d = ${d}$` },
-        { h: 'Form the equation', d: `$\\dfrac{n}{2}(${2 * a} + ${d}(n - 1)) = ${S}$, so $${d}n^2 ${sg(2 * a - d)}n - ${2 * S} = 0$` },
+        { h: 'Form the equation', d: `$\\dfrac{n}{2}(${2 * a} + ${d}(n - 1)) = ${S}$, so $${poly([d, 2 * a - d, -2 * S], 'n')} = 0$` },
         { h: 'Solve', d: `The roots are $n = ${n}$ and $n = ${fracTex(-2 * S, d * n)}$; only the positive whole number is a count of terms.` },
         { h: 'Answer', d: `$${n}$ terms` }
       ],
@@ -362,7 +370,7 @@ function apDailyLifeReasoning(rng) {
         ],
         steps: [
           { h: 'Model', d: `$\\dfrac{n}{2}(2(${a}) + (n-1)${d}) = ${T}$` },
-          { h: 'Simplify', d: `$${d}n^2 + ${2 * a - d}n - ${2 * T} = 0$` },
+          { h: 'Simplify', d: `$${poly([d, 2 * a - d, -2 * T], 'n')} = 0$` },
           { h: 'Solve', d: `$n = ${n}$ (the other root is negative)` },
           { h: 'Answer', d: `The work was delayed by $${n}$ days.` }
         ],
@@ -465,7 +473,7 @@ function bptReasoning(rng) {
         steps: [
           { h: 'Apply BPT', d: `$\\dfrac{${len(p)}}{${len(q)}} = \\dfrac{${len(r)}}{${len(s)}}$` },
           { h: 'Cross-multiply', d: `$(${len(p)})(${len(s)}) = (${len(q)})(${len(r)})$` },
-          { h: 'Solve', d: `$${p + s - q - r}x = ${q * r - p * s}$, so $x = ${x}$` },
+          { h: 'Solve', d: `$${term(p + s - q - r)} = ${q * r - p * s}$, so $x = ${x}$` },
           ...(askAC ? [{ h: 'Find AC', d: `$AC = (${x} ${sg(r)}) + (${x} ${sg(s)}) = ${answer}$ cm` }] : [])
         ],
         reasoning: 'algebraic'
@@ -526,8 +534,9 @@ function distanceReasoning(rng) {
         ],
         steps: [
           { h: 'Let the point be', d: onX ? '$P(t, 0)$' : '$P(0, t)$' },
-          { h: 'Equate squared distances', d: onX ? `$(t ${sg(-x1)})^2 + ${y1 * y1} = (t ${sg(-x2)})^2 + ${y2 * y2}$` : `$${x1 * x1} + (t ${sg(-y1)})^2 = ${x2 * x2} + (t ${sg(-y2)})^2$` },
-          { h: 'Simplify', d: `$${den}t = ${num}$, so $t = ${tpos}$` },
+          // A zero coordinate contributes nothing: (t + 6)^2 = ..., not (t + 6)^2 + 0.
+          { h: 'Equate squared distances', d: onX ? `$${sqShift('t', -x1)}${y1 ? ` + ${y1 * y1}` : ''} = ${sqShift('t', -x2)}${y2 ? ` + ${y2 * y2}` : ''}$` : `$${x1 ? `${x1 * x1} + ` : ''}${sqShift('t', -y1)} = ${x2 ? `${x2 * x2} + ` : ''}${sqShift('t', -y2)}$` },
+          { h: 'Simplify', d: `$${term(den, 't')} = ${num}$, so $t = ${tpos}$` },
           { h: 'Answer', d: `$P(${point.x}, ${point.y})$` }
         ],
         reasoning: 'equidistant'
@@ -551,9 +560,9 @@ function distanceReasoning(rng) {
       'A square has two square roots, so there are two values of $k$.'
     ],
     steps: [
-      { h: 'Distance formula', d: `$${dx * dx} + (k ${sg(-y1)})^2 = ${h * h}$` },
-      { h: 'Isolate the square', d: `$(k ${sg(-y1)})^2 = ${h * h - dx * dx}$` },
-      { h: 'Take both roots', d: `$k ${sg(-y1)} = \\pm ${dy}$` },
+      { h: 'Distance formula', d: `$${dx * dx} + ${sqShift('k', -y1)} = ${h * h}$` },
+      { h: 'Isolate the square', d: `$${sqShift('k', -y1)} = ${h * h - dx * dx}$` },
+      { h: 'Take both roots', d: `$${lin(-y1, 'k')} = \\pm ${dy}$` },
       { h: 'Answer', d: `$k = ${values[0]}$ or $k = ${values[1]}$` }
     ],
     reasoning: 'two-values'
@@ -583,7 +592,7 @@ function sectionReasoning(rng) {
           'Now use the same ratio in the section formula for the $y$-coordinate.'
         ],
         steps: [
-          { h: 'Use the x-coordinates', d: `$\\dfrac{${x2}k + ${x1 < 0 ? `(${x1})` : x1}}{k + 1} = ${xp}$, so $k = ${fracTex(m, n)}$` },
+          { h: 'Use the x-coordinates', d: `$\\dfrac{${kExpr(x2, x1)}}{k + 1} = ${xp}$, so $k = ${fracTex(m, n)}$` },
           { h: 'The ratio', d: `$AP : PB = ${m} : ${n}$` },
           { h: 'Use the y-coordinates', d: `$t = \\dfrac{${m}(${y2}) + ${n}(${y1})}{${m + n}} = ${t}$` }
         ],
@@ -604,7 +613,7 @@ function sectionReasoning(rng) {
         'Use the ratio you found in the section formula for the $x$-coordinate.'
       ],
       steps: [
-        { h: 'Set y = 0', d: `$\\dfrac{${B[1]}k ${sg(A[1])}}{k + 1} = 0$, so $k = ${fracTex(m, n)}$` },
+        { h: 'Set y = 0', d: `$\\dfrac{${kExpr(B[1], A[1])}}{k + 1} = 0$, so $k = ${fracTex(m, n)}$` },
         { h: 'The ratio', d: `$${m} : ${n}$` },
         { h: 'The x-coordinate', d: `$x = \\dfrac{${m}(${x2}) + ${n}(${x1})}{${m + n}} = ${xp}$` },
         { h: 'Answer', d: `$(${xp}, 0)$` }
@@ -1264,8 +1273,8 @@ function probabilityReasoning(rng) {
         'Solve the pair of equations.'
       ],
       steps: [
-        { h: 'At first', d: `$\\dfrac{x}{n} = \\dfrac{${a}}{${b}}$, so $${b}x = ${a}n$` },
-        { h: 'After adding', d: `$\\dfrac{x + ${k}}{n + ${k}} = \\dfrac{${after.n}}{${after.d}}$, so $${after.d}(x + ${k}) = ${after.n}(n + ${k})$` },
+        { h: 'At first', d: `$\\dfrac{x}{n} = \\dfrac{${a}}{${b}}$, so $${term(b)} = ${term(a, 'n')}$` },
+        { h: 'After adding', d: `$\\dfrac{x + ${k}}{n + ${k}} = \\dfrac{${after.n}}{${after.d}}$, so $${after.d === 1 ? '' : after.d}(x + ${k}) = ${after.n === 1 ? '' : after.n}(n + ${k})$` },
         { h: 'Solve', d: `$n = ${N}$ and $x = ${x}$` }
       ],
       reasoning: 'bag-algebra'

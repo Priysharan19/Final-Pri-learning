@@ -67,10 +67,12 @@ Do not reuse successful evidence from an older commit SHA.
 Set Xcode user-defined build setting:
 
 ```text
-PRI_CLOUD_ORIGIN=https://<approved-production-origin>
+PRI_CLOUD_ORIGIN=https://app.prilearning.com
 ```
 
-The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. Do not ship a localhost, arbitrary path, query-bearing or fragment-bearing origin. If the value is absent or invalid, native cloud requests fail closed — and because grading is online-only (ADR-0001 amendment, 2026-10-10) such a build can never mark an answer: every question is an unmarkable draft. A release archive with no valid origin is unshippable; the archive gate in §6 enforces this.
+**Every native archive names exactly `https://app.prilearning.com`** (Director decision 9 Nov 2026 under owner default D5, "test what you ship"). Until GO, `app.prilearning.com` fronts the **staging** service at the candidate SHA, so the device matrix runs on the very binary the store will receive; at promotion the owner re-points it to production and the post-promotion smoke test runs. The binary is identical either way. The owner provisions the DNS record, TLS and the Railway custom domain; until they exist the archive can be built and checked but cannot reach a server. A development build may still point at a local or staging server; an archive never does.
+
+The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. The archive gate refuses any other value: localhost or a private address, http, a path, query or fragment, a raw `*.railway.app` host, or any other host. If the value is absent or invalid, native cloud requests fail closed — and because grading is online-only (ADR-0001 amendment, 2026-10-10) such a build can never mark an answer: every question is an unmarkable draft. A release archive with no valid origin is unshippable; the archive gate in §6 enforces this.
 
 Never put credentials, session cookies, API keys or provider secrets into this build setting or the web bundle.
 
@@ -84,18 +86,18 @@ Review this list against the exact candidate before each submission rather than 
 
 ### Native capabilities currently declared
 
-- Camera: declared in `Package.swift` with a purpose string for photographing handwritten mathematics for on-device reading/attempt use.
+- Camera: declared in `Package.swift` with a purpose string for photographing handwritten mathematics; the photo is sent to the Pri server to be read.
 - App category: Education.
 - Non-exempt encryption declaration: `ITSAppUsesNonExemptEncryption = false` in Info.plist.
 
 ### Native/product data paths that must be represented accurately in privacy review
 
 - offline/local learning data and profiles stored on device;
-- Apple Pencil/PencilKit handwriting used by the local handwriting pipeline;
-- photo input when the student explicitly uses photo OCR;
+- Apple Pencil/PencilKit handwriting: captured on the device, and sent to the Pri server as a picture when the student presses "Read my answer" (no on-device reader);
+- photo input when the student attaches a photo of working: sent to the Pri server to be read (no on-device OCR);
 - optional authenticated `/v1` cloud account/sync/classroom/entitlement features through `NativeCloudBridge`;
 - native Apple purchase/restore flow with server-authoritative entitlement state;
-- optional cloud handwriting path only where the product/configuration enables it, subject to its answer-blind privacy boundary;
+- the server handwriting/photo reader is the only reader; it is answer-blind and on by default for an eligible signed-in account (minors need a confirmed guardian), and nothing is read offline;
 - user-initiated exports/shares of backups, progress/task files and related artifacts.
 
 This inventory is an engineering map, not legal advice and not an App Store privacy answer by itself. The person submitting the app must reconcile the exact shipping features, server configuration and current Apple disclosure requirements.
@@ -107,8 +109,8 @@ After the exact candidate SHA is merged/approved and preflight is green:
 1. on that checkout run `npm run build && npm run sync:ios && npm run check:ios` first (the archive copies the generated `Resources/Web`; an archive made before the sync ships an empty web folder), then open `ios/PriLearning.swiftpm` in the supported Xcode release environment;
 2. select the `PriLearning` scheme and a generic/eligible iOS device destination suitable for archiving;
 3. verify production signing team and bundle identifier;
-4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
-   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha> --probe` must print `NATIVE ARCHIVE GATE: PASS` (it refuses an empty, non-https, local, staging or path-bearing origin, a non-shipping bundle id, and a web bundle from another commit);
+4. verify `PRI_CLOUD_ORIGIN` is `https://app.prilearning.com`, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
+   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha> --probe --evidence <evidence dir>/native-archive-origin.json` must print `NATIVE ARCHIVE GATE: PASS` (it refuses any origin but `https://app.prilearning.com`, a non-shipping bundle id and a web bundle from another commit; `--probe` also requires the origin to answer as a Pri server on that commit and to serve that commit's `/release.json`). The evidence file records what `app.prilearning.com` resolved to at that moment — its CNAME chain, whether that is the staging or the production service, the server's release SHA and database engine, and the `/release.json` SHA — so the record says which backend the device matrix ran against;
 5. confirm the intended marketing/build versions shown by the package;
 6. create a Release archive with Product → Archive;
 7. in Organizer, inspect the archive identity, version/build number, signing and bundled app icon;
@@ -124,7 +126,7 @@ The same archive can be produced headless from `ios/PriLearning.swiftpm` (scheme
 ```bash
 xcodebuild archive -scheme PriLearning -destination 'generic/platform=iOS' \
   -archivePath <out>.xcarchive DEVELOPMENT_TEAM=8BY7H9SXY8 \
-  PRI_CLOUD_ORIGIN=https://<approved-production-origin> \
+  PRI_CLOUD_ORIGIN=https://app.prilearning.com \
   CODE_SIGN_ENTITLEMENTS=<plist granting com.apple.developer.applesignin = [Default]> \
   'OTHER_LDFLAGS=-Xlinker -platform_version -Xlinker ios -Xlinker 16.0 -Xlinker <iOS SDK version>'
 ```
@@ -161,6 +163,7 @@ Before pressing Submit for Review:
 - icon, display name and launch presentation are correct;
 - permission purpose text matches actual behavior;
 - App Privacy answers have been reviewed against the exact shipping data paths;
+- Accessibility Nutrition Labels: do **not** declare Larger Text / Dynamic Type support. The shell scales the whole page through the viewport, capped so the CSS viewport never drops below 360 px (about 1.12× at the largest size on a 402 pt iPhone, up to 1.5× on iPad); that is not system Dynamic Type reflow. Declare VoiceOver only after the physical pass in `docs/release/device-matrix.md` records it;
 - screenshots/preview/media match the shipping UI and supported device sizes;
 - product description, support URL, privacy-policy URL and contact information are current;
 - subscriptions/in-app purchase products used by the build are correctly configured and reviewable;

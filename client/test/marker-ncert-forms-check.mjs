@@ -32,6 +32,15 @@ function wrong(question, input, label) {
   const verdict = checkAnswer(question, input);
   ok(verdict.correct === false, `${label} — expected wrong, got correct`);
 }
+// D13 (owner default, interim until the examiner rules on #499): a numeric box
+// holds a value, so a form with an operation still to do is refused — returned
+// unread, no try spent — whatever it equals. Cases below that pinned such a
+// form as accepted before D13 now pin its refusal.
+function unevaluated(question, input, label) {
+  const verdict = checkAnswer(question, input);
+  ok(verdict.correct === false && verdict.invalid === true && /Work it out first/.test(verdict.feedback || ''),
+    `${label} — expected refused as unevaluated (D13), got correct=${verdict.correct} invalid=${verdict.invalid} (${verdict.feedback || ''})`);
+}
 
 // ── 1. Solution sets, the way NCERT writes them ──────────────────────────────
 // "The zeroes of the polynomial are …" is answered as a set, in any order, with
@@ -175,13 +184,16 @@ for (const [source, expected, label] of vocabulary) {
 
 // The vocabulary reaches the marker, not just the evaluator.
 const combinatorics = { answerType: 'numeric', answer: { value: 10 } };
-correct(combinatorics, '5C2', 'vocabulary: nCr answers a numeric question');
-correct(combinatorics, '5!/(2!*3!)', 'vocabulary: the factorial definition of the same number');
+// D13: the vocabulary is read (see the evaluator cases above), but a count or
+// a factorial left to work out is not a numeric answer.
+unevaluated(combinatorics, '5C2', 'vocabulary (D13): nCr left to evaluate is refused');
+unevaluated(combinatorics, '5!/(2!*3!)', 'vocabulary (D13): the factorial definition left to evaluate is refused');
+correct(combinatorics, '10', 'vocabulary: the count itself');
 wrong(combinatorics, '5P2', 'vocabulary: a permutation is not a combination');
 
 const trig = { answerType: 'numeric', answer: { value: 2 } };
-correct(trig, 'sec(pi/3)', 'vocabulary: sec answers a numeric question');
-correct(trig, '1/cos(pi/3)', 'vocabulary: the reciprocal written out');
+unevaluated(trig, 'sec(pi/3)', 'vocabulary (D13): sec left to evaluate is refused');
+unevaluated(trig, '1/cos(pi/3)', 'vocabulary (D13): the reciprocal left to evaluate is refused');
 
 // ── 6. Indian money: a rupee answer to a rupee question ─────────────────────
 // The product is India-first. A student who answers "₹9.75" to a question
@@ -202,8 +214,12 @@ for (const [input, label] of [
   ['INR 9.75', 'the currency code'],
   ['9.75 rupees', 'the word after the number'],
   ['9.75 Rupees', 'the word capitalised'],
-  ['$9.75', 'the dollar sign still works'],
+  ['₹9.75/-', 'the Indian "/-" after the amount (D14)'],
 ]) correct(rupees, input, `money: ${label}`);
+// D14: a currency that is not the rupee contradicts a rupee question. Before
+// D14 "$9.75" was read as ₹9.75; a typeset pair "$9.75$" is still maths.
+wrong(rupees, '$9.75', 'money (D14): a dollar sign is a contradicting currency');
+correct(rupees, '$9.75$', 'money (D14): a typeset pair of dollar signs is not money');
 wrong(rupees, '₹9.85', 'money: a rupee sign does not make a wrong number right');
 wrong(rupees, '₹', 'money: a currency sign alone is not an answer');
 wrong(rupees, 'rupees', 'money: the word alone is not an answer');
@@ -312,8 +328,8 @@ for (const [input, label] of [
 const conversion = { answerType: 'numeric', answer: { value: 120000 }, prompt: 'Convert $12$ m² to cm².' };
 correct(conversion, '120000', 'exactness: the answer');
 correct(conversion, '1.2e5', 'exactness: scientific notation');
-correct(conversion, '12*100^2', 'exactness: the calculation left unevaluated');
-correct(conversion, '(1/3)*360000', 'exactness: floating-point noise is still the answer');
+unevaluated(conversion, '12*100^2', 'exactness (D13): the calculation left unevaluated is refused');
+unevaluated(conversion, '(1/3)*360000', 'exactness (D13): a product left to take is refused');
 correct(conversion, '120,000', 'exactness: a thousands separator');
 for (const [input, label] of [
   ['120001', 'one too many'],
@@ -334,7 +350,7 @@ correct(roundedTarget, '3.14159', 'non-integer answers accept themselves');
 const smallInteger = { answerType: 'numeric', answer: { value: 12 } };
 correct(smallInteger, '12', 'small integer: itself');
 correct(smallInteger, '36/3', 'small integer: a calculation');
-correct(smallInteger, 'sqrt(144)', 'small integer: a surd that lands on it');
+unevaluated(smallInteger, 'sqrt(144)', 'small integer (D13): a root that is whole is still to take');
 wrong(smallInteger, '12.01', 'small integer: a hundredth out is wrong');
 
 // A relative band grows with the target. Without an absolute cap the default
@@ -385,6 +401,64 @@ wrong(percentage, '52.5%', 'percent: a wrong percentage is wrong');
 const proportion = { answerType: 'numeric', answer: { value: 0.475 } };
 correct(proportion, '47.5%', 'percent: a proportion answered as a percentage');
 correct(proportion, '0.475', 'percent: the proportion itself');
+// On a question that asks for a percentage, the sign is the answer's unit, written
+// once at the end. 100 times the answer with a sign is never the answer (P0, #670).
+for (const input of ['4750%', '(4750%)', '4750%%', '4750% + 0', '4750 percent']) wrong(percentage, input, `percent: "${input}" is a hundred times the percentage`);
+correct(percentage, '47.5 percent', 'percent: the word is the sign');
+correct(percentage, '(47.5%)', 'percent: one sign inside brackets');
+const bySuffix = { answerType: 'numeric', answer: { value: 66.3 }, answerSuffix: '%', prompt: 'Find the combined mean mark.' };
+correct(bySuffix, '66.3%', 'percent: a % beside the box asks for a percentage');
+wrong(bySuffix, '6630%', 'percent: and a hundred times it is wrong');
+const cvPct = { answerType: 'numeric', answer: { value: 20 / 3, simplestFraction: { n: 20, d: 3 }, requireFraction: false }, answerSuffix: '%', prompt: 'Find the coefficient of variation, as a percentage.' };
+correct(cvPct, '20/3%', 'percent: the whole expression before the sign is the percentage');
+const areaOnly = { answerType: 'numeric', answer: { value: 72 }, prompt: 'Find the area.' };
+wrong(areaOnly, '7200%', 'percent: a % on an area is a wrong unit');
+// A percentage the prompt GIVES is data, not the answer's unit, even inside the
+// sentence that asks (repair of #670, m-finish-10-marking). The key is the
+// proportion 0.2, so "20%" is it and "0.2%" is a hundred times too small.
+const givenInAsk = { answerType: 'numeric', answer: { value: 0.2 }, prompt: 'If 20 percent of the marbles are red, what is the probability of drawing a red marble?' };
+correct(givenInAsk, '20%', 'percent: a given "20 percent" in the asking sentence does not make 20% a wrong 20');
+wrong(givenInAsk, '0.2%', 'percent: and 0.2% is 0.002, not 0.2');
+correct(givenInAsk, '0.2', 'percent: the proportion itself');
+const givenBefore = { answerType: 'numeric', answer: { value: 0.2 }, prompt: 'A test is 20 percent complete. Find the probability that a task picked at random is done.' };
+correct(givenBefore, '20%', 'percent: a given "20 percent" in an earlier sentence: 20% is 0.2');
+wrong(givenBefore, '0.2%', 'percent: and 0.2% is not');
+const givenMath = { answerType: 'numeric', answer: { value: 0.125 }, prompt: 'What decimal is $12\\frac{1}{2}$ percent of a whole?' };
+correct(givenMath, '12.5%', 'percent: a typeset given percentage is a given: 12.5% is 0.125');
+wrong(givenMath, '0.125%', 'percent: and 0.125% is not');
+const findX = { answerType: 'numeric', answer: { value: 200 }, prompt: 'If 20 percent of $x$ is 40, find $x$.' };
+correct(findX, '200', 'percent: x itself');
+wrong(findX, '200%', 'percent: a % on x = 200 is a wrong unit, not a unit the given "20 percent" lent it');
+wrong(findX, '2%', 'percent: 2% is 0.02, not 200');
+const whatPct = { answerType: 'numeric', answer: { value: 20 }, prompt: 'What percentage of 50 is 10?' };
+correct(whatPct, '20%', 'percent: "what percentage" asks for one: 20% is 20');
+correct(whatPct, '20', 'percent: the bare number is 20 too');
+wrong(whatPct, '2000%', 'percent: a hundred times it is wrong');
+wrong(whatPct, '0.2', 'percent: the proportion is not the percentage');
+const asPctOf = { answerType: 'numeric', answer: { value: 40 }, prompt: 'Express 20 as a percentage of 50.' };
+correct(asPctOf, '40%', 'percent: "20 as a percentage of 50" asks for a percentage, the 20 is not a given percentage');
+wrong(asPctOf, '4000%', 'percent: and a hundred times it is wrong');
+
+// ── 10b. A label names the asked quantity ────────────────────────────────────
+const bSquared = { answerType: 'numeric', answer: { value: 50 }, prompt: 'Find $b^2$.' };
+correct(bSquared, 'b^2 = 50', 'label: the asked quantity');
+correct(bSquared, 'b² = 50', 'label: the asked quantity with a superscript');
+wrong(bSquared, 'b = 50', 'label: b is not b²');
+wrong(bSquared, 'a^2 = 50', 'label: another quantity');
+const sumAB = { answerType: 'numeric', answer: { value: 7 }, prompt: 'Find $a + b$.' };
+correct(sumAB, 'a + b = 7', 'label: the asked sum');
+wrong(sumAB, 'a = 7', 'label: one of the summands is not the sum');
+const meanDev = { answerType: 'numeric', answer: { value: 2.4 }, prompt: 'Find the mean deviation about the mean.' };
+correct(meanDev, 'mean deviation = 2.4', 'label: the whole asked phrase');
+wrong(meanDev, 'Mean = 2.4', 'label: the mean is not the mean deviation');
+const prRed = { answerType: 'numeric', answer: { value: 0.4, simplestFraction: { n: 2, d: 5 } }, prompt: 'Find $P(\\text{red})$ as a fraction in simplest form.' };
+correct(prRed, 'P(red) = 2/5', 'label: P(red)');
+correct(prRed, 'P = 2/5', 'label: the bare P still reads as before');
+const expX = { answerType: 'numeric', answer: { value: 1.05 }, prompt: 'Find $E(X)$.' };
+correct(expX, 'E = 1.05', 'label: the bare E still reads as before');
+const fAt = { answerType: 'numeric', answer: { value: 7 }, prompt: 'If $f(x) = x^2 - 2$, evaluate $f(3)$.' };
+correct(fAt, 'f = 7', 'label: the bare f still reads as before');
+correct(fAt, 'f(3) = 7', 'label: f(3)');
 
 // ── 11. A variable is not a unit ─────────────────────────────────────────────
 // cleanInput strips a trailing unit. Applied to an expression answer it ate the
@@ -400,10 +474,19 @@ for (const [expr, inputs, label] of [
 }
 wrong({ answerType: 'expression', answer: { expr: '2h' } }, '2', 'expression units: dropping the variable is wrong');
 
-// A numeric answer still forgives the unit the question was asked in.
-const withUnits = { answerType: 'numeric', answer: { value: 12 } };
-for (const input of ['12 cm', '12 m', '12 s', '12 kg', '12 cm²', '12 hours', '12 degrees'])
-  correct(withUnits, input, `numeric units: "${input}" still reads as 12`);
+// A numeric answer still forgives the unit the question was asked in. Each
+// question here names its unit: with no unit beside the box, a unit the
+// question never names is not stripped and ignored — "24 kg" is not a length
+// (#680, Q1 round 3; the refusals are pinned in marker-adversarial-corpus-check).
+for (const [input, prompt] of [
+  ['12 cm', 'A side is 4 cm. Find the perimeter of the equilateral triangle in cm.'],
+  ['12 m', 'A rope of 20 m loses 8 m. How many metres are left?'],
+  ['12 s', 'A runner takes 3 s per lap. How many seconds do 4 laps take?'],
+  ['12 kg', 'Three bags weigh 4 kg each. Find the total mass in kg.'],
+  ['12 cm²', 'A rectangle is 4 cm by 3 cm. Find its area in cm².'],
+  ['12 hours', 'A tap fills a tank in 3 hours. How many hours do 4 tanks take?'],
+  ['12 degrees', 'Find the angle in degrees.']
+]) correct({ answerType: 'numeric', answer: { value: 12 }, prompt }, input, `numeric units: "${input}" still reads as 12`);
 
 // ── 12. Decorations a student writes around a right answer ───────────────────
 // Continuing the question's own line with "= 9.75", ending the answer with a
@@ -687,4 +770,14 @@ ok(marks('e^2', '7.39') === false, 'marker: a rounded decimal is not e²');
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
-process.exit(failures.length ? 1 : 0);
+if (failures.length) process.exit(1);
+// Step 14 negative and positive holdouts are CI-blocking without rewriting shared
+// workflows or lowering the existing exact NCERT case-count assertion.
+await import('./marker-adversarial-corpus-check.mjs');
+await import('./marker-exact-bounds-check.mjs');
+// The independent R4 review of #723: its four regressions, pinned.
+await import('./marker-step14-review-check.mjs');
+// Its follow-ups on the policies train: set/point/surd guards, ratios, intervals, √0.
+await import('./marker-review-followups-check.mjs');
+// #680's own comments: the cases they preserve (not the lost original 197).
+await import('./marker-680-sourced-check.mjs');

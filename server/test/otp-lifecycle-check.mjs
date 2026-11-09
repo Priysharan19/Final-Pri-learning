@@ -15,6 +15,7 @@ process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
 process.env.PRI_PUBLIC_ORIGIN = 'http://localhost:5173';
 
 const { startApp, checks } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 const {
   readTestOutbox, clearTestOutbox, createSmsProviderFromEnv, testModeAllowed, smsOtpBody,
   createMsg91Provider, createTwilioVerifyProvider
@@ -23,12 +24,16 @@ const { normalizeEmail, normalizePhone, OTP_MAX_ATTEMPTS, OTP_TTL_MS } = await i
 const { createOtpEmailSenderFromEnv } = await import('../platform/otpEmail.js');
 const { CONSENT_NOTICE_VERSION } = await import('../platform/guardianConsent.js');
 
+// SQLite by default; `--engine=postgres` runs the same journey on a migrated
+// Postgres as the pri_server role (server/test/run-platform-postgres.mjs).
+const engine = requestedEngine();
+console.log(`engine: ${engine}`);
 const c = checks();
-const h = await startApp();
-const resetLimits = () => h.db.prepare ? h.db.prepare('DELETE FROM rate_limits').run() : h.db.run('DELETE FROM rate_limits');
+const h = await startApp({ engine });
+const resetLimits = () => h.db.run('DELETE FROM rate_limits');
 const lastCode = (to) => readTestOutbox({ to }).at(-1)?.code;
 const post = (path, body, jar = {}) => h.request(`/v1/account/otp${path}`, { method: 'POST', body, jar, headers: { Origin: 'http://localhost:5173' } });
-const raw = h.db; // bare better-sqlite3 handle in this harness
+const raw = h.db; // the async store (get/all/run) on either engine
 
 try {
   // ── normalisation ───────────────────────────────────────────────────────
@@ -93,8 +98,8 @@ try {
   const firstChallenge = r.data.challengeId;
   const code1 = lastCode('new.student@example.test');
   c.match(code1, /^\d{6}$/, 'a 6-digit code was "sent" to the normalised address');
-  c.ok(!raw.prepare('SELECT code_hash FROM otp_challenges WHERE id=?').get(firstChallenge).code_hash.includes(code1), 'the code is not stored');
-  c.ok(!JSON.stringify(raw.prepare('SELECT * FROM otp_challenges').all()).includes('new.student'), 'the address is not stored');
+  c.ok(!(await raw.get('SELECT code_hash FROM otp_challenges WHERE id=?', [firstChallenge])).code_hash.includes(code1), 'the code is not stored');
+  c.ok(!JSON.stringify((await raw.all('SELECT * FROM otp_challenges', []))).includes('new.student'), 'the address is not stored');
 
   r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', challengeId: firstChallenge, code: code1 });
   c.eq(r.data?.status, 'profile-required', 'a new address with a right code asks for a profile');
@@ -109,7 +114,7 @@ try {
   c.eq(r.data.account.email, 'new.student@example.test', 'with the proved email');
   c.ok(r.data.account.emailVerified, 'already verified: the code proved it');
   c.deq(r.data.guardianConsent, { required: true, state: 'pending' }, 'a Class 9 learner starts with consent pending');
-  c.eq(raw.prepare("SELECT age_basis FROM accounts WHERE email='new.student@example.test'").get().age_basis, 'child', 'the shared age decision is recorded as age_basis');
+  c.eq((await raw.get("SELECT age_basis FROM accounts WHERE email='new.student@example.test'", [])).age_basis, 'child', 'the shared age decision is recorded as age_basis');
   r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9', isAdult: false } });
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'a sign-up ticket is single use');
 
@@ -119,8 +124,8 @@ try {
 
   // A learner recorded as a child cannot reclassify themselves as an adult
   // from their own session (issue #477): guardian approval cannot be skipped.
-  const studentAccountId = raw.prepare("SELECT id FROM accounts WHERE email='new.student@example.test'").get().id;
-  const historyBeforeCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
+  const studentAccountId = (await raw.get("SELECT id FROM accounts WHERE email='new.student@example.test'", [])).id;
+  const historyBeforeCorrection = (await raw.get('SELECT * FROM guardian_consents WHERE account_id=?', [studentAccountId]));
   r = await h.request('/v1/account/guardian/state', { jar: studentJar });
   c.deq(
     [r.data?.ageBasis, r.data?.state, r.data?.blockerCode, r.data?.emailVerified],
@@ -130,14 +135,14 @@ try {
   r = await post('/guardian/request', { isAdult: true }, studentJar);
   c.deq([r.status, r.data?.error?.code], [409, 'AGE_CORRECTION_REQUIRES_SUPPORT'],
     'a pending child cannot redeclare themselves adult from their own session');
-  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'child', 'the account stays recorded as a child');
-  const historyAfterCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
+  c.eq((await raw.get('SELECT age_basis FROM accounts WHERE id=?', [studentAccountId])).age_basis, 'child', 'the account stays recorded as a child');
+  const historyAfterCorrection = (await raw.get('SELECT * FROM guardian_consents WHERE account_id=?', [studentAccountId]));
   c.deq(
     [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at, historyAfterCorrection.confirmed_at],
     [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at, historyBeforeCorrection.confirmed_at],
     'the guardian row is untouched'
   );
-  c.eq(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n, 0,
+  c.eq((await raw.get("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'", [studentAccountId])).n, 0,
     'and no age change is recorded');
   r = await h.request('/v1/account/guardian/state', { jar: studentJar });
   c.deq([r.data?.required, r.data?.state, r.data?.eligible], [true, 'pending', false], 'guardian/state still says approval is required');
@@ -145,7 +150,7 @@ try {
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'and the cloud gate still refuses the pending child');
 
   // ── no enumeration: same answer for a known and an unknown address ──────
-  resetLimits();
+  await resetLimits();
   const known = await post('/request', { channel: 'email', destination: 'new.student@example.test' });
   const unknown = await post('/request', { channel: 'email', destination: 'nobody.here@example.test' });
   c.eq(known.status, unknown.status, 'same status for known and unknown');
@@ -164,14 +169,14 @@ try {
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'replaying a spent code fails');
 
   // ── cooldown and per-destination cap ─────────────────────────────────────
-  resetLimits();
+  await resetLimits();
   await post('/request', { channel: 'email', destination: 'limit@example.test' });
   r = await post('/request', { channel: 'email', destination: 'limit@example.test' });
   c.eq(r.status, 429, 'a second code inside 30 s is refused');
   c.ok(Number(r.headers.get('retry-after')) > 0, 'with Retry-After');
 
   // ── brute force: 5 attempts burn the challenge, even with the right code ─
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'sms', destination: '9876543210' });
   const bfChallenge = r.data.challengeId;
   const bfCode = lastCode('+919876543210');
@@ -184,36 +189,36 @@ try {
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'after 5 wrong attempts even the right code fails');
 
   // Parallel guessing cannot exceed the ceiling.
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'sms', destination: '9876500001' });
   const parChallenge = r.data.challengeId;
   const parCode = lastCode('+919876500001');
   const guesses = Array.from({ length: 12 }, (_, i) => String((Number(parCode) + 1 + i) % 1_000_000).padStart(6, '0'));
   await Promise.all(guesses.map(code => post('/verify', { channel: 'sms', destination: '9876500001', challengeId: parChallenge, code, profile: { name: 'P', isAdult: true } })));
-  c.ok(raw.prepare('SELECT attempts FROM otp_challenges WHERE id=?').get(parChallenge).attempts <= OTP_MAX_ATTEMPTS, 'parallel guesses never exceed 5 counted attempts');
+  c.ok((await raw.get('SELECT attempts FROM otp_challenges WHERE id=?', [parChallenge])).attempts <= OTP_MAX_ATTEMPTS, 'parallel guesses never exceed 5 counted attempts');
 
   // Expiry.
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'sms', destination: '9876500002' });
-  raw.prepare('UPDATE otp_challenges SET expires_at = ? WHERE id = ?').run(Date.now() - 1, r.data.challengeId);
+  (await raw.run('UPDATE otp_challenges SET expires_at = ? WHERE id = ?', [Date.now() - 1, r.data.challengeId]));
   const exp = await post('/verify', { channel: 'sms', destination: '9876500002', challengeId: r.data.challengeId, code: lastCode('+919876500002'), profile: { name: 'P', isAdult: true } });
   c.eq(exp.data?.error?.code, 'OTP_INVALID', 'an expired code fails');
 
   // A code is bound to its destination.
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'sms', destination: '9876500003' });
   const cross = await post('/verify', { channel: 'sms', destination: '9876500004', challengeId: r.data.challengeId, code: lastCode('+919876500003'), profile: { name: 'P', isAdult: true } });
   c.eq(cross.data?.error?.code, 'OTP_INVALID', 'a code for one number does not work for another');
 
   // A newer code retires the older one.
-  raw.prepare('DELETE FROM rate_limits').run();
+  (await raw.run('DELETE FROM rate_limits', []));
   const older = r.data.challengeId; const olderCode = lastCode('+919876500003');
   await post('/request', { channel: 'sms', destination: '9876500003' });
   const stale = await post('/verify', { channel: 'sms', destination: '9876500003', challengeId: older, code: olderCode, profile: { name: 'P', isAdult: true } });
   c.eq(stale.data?.error?.code, 'OTP_INVALID', 'asking again retires the previous code');
 
   // ── phone sign-up of a child, then a parent approves by SMS ─────────────
-  resetLimits();
+  await resetLimits();
   const kidJar = {};
   r = await post('/request', { channel: 'sms', destination: '9123456780' });
   r = await post('/verify', { channel: 'sms', destination: '9123456780', challengeId: r.data.challengeId, code: lastCode('+919123456780'), profile: { name: 'Ravi', year: '8', isAdult: false } }, kidJar);
@@ -246,12 +251,12 @@ try {
   c.eq(r.data?.childName, 'Ravi', 'and is told whose account they approved');
   r = await parentPost({ code: parentCode });
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'the parent code is single use');
-  c.eq(raw.prepare("SELECT method FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().method, 'guardian-phone-otp', 'the method written is phone OTP, nothing grander');
+  c.eq((await raw.get("SELECT method FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')", [])).method, 'guardian-phone-otp', 'the method written is phone OTP, nothing grander');
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.ok(r.status !== 403, 'sync opens once approved');
 
   // ── parent withdraws by phone, no session ────────────────────────────────
-  resetLimits();
+  await resetLimits();
   const nobody = await post('/guardian/withdraw-request', { destination: '9000000001' });
   const parent = await post('/guardian/withdraw-request', { destination: '9988776655' });
   c.eq(nobody.status, parent.status, 'withdraw-request answers the same for an unknown number');
@@ -262,20 +267,20 @@ try {
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'and sync stops at once');
   // Regression: the child cannot undo a withdrawal by naming a parent again.
-  resetLimits();
+  await resetLimits();
   r = await post('/guardian/request', { guardianName: 'Someone', channel: 'sms', destination: '9811111111' }, kidJar);
   c.eq(r.status, 409, 'after a withdrawal the child’s session cannot start a new consent request');
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'it says the guardian withdrew');
   r = await post('/guardian/request', { isAdult: true }, kidJar);
   c.deq([r.status, r.data?.error?.code], [409, 'GUARDIAN_CONSENT_WITHDRAWN'],
     'and self-service age correction cannot bypass a guardian withdrawal');
-  c.ok(raw.prepare("SELECT withdrawn_at FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().withdrawn_at > 0, 'and the withdrawal stands');
-  c.eq(raw.prepare("SELECT age_basis FROM accounts WHERE id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().age_basis, 'child',
+  c.ok((await raw.get("SELECT withdrawn_at FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')", [])).withdrawn_at > 0, 'and the withdrawal stands');
+  c.eq((await raw.get("SELECT age_basis FROM accounts WHERE id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')", [])).age_basis, 'child',
     'the withdrawn account remains classified child');
   c.eq(readTestOutbox({ to: '+919811111111' }).length, 0, 'and nothing was sent to the new number');
 
   // Withdraw-request: same timing floor for a number with and without consent.
-  resetLimits();
+  await resetLimits();
   const { WITHDRAW_REQUEST_FLOOR_MS } = await import('../platform/otp.js');
   let t0 = Date.now(); await post('/guardian/withdraw-request', { destination: '9000000002' }); const tNone = Date.now() - t0;
   c.ok(tNone >= WITHDRAW_REQUEST_FLOOR_MS - 20, 'an unknown number waits out the same floor as a real one');
@@ -283,7 +288,7 @@ try {
   // ── pre-registration takeover ───────────────────────────────────────────
   // An attacker registers the victim's address with a password (never
   // verifying it) and keeps a session. The real owner then signs in by code.
-  resetLimits();
+  await resetLimits();
   const attackerJar = {};
   r = await h.request('/v1/account/register', { method: 'POST', headers: { Origin: 'http://localhost:5173' }, jar: attackerJar,
     body: { name: 'Squatter', email: 'victim@example.test', password: 'attacker-password-1', deviceId: 'evil', isAdult: true } });
@@ -296,14 +301,14 @@ try {
   c.eq(r.status, 401, 'the squatter’s session is dead');
   r = await h.request('/v1/account/login', { method: 'POST', headers: { Origin: 'http://localhost:5173' }, body: { email: 'victim@example.test', password: 'attacker-password-1' } });
   c.eq(r.status, 401, 'and the squatter’s password no longer signs in');
-  c.eq(raw.prepare("SELECT password_hash FROM accounts WHERE email='victim@example.test'").get().password_hash, null, 'the unproven password is cleared');
-  c.eq(raw.prepare("SELECT COUNT(*) n FROM account_tokens t JOIN accounts a ON a.id=t.account_id WHERE a.email='victim@example.test' AND t.consumed_at IS NULL").get().n, 0, 'every pending token is spent');
-  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE action='account.first-verified-by-otp'").get().n >= 1, 'and it is recorded in the audit log');
+  c.eq((await raw.get("SELECT password_hash FROM accounts WHERE email='victim@example.test'", [])).password_hash, null, 'the unproven password is cleared');
+  c.eq((await raw.get("SELECT COUNT(*) n FROM account_tokens t JOIN accounts a ON a.id=t.account_id WHERE a.email='victim@example.test' AND t.consumed_at IS NULL", [])).n, 0, 'every pending token is spent');
+  c.ok((await raw.get("SELECT COUNT(*) n FROM audit_log WHERE action='account.first-verified-by-otp'", [])).n >= 1, 'and it is recorded in the audit log');
   r = await h.request('/v1/account/me', { jar: victimJar });
   c.eq(r.status, 200, 'the owner’s new session works');
 
   // ── adults are not gated ─────────────────────────────────────────────────
-  resetLimits();
+  await resetLimits();
   const adultJar = {};
   r = await post('/request', { channel: 'email', destination: 'adult@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'adult@example.test', challengeId: r.data.challengeId, code: lastCode('adult@example.test'), profile: { name: 'Dev', isAdult: true } }, adultJar);
@@ -313,8 +318,8 @@ try {
 
   // An older authenticated account with no age basis can complete setup as a
   // child through the same route; it remains blocked until that guardian acts.
-  const adultAccountId = raw.prepare("SELECT id FROM accounts WHERE email='adult@example.test'").get().id;
-  raw.prepare('UPDATE accounts SET age_basis=NULL WHERE id=?').run(adultAccountId);
+  const adultAccountId = (await raw.get("SELECT id FROM accounts WHERE email='adult@example.test'", [])).id;
+  (await raw.run('UPDATE accounts SET age_basis=NULL WHERE id=?', [adultAccountId]));
   r = await h.request('/v1/account/guardian/state', { jar: adultJar });
   c.deq([r.data?.ageBasis, r.data?.state, r.data?.blockerCode], [null, 'undeclared', 'AGE_DECLARATION_REQUIRED'],
     'missing age is diagnosed without guessing from UI copy');
@@ -323,24 +328,24 @@ try {
     channel: 'email', destination: 'adult.fixture.parent@example.test'
   }, adultJar);
   c.eq(r.status, 202, 'missing age can be completed as child with guardian details');
-  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(adultAccountId).age_basis, 'child', 'child completion is server-authoritative');
-  c.eq(raw.prepare('SELECT method FROM guardian_consents WHERE account_id=?').get(adultAccountId).method, 'guardian-email-otp',
+  c.eq((await raw.get('SELECT age_basis FROM accounts WHERE id=?', [adultAccountId])).age_basis, 'child', 'child completion is server-authoritative');
+  c.eq((await raw.get('SELECT method FROM guardian_consents WHERE account_id=?', [adultAccountId])).method, 'guardian-email-otp',
     'and enters the ordinary guardian approval ceremony');
   r = await h.request('/v1/sync/pull', { jar: adultJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'child completion does not open cloud data before approval');
 
   // A claimed role or a missing age never makes an adult: only isAdult === true.
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
   // The right code proves the mailbox; a profile that is not complete creates
   // nothing and earns the sign-up ticket (the profile is judged only after the
   // code, so the answer never depends on whether the address had an account).
   c.eq(r.data?.status, 'profile-required', 'a right code with no age declaration creates no account: the profile is asked for');
-  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
+  c.eq((await raw.get("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'", [])).n, 0, 'and nothing was written');
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', signupTicket: r.data.signupTicket, profile: { name: 'Claim', role: 'parent' } });
   c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
-  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
+  c.eq((await raw.get("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'", [])).n, 0, 'and nothing was written');
 
   // ── deleting a passwordless account needs a fresh code ──────────────────
   r = await h.request('/v1/account', { method: 'DELETE', headers: { Origin: 'http://localhost:5173' }, jar: kidJar, body: {} });
@@ -352,7 +357,7 @@ try {
   c.eq(r.data?.error?.code, 'OTP_REAUTH_FAILED', 'a wrong code does not delete');
   r = await h.request('/v1/account', { method: 'DELETE', headers: { Origin: 'http://localhost:5173' }, jar: kidJar, body: { otpChallengeId: reauth, otpCode: lastCode('+919123456780') } });
   c.eq(r.data?.deleted, true, 'the right code deletes the account');
-  c.eq(raw.prepare("SELECT COUNT(*) n FROM account_phones WHERE phone_e164='+919123456780'").get().n, 0, 'and its phone row goes with it');
+  c.eq((await raw.get("SELECT COUNT(*) n FROM account_phones WHERE phone_e164='+919123456780'", [])).n, 0, 'and its phone row goes with it');
 } finally {
   await h.close();
 }

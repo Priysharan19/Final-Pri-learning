@@ -16,6 +16,7 @@ import ClassicHome from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
+import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home and Practice are the screens a first run reaches: the profile
@@ -39,6 +40,7 @@ const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
+const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
@@ -49,8 +51,12 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // rides in the install every student downloads before the first screen.
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
+const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
+// The parent weekly report's screen: off in a production build until counsel
+// has reviewed email about minors (D22, PRI_FEATURE_PARENT_REPORT).
+const PARENT_REPORT_ON = featureEnabled('parentReport');
 // The v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): staging only until
 // the owner flips it. Its code and stylesheet load only when the flag is on.
 // The build constant is read directly here (not through featureEnabled) so the
@@ -102,7 +108,7 @@ const I = {
 const STUDENT_NAV = [
   { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
-  { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
+  { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }, ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
@@ -135,7 +141,7 @@ function isDestinationActive(location, to) {
 }
 
 const TITLE_KEYS = {
-  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
+  '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
   '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
@@ -608,6 +614,8 @@ export default function App() {
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
+                    <Route path="/premium" element={studentOnly(<Paywall />)} />
+                    {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={INSTRUMENT_ON ? studentOnly(<MapPage />) : <Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
@@ -682,6 +690,8 @@ export default function App() {
           </div>
         </>
       )}
+      {/* D17: asks once, before the first handwriting or photo read. */}
+      <ReaderPermissionHost />
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>
   );
