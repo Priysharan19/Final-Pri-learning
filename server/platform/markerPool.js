@@ -30,9 +30,11 @@
 //
 // The numbers, and why:
 //   • DEADLINE_MS 1500 — one answer plus its working. Ordinary marking takes
-//     single-digit milliseconds; the engine's own cooperative backstop for a
-//     page of working is 750 ms (checker.js WORKING_LIMITS.backstopMs), so
-//     honest work the engine itself accepts finishes with room to spare, and
+//     single-digit milliseconds. The engine bounds its own work by counted
+//     budgets, not a clock (checker.js WORKING_LIMITS, and expr.js's one
+//     evaluation budget, which exact.js's BigInt steps are also charged to),
+//     so the verdict never depends on timing and honest work finishes with
+//     room to spare. This deadline is only a last guard against a defect:
 //     1.5 s is the longest any one operation can hold one worker.
 //   • EXAM_PAPER_BUDGET_MS 8000 — a whole paper's marking time, summed across
 //     its parts (each part is still stopped at DEADLINE_MS). A paper is not

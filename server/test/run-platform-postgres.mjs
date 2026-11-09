@@ -62,6 +62,13 @@ export const ENGINE_SUITES = [
   // canonical keys, the exact legacy lookups, the real housekeeping sweep and
   // account isolation under RLS, on the Postgres store as pri_server.
   'learning-state-identity-check.mjs',
+  // #723 (Step 14): exact numbers, points, sets, units and false-credit
+  // persistence over authenticated HTTP, as the pri_server role.
+  'step14-decimal-authenticated-check.mjs',
+  'step14-false-credit-persistence-check.mjs',
+  'step14-point-authenticated-check.mjs',
+  'step14-set-authenticated-check.mjs',
+  'step14-units-authenticated-check.mjs',
   // The free plan's daily cap is decided per account where a question is
   // issued: the count, its exactly-once under two racing devices and the
   // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.

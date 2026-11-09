@@ -94,6 +94,12 @@ function sizeOf(node) {
   return size;
 }
 
+/**
+ * Charge `units` of other deterministic work (exact BigInt arithmetic) to the
+ * check's one budget. False once the budget is spent; outside a check, free.
+ */
+export function chargeEvaluation(units) { return spend(units); }
+
 /** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
 export function withEvaluationBudget(units, fn) {
   if (evaluationBudget !== null) return fn();
@@ -253,7 +259,8 @@ function tokenize(input) {
       }
       const numStr = src.slice(i, j);
       if ((numStr.match(/\./g) || []).length > 1) throw new Error('Malformed number');
-      tokens.push({ t: 'num', v: parseFloat(numStr) });
+      // The literal as written rides along so exact.js can read it exactly.
+      tokens.push({ t: 'num', v: parseFloat(numStr), s: numStr });
       i = j;
       continue;
     }
@@ -364,7 +371,7 @@ class Parser {
   parseAtom() {
     const tok = this.next();
     if (!tok) throw new Error('Unexpected end of expression');
-    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v });
+    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v, ...(tok.s !== undefined ? { s: tok.s } : {}) });
     if (tok.t === 'const') return this.maybePower({ t: 'const', v: tok.v });
     if (tok.t === 'var') return this.maybePower({ t: 'var', v: tok.v });
     if (tok.t === 'lp') {
@@ -1042,8 +1049,12 @@ export function numsClose(a, b, tol) {
 
 /** The default band numsClose allows around a target b. */
 export function numericBand(b) {
+  // A whole-number target is exact: its band only absorbs floating-point
+  // noise — 1e-9 near zero, two units of the last binary place at any size
+  // (#680: a |b|·1e-9 band, capped at 0.25, accepted 21149700.019 for a key of
+  // 21149700 and 3840000000000.2 for 3840000000000).
   return Number.isInteger(b)
-    ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
+    ? Math.max(1e-9, Math.abs(b) * 2 * Number.EPSILON)
     : Math.min(decimalCap(b), relativeBand(b));
 }
 

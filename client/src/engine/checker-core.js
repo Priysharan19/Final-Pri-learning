@@ -18,10 +18,11 @@ import {
   parseVectorInput, sameVector,
   parseComplexInput, sameComplex
 } from './answer-forms.js';
-import { unitContradicts, withoutUnit, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
+import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
+import { exactValue, fraction, ExactLimit } from './exact.js';
 
-const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
+const UNIT_TAIL = /(?<![a-zA-Z])(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
 // India-first currency. A student answering a question priced in rupees writes
 // ₹9.75, Rs 9.75, Rs. 9.75 or 9.75 rupees; the dollar sign was already read by
@@ -116,12 +117,17 @@ function fractionFormDemanded(question, ans) {
   return ASKS_FRACTION.test(String(question?.prompt ?? ''));
 }
 
-// A "%" the student typed is worth a second reading at value × 100 only on a
-// question that asked for a percentage. On a question that asked for a
-// probability, "0.44%" is the wrong number written with the wrong sign, and
-// giving it a second chance would mark a wrong answer right. The word, not the
-// symbol: prompts quote percentages in their data all the time.
+// A "%" the student typed is the answer's unit only on a question that asked
+// for a percentage: "65%" is 65 there, and "6500%" is never 65. Anywhere else
+// the sign keeps its arithmetic meaning, so "44%" is 0.44 on a probability
+// question and "0.44%" is the wrong number. The word, not the symbol: prompts
+// quote percentages in their data all the time.
 const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
+// A percentage the prompt GIVES — "20 percent of x", "95 per cent accurate",
+// "$12\frac{1}{2}$ percent" — is data, not the answer's unit, even when it
+// stands in the sentence that asks. Only the word standing for the asked
+// quantity ("what percentage", "as a percentage", "the percentage profit") is.
+const GIVEN_PERCENT = /(?:\$[^$]*\d[^$]*\$|\\\([^)]*\d[^)]*\\\)|\d[\d.,/]*)\s*per\s?cent(?:age)?s?\b/gi;
 
 // "975 paise" is ₹9.75. Whether the word is a hundredth of the rupee or the
 // question's own unit depends on what the question asks in: a suffix in paise
@@ -129,16 +135,58 @@ const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
 // whatever the prompt mentions on the way; otherwise a prompt that talks in
 // paise ("How many paise are there in half a rupee?") asks in paise.
 const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+/**
+ * The answer with the answer box's own word read off its end: beside a box
+ * that says "crore", "years", "runs" or "°C", "98.1 crore", "12 years" and
+ * "-5 °C" are 98.1, 12 and −5 (the correct-answer sweep). The word must follow
+ * the number; its singular and plural are the same word.
+ */
+function withoutBoxWord(question, text) {
+  const box = String(question?.answerSuffix ?? '').trim();
+  if (!box || typeof text !== 'string' || !/[A-Za-z°]/.test(box)) return text;
+  const escape = w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // A unit box ("m", "cm") takes its spellings from units.js alone: "ms" is not
+  // metres (the delta review's "5 ms" false credit). Only a word box ("years",
+  // "runs", "crore") is read in its singular and plural.
+  const forms = canonicalUnit(box) || angleUnitOfSuffix(box) ? [box]
+    : [...new Set([box, box.replace(/(?<=[A-Za-z])s$/i, ''), `${box}s`])];
+  return text.replace(new RegExp(`(?<=[\\d)π]|pi)\\s*(?:${forms.map(escape).join('|')})\\.?\\s*$`, 'i'), '');
+}
+/** A box that counts rupees in a scale word: crore, lakh, million, thousand… */
+const RUPEE_SCALE = /^(?:crores?|lakhs?|lacs?|millions?|billions?|thousands?|hundreds?|arabs?)(?:\s+(?:of\s+)?rupees)?$/i;
 /** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
 function moneyQuestion(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
   if (RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || /paise/i.test(suffix)) return true;
+  // A box that counts rupees in crores, lakhs or millions asks for money when
+  // the prompt is priced in rupees: "₹98.1" beside "crore" is ₹98.1 crore
+  // (#723 review P1 — c7-place-value-systems-reasoning).
+  if (RUPEE_SCALE.test(suffix.trim())) return RUPEE_MARK.test(prompt);
   // An answer box with any other unit beside it (%, km, students) asks for
   // something that is not money, whatever the prompt is priced in: 2000 paise
   // is not a 20% profit (#518).
   if (suffix.trim()) return false;
+  // A question priced in rupees can still ask for a count, a percentage, a
+  // ratio or a time: "How many ₹20 notes does Uday have?", "the greatest
+  // number of copies it can print". ₹ on that answer is a wrong unit, not the
+  // answer's unit (the correct-answer sweep's audit).
+  if (COUNT_ASK.test(askingSentences(prompt.replace(/\$/g, ' ')))) return false;
   return RUPEE_MARK.test(prompt) || /\bpaise\b/i.test(prompt);
 }
+// A percentage, ratio, fraction or rate counts only when the sentence ASKS for
+// it ("what percentage", "find the ratio", "as a fraction"), not when it gives
+// one: "Find the simple interest on ₹500 at 5% per annum" asks for rupees
+// (the delta review's R2).
+const COUNT_ASK = new RegExp([
+  String.raw`\bhow\s+many\b(?!\s+(?:rupees|paise)\b)`,
+  String.raw`\bnumber\s+of\b(?!\s+(?:rupees|paise)\b)`,
+  String.raw`\bhow\s+long\b`,
+  String.raw`\b(?:what|which)\s+(?:is\s+the\s+)?(?:per\s?cent(?:age)?|ratio|fraction|rate)\b`,
+  String.raw`\b(?:find|calculate|work\s+out|give|write|state)\s+(?:the\s+|its\s+|their\s+)?(?:\w+\s+)?(?:per\s?cent(?:age)?|ratio|fraction)\b`,
+  String.raw`\b(?:find|calculate)\s+the\s+rate\b`,
+  String.raw`\bas\s+an?\s+(?:per\s?cent(?:age)?|ratio|fraction)\b`,
+  String.raw`\bin\s+(?:per\s?cent|%)`
+].join('|'), 'i');
 /** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
 function paiseAsked(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? '');
@@ -175,14 +223,232 @@ function namedPrecisionBand(question) {
   return places == null ? null : 0.5 * 10 ** -places * (1 + 1e-9);
 }
 
+// ── A label the student wrote before the answer ─────────────────────────────
+// "b^2 = 50", "PQ² = 436/5", "Area = 24", "sum = -146/7": a student names what
+// they found. A label is read off only when it names what the question asks
+// for — the quantity written right after "Find …" (or "Evaluate", "What is",
+// "the value of"), or the noun that sentence asks for ("Find the area …").
+// A label naming something else is never stripped, and a one-letter label
+// that names a different quantity built on that letter — "b = 5" when the
+// question asks for b² — is a different claim, refused with a reason.
+// "Give your answer to 2 d.p." is an instruction, not an ask.
+const ASK_VERBS = String.raw`(?:find|evaluate|calculate|compute|determine|what is|give(?!\s+(?:your|the)\s+answers?\b))`;
+const ASK_MATH = new RegExp(String.raw`\b${ASK_VERBS}\s+(?:the\s+(?:[a-z]+\s+){0,6}?values?\s+of\s+)?\$([^$]{1,60})\$`, 'gi');
+const ASK_VERB = new RegExp(String.raw`\b${ASK_VERBS}\b`, 'gi');
+const ASK_NOUN = new RegExp(String.raw`\b${ASK_VERBS}\s+((?:[a-z]+\s+){0,4}[a-z]+)`, 'gi');
+// A phrase that points back ("that number", "which step") names nothing new.
+const POINTS_BACK = /^(?:that|which|this|these|those|it)$/;
+// Words of an asked noun phrase that never name the quantity, and the words a phrase stops at.
+const NOT_A_NAME = new Set(['the', 'a', 'an', 'its', 'your', 'their', 'this', 'that', 'these', 'each', 'all', 'how', 'many', 'much', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum', 'possible', 'exact', 'total', 'required', 'new', 'final']);
+const QUANTITY_MODIFIERS = new Set(['total', 'least', 'greatest', 'smallest', 'largest', 'minimum', 'maximum']);
+const PHRASE_ENDS = /^(?:of|in|for|between|from|to|when|if|that|which|on|at|by|with|and|as|so|where|using|given|than|is|are|about|into|under|over|per|after|before|taken|obtained|formed|made|attained|reached|enclosed|bounded|the|a|an|it|its)$/;
+// Words a student puts before a label that are not part of it: "Hence area = 72", "The area is 72".
+const LABEL_LEAD = /^(?:(?:hence|so|thus|therefore|the|a|an)\s+)+/i;
+const GREEK = { alpha: 'α', beta: 'β', gamma: 'γ', delta: 'δ', theta: 'θ', lambda: 'λ', mu: 'μ', pi: 'π', omega: 'ω', Delta: 'Δ' };
+/** One spelling for a written quantity: no TeX wrappers, braces or spaces; ² is ^2. */
+function quantityKey(text) {
+  return String(text)
+    .replace(/\$/g, '')
+    .replace(/\\(?:left|right|,|;|!|\s)/g, '')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, '$1')
+    .replace(/\\ge(?:q)?\b/g, '≥').replace(/\\le(?:q)?\b/g, '≤').replace(/>=/g, '≥').replace(/<=/g, '≤')
+    .replace(/\\(sin|cos|tan|cot|sec|cosec|csc|log|ln|mid)\b/g, (_, f) => (f === 'mid' ? '|' : f))
+    .replace(/\\angle\s*/g, '')
+    .replace(/\\(alpha|beta|gamma|delta|theta|lambda|mu|pi|omega|Delta)\b/g, (_, g) => GREEK[g])
+    .replace(/²/g, '^2').replace(/³/g, '^3')
+    .replace(/[{}\s]/g, '')
+    .replace(/\*\*/g, '^')
+    .toLowerCase();
+}
+/** What the question asks for: written quantities and asked-for nouns. */
+function askedFor(question) {
+  const prompt = String(question?.prompt ?? '');
+  // Only the last ask counts: in "Find the area …, and hence find the height"
+  // the answer is the height, so "area = 8" names the wrong thing.
+  const verbs = [...prompt.matchAll(ASK_VERB)];
+  const from = verbs.length ? verbs[verbs.length - 1].index : 0;
+  const tail = prompt.slice(from).replace(/\*\*|__/g, '');
+  const math = [];
+  for (const m of tail.matchAll(ASK_MATH)) {
+    math.push(m[1]);
+    // "Find $b^2$ and hence $b$", "find $x$, $y$ and $x + y$": each $…$ joined on is asked too.
+    let rest = tail.slice(m.index + m[0].length);
+    for (let next; (next = rest.match(/^\s*(?:,|and(?:\s+hence)?|hence|then)\s+(?:the\s+value\s+of\s+)?\$([^$]{1,60})\$/i)); rest = rest.slice(next[0].length)) math.push(next[1]);
+  }
+  // An asked angle ∠AQB is the angle at its vertex Q: "Q = 74" names it.
+  const vertices = math.flatMap(t => { const a = String(t).match(/^\s*(?:\\angle|∠)\s*\{?([A-Za-z])([A-Za-z])([A-Za-z])\}?\s*$/); return a ? [`${quantityKey(a[1] + a[2] + a[3])}:${a[2].toLowerCase()}`] : []; });
+  for (let i = 0; i < math.length; i++) math[i] = quantityKey(math[i]);
+  math.splice(0, math.length, ...math.filter(k => k && !/[=<>]/.test(k)));
+  // The asked noun phrase, without its leading article and modifiers: "the
+  // least possible mean deviation about the mean" asks for "mean deviation".
+  // A label must be the whole phrase or a trailing part of it ("deviation",
+  // "interest rate", "rate") — never a leading word, which names something
+  // else: "mean" is not the mean deviation, "cube" is not the cube root.
+  const nouns = [];
+  for (const m of tail.matchAll(ASK_NOUN)) {
+    const words = [], lead = [];
+    for (const word of m[1].toLowerCase().split(/\s+/)) {
+      if (words.length && PHRASE_ENDS.test(word)) break;
+      if (!words.length && POINTS_BACK.test(word)) break;
+      if (!words.length && NOT_A_NAME.has(word)) {
+        // "the total cost": "total" on its own names the asked total too.
+        if (QUANTITY_MODIFIERS.has(word)) { nouns.push(word); lead.push(word); }
+        continue;
+      }
+      words.push(word);
+    }
+    for (let i = 0; i < words.length; i++) if (!NOT_A_NAME.has(words[i])) nouns.push(words.slice(i).join(''));
+    // …and with its modifiers kept: "least value" for "the least value of f".
+    for (let j = 1; lead.length && j <= words.length; j++) nouns.push([...lead, ...words.slice(0, j)].join(''));
+  }
+  return { math, nouns, vertices };
+}
+// The dimension an asked noun names, by its head word. Anything else — a
+// price, a root, a rate of change, a count — has no dimension a written unit
+// could match, so a unit on it is left unread.
+const NOUN_DIMENSIONS = [
+  [/(?:perimeter|length|height|width|breadth|side|radius|diameter|distance|circumference|altitude|depth|thickness|rectum|chord)$/, ['length']],
+  [/area$/, ['length²']],
+  [/(?:volume|capacity)$/, ['length³', 'volume']],
+  [/(?:speed|velocity)$/, ['rate:length/time']],
+  [/(?:time|duration)$/, ['time']],
+  [/(?:mass|weight)$/, ['mass']]
+];
+/** The dimensions the asked quantity can be written in, or an empty set. */
+function askedDimensions(question) {
+  const found = new Set();
+  for (const noun of askedFor(question).nouns) {
+    for (const [pattern, dims] of NOUN_DIMENSIONS) if (pattern.test(noun)) { dims.forEach(d => found.add(d)); break; }
+  }
+  // The asking sentence can name the unit itself: "How many metres are
+  // left?", "Find the total mass in kg.", "… its area in cm²?"
+  // The unit can stand mid-sentence ("How far, in cm, does its tip move?",
+  // "Find, in degrees, the angle …"), and the asking sentence need not be the
+  // last ("… ? Take π = 22/7.") — the delta review's P1 on
+  // c11-radian-unit-circle-reasoning.
+  const text = String(question?.prompt ?? '').replace(/\$/g, ' ').replace(/\\(?:text|mathrm)\s*\{([^{}]*)\}/g, ' $1 ');
+  const UNIT_WORDS = String.raw`((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°]+(?:\s*(?:\^?[23]|[²³]))?(?:\s*(?:\/|per)\s*[a-zA-Z]+)?)`;
+  for (const asking of askingSentences(text).split(/(?<=[.?!])\s+/)) {
+    for (const named of [asking.match(/\bhow\s+many\s+([a-z]+(?:\s+per\s+[a-z]+)?)/i)?.[1],
+      asking.match(new RegExp(String.raw`\bin\s+${UNIT_WORDS}\s*[.?!]?\s*$`, 'i'))?.[1],
+      asking.match(new RegExp(String.raw`,\s*in\s+${UNIT_WORDS}\s*,`, 'i'))?.[1]]) {
+      const unit = named ? canonicalUnit(named) : null;
+      const dim = unit && !/^units/.test(unit) ? unitDimension(unit) : null;
+      if (dim) found.add(dim);
+    }
+  }
+  // Two different kinds of quantity asked at once: no single dimension is asked.
+  const kinds = new Set([...found].map(d => (d === 'volume' ? 'length³' : d)));
+  return kinds.size === 1 ? found : new Set();
+}
+const LABELLED = /^\s*([^=≈<>]{1,40}?)\s*[=≈]\s*(\S[\s\S]*)$/;
+/**
+ * Read a label off the answer when it names what the question asks for.
+ * Returns { input } with the label removed (or unchanged when there is none or
+ * it is not ours to judge), or { refuse } with a reason.
+ */
+export function readAnswerLabel(question, raw) {
+  if (typeof raw !== 'string') return { input: raw };
+  const m = raw.match(LABELLED);
+  if (!m) return { input: raw };
+  const label = m[1].trim();
+  // Only a name is a label: "2 + 3 = 5" is working, not a label.
+  if (!/[A-Za-zα-ωΔθ]/.test(label)) return { input: raw };
+  const { math, nouns, vertices } = askedFor(question);
+  const asked = math.length + nouns.length;
+  const key = quantityKey(label);
+  // "Answer = 5", "Ans = 5": the label is the answer itself.
+  if (/^(?:final\s+)?(?:answer|ans|result)$/i.test(label)) return { input: m[2] };
+  if (/^[a-zθ]$/i.test(label)) {
+    // A letter the question GIVES a value ("In triangle ABC, a = 7, c = 9 …
+    // Find b²") names that given, not the answer, unless the letter itself is asked.
+    // Only a letter standing alone and set equal to a plain number is given
+    // ("a = 7,", "when x = 3"); "3x = -18" or "4^x = 281" is the equation to
+    // solve, and on a "Solve …" question the letter is the unknown.
+    // A letter inside an expression is not given either: "3x + 4y + c = 0 …
+    // find c" or "∠A : ∠B = 7 : 5" (a ratio), nor one the asking sentence names.
+    const prompt = String(question?.prompt ?? '');
+    const promptText = prompt.replace(/\$/g, ' ');
+    let given = false;
+    for (const g of promptText.matchAll(new RegExp(`(^|[\\s,(;])${label}\\s*=\\s*-?\\d+(?:\\.\\d+)?(?!\\s*:\\s*-?\\d)(?=[\\s,.;)]|$)`, 'g'))) {
+      const before = promptText.slice(0, g.index + g[1].length).replace(/\s+$/, '');
+      if (/[+\-*/^=<>·×÷\d)]$/.test(before) || /\\(?:angle|vec|hat|bar|overline|overrightarrow)$/.test(before)) continue;
+      // "h = 13 + 3.5w" is a model whose subject is h, not a given value of h
+      // (#723 review — ms12-bivariate): the number goes on into an expression.
+      if (/^\s*(?:[+\-−–*/^·×÷]|\\(?:times|cdot|div)\b)/.test(promptText.slice(g.index + g[0].length))) continue;
+      given = true;
+      break;
+    }
+    given = given && !/\bsolve\b/i.test(promptText);
+    if (given && !math.includes(key)) return { refuse: `${label} is given in the question; this answer should be the quantity the question asks for.` };
+    // A one-letter label is read off as it always was — unless the question
+    // asks, and only asks, for a plainly different quantity on that letter: a
+    // power or multiple of it (b², 2b) or a sum or difference of single letters
+    // that includes it (a + b, p + q + r + s). "P = 2/5" for P(red), "E = 1.05"
+    // for E(X) or "f = 7" for f(−1) stay readable as before.
+    // Any asked expression built on the letter counts — b² + 1, 2x + 3, ab,
+    // x² + 3x — not only a power, multiple or plain sum (#680, Q1: "b = 10"
+    // for "Given b is 3, find b² + 1" was marked right). A function's value
+    // named by the letter (f(−1), P(red), E(X)) is not built on it.
+    const letter = key;
+    const plainlyOther = q => q !== letter
+      && !new RegExp(`^${letter}\\(`).test(q)
+      && !vertices.includes(`${q}:${letter}`)
+      && q.replace(/\\?[a-z]{2,}(?=\()/g, '').split('').includes(letter);
+    const built = math.filter(plainlyOther);
+    if (built.length && !math.includes(letter)) {
+      return { refuse: `The question asks for $${built[0]}$, but this answer is labelled ${label}.` };
+    }
+    return { input: raw };
+  }
+  // "Area of PQR = 72": the label's own head phrase, up to "of", names the
+  // quantity; "Hence area", "The area", "Total area" are the area too.
+  const bare = label.replace(LABEL_LEAD, '').trim() || label;
+  const headWords = [];
+  for (const w of bare.split(/\s+/)) { if (headWords.length && PHRASE_ENDS.test(w.toLowerCase())) break; headWords.push(w); }
+  const head = quantityKey(headWords.join(' '));
+  const bareKey = quantityKey(bare);
+  if ([key, bareKey, head].some(k => k && (math.includes(k) || nouns.includes(k)))) return { input: m[2], asked };
+  // "Profit % = 20", "Loss % = 12", "% profit = 20": a percentage sign in the
+  // label says the value is a percentage of the asked quantity (#723 review).
+  // Matched with the percentage words taken off both sides, the value is read
+  // with its sign, and the percent rule below decides whether a percentage was asked.
+  if (/%|\bper\s?cent(?:age)?\b/i.test(label)) {
+    const unPct = k => String(k).replace(/%|percentage|percent|percent/g, '');
+    const stripped = unPct(bareKey);
+    if (stripped && nouns.some(n => unPct(n) === stripped)) return { input: /%\s*$/.test(m[2]) ? m[2] : `${m[2]}%`, asked };
+    // A percentage label this reader cannot match to the ask ("Loss % = 12"
+    // on "By what percentage did the price fall?") is left unread: no try is
+    // spent on how the answer was labelled.
+    return { unread: 'Write the percentage on its own — like 12%.', asked };
+  }
+  return { input: raw, asked };
+}
+
 function percentAnswerWanted(question, ans) {
   if (ans && typeof ans.percent === 'boolean') return ans.percent;
-  return ASKS_PERCENT.test(String(question?.prompt ?? ''));
+  // A "%" beside the answer box asks for a percentage whatever the prompt says.
+  if (/%/.test(String(question?.answerSuffix ?? ''))) return true;
+  // The word counts only where the question asks for its answer: "a test that
+  // is 95 percent accurate … find the probability" asks for a probability.
+  // A given percentage is struck out first, so "If 20 percent of the marbles
+  // are red, what is the probability?" asks for a probability too, and "If 20
+  // percent of x is 40, find x" asks for a number: a given "percent" never
+  // sets the answer's unit (it once made 20% a wrong 20 and 0.2% a right 0.2).
+  const asking = askingSentences(String(question?.prompt ?? '')).replace(GIVEN_PERCENT, ' ');
+  return ASKS_PERCENT.test(asking) || /\bas\s+an?\s+\\?%/i.test(asking);
+}
+/** The sentences of a prompt that ask for the answer (the last one when none says so). */
+function askingSentences(prompt) {
+  const sentences = prompt.split(/(?<=[.?!])\s+/).filter(Boolean);
+  const asking = sentences.filter(x => /\?\s*$/.test(x) || /\b(?:find|what|express|calculate|give|how|state|determine|work out|evaluate|compute|write)\b/i.test(x));
+  return (asking.length ? asking : sentences.slice(-1)).join(' ');
 }
 
 // One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
 // 12 34 567 (lakh, spaced). Nothing else that breaks digits apart is a number.
-const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$|^\d{1,2}(?: \d{2})* \d{3}$/;
+// The leading group never starts with 0: "0,240" is the list 0 and 240, not 240.
+const GROUPED = /^[1-9]\d{0,2}(?:,\d{3})+$|^[1-9]\d?(?:,\d{2})*,\d{3}$|^[1-9]\d{0,2}(?: \d{3})+$|^[1-9]\d?(?: \d{2})* \d{3}$/;
 // A space a person types or pastes between digit groups: the plain space, the
 // no-break space, and the thin, narrow no-break, en, figure and punctuation
 // spaces typesetting uses for digit groups. A tab or a line break is never one
@@ -233,7 +499,20 @@ function brokenDigitGroups(s) {
   }
   if (call) pieces.push(...splitArguments(call.text));
   pieces.push(top);
-  return pieces.some(brokenRun);
+  return pieces.some(brokenRun) || separatesTwoThings(top);
+}
+
+// A comma, semicolon, tab or line break between two things is a list, whatever
+// the two things are: "0, -2", "0, —2", "0⇥-2", "0, -(2)", "√2, √3", "π, 2" and
+// "2, (3)" are each two answers, never 0 − 2, √6, 2π or 6. Only a separator
+// inside one grouped number (1,234 · 12,34,567) is part of a number, and one at
+// either end ("-2,", a leading line break) separates nothing. The arguments of
+// a counting call are read apart before this, so "nCr(5, 2)" is untouched.
+const SEPARATOR = /[,;\t\n\r\v\f\u2028\u2029]/;
+function separatesTwoThings(piece) {
+  const hidden = piece.replace(/\d[\d,\s]*\d/g, run => (/,/.test(run) && GROUPED.test(run.replace(/ +/g, ' ')) ? '0' : run));
+  const inner = hidden.replace(/^[\s,;]+|[\s,;]+$/g, '');
+  return SEPARATOR.test(inner);
 }
 
 /** The arguments of a call, split at the commas that are not inside a bracket. */
@@ -276,7 +555,7 @@ export function parseNumericInput(raw) {
   // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
   // lists, not 123.
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
-  const meta = { isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
+  const meta ={ isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"
   const mixed = s.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/) ||
@@ -284,10 +563,31 @@ export function parseNumericInput(raw) {
   if (mixed) {
     const sign = mixed[1] === '-' ? -1 : 1;
     const val = sign * (Number(mixed[2]) + Number(mixed[3]) / Number(mixed[4]));
-    return { value: val, meta };
+    const d = BigInt(mixed[4]);
+    return { value: val, meta, exact: d === 0n ? null : fraction(BigInt(sign) * (BigInt(mixed[2]) * d + BigInt(mixed[3])), d) };
   }
   const value = evalNumeric(s);           // handles %, fractions, surds, pi, etc.
-  return { value, meta };
+  // Written only in numbers, the answer also has an exact value (exact.js).
+  return { value, meta, exact: exactValue(s) };
+}
+
+/**
+ * Is a whole-number key contradicted by the exact value of what was written?
+ * A key that is a whole number is exact, and an answer written only in numbers
+ * has one exact value: 3840000000000.001 and 21149700.000000004 are not the
+ * keys 3840000000000 and 21149700, however close their binary64 values lie
+ * (#680, Q1 round 2: both were marked right over authenticated HTTP). The one
+ * allowance is the policy the tolerance suite pins — a calculator's display of
+ * a whole number, 11.9999999999 for 12 — measured exactly, never relative to
+ * the size of the key: within 10⁻⁹ of it, and no further. An answer with no
+ * exact value here (π, a root, a function) keeps the band.
+ */
+const CALCULATOR_DISPLAY = fraction(1n, 1000000000n);
+function exactlyNotWhole(parsed, target) {
+  if (!parsed?.exact || !Number.isSafeInteger(target)) return false;
+  const { n, d } = parsed.exact;
+  const off = n - BigInt(target) * d;                  // (answer − key) · d
+  return (off < 0n ? -off : off) * CALCULATOR_DISPLAY.d > d * CALCULATOR_DISPLAY.n;
 }
 
 /** Does the input look like a rounded decimal rather than an exact form? */
@@ -311,13 +611,20 @@ function splitList(raw) {
   const braced = bracedInner(s, { nested: true });
   if (braced !== null) s = braced;
   s = cleanInput(s)
+    .replace(/,\s*(?=\b(?:or|and)\b)/gi, ' ')           // "2, and 3": one separator, not two
     .replace(/\bor\b/gi, ',')
     .replace(/\band\b/gi, ',')
     .replace(/;/g, ',')
     .replace(/\+\/-|\+-(?=\s*[\d(√s])/g, '±');
+  if (!s.trim()) return [];                             // "{}", "∅": the empty set
+  // A separator stands between two members: "{4,,8}", "{4,8,}" and "4;;8"
+  // leave one blank, and a blank member is refused, never dropped — dropping
+  // it marked {4,,8} right for {4, 8} over the live route (#680, Q1 round 3).
+  const members = s.split(',').map(p => p.trim());
+  if (members.some(p => !p)) throw new Error('Blank entry');
   // "2 ± √3" is the pair 2 + √3, 2 − √3 — and "±4" the pair 4, −4. One ± per
   // entry: a second one has no single reading and is left to fail to parse.
-  return s.split(',').map(p => p.trim()).filter(Boolean).flatMap(p => {
+  return members.flatMap(p => {
     const pm = (p.match(/[±∓]/g) || []).length;
     if (pm !== 1) return [p];
     const plus = p.replace(/[±∓]/, '+').replace(/^\s*\+/, '');
@@ -442,6 +749,41 @@ function checkAnswerWithinBudget(question, rawInput) {
       }
 
       case 'numeric': {
+        // "b^2 = 50": a label that names the asked quantity is read off; one that
+        // names a different quantity on the same letter is refused.
+        const labelled = readAnswerLabel(question, rawInput);
+        if (labelled.refuse) return { correct: false, feedback: labelled.refuse };
+        if (labelled.unread) return { correct: false, invalid: true, feedback: labelled.unread };
+        rawInput = labelled.input;
+        // A percentage is written once, at the end: "65%", "65 percent", "(65%)".
+        // Any other % — "(6500%)" read as 65, "6500%%", "6500% + 0" — is a
+        // percentage sign used as arithmetic, never the answer's unit (P0).
+        if (typeof rawInput === 'string') {
+          // Every "percent"/"per cent" is a sign wherever it stands, so the word
+          // cannot slip a ÷100 past this guard ("6500 percent cm"); a sentence's
+          // full stop and one outer pair of brackets or braces are not part of it.
+          let pct = rawInput.trim().replace(/\s*\bper\s?cents?\b/gi, '%').replace(/[％٪]/g, '%')
+            .replace(/(?<!\.)\.\s*$/, '').trim();
+          const signs = (pct.match(/%/g) || []).length;
+          if (signs) {
+            const outer = pct.match(/^\((.*)\)$/s) || pct.match(/^\{(.*)\}$/s) || pct.match(/^\[(.*)\]$/s);
+            if (outer && !/[(){}[\]]/.test(outer[1])) pct = outer[1].trim();
+            if (signs !== 1 || !/%\s*$/.test(pct)) {
+              return { correct: false, feedback: 'Write a percentage once, at the end — like 65%.' };
+            }
+            if (percentAnswerWanted(question, ans)) {
+              // The sign is the answer's unit: what stands before it is the
+              // percentage, evaluated whole — "20/3%" is 20/3 per cent.
+              rawInput = pct.replace(/\s*%\s*$/, '');
+            } else if (!(Math.abs(Number(ans.value)) <= 1)) {
+              // A % beside an answer outside 0–1 (an area, a count, money) on a
+              // question that does not ask for a percentage is a wrong unit.
+              return { correct: false, feedback: 'This question does not ask for a percentage.' };
+            } else {
+              rawInput = pct;               // 44% is 0.44 on a probability question
+            }
+          }
+        }
         // A unit the student wrote that contradicts the question's unit is a
         // wrong answer, never stripped and ignored: 12 cm is not 12 m.
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
@@ -457,12 +799,52 @@ function checkAnswerWithinBudget(question, rawInput) {
           angleRead = angleUnitWritten(rawInput, { implicitPi: angleUnit === 'rad' });
           if (angleRead) rawInput = withoutAngleUnit(rawInput);
         }
-        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
-        if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) rawInput = withoutUnit(rawInput);
+        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first,
+        // and so is the box's own word written out ("98.1 crore", "12 years", "-5 °C")
+        if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) {
+          rawInput = withoutBoxWord(question, rawInput);
+          // Beside a box whose word is not a unit (crore, students, %), a unit
+          // the student writes is a different quantity: "98.1 kg" is not 98.1 crore.
+          const box = String(question.answerSuffix).trim();
+          const got = writtenUnit(rawInput);
+          if (got && !canonicalUnit(box) && !angleUnitOfSuffix(box)) {
+            return { correct: false, feedback: `Check the unit — this question asks for the answer in ${box}.` };
+          }
+          rawInput = withoutUnit(rawInput);
+        }
+        // With no unit beside the answer box, a unit the student writes is
+        // checked, not stripped and ignored: "24 kg" is not a length of 24
+        // (#680, Q1 round 3). It is read only when its dimension is the asked
+        // quantity's (a perimeter is a length, an area a length², a volume a
+        // length³ or litres) AND the question states a quantity in that unit
+        // ("8 cm by 4 cm … perimeter": 24 cm) — or, for the generic "units",
+        // when the dimension matches. "24 square units" is not a length, and
+        // "g" in g(x) states no grams (#723 review P2). Otherwise the answer
+        // is returned unread — no credit and no try spent — since the
+        // dimension is never guessed.
+        if (!question.answerSuffix && !angleUnit && typeof rawInput === 'string') {
+          const got = writtenUnit(rawInput);
+          if (got && got !== '°' && got !== 'rad') {
+            const wanted = askedDimensions(question);
+            // Stated in the same unit, at any power: an area asked from lengths
+            // in cm is in cm²; a rate must be stated whole.
+            const base = u => (u.includes('/') ? u : u.replace(/[²³]$/, ''));
+            const stated = [...unitsStated(question.prompt)].map(base);
+            const fits = wanted.has(unitDimension(got)) && (/^units/.test(got) || stated.includes(base(got)));
+            if (!fits) {
+              // A number written wrongly ("1, 234 cm") is told how a number is written first.
+              try { parseNumericInput(rawInput); } catch (err) { if (err?.message === 'Not a single number') throw err; }
+              return { correct: false, invalid: true, feedback: `This question does not ask for an answer in ${got}. Write the number on its own, or with the unit the question uses.` };
+            }
+            rawInput = withoutUnit(rawInput);          // the question's own unit, in any spelling ("24 centimetres")
+          }
+        }
         const parsed = parseNumericInput(rawInput);
         const { meta } = parsed;
         let value = parsed.value;
         if (angleUnit && angleRead && angleRead !== angleUnit) value = convertAngle(value, angleRead, angleUnit);
+        // (A % on a question that asks for a percentage was removed above as the
+        // answer's unit, so "6500%" is 6500 there, never 65; a bare 0.65 is 0.65%.)
         // "975 paise" on a question priced in rupees is ₹9.75: the word names a
         // hundredth of the rupee, so the value is divided. On a question that
         // asks in paise the word is the question's own unit and nothing moves.
@@ -470,8 +852,16 @@ function checkAnswerWithinBudget(question, rawInput) {
         // under a tenth of a rupee — was marked ₹9.75.)
         // Paise are money: on a question that is not about Indian money they
         // are a wrong unit, never stripped and never rescaled (500 paise is not 5 m).
+        // Rupees are money too: "100 rupees" is not 100 metres (Q1 round 2).
+        if (!meta.paise && typeof rawInput === 'string' && RUPEE_MARK.test(rawInput) && !moneyQuestion(question)) {
+          return { correct: false, feedback: question.answerSuffix
+            ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
+            : 'Check the unit — this question does not ask for an amount of money.' };
+        }
         if (meta.paise) {
-          if (!moneyQuestion(question)) {
+          // A box that counts rupees in crores or millions is not in paise:
+          // "9810 paise" is ₹98.10, not ₹98.1 crore (#723 review P2).
+          if (!moneyQuestion(question) || RUPEE_SCALE.test(String(question.answerSuffix ?? '').trim())) {
             return { correct: false, feedback: question.answerSuffix
               ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
               : 'Check the unit — this question does not ask for an amount in paise.' };
@@ -491,6 +881,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         // A declared JEE rounding rule (engine/tolerance.js) is read only when the
         // reviewed key itself declares it; nothing is inferred.
         let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
+        // An approximation the question allows (an authored tol, a rounding
+        // rule, a named precision, a converted angle) or a rescaled unit
+        // (paise) is judged by the band; otherwise a whole-number key is exact.
+        if (ok && ans.tol == null && !ans.rounding && named == null && !converted && !meta.paise && exactlyNotWhole(parsed, target)) ok = false;
         let matched = ok ? value : null;
         let wantsExactValue = false;
         // Fraction questions that demand simplest form (e.g. simplify 12/18 → 2/3)
@@ -530,16 +924,6 @@ function checkAnswerWithinBudget(question, rawInput) {
             }
             return { correct: true };
           }
-        }
-        // Percentage forgiveness: expected 25 (%) but student typed 0.25, or
-        // vice versa. A student who writes the % sign on a question that asked
-        // for a percentage has answered it, whether or not the author thought
-        // to set ans.percent — but the sign alone earns nothing: the value is
-        // still compared, and a bare 0.25 is not a second chance at 25.
-        // Only the sign earns the second reading: the box shows "%", so a bare
-        // 0.6 on a question asking for a percentage is 0.6%, not 60%.
-        if (!ok && meta.isPercent && percentAnswerWanted(question, ans)) {
-          if (numsClose(value * 100, target, tolUsed)) { ok = true; matched = value * 100; }
         }
         const exactTol = Math.max(1e-9, Math.abs(target) * 1e-9);
         if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
@@ -582,7 +966,8 @@ function checkAnswerWithinBudget(question, rawInput) {
 
       case 'set': {
         const parts = splitList(rawInput);
-        const values = parts.map(p => parseNumericInput(p).value);
+        const parsedParts = parts.map(p => parseNumericInput(p));
+        const values = parsedParts.map(p => p.value);
         const targets = [...ans.values];
         if (values.length !== targets.length) {
           // A designed wrong answer is worth more than a count: if the student
@@ -592,8 +977,8 @@ function checkAnswerWithinBudget(question, rawInput) {
           if (why) return { correct: false, feedback: why };
           return { correct: false, feedback: targets.length > values.length ? `There ${targets.length === 2 ? 'are two solutions' : `are ${targets.length} solutions`} — you've given ${values.length}.` : 'You have listed too many solutions.' };
         }
-        for (const v of values) {
-          const i = targets.findIndex(t => numsClose(v, t, ans.tol));
+        for (const [k, v] of values.entries()) {
+          const i = targets.findIndex(t => numsClose(v, t, ans.tol) && (ans.tol != null || !exactlyNotWhole(parsedParts[k], t)));
           if (i === -1) {
             const why = matchTraps(question, v, rawInput);
             return { correct: false, feedback: why ?? undefined };
@@ -604,12 +989,20 @@ function checkAnswerWithinBudget(question, rawInput) {
       }
 
       case 'point': {
+        // One separator between two coordinates: "(2, -3)", "(2; -3)", "(2  -3)".
+        // A blank coordinate — "(-10,,6)", "(-10,6,)", "(-10; ;6)" — or two
+        // kinds of separator is refused, never dropped: dropping blanks marked
+        // (-10,,6) right for (-10, 6) over the live route (#680, Q1 round 3).
         const s = cleanInput(rawInput).replace(/^\(/, '').replace(/\)$/, '');
-        const parts = s.split(/[,;]| {2,}/).map(p => p.trim()).filter(Boolean);
+        const hasComma = s.includes(','), hasSemi = s.includes(';');
+        if (hasComma && hasSemi) throw new Error('Blank entry');
+        const parts = (hasComma || hasSemi ? s.split(hasComma ? ',' : ';') : s.split(/ {2,}/)).map(p => p.trim());
+        if (parts.some(p => !p)) throw new Error('Blank entry');
         if (parts.length !== 2) return { correct: false, feedback: 'Give your answer as a coordinate pair, like (2, -3).' };
-        const x = parseNumericInput(parts[0]).value;
-        const y = parseNumericInput(parts[1]).value;
-        const ok = numsClose(x, ans.x, ans.tol) && numsClose(y, ans.y, ans.tol);
+        const px = parseNumericInput(parts[0]), py = parseNumericInput(parts[1]);
+        const x = px.value, y = py.value;
+        const exactOk = ans.tol != null || (!exactlyNotWhole(px, ans.x) && !exactlyNotWhole(py, ans.y));
+        const ok = numsClose(x, ans.x, ans.tol) && numsClose(y, ans.y, ans.tol) && exactOk;
         if (!ok && numsClose(y, ans.x, ans.tol) && numsClose(x, ans.y, ans.tol)) {
           return { correct: false, feedback: 'Check the order — coordinates are written (x, y).' };
         }
@@ -617,18 +1010,26 @@ function checkAnswerWithinBudget(question, rawInput) {
       }
 
       case 'ratio': {
-        let s = cleanInput(rawInput).replace(/\bto\b/gi, ':').replace(/\s+/g, '');
-        let a, b;
-        if (s.includes(':')) [a, b] = s.split(':').map(Number);
-        else if (s.includes('/')) [a, b] = s.split('/').map(Number);
-        else return { correct: false, feedback: 'Write the ratio in the form a : b.' };
-        if (!isNum(a) || !isNum(b) || b === 0) return { correct: false };
-        const ok = Math.abs(a * ans.b - b * ans.a) < 1e-9;
+        // Each part is one number as written: "1 : 3", "1:3", "1.5 : 2". A
+        // space inside a part splits its digits ("1:0 3" is not 1:3), and a
+        // part is compared exactly, never within a band — 1e-12 : 1e-12 is not
+        // 1 : 2, nor is 1 : 2.0000000001 (#680, Q1 round 2).
+        const s = cleanInput(rawInput).replace(/\bto\b/gi, ':').trim();
+        const sep = s.includes(':') ? ':' : s.includes('/') ? '/' : null;
+        if (!sep) return { correct: false, feedback: 'Write the ratio in the form a : b.' };
+        const sides = s.split(sep).map(p => p.trim());
+        if (sides.length !== 2 || sides.some(p => !/^\d+(?:\.\d+)?$/.test(p))) return { correct: false, invalid: true, feedback: 'Write the ratio with exactly two parts, like 2 : 3.' };
+        const [qa, qb] = sides.map(p => exactValue(p));
+        const a = Number(sides[0]), b = Number(sides[1]);
+        if (!qa || !qb || qb.n === 0n) return { correct: false };
+        const ka = exactValue(String(ans.a)), kb = exactValue(String(ans.b));
+        const cross = (p, q, r, t) => p.n * t.n * q.d * r.d === q.n * r.n * p.d * t.d;   // p/q = r/t, i.e. p·t = q·r
+        const ok = !!(ka && kb) && cross(qa, qb, ka, kb);
         if (ok && ans.simplified) {
           const g = gcdInt(Math.round(a), Math.round(b));
           if (g > 1) return { correct: false, feedback: `Right proportions — but simplify the ratio fully (divide both parts by ${g}).` };
         }
-        if (!ok && Math.abs(a * ans.a - b * ans.b) < 1e-9 && ans.a !== ans.b) {
+        if (!ok && ka && kb && cross(qa, qb, kb, ka) && ans.a !== ans.b) {
           return { correct: false, feedback: 'Check the order of the ratio — it looks reversed.' };
         }
         return { correct: ok };
@@ -641,6 +1042,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         return { correct: false, feedback: 'Unknown answer type.' };
     }
   } catch (err) {
+    // An exact value past the bounds is too large to check: unread, never the float band.
+    if (err instanceof ExactLimit) return { correct: false, invalid: true, feedback: 'That answer is too large to check. Write the value itself, worked out.' };
     // Digits broken apart in a way no single number is written: say how one is.
     if (err?.message === 'Not a single number') {
       return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512) — a comma followed by a space reads as two numbers.' };

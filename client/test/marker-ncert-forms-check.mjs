@@ -400,10 +400,19 @@ for (const [expr, inputs, label] of [
 }
 wrong({ answerType: 'expression', answer: { expr: '2h' } }, '2', 'expression units: dropping the variable is wrong');
 
-// A numeric answer still forgives the unit the question was asked in.
-const withUnits = { answerType: 'numeric', answer: { value: 12 } };
-for (const input of ['12 cm', '12 m', '12 s', '12 kg', '12 cm²', '12 hours', '12 degrees'])
-  correct(withUnits, input, `numeric units: "${input}" still reads as 12`);
+// A numeric answer still forgives the unit the question was asked in. Each
+// question here names its unit: with no unit beside the box, a unit the
+// question never names is not stripped and ignored — "24 kg" is not a length
+// (#680, Q1 round 3; the refusals are pinned in marker-adversarial-corpus-check).
+for (const [input, prompt] of [
+  ['12 cm', 'A side is 4 cm. Find the perimeter of the equilateral triangle in cm.'],
+  ['12 m', 'A rope of 20 m loses 8 m. How many metres are left?'],
+  ['12 s', 'A runner takes 3 s per lap. How many seconds do 4 laps take?'],
+  ['12 kg', 'Three bags weigh 4 kg each. Find the total mass in kg.'],
+  ['12 cm²', 'A rectangle is 4 cm by 3 cm. Find its area in cm².'],
+  ['12 hours', 'A tap fills a tank in 3 hours. How many hours do 4 tanks take?'],
+  ['12 degrees', 'Find the angle in degrees.']
+]) correct({ answerType: 'numeric', answer: { value: 12 }, prompt }, input, `numeric units: "${input}" still reads as 12`);
 
 // ── 12. Decorations a student writes around a right answer ───────────────────
 // Continuing the question's own line with "= 9.75", ending the answer with a
@@ -687,4 +696,12 @@ ok(marks('e^2', '7.39') === false, 'marker: a rounded decimal is not e²');
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
-process.exit(failures.length ? 1 : 0);
+if (failures.length) process.exit(1);
+// Step 14 negative and positive holdouts are CI-blocking without rewriting shared
+// workflows or lowering the existing exact NCERT case-count assertion.
+await import('./marker-adversarial-corpus-check.mjs');
+await import('./marker-exact-bounds-check.mjs');
+// The independent R4 review of #723: its four regressions, pinned.
+await import('./marker-step14-review-check.mjs');
+// #680's own comments: the cases they preserve (not the lost original 197).
+await import('./marker-680-sourced-check.mjs');

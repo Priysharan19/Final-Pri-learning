@@ -189,7 +189,20 @@ jobs:
           grep -Fq '56600 questions from 566 declared (generator, difficulty) pairs × 100 draws — 56600 marked correct by their own marker, 56600 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
+          # #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count.
+          grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
+          grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 37063/37063 checks' suites.log
+          grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
+          grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
+          grep -Fq 'Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite' suites.log
+          grep -Fq 'Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite' suites.log
+          grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 133426 wrong answers marked correct across 17304 questions' suites.log
+          # The opposite direction: every right answer to every India question (the key, the box's unit in every
+          # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 29277 right answers over 11002 India questions (566 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -646,7 +659,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 78/78 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 83/83 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -674,6 +687,7 @@ jobs:
           grep -Fq '✓ mistake-notebook-check.mjs' platform-postgres.log
           # 61 → 62 (L6): typed board mocks on Postgres.
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
+          # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
