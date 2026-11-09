@@ -298,7 +298,10 @@ jobs:
           grep -Fq 'TUTOR UI: PASS — 114/114 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
-          grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
+          grep -Fq 'ONBOARDING SCOPE: PASS — 60/60 checks' suites.log
+          # No student-facing text says Pri learns a hand (the count follows the
+          # string catalogues, so only the verdict is pinned here).
+          grep -Fq 'HANDWRITING CLAIMS: PASS — ' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 200/200 checks' suites.log
@@ -331,9 +334,17 @@ jobs:
           grep -Fq 'INK PDF RESOURCE — PASS: pre-parser bytes, raster allocation, timeouts and cleanup bounded' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 33/33 checks' suites.log
-          # 68 → 70 (Train 6, re-derived by a full local shard run on the merged tree); ceilings unchanged.
-          grep -Eq 'INSTALL BUDGET: PASS — 70/70 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
-          grep -Fq 'nothing emitted left uncovered.' suites.log
+          # npm run test:budget measures the one production build: every build
+          # ships the Instrument from client/interface.config.mjs (D7), whose
+          # Map, Report and Scripts tabs are held in the warm pass (#658),
+          # together with every file those tabs import statically; 63 → 65: no
+          # tab carries a stylesheet of its own (they are in the boot one).
+          grep -Eq 'INSTALL BUDGET: PASS — 65/65 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
+          # The V1 interface decisions in source: one interface from one
+          # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
+          # language switch says questions stay in English (D11).
+          grep -Fq 'INTERFACE DECISIONS: PASS — 34/34 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log
@@ -360,7 +371,7 @@ jobs:
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 173/173 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 174/174 checks' suites.log
           # The committed certification report describes the content in the tree (version, digest, scope, result).
           grep -Fq 'CONTENT REPORT FRESH: PASS' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
@@ -1047,9 +1058,13 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
-            # v1.1 instrument interface (PRI_FEATURE_INSTRUMENT): builds with the
-            # flag on, so it runs last in this group.
-            node client/test/tour-instrument.js 2>&1 | tee -a browser.log
+            # The Instrument's own shell, Index, command bar and first-offline
+            # tabs (#658). Every build ships it (client/interface.config.mjs),
+            # so it runs on this group's build like the tours above.
+            node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
+            # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
+            node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -1064,6 +1079,7 @@ jobs:
             node client/test/tour-verified-mark-breakdown.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -1128,8 +1144,9 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          # tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40).
-          grep -Eq 'E2E SUITE.*438/438.*13 flows' browser.log
+          # 429 across 12 flows: main's 438/13, less cal-smoke (the v1.0 calibration
+          # flow, retired with that interface), plus the Instrument's phone destinations.
+          grep -Eq 'E2E SUITE.*429/429.*12 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -1232,6 +1249,8 @@ jobs:
           test "$(grep -Fc 'Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots' browser.log)" -ge 2
           # The v1.1 instrument tour ran (Chromium, flag-on build).
           test "$(grep -Fc 'Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift' browser.log)" -ge 1
+          # Maths at 200% text ran in both engines (its count follows the sample).
+          test "$(grep -Fc 'Maths at 200% text: superscripted formulas wrap or scroll in their own box, nothing cut' browser.log)" -ge 2
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           # Chromium's interface-quality tour runs exactly 209 checks. Practice
           # shows a pinned written question (seeded test server), so its
@@ -1284,13 +1303,15 @@ jobs:
         run: npm run check:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
-      - name: Generated iOS bundles are flag-off production builds
+      - name: Generated iOS bundles are flag-off production builds of the one interface
         # The exact count moved here with the suite (it no longer runs in the
         # sharded npm test): a check that silently ran fewer cases fails.
         run: |
           set -euo pipefail
           node client/test/ios-bundle-features-check.mjs | tee ios-bundle-features.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' ios-bundle-features.log
+          # 20 → 24: each bundle also records the one student interface and its
+          # skin from client/interface.config.mjs (V1 decision D7).
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 24/24 checks' ios-bundle-features.log
       - name: Generated iOS bundle pages need no inline script under the shell CSP
         run: node client/test/native-shell-csp-check.mjs --require-generated
       # After the build, so the scan reads the bytes that ship: every tracked
