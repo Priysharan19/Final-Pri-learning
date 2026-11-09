@@ -1,23 +1,23 @@
 {
  "summary": {
-  "contentVersion": "2026.11.2",
+  "contentVersion": "2026.11.3",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
   "pastPapers": {
    "enabled": false,
    "reason": "rights-opinion-pending",
-   "paths": 57,
+   "paths": 61,
    "advertised": 0
   },
-  "paths": 803,
+  "paths": 807,
   "advertisedPaths": 746,
-  "passed": 803,
+  "passed": 807,
   "failed": 0,
   "questionsServed": 80880,
   "questionsFailed": 0,
   "emptyAdvertisedPaths": 0,
-  "unadvertisedEmptyPaths": 57,
+  "unadvertisedEmptyPaths": 61,
   "difficultySnapped": 10080,
   "difficultyBelowWindow": 0,
   "difficultyMismatch": 0,
@@ -83,14 +83,14 @@
     "chapters": 27
    },
    "jee-advanced · Class 11": {
-    "paths": 127,
-    "passed": 127,
+    "paths": 129,
+    "passed": 129,
     "served": 8640,
     "chapters": 27
    },
    "jee-advanced · Class 12": {
-    "paths": 127,
-    "passed": 127,
+    "paths": 129,
+    "passed": 129,
     "served": 8640,
     "chapters": 27
    }
@@ -862,6 +862,7 @@
   ["jee-advanced/11/c12-determinants#1", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-determinants#2", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-determinants#3", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/11/c12-determinants?pyq", "jee-advanced", 11, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-continuity-differentiability", "jee-advanced", 11, 80, 0, 0, 78, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-continuity-differentiability#1", "jee-advanced", 11, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-continuity-differentiability#2", "jee-advanced", 11, 80, 0, 0, 51, 0, 0, 0, 0, 1, true],
@@ -896,6 +897,7 @@
   ["jee-advanced/11/c12-3d-geometry#1", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-3d-geometry#2", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-3d-geometry#3", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/11/c12-3d-geometry?pyq", "jee-advanced", 11, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-linear-programming", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-linear-programming#1", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/11/c12-linear-programming#2", "jee-advanced", 11, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
@@ -989,6 +991,7 @@
   ["jee-advanced/12/c12-determinants#1", "jee-advanced", 12, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-determinants#2", "jee-advanced", 12, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-determinants#3", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/12/c12-determinants?pyq", "jee-advanced", 12, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-continuity-differentiability", "jee-advanced", 12, 80, 0, 0, 75, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-continuity-differentiability#1", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-continuity-differentiability#2", "jee-advanced", 12, 80, 0, 0, 53, 0, 0, 0, 0, 1, true],
@@ -1023,6 +1026,7 @@
   ["jee-advanced/12/c12-3d-geometry#1", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-3d-geometry#2", "jee-advanced", 12, 80, 0, 0, 79, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-3d-geometry#3", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
+  ["jee-advanced/12/c12-3d-geometry?pyq", "jee-advanced", 12, 0, 0, 80, 0, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-linear-programming", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-linear-programming#1", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
   ["jee-advanced/12/c12-linear-programming#2", "jee-advanced", 12, 80, 0, 0, 80, 0, 0, 0, 0, 0, true],
