@@ -27,7 +27,7 @@ resetStorage();
 // cloud link row, so every linked profile here is a real verified account
 // (never a made-up accountId) whose snapshot the suite then sets.
 const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-const authority = await startOnlineAuthority({ label: 'entitlement-enforcement' });
+const authority = await startOnlineAuthority({ label: 'entitlement-enforcement', nswBanks: true });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');

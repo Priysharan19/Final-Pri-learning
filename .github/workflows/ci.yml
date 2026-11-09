@@ -112,6 +112,10 @@ jobs:
           node client/test/entitlement-check.mjs
           node client/test/question-clock-check.mjs
           node client/test/sync-contract-check.mjs
+          # #300: legacy generator-keyed rows count on the chapter, its dot points and the
+          # predicted paper — sibling generators, after a new answer, after a restore.
+          node client/test/india-legacy-rows-check.mjs | tee india-legacy-rows.log
+          grep -Fq 'india-legacy-rows-check: 85/85 checks passed' india-legacy-rows.log
           # Both of these guard the offline-first backup and cloud-sync paths and
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs
@@ -205,6 +209,8 @@ jobs:
           grep -Fq 'Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite' suites.log
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10840/10840 checks' suites.log
+          # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
+          grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 405961 wrong answers marked correct across 18072 questions' suites.log
@@ -581,6 +587,7 @@ jobs:
       - name: Rate-limit identity, sync idempotency, grants, body size, compressed-body survival and catalogue exposure
         run: |
           node server/test/proxy-identity-contract-check.mjs
+          node server/test/client-ip-header-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
           node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs

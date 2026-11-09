@@ -94,12 +94,16 @@ try {
   const c10 = await spec(free.jar, 10);
   for (const [body, why] of [
     [{ ...c10, mock: 'yes' }, 'a non-boolean flag'], [{ ...c10, mock: false }, 'a false flag (a paper is a mock or omits it)'], [{ ...c10, mock: 1 }, 'a numeric flag'],
-    [{ kind: 'practice-paper', paper: { year: 10, minutes: 30 }, slots: [], mock: true }, 'a practice paper']
   ]) {
     await h.db.run('DELETE FROM rate_limits');
     const r = await create(free.jar, body);
     eq([r.status, r.data?.error?.code], [400, 'EXAM_SPEC_INVALID'], `refused: ${why}`);
   }
+  // A mock flag on the NSW-era practice paper: D15 refuses that kind outright,
+  // before its flag is read (server/platform/indiaBanks.js).
+  await h.db.run('DELETE FROM rate_limits');
+  const nsw = await create(free.jar, { kind: 'practice-paper', paper: { year: 10, minutes: 30 }, slots: [], mock: true });
+  eq([nsw.status, nsw.data?.error?.code], [422, 'EXAM_KIND_OUTSIDE_CURRICULUM'], 'refused: a practice paper (D15: the kind is outside the India curriculum)');
   const basic = await spec(free.jar, 10, 'basic');
   await h.db.run('DELETE FROM rate_limits');
   eq((await create(free.jar, { ...basic, mock: true })).status, 400, 'no mock on the Class X Basic blueprint');

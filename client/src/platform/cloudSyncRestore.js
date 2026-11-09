@@ -233,8 +233,13 @@ async function applyPracticeEvent(pid, profile, event) {
   if (!isGame && !isRepeat && owner !== 'custom') {
     const st = (await get('ratings', `${pid}:${owner}`).catch(() => null))
       || { key: `${pid}:${owner}`, pid, subtopic: owner, rating: START_RATING, attempts: 0, correct: 0, last_at: null, dp: {}, traps: {}, recent: [] };
+    // A pre-cutover row (no dot-point map) keeps its legacy totals frozen
+    // before this restored answer is added (#300; backend.js legacyBaselineOf).
+    const legacy = (!st.dp || typeof st.dp !== 'object') && num(st.attempts, 0) > 0
+      ? { attempts: num(st.attempts, 0), correct: num(st.correct, 0), rating: num(st.rating, START_RATING), last_at: st.last_at || null }
+      : st.legacy || null;
     const ratingNext = {
-      ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
+      ...st, ...(legacy ? { legacy } : {}), key: `${pid}:${owner}`, pid, subtopic: owner,
       rating: updateRating(num(st.rating, START_RATING), num(st.attempts, 0), attempt.difficulty, correct, effHints),
       attempts: num(st.attempts, 0) + 1,
       correct: num(st.correct, 0) + (correct ? 1 : 0),

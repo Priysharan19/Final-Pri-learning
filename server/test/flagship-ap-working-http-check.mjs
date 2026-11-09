@@ -32,6 +32,10 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-flagship-ap-'));
 process.env.NODE_ENV = 'test';
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because its long-expression cases use an NSW bank (y7-algebra) for an expression answer;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 // D12: method marks are off by default — production marks the final answer only
 // until an examiner signs (#499). This suite pins the method rubric itself, so it
 // turns the server switch on; marking-policy-check.mjs pins the default.
