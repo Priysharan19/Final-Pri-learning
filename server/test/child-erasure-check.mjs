@@ -46,7 +46,7 @@ const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { CONSENT_NOTICE_VERSION, confirmConsent } = await import('../platform/guardianConsent.js');
 const { readTestOutbox } = await import('../platform/smsProvider.js');
 const {
-  ERASURE_GRACE_MS, ERASURE_REASONS, UNCONSENTED_CHILD_RETENTION_MS, childErasureMode, retentionCandidates, runChildErasure, scheduleErasure
+  ERASURE_GRACE_MS, ERASURE_REASONS, UNCONSENTED_CHILD_RETENTION_MS, backfillConfirmations, childErasureMode, retentionCandidates, runChildErasure, scheduleErasure
 } = await import('../platform/childErasure.js');
 const { housekeepingStatus, runHousekeeping } = await import('../platform/housekeeping.js');
 
@@ -297,6 +297,18 @@ try {
   await setCreated(moved.id, NOW - 45 * DAY);
   c.ok(!(await retentionCandidates(h.db, { now: NOW })).some(row => row.account_id === moved.id), 'a confirmed child whose renewal cleared confirmed_at is not selected by the 30-day rule');
   c.deq(await scheduleErasure(h.db, moved.id, { now: NOW }), { scheduled: false, eraseAfter: null, reason: null }, 'and the schedule re-check agrees');
+
+  // A child confirmed BEFORE confirmations were audited, then renewed: the backfill keeps it.
+  const early = await registerChild('early');
+  await post('/v1/account/guardian/confirm', { token: await bearer(early.id, 'guardian-consent'), approve: true, noticeVersion: CONSENT_NOTICE_VERSION });
+  // (Setup only: audit_log is append-only for the server role, so on Postgres the owner removes the row.)
+  if (engine === 'postgres') await h.adminExec(`DELETE FROM pri.audit_log WHERE action = 'guardian.confirm' AND target_id = '${early.id.replace(/'/g, "''")}'`);
+  else await h.db.run("DELETE FROM audit_log WHERE action = 'guardian.confirm' AND target_id = ?", [early.id]);
+  c.eq(await backfillConfirmations(h.db, NOW), 1, 'the backfill records the one confirmed child that has no confirmation row');
+  c.eq(await backfillConfirmations(h.db, NOW), 0, 'and is idempotent');
+  await h.db.run("UPDATE guardian_consents SET confirmed_at = NULL WHERE account_id = ?", [early.id]);
+  await setCreated(early.id, NOW - 45 * DAY);
+  c.ok(!(await retentionCandidates(h.db, { now: NOW })).some(row => row.account_id === early.id), 'a child confirmed before this deploy and since renewed is not selected');
 
   // The long-lived withdrawal credential, a second account.
   const keeper = await registerChild('keeper');

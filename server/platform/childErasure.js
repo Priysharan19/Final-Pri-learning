@@ -189,6 +189,24 @@ export function webSubscriptionCancel(db) {
 }
 
 /**
+ * Confirmations recorded before confirmConsent wrote a `guardian.confirm` audit
+ * row: every account whose consent is confirmed now gets one, once, so a later
+ * renewal (which clears confirmed_at) can never make it "never confirmed".
+ * Idempotent; runs before every selection. Returns how many were written.
+ */
+export async function backfillConfirmations(db, now = Date.now()) {
+  db = asStore(db);
+  const rows = await db.all(`SELECT g.account_id, g.confirmed_at FROM guardian_consents g
+    WHERE g.confirmed_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM audit_log l WHERE l.action = 'guardian.confirm' AND l.target_kind = 'account' AND l.target_id = g.account_id)`);
+  for (const row of rows) {
+    await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
+      [null, 'guardian.confirm', 'account', row.account_id, JSON.stringify({ backfilled: true, confirmedAt: Number(row.confirmed_at) }), now]);
+  }
+  return rows.length;
+}
+
+/**
  * One housekeeping pass. Step 2 for every scheduled account whose grace has
  * run out, then step 1 for the retention rule (enforce mode) or a count of
  * what it would schedule (report mode). One account that fails does not stop
@@ -198,6 +216,7 @@ export function webSubscriptionCancel(db) {
 export async function runChildErasure(db, { now = Date.now(), mode = childErasureMode(), beforeDelete, limit = ERASURE_BATCH } = {}) {
   db = asStore(db);
   if (beforeDelete === undefined) beforeDelete = webSubscriptionCancel(db);
+  await backfillConfirmations(db, now);
   const result = { mode, erased: 0, eraseFailed: 0, scheduled: 0, scheduleFailed: 0, candidates: 0 };
 
   const due = await db.all(DUE_SQL, [now - ERASURE_GRACE_MS, limit]);
