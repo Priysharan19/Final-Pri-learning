@@ -2,8 +2,9 @@
 // Pri Learning · the V1 interface decisions D7–D11, held in source
 //
 // D7  one student interface, from one setting, on every build (sections 1–5);
-// D8  the plain Instrument tokens are what ships until the Aurora skin passes
-//     its gates (the setting's INTERFACE_SKIN);
+// D7  …wearing the Aurora skin on chrome (D9), the setting's default;
+// D8  falling back to the plain Instrument tokens is one line of the setting
+//     (INTERFACE_SKIN = 'instrument'), covered here;
 // D10 anything the V1 evidence does not cover is hidden from students,
 //     starting with Classes (section 6);
 // D11 the Hindi switch stays and the app says questions stay in English
@@ -47,7 +48,26 @@ const setting = await import('../interface.config.mjs');
 ok(setting.STUDENT_INTERFACES.includes(setting.STUDENT_INTERFACE), `the setting names a known interface (${setting.STUDENT_INTERFACE})`);
 ok(setting.INTERFACE_SKINS.includes(setting.INTERFACE_SKIN), `and a known skin (${setting.INTERFACE_SKIN})`);
 ok(setting.STUDENT_INTERFACE === 'instrument', 'D7: the one student interface is the Instrument');
-ok(setting.INTERFACE_SKIN === 'instrument', 'D8: until the Aurora skin passes its gates, the Instrument wears its plain tokens');
+ok(setting.INTERFACE_SKIN === 'aurora', 'D7: the Instrument wears the Aurora skin on its chrome (the owner\'s 22 Oct choice; D9 keeps it off content)');
+// D8: the fallback is one line. The setting declares the skin exactly once,
+// 'instrument' is a valid value of it, and the same module with that one
+// line changed still loads and names it.
+{
+  const src = read('client/interface.config.mjs');
+  const lines = src.split('\n').filter(l => /^export const INTERFACE_SKIN = /.test(l));
+  ok(lines.length === 1, 'D8: the skin is one line of the setting');
+  ok(setting.INTERFACE_SKINS.includes('instrument'), 'D8: the plain Instrument tokens are a valid skin');
+  const switched = src.replace(/^export const INTERFACE_SKIN = '[a-z]+';$/m, "export const INTERFACE_SKIN = 'instrument';");
+  const fallback = await import(`data:text/javascript,${encodeURIComponent(switched)}`);
+  ok(src !== switched && fallback.INTERFACE_SKIN === 'instrument' && fallback.INTERFACE_SKINS.includes(fallback.INTERFACE_SKIN) && fallback.STUDENT_INTERFACE === setting.STUDENT_INTERFACE,
+    'D8: switching that one line to \'instrument\' gives a valid setting with the interface unchanged');
+  const appSrc = read('client/src/App.jsx');
+  ok(/if \(INTERFACE_SKIN_UI === 'aurora'\) document\.documentElement\?\.classList\?\.add\('skin-aurora'\);/.test(appSrc)
+    && /INTERFACE_SKIN_UI === 'aurora' && user\.role !== 'teacher' && AURORA_POOL_ROUTES/.test(appSrc),
+    'D8: with \'instrument\' the skin class and the light pools are never applied (aurora-skin-check: every Aurora rule needs that class)');
+  ok(/__PRI_INTERFACE_SKIN__: JSON\.stringify\(states\.skin\)/.test(read('client/vite.config.js')) && /INTERFACE_SKIN_UI = typeof __PRI_INTERFACE_SKIN__ === 'string' \? __PRI_INTERFACE_SKIN__ : SETTING_SKIN/.test(read('client/src/platform/features.js')),
+    'the client reads the skin from the build constant, and from the setting itself where there is none');
+}
 
 // ── 1 + 2 · the build takes the interface from the setting, whatever the env ──
 const saved = process.env.PRI_FEATURE_INSTRUMENT;
@@ -113,4 +133,4 @@ if (failures.length) {
   console.log(`INTERFACE DECISIONS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`INTERFACE DECISIONS: PASS — ${pass}/${pass} checks — D7: web, iOS and Android build the ${setting.STUDENT_INTERFACE} interface (${setting.INTERFACE_SKIN} skin, D8) from client/interface.config.mjs and no build variable can fork it; D10: Classes hidden where the classroom flag is off; D11: the language switch says questions stay in English.`);
+console.log(`INTERFACE DECISIONS: PASS — ${pass}/${pass} checks — D7: web, iOS and Android build the ${setting.STUDENT_INTERFACE} interface (${setting.INTERFACE_SKIN} skin on chrome; D8 fallback one line away) from client/interface.config.mjs and no build variable can fork it; D10: Classes hidden where the classroom flag is off; D11: the language switch says questions stay in English.`);

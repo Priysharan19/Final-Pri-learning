@@ -363,7 +363,12 @@ jobs:
           # The V1 interface decisions in source: one interface from one
           # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
           # language switch says questions stay in English (D11).
-          grep -Fq 'INTERFACE DECISIONS: PASS — 34/34 checks' suites.log
+          # 34 → 39: the Aurora skin is the default on chrome (D7) and the D8
+          # fallback is one line of the setting, covered.
+          grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
+          # The Aurora skin stays on chrome: scope, no content tokens, glass
+          # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
+          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           grep -Fq 'PAYWALL HONESTY: PASS — 45/45 checks' suites.log

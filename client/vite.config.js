@@ -477,7 +477,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
-    __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport)
+    __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
+    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin)
   };
 }
 

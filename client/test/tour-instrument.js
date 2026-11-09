@@ -17,7 +17,7 @@
 // Screens are written to PRI_VISUAL_OUT (or a temp dir) for review.
 //
 // Usage: node client/test/tour-instrument.js [--no-build] [--browser=webkit]
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -800,6 +800,132 @@ export const offlineFlow = {
   }
 };
 
+// V1 decisions D7–D9: the Aurora skin dresses the chrome and nothing else.
+// aurora.css is scoped to html.skin-aurora, so removing that class on the same
+// page is exactly the 'instrument' skin for everything the stylesheet does;
+// the flow compares the two on one page. aurora-skin-check.mjs holds the
+// stylesheet itself (scope, reach, AA contrast).
+const INSTRUMENT_CSS = readFileSync(new URL('../src/instrument/instrument.css', import.meta.url), 'utf8');
+const CONTENT_TOKENS = [...new Set([...INSTRUMENT_CSS.matchAll(/(--in-[a-z0-9-]+)\s*:/g)].map(m => m[1]))]
+  .concat(['--page', '--surface', '--surface-2', '--paper', '--ink', '--ink-2', '--ink-3', '--accent', '--hairline', '--good', '--bad']);
+const CONTENT_SURFACES = ['.qpage', '.q-prompt', '.q-prompt .katex', '.ws-actions', '.ws-bar', '.editor-body', '.ink-stage', '.ink-canvas-live'];
+const SURFACE_PROPS = ['color', 'background-color', 'background-image', 'box-shadow', 'backdrop-filter', 'filter', 'font-family', 'border-top-color', 'opacity'];
+export const auroraFlow = {
+  id: 'instrument-aurora',
+  name: 'Instrument · the Aurora skin stays on chrome: content tokens, ink alignment, pools, motion and transparency (D7–D9)',
+  online: true,
+  async run({ page, check, goto, settle, createProfile, online, note, browserName = 'chromium' }) {
+    const chromium = browserName === 'chromium';
+    const setSkin = on => page.evaluate(v => document.documentElement.classList.toggle('skin-aurora', v), on);
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await goto('/');
+    await createProfile({ name: 'Aurora Student', year: 7 });
+    await online.signIn({ name: 'Aurora Student' });
+    await settle();
+    await goto('/');
+    await page.waitForSelector('.in-ch', { timeout: 30000 });
+    await check('the setting\'s default skin is on: html.skin-aurora', await page.evaluate(() => document.documentElement.classList.contains('skin-aurora')));
+    await check('on the Index the light pools are drawn behind the page',
+      await page.locator('.a-aurora').count() === 1 && await page.evaluate(() => document.documentElement.hasAttribute('data-aurora-pools')));
+    const alphaOf = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
+    await check('the Index plate, which holds the chapter\'s mathematics, is opaque over them',
+      alphaOf(await page.locator('.in-plate').first().evaluate(el => getComputedStyle(el).backgroundColor)) === 1);
+    const barGlass = async () => page.locator('[data-instrument-bar]').evaluate(el => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter || 'none');
+    await check('the tab bar is glass', /blur/.test(await barGlass()), await barGlass());
+    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=y7-integers', '.q-prompt', false]]) {
+      await goto(path);
+      await page.waitForSelector(ready, { timeout: 30000 }).catch(() => {});
+      await settle();
+      const drawn = await page.locator('.a-aurora').count();
+      await check(`${path}: light pools ${want ? 'drawn' : 'never drawn (a question, script or report is on screen)'}`, want ? drawn === 1 : drawn === 0, `${drawn} pool layers`);
+    }
+
+    // Content is the Instrument's under both skins: every content token and
+    // every content surface computes the same with and without the skin.
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+    if (await tab.count()) await tab.click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    await settle();
+    const contentSnapshot = () => page.evaluate(([tokens, surfaces, props]) => {
+      const root = getComputedStyle(document.documentElement);
+      const out = { tokens: Object.fromEntries(tokens.map(t => [t, root.getPropertyValue(t).trim()])), surfaces: {}, glassInside: 0 };
+      for (const sel of surfaces) {
+        const el = document.querySelector(sel);
+        out.surfaces[sel] = el ? Object.fromEntries(props.map(p => [p, getComputedStyle(el).getPropertyValue(p)])) : null;
+      }
+      for (const el of document.querySelectorAll('.qpage *')) {
+        const s = getComputedStyle(el);
+        if ((s.backdropFilter && s.backdropFilter !== 'none') || (s.webkitBackdropFilter && s.webkitBackdropFilter !== 'none')) out.glassInside++;
+      }
+      return out;
+    }, [CONTENT_TOKENS, CONTENT_SURFACES, SURFACE_PROPS]);
+    const withSkin = await contentSnapshot();
+    await setSkin(false); await page.waitForTimeout(300);
+    const without = await contentSnapshot();
+    await setSkin(true); await page.waitForTimeout(300);
+    const tokenDiff = CONTENT_TOKENS.filter(t => withSkin.tokens[t] !== without.tokens[t]);
+    await check(`every content token is identical under both skins (${CONTENT_TOKENS.length} tokens)`, tokenDiff.length === 0, JSON.stringify(tokenDiff.slice(0, 5)));
+    const surfaceDiff = CONTENT_SURFACES.filter(s => JSON.stringify(withSkin.surfaces[s]) !== JSON.stringify(without.surfaces[s]));
+    await check('the question, its KaTeX, the working area, the action bar and the ink surface compute the same under both skins', surfaceDiff.length === 0, JSON.stringify(surfaceDiff));
+    await check('no glass anywhere inside the question card', withSkin.glassInside === 0, `${withSkin.glassInside} elements with a backdrop filter`);
+
+    // Ink alignment: the canvas sits on the same pixels, maps them the same
+    // way and holds the same bitmap under both skins.
+    const canvas = page.locator('.ink-canvas-live').first();
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 60); await page.mouse.down();
+    for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 9, box.y + 60 + (i % 4) * 7);
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    const inkState = () => canvas.evaluate(c => {
+      const r = c.getBoundingClientRect();
+      let h = 0; const d = c.toDataURL(); for (let i = 0; i < d.length; i += 7) h = (h * 31 + d.charCodeAt(i)) | 0;
+      const chain = []; for (let n = c; n; n = n.parentElement) { const s = getComputedStyle(n); chain.push([s.transform, s.filter, s.backdropFilter || s.webkitBackdropFilter || 'none'].join('|')); }
+      return { rect: [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100), size: [c.width, c.height], dpr: devicePixelRatio, bitmap: `${d.length}:${h}`, chain: chain.join(' / ') };
+    });
+    let a = await inkState();
+    await page.waitForTimeout(500);
+    const a2 = await inkState();
+    if (JSON.stringify(a) !== JSON.stringify(a2)) { note('ink surface still settling; re-read'); await page.waitForTimeout(1500); a = await inkState(); }
+    await setSkin(false); await page.waitForTimeout(600);
+    const b = await inkState();
+    await setSkin(true); await page.waitForTimeout(300);
+    await check('ink alignment: the canvas has the same position, size and pixel ratio under both skins', JSON.stringify([a.rect, a.size, a.dpr]) === JSON.stringify([b.rect, b.size, b.dpr]), JSON.stringify({ aurora: a.rect, instrument: b.rect }));
+    await check('ink alignment: the same strokes hold the same bitmap under both skins', a.bitmap === b.bitmap, JSON.stringify({ aurora: a.bitmap, instrument: b.bitmap }));
+    await check('nothing above the canvas transforms or filters it under the skin', !/blur|matrix|scale|translate/.test(a.chain.replace(/none/g, '')), a.chain.slice(0, 200));
+
+    // Motion, transparency, forced colours (on the Index, where the pools are).
+    await goto('/');
+    await page.waitForSelector('.a-aurora i', { timeout: 30000 });
+    const poolAnim = () => page.locator('.a-aurora i').first().evaluate(el => getComputedStyle(el).animationName);
+    const poolShown = () => page.locator('.a-aurora').evaluate(el => getComputedStyle(el).display !== 'none');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await check('with motion allowed the pools drift', await poolAnim() === 'au-drift', await poolAnim());
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await check('under Reduce Motion they stand still', await poolAnim() === 'none', await poolAnim());
+    // The iOS shell's Reduce Transparency class (WebShell.swift): WebKit does not
+    // answer the media query, so the class alone must make the chrome opaque.
+    await page.evaluate(() => document.documentElement.classList.add('a11y-reduce-transparency'));
+    await check('with the shell\'s Reduce Transparency class the bar is opaque and no pool is drawn', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+    await page.evaluate(() => document.documentElement.classList.remove('a11y-reduce-transparency'));
+    await check('and without it the glass and the pools return', /blur/.test(await barGlass()) && await poolShown(), `${await barGlass()} / pools ${await poolShown()}`);
+    if (chromium) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await check('under Reduce Transparency the bar is opaque and no pool is drawn', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await check('in forced colours there is no glass and no pool', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    } else note('Reduce Transparency and forced colours are emulated in Chromium only (CDP); aurora-skin-check holds the rules for every engine');
+
+    // D8: the plain skin is the class away. Without it nothing Aurora remains.
+    await setSkin(false); await page.waitForTimeout(300);
+    await check('without the skin (D8\'s fallback): no pools drawn, no glass bar', !(await poolShown()) && !/blur/.test(await barGlass()), `${await barGlass()}`);
+    await setSkin(true);
+  }
+};
+
 // The first screen on a touch phone. #487 measured the welcome footer's legal
 // links at 15 px tall; on a coarse pointer each is a 44 px target now. V1
 // decision D11: the language switch stays, and choosing Hindi says at once
@@ -833,5 +959,5 @@ export const welcomeFlow = {
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');
-  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow, welcomeFlow]) ? 1 : 0);
+  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow, welcomeFlow, auroraFlow]) ? 1 : 0);
 }

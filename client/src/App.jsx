@@ -1,4 +1,5 @@
-import { featureEnabled } from './platform/features.js';
+import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
+import Aurora from './instrument/Aurora.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import PageLink from './components/PageLink.jsx';
@@ -88,6 +89,9 @@ if (INSTRUMENT_ON && typeof document !== 'undefined') {
   // Optional chaining: server-side renders and test harnesses may hand the
   // module a document without a real documentElement (online-check-access-check).
   document.documentElement?.classList?.add('ui-instrument');
+  // The chrome's skin (client/interface.config.mjs): aurora.css is scoped to
+  // this class, so 'instrument' (D8's fallback) turns every Aurora rule off.
+  if (INTERFACE_SKIN_UI === 'aurora') document.documentElement?.classList?.add('skin-aurora');
   // Its stylesheets are in the boot stylesheet (main.jsx).
   // The Map, Report and Scripts tabs are part of the warm pass in this build
   // (vite.config.js: no on-demand rule names them), so the service worker
@@ -145,6 +149,9 @@ const TEACHER_NAV = [
 // The phone bar's four destinations (More holds the rest). The instrument
 // build puts the Map where v1.0 put Tasks: it is a tab of that interface and
 // had no phone entry at all before (audit-interface item 2).
+// Where the Aurora skin's light pools may show: screens with no question, ink,
+// review or exam surface on them.
+const AURORA_POOL_ROUTES = new Set(['/', '/map', '/settings']);
 const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/map', '/progress']);
 const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
 
@@ -601,6 +608,9 @@ export default function App() {
   return (
     <AppCtx.Provider value={ctx}>
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
+        {/* The Aurora skin's light pools: never behind mathematics or ink, so
+            only on the Index, the Map and Settings (D9). */}
+        {INSTRUMENT_ON && INTERFACE_SKIN_UI === 'aurora' && user.role !== 'teacher' && AURORA_POOL_ROUTES.has(loc.pathname) && <Aurora />}
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         {/* The one shell bar (the v1.0 top bar and rail are gone with the
             v1.0 interface; client/interface.config.mjs). */}
