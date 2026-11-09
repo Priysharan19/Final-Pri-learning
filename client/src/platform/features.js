@@ -45,6 +45,9 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
+
+
 /* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
@@ -70,6 +73,11 @@ const BUILT = {
 // featureEnabled('instrument') is a runtime call the bundler cannot see
 // through, so shared pages read this instead.
 export const INSTRUMENT_UI = typeof __PRI_FEATURE_INSTRUMENT__ === 'boolean' ? __PRI_FEATURE_INSTRUMENT__ : true;
+// The skin the Instrument's chrome wears ('aurora' or 'instrument'), from the
+// same setting; where there is no build constant (the Node suites) the
+// setting itself is read.
+/* global __PRI_INTERFACE_SKIN__ */
+export const INTERFACE_SKIN_UI = typeof __PRI_INTERFACE_SKIN__ === 'string' ? __PRI_INTERFACE_SKIN__ : SETTING_SKIN;
 
 const productionBuild = () => {
   try { return import.meta.env?.PROD === true; } catch { return false; }
