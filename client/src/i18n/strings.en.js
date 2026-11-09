@@ -2940,8 +2940,6 @@ export default {
   'login.functionStudy': 'FUNCTION STUDY',
   'login.movePointer': 'MOVE POINTER TO INSPECT',
   'login.exampleLabel': 'ILLUSTRATIVE EXAMPLE',
-  'login.examplePrompt': 'Solve for x',
-  'login.exampleFoot': 'One step at a time. The method matters.',
   'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",

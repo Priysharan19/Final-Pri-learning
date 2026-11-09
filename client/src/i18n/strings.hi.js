@@ -3003,8 +3003,6 @@ export default {
   'login.functionStudy': 'फलन का अध्ययन',
   'login.movePointer': 'बिंदु देखने के लिए सूचक हिलाएँ',
   'login.exampleLabel': 'उदाहरण मात्र',
-  'login.examplePrompt': 'x का मान निकालें',
-  'login.exampleFoot': 'हर चरण महत्त्वपूर्ण है। तरीका भी महत्त्वपूर्ण है।',
   'login.instrumentHeadline': 'हाथ से लिखिए। उसे जँचते हुए देखिए।',
   'login.existingDeviceProfile': "इस डिवाइस पर सहेजी गई प्रोफ़ाइल से जारी रखें",
   'login.createAnotherAccount': "एक और Pri खाता बनाएँ",
