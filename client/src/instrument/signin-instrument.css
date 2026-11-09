@@ -244,6 +244,7 @@ html.ui-instrument.skin-aurora .pri-plot-value {
 /* An iPad has space for the same full-depth workspace as desktop.
    Keep the form wider than the plot in portrait orientation. */
 @media (min-width: 700px) and (max-width: 1020px) {
+  html.ui-instrument.skin-aurora .auth-wrap > .in-signin-plot { display: block; min-height: 100%; }
   html.ui-instrument.skin-aurora .auth-wrap:has(> .in-signin-plot) {
     grid-template-columns: minmax(0,.83fr) minmax(0,1.17fr);
   }
