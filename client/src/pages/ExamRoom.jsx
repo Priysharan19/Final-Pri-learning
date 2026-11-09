@@ -116,7 +116,7 @@ function LostLine({ lost }) {
   const [a, b] = lost.sections || [];
   // "N of those…" needs the sentence it refers to: no section, no blank line.
   if (!a) return null;
-  const head = !a ? null : b
+  const head = b
     ? t('examRoom.lostTwo', { count: lost.marks, a: a.lost, sa: a.label, b: b.lost, sb: b.label })
     : t('examRoom.lostOne', { count: lost.marks, a: a.lost, sa: a.label });
   return (

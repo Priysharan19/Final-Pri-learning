@@ -67,6 +67,14 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // nothing about the question, the submission's content or its mark, and
   // never reaches the reader request.
   'checkingEarlier',
+  // Reviewed 2026-11-10 (audit #2, L4): a boolean computed on the card as
+  // exactly `asksForInequality(question.prompt)` — whether the VISIBLE prompt
+  // the student reads asks for an inequality. Pinned below to that one
+  // expression. It only decides whether a line the reader already returned
+  // as "≠" gets a "check the sign" note; it never reads the expected answer,
+  // solution or marks, and never reaches the reader request (the request is
+  // still the picture alone, checked by CLOUD_OPTION_KEYS).
+  'promptAsksInequality',
   // Reviewed 2026-11-10 (F1 live step coach, L4): a boolean, true where the
   // server says the coach is on for this account (its switch and Premium) and
   // the attempt is open. It only lets the surface read the page on its own
@@ -401,6 +409,17 @@ ok(inkAnswerProps('<InkAnswer key={k} question={question} onRecognized={f} />')[
   ok(bad.length === 1 && analyseContextExpression(bad[0].expr, cloudBad, 0, new Set(), bad[0].allowedKeys).length > 0, 'fixture: cloud options carrying the question refused');
 }
 
+/** The only value promptAsksInequality may take: the visible prompt, through the pure helper. */
+export const PROMPT_ONLY_INEQUALITY = /^asksForInequality\((question|q|item)\.prompt\)$/;
+for (const [expr, want] of [
+  ['asksForInequality(question.prompt)', true],
+  ['asksForInequality(question.answer)', false],
+  ['asksForInequality(question.solution)', false],
+  ["/[<>≤≥]/.test(question.expected)", false],
+  ['asksForInequality(question.prompt + question.answer)', false],
+  ['true', false]
+]) ok(PROMPT_ONLY_INEQUALITY.test(expr) === want, `promptAsksInequality pin ${want ? 'accepts' : 'rejects'} {${expr}}`);
+
 // ── 2 · the real tree ────────────────────────────────────────────────────────
 const files = walk(SRC);
 ok(files.length > 50, `scanned ${files.length} files under client/src (excluding client/src/ink/)`);
@@ -422,6 +441,9 @@ for (const file of files) {
   // liveRead is the coach's on/off switch and nothing else.
   for (const m of source.matchAll(/liveRead=\{([^}]*)\}/g)) {
     ok(/^coachOn && !resolved$/.test(m[1].trim()), `${rel}: liveRead must be exactly {coachOn && !resolved}, got {${m[1].trim()}}`);
+  }
+  for (const m of source.matchAll(/promptAsksInequality=\{([^}]*)\}/g)) {
+    ok(PROMPT_ONLY_INEQUALITY.test(m[1].trim()), `${rel}: promptAsksInequality must be exactly asksForInequality(<question>.prompt), got {${m[1].trim()}}`);
   }
 }
 ok(contextSites >= 2, `found ${contextSites} recognition-context site(s) in production code (QuestionCard, ExamRoom expected)`);

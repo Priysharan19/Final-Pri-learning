@@ -758,6 +758,9 @@ select.input {
 .ink-line-doubt { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--warn); color: var(--warn); font-size: 12px; font-weight: 700; display: grid; place-items: center; flex-shrink: 0; }
 .ink-line-corrected { color: var(--good); font-size: 12px; }
 .ink-correct-btn { font: inherit; font-size: 12.5px; padding: 4px 10px; min-height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong); background: var(--surface-2); color: var(--ink); cursor: pointer; }
+/* A relation-swap sign (relationSwap.js) is a 44 px target on a touch screen:
+   btn-sm is 36 px there, too small for a thumb on a sign. */
+@media (pointer: coarse), (hover: none) { .ink-relation-swap { min-width: 44px; min-height: 44px; } }
 .ink-correct-btn:hover { border-color: var(--brand-1); }
 .ink-correct { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .ink-correct input { font: inherit; font-family: var(--font-math); font-size: 15px; min-width: 160px; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong); background: var(--surface); color: var(--ink); }
