@@ -675,13 +675,12 @@ function evaluatedTerm(node) {
     // a whole number over a surd (1/√2) — each is one term.
     if (isWholeLiteral(den)) {
       if (Number(den.s ?? den.v) === 0) return null;
-      // A signed denominator ("−56/−8", "(−56)/(−8)") is the asked division
-      // typed back, not a fraction as one is written (#739 review P1).
-      if (den !== node.r && !(node.r?.t === 'group' && node.r.v === den)) return null;
       const top = unsign(node.l);
-      // A whole number over a whole number that divides it ("56/8", "14/2",
-      // "7/1") is a whole number still to work out, not a fraction.
-      if (isWholeLiteral(top) && BigInt(String(top.s ?? top.v)) % BigInt(String(den.s ?? den.v)) === 0n) return null;
+      // A sign on both parts ("−56/−8", "(−56)/(−8)") is the asked division
+      // typed back with its signs still to resolve, not a fraction as one is
+      // written (#739 review P1). One sign ("10/−2") is a negative fraction.
+      const signed = n => { while (n?.t === 'group') n = n.v; return n?.t === 'neg'; };
+      if (signed(node.l) && signed(node.r)) return null;
       // "2.5/5" divides a decimal: not a fraction of whole numbers.
       if (num.coefficients && !num.surd && !num.pi && !isWholeLiteral(top)) return null;
       return num.coefficients > 1 ? null : { ...num, coefficients: Math.max(1, num.coefficients) };
