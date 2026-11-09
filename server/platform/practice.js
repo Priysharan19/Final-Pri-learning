@@ -251,13 +251,18 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     // evidence", exactly as when the engine threw.
     async workEvidence(lines) {
       const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      // Silence because the check did not RUN (cooldown, busy pool, deadline)
+      // is marked `unchecked`, so a caller can say "couldn't check your working
+      // this time" instead of showing nothing — or, worse, implying the lines
+      // were checked and held. It is still no evidence about any line.
+      const unchecked = { ...silent, unchecked: true };
       if (!stepMetaFor(q) || !Array.isArray(lines) || !lines.length) return silent;
-      if (await markerCooldownUntil(db, accountId)) return silent;
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
       let outcome;
-      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return silent; }
+      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return unchecked; }
       if (outcome.ok) return outcome.value.evidence;
       if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
-      return silent;
+      return unchecked;
     }
   };
 }

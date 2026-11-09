@@ -61,7 +61,7 @@ import {
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
-import { requestTutorHelp } from './tutorBridge.js';
+import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
@@ -3771,6 +3771,95 @@ const routes = {
       code: outcome?.error?.code || null
     };
   },
+  // "What went wrong?" — a diagnosis of working the deterministic engine has
+  // already judged. It explains the verdict and never changes it: nothing here
+  // touches the mark. Asked while the attempt is still open it is help, so it is
+  // charged like the first tutor level (once); asked after the question is
+  // resolved it costs nothing, because the mark is already decided. The
+  // server grounds a server-issued question in its own escrow and decides for
+  // itself whether that question is resolved; it never takes the device's word.
+  'POST /practice/:id/tutor/diagnose': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    const q = row.payload;
+    const resolvedRow = !!row.answered;
+    const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
+          solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const work = tutorWork(q, body?.work);
+    // Nothing written: nothing to diagnose, and nothing charged (F5).
+    if (!work.lines.length && !work.typedAnswer) {
+      return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: used };
+    }
+    if (!resolvedRow && used < 1) {
+      row.tutorLevel = 1;
+      await put('questions', row);
+    }
+    const finalAnswer = ['correct', 'wrong'].includes(body?.finalAnswer) ? body.finalAnswer : 'unknown';
+    const request = tutorRequest(p, row, q, solution, {
+      level: 'diagnose', locale: body?.locale,
+      work: { ...work, lineStatus: work.lines.map((_, i) => (i === work.firstBreak ? 'break' : i < work.verifiedLines && (work.firstBreak < 0 || i < work.firstBreak) ? 'ok' : 'unknown')), finalAnswer },
+      resolved: resolvedRow
+    });
+    // A diagnosis waits for a high-effort model: longer than the ladder's 25 s.
+    const outcome = request ? await requestTutorHelp(request, { timeoutMs: 58_000 }) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const d = outcome?.tutor?.diagnosis;
+    const clean = d && typeof d === 'object' ? {
+      didRight: sanitizeText(d.didRight, 400) || '',
+      wentWrong: sanitizeText(d.wentWrong, 400) || '',
+      nextStep: sanitizeText(d.nextStep, 400) || '',
+      wentWrongLine: Number.isInteger(d.wentWrongLine) ? d.wentWrongLine : -1
+    } : null;
+    return {
+      diagnosis: clean && clean.wentWrong ? clean : null,
+      source: outcome?.tutor?.source === 'model' ? 'tutor' : 'deterministic',
+      code: outcome?.tutor?.source === 'model' ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
+      tutorLevel: Number(row.tutorLevel) || 0
+    };
+  },
+
+  // "Check this line so far": the server's Step Check of the lines on an OPEN
+  // server-issued question. It names a step of the method, never a value, and
+  // never marks. It is help, so it is charged like a tutor level (one level
+  // per check, never past 2 so the walkthrough stays its own rung), and a
+  // question allows at most two, so it cannot be used to test guesses.
+  'POST /practice/:id/tutor/line-check': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    if (!row.serverQuestionId) throw Object.assign(new Error('Only a question the server issued can be checked.'), { status: 409, code: 'LINE_CHECK_UNAVAILABLE' });
+    const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+    if (!lines.length) return { lineCheck: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: Number(row.tutorLevel) || 0 };
+    const usedChecks = Math.max(0, Number(row.lineChecks) || 0);
+    if (usedChecks >= 2) throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
+    const outcome = await requestLineCheck({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines, locale: body?.locale === 'hi' ? 'hi' : 'en' });
+    const lc = outcome?.lineCheck;
+    if (outcome?.error?.code === 'LINE_CHECK_LIMIT') throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
+    if (!lc || typeof lc.message !== 'string') return { lineCheck: null, code: outcome?.error?.code || 'TUTOR_FAILED', tutorLevel: Number(row.tutorLevel) || 0 };
+    // Charged only when the server actually checked (an 'unchecked' reply costs nothing).
+    if (lc.status !== 'unchecked' && lc.status !== 'final') {
+      row.lineChecks = usedChecks + 1;
+      const level = Math.max(0, Number(row.tutorLevel) || 0);
+      row.tutorLevel = Math.max(level, Math.min(2, level + 1));
+      await put('questions', row);
+    }
+    return {
+      lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked', 'final'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
+      tutorLevel: Number(row.tutorLevel) || 0, checksLeft: Math.max(0, 2 - (Number(row.lineChecks) || 0))
+    };
+  },
+
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
   // The route module (and the conversation and streaming code behind it) is
@@ -5467,7 +5556,10 @@ function tutorWork(q, raw) {
 }
 
 /** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
-function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+function tutorRequest(p, row, q, solution, { level, locale, work, captions, resolved }) {
+  // `resolved` belongs to a diagnosis only (the server refuses it elsewhere);
+  // for a server-issued question the server decides it from its own records.
+  const diagnosis = level === 'diagnose' ? { resolved: resolved === true } : {};
   if (row.serverQuestionId) {
     // Server-issued: name the question, send the student's own work, and
     // nothing else. No prompt, step, answer or hint leaves the device for it —
@@ -5480,7 +5572,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       locale: lang === 'hi' ? 'hi' : 'en',
       serverQuestionId: String(row.serverQuestionId),
       studentWork: work,
-      ...(captions ? { captions } : {})
+      ...(captions ? { captions } : {}),
+      ...diagnosis
     };
   }
   if (!solution) return null;
@@ -5503,7 +5596,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       hints: (Array.isArray(q.hints) ? q.hints : []).slice(0, 6).map(h => String(h).slice(0, 500))
     },
     studentWork: work,
-    ...(captions ? { captions } : {})
+    ...(captions ? { captions } : {}),
+    ...diagnosis
   };
 }
 
