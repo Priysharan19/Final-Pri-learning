@@ -80,6 +80,8 @@ eq(key(new TypeError('Failed to fetch')), 'signup.offlineError', 'a request that
 eq(key(Object.assign(new Error('Timed out'), { name: 'TimeoutError', code: 23 })), 'signup.offlineError', 'a timeout (a DOMException, whose numeric code is not ours) is the same');
 eq(key({ code: 'CLOUD_REQUEST_FAILED', status: 500 }), 'signup.serverDown', 'a 5xx is the server, not the connection');
 eq(key({ code: 'CLOUD_DISABLED' }), 'signup.serverDown', 'no server reachable from this build');
+eq(signInErrorCopy({ code: 'ORIGIN_REJECTED', status: 403 }), { key: 'signup.originRejected', kind: 'configuration' }, 'wrong deployment origin has actionable copy, never the generic error');
+eq(signInErrorCopy({ code: 'CSRF_REJECTED', status: 403 }), { key: 'signup.sessionNeedsRefresh', kind: 'expired' }, 'expired session token asks for a refresh, not a new OTP');
 eq(key({ code: 'SOMETHING_NEW', status: 400 }), 'signup.genericError', 'an unknown refusal gets the generic sentence, never the server\'s English prose');
 ok(isNetworkFailure(new TypeError('x')) && !isNetworkFailure({ status: 400 }) && !isNetworkFailure({ code: 'OTP_INVALID' }) && !isNetworkFailure(null), 'only an error with no status and no string code counts as "never arrived"');
 const en = (await import(pathToFileURL(join(SRC, 'i18n/strings.en.js')).href)).default;
@@ -91,6 +93,7 @@ const everyKey = [
   { code: 'OTP_DESTINATION_INVALID', status: 400 }, { code: 'PROFILE_NAME_REQUIRED', status: 400 }, { code: 'AGE_DECLARATION_REQUIRED', status: 400 },
   { code: 'GUARDIAN_SAME_AS_STUDENT', status: 400 }, { code: 'GUARDIAN_CONSENT_WITHDRAWN', status: 409 }, { code: 'IDENTITY_LINK_REQUIRED', status: 409 },
   { code: 'OIDC_NONCE_INVALID', status: 401 }, { code: 'OIDC_PROVIDER_NOT_CONFIGURED', status: 503 }, { code: 'SOCIAL_POPUP_BLOCKED' }, { code: 'SOCIAL_TIMEOUT' },
+  { code: 'ORIGIN_REJECTED', status: 403 }, { code: 'CSRF_REJECTED', status: 403 },
   { code: 'CLOUD_LINK_CONFLICT' }, { code: 'INK_PROFILE_CHANGED' }, { code: 'INK_DRAFT_NOT_SAVED' }, new TypeError('x'), { code: 'X', status: 500 }, { code: 'X', status: 400 }
 ].map(e => signInErrorCopy(e).key);
 eq(everyKey.filter(k => !(k in en)), [], 'every sentence the card can say exists in English');
