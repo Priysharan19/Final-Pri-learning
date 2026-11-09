@@ -160,11 +160,19 @@ export const flow = {
     const openWriting = async (topic = TOPIC) => {
       await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
-      const before = await shownId();
-      await page.locator('.ctx-next').click();
-      await questionChangesFrom(before);
-      await settle();
-      await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+      // A fresh question that takes written work: some India forms are
+      // multiple choice (Class 7 integers at D3), which has no canvas, so Next
+      // is pressed again — a bounded number of times — until one is written.
+      const writable = page.getByRole('button', { name: 'Answer by handwriting' });
+      for (let moved = 0; ; moved++) {
+        const before = await shownId();
+        await page.locator('.ctx-next').click();
+        await questionChangesFrom(before);
+        await settle();
+        if (await writable.count()) break;
+        if (moved >= 8) throw new Error(`no question on ${topic} took written work in ${moved + 1} draws`);
+      }
+      await writable.click();
       await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
