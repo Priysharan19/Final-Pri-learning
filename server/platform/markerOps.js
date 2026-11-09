@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { markGeometry } from '../../client/src/engine/geometryFacts.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -118,6 +119,18 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
       partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
       outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'geometry') {
+    // Measurable facts earn their part marks; a construction step waits for a person.
+    let response = given, r = null;
+    if (typeof given === 'string') { try { response = given.length <= 4096 ? JSON.parse(given) : null; } catch { response = null; } }
+    if (response && typeof response === 'object') { try { r = markGeometry(q.answer?.geometry, response); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
+      needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }

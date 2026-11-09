@@ -12,6 +12,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
+import { checkGeometry } from './geometryFacts.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -42,6 +43,8 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  // A diagram question's parts, each marked by the rule for its kind (geometryFacts.js).
+  if (question?.answerType === 'geometry') return checkGeometry(question, rawInput);
   const long = answerTooLong(rawInput);
   if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
