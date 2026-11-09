@@ -406,7 +406,7 @@ export const flow = {
     await check('History holds that attempt once, marked correct and labelled as handwritten',
       await page.locator('.hist-row').count() === 1 && await histRow.count() === 1 &&
         (await histRow.locator('.hist-verdict .sr-only').innerText()) === 'Correct' &&
-        await histRow.locator('.tag .sr-only').count() >= 1,
+        await histRow.locator('[data-history-via="ink"] .sr-only').count() >= 1,
       (await page.locator('.hist-row').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 80)).join(' | '));
 
     await histRow.locator('.hist-main').click();
@@ -454,6 +454,9 @@ export const flow = {
       `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
     await check('no mark is given from it: the card is not auto-marked and Submit asks to check the reading first',
       await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 1);
+    // Relation swaps (relationSwap.js) appear only on a line with a relation
+    // sign; this doubtful line reads "7", so it offers none.
+    await check('a doubtful line with no relation sign offers no relation swaps', await page.locator('[data-relation-swaps]').count() === 0);
     const readsBeforeCorrection = reader.requests.length;
     const iWrote = page.getByRole('button', { name: /Correct line 1/ });
     await check('a one-tap "I wrote…" control is offered on that line', await iWrote.count() === 1);

@@ -6,7 +6,10 @@ import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
 import BarSlot from './BarSlot.jsx';
-import './report.css';
+// report.css is part of the boot stylesheet (main.jsx; #658).
+import PageLink from '../components/PageLink.jsx';
+import { practiceHref } from '../lib/practiceLinks.js';
+import { trendSentence, worstDotpoint } from './reportNarrative.js';
 
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the
@@ -31,13 +34,16 @@ function dateName(key, user, options) {
 }
 const fmtPct = v => (v == null ? '—' : `${Math.round(v)}%`);
 
-/** A signed change, or nothing when there is none to state. */
-function Delta({ n, unit = '' }) {
+/** A signed change, or nothing when there is none to state. The direction is
+ *  said in a word as well as drawn in colour and a sign (a11y-check's rule:
+ *  a verdict colour never carries meaning alone), read by assistive tech and
+ *  hidden from the eye. */
+function Delta({ n, unit = '', t }) {
   if (n == null || !Number.isFinite(n) || n === 0) return null;
   const v = Math.round(n);
   if (!v) return null;
   const text = `${v > 0 ? '+' : '−'}${Math.abs(v)}${unit ? ` ${unit}` : ''}`;
-  return <> <em className={v < 0 ? 'is-down' : undefined} data-report-delta>{text}</em></>;
+  return <> <em className={v < 0 ? 'is-down' : undefined} data-report-delta data-report-delta-sign={v > 0 ? 'up' : 'down'}><span className="sr-only">{t(v > 0 ? 'inst.reportUp' : 'inst.reportDown')} </span>{text}</em></>;
 }
 
 // The chart, drawn as SVG in a fixed 1000×300 frame (the design's .chart).
@@ -108,12 +114,12 @@ export default function ReportHead() {
   const [failed, setFailed] = useState(false);
   const [stats, setStats] = useState(null);
   const [marks, setMarks] = useState(null);
+  const [marksFailed, setMarksFailed] = useState(false);
   const [curriculum, setCurriculum] = useState(null);
 
   useEffect(() => {
     let live = true;
     api.get('/stats').then(s => live && setStats(s)).catch(() => live && setStats({}));
-    api.get('/marks/by-chapter').then(r => live && setMarks(r?.chapters || {})).catch(() => live && setMarks({}));
     api.get('/curriculum').then(c => live && setCurriculum(c)).catch(() => { });
     return () => { live = false; };
   }, []);
@@ -129,8 +135,25 @@ export default function ReportHead() {
     return () => { live = false; };
   }, [period]);
 
+  // "Where marks were lost" is read for the window on screen: the series says
+  // when the period starts, and the marks route takes that day as `since`.
+  // Until the series has loaded (or if it failed) the all-time totals are not
+  // shown under a "This week" title; the list waits instead.
+  const periodFrom = report?.period === period ? report?.current?.from || null : null;
+  useEffect(() => {
+    let live = true;
+    setMarks(null);
+    setMarksFailed(false);
+    // No period start (the series failed or is loading): no list, and no
+    // claim about it. A failed read of the marks says so, not "none lost".
+    if (!periodFrom) return () => { live = false; };
+    api.get(`/marks/by-chapter?since=${encodeURIComponent(periodFrom)}`)
+      .then(r => live && setMarks(r?.chapters || {})).catch(() => { if (live) setMarksFailed(true); });
+    return () => { live = false; };
+  }, [periodFrom]);
+
   const view = useMemo(() => {
-    if (!stats || !marks) return null;
+    if (!stats) return null;
     const activity = Array.isArray(stats.activity) ? stats.activity : [];
     const byDay = new Map(activity.map(d => [d.date, Number(d.questions) || 0]));
     const keys = [dayKey(Date.now(), timezoneOf(user))];
@@ -141,11 +164,12 @@ export default function ReportHead() {
     const rows = scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || [];
     const nameOf = id => rows.find(r => r.id === id)?.name || null;
     const colourOf = id => { const i = rows.findIndex(r => r.id === id); return i >= 0 ? colourFor(i) : '--in-tx-3'; };
-    const lost = Object.entries(marks)
+    const lost = Object.entries(marks || {})
       .map(([id, m]) => ({ id, name: nameOf(id), lost: m.possible - m.earned, ...m }))
       .filter(c => c.name && c.lost > 0)
-      .sort((a, b) => b.lost - a.lost || a.name.localeCompare(b.name)).slice(0, 3);
-    return { cells, heatDays, max, lost, colourOf };
+      .sort((a, b) => b.lost - a.lost || a.name.localeCompare(b.name)).slice(0, 3)
+      .map(c => ({ ...c, href: practiceHref({ subtopic: c.id, dotpoint: worstDotpoint(c, user) }) }));
+    return { cells, heatDays, max, lost, lostReady: marks != null, colourOf };
   }, [stats, marks, curriculum, user]);
 
   if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true" />;
@@ -176,6 +200,8 @@ export default function ReportHead() {
     } else if (cur.questions > 0) lede.push(t('inst.ledeFew', { count: cur.questions, n: cur.questions }));
     else lede.push(t('inst.ledeNone'));
   }
+  const trend = trendSentence(shown, period, t);
+  if (trend) lede.push(trend);
   const worst = view.lost[0];
 
   return (
@@ -188,7 +214,7 @@ export default function ReportHead() {
           {lede.length > 0 && (
             <p className="in-report-lede" data-report-lede>
               {lede.join(' ')}
-              {worst && (() => { const [pre, post = ''] = t('inst.ledeChapter', { chapter: '\u0000' }).split('\u0000'); return <> {pre}<span lang="en">{worst.name}</span>{post}</>; })()}
+              {worst && (() => { const [pre, post = ''] = t('inst.ledeChapterPeriod', { chapter: '\u0000' }).split('\u0000'); return <> {pre}<span lang="en">{worst.name}</span>{post}</>; })()}
             </p>
           )}
         </div>
@@ -202,11 +228,11 @@ export default function ReportHead() {
       </div>
       {failed && <p className="in-note" role="status">{t('inst.reportSeriesFailed')}</p>}
       <div className="in-report-figs">
-        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} />}</div>
+        <div data-report-questions><b>{cur ? cur.questions : '—'}</b><small>{t('inst.reportQuestions')}</small>{cur && <Delta n={shown.delta?.questions} t={t} />}</div>
         <div data-report-marks><b>{cur?.marksPossible ? `${cur.marksEarned}` : '—'}{cur?.marksPossible ? <span>/{cur.marksPossible}</span> : null}</b>
           <small>{cur?.marksPct != null ? t('inst.reportMarksEarnedPct', { p: Math.round(cur.marksPct) }) : t('inst.reportMarksEarned')}</small>
-          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} />}</div>
-        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} />}</div>
+          {cur?.marksPossible > 0 && <Delta n={shown.delta?.marksEarned} t={t} />}</div>
+        <div data-report-method><b>{fmtPct(cur?.methodPct)}</b><small>{t('inst.reportMethod')}</small>{cur?.methodPct != null && <Delta n={shown.delta?.methodPct} unit={t('inst.reportPts')} t={t} />}</div>
         <div data-report-days><b>{cur ? cur.daysPractised : '—'}</b><small>{t('inst.reportDaysPractised')}</small>{cur?.streak > 0 && <> <em>{t('inst.reportStreakEm', { n: cur.streak })}</em></>}</div>
       </div>
       <div className="in-rp">
@@ -218,13 +244,14 @@ export default function ReportHead() {
           </div>
           <div className="in-report-lost">
             <h3>{t('inst.reportLost')}</h3>
-            {view.lost.length ? (
+            {failed || marksFailed ? <p className="in-note" role="status" data-report-lost-failed>{t('inst.reportLostFailed')}</p>
+              : !view.lostReady ? <p className="in-note" aria-busy="true">{t('inst.reportLostLoading')}</p> : view.lost.length ? (
               <ul>{view.lost.map(c => (
                 <li key={c.id} style={{ '--cc': `var(${view.colourOf(c.id)})` }}>
-                  <i aria-hidden="true" /><span lang="en"><TermGloss text={c.name} /></span><small>{`${c.earned}/${c.possible}`}</small>
+                  <i aria-hidden="true" /><PageLink to={c.href} data-report-lost-link={c.id}><span lang="en"><TermGloss text={c.name} /></span></PageLink><small>{`${c.earned}/${c.possible}`}</small>
                 </li>
               ))}</ul>
-            ) : <p className="in-note">{t('inst.reportLostNone')}</p>}
+            ) : <p className="in-note">{t('inst.reportLostNonePeriod')}</p>}
           </div>
         </div>
       </div>

@@ -1581,6 +1581,8 @@ async function run() {
     const darkErr = await rejects('with the tutor off, a help request is refused', POST(`/practice/${dark.question.id}/tutor`, { level: 1 }), { status: 404 });
     eq('— as disabled', darkErr?.code, 'TUTOR_DISABLED');
     await rejects('and so are captions', POST(`/practice/${dark.question.id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 404 });
+    const darkWhy = await rejects('and so is "Why this step?"', POST(`/practice/${dark.question.id}/tutor/why`, { stepIndex: 0 }), { status: 404 });
+    eq('— as disabled', darkWhy?.code, 'TUTOR_DISABLED');
     const darkDiag = await rejects('and so is "What went wrong?"', POST(`/practice/${dark.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] } }), { status: 404 });
     eq('— as disabled', darkDiag?.code, 'TUTOR_DISABLED');
     const darkLine = await rejects('and so is "Check this line so far"', POST(`/practice/${dark.question.id}/tutor/line-check`, { lines: ['x = 1'] }), { status: 404 });
@@ -1683,6 +1685,23 @@ async function run() {
     const caps = await POST(`/practice/${wid}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
     eq('rephrased captions come back by id, the rest deterministic', caps.captions.map(c => [c.id, c.source]), [['solution-0', 'tutor'], ['solution-1', 'deterministic']]);
     eq('the walkthrough request carries the captions', tutorCalls.at(-1)?.level, 'walkthrough');
+
+    // "Why this step?" — a dialogue about one step of the resolved question.
+    reply = () => ({ tutor: { source: 'model', level: 'why', message: 'Because both sides must stay balanced.' } });
+    const rowBeforeWhy = await idb.get('questions', wid);
+    const why1 = await POST(`/practice/${wid}/tutor/why`, { stepIndex: 0, locale: 'en' });
+    eq('a resolved question\'s step can be asked "why?"', [why1.source, why1.message], ['tutor', 'Because both sides must stay balanced.']);
+    const whySent = tutorCalls.at(-1) || {};
+    eq('as level why, about that step, on a resolved question', [whySent.level, whySent.stepIndex, whySent.resolved], ['why', 0, true]);
+    eq('naming the issued question and sending none of its solution', ['question', 'prompt', 'steps', 'answer', 'hints', 'solution'].filter(k => k in whySent), []);
+    await POST(`/practice/${wid}/tutor/why`, { stepIndex: 0, message: 'why balanced?', history: [{ role: 'tutor', text: 'Because both sides must stay balanced.' }] });
+    eq('a follow-up carries the message and history', [tutorCalls.at(-1)?.message, tutorCalls.at(-1)?.history?.length], ['why balanced?', 1]);
+    const whyRow = await idb.get('questions', wid);
+    eq('"why?" writes nothing to the question', [whyRow.tutorLevel, whyRow.answered], [rowBeforeWhy.tutorLevel, rowBeforeWhy.answered]);
+    reply = () => ({ error: { code: 'TUTOR_PREMIUM_REQUIRED', status: 402 } });
+    eq('past the free tries the server\'s Premium code reaches the card', (await POST(`/practice/${wid}/tutor/why`, { stepIndex: 1 })).code, 'TUTOR_PREMIUM_REQUIRED');
+    const openWhyQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await rejects('"why?" is refused before the question is answered', POST(`/practice/${openWhyQ.question.id}/tutor/why`, { stepIndex: 0 }), { status: 409 });
 
     // "What went wrong?" — explains the engine's verdict, never changes it.
     reply = () => ({ tutor: { source: 'model', level: 'diagnose', diagnosis: { didRight: 'You set it up.', wentWrong: 'You skipped a step.', nextStep: 'Find it first.', wentWrongLine: 0 } } });
@@ -1984,6 +2003,7 @@ async function run() {
       await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
       await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
       await locked(`a ${label} active exam question cannot take a line check`, POST(`/practice/${id}/tutor/line-check`, { lines: ['x = 1'] }));
+      await locked(`a ${label} active exam question cannot be asked "why?"`, POST(`/practice/${id}/tutor/why`, { stepIndex: 0 }));
       await locked(`a ${label} active exam question cannot be diagnosed by the tutor`, POST(`/practice/${id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' }));
       await locked(`a ${label} active exam question cannot be asked about in the tutor conversation`, POST(`/practice/${id}/tutor/ask`, { message: 'what is the answer?' }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));

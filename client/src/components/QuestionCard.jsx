@@ -54,13 +54,14 @@ import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
+import { asksForInequality } from '../ink/relationSwap.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
-const INSTRUMENT = featureEnabled('instrument');
+const INSTRUMENT = INSTRUMENT_UI;
 // Both chords work (the handler takes Meta or Control), so the chip names both
 // rather than guessing the keyboard from the device.
 const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
@@ -125,6 +126,8 @@ export const SR_ONLY = {
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
 // "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
+// "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
+const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -257,6 +260,8 @@ function doubtOf(ink) {
   // The server reader's own flag: a line under its confidence floor. The
   // student corrects it in the reading panel ("I wrote…") or stands behind
   // it; it is never marked from silently.
+  const doubtedLine = lines.findIndex(l => typeof l?.doubt === 'string' && l.doubt && l.corrected !== true);
+  if (doubtedLine >= 0) return { why: 'glyph', weakest, line: doubtedLine, doubt: lines[doubtedLine].doubt };
   if (ink.needsConfirmation === true) return { why: 'glyph', weakest };
   // The server/provider floor is authoritative for cloud readings. Keep the
   // older local confirmation threshold only as a fallback when no floor was
@@ -329,6 +334,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showTutor, setShowTutor] = useState(false);
   // The diagnosis panel is keyed by the attempt it explains; a new attempt closes it.
   const [diagnoseFor, setDiagnoseFor] = useState(null);
+  const [whyStep, setWhyStep] = useState(null);
   const [lineCheck, setLineCheck] = useState(null);
   const [lineCheckBusy, setLineCheckBusy] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
@@ -464,7 +470,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
-    setShowTutor(false); setDiagnoseFor(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
+    setShowTutor(false); setDiagnoseFor(null); setWhyStep(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     // An old photo must never follow the student into a new question.
@@ -1230,6 +1236,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
+    // A cloud reading names the doubted line and its two readings; the swap
+    // buttons sit on that line in the reading below.
+    if (doubt.doubt) return t('verdict.checkLineDoubt', { n: doubt.line + 1, doubt: doubt.doubt });
     const w = doubt.weakest;
     const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
     const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
@@ -2192,6 +2201,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div>
               <div className="step-h"><MathText text={s.h} /></div>
               <div className="step-d"><MathText text={s.d} /></div>
+              {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
+              {WhyStep && tutorEnabled && !diagnostic && resolved && (
+                <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}
+                  onClick={() => setWhyStep(v => (v === i ? null : i))}>{t('tutor.why.button')}</button>
+              )}
+              {WhyStep && whyStep === i && tutorEnabled && resolved && (
+                <TutorBoundary fallback={t('tutor.unavailable')}>
+                  <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.why.asking')}</div>}>
+                    <WhyStep questionId={question.id} stepIndex={i} locale={language === 'hi' ? 'hi' : 'en'} onClose={() => setWhyStep(null)} />
+                  </React.Suspense>
+                </TutorBoundary>
+              )}
             </div>
           </div>
         ))}
@@ -2641,7 +2662,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}

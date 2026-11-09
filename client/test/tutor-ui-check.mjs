@@ -298,6 +298,17 @@ const fakeStream = events => async (body, { onEvent }) => { for (const [event, d
   eq((await requestLineCheck({ lines: ['x'] })).error?.code, 'TUTOR_DISABLED', 'with the tutor off, no line check is sent');
   globalThis.__PRI_TUTOR_OVERRIDE__ = true;
 
+  // "Why this step?" — on each solution step, tutor on and resolved only.
+  ok(/const WhyStep = TUTOR_BUILT_OUT \? null : React\.lazy\(\(\) => import\('\.\.\/tutor\/WhyStep\.jsx'\)\)/.test(card), '"Why this step?" is a lazy chunk, not built when the tutor is built out');
+  ok(/\{WhyStep && tutorEnabled && !diagnostic && resolved && \(\s*<button[^>]*data-why-step=\{i\}/.test(card), 'the "why?" control on each step renders only with the tutor on, after resolution, never on a placement check');
+  ok(card.split('data-why-step').length === 2, 'and nowhere else');
+  const whyPanel = read('src/tutor/WhyStep.jsx');
+  ok(/\/practice\/\$\{questionId\}\/tutor\/why/.test(whyPanel) && !/answerText|\.steps\b|solution\./.test(whyPanel.replace(/\/\/.*$/gm, '')), 'the why panel asks through the local backend and never handles the solution');
+  ok(!/sparkle|glow|✨|gradient/i.test(whyPanel), 'plain instrument styling');
+  for (const key of ['tutor.why.button', 'tutor.why.title', 'tutor.why.close', 'tutor.why.asking', 'tutor.why.followUp', 'tutor.why.fromSolution', 'tutor.why.premium', 'tutor.why.unavailable']) {
+    ok(typeof en[key] === 'string' && typeof hi[key] === 'string' && en[key] !== hi[key], `${key} is in both catalogues`);
+  }
+
   // The bridge: off means nothing is sent; a diagnosis may ask for longer.
   const { requestTutorHelp, setTutorTransportForTests } = await import('../src/local/tutorBridge.js');
   let seen = null;

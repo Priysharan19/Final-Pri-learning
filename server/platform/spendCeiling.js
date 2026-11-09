@@ -27,6 +27,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { consumeRateLimit } from './security.js';
 import { asStore } from './store.js';
+import { recordPaidCeilingHigh } from './metrics.js';
+
+/** At this share of either window's ceiling, the operator is warned (PAID_CEILING_HIGH). */
+export const PAID_ALERT_RATIO = 0.8;
 
 /** One budget for every paid route: one key, one bill. */
 export const PAID_BUDGET = 'paid-provider';
@@ -110,6 +114,12 @@ export async function reservePaidCall(db, { env = process.env, now = Date.now() 
     if (!day.allowed) {
       await giveBack(store, hourUnit);
       return { verdict: { ...spent(day.resetAt), window: 'day' }, units: [] };
+    }
+    // Early warning: a call that takes either window to 80% or more of its
+    // ceiling is counted, and the PAID_CEILING_HIGH alert rule (metrics.js)
+    // emails the operator before students start being refused.
+    for (const [window, verdict, limit] of [['hour', hour, ceiling.perHour], ['day', day, ceiling.perDay]]) {
+      if ((limit - verdict.remaining) >= Math.ceil(limit * PAID_ALERT_RATIO)) recordPaidCeilingHigh(window);
     }
     return { verdict: null, units: [hourUnit, { bucket: dayBucket, windowStart: day.resetAt - WINDOWS.day }] };
   });

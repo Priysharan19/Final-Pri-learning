@@ -53,6 +53,9 @@ export function cleanCorrection(text) {
  * fully confident — the student is the authority on their own page — and
  * keeps the text the reader proposed beside it for the record.
  */
+/** A corrected line no longer carries the reader's doubt: the student has answered it. */
+const withoutDoubt = ({ doubt, uncertain, ...rest }) => rest; // eslint-disable-line no-unused-vars
+
 export function applyLineCorrection(reading, index, text, { floor = confidenceFloorOf(reading) } = {}) {
   const clean = cleanCorrection(text);
   const lines = reading?.lines;
@@ -60,7 +63,7 @@ export function applyLineCorrection(reading, index, text, { floor = confidenceFl
   if (lines[index].text === clean && lines[index].corrected === true) return reading;
   const effectiveFloor = confidenceFloorOf(floor);
   const next = lines.map((line, i) => (i === index
-    ? { ...line, text: clean, conf: 1, corrected: true, readText: line.readText ?? line.text }
+    ? { ...withoutDoubt(line), text: clean, conf: 1, corrected: true, readText: line.readText ?? line.text }
     : line));
   const confidence = next.length ? Math.min(...next.map(lineConfidence)) : 0;
 
