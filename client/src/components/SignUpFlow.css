@@ -67,6 +67,10 @@
    a two-option selector. Reuse the exact layout in the inline activation gate. */
 .signup-social { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 .signup-social > .btn { width: 100%; min-height: 48px; white-space: normal; text-wrap: balance; }
+.signup-method-hint { margin: 2px 0 0; font-size: 12.5px; line-height: 1.4; color: var(--ink-3); }
+.signup-social-wait { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; }
+.signup-social-wait p { margin: 0; color: var(--ink-2); }
+.signup-social-wait button { min-height: 36px; text-decoration: underline; text-underline-offset: 2px; }
 .signup-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-size: 13.5px; }
 .signup-error { margin-top: var(--space-4); }
 

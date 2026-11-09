@@ -663,6 +663,28 @@ html.ui-instrument .auth-wrap:has(> .in-signin-plot) .brand-wordmark {
   position: absolute; left: 36px; right: 36px; bottom: 40px; margin: 0; max-width: 13em;
   font: 500 clamp(26px, 2.6vw, 34px)/1.05 var(--in-ui); letter-spacing: -0.035em; color: var(--in-tx);
 }
+/* The example is visual proof of the learning method, not a fake live grade.
+   It stays inside the decorative column and cannot intercept an auth control. */
+.in-signin-example {
+  position: absolute; left: clamp(28px, 3.5vw, 56px); right: clamp(28px, 3.5vw, 56px);
+  top: 47%; transform: translateY(-50%); max-width: 452px; margin-inline: auto;
+  padding: clamp(18px, 2vw, 28px); color: var(--in-tx); border-radius: 9px;
+  background: var(--in-l1); box-shadow: 0 18px 65px -24px var(--in-shadow), 0 0 0 1px var(--in-edge-3);
+}
+.in-signin-example-top { display: flex; justify-content: space-between; align-items: center; font: 500 11px/1.5 var(--in-mono); letter-spacing: .07em; color: var(--in-tx-3); }
+.in-signin-example-mark, .in-signin-step-tick { color: var(--in-good); font-size: 16px; }
+.in-signin-example-prompt { margin: 22px 0 6px; font: 500 13px/1.4 var(--in-ui); color: var(--in-tx-2); }
+.in-signin-equation { font: 500 clamp(27px, 2.7vw, 37px)/1.25 var(--in-ui); letter-spacing: -.035em; padding-bottom: 16px; border-bottom: 1px solid var(--in-edge); }
+.in-signin-example-steps { display: grid; margin-top: 8px; }
+.in-signin-example-steps > div { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--in-edge); }
+.in-signin-example-steps > div > span:first-child { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+.in-signin-example-steps strong { font: 500 22px/1.35 var(--in-ui); }
+.in-signin-step-tick { margin-left: auto; }
+.in-signin-example-foot { margin: 17px 0 0; color: var(--in-tx-2); font: 500 12.5px/1.45 var(--in-ui); }
+@media (max-width: 1060px) {
+  .in-signin-example { padding: 16px; }
+  .in-signin-example-steps > div { padding: 9px 0; }
+}
 @media (max-width: 860px) {
   html.ui-instrument .auth-wrap:has(> .in-signin-plot) { grid-template-columns: minmax(0, 1fr); }
   html.ui-instrument .auth-wrap > .in-signin-plot { display: none; }

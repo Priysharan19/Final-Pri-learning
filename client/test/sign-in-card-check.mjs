@@ -142,6 +142,23 @@ ok(/\.signup-social \{[^}]*grid-template-columns: minmax\(0, 1fr\)/.test(signupC
   'one configured Google or Apple provider spans the full form, rather than half a two-column grid');
 ok(/\.brand-wordmark \{[^}]*max-width: 100%/.test(instrumentCss),
   'the outlined wordmark itself contracts at 200% text zoom to avoid horizontal overflow');
+// First-impression contracts: one visible privacy note, honest sample,
+ // non-blocking social popup and a clear expectation for email codes.
+const plot = read('instrument/SignInPlot.jsx');
+ok(/in-signin-example/.test(plot) && /login\.exampleLabel/.test(plot)
+  && /2x \+ 7 = 19/.test(plot) && /2x = 12/.test(plot) && /x = 6/.test(plot),
+  'the welcome illustration shows a mathematically correct example, explicitly labelled as illustrative');
+ok(/signup\.methodHint/.test(card) && typeof en['signup.methodHint'] === 'string'
+  && typeof hi['signup.methodHint'] === 'string',
+  'the email road explains one-time code and no password before submitting');
+ok(/const controller = new AbortController\(\);/.test(card)
+  && /requestIdentityToken\(provider, providers\[provider\], \{ signal: controller\.signal \}\)/.test(card)
+  && /socialAbortRef\.current\?\.abort\(\)/.test(card)
+  && /data-testid="signup-cancel-social"/.test(card),
+  'a waiting Google or Apple popup offers a real abort action, without navigating or logging token data');
+ok(typeof en['signup.socialWindowHint'] === 'string' && typeof en['signup.cancelSocial'] === 'string'
+  && typeof hi['signup.socialWindowHint'] === 'string' && typeof hi['signup.cancelSocial'] === 'string',
+  'popup help and cancellation are translated to both languages');
 const login = read('pages/Login.jsx');
 ok(/className="muted auth-privacy">\{t\('login\.heroPrivacy'\)\}/.test(login)
   && /className="sr-only">\{t\('login\.heroSub'\)\}/.test(login)
