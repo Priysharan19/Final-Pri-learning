@@ -12,6 +12,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
+import { changedTerm } from './slips.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -1569,7 +1570,28 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options));
+  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
+}
+
+/**
+ * A break the diagnoser could not name gets the one term that changed since
+ * the line above, when exactly one did (audit #10). Feedback only: the
+ * status and the first break are unchanged.
+ */
+function nameChangedTerm(report) {
+  if (!report || !Array.isArray(report.lines)) return report;
+  let changed = false;
+  const lines = report.lines.map((l, i) => {
+    // Unnamed, or named only as "one side was changed": say which term.
+    const vague = !l?.diagnosis || (l.diagnosis.code === 'one-side-only' && /was changed, but/.test(String(l.note || '')));
+    if (l?.status !== 'break' || !vague || i === 0 || report.lines[i - 1]?.status !== 'ok') return l;
+    let sentence = null;
+    try { sentence = changedTerm(report.lines[i - 1].text, l.text); } catch { sentence = null; }
+    if (!sentence) return l;
+    changed = true;
+    return { ...l, note: l.note ? `${sentence} ${l.note}` : sentence, changedTerm: true };
+  });
+  return changed ? { ...report, lines } : report;
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
