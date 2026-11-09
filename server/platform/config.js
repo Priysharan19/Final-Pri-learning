@@ -317,6 +317,16 @@ export function trustedProxyHops(env = process.env) {
  * deployment reachable without that edge.
  */
 const CLIENT_IP_HEADERS = new Set(['x-real-ip']);
+/**
+ * The staging-only client-address probe (#779 review): echoes what reached the
+ * process so it can be MEASURED whether a caller can forge X-Real-IP through the
+ * edge. On only with PRI_CLIENT_IP_HEADER_PROBE=1 AND RAILWAY_ENVIRONMENT_NAME=staging;
+ * never in a production Railway environment, whatever else is set.
+ */
+export function clientIpProbeEnabled(env = process.env) {
+  return String(env.PRI_CLIENT_IP_HEADER_PROBE || '') === '1'
+    && String(env.RAILWAY_ENVIRONMENT_NAME || '').trim().toLowerCase() === 'staging';
+}
 export function clientIpHeader(env = process.env) {
   const raw = String(env.PRI_CLIENT_IP_HEADER ?? '').trim().toLowerCase();
   if (!raw) return null;

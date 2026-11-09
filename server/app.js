@@ -16,7 +16,7 @@ import { createAppleBilling } from './platform/appleBilling.js';
 import { createGoogleBilling } from './platform/googleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
-import { trustedProxyHops, clientIpHeader } from './platform/config.js';
+import { trustedProxyHops, clientIpHeader, clientIpProbeEnabled } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
 import { rateLimit } from './platform/security.js';
 import { asStore } from './platform/store.js';
@@ -125,6 +125,13 @@ export async function createServerApp(db, {
   // retry until it gives up, losing the entitlement change.
   // After the body parsers: the timing context must be entered on the path
   // that actually reaches the handlers (requestTiming.js).
+  // Staging-only measurement of the client-address headers (see config.js clientIpProbeEnabled).
+  if (clientIpProbeEnabled()) {
+    app.get('/v1/diag/client-ip', (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      res.json({ probe: 'client-ip', xRealIp: req.get('x-real-ip') ?? null, xForwardedFor: req.get('x-forwarded-for') ?? null, reqIp: req.ip ?? null, socket: req.socket?.remoteAddress ?? null });
+    });
+  }
   app.use('/v1', requestTiming());
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
