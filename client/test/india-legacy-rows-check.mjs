@@ -165,7 +165,7 @@ eq('legacy: exactly one unit is covered', units.filter(u => u.covered).length, 1
     const k = indiaDotpointKey(sib.id, legacyOrdinals[0]);
     await put('ratings', { key: `${id}:${legacyRow}`, pid: id, subtopic: legacyRow, rating: 1300, attempts: 13, correct: 10, last_at: NOW,
       dp: { [k]: { rating: 1220, attempts: 1, correct: 1, last_at: NOW } }, legacy: legacyBaselineOf(before) });
-    ({ ch, u } = await view());
+    ({ ch } = await view());
     eq('after a new answer: the chapter still shows all 13 answers', ch?.attempts, 13);
     ok('after a new answer: the 12 legacy answers still reach its dot points', legacyOrdinals.some(o => dpOf(ch, o) >= 12), JSON.stringify(ch?.dotpoints?.map(d => d.attempts)));
 
