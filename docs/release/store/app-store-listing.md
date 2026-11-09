@@ -275,7 +275,7 @@ claims.
 | 2 | Review notes said a guardian confirms "by email link or SMS code" | SMS is off at launch (D3) and the client hides it unless the server reports it live (`SignUpFlow.jsx`, `channels.sms`); the notes say email link or email code |
 | 3 | The pre-submission check expected Sign in with Apple to appear | D3: email code and password only in the first submission |
 | 4 | Content rights cited official paper material approved for use | D23: past papers are off for students until a rights opinion exists |
-| 5 | "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only; nothing says complete, every chapter, syllabus-aligned, official or accurate |
+| 5 | Retired (D24): "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only; nothing says complete, every chapter, syllabus-aligned, official or accurate |
 | 6 | "No third-party analytics" with no word about the server's own telemetry | Says what is true: no third-party analytics or crash SDK; Pri's server keeps operational telemetry and coded crash reports, which App Privacy declares |
 | 7 | The description and notes did not say what changes when D17 lands | The PRIVACY paragraph describes the prompt (#737); publication gates (e) and (f) in §2 and the pre-submission check in §6 |
 

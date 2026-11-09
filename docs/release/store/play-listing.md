@@ -172,7 +172,7 @@ owner private photo, no claims beyond what the screen shows.
 | 1 | A public-origin placeholder stood for the privacy and deletion URLs | D5 origins: `https://prilearning.com/privacy` and `https://prilearning.com/delete-account` (the site in `site/`, not deployed, DNS untouched), and the form itself at `https://app.prilearning.com/account/delete-request`. None resolves until the site is deployed; the owner confirms D5 before the first signed build |
 | 2 | The privacy-policy row said the notice "must be rewritten first" | It was corrected against the code on 2 November 2026; what it still needs is counsel's review, recorded only in `docs/legal/review-status.json` |
 | 3 | §5 pointed at counsel question 26 for the Families question | It is question 33 in the current pack |
-| 4 | "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only |
+| 4 | Retired (D24): "Follows the NCERT syllabus and public examination patterns" | Replaced by the D24 wording only |
 | 5 | Nothing said when Android ships | D1: the Android software is finished, but the public launch is iPhone and iPad first, because a new personal developer account needs a 14-day closed test with 12 testers (§7) |
 
 **Before this description is published:** the release build must include the D17 prompt (#737),

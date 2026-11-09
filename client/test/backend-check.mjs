@@ -628,6 +628,7 @@ async function run() {
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
   const { BADGES } = await import(`${SRC}local/badges.js`);
   const { subtopicsForYear } = await import(`${SRC}engine/curriculum.js`);
+  const { recordReaderPermission, forgetReaderPermission, READER_PERMISSION } = await import(`${SRC}ink/readerPermission.js`);
 
   // Question banks are lazy chunks that src/api.js pulls in before a request
   // reaches the backend. This suite talks to dispatch() directly, so it does
@@ -1859,8 +1860,14 @@ async function run() {
 
     blankExam = (await POST('/exams', { length: 10 })).exam;
     const blank = await POST(`/exams/${blankExam.id}/submit`, { answers: {}, ms: 60000 });
+    // D17 (#737): a page is sent to be read only once the profile has allowed
+    // it, so the reader is allowed here to reach the missing-page check; the
+    // refusal without permission is proved in exam-unread-handwriting-check.
+    const examReader = { id: (await GET('/me')).user.id };
+    recordReaderPermission(examReader, READER_PERMISSION.ACCEPTED);
     await rejects('Retry checking on a marked paper that holds no saved page says so by name and marks nothing',
       POST(`/exams/${blankExam.id}/handwriting`, { key: 'no-such-page' }), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
+    forgetReaderPermission(examReader);
     eq('an unanswered paper scores nothing', blank.score, 0);
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);
