@@ -42,18 +42,42 @@ export function isProbability(q) {
 export function classifySlip(value, answer, q = null) {
   const v = Number(value), a = Number(answer);
   if (!Number.isFinite(v) || !Number.isFinite(a) || close(v, a)) return null;
-  if (q && stepValues(q, a).some(s => close(s, v))) return 'early-step';
-  if (a !== 0 && close(v, -a)) return 'sign';
-  if (a !== 0 && Math.abs(a) !== 1 && close(v, 1 / a)) return 'reciprocal';
-  if (a !== 0) for (const n of [1, 2, 3]) if (close(v, a * 10 ** n) || close(v, a / 10 ** n)) return 'power-of-ten';
+  // A number the question prints is most simply a copied number, and a value
+  // that is the answer times a printed number is most simply "×k": neither is
+  // a sign, reciprocal, power or root slip. Say nothing then.
+  const printed = printedNumbers(q);
+  if (printed.some(n => close(n, v))) return null;
+  const timesPrinted = a !== 0 && printed.some(k => Math.abs(k) !== 1 && (close(v, a * k) || close(v, a / k)));
+  const kinds = [];
+  if (q && stepValues(q, a).some(s => close(s, v))) kinds.push('early-step');
+  if (a !== 0 && close(v, -a)) kinds.push('sign');
+  if (!timesPrinted && a !== 0 && Math.abs(a) !== 1 && close(v, 1 / a)) kinds.push('reciprocal');
+  if (!timesPrinted && a !== 0 && [1, 2, 3].some(n => close(v, a * 10 ** n) || close(v, a / 10 ** n))) kinds.push('power-of-ten');
   // Only a probability has a complement.
-  if (a > 0 && a < 1 && a !== 0.5 && close(v, 1 - a) && isProbability(q)) return 'complement';
-  // Squared or rooted only where no simpler slip gives the same number:
-  // for a = 2, 4 is just as much "doubled", so no kind is claimed.
-  const ambiguous = close(v, 2 * a) || close(v, a / 2) || close(v, a + 1) || close(v, a - 1);
-  if (!ambiguous && Math.abs(a) > 1e-9 && Math.abs(a) !== 1 && close(v, a * a)) return 'square';
-  if (!ambiguous && a > 0 && a !== 1 && close(v, Math.sqrt(a))) return 'root';
-  return null;
+  if (a > 0 && a < 1 && a !== 0.5 && close(v, 1 - a) && isProbability(q)) kinds.push('complement');
+  // Squared or rooted only on a question about powers, roots or area, and
+  // only where doubling, halving or off-by-one do not give the same number.
+  const simpler = close(v, 2 * a) || close(v, a / 2) || close(v, a + 1) || close(v, a - 1) || timesPrinted;
+  if (!simpler && involvesPowers(q) && Math.abs(a) > 1e-9 && Math.abs(a) !== 1 && close(v, a * a)) kinds.push('square');
+  if (!simpler && involvesPowers(q) && a > 0 && a !== 1 && close(v, Math.sqrt(a))) kinds.push('root');
+  // Two explanations fit: claim neither.
+  return kinds.length === 1 ? kinds[0] : null;
+}
+
+/** The numbers a question prints (its prompt), TeX fractions included. */
+export function printedNumbers(q) {
+  const text = String(q?.prompt ?? '');
+  const out = [];
+  for (const m of text.matchAll(/\\d?frac\{(-?\d+(?:\.\d+)?)\}\{(-?\d+(?:\.\d+)?)\}/g)) out.push(Number(m[1]) / Number(m[2]));
+  for (const m of text.replace(/,(?=\d{3}\b)/g, '').matchAll(/-?\d+(?:\.\d+)?/g)) out.push(Number(m[0]));
+  return out.filter(Number.isFinite);
+}
+
+/** A question about powers, roots or area: said so by its prompt, steps or topic. */
+export function involvesPowers(q) {
+  if (!q) return false;
+  const text = [q.prompt, q.subtopic, q.generator, ...(Array.isArray(q.steps) ? q.steps.map(s => `${s?.h ?? ''} ${s?.d ?? ''}`) : [])].join(' ');
+  return /\^|\\sqrt|√|²|³|squar|root|area|pythag|hypotenuse|surd|power|exponent|indices/i.test(text);
 }
 
 /** Open attempt: the kind, never a value. */

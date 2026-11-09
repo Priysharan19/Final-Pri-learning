@@ -1,7 +1,7 @@
 // Naming the kind of slip (audit #6, #3) and the term that changed (#10).
 // While open: the kind only, never a value of the answer.
 // Run: node client/test/slips-check.mjs   [SYNTHETIC: direct engine]
-import { classifySlip, slipFeedback, slipReason, changedTerm, SLIP_FEEDBACK } from '../src/engine/slips.js';
+import { classifySlip, slipFeedback, slipReason, changedTerm, SLIP_FEEDBACK, involvesPowers, printedNumbers } from '../src/engine/slips.js';
 import { checkAnswer, stepCheck } from '../src/engine/checker.js';
 
 let pass = 0, fail = 0;
@@ -17,11 +17,55 @@ ok(checkAnswer({ prompt: 'Find the length AB in m.', answerType: 'numeric', answ
 ok(classifySlip(4, 2) === null, '5x = 10, wrote 4: doubling is as likely as squaring, so no kind');
 ok(classifySlip(1, 2) === null && classifySlip(3, 2) === null, 'off by one is not a kind here');
 ok(classifySlip(0.5, 0.5) === null, 'equal is not a slip');
-ok(classifySlip(49, 7) === 'square' && classifySlip(Math.sqrt(7), 7) === 'root', 'square and root where nothing simpler fits');
 ok(classifySlip(8, 7) === null, 'unrelated value: no kind');
 const q = { prompt: 'p', answerType: 'numeric', answer: { value: 14 }, steps: [{ h: 'Square', d: '$a = 49$' }, { h: 'Add', d: '$b = 49 - 35 = 14$' }] };
 ok(classifySlip(49, 14, q) === 'early-step', 'value of an earlier step');
 ok(classifySlip(-1, 1) === 'sign' && classifySlip(1, -1) === 'sign', '±1: sign, not reciprocal');
+
+
+// ── Group 1b: square/root only where powers are the topic, and never when ×k explains it (delta review) ──
+const AREA = { prompt: 'The area of a square field is given. Find the length of its side.' };
+ok(classifySlip(49, 7, AREA) === 'square' && classifySlip(Math.sqrt(7), 7, AREA) === 'root', 'square and root on a question about area');
+ok(classifySlip(49, 7) === null, 'no question: no square claim');
+for (const [prompt, answer, reply] of [['Solve $3x = 9$.', 3, 9], ['Solve $4x = 16$.', 4, 16], ['Solve $x/3 = 3$.', 9, 3], ['Solve $3x = 9$ for $x^2$ later.', 3, 9]]) {
+  const qq = { prompt, answerType: 'numeric', answer: { value: answer } };
+  const r = checkAnswer(qq, String(reply));
+  ok(r.slip === undefined && !/square/.test(String(r.feedback)), `${prompt} answered ${reply}: no square/root message`);
+}
+ok(classifySlip(12, 4, { prompt: 'Each box holds 3 pens. How many boxes?' }) === null, 'a value that is the answer times a printed number: no kind');
+ok(classifySlip(25, 5, { prompt: '$25$ units and $125$ units. How many times as large?' }) === null, 'a copied printed number: no kind');
+{
+  const { generateQuestion, GENERATORS, loadAllBanks } = await import('../src/engine/generators/index.js');
+  const { IN_CHAPTERS } = await import('../src/engine/curriculum-in.js');
+  await loadAllBanks();
+  for (const [gen, d, seed, reply] of [['c7-large-numbers-current', 3, 17, 25], ['c7-triangle-inequality-reasoning', 3, 27, 16], ['c7-factor-regroup-reasoning', 3, 23, 16]]) {
+    let g; try { g = generateQuestion(gen, d, seed); } catch { g = null; }
+    if (!g) continue;
+    ok(!['square', 'root'].includes(checkAnswer(g, String(reply)).slip), `${gen} d${d} s${seed} reply ${reply}: no square/root`);
+  }
+  // Catalogue: over India numeric draws, a square or root kind appears only on
+  // a question whose prompt or steps are about powers, roots or area, and no
+  // kind is ever claimed for a number the prompt prints.
+  const cells = new Map();
+  for (const ch of IN_CHAPTERS) for (const c of ch.covers || []) if (GENERATORS[c.gen]) for (const d of c.diff || [1, 2, 3, 4]) cells.set(`${c.gen}|${d}`, { gen: c.gen, d });
+  let tried = 0, offTopic = 0, copied = 0, ambiguousClaim = 0;
+  for (const { gen, d } of cells.values()) for (let seed = 1; seed <= 40; seed += 1) {
+    let g; try { g = generateQuestion(gen, d, seed); } catch { continue; }
+    const a = Number(g?.answer?.value);
+    if (g?.answerType !== 'numeric' || !Number.isFinite(a) || a === 0) continue;
+    for (const v of [a * a, Math.sqrt(Math.abs(a)), -a, 1 / a, a * 10, 1 - a]) {
+      if (!Number.isFinite(v) || Math.abs(v - a) < 1e-9) continue;
+      const k = classifySlip(v, a, g);
+      tried += 1;
+      if ((k === 'square' || k === 'root') && !involvesPowers(g)) offTopic += 1;
+      if (k && printedNumbers(g).some(n => Math.abs(n - v) < 1e-9)) copied += 1;
+      const fits = [Math.abs(v + a) < 1e-9, Math.abs(v * a - 1) < 1e-9 && Math.abs(a) !== 1].filter(Boolean).length;
+      if (k && fits > 1) ambiguousClaim += 1;
+    }
+  }
+  ok(offTopic === 0 && copied === 0 && ambiguousClaim === 0, `catalogue: ${offTopic} off-topic square/root, ${copied} copied numbers, ${ambiguousClaim} ambiguous claims in ${tried}`);
+  console.log(`slip catalogue: ${offTopic} off-topic square/root, ${copied} copied-number claims, ${ambiguousClaim} ambiguous claims in ${tried} India wrong answers [SYNTHETIC]`);
+}
 
 // ── Group 2: in the checker, no value leaks ──
 const num = { prompt: 'Find x.', answerType: 'numeric', answer: { value: 35 } };
