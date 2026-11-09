@@ -34,6 +34,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
+import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
@@ -201,6 +202,12 @@ export default function ExamRoom() {
   // Measured while the question is on screen and the page is visible; a hidden
   // tab's time is not attributed to any question (the paper's own clock still
   // runs — that is the deadline's job, not this one's).
+  // Every question of the paper is sent with a time — zero for one never
+  // opened — so a paper sat in this room is always reported as measured.
+  const allTimes = () => Object.fromEntries([
+    ...(latest.current.exam?.questions || []).map(q => [q.id, 0]),
+    ...Object.entries(timesRef.current)
+  ]);
   const accrue = useCallback(() => {
     const { qid, at } = enteredRef.current;
     if (qid && at) {
@@ -317,7 +324,7 @@ export default function ExamRoom() {
       points += n;
     }
     const body = {
-      answers: snap.answers, workings: snap.workings, times: timesRef.current, modes: snap.modes, cur: snap.cur,
+      answers: snap.answers, workings: snap.workings, times: allTimes(), modes: snap.modes, cur: snap.cur,
       inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }])),
       // The page is going away: the server's checkpoint is sent now, not after its debounce.
       ...(urgent === true ? { urgent: true } : {})
@@ -462,7 +469,7 @@ export default function ExamRoom() {
     const frozen = await freezeUnread(snap).catch(() => null) || { unread: unreadInkKeys(snap.inks, snap.answers), pages: {} };
     try {
       const r = await api.post(`/exams/${id}/submit`, {
-        answers: snap.answers, workings: snap.workings, times: timesRef.current,
+        answers: snap.answers, workings: snap.workings, times: allTimes(),
         ms: Date.now() - startedAtRef.current, submissionKey: submissionKey.current, reason,
         ...(frozen ? unreadBody(frozen) : {})
       });
@@ -752,6 +759,7 @@ export default function ExamRoom() {
         </div>
 
         <ExamAnalysis analysis={result.analysis} track={exam.indiaExam?.track} />
+        <SectionTime report={result.timeReport} offered={result.timeReportOffered} />
 
         {result.detail.map((d, i) => d.multipart ? (
           <div className="card" key={d.id}>

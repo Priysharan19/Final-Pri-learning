@@ -1799,6 +1799,15 @@ export default {
   'examAnalysis.practise': '{label} का अभ्यास करें',
   'examAnalysis.weakItem': '{label} — {marks} में से {awarded} अंक ({lost} कटे, {wrong} गलत, {unattempted} छोड़े गए)',
   'examAnalysis.untimed': 'इस प्रश्नपत्र के लिए खंडवार समय नहीं मापा गया।',
+  'sectionTime.title': 'आपका समय कहाँ गया',
+  'sectionTime.summary': 'इस प्रश्नपत्र पर मापा गया समय: {time}। अंक: {marks} में से {awarded}।',
+  'sectionTime.ruleTime': 'समय',
+  'sectionTime.ruleMarks': 'अंक',
+  'sectionTime.line': 'यहाँ {time} ({timeShare} समय), ऐसे खंड पर जिसके {marks} अंक हैं (प्रश्नपत्र का {marksShare})। {awarded} अंक मिले, प्रति मिनट {perMinute} अंक। {questions} में से {reached} प्रश्नों तक पहुँचे।',
+  'sectionTime.lastLost': 'यहाँ आप जिस अंतिम प्रश्न तक पहुँचे, प्रश्न {order}, उस पर इस खंड में गए {sectionLost} अंकों में से {lost} अंक गए।',
+  'sectionTime.note': 'यह केवल इस एक बार के प्रयास का विवरण है। समय तब मापा जाता है जब प्रश्न स्क्रीन पर हो; यह इस पर निर्णय नहीं है कि आपको समय कैसे बाँटना चाहिए।',
+  'sectionTime.offer': 'हर समयबद्ध प्रश्नपत्र के बाद, प्रीमियम खंड-दर-खंड दिखाता है कि आपका समय कहाँ गया।',
+  'sectionTime.offerLink': 'प्रीमियम देखें',
   'examAnalysis.stepMarks': { one: 'चरण-अंक: {count} प्रश्न पर विधि के अंक मिले ({earned} अंक); उसी प्रश्न पर {lost} अंक और कटे। हल किए प्रश्नों पर कटे अंक: {lostOnAttempted}; छोड़े गए प्रश्नों पर छूटे अंक: {unattempted}।', other: 'चरण-अंक: {count} प्रश्नों पर विधि के अंक मिले ({earned} अंक); उन्हीं प्रश्नों पर {lost} अंक और कटे। हल किए प्रश्नों पर कटे अंक: {lostOnAttempted}; छोड़े गए प्रश्नों पर छूटे अंक: {unattempted}।' },
 
   // ── Progress (Australian course branch) ───────────────────────────────────────
