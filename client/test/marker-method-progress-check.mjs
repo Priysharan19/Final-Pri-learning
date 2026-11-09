@@ -1017,7 +1017,9 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     }
   }
   time('working ncr nested 40 deep', () => { const working = 'ncr('.repeat(40) + 'n' + ';2)'.repeat(40) + ' = 10'; const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
-  ok(checkAnswer({ answerType: 'numeric', answer: { value: 0 }, prompt: 'Find the value.' }, 'sum(k;k;5;1)').correct === true, 'a sum whose upper bound is below its lower bound is 0');
+  // The empty sum is still read as 0; as a numeric answer it is a sum left to take (D13).
+  ok(parseNumericInput('sum(k;k;5;1)').value === 0, 'a sum whose upper bound is below its lower bound is 0');
+  ok(checkAnswer({ answerType: 'numeric', answer: { value: 0 }, prompt: 'Find the value.' }, 'sum(k;k;5;1)').invalid === true, 'and as a numeric answer it is refused as unevaluated (D13)');
   ok(checkAnswer({ answerType: 'expression', answer: { expr: 'n(n+1)/2' }, prompt: 'Simplify.' }, 'sum(k;k;1;n)').correct === true, 'a sum to n is still recognised as n(n+1)/2');
   // Blank runs: four hundred spaces after `C(`, or after `Σk=`, sent a notation
   // pattern into thirty-three seconds of backtracking — in an answer or in one line.
@@ -1066,10 +1068,15 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
   ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
   // Exact small values are untouched, and what is out of range is not a number.
+  // The evaluator still reads each exactly. As a numeric ANSWER each is a count
+  // or a sum left to take, which D13 refuses (owner default, interim until the
+  // examiner rules): pinned here so the exactness and the refusal both hold.
   for (const text of ['nCr(10,3)', '10C3', '5!', 'nPr(6,3)', 'sum(k;k;1;15)', 'sum(sum(1;j;1;10);k;1;12)', 'ncr(120,1)', 'ncr(1000,999) - 880']) {
-    ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
+    ok(parseNumericInput(text).value === 120, `${text} is still exactly 120`);
+    const r = checkAnswer(numeric, text);
+    ok(r.correct === false && r.invalid === true && /Work it out first/.test(r.feedback || ''), `${text} as a numeric answer is refused as unevaluated (D13)`);
   }
-  ok(checkAnswer({ answerType: 'numeric', answer: { value: 137846528820 }, prompt: '' }, 'nCr(40,20)').correct === true, 'nCr(40, 20) is still exact');
+  ok(parseNumericInput('nCr(40,20)').value === 137846528820, 'nCr(40, 20) is still exact');
   for (const text of ['ncr(3000000000,1500000000)', 'npr(3000000000,1500000000)', '600000000C300000000', 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300)', '171!', 'ncr(20002,10001)']) {
     const got = checkAnswer(numeric, text);
     ok(got.correct !== true && got.invalid === true, `${text} is not a number the marker can hold: unreadable, never correct`);

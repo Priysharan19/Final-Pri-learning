@@ -43,6 +43,10 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-marker-isolation-'));
 process.env.NODE_ENV = 'test';
+// D12: method marks are off by default — production marks the final answer only
+// until an examiner signs (#499). This suite pins the method rubric itself, so it
+// turns the server switch on; marking-policy-check.mjs pins the default.
+process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'a7'.repeat(32);
 // This suite is about marking, not the free plan: its accounts are issued far
@@ -61,6 +65,9 @@ const {
   TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } = await import('../platform/markerPool.js');
 const { MARKER_OPS, stepMetaFor, tutorEvidence } = await import('../platform/markerOps.js');
+// The pool puts the server's marking policy (D12) into every operation, so the
+// in-process reference is run under the same policy.
+const { markingPolicy } = await import('../platform/markingPolicy.js');
 const { issuedQuestionForTutor } = await import('../platform/practice.js');
 const { setLogSink } = await import('../platform/observability.js');
 const { metrics } = await import('../platform/metrics.js');
@@ -101,7 +108,7 @@ const practiceArgs = (answer, working = '', evidenceIfWrong = true) => ({ q: Q, 
   // The same input, the same verdict — through a worker or not.
   for (const [answer, working] of [['x^2+2x+1', ''], ['(x+1)^2', ''], ['x^2+1', '(x+1)(x+1)\nx^2+x+x+1'], ['', 'x^2+2x+1'], ['??', ''], ['x^2+2x+2', '']]) {
     const viaPool = await pool.run('practice', practiceArgs(answer, working), { key: 'determinism' });
-    const inline = MARKER_OPS.practice(practiceArgs(answer, working), () => {});
+    const inline = MARKER_OPS.practice({ ...practiceArgs(answer, working), policy: markingPolicy() }, () => {});
     c.ok(viaPool.ok, `pool: ${JSON.stringify(answer)} is marked`);
     c.deq(viaPool.value, inline, `pool: ${JSON.stringify(answer)} gets exactly the verdict the engine gives in-process`);
   }
@@ -121,7 +128,7 @@ const practiceArgs = (answer, working = '', evidenceIfWrong = true) => ({ q: Q, 
   // A stage that finished before the deadline is kept.
   const half = await pool.run('practice', practiceArgs('x^2+1', `x^2+2x+1 ${magic('spin')}`), { key: 'attacker' });
   c.deq([half.ok, half.code], [false, MARKING_TOO_COMPLEX], 'pool: working that never finishes is stopped too');
-  c.deq(half.partials, [{ result: MARKER_OPS.practice(practiceArgs('x^2+1', '', false), () => {}).result }], 'pool: and the answer verdict it had already reached is kept, exactly');
+  c.deq(half.partials, [{ result: MARKER_OPS.practice({ ...practiceArgs('x^2+1', '', false), policy: markingPolicy() }, () => {}).result }], 'pool: and the answer verdict it had already reached is kept, exactly');
 
   // A worker that dies is a deadline by another name.
   const died = await pool.run('practice', practiceArgs(magic('exit')), { key: 'attacker' });

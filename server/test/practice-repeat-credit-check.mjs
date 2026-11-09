@@ -14,6 +14,10 @@ import { join } from 'node:path';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-repeat-credit-'));
 process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
+// D12: method marks are off by default — production marks the final answer only
+// until an examiner signs (#499). This suite pins the method rubric itself, so it
+// turns the server switch on; marking-policy-check.mjs pins the default.
+process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '6b'.repeat(32);
 // This suite is about marking, not the free plan: its accounts are issued far

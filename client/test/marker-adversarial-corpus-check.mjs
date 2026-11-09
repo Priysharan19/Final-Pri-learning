@@ -115,15 +115,24 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   ]) expect(G, id, numQ(value, prompt), input, want);
 }
 
+// ── D13: a value with an operation still to do is refused ─────────────────────
+// Owner default D13 (interim until the examiner rules on #499). These three
+// were pinned as valid alternatives before D13; they are the same inputs, now
+// pinned as refused whatever they equal.
+{
+  const G = 'd13-unevaluated';
+  expect(G, 'a product of two standard forms', numQ(3840000000000), '(3.2×10^6)(1.2×10^6)', false);
+  expect(G, 'a written product', numQ(3), '0.1*3*10', false);
+  expect(G, 'a root that is whole', numQ(4), 'sqrt(16)', false);
+}
+
 // ── Valid alternatives every repair must keep ───────────────────────────────
 {
   const G = 'valid-alternatives';
   const big = numQ(3840000000000);
-  for (const input of ['3840000000000', '3,840,000,000,000', '3.84 × 10^12', '3.84*10^12', '3.84e12', '(3.2×10^6)(1.2×10^6)', '3840000000000.000', '3840000000000.0']) expect(G, `whole key as ${input}`, big, input, true);
+  for (const input of ['3840000000000', '3,840,000,000,000', '3.84 × 10^12', '3.84*10^12', '3.84e12', '3840000000000.000', '3840000000000.0']) expect(G, `whole key as ${input}`, big, input, true);
   for (const input of ['21149700', '2,11,49,700', '21,149,700', '21149700.00']) expect(G, `lakh grouping ${input}`, numQ(21149700), input, true);
-  expect(G, 'float noise in a written product', numQ(3), '0.1*3*10', true);
   expect(G, 'a fraction that is whole', numQ(4), '12/3', true);
-  expect(G, 'a root that is whole', numQ(4), 'sqrt(16)', true);
   expect(G, 'a mixed numeral', numQ(2.5), '2 1/2', true);
   expect(G, 'negative whole key', numQ(-7), '-7', true);
   expect(G, 'negative whole key, decimal off', numQ(-7), '-7.0000001', false);

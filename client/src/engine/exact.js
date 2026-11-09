@@ -163,6 +163,8 @@ function smallRoot(f) {
   // Quadratic surds can be canonicalized by square-free factorization.
   // A deliberate 1e8 cap bounds CPU and prevents trial division of huge keys.
   if (f.n < 0n || f.n * f.d > 100000000n) return null;
+  // √0 is 0: no term at all, never a radical keyed "0" (#723 review).
+  if (f.n === 0n) return new Map();
   let n = f.n * f.d, square = 1n, prime = 2n, remaining = 1n;
   while (prime * prime <= n) {
     let count = 0n;
@@ -176,6 +178,18 @@ function smallRoot(f) {
   remaining *= n;
   const coeff = fraction(square, f.d);
   return coeff ? tidyTerms(new Map([[String(remaining), coeff]])) : null;
+}
+/** (Σ aᵢ√mᵢ)(Σ bⱼ√nⱼ) = Σ aᵢbⱼ√(mᵢnⱼ), each root put back in square-free form. */
+function mulTerms(a, b) {
+  let out = new Map();
+  for (const [ka, fa] of a) for (const [kb, fb] of b) {
+    const root = smallRoot(fraction(BigInt(ka) * BigInt(kb)));
+    const coeff = mul(fa, fb);
+    if (!root || !coeff) return null;
+    out = addTerms(out, scaleTerms(root, coeff) || new Map());
+    if (!out) return null;
+  }
+  return out;
 }
 function radicalOf(ast) {
   const q = exactOf(ast);
@@ -199,11 +213,18 @@ function radicalOf(ast) {
     const ar = rationalTerm(a), br = rationalTerm(b);
     if (ar) return scaleTerms(b, ar);
     if (br) return scaleTerms(a, br);
-    return null;
+    return mulTerms(a, b);
   }
   if (ast.op === '/') {
     const br = rationalTerm(b);
-    return br && br.n !== 0n ? scaleTerms(a, fraction(br.d, br.n)) : null;
+    if (br) return br.n !== 0n ? scaleTerms(a, fraction(br.d, br.n)) : null;
+    // One radical term below: a / (c√r) = a·√r / (c·r), so 2/√2 is √2 (#723 review).
+    if (b.size !== 1) return null;
+    const [[key, c]] = [...b];
+    const r = BigInt(key);
+    if (c.n === 0n || r === 0n) return null;
+    const lifted = mulTerms(a, new Map([[key, fraction(1n)]]));
+    return lifted && scaleTerms(lifted, fraction(c.d, c.n * r));
   }
   return null;
 }
@@ -218,6 +239,30 @@ export function sameRadical(a, b) {
   if (!a || !b || a.size !== b.size) return false;
   for (const [key, f] of a) if (!sameFraction(f, b.get(key))) return false;
   return true;
+}
+/**
+ * The exact sign of a − b for two radical expressions, or null when this
+ * grammar cannot decide it (more than one root left in the difference).
+ * a + b√r is signed exactly by comparing a² with b²r.
+ */
+export function compareRadical(a, b) {
+  if (!a || !b) return null;
+  const d = addTerms(a, b, -1n);
+  if (!d) return null;
+  const roots = [...d.keys()].filter(k => k !== '1');
+  const rational = d.get('1') || zero();
+  const sign = f => (f.n > 0n ? 1 : f.n < 0n ? -1 : 0);
+  if (!roots.length) return sign(rational);
+  if (roots.length > 1) return null;
+  const c = d.get(roots[0]), r = BigInt(roots[0]);
+  const sa = sign(rational), sc = sign(c);
+  if (sa === 0) return sc;
+  if (sa === sc) return sa;
+  // Opposite signs: compare |rational|² with c²·r.
+  const lhs = mul(rational, rational), rhs = mul(mul(c, c), fraction(r));
+  if (!lhs || !rhs) return null;
+  const cmp = lhs.n * rhs.d - rhs.n * lhs.d;
+  return cmp === 0n ? 0 : cmp > 0n ? sa : sc;
 }
 export function rationalAsRadical(q) {
   return q ? tidyTerms(new Map([['1', q]])) : null;
