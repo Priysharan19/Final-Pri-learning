@@ -5,6 +5,29 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/v1/forecast/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded events (learning_events where account_id = the session's account and device_id = 'server-grader'); premium detail only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise coverage only; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "forecast",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/health",
       "auth": "none",
       "roles": null,
@@ -144,7 +167,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; the optional body accountId never selects what is revoked — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before anything is revoked (#481, as #521); another account's sessions are never touched",
+      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; the optional body accountId never selects what is revoked \u2014 it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before anything is revoked (#481, as #521); another account's sessions are never touched",
       "rateLimits": [
         {
           "key": "logout-all",
@@ -444,7 +467,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; the optional body accountId never selects what is deleted — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before any proof is spent (#521); requires fresh password, one-time code or linked OIDC re-authentication",
+      "ownership": "own account only: every query is keyed by the session account id; the optional body accountId never selects what is deleted \u2014 it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before any proof is spent (#521); requires fresh password, one-time code or linked OIDC re-authentication",
       "rateLimits": [
         {
           "key": "account-delete",
@@ -618,7 +641,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: one valid code (±1 step) confirms the pending enrolment, issues eight recovery codes once (stored hashed), marks this session mfa_verified_at and is audited (mfa.enrol)",
+      "ownership": "own account only: one valid code (\u00b11 step) confirms the pending enrolment, issues eight recovery codes once (stored hashed), marks this session mfa_verified_at and is audited (mfa.enrol)",
       "rateLimits": [
         {
           "key": "mfa-confirm",
@@ -675,7 +698,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "≤100 items; event payload ≤256 KiB; entity body ≤512 KiB"
+      "innerLimits": "\u2264100 items; event payload \u2264256 KiB; entity body \u2264512 KiB"
     },
     {
       "method": "GET",
@@ -1153,7 +1176,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "specification ≤128 KiB"
+      "innerLimits": "specification \u2264128 KiB"
     },
     {
       "method": "POST",
@@ -1178,7 +1201,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "specification ≤128 KiB"
+      "innerLimits": "specification \u2264128 KiB"
     },
     {
       "method": "PATCH",
@@ -1195,7 +1218,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "summary ≤64 KiB, reduced to aggregate counts"
+      "innerLimits": "summary \u226464 KiB, reduced to aggregate counts"
     },
     {
       "method": "POST",
@@ -1213,7 +1236,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "feedback ≤32 KiB"
+      "innerLimits": "feedback \u226432 KiB"
     },
     {
       "method": "GET",
@@ -1339,7 +1362,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "source ≤128 KiB; body ≤2 MiB (transport cap 1 MiB applies first)"
+      "innerLimits": "source \u2264128 KiB; body \u22642 MiB (transport cap 1 MiB applies first)"
     },
     {
       "method": "PATCH",
@@ -1357,7 +1380,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "source ≤128 KiB; body ≤2 MiB (transport cap 1 MiB applies first)"
+      "innerLimits": "source \u2264128 KiB; body \u22642 MiB (transport cap 1 MiB applies first)"
     },
     {
       "method": "POST",
@@ -1462,7 +1485,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "note ≤4000 chars; context ≤30 keys, ≤32 KiB"
+      "innerLimits": "note \u22644000 chars; context \u226430 keys, \u226432 KiB"
     },
     {
       "method": "GET",
@@ -1634,7 +1657,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message \u2264600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body \u226448 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
       "rateLimits": [
         {
           "key": "tutor-help",
@@ -1655,7 +1678,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "same account-scoped serverQuestionId grounding as /v1/tutor/help (another account's issued question is 404 TUTOR_QUESTION_NOT_FOUND as JSON before any event); otherwise stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
+      "ownership": "same account-scoped serverQuestionId grounding as /v1/tutor/help (another account's issued question is 404 TUTOR_QUESTION_NOT_FOUND as JSON before any event); otherwise stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal \u2014 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED \u2014 is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
       "rateLimits": [
         {
           "key": "tutor-stream",
@@ -1676,7 +1699,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "404 (before any session lookup) unless PRI_FEATURE_LINE_CHECK=1 — and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1. Closed body { context, serverQuestionId, lines, locale }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) judges only the lines before the first final-answer attempt (engine-decided by form, never by value; unreadable fails closed); with none left the reply is the one generic 'Press Check to mark your answer.' and nothing is charged. Reply names a step heading only, never a value or a mark; no model call. Two checks per issued question per account (bucket line-check:sha256(account:id), 30-day window, peeked before and taken after the check ran; a third is 409 LINE_CHECK_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run (cooldown, busy, deadline) spends neither.",
+      "ownership": "404 (before any session lookup) unless PRI_FEATURE_LINE_CHECK=1 \u2014 and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1. Closed body { context, serverQuestionId, lines, locale }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) judges only the lines before the first final-answer attempt (engine-decided by form, never by value; unreadable fails closed); with none left the reply is the one generic 'Press Check to mark your answer.' and nothing is charged. Reply names a step heading only, never a value or a mark; no model call. Two checks per issued question per account (bucket line-check:sha256(account:id), 30-day window, peeked before and taken after the check ran; a third is 409 LINE_CHECK_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run (cooldown, busy, deadline) spends neither.",
       "rateLimits": [
         {
           "key": "tutor-line-check",
@@ -1709,7 +1732,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "≤30 events per batch"
+      "innerLimits": "\u226430 events per batch"
     },
     {
       "method": "POST",
@@ -1719,7 +1742,7 @@
       "verifiedEmail": false,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "crash report owned by the session account: a closed platform (web/ios-shell/android-shell), an upper-case error code, a lower-case surface slug, a scope and an optional hex fingerprint and release SHA; every other field dropped, free text in a known field refused (TELEMETRY_ERROR_INVALID). Stored as a client-error operational event, counted on /v1/metrics (client_errors_total) and forwarded to the error sink (errorSink.js) as the same coded fields plus request id and server release — never a message, stack, URL or body. Consent-gated (guardian gate on the router, device preference on the client) and limited to 20 per 10 minutes per account",
+      "ownership": "crash report owned by the session account: a closed platform (web/ios-shell/android-shell), an upper-case error code, a lower-case surface slug, a scope and an optional hex fingerprint and release SHA; every other field dropped, free text in a known field refused (TELEMETRY_ERROR_INVALID). Stored as a client-error operational event, counted on /v1/metrics (client_errors_total) and forwarded to the error sink (errorSink.js) as the same coded fields plus request id and server release \u2014 never a message, stack, URL or body. Consent-gated (guardian gate on the router, device preference on the client) and limited to 20 per 10 minutes per account",
       "rateLimits": [
         {
           "key": "telemetry-error",
@@ -1894,7 +1917,7 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb",
-      "innerLimits": "config ≤32 KiB"
+      "innerLimits": "config \u226432 KiB"
     },
     {
       "method": "GET",
@@ -2003,7 +2026,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "public account-deletion request from the web page /account/delete-request: no account is revealed — the same 202 shape and a code sent for any valid email, account or not (no enumeration); the challenge is bound to the account holding that address at send time (or to none); per-destination cooldown 30 s and 5 codes/h; synthetic phone-account addresses are refused",
+      "ownership": "public account-deletion request from the web page /account/delete-request: no account is revealed \u2014 the same 202 shape and a code sent for any valid email, account or not (no enumeration); the challenge is bound to the account holding that address at send time (or to none); per-destination cooldown 30 s and 5 codes/h; synthetic phone-account addresses are refused",
       "rateLimits": [
         {
           "key": "otp-delete-request",
@@ -2044,7 +2067,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: records the guardian contact on the session account's consent row and sends the code there; refuses the student's own contact; refused (409) once a guardian has withdrawn — the child's session cannot reopen consent",
+      "ownership": "own account only: records the guardian contact on the session account's consent row and sends the code there; refuses the student's own contact; refused (409) once a guardian has withdrawn \u2014 the child's session cannot reopen consent",
       "rateLimits": [
         {
           "key": "otp-guardian-request",
@@ -2151,7 +2174,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test; the free plan's daily cap (20 practice/review/task questions per account per Asia/Kolkata day, server/platform/practiceAllowance.js) is decided here from the server's own entitlement record and count — 402 FREE_CAP_REACHED with Retry-After, nothing escrowed, replays never counted twice",
+      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test; the free plan's daily cap (20 practice/review/task questions per account per Asia/Kolkata day, server/platform/practiceAllowance.js) is decided here from the server's own entitlement record and count \u2014 402 FREE_CAP_REACHED with Retry-After, nothing escrowed, replays never counted twice",
       "rateLimits": [
         {
           "key": "practice-issue",
@@ -2427,7 +2450,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout — any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper — or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
+      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout \u2014 any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper \u2014 or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
       "rateLimits": [
         {
           "key": "exam-create",
@@ -2450,7 +2473,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode \u2014 text only, keys of this paper only \u2014 and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
@@ -2473,7 +2496,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode \u2014 text only, keys of this paper only \u2014 and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
