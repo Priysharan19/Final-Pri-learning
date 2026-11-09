@@ -43,7 +43,7 @@
     "test:placement": "node client/test/placement-check.mjs",
     "test:browser-run": "node client/test/browser-run-fixes-check.mjs",
     "test:ios:features": "node client/test/ios-bundle-features-check.mjs",
-    "test:ios:bundles": "node client/test/ios-bundle-generation-check.mjs && node tools/generated-bundles-untracked-check.mjs",
+    "test:ios:bundles": "node client/test/ios-bundle-generation-check.mjs && node client/test/ios-bundle-features-policy-check.mjs && node tools/generated-bundles-untracked-check.mjs",
     "test:india:weights": "node client/test/india-exam-weight-check.mjs",
     "test:ncert:rational": "node client/test/ncert-rational-numbers-check.mjs",
     "test:ncert:linear": "node client/test/ncert-linear-equations-check.mjs",
