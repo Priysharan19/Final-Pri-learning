@@ -32,6 +32,10 @@
 // with near misses — the key ±1, its negative, and each authored trap — and
 // none of them may be marked correct.
 //
+// The issue #408 replacement tranche adds an original D4 form where the only D4
+// form was routine, and section 1b checks the retired rung is gone from every
+// JEE pool without touching CBSE.
+//
 // Passing this suite is not a human maths review and is not board approval.
 //
 // Usage: node client/test/india-hardest-forms-check.mjs [draws-per-form]
@@ -40,11 +44,13 @@ const SRC = new URL('../src/', import.meta.url).href;
 const { inspect } = await import('../../server/test/selfcheck.mjs');
 const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
-const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR } = await import(`${SRC}engine/curriculum-in.js`);
-const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
+const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
+const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
+const BASE_SOURCE = (await import('node:fs')).readFileSync(new URL('../src/engine/curriculum-in-base.js', import.meta.url), 'utf8');
+const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_COVERS, INDIA_JEE_REPLACEMENT_PROVENANCE, INDIA_RETIRED_RUNGS } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
 const { SOLVE_JEE_C11 } = await import('./india-hardest-solvers-jee-c11.mjs');
 const { SOLVE_JEE_C12 } = await import('./india-hardest-solvers-jee-c12.mjs');
-const { indiaRequestableDifficulties, indiaChapterGrade, indiaDifficultyWindow } = await import(`${SRC}engine/indiaProduct.js`);
+const { indiaRequestableDifficulties, indiaChapterGrade, indiaDifficultyWindow, resolveIndiaTarget } = await import(`${SRC}engine/indiaProduct.js`);
 const { BOX_SHEETS_FOR_CHECK } = await import(`${SRC}engine/generators/india-class12-hardest.js`);
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
 
@@ -708,8 +714,11 @@ const SOLVE_T1 = {
 // answers a student could plausibly write that must be marked WRONG.
 const TRANCHE3 = await Promise.all(['class7', 'class7-part2', 'class8', 'class11']
   .map(name => import(`./support/india-hardest-${name}-solvers.mjs`)));
-const SOLVE = Object.assign({}, SOLVE_T1, SOLVE_JEE_C11, SOLVE_JEE_C12, ...TRANCHE3.map(m => m.SOLVE));
-const NEAR_MISS = Object.assign({}, ...TRANCHE3.map(m => m.NEAR_MISS || {}));
+// The #408 Class 11 single-template chapters: one solver module per chapter.
+const JEE_D4 = await Promise.all(['sets', 'inequalities', 'binomial', 'conics', '3d']
+  .map(name => import(`./support/india-jee-d4-${name}-solvers.mjs`)));
+const SOLVE = Object.assign({}, SOLVE_T1, SOLVE_JEE_C11, SOLVE_JEE_C12, ...TRANCHE3.map(m => m.SOLVE), ...JEE_D4.map(m => m.SOLVE));
+const NEAR_MISS = Object.assign({}, ...TRANCHE3.map(m => m.NEAR_MISS || {}), ...JEE_D4.map(m => m.NEAR_MISS || {}));
 /** The bank each class's CBSE (D3) hardest forms live in. */
 const BANK_FOR_GRADE = { 7: 'india-class7-hardest', 8: 'india-class8-hardest', 10: 'india-class10', 11: 'india-class11-hardest', 12: 'india-class12' };
 const TRANCHE1_GRADES = new Set([10, 12]);
@@ -719,7 +728,13 @@ const TRANCHE1_GRADES = new Set([10, 12]);
 // INDIA_JEE_HARDEST_COVERS the JEE D4 forms of tranche 2.
 const TRANCHES = [
   { name: 'CBSE D3 (tranches 1 and 3)', table: INDIA_HARDEST_COVERS, rung: 3, tracks: ['cbse'], grades: [7, 8, 10, 11, 12], count: 103 },
-  { name: 'tranche 2', table: INDIA_JEE_HARDEST_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 23 }
+  { name: 'tranche 2', table: INDIA_JEE_HARDEST_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 23 },
+  // Issue #408: an original D4 form for each dot point whose only D4 form was
+  // routine — Complex Numbers dot point 2, and the three dot points of each
+  // Class 11 chapter whose one whole-chapter template was claimed at D4. Those
+  // rungs are retired (section 1b), so the "gap was real" check below holds
+  // against the live chapter after retirement.
+  { name: 'issue #408 replacements', table: INDIA_JEE_REPLACEMENT_COVERS, rung: 4, tracks: ['jee-main', 'jee-advanced'], grades: [11, 12], count: 16 }
 ];
 const entries = TRANCHES.flatMap(t => Object.entries(t.table).flatMap(([chapterId, covers]) => covers.map(c => ({ chapterId, tranche: t, ...c }))));
 const ids = entries.map(e => e.gen);
@@ -730,7 +745,7 @@ for (const t of TRANCHES) {
 }
 ok('one generator per dot point, none reused', new Set(ids).size === ids.length);
 ok('every generator in the tables has an independent solver here', ids.every(id => SOLVE[id]), ids.filter(id => !SOLVE[id]).join(', '));
-for (const prov of [INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_PROVENANCE]) {
+for (const prov of [INDIA_HARDEST_PROVENANCE, INDIA_JEE_HARDEST_PROVENANCE, INDIA_JEE_REPLACEMENT_PROVENANCE]) {
   ok(`${prov.tranche}: provenance states the forms are original and awaiting human review`,
     prov.authored === 'original-parameterised' && prov.humanMathsReview === 'pending' && prov.boardApproved === false);
 }
@@ -762,6 +777,62 @@ for (const e of entries) {
 for (const chapter of IN_CHAPTERS) {
   for (const c of chapter.covers) {
     if (ids.includes(c.gen)) ok(`${chapter.id} claims ${c.gen} only at D${rungOf[c.gen]}`, JSON.stringify(c.diff) === `[${rungOf[c.gen]}]`, JSON.stringify(c.diff));
+  }
+}
+
+// ── 1b · Retired rungs (issue #408) are replaced, gone, and harmless to CBSE ─
+const retirements = Object.entries(INDIA_RETIRED_RUNGS).flatMap(([chapterId, list]) => list.map(r => ({ chapterId, ...r })));
+ok('every retirement is logged once', retirements.length >= 1 && INDIA_RETIRED_LOG.length === retirements.length, `${retirements.length} vs ${INDIA_RETIRED_LOG.length}`);
+for (const r of retirements) {
+  const where = `${r.chapterId}#${r.dp} ${r.gen}@D${r.diff}`;
+  const chapter = IN_CHAPTER_BY_ID[r.chapterId];
+  if (!ok(`${where}: a live chapter`, !!chapter)) continue;
+  const grade = indiaChapterGrade(chapter);
+  ok(`${where}: the retirement gives a reason`, typeof r.reason === 'string' && r.reason.length > 20);
+  // It was really there, by evidence independent of the retirement code: the
+  // native coverage table claims it, or the chapter is declared `native: true`
+  // in curriculum-in-base.js (its own generator at every dot point, D1–D4).
+  const declaredNative = (INDIA_NATIVE_COVERS[r.chapterId] || []).some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff));
+  const declaredWhole = r.gen === r.chapterId && new RegExp(`C\\('${r.chapterId}',[^)]*\\][^)]*\\{\\s*native:\\s*true\\s*\\}\\)`).test(BASE_SOURCE) && !INDIA_NATIVE_COVERS[r.chapterId];
+  ok(`${where}: a declared coverage source claimed the rung`, declaredNative || declaredWhole);
+  // …and the load-time log records the cover as it stood when the rung went.
+  const logged = INDIA_RETIRED_LOG.find(l => l.chapterId === r.chapterId && l.gen === r.gen && l.dp === r.dp && l.diff === r.diff);
+  ok(`${where}: the retirement is logged with the cover it split`, !!logged && logged.claimed.dp.includes(r.dp) && logged.claimed.diff.includes(r.diff), JSON.stringify(logged));
+  // It is gone from the live chapter, and only that rung: the generator's other covers stay.
+  ok(`${where}: no live cover claims the rung`, !chapter.covers.some(c => c.gen === r.gen && c.dp.includes(r.dp) && c.diff.includes(r.diff)));
+  ok(`${where}: the generator still serves the chapter's other covers`, chapter.covers.some(c => c.gen === r.gen));
+  ok(`${where}: replaced at the same dot point and rung`, (INDIA_JEE_REPLACEMENT_COVERS[r.chapterId] || []).some(c => c.gen === r.replacedBy && c.dp[0] === r.dp && c.diff.includes(r.diff)));
+  // CBSE never served it: the rung is above the CBSE ceiling, so CBSE's levels are unchanged.
+  const cbse = indiaDifficultyWindow('cbse', grade);
+  ok(`${where}: the rung was above the CBSE window`, r.diff > cbse.ceiling, `${r.diff} vs ${cbse.ceiling}`);
+  ok(`${where}: CBSE still reaches its hardest level at the dot point`, indiaRequestableDifficulties(chapter, { dotpoint: r.dp, track: 'cbse', grade }).includes(cbse.ceiling));
+  // No JEE request — at the dot point or chapter-level — is ever answered by the retired rung.
+  for (const track of ['jee-main', 'jee-advanced']) for (const profile of [11, 12]) {
+    for (const dotpoint of [r.dp, null]) {
+      const served = new Set();
+      for (let i = 0; i < 200; i++) {
+        const t = resolveIndiaTarget(chapter, { track, grade: profile, dotpoint, difficulty: r.diff, random: () => i / 200 });
+        if (t) served.add(`${t.generator}@${t.difficulty}`);
+      }
+      const label = `${track} Class ${profile} ${dotpoint == null ? 'chapter-level' : `dot point ${dotpoint}`} D${r.diff}`;
+      ok(`${where}: ${label} never serves the retired form`, !served.has(`${r.gen}@${r.diff}`), [...served].join(', '));
+      if (dotpoint != null) ok(`${where}: ${label} is the replacement`, served.size === 1 && served.has(`${r.replacedBy}@${r.diff}`), [...served].join(', '));
+    }
+  }
+}
+// The owner's #408 case: JEE Advanced Complex Numbers at the hardest level is
+// never the D3 principal-argument question (seed 56: -5 + 5i) or the routine
+// quadratic, chapter-level or at any dot point.
+{
+  const chapter = IN_CHAPTER_BY_ID['c11-complex-numbers'];
+  for (const dotpoint of [null, 0, 1, 2]) {
+    const served = new Set();
+    for (let i = 0; i < 200; i++) {
+      const t = resolveIndiaTarget(chapter, { track: 'jee-advanced', grade: 12, dotpoint, difficulty: 4, random: () => i / 200 });
+      if (t) served.add(`${t.generator}@${t.difficulty}`);
+    }
+    ok(`#408: JEE Advanced Complex Numbers ${dotpoint == null ? 'chapter-level' : `dot point ${dotpoint}`} D4 serves only D4 forms`, [...served].every(s => s.endsWith('@4')), [...served].join(', '));
+    ok(`#408: JEE Advanced Complex Numbers ${dotpoint == null ? 'chapter-level' : `dot point ${dotpoint}`} D4 never serves the chapter's own generator`, ![...served].some(s => s.startsWith('c11-complex-numbers@')), [...served].join(', '));
   }
 }
 
@@ -830,9 +901,10 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
       const n = Number(token);
       const significant = !Number.isFinite(n) || !Number.isInteger(n) || Math.abs(n) >= 10;
       // A set answer is "stated" as x = r; any other answer as "= value".
+      // A full stop ending the sentence still states it: "= 37." (a decimal point does not).
       const lhs = q.answerType === 'set' ? 'x\\s*' : '';
-      const stated = new RegExp(`${lhs}=\\s*${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9.a-zA-Z^{(\\\\])`).test(hintText);
-      const present = significant && new RegExp(`(^|[^0-9.])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9.])`).test(hintText);
+      const stated = new RegExp(`${lhs}=\\s*${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9a-zA-Z^{(\\\\]|\\.[0-9])`).test(hintText);
+      const present = significant && new RegExp(`(^|[^0-9.])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9]|\\.[0-9])`).test(hintText);
       ok(`${id} seed ${seed}: no hint states the answer`, !stated && !present, `${token} in: ${hintText.slice(0, 160)}`);
     }
     // A keyed fraction whose decimal terminates is accepted as that exact

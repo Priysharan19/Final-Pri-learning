@@ -11,7 +11,7 @@
 // is the same vector as "(1, −2, 3)". Everything here is deterministic.
 // ─────────────────────────────────────────────────────────────────────────────
 import { evalNumeric, numsClose, parse, evaluate, variablesOf } from './expr.js';
-import { exactValue, literalFraction, fraction, sameFraction, exactRadical, sameRadical, rationalAsRadical } from './exact.js';
+import { exactValue, literalFraction, fraction, sameFraction, exactRadical, sameRadical, rationalAsRadical, compareRadical } from './exact.js';
 
 const INF = Infinity;
 
@@ -29,44 +29,57 @@ function num(text) {
 // although the two differ by less than four units of the last binary place
 // (#680; Q1 round 2 found that a relative-ULP band credited 17 such bounds).
 // So each finite endpoint carries, beside its binary64 value, its exact
-// rational value when it is written only in numbers (exact.js), and two
+// rational value when it is written only in numbers, or its exact radical
+// form when it is a rational sum of square roots (exact.js), and two
 // endpoints are the same only when:
-//   · both are exact and equal as fractions;
-//   · one is exact and it IS the other's binary64 value (sqrt(1/4) is 1/2,
+//   · both are exact or radical and equal exactly (√8 and 2√2, 2/√2 and √2 —
 //     but the decimal 1.4142135623730951 is not √2);
-//   · neither is exact (√8 and 2√2, each evaluated in binary64) and they agree
-//     to four units of the last place — the noise of the evaluation;
+//   · one has no exact form (sin(π/6), a key authored as the number 1/3) and
+//     they agree to four units of the last place — the noise of binary64,
+//     the same whatever the platform's Math library rounds;
 //   · or the question authors a tolerance, the only approximate bound.
-
-/** The exact rational value of a finite binary64. */
-function floatFraction(v) {
-  if (!Number.isFinite(v)) return null;
-  if (Number.isInteger(v)) return fraction(BigInt(v));
-  let m = v, e = 0n;
-  while (!Number.isInteger(m)) { m *= 2; e += 1n; }
-  return fraction(BigInt(m), 2n ** e);
-}
 
 /** A written bound: its value and, when it has one, its exact value. */
 function bound(text) {
+  // A bound is one number as the numeric box reads one: digits split by a
+  // space or a comma ("1 2", "1,2"), a mixed numeral ("2 1/2" would run
+  // together as 21/2) and a percentage sign are not a bound (#723 review).
+  const written = String(text ?? '');
+  if (/%/.test(written) || /\d\s+\d/.test(written) || /\d,\d/.test(written)) throw new Error('A bound must be one number');
   const v = num(text);
   if (!Number.isFinite(v)) return { v, q: null, alg: null };
   const q = exactValue(String(text).replace(/[−–—]/g, '-'));
   return { v, q, alg: q ? null : exactRadical(String(text).replace(/[−–—]/g, '-')) };
 }
 
-/** An authored numeric endpoint means the decimal it is written as: 0.1 is 1/10. */
+/**
+ * An authored numeric endpoint means the decimal it is written as: 0.1 is
+ * 1/10. A number that prints as a long decimal (1/3, Math.SQRT2) was computed,
+ * not written, so it is a binary64 value with no exact form, and it is matched
+ * to the noise of its last place (#723 review: x > 1/3 was refused for it).
+ */
 function authoredFraction(v) {
   if (!Number.isFinite(v)) return null;
-  const q = literalFraction(String(Math.abs(v)));
+  const printed = String(Math.abs(v));
+  if (/e/i.test(printed) || printed.replace(/^0\.0*|\./g, '').length > 12) return null;
+  const q = literalFraction(printed);
   return q && (v < 0 ? fraction(-q.n, q.d) : q);
 }
 
-/** −1, 0 or 1 as the endpoint (x, xq) is below, at or above (y, yq). */
-function cmpEnd(x, xq, y, yq) {
+/**
+ * −1, 0 or 1 as the endpoint (x, xq, xAlg) is below, at or above (y, yq, yAlg).
+ * Exact and radical endpoints are ordered exactly, so an intersection never
+ * depends on which side was written first (#723 review: x > √2 and
+ * x > 1.4142135623730951 is x > 1.4142135623730951, in either order).
+ */
+function cmpEnd(x, xq, y, yq, xAlg = null, yAlg = null) {
   if (xq && yq) {
     const d = xq.n * yq.d - yq.n * xq.d;
     return d < 0n ? -1 : d > 0n ? 1 : 0;
+  }
+  if ((xq || xAlg) && (yq || yAlg)) {
+    const c = compareRadical(xAlg || rationalAsRadical(xq), yAlg || rationalAsRadical(yq));
+    if (c !== null) return c;
   }
   return x < y ? -1 : x > y ? 1 : 0;
 }
@@ -79,7 +92,9 @@ function sameEndpoint(x, xq, xAlg, y, yq, yAlg, tol) {
   // coefficients. A perturbation of 10^-15 is a different exact boundary,
   // even where binary64 evaluates the two expressions to the same float.
   if ((xAlg || xq) && (yAlg || yq)) return sameRadical(xAlg || rationalAsRadical(xq), yAlg || rationalAsRadical(yq));
-  if (xq || yq) return sameFraction(xq || floatFraction(x), yq || floatFraction(y));
+  // One side has no exact form (sin(π/6), an authored 1/3): its value is a
+  // binary64 evaluation, so it is matched to the noise of its last place, the
+  // same on every platform's Math library (#723 review).
   return x === y || Math.abs(x - y) <= 4 * Number.EPSILON * Math.max(Math.abs(x), Math.abs(y));
 }
 
@@ -134,7 +149,7 @@ function halfLine(variable, op, boundText, variableOnLeft) {
 }
 
 function intersect(a, b) {
-  const cl = cmpEnd(a.lo, a.loQ, b.lo, b.loQ), ch = cmpEnd(a.hi, a.hiQ, b.hi, b.hiQ);
+  const cl = cmpEnd(a.lo, a.loQ, b.lo, b.loQ, a.loAlg, b.loAlg), ch = cmpEnd(a.hi, a.hiQ, b.hi, b.hiQ, a.hiAlg, b.hiAlg);
   const L = cl >= 0 ? a : b, H = ch <= 0 ? a : b;
   return {
     lo: L.lo, loQ: L.loQ ?? null, loAlg: L.loAlg ?? null, hi: H.hi, hiQ: H.hiQ ?? null, hiAlg: H.hiAlg ?? null,
@@ -144,7 +159,7 @@ function intersect(a, b) {
 }
 
 function isEmptyInterval(iv) {
-  const c = cmpEnd(iv.lo, iv.loQ, iv.hi, iv.hiQ);
+  const c = cmpEnd(iv.lo, iv.loQ, iv.hi, iv.hiQ, iv.loAlg, iv.hiAlg);
   if (c > 0) return true;
   // Only equal endpoints make a degenerate interval: (0, 1e-13) holds 5e-14
   // and is not empty, so nearly equal endpoints never erase it (#680, Q1).
@@ -169,15 +184,15 @@ export function normalizeRegion(intervals) {
       };
     })
     .filter(iv => !isEmptyInterval(iv))
-    .sort((a, b) => cmpEnd(a.lo, a.loQ, b.lo, b.loQ) || (a.loOpen === b.loOpen ? 0 : a.loOpen ? 1 : -1));
+    .sort((a, b) => cmpEnd(a.lo, a.loQ, b.lo, b.loQ, a.loAlg, b.loAlg) || (a.loOpen === b.loOpen ? 0 : a.loOpen ? 1 : -1));
   const out = [];
   for (const iv of list) {
     const last = out[out.length - 1];
     if (!last) { out.push({ ...iv }); continue; }
-    const at = cmpEnd(iv.lo, iv.loQ, last.hi, last.hiQ);
+    const at = cmpEnd(iv.lo, iv.loQ, last.hi, last.hiQ, iv.loAlg, last.hiAlg);
     const touches = at < 0 || (at === 0 && !(iv.loOpen && last.hiOpen));
     if (!touches) { out.push({ ...iv }); continue; }
-    const beyond = cmpEnd(iv.hi, iv.hiQ, last.hi, last.hiQ);
+    const beyond = cmpEnd(iv.hi, iv.hiQ, last.hi, last.hiQ, iv.hiAlg, last.hiAlg);
     if (beyond > 0) { last.hi = iv.hi; last.hiQ = iv.hiQ; last.hiAlg = iv.hiAlg; last.hiOpen = iv.hiOpen; }
     else if (beyond === 0) last.hiOpen = last.hiOpen && iv.hiOpen;
   }
@@ -336,6 +351,14 @@ export function parseMatrixInput(raw) {
     .replace(/\\\\/g, '],[')
     .replace(/\\left|\\right/g, '')
     .replace(/[−–—]/g, '-');
+  // A matrix's brackets balance and close in kind: "(1,2;3,4]" and
+  // "[[1,2],[3,4]]]]" are not matrices (#680 follow-up, Cycle 104 cases).
+  const stack = [];
+  for (const ch of s) {
+    if ('([{'.includes(ch)) stack.push(ch);
+    else if (')]}'.includes(ch) && stack.pop() !== '([{'[')]}'.indexOf(ch)]) throw new Error('Unbalanced brackets');
+  }
+  if (stack.length) throw new Error('Unbalanced brackets');
   // leading scalar: "1/3[[...]]", "(1/3)((...))", "2 × [1 2; 3 4]"
   let scalar = 1;
   const lead = s.match(/^(.*?)\s*[*×·]?\s*((?:\[\[|\(\(|\{\{|\[|\().*)$/s);

@@ -171,7 +171,11 @@ export const flow = {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { onlinePlatform } = await import('./support/online-session.mjs');
   // The preselected seed is accepted ONLY by the test server, never deployed.
-  await onlinePlatform({ allowSeededPractice: true });
+  // This tour checks how method credit is DISPLAYED, so its test server runs
+  // the method-mark pilot (D12: PRI_METHOD_MARKS=on), as the server method
+  // suites do. Production's default — final answer only, 0 method marks — is
+  // pinned by server/test/marking-policy-check.mjs.
+  await onlinePlatform({ allowSeededPractice: true, env: { PRI_METHOD_MARKS: 'on' } });
   const { runOne } = await import('./e2e.mjs');
   process.exit(await runOne(flow) ? 1 : 0);
 }
