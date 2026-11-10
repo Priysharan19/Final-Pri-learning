@@ -29,7 +29,7 @@ const { awardStepMarks } = await import(`${SRC}engine/cbseMarking.js`);
 const { stepCheck, checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { validatePyqRecord, pyqPayload } = await import(`${SRC}engine/pyq/pyqSchema.js`);
 const { PYQ_RECORDS } = await import(`${SRC}engine/pyq/pyqArchive.js`);
-const { MARKER_OPS, marksPossibleFor } = await import('../../server/platform/markerOps.js');
+const { MARKER_OPS, marksPossibleFor, practiceMarksEarned, markResponse } = await import('../../server/platform/markerOps.js');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks += 1; };
@@ -53,6 +53,8 @@ ok(boardSchemeProblems(SCHEME.slice(0, -1), 2.5).length > 0, 'a scheme without a
 ok(boardSchemeProblems([{ ...SCHEME[0], line: '' }, ...SCHEME.slice(1)], 3).some(p => /no line/.test(p)), 'a working point the engine cannot verify is refused');
 ok(boardSchemeProblems([{ ...SCHEME[0], answer: true }, ...SCHEME.slice(1)], 3).some(p => /not last/.test(p)), 'an answer point that is not last is refused');
 ok(boardSchemeProblems([SCHEME[0], { ...SCHEME[1], line: 'x = 3' }, ...SCHEME.slice(2)], 3, META).some(p => /only states the final value/.test(p)), 'a working point whose line is only the final value is refused');
+ok(boardSchemeProblems([SCHEME[0], { ...SCHEME[1], line: '4x + 10 = 22' }, ...SCHEME.slice(2)], 3, META).some(p => /share the line/.test(p)), 'two working points with the same line are refused');
+ok(boardSchemeProblems([SCHEME[0], { ...SCHEME[1], line: '22 = 4x + 10' }, ...SCHEME.slice(2)], 3, META).some(p => /share the line/.test(p)), 'two working points with the same line written differently are refused');
 eq(wholeMarkGroups(SCHEME).map(g => [g.points.join(','), g.marks]), [['0,1', 1], ['2', 1], ['3,4', 1]], '½ + ½ group into one whole mark');
 
 // ── 2. Never above the Board ─────────────────────────────────────────────────
@@ -126,6 +128,29 @@ const twice = run('4', [working[0], working[0], working[1], working[1]].join('\n
 eq(twice.evidence.partial.awarded, 1, 'server: the first two points\' lines each written twice earn their one group (Board: 1), not four points\' worth');
 const fourDup = run('4', [working[2], working[2], working[2], working[2]].join('\n'));
 eq(fourDup.evidence.partial.awarded, 1, 'server: one point\'s line written four times earns that one point\'s group only');
+// A right answer is marked by the Board scheme too, on the server's practice
+// and exam paths: the printed marks only with every point's own line.
+const GRID = { correct: 3, incorrect: 0, unanswered: 0 };
+const practiceMarks = (answer, work) => { const r = run(answer, work); return practiceMarksEarned(q, r.result, r.evidence, marksPossibleFor(q)); };
+for (const [label, work, expected] of [
+  ['the Board\'s working', working.join('\n'), 3],
+  ['no working', '', 0],
+  ['junk working', 'hello\nwhatever\n= = =', 0],
+  ['x = 3 four times', 'x = 3\nx = 3\nx = 3\nx = 3', 0],
+  ['the first point\'s line four times', Array(4).fill(working[0]).join('\n'), 0],
+  ['the first two points\' lines', working.slice(0, 2).join('\n'), 1]
+]) {
+  eq(practiceMarks('3', work), expected, `server practice, right answer with ${label}: ${expected}/3`);
+  eq(markResponse(q, '3', work, GRID).awarded, expected, `server exam, right answer with ${label}: ${expected}/3`);
+}
+eq(markResponse(q, '4', 'x = 3\nx = 3\nx = 3\nx = 3', GRID).awarded, 0, 'server exam, wrong answer with x = 3 four times: 0');
+eq(markResponse(q, '4', working.slice(0, 3).join('\n'), GRID).awarded, 2, 'server exam, wrong answer with the first three points\' lines: 2');
+eq(practiceMarksEarned(q, { correct: true }, null, 3), 0, 'no deterministic Board award, no mark — never the printed marks by default');
+// The client pairs step-check verdicts with written lines by text, not position.
+const shuffled = { lines: [...report.lines].reverse() };
+eq(awardStepMarks({ question: q, workingLines: working, stepReport: shuffled, answerText: '3', correct: true }).awarded, 3, 'client: verdicts in another order still pair with their own lines');
+const shifted = { lines: [{ status: 'ok', text: 'x = 3' }, ...report.lines.slice(0, 3).map(l => ({ ...l, status: 'break' }))] };
+eq(awardStepMarks({ question: q, workingLines: working, stepReport: shifted, answerText: '4', correct: false }).awarded, 0, 'client: an ok verdict for another line\'s text earns nothing');
 const right = run('3', working.join('\n'));
 eq(right.result.correct, true, 'the right answer is credited by checkAnswer');
 eq(checkAnswer(q, '3').correct, true, 'and checkAnswer is the authority on the final answer');

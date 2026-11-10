@@ -57,6 +57,15 @@ export function boardSchemeProblems(scheme, marks, meta = null) {
     if (!last && !text(p?.line)) out.push(`point ${i + 1} has no line the deterministic checker can verify`);
     if (!last && meta && text(p?.line) && statesOnlyFinalAnswer(p.line, meta)) out.push(`point ${i + 1}'s line only states the final value, which is the answer point's to earn`);
   });
+  // Two working points with the same line would let one written line stand for
+  // both, or two copies of it earn twice: refused.
+  scheme.forEach((p, i) => {
+    if (p?.answer === true || !text(p?.line)) return;
+    for (let j = 0; j < i; j++) {
+      const o = scheme[j];
+      if (o?.answer !== true && text(o?.line) && (text(o.line) === text(p.line) || writtenAsLine(p.line, o.line))) out.push(`points ${j + 1} and ${i + 1} share the line ${JSON.stringify(text(p.line))}`);
+    }
+  });
   const total = scheme.reduce((s, p) => s + Number(p?.marks || 0), 0);
   if (Math.abs(total - marks) > 1e-9) out.push(`the points add to ${total}, not ${marks}`);
   return out;
