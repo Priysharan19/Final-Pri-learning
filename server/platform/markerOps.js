@@ -20,6 +20,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
+import { awardBoardScheme } from '../../client/src/engine/boardScheme.js';
 import { answerForm, firstFinalAttempt, planGivens } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -63,6 +64,9 @@ export function isSchemeStep(step) {
 }
 
 export function marksPossibleFor(q) {
+  // A past-paper question carrying the Board's transcribed scheme is worth the
+  // marks the Board printed (boardScheme.js), not a number guessed from steps.
+  if (Array.isArray(q.boardScheme) && Number.isInteger(q.marks)) return q.marks;
   const keySteps = (q.steps || []).filter(isSchemeStep);
   const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
@@ -82,7 +86,14 @@ export function stepEvidence(q, answer, steps, result) {
   // because working was attached; only an actually empty final-answer field
   // can be graded by method alone.
   const blankFinal = typeof answer === 'string' && answer.trim() === '';
-  if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
+  if (meta && steps && !result.correct && (!result.invalid || blankFinal) && Array.isArray(q.boardScheme)) {
+    // The Board's own scheme: value points ticked down the page by lines the
+    // deterministic step check verified. methodMarks' generic rubric is not
+    // used — the record says how the Board marked this question.
+    const okLines = (report?.lines || []).filter(l => l?.status === 'ok').length;
+    const award = awardBoardScheme({ scheme: q.boardScheme, okLines, correct: false });
+    if (okLines > 0) partial = { okLines, awarded: award.method, note: award.method > 0 ? `${award.method} of ${award.total} marks for the method the Board's marking scheme credits.` : 'Your working does not yet reach a whole mark of the Board\'s marking scheme.', lines: (report?.lines || []).map(l => ({ status: l?.status, text: l?.text })), lost: award.total - award.method, boardScheme: true };
+  } else if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
     try {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
