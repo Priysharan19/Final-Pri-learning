@@ -180,6 +180,8 @@ jobs:
           grep -Fq '2880000/2880000 self-checks passed across 360 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 2708/2708 checks' suites.log
+          grep -Fq '2864000/2864000 self-checks passed across 358 subtopics' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2696/2696 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
           grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks' suites.log
@@ -206,6 +208,10 @@ jobs:
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 172804 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '59100 questions from 591 declared (generator, difficulty) pairs × 100 draws — 59100 marked correct by their own marker, 59100 well formed' suites.log
+          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 4.18×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 171844 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '57900 questions from 579 declared (generator, difficulty) pairs × 100 draws — 57900 marked correct by their own marker, 57900 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
@@ -235,6 +241,9 @@ jobs:
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
           grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 32486 right answers over 12279 India questions (591 generator×difficulty cells × 24 seeds)' suites.log
+          # #784 CBSE X competency forms, re-derived on main 35159d3c4: 355 → 358 subtopics, 576 → 579 pairs, sweeps and distinct counts re-measured.
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 413928 wrong answers marked correct across 18456 questions' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 32130 right answers over 12002 India questions (579 generator×difficulty cells × 24 seeds)' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
