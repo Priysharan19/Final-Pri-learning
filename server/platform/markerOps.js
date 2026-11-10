@@ -19,6 +19,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
 import { markGeometry } from '../../client/src/engine/geometryFacts.js';
+import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -153,6 +154,11 @@ export function examAnswerStage(q, given, working, grid) {
     const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
       partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
       needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  if (q.answerType === 'proof') {
+    // A proof earns marks from a person only. The algebra report goes with it as evidence.
+    try { r = checkProof(q, given); } catch { r = { feedback: 'This proof could not be read.' }; }
+    return { final: true, response: { unanswered: false, correct: false, awarded: 0, feedback: String(r.feedback || '').slice(0, 3000), partial: null,
+      proofReport: r.proofReport || null, needsReview: true, markingScheme: 'teacher-review', outcome: 'needs-review' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
