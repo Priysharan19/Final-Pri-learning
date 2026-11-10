@@ -114,6 +114,7 @@ function mmss(totalSeconds) {
 // the server's own record of which questions leant toward which subtopic and
 // on what evidence. Facts about the student's marked work; no prediction.
 function WhyKey({ why }) {
+  const t = useT();
   const rows = (why?.rows || []).filter(r => r.targeted);
   if (!why) return null;
   return (

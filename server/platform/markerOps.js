@@ -135,6 +135,7 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: r.outcome === 'unanswered', correct: r.outcome === 'full', awarded: r.awarded,
       feedback: String(r.feedback || '').slice(0, 3000), partial: r.outcome === 'partial' ? { awarded: r.awarded, note: r.feedback } : null,
       markingScheme: 'objective-per-row', outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
   if (q.answerType === 'graph-sketch') {
     // Each assessed feature earns its scheme marks; review features earn nothing until a person marks them.
     const g = q.answer?.graph, set = readFeatureSet(given);
@@ -146,16 +147,22 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
       partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the features that match.' } : null, features: r?.features || null,
       needsReview: !!r?.needsReview, markingScheme: 'graph-features', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
   if (q.answerType === 'geometry') {
     // Measurable facts earn their part marks; a construction step waits for a person.
     let response = given, r = null;
     if (typeof given === 'string') { try { response = given.length <= 4096 ? JSON.parse(given) : null; } catch { response = null; } }
     if (response && typeof response === 'object') { try { r = markGeometry(q.answer?.geometry, response); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
     const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
       partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
       needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
   if (q.answerType === 'proof') {
     // A proof earns marks from a person only. The algebra report goes with it as evidence.
+    let r;
     try { r = checkProof(q, given); } catch { r = { feedback: 'This proof could not be read.' }; }
     return { final: true, response: { unanswered: false, correct: false, awarded: 0, feedback: String(r.feedback || '').slice(0, 3000), partial: null,
       proofReport: r.proofReport || null, needsReview: true, markingScheme: 'teacher-review', outcome: 'needs-review' } };

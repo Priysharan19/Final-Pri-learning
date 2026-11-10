@@ -9,7 +9,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 7 | 103 | ≥ 2.98×10^8 | 2 | 74 | met |
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
 | Class 9 | 32 | 8.26×10^7 | 0 | 9 | not met |
-| Class 10 | 95 | 4.18×10^7 | 0 | 71 | not met |
+| Class 10 | 110 | 4.26×10^7 | 0 | 79 | not met |
 | Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
 | Class 12 | 93 | ≥ 3.83×10^8 | 2 | 69 | met |
 
@@ -228,10 +228,12 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-areas-circles` | 1 | 2000 | 32 | 32 |
 | `c10-surface-area-combo` | 4 | 2000 | 34 | 34 |
 | `c10-surface-area-combo` | 1 | 2000 | 57 | 57 |
+| `c10-quadratic-k-forms` | 3 | 2000 | 59 | 59 |
 | `c10-irrationality-proofs` | 1 | 2000 | 72 | 72 |
 | `c10-irrationality-proofs` | 2 | 2000 | 72 | 72 |
 | `c10-irrationality-proofs` | 3 | 2000 | 72 | 72 |
 | `c10-triangles-current` | 3 | 2000 | 72 | 72 |
+| `c10-quadratic-k-forms` | 2 | 2000 | 76 | 76 |
 | `c10-quadratic-triangle-competency` | 3 | 2000 | 80 | 80 |
 | `c10-quadratic-context` | 4 | 2000 | 81 | 81 |
 | `c10-quadratic-roots` | 3 | 2000 | 121 | 121 |
@@ -267,9 +269,15 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-triangles-current` | 2 | 2000 | 1234 | 1912 |
 | `c10-quadratic-factorisation-reasoning` | 3 | 2000 | 941 | 1967 |
 | `c10-tangent-length-reasoning` | 3 | 2000 | 989 | 2252 |
+| `c10-zero-coefficient-forms` | 3 | 2000 | 944 | 2482 |
+| `c10-quadratic-k-forms` | 1 | 2000 | 864 | 2874 |
 | `c10-ap-daily-life-reasoning` | 3 | 2000 | 1323 | 3445 |
 | `c10-linear-graphs` | 4 | 2000 | 1503 | 3698 |
 | `c10-linear-graphs` | 2 | 2000 | 1568 | 4039 |
+| `c10-zero-coefficient-forms` | 2 | 2000 | 1558 | 4043 |
+| `c10-zero-coefficient-forms` | 1 | 2000 | 1549 | 4339 |
+| `c10-ap-sum-forms` | 1 | 2000 | 1287 | 5809 |
+| `c10-ap-term-forms` | 3 | 2000 | 1639 | 6229 |
 | `c10-coordinate-geometry` | 1 | 2000 | 1741 | 6872 |
 
 ### Class 11

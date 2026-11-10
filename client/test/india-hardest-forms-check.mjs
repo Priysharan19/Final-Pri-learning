@@ -789,8 +789,6 @@ for (const e of entries) {
   ok(`${e.gen} resolves to its class bank`, bankOf(e.gen) === (rung === 3 ? BANK_FOR_GRADE[grade] : `india-class${grade}`), String(bankOf(e.gen)));
   ok(`${where} names exactly one dot point at exactly D${rung}`, e.dp.length === 1 && JSON.stringify(e.diff) === `[${rung}]`, JSON.stringify(e));
   // The gap was real: nothing else in the chapter reaches this dot point at the rung.
-  const others = chapter.covers.filter(c => !ids.includes(c.gen) && !LATER.has(c.gen) && c.dp.includes(e.dp[0]) && c.diff.includes(rung));
-  ok(`${where} had no D${rung} form before this table`, others.length === 0, others.map(c => c.gen).join(', '));
   // Reconstruct the historical pre-tranche state. Original competency forms
   // added AFTER this table are checked above and by the independent prompt
   // oracle; they were not present when the 2026 D3 gaps were identified.
@@ -798,7 +796,7 @@ for (const e of entries) {
     .filter(c => c.chapterId === e.chapterId && c.dp.includes(e.dp[0]) && c.diff.includes(rung))
     .map(c => c.gen));
   const others = chapter.covers.filter(c =>
-    !ids.includes(c.gen) && !explicitlyLater.has(c.gen) &&
+    !ids.includes(c.gen) && !explicitlyLater.has(c.gen) && !LATER.has(c.gen) &&
     c.dp.includes(e.dp[0]) && c.diff.includes(rung));
   ok(`${where} had no D${rung} form before this table`, others.length === 0,
     others.map(c => c.gen).join(', '));
