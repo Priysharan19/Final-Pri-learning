@@ -55,6 +55,7 @@ import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnsw
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { asksForInequality } from '../ink/relationSwap.js';
+import { questionAsksForGraph } from '../ink/graphAnswer.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
@@ -2664,7 +2665,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} onGraphFeatures={setGraphFeatures} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} graphAnswer={questionAsksForGraph(question)} onGraphFeatures={setGraphFeatures} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}

@@ -102,7 +102,7 @@ function knownBlockOf(who, isOnline) {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, onGraphFeatures = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, graphAnswer = false, onGraphFeatures = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -297,7 +297,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // A page may hold a sketched graph beside written lines: the graph is read
     // as geometry (its labels alone, answer-blind), the rest as lines.
     // If the reader's chunk cannot load, the whole page is read as lines.
-    loadSketchKit().catch(() => null).then(kit => {
+    // Only a question that declares a graph answer is read for a sketch (#793).
+    (graphAnswer ? loadSketchKit().catch(() => null) : Promise.resolve(null)).then(kit => {
     if (seq !== readSeqRef.current || disabledRef.current) { landed(); return; }
     const region = kit ? kit.splitSketchRegion(strokes) : { sketch: [], writing: strokes };
     const lineStrokes = region.sketch.length ? region.writing : strokes;
@@ -361,7 +362,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
     });
     });
-  }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [publish, graphAnswer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * One tap: the student says what they wrote on a line the reader was unsure

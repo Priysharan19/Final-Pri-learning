@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyStrokes, confirmGraphFeatures, geometryStrokes, labelGroups, parseLines, parsePoints, parseValues, readGraphSketch, showValues, splitSketchRegion, tickValuesFromLabels } from '../src/ink/graphSketch.js';
 import { proposeSketch, readSketchLabels } from '../src/ink/graphLabels.js';
+import { questionAsksForGraph } from '../src/ink/graphAnswer.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 let pass = 0;
@@ -158,6 +159,23 @@ ok(/splitSketchRegion\(strokes\)/.test(ink) && /readWithCloud\(lineStrokes/.test
 ok(/onGraphRef\.current\?\.\(null\)/.test(ink), 'a changed page withdraws what was confirmed');
 const card = readFileSync(join(ROOT, 'client/src/components/QuestionCard.jsx'), 'utf8');
 ok(/onGraphFeatures=\{setGraphFeatures\}/.test(card) && /graph: graphFeatures \} : \{\}\), scribble/.test(card) && /graph: graphFeatures \} : \{\}\) \}\}/.test(card), 'the question sends the confirmed set with Check and to "What went wrong?"');
+
+// ── only a graph question is read for a sketch (#793 regression) ─────────────
+// A single written "4" on a Class 7 "Finding the Unknown" item opened the sketch
+// panel and left the server reading stale, so Submit never completed.
+ok(!questionAsksForGraph({ answerType: 'numeric', prompt: 'Find the unknown: x + 9 = 13. What is x?' }), 'a numeric Finding-the-Unknown item does not ask for a graph');
+ok(!questionAsksForGraph({ answerType: 'working', prompt: 'Solve x^2 - 5x + 6 = 0.' }), 'a solve item does not ask for a graph');
+ok(!questionAsksForGraph({ answerType: 'numeric', prompt: 'The graph shows sales. How many in May?' }), 'reading a given graph is not drawing one');
+ok(!questionAsksForGraph(null) && !questionAsksForGraph({}), 'no question, no sketch');
+ok(questionAsksForGraph({ answerType: 'graph-sketch', prompt: 'y = x^2' }), 'a graph-sketch item asks for a graph');
+ok(questionAsksForGraph({ answerType: 'working', prompt: 'Sketch the graph of y = x^2 - 4.' }), 'a prompt that asks for a sketched graph asks for one');
+{
+  const ink = readFileSync(join(ROOT, 'client/src/ink/InkAnswer.jsx'), 'utf8');
+  ok(/graphAnswer = false/.test(ink), 'InkAnswer reads no sketch unless told the question asks for one');
+  ok(ink.includes("(graphAnswer ? loadSketchKit().catch(() => null) : Promise.resolve(null))"), 'the sketch kit loads only for a graph question');
+  const card = readFileSync(join(ROOT, 'client/src/components/QuestionCard.jsx'), 'utf8');
+  ok(/graphAnswer=\{questionAsksForGraph\(question\)\}/.test(card), 'the card tells InkAnswer whether its question declares a graph answer');
+}
 
 // ── answer-blind ──────────────────────────────────────────────────────────────
 for (const rel of ['client/src/ink/graphSketch.js', 'client/src/ink/GraphSketchConfirm.jsx', 'client/src/ink/graphLabels.js']) {
