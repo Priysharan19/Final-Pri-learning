@@ -128,6 +128,8 @@ const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/Tut
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
 // "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
 const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
+// The live step coach (F1): its requests and per-line verdicts, on demand.
+const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -1901,45 +1903,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // verified line, or nothing. A final-answer line gets only "Press Check".
   // No value and no mark: Check alone marks. On only where the server says so
   // (its switch and the account's Premium), so this asks the backend once.
+  // Its state and requests live in tutor/StepCoachLive.jsx, a lazy chunk;
+  // a tutor-off production build folds all of this away.
   const [coachOn, setCoachOn] = useState(false);
-  const [liveCoach, setLiveCoach] = useState(null);   // { lines, rows }
-  const coachSentRef = useRef(null);
+  const [liveCoach, setLiveCoach] = useState(null);   // { verdicts, final }
   useEffect(() => {
-    if (!writeMode) return undefined;
+    if (TUTOR_BUILT_OUT || !writeMode) return undefined;
     let live = true;
     api.get('/tutor/step-coach').then(r => { if (live) setCoachOn(r?.on === true); }).catch(() => { });
     return () => { live = false; };
   }, [writeMode]);
-  useEffect(() => { setLiveCoach(null); coachSentRef.current = null; }, [question?.id]);
-  useEffect(() => {
-    if (!coachOn || !writeMode || resolved || !question?.id || !inkResult || inkResult.stale === true) return undefined;
-    const all = (inkResult.lines || []).map(l => String(l || '').trim());
-    // A live read's last line may still be being written: only the lines above it are finished.
-    const finished = inkResult.live === true ? all.slice(0, -1) : all;
-    if (!finished.length || finished.some(l => !l)) return undefined;
-    const key = finished.join('\n');
-    if (coachSentRef.current === key) return undefined;
-    coachSentRef.current = key;
-    let live = true;
-    api.post(`/practice/${question.id}/tutor/step-coach`, { lines: finished })
-      .then(r => { if (live && Array.isArray(r?.stepCoach?.lines)) setLiveCoach({ lines: finished, rows: r.stepCoach.lines }); })
-      .catch(() => { });
-    return () => { live = false; };
-  }, [coachOn, writeMode, resolved, question?.id, inkResult]);
-  const liveLineVerdicts = useMemo(() => {
-    if (!coachOn || !writeMode || resolved || !liveCoach || inkResult?.stale === true) return null;
-    const shown = (inkResult?.lines || []).map(l => String(l || '').trim());
-    // Drawn only while the lines it judged are still the lines on screen.
-    if (!liveCoach.lines.every((l, i) => shown[i] === l)) return null;
-    const out = shown.map((_, i) => {
-      const r = liveCoach.rows[i];
-      if (r?.status === 'ok') return { status: 'ok', note: Number.isInteger(r.step) ? t('ink.coachStep', { n: r.step }) : t('ink.coachOk') };
-      if (r?.status === 'break') return { status: 'break', note: t('ink.coachBreak') };
-      return { status: 'unknown' };
-    });
-    return out.some(v => v.status !== 'unknown') ? out : null;
-  }, [coachOn, writeMode, resolved, liveCoach, inkResult, t]);
-  const liveCoachFinal = !!liveCoach && !resolved && liveCoach.rows.some(r => r?.status === 'final');
+  useEffect(() => { setLiveCoach(null); }, [question?.id]);
+  const coaching = !TUTOR_BUILT_OUT && coachOn && writeMode && !resolved;
+  const liveLineVerdicts = coaching ? liveCoach?.verdicts || null : null;
+  const liveCoachFinal = coaching && !!liveCoach?.final;
 
   const lineVerdicts = useMemo(() => {
     // The live coach speaks only while nothing has been submitted for marking.
@@ -3227,6 +3204,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
               </button>
             </span>
+          )}
+          {StepCoachLive && coaching && (
+            <React.Suspense fallback={null}>
+              <StepCoachLive questionId={question.id} inkResult={inkResult} onChange={setLiveCoach} />
+            </React.Suspense>
           )}
           {writeMode && liveCoachFinal && (
             <span className="ws-line-check-result muted" role="status" data-step-coach-final>{t('ink.coachPressCheck')}</span>

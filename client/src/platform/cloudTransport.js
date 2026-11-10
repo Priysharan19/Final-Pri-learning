@@ -600,10 +600,6 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/tutor/line-check', { method: 'POST', body, signal, timeoutMs }),
   // The live step coach (F1): one status per finished line, never a value.
   // Sends only the issued question's id and the student's own read lines.
-  tutorStepCoach: (body, { signal = null, timeoutMs = 15000 } = {}) =>
-    cloudRequest('/v1/tutor/step-coach', { method: 'POST', body, signal, timeoutMs }),
-  tutorStatus: ({ signal = null, timeoutMs = 10000 } = {}) =>
-    cloudRequest('/v1/tutor/status', { signal, timeoutMs }),
   // The same body, answered as server-sent events (see cloudStreamRequest).
   tutorStream: (body, { onEvent, signal = null, timeoutMs = 45000 } = {}) =>
     cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),

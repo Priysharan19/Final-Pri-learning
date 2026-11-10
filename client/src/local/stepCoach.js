@@ -2,8 +2,8 @@
 // it loads only when the server has switched the coach on for this account
 // (first-visit budget, client/test/install-budget-check.mjs). backend.js
 // checks the profile, the row and the lines before importing this.
-import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
-import { tutorFeatureEnabled } from '../tutor/flag.js';
+// backend.js has checked the tutor switch before it imports this module.
+import { cloudAvailable, cloudRequest } from '../platform/cloudTransport.js';
 
 let coachOverride = null;
 /** Tests replace the step-coach transport; production never calls this. */
@@ -18,10 +18,9 @@ export function setStepCoachTransportForTests(fn) {
  */
 let coachStatus = null;
 export function stepCoachAvailable() {
-  if (!tutorFeatureEnabled()) return Promise.resolve(false);
   if (coachOverride) return Promise.resolve(true);
   if (!cloudAvailable()) return Promise.resolve(false);
-  if (!coachStatus) coachStatus = cloud.tutorStatus().then(r => r?.stepCoach === true).catch(() => { coachStatus = null; return false; });
+  if (!coachStatus) coachStatus = cloudRequest('/v1/tutor/status', { timeoutMs: 10000 }).then(r => r?.stepCoach === true).catch(() => { coachStatus = null; return false; });
   return coachStatus;
 }
 /** Forget the cached answer (sign-in, sign-out, a plan change). */
@@ -29,11 +28,10 @@ export function resetStepCoachStatus() { coachStatus = null; }
 
 /** Ask /v1/tutor/step-coach. Resolves to { stepCoach } or { error: { code } }; never rejects. */
 export async function requestStepCoach(body, { signal = null } = {}) {
-  if (!tutorFeatureEnabled()) return { error: { code: 'TUTOR_DISABLED' } };
   try {
     if (coachOverride) return await coachOverride(body, { signal });
     if (!cloudAvailable()) return { error: { code: 'TUTOR_OFFLINE' } };
-    const response = await cloud.tutorStepCoach(body, { signal });
+    const response = await cloudRequest('/v1/tutor/step-coach', { method: 'POST', body, signal, timeoutMs: 15000 });
     if (!Array.isArray(response?.stepCoach?.lines)) return { error: { code: 'TUTOR_MALFORMED' } };
     return { stepCoach: response.stepCoach };
   } catch (error) {
@@ -42,6 +40,18 @@ export async function requestStepCoach(body, { signal = null } = {}) {
     if (code === 'STEP_COACH_PREMIUM' || code === 'NOT_FOUND' || error?.status === 404) coachStatus = Promise.resolve(false);
     return { error: { code } };
   }
+}
+
+/** The whole POST /practice/:id/tutor/step-coach route; backend.js passes its own helpers. */
+export async function coachRoute(body, params, { requireProfile, get, put, assertPracticeRow, sanitizeText }) {
+  const p = await requireProfile();
+  const row = await get('questions', params.id);
+  if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+  assertPracticeRow(row);
+  if (row.discardedAt || row.answered || !row.serverQuestionId) return { stepCoach: null };
+  const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+  if (!lines.length) return { stepCoach: null };
+  return coachLines(row, lines, put);
 }
 
 /** Ask the server, keep only status and step, and record the shown help on the attempt. */

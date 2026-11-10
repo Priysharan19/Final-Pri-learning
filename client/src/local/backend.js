@@ -3952,7 +3952,10 @@ const routes = {
 
   // The live step coach (F1): is it on for this account? The server decides.
   // Its code is an on-demand chunk; offline or unloadable means off.
-  'GET /tutor/step-coach': async () => ({ on: await import('./stepCoach.js').then(m => m.stepCoachAvailable(), () => false) }),
+  // Folded out of a tutor-off production build, like the ask route.
+  'GET /tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => ({ on: false })
+    : async () => ({ on: tutorFeatureEnabled() && await import('./stepCoach.js').then(m => m.stepCoachAvailable(), () => false) }),
 
   // The live step coach (F1): the server's Step Check of the FINISHED lines of
   // an OPEN server-issued question, as the student writes. One status per
@@ -3965,19 +3968,12 @@ const routes = {
   // break is A1 (localization only), a shown tick is verification feedback.
   // Both are recorded on the attempt, system-initiated, with the line index;
   // no help credit is charged here — that policy is the owner's decision.
-  'POST /practice/:id/tutor/step-coach': async (body, params) => {
-    if (!tutorFeatureEnabled()) throw tutorDisabledError();
-    const p = await requireProfile();
-    const row = await get('questions', params.id);
-    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
-    assertPracticeRow(row);
-    if (row.discardedAt || row.answered || !row.serverQuestionId) return { stepCoach: null };
-    const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
-    if (!lines.length) return { stepCoach: null };
-    // The rest loads only when the coach is on (its own on-demand chunk).
-    const { coachLines } = await import('./stepCoach.js');
-    return coachLines(row, lines, put);
-  },
+  'POST /practice/:id/tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => { throw tutorDisabledError(); }
+    : async (body, params) => {
+      if (!tutorFeatureEnabled()) throw tutorDisabledError();
+      return (await import('./stepCoach.js')).coachRoute(body, params, { requireProfile, get, put, assertPracticeRow, sanitizeText });
+    },
 
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
