@@ -209,7 +209,16 @@ export function awardStepMarks({
   if (Array.isArray(question?.boardScheme)) {
     // Only report lines that stand for a written line are read, and each value
     // point is earned by its own line, one-to-one and in order.
-    const paired = lines.map((t, i) => ({ status: reportLines[i]?.status, text: t }));
+    // Paired by text, not position: a report line stands for the written line
+    // with the same text, each report line used once. A line the report does
+    // not carry has no verdict and earns nothing.
+    const used = new Set();
+    const paired = lines.map(t => {
+      const k = reportLines.findIndex((r, i) => !used.has(i) && text(r?.text) === t);
+      if (k < 0) return { status: null, text: t };
+      used.add(k);
+      return { status: reportLines[k]?.status, text: t };
+    });
     const ticked = matchBoardPoints({ scheme: question.boardScheme, lines: paired, meta: question.stepcheck || null });
     const ok = ticked.filter(Boolean).length;
     const award = awardBoardScheme({ scheme: question.boardScheme, ticked, correct: !!correct });

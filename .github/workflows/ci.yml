@@ -200,7 +200,7 @@ jobs:
           # The pin is the measurement; widening generators moves it and the report together.
           grep -Fq 'DISTINCT QUESTIONS REPORT: PASS' suites.log
           # Board-scheme marks contract (L5, R4): CBSE Section B–E value points, awarded only by the deterministic engine.
-          grep -Fq 'BOARD SCHEME CONTRACT: PASS — 124/124 checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; 1 Section B–E archive records, every scheme line engine-verified.' suites.log
+          grep -Fq 'BOARD SCHEME CONTRACT: PASS — 147/147 checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; 1 Section B–E archive records, every scheme line engine-verified.' suites.log
           grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 3.61×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
@@ -229,7 +229,7 @@ jobs:
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          # 409709/18312 → 409925/18384 (CBSE X 2025 Sets 30/1/2, 30/1/3, 30/2/1 Section A: 35 records; 409925/18384 → 409997/18408 with 30/1/3 and 30/2/1; 410141/18456 with CBSE XII 65/2/1; re-derived on main 35159d3c4).
+          # 409709/18312 → 409925/18384 (CBSE X 2025 Sets 30/1/2, 30/1/3, 30/2/1 Section A: 35 records; 409925/18384 → 409997/18408 with 30/1/3 and 30/2/1; 410141/18456 with CBSE XII 65/2/1 Section A; 410141/18456 → 410219/18456 with 65/2/1 Q24, the first Section B record; re-derived on main 35159d3c4).
           grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 410219 wrong answers marked correct across 18456 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
