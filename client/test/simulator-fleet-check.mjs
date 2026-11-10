@@ -254,6 +254,23 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
 }
 
+{
+  // Every harness script picks its device by the shared PINNED rule. The bridge
+  // self-check once took the newest runtime installed: on the iOS 27 lane it
+  // cold-booted an iOS 27.2 iPhone the journey then shut down for its own
+  // 27.0 one, and the lane ran past its 60-minute limit.
+  for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfcheck.mjs', 'scripts/ink-native-check.mjs']) {
+    const text = src(script);
+    ok(/pickSimulator\(listing, \{[^}]*\bruntime(: PINNED_RUNTIME)?\b/.test(text) && /requiredRuntime\(\)/.test(text), `${script}: picks its simulator through pickSimulator on the pinned runtime`);
+  }
+  // The iOS 27 lane boots each family once: every iPad step before the first iPhone step.
+  const wf = src('.github/workflows/native-journey-ios27.yml');
+  const steps = [...wf.matchAll(/--family (ipad|iphone)/g)].map(m => m[1]);
+  const firstPhone = steps.indexOf('iphone');
+  ok(firstPhone > 0 && steps.slice(firstPhone).every(f => f === 'iphone') && wf.indexOf('ink-native-check.mjs') < wf.indexOf('--family iphone'),
+    `the iOS 27 lane runs every iPad step before the first iPhone step (got ${steps.join(' → ')})`);
+}
+
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.
