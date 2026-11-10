@@ -1282,7 +1282,7 @@ jobs:
           grep -Fq 'Rapid Fire and Match · signed in, every answer is server-marked' browser.log
           grep -Fq 'Session ended at a start: a paper, Rapid Fire and Match start nothing; signing in again in place starts them' browser.log
           grep -Fq "Exam · finished offline: submitted, no score; reconnected: the server's result" browser.log
-          grep -Eq 'E2E SUITE.*72/72.*8 flows' browser.log
+          grep -Eq 'E2E SUITE.*73/73.*8 flows' browser.log
           # The free plan's daily cap is the server's (#537): with nineteen of
           # the day's questions used on another device, Next shows the cap
           # screen from the server's 402 and fetches nothing instead; a capped
