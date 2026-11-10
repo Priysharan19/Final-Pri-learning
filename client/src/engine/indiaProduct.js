@@ -14,7 +14,7 @@ import {
 } from './curriculum-in.js';
 import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
 import { hasJeePyqGenerator, hasJeePyqDifficulty } from './generators/jee-pyq-runtime.js';
-import { hasPyqGenerator, pyqCoverageOf, pyqGeneratorId } from './pyq/pyqCoverage.js';
+import { hasPyqGenerator, pyqRungsOf, pyqGeneratorId } from './pyq/pyqIndex.js';
 import { pastPapersEnabled } from './pastPapers.js';
 
 export const INDIA_COURSE = 'in';
@@ -259,7 +259,7 @@ export function resolveIndiaTarget(chapter, {
 
   const archiveId = pyqGeneratorId(track.id, chapter.id);
   const archiveCells = archives && ordinal == null && hasPyqGenerator(archiveId)
-    ? pyqCoverageOf(archiveId).difficulties.map(d => ({
+    ? pyqRungsOf(archiveId).difficulties.map(d => ({
       generator: archiveId, difficulty: d, dotpointIndex: null,
       pyq: true, pyqArchive: 'source-cited-archive', windowed: d >= floor && d <= ceiling
     }))
