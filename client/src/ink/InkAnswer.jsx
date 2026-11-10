@@ -302,7 +302,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const region = kit ? kit.splitSketchRegion(strokes) : { sketch: [], writing: strokes };
     const lineStrokes = region.sketch.length ? region.writing : strokes;
     if (region.sketch.length) {
-      kit.proposeSketch(region.sketch, { user: who, signal: controller?.signal }).then(proposal => {
+      kit.proposeSketch(region.sketch, { user: who, signal: controller?.signal, read: readWithCloud }).then(proposal => {
         if (seq !== readSeqRef.current || disabledRef.current) return;
         setSketch({ signature, proposal, confirmed: null, Confirm: kit.GraphSketchConfirm });
       }).catch(() => {});

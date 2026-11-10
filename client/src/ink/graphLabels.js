@@ -8,13 +8,14 @@
 // and a confidence. A label read below the reader's own confidence floor, or
 // not read at all, is kept as unread and the sketch asks the student.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readWithCloud } from './cloudReader.js';
+// The reader (cloudReader's readWithCloud) is passed in by InkAnswer, which
+// already holds it, so this chunk does not pull the reader's graph with it.
 import { labelGroups, readGraphSketch, tickValuesFromLabels, geometryStrokes } from './graphSketch.js';
 
 const MAX_LABELS = 12;
 
 /** Read each label group; { labels: [{ text, x, y, confidence }], unread: n, stopped: reason|null }. */
-export async function readSketchLabels(groups, { user, signal = null, read = readWithCloud } = {}) {
+export async function readSketchLabels(groups, { user, signal = null, read } = {}) {
   const labels = [];
   let unread = 0, stopped = null;
   for (const g of (groups || []).slice(0, MAX_LABELS)) {
@@ -41,7 +42,7 @@ export async function readSketchLabels(groups, { user, signal = null, read = rea
  * The whole sketch proposal: geometry, labels read, tick values from the
  * numbers next to ticks (or 1, asked). `tickValues` given by the student win.
  */
-export async function proposeSketch(sketchStrokes, { user, signal = null, read = readWithCloud, tickValues = null } = {}) {
+export async function proposeSketch(sketchStrokes, { user, signal = null, read, tickValues = null } = {}) {
   const groups = labelGroups(sketchStrokes);
   const { labels, unread, stopped } = await readSketchLabels(groups, { user, signal, read });
   const fromLabels = tickValuesFromLabels(sketchStrokes, labels);

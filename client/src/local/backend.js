@@ -3859,7 +3859,8 @@ const routes = {
     // A sketched graph the student confirmed: compared with the engine's own
     // graph of the function the question states. Engine-verified features
     // only; while the question is open it names the feature, never the value.
-    const graph = await graphWork(q, solution, body?.work?.graph, { resolved: resolvedRow });
+    // Folded out of a tutor-off production build (this route then refuses above).
+    const graph = TUTOR_BUILT_OUT ? null : await graphWork(q, solution, body?.work?.graph, { resolved: resolvedRow });
     if (graph) {
       if (!resolvedRow && used < 1) { row.tutorLevel = 1; await put('questions', row); }
       return { source: 'deterministic', diagnosis: { didRight: '', wentWrong: graph.wentWrong, nextStep: '', wentWrongLine: -1 }, code: null, tutorLevel: Number(row.tutorLevel) || 0 };
