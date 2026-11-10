@@ -843,7 +843,15 @@ export const auroraFlow = {
     // Content is the Instrument's under both skins: every content token and
     // every content surface computes the same with and without the skin.
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    // The India chapter mixes multiple-choice items (no writing surface) with
+    // written ones: move on, within a bound, to a question that can be written.
     const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+    for (let i = 0; i < 8 && !(await tab.count()) && !(await page.locator('.ink-canvas-live').count()); i++) {
+      const leaving = await page.locator('.qpage').getAttribute('data-question-id');
+      await page.locator('.ctx-next').click();
+      await page.waitForFunction(id => { const e = document.querySelector('.qpage[data-question-id]'); return e && e.getAttribute('data-question-id') !== id; }, leaving, { timeout: 30000 });
+      await settle();
+    }
     if (await tab.count()) await tab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await settle();
