@@ -111,7 +111,7 @@ function Forecast({ data, t, locale }) {
         <p className="sub">{paper}</p>
         <Coverage coverage={data.coverage} covered={data.coveredMarks} total={data.paper?.totalMarks} t={t} />
         <p className="ins-premium" data-premium-gate="forecast">
-          {t('insights.forecastPremium')} <PageLink to="/premium">{t('insights.seePremium')}</PageLink>
+          {t('insights.forecastPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
         </p>
       </section>
     );
@@ -210,7 +210,7 @@ function Dna({ data, names, t, locale }) {
           ? t('insights.dnaFreeCount', { count: data.habitCount, n: data.habitCount })
           : t('insights.dnaNone', { count: data.answered, n: data.answered })}</p>
         <p className="ins-premium" data-premium-gate="dna">
-          {t('insights.dnaPremium')} <PageLink to="/premium">{t('insights.seePremium')}</PageLink>
+          {t('insights.dnaPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
         </p>
       </section>
     );

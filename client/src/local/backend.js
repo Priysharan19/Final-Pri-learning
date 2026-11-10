@@ -3959,6 +3959,31 @@ const routes = {
     };
   },
 
+  // The live step coach (F1): is it on for this account? The server decides.
+  // Its code is an on-demand chunk; offline or unloadable means off.
+  // Folded out of a tutor-off production build, like the ask route.
+  'GET /tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => ({ on: false })
+    : async () => ({ on: tutorFeatureEnabled() && await import('./stepCoach.js').then(m => m.stepCoachAvailable(), () => false) }),
+
+  // The live step coach (F1): the server's Step Check of the FINISHED lines of
+  // an OPEN server-issued question, as the student writes. One status per
+  // line — 'ok' (with the plan step), 'break' (the first line that does not
+  // follow from a verified line above), 'unsure' (say nothing) or 'final' (a
+  // final-answer attempt: only "Press Check"). No value, no mark. The server
+  // gates it (switch, Premium, per-question cap, daily allowance).
+  //
+  // Assistance provenance (PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL §6): a shown
+  // break is A1 (localization only), a shown tick is verification feedback.
+  // Both are recorded on the attempt, system-initiated, with the line index;
+  // no help credit is charged here — that policy is the owner's decision.
+  'POST /practice/:id/tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => { throw tutorDisabledError(); }
+    : async (body, params) => {
+      if (!tutorFeatureEnabled()) throw tutorDisabledError();
+      return (await import('./stepCoach.js')).coachRoute(body, params, { requireProfile, get, put, assertPracticeRow, sanitizeText });
+    },
+
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
   // The route module (and the conversation and streaming code behind it) is
@@ -6480,6 +6505,7 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/tutor/diagnose'
     || key === 'POST /practice/:id/tutor/line-check'
+    || key === 'POST /practice/:id/tutor/step-coach'
     || key === 'POST /practice/:id/discard'
     || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);

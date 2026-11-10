@@ -162,6 +162,10 @@ export const ON_DEMAND = [
   // asks about a sketched graph, so they cost the first visit nothing. Like
   // the recogniser, a student who reads once online keeps them.
   [/(^|\/)(graphSketchKit|graphCompare)-[^/]*\.js$/, 'graph sketch reader'],
+  // The live step coach's practice route (F1, #826): behind import() in
+  // local/backend.js, reached only when the server has the coach on for this
+  // account, so it costs the first visit nothing.
+  [/(^|\/)stepCoach-[^/]*\.js$/, 'live step coach'],
 
   // Inter ships one file per script. Latin is the only one an Indian student
   // reading English maths paints from; the browser fetches a subset only when a
@@ -246,9 +250,12 @@ export const ON_DEMAND = [
   ]),
 
   // The previous-year archive is reached only by a student who asks for past
-  // papers. It is behind an import() already; warming it spent 48 kB on the
-  // majority who never open one.
-  [/(^|\/)pyqArchive-[^/]*\.js$/, 'previous-year question archive'],
+  // papers, which are online-only and behind a switch. Its records, schema,
+  // cited sources and coverage manifest are all behind an import(); the shell
+  // carries only pyq/pyqIndex.js (ids and rungs). Warming the rest spent kB on
+  // the majority who never open one, and grew with every transcribed paper —
+  // install-budget-check.mjs holds the archive at 0 bytes of the measure.
+  [/(^|\/)(pyqArchive|pyqCoverage|pyqSources|pyqSchema|records-[a-z0-9-]+)-[^/]*\.js$/, 'previous-year question archive'],
 
   // A translation catalogue is the same argument in miniature. Every install
   // would otherwise carry every language: an English reader paying to download
