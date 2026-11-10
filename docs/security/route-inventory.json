@@ -2418,6 +2418,29 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/exams/targets",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, Premium only (premium-exams from the server's entitlement snapshot, else 402 PREMIUM_REQUIRED): the subtopics a targeted board mock would lean toward, derived only from this account's own server-graded attempts (due dot points and unfixed mistakes); no question, answer or other account's data; Cache-Control no-store. The server re-derives the targets when it seals a targeted paper and writes the 'why these questions' key itself.",
+      "rateLimits": [
+        {
+          "key": "exam-targets",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/exams/layout",
       "auth": "session",

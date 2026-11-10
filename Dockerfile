@@ -18,10 +18,12 @@ ARG PRI_FEATURE_EXTENDED_TRACKS
 # The student interface is not a build variable: client/interface.config.mjs
 # sets it for this image, the iOS bundles and the Android app alike (D7).
 ARG PRI_FEATURE_PAST_PAPERS
+ARG PRI_FEATURE_PARENT_REPORT
 ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
     PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
     PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS} \
-    PRI_FEATURE_PAST_PAPERS=${PRI_FEATURE_PAST_PAPERS}
+    PRI_FEATURE_PAST_PAPERS=${PRI_FEATURE_PAST_PAPERS} \
+    PRI_FEATURE_PARENT_REPORT=${PRI_FEATURE_PARENT_REPORT}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client

@@ -41,7 +41,8 @@ import { readLines, turnOnServerReading } from './fakeServerReader.js';
 import { TEMPLATES } from '../src/ink/templates.js';
 import EN from '../src/i18n/strings.en.js';
 
-const TOPIC = 'y7-equations';
+// An India chapter (D2: every student is on the India course; D15: no NSW bank is issued).
+const TOPIC = 'c7-finding-unknown-current';
 const WHOLE = /^\d{1,3}$/;
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
 const PHONE = { width: 390, height: 844 };

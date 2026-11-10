@@ -11,7 +11,7 @@
 // The server issues from nothing outside this set, so a spec cannot name a
 // generator the student's own track and class do not own.
 import { indiaScope, resolveIndiaTarget } from './indiaProduct.js';
-import { pyqCellsFor } from './pyq/pyqCoverage.js';
+import { pyqCellsFor } from './pyq/pyqIndex.js';
 import { chapterCells } from './indiaExamComposer.js';
 import { pastPapersEnabled } from './pastPapers.js';
 
