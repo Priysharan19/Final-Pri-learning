@@ -25,6 +25,8 @@ html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: 
 .in-led-q * { white-space: nowrap; }
 .in-led-ch { color: var(--in-tx-2); font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .in-led-res { display: flex; align-items: center; gap: 8px; font: 500 12px var(--in-mono); color: var(--in-tx-2); }
+/* Beside a mark strip the verdict is a spoken word only: it takes no slot. */
+.in-led-res .hist-verdict.is-word { display: contents; }
 .in-led-ic { display: inline-flex; color: var(--in-tx-3); }
 .in-led-open { grid-column: 1 / -1; padding: 4px 22px 16px 48px; display: grid; gap: 10px; }
 @media (hover: hover) { html.ui-instrument .hist-row.in-led-row:hover { background: var(--in-l1); } html.ui-instrument .hist-row.in-led-row.is-sel:hover { background: var(--in-l2); } }

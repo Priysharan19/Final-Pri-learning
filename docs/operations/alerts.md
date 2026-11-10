@@ -79,6 +79,7 @@ states every one of its numbers (`≥ N`, `≥ P%`, `N minutes`).
 | `WEBHOOK_FAILURES` | ≥ 1 billing webhook failed to apply (5xx) in 15 minutes. Rejections (4xx: bad signature, malformed, a provider this deployment does not use) are counted as `webhook_total{outcome=rejected}` but never page — anyone can send one | page | `webhook_total{provider,outcome}`, `webhook_failures_total{provider,code}`; `platform_error` lines on `/v1/billing/webhook/:provider` | Railway log alert on `"route":"/v1/billing/webhook/:provider"` with status ≥ 500; Razorpay dashboard webhook failure notifications; App Store Server Notifications retry visibility |
 | `CLIENT_ERROR_SPIKE` | ≥ 20 crash reports accepted on `POST /v1/telemetry/error` in 15 minutes, across every platform | warn | `client_errors_total{platform,code}`; `client_error` lines; the sink's `source=client` events grouped by `code` + `surface` + `fingerprint` | Railway log alert on `"event":"client_error"` ≥ 20 in 15 min; or a monitor polling `/v1/metrics` for `CLIENT_ERROR_SPIKE` in `firing`; the Sentry project's own issue alert on new `source:client` groups. Response: read `platform`, `surface` and `code` from the lines; the stored row carries the client `build`. A spike right after a deploy is a rollback candidate (`runbook.md` §3) |
 | `ERROR_SINK_FAILURES` | ≥ 5 deliveries to the error sink refused or unreachable in 15 minutes | warn | `error_sink_total{outcome=failed}`; `error_sink_failed` lines (`ERROR_SINK_REFUSED` with the HTTP status, `ERROR_SINK_TIMEOUT`, `ERROR_SINK_UNREACHABLE`) | Railway log alert on `"event":"error_sink_failed"`; Sentry's quota/rate-limit notifications. Errors are still logged while the sink is down; `error_sink_total{outcome=noop}` rising instead means `PRI_SENTRY_DSN` is unset on this replica |
+| `PAID_CEILING_HIGH` | ≥ 1 paid call in 60 minutes that took the hour or day paid-call ceiling (`PRI_PAID_CALLS_PER_HOUR` / `PRI_PAID_CALLS_PER_DAY`) to 80% or more | warn | `paid_ceiling_high_total{window=hour or day}` (spendCeiling.js) | Raising the ceiling is an owner decision. Until then the tutor ("Why this step?", diagnose) and server reading refuse with `PAID_CAPACITY_REACHED` once it is reached; the per-account tutor allowance and the "Why this step?" free taster still bound each account |
 
 ### 2a. Handwriting latency budget
 
@@ -250,6 +251,7 @@ and `ERROR_SINK_FAILURES`. Until one exists, their rows say "route proven by the
 | `WEBHOOK_FAILURES` | — | — | — | — |
 | `CLIENT_ERROR_SPIKE` | — | — | — | — |
 | `ERROR_SINK_FAILURES` | — | — | — | — |
+| `PAID_CEILING_HIGH` | — | — | — | — |
 
 An alert counts as configured only when this row is filled **and** the alert has been seen to
 fire during a staging drill.

@@ -206,7 +206,9 @@ export const flow = {
     await check('each History row names the chapter, not a demo, generator or device',
       names.length === 2 && names.every(n => /Linear Equations/.test(n)) && !names.some(n => /Pri demo|generator|iPad/i.test(n)),
       `names read ${JSON.stringify(names)}`);
-    const dates = await page.locator('.hist-row .hist-top > .muted').allInnerTexts();
+    // The Scripts ledger groups rows under day headings; each row also states
+    // its own date (data-history-date, and a spoken prefix), which is read here.
+    const dates = await page.locator('.hist-row [data-history-date]').evaluateAll(els => els.map(el => el.getAttribute('data-history-date')));
     await check('History dates read day then month (en-IN), not US month-first',
       dates.length === 2 && dates.every(d => /^\d{1,2}\s+[A-Za-z]{3,4}$/.test(d.trim())),
       `dates read ${JSON.stringify(dates)}`);
@@ -217,6 +219,8 @@ export const flow = {
     // never disclosed a seed — is asked to repeat it; the new attempt is its
     // own server question, marked by the server, and its receipt says repeat.
     const missedRow = page.locator('.hist-row').filter({ has: page.locator('.hist-verdict.bad') }).first();
+    // A ledger row opens to show its actions and its working.
+    await missedRow.locator('.hist-main').click();
     await missedRow.locator('.hist-actions .btn').first().click();
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     if (await typeTab.count()) await typeTab.click();

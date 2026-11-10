@@ -64,7 +64,15 @@ try {
   await startDemo(page, server.origin);
 
   // ── 1 · Notes is in the navigation and opens on the student's class ───────
-  await page.locator('.sidebar a[href="/notes"]').first().click();
+  // The current Instrument shell places Notes in its accessible More menu,
+  // rather than the retired sidebar. Exercise the actual student navigation.
+  const notesTab = page.locator('[data-instrument-bar] .in-tab[href="/notes"]');
+  if (await notesTab.count()) {
+    await notesTab.click();
+  } else {
+    await page.locator('#in-more-btn').click();
+    await page.getByRole('menuitem', { name: 'Notes', exact: true }).click();
+  }
   await page.waitForSelector('[data-testid="notes-chapter"]');
   await check('Notes opens from the navigation', page.url().endsWith('/notes'));
   await check('it opens on Class 10, the student’s class',
