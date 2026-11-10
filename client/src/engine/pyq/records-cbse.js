@@ -1218,5 +1218,30 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
       { h: 'Assertion', d: 'A feasible point is one that satisfies the constraints; it is optimal only if it gives the best value of $Z$, which in general only some points do. (A) is false.' },
       { h: 'Reason', d: 'By the corner point theorem, when an optimal value exists it is attained at a corner point of the feasible region; the Board takes (R) as true.' }
     ]
+  },
+  // ── CBSE Class 12 · 2025 · Set 65/2/1 · Section B — on the Board-scheme contract ─
+  // Marked by the Board's own value points (boardScheme.js, #844): 1½ for the
+  // collinearity equation, ½ for the answer. Grouped into whole marks that is ONE
+  // 2-mark group, so a wrong final answer earns nothing here even where the Board
+  // would give 1½ — the contract may fall below the Board, never above it. The
+  // point is the Board's wording; its `line` is the same statement cross-multiplied
+  // (3 + 2x ≠ 0 at the solution), the form the deterministic step check verifies.
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q24', questionNumber: 24, section: 'Section B',
+    chapterId: 'c12-vector-algebra', difficulty: 2, answerType: 'numeric',
+    prompt: 'If $\\vec{a}$ and $\\vec{b}$ are two non-collinear vectors, then find $x$, such that $\\vec{\\alpha} = (x - 2)\\vec{a} + \\vec{b}$ and $\\vec{\\beta} = (3 + 2x)\\vec{a} - 2\\vec{b}$ are collinear.',
+    answer: { value: 0.25, simplestFraction: { n: 1, d: 4 } },
+    inputHint: 'e.g. 1/4',
+    marks: 2,
+    boardScheme: [
+      { marks: 1.5, point: '$\\vec{\\alpha}$ and $\\vec{\\beta}$ collinear $\\Rightarrow \\dfrac{x-2}{3+2x} = \\dfrac{1}{-2}$', line: '-2(x-2) = 3+2x' },
+      { marks: 0.5, point: '$x = \\dfrac{1}{4}$', answer: true }
+    ],
+    stepcheck: { kind: 'equation', variable: 'x', solutions: [0.25] },
+    steps: [
+      { h: 'Collinear means proportional coefficients', d: 'Since $\\vec{a}$ and $\\vec{b}$ are non-collinear, $\\vec{\\alpha} \\parallel \\vec{\\beta}$ exactly when $\\dfrac{x-2}{3+2x} = \\dfrac{1}{-2}$.' },
+      { h: 'Cross-multiply', d: '$-2(x - 2) = 3 + 2x$, so $-2x + 4 = 3 + 2x$.' },
+      { h: 'Solve', d: '$4x = 1$, so $x = \\dfrac{1}{4}$.' }
+    ]
   }
 ]);

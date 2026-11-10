@@ -116,6 +116,14 @@ for (const r of real) {
   const rep = stepCheck(r.stepcheck, lines.join('\n'), { prompt: r.prompt });
   eq(rep.lines.map(l => l.status), lines.map(() => 'ok'), `${r.id}: every Board point's line is verified by the engine`);
   ok(r.stepcheck.solutions.some(s => Math.abs(s - r.answer.value) < 1e-9), `${r.id}: the keyed answer is a solution of the step metadata`);
+  // End to end on the server's practice operation, with the real payload.
+  const pq = pyqPayload(r);
+  eq(marksPossibleFor(pq), r.marks, `${r.id}: worth the Board's printed marks`);
+  const right = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value), working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  eq(right.result.correct, true, `${r.id}: the keyed answer is credited by checkAnswer`);
+  const wrongR = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value + 1), working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  const board = r.boardScheme.filter(p => !p.answer).reduce((s, p) => s + p.marks, 0);
+  ok((wrongR.evidence?.partial?.awarded ?? 0) <= board, `${r.id}: a wrong answer's method marks never exceed the Board's method marks`);
 }
 
 console.log(`BOARD SCHEME CONTRACT: PASS — ${checks}/${checks} checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn; no model verdict sets a mark; ${real.length} Section B–E archive records, every scheme line engine-verified. [SYNTHETIC fixtures]`);
