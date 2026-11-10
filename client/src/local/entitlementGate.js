@@ -40,10 +40,13 @@ export const FREE_TIER = Object.freeze({
  */
 export const CAPABILITY_ENFORCEMENT = Object.freeze({
   [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'server · POST /v1/practice/issue, /v1/practice/:id/repeat and /v1/practice/notebook/:attemptId/twin refuse the twenty-first practice question of the account\'s day (server/platform/practiceAllowance.js, from the server\'s own entitlement record, #537, D19); the local backend\'s POST /practice/next and /history/:id/retry pre-check is the device\'s courtesy copy',
-  [ENTITLEMENTS.PREMIUM_EXAMS]: 'server · POST /v1/exams counts the account\'s own sealed papers (server/platform/exams.js); local backend · POST /exams (HSC paper builder and India exam module) pre-checks beyond the free simulation',
+  [ENTITLEMENTS.PREMIUM_EXAMS]: 'server · POST /v1/exams counts the account\'s own sealed papers, and a finished paper\'s time report is added only when the result is read by a Premium account (server/platform/exams.js withTimeReport); local backend · POST /exams (HSC paper builder and India exam module) pre-checks beyond the free simulation',
   [ENTITLEMENTS.JEE_ADVANCED]: 'server · the track\'s own papers (POST /v1/exams, server/platform/exams.js) and its own question banks, jee-advanced-* and pyq-jee-advanced-* (POST /v1/practice/issue, prepared bind, repeat and notebook twin, server/platform/practiceAllowance.js PREMIUM_PRACTICE_CONTENT, D19); its difficulty 3–4 chapter questions are the free JEE Main items, so the track as a whole is gated by the local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
-  [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'client · PriExplainV5 adaptive teaching plan, retrieval checkpoints and follow-up (basic playback stays free)',
-  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'client · Progress priorities / knowledge map tabs and the teacher progress-file export',
+  // Declared, sold nowhere and gated nowhere: Pri Explain plays in full on every
+  // plan, and the Premium screen (paywall/plans.js) does not list it. Gating it
+  // would take something away from free students — the owner's call, not a fix.
+  [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'none · not enforced and not sold: Pri Explain (PriExplainV5) plays in full on every plan, and the Premium screen does not list it',
+  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'server · GET /v1/forecast (server/platform/forecast.js) and GET /v1/habits (server/platform/mistakeDna.js) give a free account the offer instead of the reading, and the parent weekly report (server/platform/parentReport.js) is refused at read and at send, all from the server\'s own entitlement record; Progress priorities, the knowledge map and the progress-file export stay free on every plan',
   [ENTITLEMENTS.EXTRA_AI]: 'server · POST /v1/handwriting/transcribe, /v1/working/check and /v1/question-photo/identify daily allowance (server/platform/aiAllowance.js), raised only by the server\'s own entitlement record (SEC-COMM-01)'
 });
 
@@ -202,7 +205,7 @@ export async function recordExamSimulation(profile, now = clock()) {
 const CAPABILITY_COPY = Object.freeze({
   [ENTITLEMENTS.JEE_ADVANCED]: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'Adaptive Pri Explain teaching is part of Pri Learning Premium.',
-  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'Priorities, the knowledge map and teacher analytics exports are part of Pri Learning Premium.',
+  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'The estimate from your practice and your mistake patterns are part of Pri Learning Premium.',
   [ENTITLEMENTS.PREMIUM_EXAMS]: 'Further exam simulations are part of Pri Learning Premium.',
   [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'Unlimited daily practice is part of Pri Learning Premium.',
   [ENTITLEMENTS.EXTRA_AI]: 'Additional AI usage is reserved for Pri Learning Premium.'
