@@ -128,6 +128,8 @@ const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/Tut
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
 // "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
 const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
+// The live step coach (F1): its requests and per-line verdicts, on demand.
+const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -1894,7 +1896,31 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
     ? cloudCheckFor.result : null;
 
+  // ── The live step coach (F1) ────────────────────────────────────────────────
+  // While the attempt is open, each FINISHED line the reader has read is
+  // checked by the server against the worked steps: a tick with the step it
+  // reached, "doesn't follow from the line above" on the first break under a
+  // verified line, or nothing. A final-answer line gets only "Press Check".
+  // No value and no mark: Check alone marks. On only where the server says so
+  // (its switch and the account's Premium), so this asks the backend once.
+  // Its state and requests live in tutor/StepCoachLive.jsx, a lazy chunk;
+  // a tutor-off production build folds all of this away.
+  const [coachOn, setCoachOn] = useState(false);
+  const [liveCoach, setLiveCoach] = useState(null);   // { verdicts, final }
+  useEffect(() => {
+    if (TUTOR_BUILT_OUT || !writeMode) return undefined;
+    let live = true;
+    api.get('/tutor/step-coach').then(r => { if (live) setCoachOn(r?.on === true); }).catch(() => { });
+    return () => { live = false; };
+  }, [writeMode]);
+  useEffect(() => { setLiveCoach(null); }, [question?.id]);
+  const coaching = !TUTOR_BUILT_OUT && coachOn && writeMode && !resolved;
+  const liveLineVerdicts = coaching ? liveCoach?.verdicts || null : null;
+  const liveCoachFinal = coaching && !!liveCoach?.final;
+
   const lineVerdicts = useMemo(() => {
+    // The live coach speaks only while nothing has been submitted for marking.
+    if (!localLineVerdicts && !resolved && liveLineVerdicts) return liveLineVerdicts;
     // The second read was of the submitted lines: it is drawn only on them.
     const ofShown = resolved && sameLines(judged?.lines, inkResult?.lines) && inkResult?.stale !== true;
     const merged = mergeVerdicts(localLineVerdicts, ofShown ? cloudCheck : null, { lineCount: inkResult?.lines?.length || 0 });
@@ -1904,7 +1930,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // nothing wrong it earns no tick on the page.
     const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
     return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
-  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
+  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved, liveLineVerdicts]);
   // What the server established about the working that was submitted, for a
   // reading-based submission (handwriting or a photo), where the lines came
   // from a reader and may not be what the student wrote.
@@ -2662,7 +2688,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
@@ -3178,6 +3204,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
               </button>
             </span>
+          )}
+          {StepCoachLive && coaching && (
+            <React.Suspense fallback={null}>
+              <StepCoachLive questionId={question.id} inkResult={inkResult} onChange={setLiveCoach} />
+            </React.Suspense>
+          )}
+          {writeMode && liveCoachFinal && (
+            <span className="ws-line-check-result muted" role="status" data-step-coach-final>{t('ink.coachPressCheck')}</span>
           )}
           {writeMode && !resolved && (lineCheck?.message || lineCheck?.key) && (
             <span className="ws-line-check-result muted" role="status" data-line-check-status={lineCheck.status}>{lineCheck.message || t(lineCheck.key)}</span>

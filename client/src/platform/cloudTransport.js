@@ -598,6 +598,8 @@ export const cloud = Object.freeze({
   // question's lines; names a step, never a value. Sends only the id and lines.
   tutorLineCheck: (body, { signal = null, timeoutMs = 20000 } = {}) =>
     cloudRequest('/v1/tutor/line-check', { method: 'POST', body, signal, timeoutMs }),
+  // The live step coach (F1): one status per finished line, never a value.
+  // Sends only the issued question's id and the student's own read lines.
   // The same body, answered as server-sent events (see cloudStreamRequest).
   tutorStream: (body, { onEvent, signal = null, timeoutMs = 45000 } = {}) =>
     cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),
