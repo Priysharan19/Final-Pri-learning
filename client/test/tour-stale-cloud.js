@@ -30,6 +30,10 @@ const TOPIC = 'c7-finding-unknown-current';
 // Whole-number answers with no Step Check metadata: wrong working here is the
 // case the on-device checker cannot place, which is when the server is asked.
 const UNPLACED_TOPIC = 'c7-integer-operations-current';
+// Held at D2, where every form of it is written: at D3 three of its four
+// cells are multiple choice (no canvas), so a bounded Next could run out
+// before a written question came up (about one sitting in ten in CI).
+const UNPLACED_LEVEL = 2;
 // Every working check the stub answers names itself, so a note on screen says
 // which request — and so which question — it came from.
 const noteFor = (n) => `STUB-NOTE-${n}`;
@@ -158,7 +162,7 @@ export const flow = {
     }, before, { timeout: 30000 }).catch(() => null);
     // A fresh question each time, on a clean page.
     const openWriting = async (topic = TOPIC) => {
-      await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${base}/practice?subtopic=${topic}${topic === UNPLACED_TOPIC ? `&difficulty=${UNPLACED_LEVEL}` : ''}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
       // A fresh question that takes written work: some India forms are
       // multiple choice (Class 7 integers at D3), which has no canvas, so Next

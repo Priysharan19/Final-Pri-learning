@@ -116,7 +116,8 @@ export const flow = {
     /** A fresh, untried numeric question, in handwriting mode. */
     const openFresh = async ({ want = () => true, tries = 6, topic = TOPIC } = {}) => {
       await quiet();
-      await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
+      // The integers chapter at D3 is mostly multiple choice; held at D2, where every form is written.
+      await page.goto(`${base}/practice?subtopic=${topic}${topic === ARITHMETIC ? '&difficulty=2' : ''}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
       await settle();
       for (let moved = 0; moved < tries; moved++) {
