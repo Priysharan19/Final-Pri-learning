@@ -41,6 +41,7 @@ import en from '../i18n/strings.en.js';
 import { pluralCategory } from '../i18n/languages.js';
 import { unitWritten } from './units.js';
 import { ruleKeyFor } from './lost-marks.js';
+import { awardBoardScheme } from './boardScheme.js';
 
 const english = (key, vars = {}) => {
   let entry = en[key];
@@ -201,9 +202,29 @@ export function awardStepMarks({
   answerText = '',
   correct = false
 } = {}) {
-  const scheme = markScheme(question);
   const lines = (workingLines || []).map(text).filter(Boolean);
   const reportLines = Array.isArray(stepReport?.lines) ? stepReport.lines : [];
+  // A past-paper question with the Board's own scheme is marked by it
+  // (boardScheme.js): verified lines tick value points, never anything else.
+  if (Array.isArray(question?.boardScheme)) {
+    let ok = 0;
+    for (let i = 0; i < lines.length; i += 1) if (reportLines[i]?.status === 'ok') ok += 1;
+    const award = awardBoardScheme({ scheme: question.boardScheme, okLines: ok, correct: !!correct });
+    const rows = award.groups.map((g, i) => ({
+      kind: i === award.groups.length - 1 ? MARK_KINDS.ANSWER : MARK_KINDS.METHOD,
+      label: g.points.join('; '), labelKey: null, outOf: g.marks, earned: g.earned,
+      why: null, whyKey: null, whyVars: null
+    }));
+    return Object.freeze({
+      awarded: award.awarded, total: award.total, rows: Object.freeze(rows),
+      showedWorking: lines.length > 0, lostToNoWorking: lines.length ? 0 : award.method === 0 ? award.total - rows[rows.length - 1].outOf : 0,
+      unitsMissing: false, creditedLines: ok,
+      // Transcribed from the Board's marking scheme for this past paper, and
+      // awarded by the deterministic engine; whole-mark groups, so never above it.
+      schemeKind: 'board-official-transcribed'
+    });
+  }
+  const scheme = markScheme(question);
 
   // Fail closed: only an affirmative checker verdict can create marking credit.
   // `break`, `note`, missing entries and unknown statuses earn nothing. This
