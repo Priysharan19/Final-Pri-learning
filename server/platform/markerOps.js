@@ -16,6 +16,10 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
+import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
+import { markGeometry } from '../../client/src/engine/geometryFacts.js';
+import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -99,7 +103,7 @@ export function stepEvidence(q, answer, steps, result) {
 }
 
 // ── Examination marking, in the two stages the pool can tell apart ──────────
-const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
+const OBJECTIVE = new Set(['mcq', 'multi-mcq', 'matrix-match']);
 const blank = v => v === undefined || v === null || String(v).trim() === '';
 
 /**
@@ -124,6 +128,44 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
       partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
       outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'matrix-match') {
+    let r;
+    try { r = markMatrixMatch(grid, given, q.answer?.matrix); } catch { r = { awarded: 0, outcome: 'invalid', feedback: 'This grid cannot be checked.' }; }
+    return { final: true, response: { unanswered: r.outcome === 'unanswered', correct: r.outcome === 'full', awarded: r.awarded,
+      feedback: String(r.feedback || '').slice(0, 3000), partial: r.outcome === 'partial' ? { awarded: r.awarded, note: r.feedback } : null,
+      markingScheme: 'objective-per-row', outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'graph-sketch') {
+    // Each assessed feature earns its scheme marks; review features earn nothing until a person marks them.
+    const g = q.answer?.graph, set = readFeatureSet(given);
+    let r = null;
+    if (set && g?.spec && g?.scheme) { try { r = markGraphSketch(g.spec, set, g.scheme, g.tol); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This sketch could not be read.' : r.needsReview ? 'Part of this sketch needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the features that match.' } : null, features: r?.features || null,
+      needsReview: !!r?.needsReview, markingScheme: 'graph-features', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
+  if (q.answerType === 'geometry') {
+    // Measurable facts earn their part marks; a construction step waits for a person.
+    let response = given, r = null;
+    if (typeof given === 'string') { try { response = given.length <= 4096 ? JSON.parse(given) : null; } catch { response = null; } }
+    if (response && typeof response === 'object') { try { r = markGeometry(q.answer?.geometry, response); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
+      needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
+  if (q.answerType === 'proof') {
+    // A proof earns marks from a person only. The algebra report goes with it as evidence.
+    let r;
+    try { r = checkProof(q, given); } catch { r = { feedback: 'This proof could not be read.' }; }
+    return { final: true, response: { unanswered: false, correct: false, awarded: 0, feedback: String(r.feedback || '').slice(0, 3000), partial: null,
+      proofReport: r.proofReport || null, needsReview: true, markingScheme: 'teacher-review', outcome: 'needs-review' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
@@ -152,6 +194,25 @@ export function examWorkingStage(q, working, grid, stage) {
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }
   return response;
+}
+
+/**
+ * A sketch inside the working (q.answer.sketchMethod = { spec, features, marks,
+ * label }). Method credit only: off unless the marking policy turns method
+ * marks on (D12), never for a right answer (it already has full marks), and
+ * capped one below full marks like every method mark.
+ */
+export function sketchWorkingStage(q, sketch, grid, response, policy) {
+  const rule = q.answer?.sketchMethod;
+  if (!rule || !policyOf({ policy }).methodMarks || response.correct || response.unanswered) return response;
+  const set = readFeatureSet(sketch);
+  if (!set) return response;
+  let credit;
+  try { credit = sketchMethodCredit(rule.spec, set, rule); } catch { return response; }
+  const marks = Number(grid.correct);
+  const awarded = Math.max(0, Math.min(marks - 1, credit.awarded));
+  if (awarded <= (response.awarded || 0)) return response;
+  return { ...response, awarded, partial: { awarded, note: credit.label ? `Method: ${credit.label}.` : 'Method: the sketch in your working.' }, markingScheme: 'step-marked' };
 }
 
 /**

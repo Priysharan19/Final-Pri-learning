@@ -6479,6 +6479,7 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/tutor/diagnose'
     || key === 'POST /practice/:id/tutor/line-check'
+    || key === 'POST /practice/:id/tutor/step-coach'
     || key === 'POST /practice/:id/discard'
     || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);

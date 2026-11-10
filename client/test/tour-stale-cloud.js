@@ -26,10 +26,14 @@ import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 // Whole-number answers with no Step Check metadata: wrong working here is the
 // case the on-device checker cannot place, which is when the server is asked.
-const UNPLACED_TOPIC = 'y7-integers';
+const UNPLACED_TOPIC = 'c7-integer-operations-current';
+// Held at D2, where every form of it is written: at D3 three of its four
+// cells are multiple choice (no canvas), so a bounded Next could run out
+// before a written question came up (about one sitting in ten in CI).
+const UNPLACED_LEVEL = 2;
 // Every working check the stub answers names itself, so a note on screen says
 // which request — and so which question — it came from.
 const noteFor = (n) => `STUB-NOTE-${n}`;
@@ -158,13 +162,23 @@ export const flow = {
     }, before, { timeout: 30000 }).catch(() => null);
     // A fresh question each time, on a clean page.
     const openWriting = async (topic = TOPIC) => {
-      await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${base}/practice?subtopic=${topic}${topic === UNPLACED_TOPIC ? `&difficulty=${UNPLACED_LEVEL}` : ''}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
-      const before = await shownId();
-      await page.locator('.ctx-next').click();
-      await questionChangesFrom(before);
-      await settle();
-      await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+      // A fresh question that takes written work: some India forms are
+      // multiple choice (Class 7 integers at D3), which has no canvas, so Next
+      // is pressed again — a bounded number of times — until one is written.
+      // Only the card's own answer-mode switch (QuestionCard.jsx renders it for
+      // every non-MCQ question); a name search alone also matches other controls.
+      const writable = page.locator('.qpage .mode-tabs').getByRole('button', { name: 'Answer by handwriting' });
+      for (let moved = 0; ; moved++) {
+        const before = await shownId();
+        await page.locator('.ctx-next').click();
+        await questionChangesFrom(before);
+        await settle();
+        if (await writable.count()) break;
+        if (moved >= 8) throw new Error(`no question on ${topic} took written work in ${moved + 1} draws`);
+      }
+      await writable.click();
       await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
@@ -303,6 +317,15 @@ export const flow = {
     await check('the slow working check for A was requested', !!evalA && aId > askedBeforeA, `checks ${stub.checked}`);
     await page.locator('.ctx-next').click();
     await questionChangesFrom(idA);
+    await settle();
+    // B must take written work: a multiple-choice question (Class 7 integers
+    // at D3) has no canvas, so Next again, still without a reload, bounded.
+    for (let moved = 0; moved < 8 && !await page.locator('.qpage .mode-tabs').count(); moved++) {
+      const skipped = await shownId();
+      await page.locator('.ctx-next').click();
+      await questionChangesFrom(skipped);
+      await settle();
+    }
     await check('the student is on question B', !!idA && await shownId() !== idA, 'still on A');
     await writeTwoLinesAndResolve();
     const settleA = Date.now() + 15000;
