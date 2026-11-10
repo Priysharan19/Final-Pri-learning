@@ -171,6 +171,10 @@ import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { timeReport } from '../../client/src/engine/examTime.js';
+import { targetsFrom, whyTheseQuestions, TARGETED_LABEL } from '../../client/src/engine/targetedMock.js';
+import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
+import { buildNotebook } from '../../client/src/engine/mistakeNotebook.js';
+import { rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 import { recognitionOpsFor } from './recognitionOps.js';
@@ -200,7 +204,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock', 'targeted']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -293,9 +297,21 @@ function publicQuestion(sq) {
   };
 }
 
+/**
+ * A targeted paper (engine/targetedMock.js, plan F3) says so on every surface,
+ * with the key the SERVER wrote when it sealed the paper: which questions were
+ * drawn toward which subtopic, and on what evidence from this account's own
+ * marked work.
+ */
+function targetedFields(paper) {
+  if (!paper?.targeted) return {};
+  return { targeted: true, targetedLabel: TARGETED_LABEL, why: paper.targeted.key };
+}
+
 function publicPaper(paper, now) {
   return {
     id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL, typedOnly: true } : {}), title: paper.title, durationMin: paper.durationMin,
+    ...targetedFields(paper),
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
@@ -525,9 +541,13 @@ function readSpec(body) {
   // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
   // full blueprint paper on a board blueprint, sat typed, under its own title.
   // For the plan it is a timed paper like any other (D19).
+  // A TARGETED paper (plan F3, engine/targetedMock.js) is a board mock whose
+  // questions lean toward this account's weak and due subtopics. Premium only;
+  // the server decides what counts as targeted, never the device.
+  if (body.targeted !== undefined && (body.targeted !== true || body.mock !== true)) return INVALID('A targeted paper is a board mock.');
   if (body.mock !== undefined) {
     if (body.mock !== true || read.kind !== 'india' || !boardMockOf(read.blueprint)) return INVALID('A board mock is a CBSE Class X Standard or Class XII paper.');
-    return { ...read, mock: true, title: mockTitleOf(read.blueprint) };
+    return { ...read, mock: true, ...(body.targeted === true ? { targeted: true } : {}), title: mockTitleOf(read.blueprint) + (body.targeted === true ? ' · targeted' : '') };
   }
   // The title of a certified paper is the server's, from the blueprint. A
   // device may call the paper what it likes locally; that name is never here.
@@ -1053,6 +1073,26 @@ const EXAM_WINDOW_MS = FREE_EXAM_ALLOWANCE.examWindowDays * DAY_MS;
  * the codes the device's own gate uses (402 FREE_CAP_REACHED / PREMIUM_REQUIRED)
  * so the same paywall copy applies. Reads only; consumes nothing.
  */
+/**
+ * The targets of a targeted paper, from this account's own server-graded
+ * attempts only: due dot points (engine/reviewQueue.js) and unfixed mistakes
+ * (engine/mistakeNotebook.js) — the same pure functions the review queue and
+ * the notebook routes run, over the same events.
+ */
+export async function accountTargets(db, accountId, now) {
+  const rows = await db.all(
+    "SELECT id,occurred_at,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' ORDER BY server_cursor DESC LIMIT 4000",
+    [accountId]);
+  const attempts = rows.map(row => { try { return { id: row.id, at: Number(row.occurred_at), ...JSON.parse(row.payload_json) }; } catch { return null; } })
+    .filter(a => a && a.mode !== 'placement' && typeof a.subtopic === 'string' && a.subtopic);
+  const { ratings, reviews } = reviewStateFromAttempts(attempts.map(a => ({
+    subtopic: a.subtopic, dotpoint: a.dotpoint || null, correct: a.correct === true, revealed: a.revealed === true,
+    hintsUsed: rungLevelOf(a.hintLevel), difficulty: Number(a.difficulty) || 2, at: a.at })));
+  const { due } = dueDotpoints({ ratings, reviews, now });
+  const book = buildNotebook(attempts.map(a => ({ ...a, attemptId: a.attemptId || a.id })), { now });
+  return targetsFrom({ due, notebook: book.entries });
+}
+
 async function entitlementRefusal(db, accountId, spec, now) {
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const capabilities = serverEntitlementCapabilities(snapshot, now);
@@ -1061,6 +1101,10 @@ async function entitlementRefusal(db, accountId, spec, now) {
   if (spec.blueprint?.track === 'jee-advanced' && !capabilities.includes('jee-advanced-content')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'jee-advanced-content',
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
+  }
+  if (spec.targeted && !capabilities.includes('premium-exams')) {
+    return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+      message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' };
   }
   if (capabilities.includes('premium-exams')) return null;
   const recent = await db.all("SELECT created_at FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
@@ -1249,6 +1293,10 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
       authoritative: true, examId: id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title,
+      // A targeted paper's score is not a whole-syllabus estimate
+      // (PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md): it is labelled so nothing
+      // downstream reads it as one.
+      ...targetedFields(paper),
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1285,7 +1333,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
     await event(id, 'exam-result', id, {
-      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), title: paper.title, durationMin: paper.durationMin,
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), ...(paper.targeted ? { targeted: true } : {}), title: paper.title, durationMin: paper.durationMin,
       year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
@@ -1686,6 +1734,22 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     return res.status(200).json({ blueprint, layoutSeed, accountId: String(accountId) });
   });
 
+  // The targets a targeted paper would lean toward now, for the device to
+  // compose with. Premium only (premium-exams); the server re-derives them at
+  // the seal and writes the key itself.
+  router.get('/targets', rateLimit(db, 'exam-targets', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+    if (!serverEntitlementCapabilities(snapshot, now).includes('premium-exams')) {
+      return refuseEntitlement(res, { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+        message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' });
+    }
+    const targets = await accountTargets(db, accountId, now);
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ targets, label: TARGETED_LABEL, at: now });
+  });
+
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
     if (!ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'Starting a paper needs a stable idempotency key.');
@@ -1738,6 +1802,16 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       }
       return reject(res, ...issued.refused);
     }
+    // A targeted paper's key is the server's, from its own records of this
+    // account: a question counts as targeted only when its generator is a
+    // target subtopic now. More than the cap allows is refused, not trimmed.
+    let targeted = null;
+    if (spec.targeted) {
+      const targets = await accountTargets(db, accountId, Date.now());
+      const key = whyTheseQuestions(issued.questions, targets);
+      if (!key.withinCap) return reject(res, 409, 'EXAM_TARGETING_OVER_CAP', `A targeted paper may lean on at most ${key.cap} of its ${key.questions} questions.`);
+      targeted = { key, targets: targets.map(t => ({ subtopic: t.subtopic, reasons: t.reasons })) };
+    }
     const id = randomUUID();
     const startedAt = Date.now();
     const paper = {
@@ -1746,6 +1820,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
       ...(spec.mock ? { mock: true } : {}),
+      ...(targeted ? { targeted } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };

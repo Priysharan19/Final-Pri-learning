@@ -1,27 +1,22 @@
 // Pri Learning · what the previous-year archive covers
 //
-// The statically-imported half of the PYQ layer. indiaProduct.js resolves a
-// practice target on every question a student asks for and cannot wait on a
-// dynamic import to do it, so the shape of the archive — which (track, chapter)
-// pairs it serves and at which difficulty rungs — lives here, and the questions
-// themselves stay in pyqArchive.js, which generators/index.js pulls in as its
-// own chunk the first time one is actually drawn.
+// The full coverage rows and the manifest of transcribed papers. This module is
+// ON DEMAND (vite.config.js): the app shell carries only pyqIndex.js — ids and
+// rungs, which is all indiaProduct.js needs synchronously — and this file, the
+// sources it reads and the records are fetched when past papers are asked for.
 //
-// The table below is hand-maintained, exactly like INDIA_BANK_OF in
-// generators/index.js: adding a record means adding its (track, chapter) row
-// here too. Nothing silently papers over a mismatch — india-pyq-check.mjs
+// The table below is maintained with the records: adding a record means adding
+// its (track, chapter) row here, and its rungs in pyqIndex.js. Nothing silently papers over a mismatch — india-pyq-check.mjs
 // rebuilds this table from the records and fails if a single field differs, so
 // a forgotten row is a red suite rather than a chapter that quietly stops
 // serving past papers.
 
 import { PYQ_ABSENT_EXAMS, PYQ_EXAMS } from './pyqSources.js';
+import { pyqGeneratorId, hasPyqGenerator, pyqCoversChapter, pyqCellsFor } from './pyqIndex.js';
 
 export { PYQ_ABSENT_EXAMS, PYQ_EXAMS };
-
-/** The generator id a (track, chapter) pair is served under. */
-export function pyqGeneratorId(track, chapterId) {
-  return `pyq-${track}-${chapterId}`;
-}
+// One implementation of the lookups, the shell's (pyqIndex.js).
+export { pyqGeneratorId, hasPyqGenerator, pyqCoversChapter, pyqCellsFor };
 
 /**
  * Every generator the archive publishes. `difficulties` are the rungs that
@@ -107,44 +102,14 @@ export const PYQ_MANIFEST = Object.freeze({
   ])
 });
 
-/** Does the archive publish this generator id? */
-export function hasPyqGenerator(generatorId) {
-  return Object.prototype.hasOwnProperty.call(PYQ_COVERAGE, String(generatorId || ''));
-}
-
 /** The coverage row for a generator id, or null. */
 export function pyqCoverageOf(generatorId) {
   const key = String(generatorId || '');
   return (Object.hasOwn(PYQ_COVERAGE, key) && PYQ_COVERAGE[key]) || null;
 }
 
-/** Does the archive publish anything for this track and chapter? */
-export function pyqCoversChapter(track, chapterId) {
-  return hasPyqGenerator(pyqGeneratorId(track, chapterId));
-}
-
 /** The tracks the archive can serve at all, in track order. */
 export const PYQ_TRACKS = Object.freeze([...new Set(Object.values(PYQ_COVERAGE).map(row => row.track))].sort());
-
-/**
- * The reviewed-PYQ cells a chapter can offer inside a difficulty window, in the
- * `{ generator, difficulty, pyq }` shape indiaExamComposer.js draws from. The
- * window is honoured the same way chapterCells honours it: rungs inside the
- * window if there are any, otherwise the nearest rung outside it, so a paper
- * gets the archive's closest real question rather than nothing.
- */
-export function pyqCellsFor(track, chapterId, { min = 1, max = 4 } = {}) {
-  const id = pyqGeneratorId(track, chapterId);
-  const row = pyqCoverageOf(id);
-  if (!row) return [];
-  const inside = row.difficulties.filter(d => d >= min && d <= max);
-  const gap = d => Math.min(Math.abs(d - min), Math.abs(d - max));
-  const best = inside.length ? inside : (() => {
-    const nearest = Math.min(...row.difficulties.map(gap));
-    return row.difficulties.filter(d => gap(d) === nearest);
-  })();
-  return best.map(difficulty => ({ generator: id, difficulty, pyq: true }));
-}
 
 /** Why a track a student might expect PYQs for has none, or null. */
 export function pyqAbsenceFor(track) {

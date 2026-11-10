@@ -177,12 +177,12 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '2840000/2840000 self-checks passed across 355 subtopics' suites.log
+          grep -Fq '2904000/2904000 self-checks passed across 363 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 2678/2678 checks' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 2726/2726 checks' suites.log
           # v1.1: step-mark rows say the engine's mark and never contradict it.
           grep -Fq 'STUDENT PLOT: PASS — 38/38 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36944/36944 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks' suites.log
           # Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk.
           grep -Fq 'PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities' suites.log
           grep -Fq 'PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED' suites.log
@@ -199,10 +199,14 @@ jobs:
           # Distinct questions per class (L5): measured against the owner's 10^8-per-class target (lower bounds marked ≥).
           # The pin is the measurement; widening generators moves it and the report together.
           grep -Fq 'DISTINCT QUESTIONS REPORT: PASS' suites.log
-          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 3.61×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 647067/647067 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 170404 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '57600 questions from 576 declared (generator, difficulty) pairs × 100 draws — 57600 marked correct by their own marker, 57600 well formed' suites.log
+          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 4.26×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
+          # Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared
+          # pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route.
+          grep -Fq 'CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6000 items re-derived from the prompt by a second route' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 174244 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
@@ -210,7 +214,7 @@ jobs:
           grep -Fq 'ADVERSARIAL CORPUS: PASS — 219/219 checks' suites.log
           grep -Fq 'EXACT BOUNDS: PASS — 107/107 checks' suites.log
           # 39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          grep -Fq 'STEP14 REVIEW FIXES: PASS — 39547/39547 checks' suites.log
+          grep -Fq 'STEP14 REVIEW FIXES: PASS — 40667/40667 checks' suites.log
           grep -Fq 'REVIEW FOLLOW-UPS: PASS — 415/415 checks' suites.log
           grep -Fq '#680 SOURCED CASES: PASS — 91/91 cases' suites.log
           grep -Fq 'STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite' suites.log
@@ -221,17 +225,18 @@ jobs:
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
           # 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed.
-          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 10820/10820 checks' suites.log
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 11280/11280 checks' suites.log
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          # 409709/18312 → 409925/18384 (CBSE X 2025 Sets 30/1/2, 30/1/3, 30/2/1 Section A: 35 records; 409925/18384 → 409997/18408 with 30/1/3 and 30/2/1; re-derived on main 35159d3c4).
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 409997 wrong answers marked correct across 18408 questions' suites.log
+          # 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree).
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 419741 wrong answers marked correct across 18696 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
-          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 31792 right answers over 11932 India questions (576 generator×difficulty cells × 24 seeds)' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 32824 right answers over 12349 India questions (594 generator×difficulty cells × 24 seeds)' suites.log
+          # Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs.
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
           # #499: the examiner dossier matches the marking code it hashes (a marking change re-requests review).
@@ -261,13 +266,13 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
-          grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
+          grep -Fq 'BOARD MOCK: PASS — 64/64 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
           # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 35/35 checks' suites.log
           # 1082/45 → 2915/173, the JEE archive (#795) (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          grep -Fq 'INDIA PYQ: PASS — 3470/3470 checks — 208 source-cited previous-year questions' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 2959/2959 checks — 173 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
           grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
@@ -359,7 +364,7 @@ jobs:
           # Map, Report and Scripts tabs are held in the warm pass (#658),
           # together with every file those tabs import statically; 63 → 65: no
           # tab carries a stylesheet of its own (they are in the boot one).
-          grep -Eq 'INSTALL BUDGET: PASS — 67/67 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 72/72 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under.*previous-year archive 0 kB of it' suites.log
           test "$(grep -Fc 'nothing emitted left uncovered.' suites.log)" -eq 1
           # The V1 interface decisions in source: one interface from one
           # setting on web, iOS and Android (D7, D8), Classes hidden (D10), the
@@ -597,7 +602,7 @@ jobs:
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
-          grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
+          grep -Fq 'SEEK BUDGET: PASS — 20/20 checks' practice-http.log
           grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
           grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
@@ -712,6 +717,11 @@ jobs:
           set -o pipefail
           node server/test/exam-time-check.mjs 2>&1 | tee exam-time.log
           grep -Fq 'EXAM TIME: PASS — 23/23 checks' exam-time.log
+      - name: Targeted board mocks — capped lean, Premium-gated, server-written key (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/targeted-mock-check.mjs 2>&1 | tee targeted-mock.log
+          grep -Fq 'TARGETED MOCK: PASS — 43/43 checks' targeted-mock.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -740,7 +750,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 84/84 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 85/85 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -770,6 +780,8 @@ jobs:
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
           # 83 → 84 (L6, plan F10): where the time went, on Postgres.
           grep -Fq '✓ exam-time-check.mjs' platform-postgres.log
+          # 84 → 85 (L6, plan F3): targeted board mocks on Postgres.
+          grep -Fq '✓ targeted-mock-check.mjs' platform-postgres.log
           # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
@@ -1270,7 +1282,7 @@ jobs:
           grep -Fq 'Rapid Fire and Match · signed in, every answer is server-marked' browser.log
           grep -Fq 'Session ended at a start: a paper, Rapid Fire and Match start nothing; signing in again in place starts them' browser.log
           grep -Fq "Exam · finished offline: submitted, no score; reconnected: the server's result" browser.log
-          grep -Eq 'E2E SUITE.*72/72.*8 flows' browser.log
+          grep -Eq 'E2E SUITE.*73/73.*8 flows' browser.log
           # The free plan's daily cap is the server's (#537): with nineteen of
           # the day's questions used on another device, Next shows the cap
           # screen from the server's 402 and fetches nothing instead; a capped

@@ -10,7 +10,7 @@
 import { makeRng } from '../qhelpers.js';
 import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
 import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
-import { hasPyqGenerator } from '../pyq/pyqCoverage.js';
+import { hasPyqGenerator } from '../pyq/pyqIndex.js';
 import { stampContent } from '../contentIdentity.js';
 import { withSafeInputHints } from '../inputHint.js';
 
@@ -35,6 +35,8 @@ const BANKS = {
   // source-audited NCERT Class 8 Chapter 1 and Chapter 2 skill generators.
   'india-junior': () => import('./india-junior-overlay.js').then(m => m.indiaJunior),
   'india-class10': () => import('./india-class10.js').then(m => m.indiaClass10),
+  // Additional original Class X competencies load only on selection.
+  'india-class10-competency': () => import('./india-class10-competency-bank.js').then(m => m.indiaClass10Competency),
   'india-senior': () => import('./india-senior.js').then(m => m.indiaSenior),
   // The Class 11 and Class 12 chapters that used to borrow an NSW Year 10/11/12
   // or Extension generator for their central dot points. They are their own
@@ -166,6 +168,9 @@ const INDIA_BANK_OF = {
   'c10-quadratic-discriminant': 'india-class10',
   'c10-trig-boundary-relations': 'india-class10',
   'c10-quadratic-context': 'india-class10',
+  'c10-ap-inverse-competency': 'india-class10-competency',
+  'c10-linear-ticket-competency': 'india-class10-competency',
+  'c10-quadratic-triangle-competency': 'india-class10-competency',
   'c10-surface-area-combo': 'india-class10',
   'c10-trigonometry-current': 'india-class10',
   'c10-trig-applications-current': 'india-class10',
@@ -194,6 +199,12 @@ const INDIA_BANK_OF = {
   'c10-grouped-mean-reasoning': 'india-class10',
   'c10-grouped-mode-reasoning': 'india-class10',
   'c10-probability-reasoning': 'india-class10',
+  // Additional Algebra forms (D1–D3), curriculum-in-forms-covers.js.
+  'c10-ap-term-forms': 'india-class10',
+  'c10-ap-sum-forms': 'india-class10',
+  'c10-zero-coefficient-forms': 'india-class10',
+  'c10-quadratic-k-forms': 'india-class10',
+  'c10-linear-condition-forms': 'india-class10',
   'c11-relations-functions': 'india-class11',
   'c11-trig-functions': 'india-class11',
   'c11-complex-numbers': 'india-class11',
