@@ -1917,6 +1917,32 @@ function methodProgressDuplicate(line, reference) {
   return size(ls) >= size(rs);
 }
 
+/**
+ * Is this student line the given scheme line, as written? The same symbols,
+ * allowing spacing, unicode notation, the order of a sum or a product, the two
+ * sides swapped and identities padded in (`+0`, `*1`). NOT mere equivalence:
+ * every correct line of a one-unknown linear equation is equivalent to every
+ * other, so equivalence would let any correct line — `x = 3` written four
+ * times — stand for any value point (boardScheme.js, D25 review of #844).
+ */
+export function writtenAsLine(studentText, schemeText) {
+  const a = readClaim(studentText), b = readClaim(schemeText);
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (sameWrittenClaim(a, b)) return true;
+  const strip = c => c.kind === 'relation'
+    ? { ...c, relation: { ...c.relation, l: withoutNeutralArithmetic(c.relation.l), r: withoutNeutralArithmetic(c.relation.r) } }
+    : c.kind === 'equation'
+      ? { ...c, ast: { ...c.ast, l: withoutNeutralArithmetic(c.ast.l), r: withoutNeutralArithmetic(c.ast.r) } }
+      : { ...c, ast: withoutNeutralArithmetic(c.ast) };
+  try { return sameWrittenClaim(strip(a), strip(b)); } catch { return false; }
+}
+
+/** Is this line only the final value (`x = 3`)? An answer claim, never a working point. */
+export function statesOnlyFinalAnswer(text, meta) {
+  const claim = readClaim(text);
+  return !!claim && isolatedFinalAnswer(claim, meta);
+}
+
 /** An isolated final value is an answer claim, not a new method step. */
 function isolatedFinalAnswer(claim, meta) {
   if (meta?.kind !== 'equation' || claim?.kind !== 'equation') return false;

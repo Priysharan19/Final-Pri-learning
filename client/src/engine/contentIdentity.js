@@ -41,7 +41,8 @@
 // 2026.11.10 — the same tranche grown to Sets 30/1/3 and 30/2/1 (25 more records).
 // 2026.11.11 — CBSE Class XII 2025 Set 65/2/1 Section A: 17 official questions.
 // 2026.11.12 — the first Section B record on the Board-scheme contract (65/2/1 Q24).
-export const CONTENT_VERSION = '2026.11.12';
+// 2026.11.13 — the same record on the corrected contract (D25: lines match value points one-to-one).
+export const CONTENT_VERSION = '2026.11.13';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

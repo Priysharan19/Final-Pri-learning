@@ -41,7 +41,7 @@ import en from '../i18n/strings.en.js';
 import { pluralCategory } from '../i18n/languages.js';
 import { unitWritten } from './units.js';
 import { ruleKeyFor } from './lost-marks.js';
-import { awardBoardScheme } from './boardScheme.js';
+import { awardBoardScheme, matchBoardPoints } from './boardScheme.js';
 
 const english = (key, vars = {}) => {
   let entry = en[key];
@@ -207,9 +207,12 @@ export function awardStepMarks({
   // A past-paper question with the Board's own scheme is marked by it
   // (boardScheme.js): verified lines tick value points, never anything else.
   if (Array.isArray(question?.boardScheme)) {
-    let ok = 0;
-    for (let i = 0; i < lines.length; i += 1) if (reportLines[i]?.status === 'ok') ok += 1;
-    const award = awardBoardScheme({ scheme: question.boardScheme, okLines: ok, correct: !!correct });
+    // Only report lines that stand for a written line are read, and each value
+    // point is earned by its own line, one-to-one and in order.
+    const paired = lines.map((t, i) => ({ status: reportLines[i]?.status, text: t }));
+    const ticked = matchBoardPoints({ scheme: question.boardScheme, lines: paired, meta: question.stepcheck || null });
+    const ok = ticked.filter(Boolean).length;
+    const award = awardBoardScheme({ scheme: question.boardScheme, ticked, correct: !!correct });
     const rows = award.groups.map((g, i) => ({
       kind: i === award.groups.length - 1 ? MARK_KINDS.ANSWER : MARK_KINDS.METHOD,
       label: g.points.join('; '), labelKey: null, outOf: g.marks, earned: g.earned,
