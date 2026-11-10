@@ -20,7 +20,6 @@
 // finish cannot be marked at all.
 import { get, put, del, byIndex } from './idb.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
-import { pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
 import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
@@ -135,7 +134,15 @@ function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
   };
 }
 
+// What the archive holds is on demand (pyq/pyqIndex.js says why); a paper whose
+// fetch of it fails says nothing about the archive rather than failing.
+async function pyqAboutArchive() {
+  try { return await import('../engine/pyq/pyqCoverage.js'); } catch { return null; }
+}
+const pyqAbsenceFor = (about, track) => about.pyqAbsenceFor(track);
+
 async function createIndiaExam(profile, body = {}) {
+  const pyqAbout = await pyqAboutArchive();
   const grade = Number(profile.year);
   const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', grade);
   // A board mock (engine/boardMock.js, D22) is the Standard paper of a board
@@ -282,8 +289,8 @@ async function createIndiaExam(profile, body = {}) {
       pyq: {
         used: composition.pyq,
         questions: issued.questions.length,
-        archive: PYQ_MANIFEST,
-        absent: pyqAbsenceFor(track)
+        archive: pyqAbout?.PYQ_MANIFEST || null,
+        absent: pyqAbout ? pyqAbsenceFor(pyqAbout, track) : null
       },
       composition,
       reducedPattern: composed.reducedPattern,
