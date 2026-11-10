@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { slipFeedback } from './slips.js';
+import { checkMatrixMatch } from './matrixMatch.js';
 import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, numericBand, relativeBand, variablesOf, withEvaluationBudget } from './expr.js';
 
 // Every sum term and counting-loop turn spent while one answer or one page of
@@ -939,6 +940,8 @@ function checkAnswerWithinBudget(question, rawInput) {
     if (type === 'interval' || type === 'matrix' || type === 'vector' || type === 'complex') {
       return checkForm(question, rawInput);
     }
+    // A pairing grid: right only when every row matches its key exactly.
+    if (type === 'matrix-match') return checkMatrixMatch(question, rawInput);
     // Optional form guard: reject inputs matching a forbidden pattern
     if (ans && ans.forbid) {
       const s = normalize(cleanInput(rawInput));
