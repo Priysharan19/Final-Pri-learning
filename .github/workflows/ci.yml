@@ -199,7 +199,7 @@ jobs:
           # Distinct questions per class (L5): measured against the owner's 10^8-per-class target (lower bounds marked ≥).
           # The pin is the measurement; widening generators moves it and the report together.
           grep -Fq 'DISTINCT QUESTIONS REPORT: PASS' suites.log
-          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 8.26×10^7, Class 10 4.26×10^7, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 4/6 classes at the 10^8 target' suites.log
+          grep -Fq 'DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 ≥ 2.43×10^8, Class 10 ≥ 1.46×10^8, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 6/6 classes at the 10^8 target' suites.log
           # Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared
           # pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route.
           grep -Fq 'CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6000 items re-derived from the prompt by a second route' suites.log
@@ -225,17 +225,18 @@ jobs:
           grep -Fq 'MARKING POLICY (D12): PASS — 68/68 checks' suites.log
           # 10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same).
           # 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed.
-          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 11280/11280 checks' suites.log
+          grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 11285/11285 checks' suites.log
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
           # 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree).
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 419741 wrong answers marked correct across 18696 questions' suites.log
+          # 419741 → 419759 (#838: widened Class X/9 ranges, re-derived on main 0c655e4cf by running all 4 shards).
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 419759 wrong answers marked correct across 18696 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
-          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 32824 right answers over 12349 India questions (594 generator×difficulty cells × 24 seeds)' suites.log
+          grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 33992 right answers over 12508 India questions (594 generator×difficulty cells × 24 seeds)' suites.log
           # Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs.
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes' suites.log
           grep -Fq 'WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels' suites.log
