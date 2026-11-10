@@ -27,6 +27,7 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
+import { INDIA_FORMS_COVERS } from './curriculum-in-forms-covers.js';
 import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS, INDIA_RETIRED_RUNGS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
@@ -260,6 +261,9 @@ function retireRungs(table) {
 
 installHardestCovers(INDIA_JEE_REPLACEMENT_COVERS);
 retireRungs(INDIA_RETIRED_RUNGS);
+// Additional forms per dot point (curriculum-in-forms-covers.js): appended at
+// D1–D3 with the same load-time checks; nothing already claimed changes.
+installHardestCovers(INDIA_FORMS_COVERS);
 /** What each retirement removed, recorded at load: the cover as it was claimed before its rung went. */
 export const INDIA_RETIRED_LOG = Object.freeze(retiredLog);
 

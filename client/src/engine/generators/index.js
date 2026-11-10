@@ -194,6 +194,12 @@ const INDIA_BANK_OF = {
   'c10-grouped-mean-reasoning': 'india-class10',
   'c10-grouped-mode-reasoning': 'india-class10',
   'c10-probability-reasoning': 'india-class10',
+  // Additional Algebra forms (D1–D3), curriculum-in-forms-covers.js.
+  'c10-ap-term-forms': 'india-class10',
+  'c10-ap-sum-forms': 'india-class10',
+  'c10-zero-coefficient-forms': 'india-class10',
+  'c10-quadratic-k-forms': 'india-class10',
+  'c10-linear-condition-forms': 'india-class10',
   'c11-relations-functions': 'india-class11',
   'c11-trig-functions': 'india-class11',
   'c11-complex-numbers': 'india-class11',
