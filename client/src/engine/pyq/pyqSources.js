@@ -29,8 +29,15 @@
  */
 export const PYQ_PROVENANCE = Object.freeze({
   // The exam authority published both the question and the answer, and both
-  // were read off those documents.
+  // were read off those documents (for CBSE, one marking scheme that reprints
+  // each question above its answer).
   OFFICIAL_PAPER_AND_KEY: 'official-paper-and-official-key',
+  // The exam authority published the question paper and, separately, its final
+  // answer key; the two are joined by the authority's own question id (NTA's
+  // "Question Id" printed on the paper and keyed in the final answer key). Both
+  // documents are pinned by sha256. Weaker than one document carrying both,
+  // stronger than an answer worked out here — and labelled as such on the card.
+  OFFICIAL_PAPER_PLUS_SEPARATE_KEY: 'official-paper-plus-separate-official-key',
   // The exam authority published the question; the answer was worked out here
   // and is NOT quoted from an official key.
   OFFICIAL_PAPER_DERIVED_ANSWER: 'official-paper-and-derived-answer',
@@ -41,8 +48,16 @@ export const PYQ_PROVENANCE = Object.freeze({
 /** The provenance rungs a record is allowed to be published at. */
 export const PYQ_PUBLISHABLE = Object.freeze([
   PYQ_PROVENANCE.OFFICIAL_PAPER_AND_KEY,
+  PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY,
   PYQ_PROVENANCE.OFFICIAL_PAPER_DERIVED_ANSWER
 ]);
+
+/** What each rung means, in the words a student reads on the card. */
+export const PYQ_PROVENANCE_LABEL = Object.freeze({
+  [PYQ_PROVENANCE.OFFICIAL_PAPER_AND_KEY]: 'Question and answer from the exam authority\'s own documents.',
+  [PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY]: 'Question from the official question paper; answer from the authority\'s separate final answer key, matched by its question id.',
+  [PYQ_PROVENANCE.OFFICIAL_PAPER_DERIVED_ANSWER]: 'Question from the official paper; the answer was worked out by Pri Learning, not quoted from an official key.'
+});
 
 // ── Documents ───────────────────────────────────────────────────────────────
 // `retrieved` is the day the document was fetched and transcribed, not the day
@@ -51,6 +66,26 @@ export const PYQ_PUBLISHABLE = Object.freeze([
 // the archived copy named in `archivedAt`.
 
 export const PYQ_SOURCES = Object.freeze({
+  'jeemain-2026-s2-0402-s1-paper': Object.freeze({
+    authority: 'National Testing Agency · JEE (Main)',
+    title: 'JEE (Main) 2026 Session 2 · B.E./B.Tech · 2 April 2026 Shift 1 · question paper',
+    kind: 'official-question-paper',
+    url: 'https://cdnbbsr.s3waas.gov.in/s3f8e59f4b2fe7c5705bf878bbd494ccdf/uploads/2026/04/202604092096865379.pdf',
+    listedAt: 'https://jeemain.nta.nic.in/question-paper/',
+    sha256: 'ba8b5256533e0a29e2eb71df3e322885335219d48259f4083365662f5ad7933b',
+    retrieved: '2026-11-10',
+    note: 'NTA\'s own CBT paper: each question prints its NTA Question Id and option ids. Same document and hash as tools/jee-question-department/official-sources.json.'
+  }),
+  'jeemain-2026-s2-final-key': Object.freeze({
+    authority: 'National Testing Agency · JEE (Main)',
+    title: 'JEE (Main) 2026 Session 2 · B.E./B.Tech · final answer key on which the result was compiled (Mathematics)',
+    kind: 'official-final-answer-key',
+    url: 'https://cdnbbsr.s3waas.gov.in/s3f8e59f4b2fe7c5705bf878bbd494ccdf/uploads/2026/04/20260420409057044.pdf',
+    listedAt: 'https://jeemain.nta.nic.in/public-notices/',
+    sha256: '07c89e20741c17f14a000501d6f79055d09834692de0dcb792bf237b77e1c7f9',
+    retrieved: '2026-11-10',
+    note: 'Maps NTA Question Id to the correct option id (MCQ) or the numerical answer. Carries no question text, so it is paired with the paper by Question Id.'
+  }),
   'jeeadv-2026-p1-questions': Object.freeze({
     authority: 'Joint Admission Board · JEE (Advanced)',
     title: 'JEE (Advanced) 2026 · Paper 1 · question paper (English)',
@@ -189,6 +224,23 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-09-07',
     note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document.'
   }),
+  'cbse-2025-xii-65-2-1-questions': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Senior School Certificate Examination 2025 · Mathematics (041) · question paper 65/2/1',
+    kind: 'official-question-paper',
+    url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/XII/MATHEMATICS.zip',
+    retrieved: '2026-11-10',
+    note: 'Zip sha256 d6458be0e324b9742489c40e1c6f40fb4e73d0ec8aecd871ba93774a98f5b556 as retrieved.'
+  }),
+  'cbse-2025-xii-65-2-1-marking-scheme': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Senior School Certificate Examination 2024-25 · Mathematics (041) · Marking Scheme 65/2/1',
+    kind: 'official-marking-scheme',
+    url: 'https://www.cbse.gov.in/cbsenew/Marking-Scheme/2025/XII/Math.zip',
+    file: 'XII_MS 041_65-2-1 Mathematics 2024-25.pdf',
+    retrieved: '2026-11-10',
+    note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document. Zip sha256 fa74de843c9767e44740df359a63738906532dd7533380fd9cac6c01a0f2aee6 as retrieved.'
+  }),
   'cbse-2025-x-30-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
     title: 'CBSE Secondary School Examination 2025 · Mathematics Standard (041) · question paper 30/1/1',
@@ -196,6 +248,60 @@ export const PYQ_SOURCES = Object.freeze({
     url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/X/041_Mathematics_Standard.zip',
     file: '30-1-1_Mathematics Standard.pdf',
     retrieved: '2026-09-07'
+  }),
+  'cbse-2025-x-30-1-2-questions': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2025 · Mathematics Standard (041) · question paper 30/1/2',
+    kind: 'official-question-paper',
+    url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/X/041_Mathematics_Standard.zip',
+    file: '30-1-2_Mathematics Standard.pdf',
+    retrieved: '2026-11-10',
+    note: 'Zip sha256 438fc0ef5e02bbf513d0da090c7846e64bd631d595f48eb919e1ba3dcfd69ebf as retrieved.'
+  }),
+  'cbse-2025-x-30-1-2-marking-scheme': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2024-25 · Mathematics Standard (041) · Marking Scheme 30/1/2',
+    kind: 'official-marking-scheme',
+    url: 'https://www.cbse.gov.in/cbsenew/Marking-Scheme/2025/X/Math.zip',
+    file: 'X_MS_041_Mathematics Standard_30-1-2_2024-25.pdf',
+    retrieved: '2026-11-10',
+    note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document. Zip sha256 11da8f09e6594bad698f5959ed5a8faeead1630eb4569b242395825254df8248 as retrieved.'
+  }),
+  'cbse-2025-x-30-1-3-questions': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2025 · Mathematics Standard (041) · question paper 30/1/3',
+    kind: 'official-question-paper',
+    url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/X/041_Mathematics_Standard.zip',
+    file: '30-1-3_Mathematics Standard.pdf',
+    retrieved: '2026-11-10',
+    note: 'Zip sha256 438fc0ef5e02bbf513d0da090c7846e64bd631d595f48eb919e1ba3dcfd69ebf as retrieved.'
+  }),
+  'cbse-2025-x-30-1-3-marking-scheme': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2024-25 · Mathematics Standard (041) · Marking Scheme 30/1/3',
+    kind: 'official-marking-scheme',
+    url: 'https://www.cbse.gov.in/cbsenew/Marking-Scheme/2025/X/Math.zip',
+    file: 'X_MS_041_Mathematics Standard_30-1-3_2024-25.pdf',
+    retrieved: '2026-11-10',
+    note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document. Zip sha256 11da8f09e6594bad698f5959ed5a8faeead1630eb4569b242395825254df8248 as retrieved.'
+  }),
+  'cbse-2025-x-30-2-1-questions': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2025 · Mathematics Standard (041) · question paper 30/2/1',
+    kind: 'official-question-paper',
+    url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/X/041_Mathematics_Standard.zip',
+    file: '30-2-1_Mathematics Standard.pdf',
+    retrieved: '2026-11-10',
+    note: 'Zip sha256 438fc0ef5e02bbf513d0da090c7846e64bd631d595f48eb919e1ba3dcfd69ebf as retrieved.'
+  }),
+  'cbse-2025-x-30-2-1-marking-scheme': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Secondary School Examination 2024-25 · Mathematics Standard (041) · Marking Scheme 30/2/1',
+    kind: 'official-marking-scheme',
+    url: 'https://www.cbse.gov.in/cbsenew/Marking-Scheme/2025/X/Math.zip',
+    file: 'X_MS_041_Mathematics Standard_30-2-1_2024-25.pdf',
+    retrieved: '2026-11-10',
+    note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document. Zip sha256 11da8f09e6594bad698f5959ed5a8faeead1630eb4569b242395825254df8248 as retrieved.'
   }),
   'cbse-2025-x-30-1-1-marking-scheme': Object.freeze({
     authority: 'Central Board of Secondary Education',
@@ -223,6 +329,14 @@ export const PYQ_EXAMS = Object.freeze({
     grades: Object.freeze([11, 12]),
     labelFor: rec => `JEE Advanced ${rec.year} · Paper ${rec.paper} · Q${rec.questionNumber}`
   }),
+  'jee-main': Object.freeze({
+    id: 'jee-main',
+    label: 'JEE Main',
+    authority: 'National Testing Agency · JEE (Main)',
+    track: 'jee-main',
+    grades: Object.freeze([11, 12]),
+    labelFor: rec => `JEE Main ${rec.year} · ${rec.shift} · Q${rec.questionNumber} · official paper + separate NTA key`
+  }),
   'cbse-class-12': Object.freeze({
     id: 'cbse-class-12',
     label: 'CBSE Class 12 board',
@@ -247,12 +361,6 @@ export const PYQ_EXAMS = Object.freeze({
  * stated fact with a reason rather than a silently empty list.
  */
 export const PYQ_ABSENT_EXAMS = Object.freeze([
-  Object.freeze({
-    id: 'jee-main',
-    label: 'JEE Main',
-    track: 'jee-main',
-    reason: 'The NTA publishes JEE Main final answer keys publicly, but keys the answers by internal question id and releases the question paper itself only through the candidate portal. No public document carries a JEE Main question together with its official answer, so no JEE Main question is transcribed here rather than transcribing one from a coaching-site reprint and calling it official.'
-  }),
   Object.freeze({
     id: 'ioqm',
     label: 'IOQM',

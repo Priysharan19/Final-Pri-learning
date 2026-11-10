@@ -10,7 +10,7 @@
 import { makeRng } from '../qhelpers.js';
 import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
 import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
-import { hasPyqGenerator } from '../pyq/pyqCoverage.js';
+import { hasPyqGenerator } from '../pyq/pyqIndex.js';
 import { stampContent } from '../contentIdentity.js';
 import { withSafeInputHints } from '../inputHint.js';
 

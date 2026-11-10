@@ -1747,6 +1747,31 @@ async function run() {
     eq('— with the limit code', lcLimit?.code, 'LINE_CHECK_LIMIT');
     eq('empty lines are refused before any charge', (await POST(`/practice/${openDiag.question.id}/tutor/line-check`, { lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE');
     setLineCheckTransportForTests(null);
+    // The live step coach (F1): status per finished line, no value, no charge;
+    // a shown tick or break is recorded as assistance provenance on the attempt.
+    {
+      const { setStepCoachTransportForTests } = await import(`${SRC}local/stepCoach.js`);
+      const scCalls = [];
+      let scReply = { stepCoach: { lines: [{ status: 'ok', step: 1 }, { status: 'break', note: 'leak 11' }, { status: 'final' }], checksLeft: 11 } };
+      setStepCoachTransportForTests(async body => { scCalls.push(body); return scReply; });
+      eq('the coach is on when the server says so', (await GET('/tutor/step-coach')).on, true);
+      const scQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      const scId = scQ.question.id;
+      const before = (await idb.get('questions', scId)).tutorLevel || 0;
+      const sc = await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b', 'c'] });
+      eq('one status per line; only status and a verified step leave the bridge', sc.stepCoach?.lines, [{ status: 'ok', step: 1 }, { status: 'break' }, { status: 'final' }]);
+      eq('it sends only the issued id and the lines', Object.keys(scCalls.at(-1)).sort(), ['context', 'lines', 'serverQuestionId']);
+      const row = await idb.get('questions', scId);
+      eq('no help credit is charged', row.tutorLevel || 0, before);
+      eq('the shown tick and break are recorded as A1 assistance, system-initiated', [row.assistance?.stepCoach?.level, row.assistance?.stepCoach?.ticks, row.assistance?.stepCoach?.breaks, row.assistance?.stepCoach?.initiatedBy, row.assistance?.stepCoach?.revealedFinalAnswer],
+        ['A1', [0], [1], 'system', false]);
+      scReply = { stepCoach: { lines: [{ status: 'ok' }], checksLeft: 3 } };
+      eq('a reply for the wrong number of lines is dropped', (await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b'] })).stepCoach, null);
+      scReply = { stepCoach: { lines: [{ status: 'unsure' }, { status: 'unsure' }], unchecked: true } };
+      eq('a check that did not run says nothing', (await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b'] })).stepCoach, null);
+      eq('empty lines send nothing', [(await POST(`/practice/${scId}/tutor/step-coach`, { lines: [] })).stepCoach, scCalls.length], [null, 3]);
+      setStepCoachTransportForTests(null);
+    }
     const emptyDiag = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: [] } });
     eq('with nothing written there is nothing to diagnose', emptyDiag.code, 'TUTOR_NOTHING_TO_DIAGNOSE');
 

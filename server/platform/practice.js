@@ -30,7 +30,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // worker threads under a hard deadline. Only the two pure rubric helpers
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
-import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import { stepMetaFor, marksPossibleFor, practiceMarksEarned } from './markerOps.js';
 import { markRowsFor } from './markRows.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
@@ -275,6 +275,17 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     // "Check this line so far": the marker pool decides, by form and never by
     // value, where the first final-answer attempt is, and Step Checks the lines
     // only when there is none. Did not run → `unchecked`, for any lines.
+    // The live step coach (F1): per-line rows from the marker pool, by form
+    // and never by value. Did not run → null (the caller says nothing).
+    async stepCoachEvidence(lines) {
+      if (!Array.isArray(lines) || !lines.length) return null;
+      if (await markerCooldownUntil(db, accountId)) return null;
+      let outcome;
+      try { outcome = await markerPool().run('stepCoach', { q, lines, answerText: String(answerTextFor(q) ?? '') }, { key: accountId }); } catch { return null; }
+      if (outcome.ok && Array.isArray(outcome.value)) return outcome.value;
+      if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      return null;
+    },
     async lineCheckEvidence(lines) {
       const unchecked = { firstBreak: -1, verifiedLines: 0, misconception: null, attemptAt: -1, unchecked: true };
       if (!Array.isArray(lines) || !lines.length) return { ...unchecked, unchecked: false, attemptAt: 0 };
@@ -1268,9 +1279,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // Unreadable working or an invalid NONBLANK answer still cannot earn
       // marks. This prevents rewarding a mere copy of the question.
       const workingOnlyCredit = workingOnly && Number.isInteger(partial?.awarded) && partial.awarded > 0;
-      const marksEarned = invalid ? 0 : result.correct
-        ? marksPossible
-        : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
+      // A question carrying the Board's scheme is marked by it whether the
+      // answer is right or wrong (markerOps.practiceMarksEarned).
+      const marksEarned = invalid ? 0 : practiceMarksEarned(q, result, resolved ? evidence : null, marksPossible);
       const said = !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback;
       const attemptId = randomUUID();
       // The hint ladder's charge, from the level committed under this lock.
