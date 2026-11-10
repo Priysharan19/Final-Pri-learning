@@ -34,6 +34,7 @@
 import { IN_CHAPTER_BY_ID } from '../curriculum-in.js';
 import { PYQ_PROVENANCE, PYQ_PROVENANCE_LABEL, PYQ_PUBLISHABLE, pyqExam, pyqSource } from './pyqSources.js';
 import { figureHasExternalRef } from '../figureRefs.js';
+import { boardSchemeProblems } from '../boardScheme.js';
 
 /** Answer contracts the archive can carry, and checker.js can mark. */
 export const PYQ_ANSWER_TYPES = Object.freeze(['mcq', 'numeric']);
@@ -102,6 +103,27 @@ function checkSeparateKey(rec) {
   }
 }
 
+/**
+ * Sections B–E of a CBSE paper are marked per value point, so a record from one
+ * carries the Board's scheme (boardScheme.js) and is refused without it: the
+ * marks, the transcribed points (each working point with the line that earns it),
+ * a numeric final answer the engine checks, the step-check metadata the lines
+ * are verified against, and the Board's marking scheme as its answer source.
+ * A Section A record carries none of this, and may not.
+ */
+function checkBoardScheme(rec) {
+  const stepped = rec.examId?.startsWith?.('cbse-') && isText(rec.section) && rec.section !== 'Section A';
+  if (!stepped) {
+    if (rec.boardScheme !== undefined || rec.marks !== undefined) fail(rec, 'carries a Board marking scheme, which only a CBSE Section B–E record may.');
+    return;
+  }
+  if (rec.answerType !== 'numeric') fail(rec, `is a ${rec.section} record without a numeric final answer the engine can check; a proof or a construction cannot be marked deterministically and stays out.`);
+  const problems = boardSchemeProblems(rec.boardScheme, rec.marks, rec.stepcheck || null);
+  if (problems.length) fail(rec, `has a Board scheme the engine cannot mark: ${problems.join('; ')}.`);
+  if (!rec.stepcheck || rec.stepcheck.kind !== 'equation' || !Array.isArray(rec.stepcheck.solutions) || !rec.stepcheck.solutions.length) fail(rec, 'has no step-check metadata, so no line of its scheme could ever be verified.');
+  if (!asList(rec.answerSource).some(id => pyqSource(id)?.kind === 'official-marking-scheme')) fail(rec, 'carries a Board scheme that is not read from the Board\'s marking scheme.');
+}
+
 function checkSources(rec, field) {
   const ids = asList(rec[field]);
   if (!ids.length) fail(rec, `names no ${field}. A past-paper question must say which document its ${field === 'promptSource' ? 'prompt' : 'answer'} was read from.`);
@@ -148,6 +170,7 @@ export function validatePyqRecord(rec) {
   }
   if (rec.provenance === PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY) checkSeparateKey(rec);
 
+  checkBoardScheme(rec);
   if (!isText(rec.prompt)) fail(rec, 'has no prompt.');
   if (!Number.isInteger(rec.difficulty) || rec.difficulty < 1 || rec.difficulty > 4) fail(rec, `has difficulty ${JSON.stringify(rec.difficulty)}; it must be an integer 1-4.`);
   if (!Array.isArray(rec.steps) || !rec.steps.length) fail(rec, 'has no worked steps. A PYQ a student gets wrong with no explanation is worse than no PYQ.');
@@ -257,6 +280,13 @@ export function pyqPayload(rec) {
     archive: archiveMeta(rec)
   };
   if (rec.figure) base.figure = String(rec.figure);
+  // Server-private: the scheme and its step metadata never reach a device
+  // (PUBLIC_Q in server/platform/practice.js does not list them).
+  if (Array.isArray(rec.boardScheme)) {
+    base.marks = rec.marks;
+    base.boardScheme = rec.boardScheme.map(p => ({ ...p }));
+    base.stepcheck = { ...rec.stepcheck };
+  }
   if (rec.answerType === 'mcq') {
     return { ...base, answerType: 'mcq', mcqOptions: rec.mcqOptions.map(String), answer: { correctIndex: rec.answer.correctIndex } };
   }

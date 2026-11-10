@@ -24,6 +24,7 @@ import { checkProof } from '../../client/src/engine/proofSteps.js';
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
+import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -67,6 +68,9 @@ export function isSchemeStep(step) {
 }
 
 export function marksPossibleFor(q) {
+  // A past-paper question carrying the Board's transcribed scheme is worth the
+  // marks the Board printed (boardScheme.js), not a number guessed from steps.
+  if (Array.isArray(q.boardScheme) && Number.isInteger(q.marks)) return q.marks;
   const keySteps = (q.steps || []).filter(isSchemeStep);
   const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
@@ -86,7 +90,16 @@ export function stepEvidence(q, answer, steps, result) {
   // because working was attached; only an actually empty final-answer field
   // can be graded by method alone.
   const blankFinal = typeof answer === 'string' && answer.trim() === '';
-  if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
+  if (meta && steps && !result.correct && (!result.invalid || blankFinal) && Array.isArray(q.boardScheme)) {
+    // The Board's own scheme: each value point earned by its own line, one line
+    // per point, in order, verified by the deterministic step check
+    // (matchBoardPoints). methodMarks' generic rubric is not used — the record
+    // says how the Board marked this question.
+    const okLines = (report?.lines || []).filter(l => l?.status === 'ok').length;
+    const ticked = matchBoardPoints({ scheme: q.boardScheme, lines: report?.lines || [], meta });
+    const award = awardBoardScheme({ scheme: q.boardScheme, ticked, correct: false });
+    if (okLines > 0) partial = { okLines, awarded: award.method, note: award.method > 0 ? `${award.method} of ${award.total} marks for the method the Board's marking scheme credits.` : 'Your working does not yet reach a whole mark of the Board\'s marking scheme.', lines: (report?.lines || []).map(l => ({ status: l?.status, text: l?.text })), lost: award.total - award.method, boardScheme: true };
+  } else if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
     try {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
@@ -98,8 +111,30 @@ export function stepEvidence(q, answer, steps, result) {
   // that matches a step of the worked solution is ticked (milestones.js).
   // A question whose working is not checked (no Step Check: supportsSteps
   // false) gets no report at all, milestones or not.
+  // The Board's scheme decides the mark of a right answer too: the answer
+  // point is earned by checkAnswer, every working point only by its own line
+  // (matchBoardPoints). A right answer with junk, repeated or no working is
+  // worth the answer point alone, never the printed marks (D25 delta review).
+  const board = Array.isArray(q.boardScheme) ? boardAward(q, meta, report, result.correct === true) : null;
   try { if (report) report = annotateMilestones(q, report); } catch { /* the report stands */ }
-  return { stepReport: report, partial };
+  return board ? { stepReport: report, partial, board } : { stepReport: report, partial };
+}
+
+/** The Board-scheme award for a question carrying one, from the deterministic report. */
+function boardAward(q, meta, report, correct) {
+  const ticked = matchBoardPoints({ scheme: q.boardScheme, lines: report?.lines || [], meta });
+  const award = awardBoardScheme({ scheme: q.boardScheme, ticked, correct });
+  return { awarded: award.awarded, total: award.total, method: award.method };
+}
+
+/** The marks a resolved practice answer earns: the Board's scheme when the question carries one. */
+export function practiceMarksEarned(q, result, evidence, marksPossible) {
+  if (Array.isArray(q.boardScheme)) {
+    const board = evidence?.board;
+    if (!board) return 0;   // no deterministic award, no mark
+    return result.correct ? Math.min(marksPossible, board.awarded) : Math.max(0, Math.min(marksPossible - 1, evidence?.partial?.awarded ?? 0));
+  }
+  return result.correct ? marksPossible : Math.max(0, Math.min(marksPossible - 1, evidence?.partial?.awarded ?? 0));
 }
 
 // ── Examination marking, in the two stages the pool can tell apart ──────────
@@ -173,6 +208,18 @@ export function examAnswerStage(q, given, working, grid) {
   const awarded = markObjective(grid, { unanswered: false, correct });
   let feedback = String(result.feedback || '');
   if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps?.[Number(given)]) feedback = String(q.answer.optionTraps[Number(given)]);
+  if (Array.isArray(q.boardScheme) && !objective) {
+    // A Board-scheme question is marked by its scheme in an exam too: the
+    // answer point by checkAnswer, each working point only by its own line.
+    const meta = stepMetaFor(q);
+    let report = null;
+    if (meta && !blank(working)) { try { report = stepCheck(meta, String(working), { prompt: q.prompt }); } catch { report = null; } }
+    const b = boardAward(q, meta, report, correct);
+    const earned = Math.max(0, Math.min(marks, correct ? b.awarded : Math.min(marks - 1, b.method)));
+    return { final: true, response: { unanswered: false, correct, awarded: earned, feedback: feedback.slice(0, 3000),
+      partial: !correct && earned > 0 ? { awarded: earned, note: `${earned} of ${b.total} marks for the method the Board's marking scheme credits.`, lost: b.total - earned } : null,
+      markingScheme: 'step-marked', outcome: correct ? 'correct' : 'wrong' } };
+  }
   const markingScheme = objective || (grid.incorrect || 0) < 0 || marks <= 1 ? 'objective' : 'final-answer';
   const response = { unanswered: false, correct, awarded, feedback: feedback.slice(0, 3000), partial: null, markingScheme,
     outcome: correct ? 'correct' : 'wrong' };
@@ -276,7 +323,7 @@ export const MARKER_OPS = Object.freeze({
     if (!wanted) return { result, evidence: null };
     const evidence = stepEvidence(q, answer, working, result);
     // Final answer only: the step report stays, the method mark does not.
-    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null } };
+    return { result, evidence: policyOf({ policy }).methodMarks ? evidence : { stepReport: evidence.stepReport, partial: null, ...(evidence.board ? { board: evidence.board } : {}) } };
   },
   /** One examination response: the answer stage, then (method marks on) the working stage. */
   exam({ q, given, working, grid, policy }, emit) {
