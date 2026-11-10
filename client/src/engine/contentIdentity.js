@@ -39,7 +39,8 @@
 // shares with 30/1/1 are not repeated). (2026.11.8 is the distinct-question
 // widening, #838; whichever lands second re-derives the digest.)
 // 2026.11.10 — the same tranche grown to Sets 30/1/3 and 30/2/1 (25 more records).
-export const CONTENT_VERSION = '2026.11.10';
+// 2026.11.11 — CBSE Class XII 2025 Set 65/2/1 Section A: 17 official questions.
+export const CONTENT_VERSION = '2026.11.11';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

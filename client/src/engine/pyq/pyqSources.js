@@ -189,6 +189,23 @@ export const PYQ_SOURCES = Object.freeze({
     retrieved: '2026-09-07',
     note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document.'
   }),
+  'cbse-2025-xii-65-2-1-questions': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Senior School Certificate Examination 2025 · Mathematics (041) · question paper 65/2/1',
+    kind: 'official-question-paper',
+    url: 'https://www.cbse.gov.in/cbsenew/question-paper/2025/XII/MATHEMATICS.zip',
+    retrieved: '2026-11-10',
+    note: 'Zip sha256 d6458be0e324b9742489c40e1c6f40fb4e73d0ec8aecd871ba93774a98f5b556 as retrieved.'
+  }),
+  'cbse-2025-xii-65-2-1-marking-scheme': Object.freeze({
+    authority: 'Central Board of Secondary Education',
+    title: 'CBSE Senior School Certificate Examination 2024-25 · Mathematics (041) · Marking Scheme 65/2/1',
+    kind: 'official-marking-scheme',
+    url: 'https://www.cbse.gov.in/cbsenew/Marking-Scheme/2025/XII/Math.zip',
+    file: 'XII_MS 041_65-2-1 Mathematics 2024-25.pdf',
+    retrieved: '2026-11-10',
+    note: 'The marking scheme reprints each question above its expected answer, so prompt and answer were read from one document. Zip sha256 fa74de843c9767e44740df359a63738906532dd7533380fd9cac6c01a0f2aee6 as retrieved.'
+  }),
   'cbse-2025-x-30-1-1-questions': Object.freeze({
     authority: 'Central Board of Secondary Education',
     title: 'CBSE Secondary School Examination 2025 · Mathematics Standard (041) · question paper 30/1/1',
