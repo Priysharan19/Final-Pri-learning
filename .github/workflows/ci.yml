@@ -232,8 +232,8 @@ jobs:
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
           # 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree).
-          # 419741/18696 → 420029/18792 with CBSE X 2025 30/1/2, 30/1/3, 30/2/1 Section A (35 records), re-derived on #847.
-          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 420029 wrong answers marked correct across 18792 questions' suites.log
+          # 419741/18696 → 420029/18792 with CBSE X 2025 30/1/2, 30/1/3, 30/2/1 Section A (35 records), re-derived on #847; 420173/18840 with CBSE XII 65/2/1 Section A.
+          grep -Fq 'FALSE-POSITIVE SWEEP: PASS — 0 of 420173 wrong answers marked correct across 18840 questions' suites.log
           # The opposite direction: every right answer to every India question (the key, the box's unit in every
           # spelling, ₹/Rs on an amount, the printed answer, the photo path's "Ans:" line) is credited, or refused only by D13.
           grep -Fq 'CORRECT-ANSWER SWEEP: PASS — 0 of 32824 right answers over 12349 India questions (594 generator×difficulty cells × 24 seeds)' suites.log
@@ -273,7 +273,7 @@ jobs:
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 35/35 checks' suites.log
           # 1082/45 → 2915/173, the JEE archive (#795) (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          grep -Fq 'INDIA PYQ: PASS — 3518/3518 checks — 208 source-cited previous-year questions' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 3788/3788 checks — 225 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
           grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
