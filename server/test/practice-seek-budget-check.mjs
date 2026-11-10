@@ -81,7 +81,12 @@ ok(Math.pow(worst, OLD_FLAT_BUDGET) > 1e-3, `the old flat budget missed at the c
 ok(Math.pow(worst, seekBudget(WINDOW - 1)) < 1e-12, `the new budget misses at the contract's edge below once in 10^12 seeks (${Math.pow(worst, seekBudget(WINDOW - 1)).toExponential(1)})`);
 
 // ── 2. Seeded sittings on the real chapter ──────────────────────────────────
-const CHAPTER = 'c10-quadratic-equations';
+// The reproduction needs a chapter with a D2 cell smaller than the window.
+// Quadratic Equations' context cell (12 items when #540 was found) was widened
+// past it by #838, so the chapter is now Class XII Probability, whose
+// random-variable cell (14 items) sits beside two larger ones — the same mix.
+const CHAPTER = 'c12-probability';
+const GRADE = 12;
 const DIFFICULTY = 2;
 const live = IN_CHAPTER_BY_ID[CHAPTER];
 assert.ok(live, `${CHAPTER} is an India chapter`);
@@ -96,7 +101,7 @@ const chapter = { ...live, covers: live.covers.filter(c => !LATER.has(c.gen)) };
 // Every cell a chapter-level request can land on, and each cell's real pool.
 const cells = new Map();
 for (let i = 0; i < 3000; i++) for (const ch of [chapter, live]) {
-  const t = resolveIndiaTarget(ch, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: () => i / 3000 });
+  const t = resolveIndiaTarget(ch, { difficulty: DIFFICULTY, track: 'cbse', grade: GRADE, random: () => i / 3000 });
   if (t) cells.set(t.generator, t);
 }
 const poolOf = new Map();
@@ -125,7 +130,7 @@ function sitting(seed, tries, on = chapter) {
   const recent = [];
   const repeats = [];
   for (let i = 0; i < WINDOW; i++) {
-    const t = resolveIndiaTarget(on, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: choose });
+    const t = resolveIndiaTarget(on, { difficulty: DIFFICULTY, track: 'cbse', grade: GRADE, random: choose });
     const avoid = new Set(recent.map(opaqueContentHash));
     const { q, repeat } = chooseQuestion({ generator: t.generator, difficulty: t.difficulty, avoid, trap: null }, null, tries === null ? { draw } : { draw, tries });
     if (repeat) {

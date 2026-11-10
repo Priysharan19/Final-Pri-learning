@@ -60,7 +60,7 @@ const coordinate = (rng,diff) => {
     const x1=ri(rng,-40,40),y1=ri(rng,-40,40),x2=x1+(rng()<.5?-dx:dx),y2=y1+(rng()<.5?-dy:dy);
     return q(`Find the distance between $P(${x1},${y1})$ and $Q(${x2},${y2})$.`,h,['Use coordinate differences as perpendicular legs.','Apply the Baudhāyana–Pythagoras relation.','Distance is the positive square root.'],[['Differences',`$\\Delta x=${x2-x1},\\ \\Delta y=${y2-y1}$`],['Distance',`$PQ=\\sqrt{(${x2-x1})^2+(${y2-y1})^2}=\\sqrt{${h*h}}$`],['Answer',`$PQ=${h}$ units`]]);
   }
-  const x1=ri(rng,-50,20),x2=x1+ri(rng,3,60),y1=ri(rng,-50,20),y2=y1+ri(rng,3,60),w=x2-x1,ht=y2-y1;
+  const x1=ri(rng,-200,150),x2=x1+ri(rng,3,250),y1=ri(rng,-200,150),y2=y1+ri(rng,3,250),w=x2-x1,ht=y2-y1;
   if(rng()<.5) return q(`Opposite vertices of an axis-aligned rectangle are $A(${x1},${y1})$ and $C(${x2},${y2})$. Find its area.`,w*ht,['Use coordinate differences for the side lengths.','Width is $|x_2-x_1|$ and height is $|y_2-y_1|$.','Multiply the perpendicular lengths.'],[['Width',`$${w}$`],['Height',`$${ht}$`],['Area',`$${w}\\times${ht}=${w*ht}$ square units`]]);
   return q(`Opposite vertices of an axis-aligned rectangle are $A(${x1},${y1})$ and $C(${x2},${y2})$. Find its perimeter.`,2*(w+ht),['Use coordinate differences for the side lengths.','Width is $|x_2-x_1|$ and height is $|y_2-y_1|$.','Perimeter is twice the sum of the sides.'],[['Width',`$${w}$`],['Height',`$${ht}$`],['Perimeter',`$2(${w}+${ht})=${2*(w+ht)}$ units`]]);
 };
@@ -83,7 +83,7 @@ const polynomials = (rng,diff) => {
     return q(`Evaluate $p(x)=${cv(a,'x^2')}${tailv(b,'x')}${tail(c)}$ at $x=${x}$.`,v,['Substitute x using brackets.','Square first, then multiply, then add.','Control the signs term by term.'],[['Substitute',`$${a}(${x})^2${b?` ${b<0?'-':'+'} ${Math.abs(b)}(${x})`:''}${tail(c)}$`],['Simplify',`$${a*x*x}${tail(b*x)}${tail(c)}$`],['Answer',`$p(${x})=${v}$`]]);
   }
   if(diff===3){
-    const a=nzi(rng,-20,20),b=ri(rng,-80,80),x1=ri(rng,-30,20),x2=x1+ri(rng,1,15),y1=a*x1+b,y2=a*x2+b;
+    const a=nzi(rng,-50,50),b=ri(rng,-500,500),x1=ri(rng,-100,100),x2=x1+ri(rng,1,40),y1=a*x1+b,y2=a*x2+b;
     if(rng()<.5) return q(`A linear relation passes through $(${x1},${y1})$ and $(${x2},${y2})$. Find its slope.`,a,['Slope is change in y divided by change in x.','Subtract coordinates in the same order.','The rate is constant for a linear relation.'],[['Changes',`$\\Delta y=${y2-y1},\\ \\Delta x=${x2-x1}$`],['Slope',`$a=\\frac{${y2-y1}}{${x2-x1}}$`],['Answer',`$a=${a}$`]]);
     return q(`A linear relation $y=ax+b$ passes through $(${x1},${y1})$ and $(${x2},${y2})$. Find $b$.`,b,['Find the slope first.','Substitute one point into $y=ax+b$.','Solve for b.'],[['Slope',`$a=\\frac{${y2-y1}}{${x2-x1}}=${a}$`],['Substitute',`$${y1}=${a}(${x1})+b$`],['Answer',`$b=${b}$`]]);
   }
