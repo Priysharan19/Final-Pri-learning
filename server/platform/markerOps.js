@@ -18,6 +18,7 @@ import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/che
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
+import { markGeometry } from '../../client/src/engine/geometryFacts.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
@@ -144,6 +145,14 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
       partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the features that match.' } : null, features: r?.features || null,
       needsReview: !!r?.needsReview, markingScheme: 'graph-features', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  if (q.answerType === 'geometry') {
+    // Measurable facts earn their part marks; a construction step waits for a person.
+    let response = given, r = null;
+    if (typeof given === 'string') { try { response = given.length <= 4096 ? JSON.parse(given) : null; } catch { response = null; } }
+    if (response && typeof response === 'object') { try { r = markGeometry(q.answer?.geometry, response); } catch { r = null; } }
+    const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
+      needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
