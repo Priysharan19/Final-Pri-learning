@@ -34,7 +34,12 @@
 // option, written in one factor order; no wrong option expands to the key.
 // 2026.11.7 — Merge Train 8: the JEE archive (#795, 2026.11.6) and the Class 9
 // widening (#812, 2026.11.2 above) together; neither version alone describes it.
-export const CONTENT_VERSION = '2026.11.7';
+// 2026.11.8 — Distinct-question widening (L5): Class X surface-area combinations
+// (any multiple-of-7 radius, every whole-number cone, a capsule form, free cube
+// radius), trigonometry triples and heights, situational quadratics, linear-pair
+// methods; Class 9 rectangle-from-vertices and two-point linear relation ranges.
+// Every form, answer type, hint and worked step is unchanged in kind.
+export const CONTENT_VERSION = '2026.11.8';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

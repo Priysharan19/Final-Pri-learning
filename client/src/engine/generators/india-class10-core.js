@@ -59,8 +59,8 @@ export const indiaClass10Core = {
   // chapter has not taught yet.
   'c10-linear-pair-methods': (rng, diff) => {
     if (diff === 1) {
-      const x0 = ri(rng, 1, 9), y0 = ri(rng, 1, 9);
-      const a = ri(rng, 1, 4), b = ri(rng, 2, 5);
+      const x0 = ri(rng, 1, 40), y0 = ri(rng, 1, 40);
+      const a = ri(rng, 1, 12), b = ri(rng, 2, 12);
       const r1 = x0 + a * y0;             // x + ay = r1  → x = r1 − ay
       const r2 = b * x0 - y0;             // bx − y = r2
       return {
@@ -85,9 +85,9 @@ export const indiaClass10Core = {
       };
     }
     if (diff === 2) {
-      const x0 = nz(rng, -7, 9), y0 = nz(rng, -7, 9);
-      const a = ri(rng, 2, 6), b = nz(rng, -6, 6);
-      const c = ri(rng, 2, 6), d = nz(rng, -6, 6);
+      const x0 = nz(rng, -40, 40), y0 = nz(rng, -40, 40);
+      const a = ri(rng, 2, 15), b = nz(rng, -15, 15);
+      const c = ri(rng, 2, 15), d = nz(rng, -15, 15);
       if (a * d - b * c === 0) return indiaClass10Core['c10-linear-pair-methods'](rng, 3);
       const r1 = a * x0 + b * y0;
       const r2 = c * x0 + d * y0;
@@ -112,9 +112,9 @@ export const indiaClass10Core = {
       };
     }
     if (diff === 3) {
-      const x0 = nz(rng, -8, 9), y0 = nz(rng, -8, 9);
-      const a = ri(rng, 2, 7), b = nz(rng, -7, 7);
-      const c = nz(rng, -7, 7), d = ri(rng, 2, 7);
+      const x0 = nz(rng, -50, 50), y0 = nz(rng, -50, 50);
+      const a = ri(rng, 2, 15), b = nz(rng, -15, 15);
+      const c = nz(rng, -15, 15), d = ri(rng, 2, 15);
       if (a * d - b * c === 0) return indiaClass10Core['c10-linear-pair-methods'](rng, 1);
       const r1 = a * x0 + b * y0;
       const r2 = c * x0 + d * y0;
