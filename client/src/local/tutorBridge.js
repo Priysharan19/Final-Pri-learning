@@ -41,45 +41,6 @@ export async function requestLineCheck(body, { signal = null } = {}) {
   }
 }
 
-let coachOverride = null;
-/** Tests replace the step-coach transport; production never calls this. */
-export function setStepCoachTransportForTests(fn) {
-  coachOverride = typeof fn === 'function' ? fn : null;
-}
-
-/**
- * Is the live step coach on for this account? The SERVER decides (its switch
- * and the account's own entitlement snapshot); this only asks, once per
- * session, and treats any failure as off.
- */
-let coachStatus = null;
-export function stepCoachAvailable() {
-  if (!tutorFeatureEnabled()) return Promise.resolve(false);
-  if (coachOverride) return Promise.resolve(true);
-  if (!cloudAvailable()) return Promise.resolve(false);
-  if (!coachStatus) coachStatus = cloud.tutorStatus().then(r => r?.stepCoach === true).catch(() => { coachStatus = null; return false; });
-  return coachStatus;
-}
-/** Forget the cached answer (sign-in, sign-out, a plan change). */
-export function resetStepCoachStatus() { coachStatus = null; }
-
-/** Ask /v1/tutor/step-coach. Resolves to { stepCoach } or { error: { code } }; never rejects. */
-export async function requestStepCoach(body, { signal = null } = {}) {
-  if (!tutorFeatureEnabled()) return { error: { code: 'TUTOR_DISABLED' } };
-  try {
-    if (coachOverride) return await coachOverride(body, { signal });
-    if (!cloudAvailable()) return { error: { code: 'TUTOR_OFFLINE' } };
-    const response = await cloud.tutorStepCoach(body, { signal });
-    if (!Array.isArray(response?.stepCoach?.lines)) return { error: { code: 'TUTOR_MALFORMED' } };
-    return { stepCoach: response.stepCoach };
-  } catch (error) {
-    const code = String(error?.code || 'TUTOR_FAILED').slice(0, 60);
-    // The server said no for this account: stop asking this session.
-    if (code === 'STEP_COACH_PREMIUM' || code === 'NOT_FOUND' || error?.status === 404) coachStatus = Promise.resolve(false);
-    return { error: { code } };
-  }
-}
-
 /** Ask /v1/tutor/help. Resolves to { tutor } or { error: { code } }; never rejects. */
 export async function requestTutorHelp(body, { signal = null, timeoutMs = TIMEOUT_MS } = {}) {
   // Dark by default: with the feature off nothing is sent to /v1/tutor.

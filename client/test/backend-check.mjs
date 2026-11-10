@@ -1750,7 +1750,7 @@ async function run() {
     // The live step coach (F1): status per finished line, no value, no charge;
     // a shown tick or break is recorded as assistance provenance on the attempt.
     {
-      const { setStepCoachTransportForTests } = await import(`${SRC}local/tutorBridge.js`);
+      const { setStepCoachTransportForTests } = await import(`${SRC}local/stepCoach.js`);
       const scCalls = [];
       let scReply = { stepCoach: { lines: [{ status: 'ok', step: 1 }, { status: 'break', note: 'leak 11' }, { status: 'final' }], checksLeft: 11 } };
       setStepCoachTransportForTests(async body => { scCalls.push(body); return scReply; });

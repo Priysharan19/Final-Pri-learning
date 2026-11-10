@@ -61,7 +61,7 @@ import {
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
-import { requestLineCheck, requestStepCoach, requestTutorHelp, stepCoachAvailable } from './tutorBridge.js';
+import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
@@ -3951,7 +3951,8 @@ const routes = {
   },
 
   // The live step coach (F1): is it on for this account? The server decides.
-  'GET /tutor/step-coach': async () => ({ on: await stepCoachAvailable() }),
+  // Its code is an on-demand chunk; offline or unloadable means off.
+  'GET /tutor/step-coach': async () => ({ on: await import('./stepCoach.js').then(m => m.stepCoachAvailable(), () => false) }),
 
   // The live step coach (F1): the server's Step Check of the FINISHED lines of
   // an OPEN server-issued question, as the student writes. One status per
@@ -3973,30 +3974,9 @@ const routes = {
     if (row.discardedAt || row.answered || !row.serverQuestionId) return { stepCoach: null };
     const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
     if (!lines.length) return { stepCoach: null };
-    const outcome = await requestStepCoach({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines });
-    const rows = outcome?.stepCoach?.lines;
-    if (!Array.isArray(rows) || rows.length !== lines.length || outcome.stepCoach.unchecked) return { stepCoach: null, code: outcome?.error?.code || null };
-    const clean = rows.map(r => {
-      const status = ['ok', 'break', 'unsure', 'final'].includes(r?.status) ? r.status : 'unsure';
-      return status === 'ok' && Number.isInteger(r.step) && r.step > 0 && r.step < 100 ? { status, step: r.step } : { status };
-    });
-    const shown = clean.map((r, i) => ({ i, s: r.status })).filter(r => r.s === 'ok' || r.s === 'break');
-    if (shown.length) {
-      const env = row.assistance && typeof row.assistance === 'object' ? row.assistance : {};
-      const coach = env.stepCoach && typeof env.stepCoach === 'object' ? env.stepCoach : { reads: 0, breaks: [], ticks: [] };
-      coach.reads = (Number(coach.reads) || 0) + 1;
-      for (const { i, s } of shown) {
-        const list = s === 'break' ? (coach.breaks ||= []) : (coach.ticks ||= []);
-        if (!list.includes(i) && list.length < 40) list.push(i);
-      }
-      coach.level = coach.breaks?.length ? 'A1' : 'A0-verify';
-      coach.initiatedBy = 'system';
-      coach.revealedNextStep = false;
-      coach.revealedFinalAnswer = false;
-      row.assistance = { ...env, stepCoach: coach };
-      await put('questions', row);
-    }
-    return { stepCoach: { lines: clean, checksLeft: Number.isInteger(outcome.stepCoach.checksLeft) ? outcome.stepCoach.checksLeft : null } };
+    // The rest loads only when the coach is on (its own on-demand chunk).
+    const { coachLines } = await import('./stepCoach.js');
+    return coachLines(row, lines, put);
   },
 
   // The student's own question, between levels 1 and 3. Grounded and streamed
