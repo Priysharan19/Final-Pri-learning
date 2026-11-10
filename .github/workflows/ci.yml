@@ -602,7 +602,7 @@ jobs:
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
           grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
-          grep -Fq 'SEEK BUDGET: PASS — 19/19 checks' practice-http.log
+          grep -Fq 'SEEK BUDGET: PASS — 20/20 checks' practice-http.log
           grep -Fq 'HINTS AND NOTEBOOK: PASS — 59/59 checks' practice-http.log
           grep -Fq 'HINT LADDER: PASS — 24/24 checks' practice-http.log
           grep -Fq 'REVIEW QUEUE: PASS — 36/36 checks' practice-http.log
