@@ -47,6 +47,9 @@ export const ENGINE_SUITES = [
   // Plan F10: where the time went on a timed paper — Premium on read, from
   // the entitlement the server holds now, on Postgres as pri_server.
   'exam-time-check.mjs',
+  // Plan F3: targeted board mocks — the Premium gate and the server-written
+  // key from the account's own graded attempts, on Postgres as pri_server.
+  'targeted-mock-check.mjs',
   // Handwriting not read when a paper closed: frozen by digest, pending, and
   // read a bounded number of times — the attempt reservation and the result
   // amendment under the account lock, on the Postgres store.

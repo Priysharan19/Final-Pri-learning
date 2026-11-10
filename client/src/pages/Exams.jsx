@@ -59,16 +59,20 @@ export default function Exams() {
   // again: while a refusal is on screen, a start that does not name a kind
   // repeats the last one. (For a CBSE Class X/XII student the only start
   // button on the page is the mock's.)
-  const lastStart = useRef(false);
+  // `targeted`: a targeted paper (Premium, engine/targetedMock.js) — the same
+  // board mock, its questions leaning toward weak and due subtopics.
+  const lastStart = useRef({ mock: false, targeted: false });
   async function start(options) {
-    const mock = options?.mock === true || (options?.mock === undefined && refusal !== null && lastStart.current);
-    lastStart.current = mock;
+    const repeat = options?.mock === undefined && refusal !== null;
+    const mock = options?.mock === true || (repeat && lastStart.current.mock);
+    const targeted = mock && (options?.targeted === true || (repeat && lastStart.current.targeted));
+    lastStart.current = { mock, targeted };
     setBusy(true);
     setError('');
     setRefusal(null);
     setStillOpen(null);
     try {
-      const body = user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}) } : cfg;
+      const body = user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}), ...(targeted ? { targeted: true } : {}) } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
@@ -185,6 +189,10 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
               <p className="muted">{t('mock.intro')}</p>
               <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => start({ mock: true })} disabled={busy} data-exam-board-mock>
                 {busy ? t('exams.building') : t('mock.start')}
+              </button>
+              <p className="muted" style={{ marginTop: 14 }}>{t('mock.targetedIntro')}</p>
+              <button className="btn btn-ghost btn-lg" style={{ width: '100%' }} onClick={() => start({ mock: true, targeted: true })} disabled={busy} data-exam-targeted-mock>
+                {t('mock.targetedStart')}
               </button>
             </div>
             : <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>

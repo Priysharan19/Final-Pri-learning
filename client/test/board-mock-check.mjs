@@ -50,20 +50,23 @@ ok(/const inkAllowed = featureEnabled\('examHandwriting'\) && exam\?\.mock !== t
 ok(/data-exam-mock-label/.test(room) && /mock\.notOfficial/.test(room) && /mock\.resultNote/.test(room), 'the exam room labels a mock while it is sat and on its result');
 const backend = read('local/indiaExamBackend.js');
 ok(/if \(mock && !boardMockOf\(\{ track, grade, variant \}\)\) throw error/.test(backend), 'the device refuses a mock where none is set');
-ok(/\.\.\.\(mock \? \{ mock: true \} : \{\}\) \}/.test(backend), 'the device asks the server for a mock, which decides the title');
+ok(/\.\.\.\(mock \? \{ mock: true \} : \{\}\), \.\.\.\(targeted \? \{ targeted: true \} : \{\}\) \}/.test(backend), 'the device asks the server for a mock (targeted or not), which decides the title');
 ok(/await assertExamAllowed\(profile\);\s*const created = await createIndiaExam\(profile, body \|\| \{\}\);\s*await recordExamSimulation\(profile\);/.test(backend),
   'D19: a mock goes through the same free-paper pre-check as any timed paper (no allowance of its own)');
 
 // ── 3. Where it is offered, and what is said ────────────────────────────────
 const exams = read('pages/Exams.jsx');
 ok(/boardMockOf\(\{ track, grade: user\.year, variant: 'standard' \}\)/.test(exams) && /start\(\{ mock: true \}\)/.test(exams), 'the Exams page offers a mock only where one is set');
-ok(/onRetry=\{start\}/.test(exams) && /options\?\.mock === undefined && refusal !== null && lastStart\.current/.test(exams), 'a retry after signing in starts the same kind of paper');
+ok(/onRetry=\{start\}/.test(exams) && /const repeat = options\?\.mock === undefined && refusal !== null;/.test(exams) && /\(repeat && lastStart\.current\.mock\)/.test(exams) && /\(repeat && lastStart\.current\.targeted\)/.test(exams), 'a retry after signing in starts the same kind of paper');
+ok(/start\(\{ mock: true, targeted: true \}\)/.test(exams) && /data-exam-targeted-mock/.test(exams), 'the Exams page offers the targeted paper beside the mock');
+ok(/data-exam-targeted-label/.test(room) && /<WhyKey why=\{exam\.why\} \/>/.test(room), 'a targeted result says so and shows the server\'s key');
 for (const [lang, cat] of [['en', en], ['hi', hi]]) {
-  for (const k of ['mock.intro', 'mock.start', 'mock.notOfficial', 'mock.typed', 'mock.resultNote']) ok(typeof cat[k] === 'string' && cat[k].length > 3, `${k} exists in ${lang}`);
+  for (const k of ['mock.intro', 'mock.start', 'mock.notOfficial', 'mock.typed', 'mock.resultNote', 'mock.targetedIntro', 'mock.targetedStart', 'mock.targetedResultNote', 'mock.whyTitle', 'mock.whyRow', 'mock.whyDue', 'mock.whyOpen', 'mock.whyNone']) ok(typeof cat[k] === 'string' && cat[k].length > 3, `${k} exists in ${lang}`);
 }
 ok(/not one set by CBSE/.test(en['mock.intro']) && /type every answer/i.test(en['mock.intro']), 'the offer says it is Pri\'s own paper and typed');
 ok(/not an official CBSE paper/.test(en['mock.notOfficial']), 'the label says it is not an official CBSE paper');
 ok(/not CBSE’s marking scheme/.test(en['mock.resultNote']) && /does not predict a board result/.test(en['mock.resultNote']), 'the result says it is not CBSE\'s scheme and predicts nothing');
+ok(/not an estimate of a whole-syllabus mark/.test(en['mock.targetedResultNote']) && /At most 60%/.test(en['mock.targetedIntro']), 'a targeted paper says its score is no whole-syllabus estimate, and states its cap');
 ok(!/step|method mark/i.test(en['mock.resultNote']), 'and claims no step marking (method marks stay off in production, D12)');
 ok(!Object.entries(en).some(([k, v]) => k.startsWith('mock.') && /\b(official paper|guarantee|percentile|predicts? your|accurate|certified)\b/i.test(String(v)) && !/not an official/.test(String(v))),
   'no mock copy claims officialness, accuracy or a prediction (D24)');

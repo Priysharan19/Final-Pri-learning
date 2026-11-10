@@ -3,7 +3,7 @@
 // This module is the demand-loaded half of the layer: it holds every record,
 // validates all of them at load, and turns each (track, chapter) group into one
 // generator function with the same `(rng, difficulty) => payload` signature as
-// every authored bank. The statically-imported half is pyqCoverage.js, which is
+// every authored bank. The statically-imported part is pyqIndex.js, which is
 // small enough for indiaProduct.js to consult on every practice request without
 // pulling the questions themselves into the startup chunk.
 //
@@ -14,7 +14,7 @@
 // shipping a question that lies about where it came from.
 
 import { validatePyqRecord, pyqPayload } from './pyqSchema.js';
-import { pyqGeneratorId } from './pyqCoverage.js';
+import { pyqGeneratorId } from './pyqIndex.js';
 import { JEE_ADVANCED_PYQ_RECORDS } from './records-jee-advanced.js';
 import { JEE_ADVANCED_2019_RECORDS } from './records-jee-advanced-2019.js';
 import { JEE_ADVANCED_2022_RECORDS } from './records-jee-advanced-2022.js';

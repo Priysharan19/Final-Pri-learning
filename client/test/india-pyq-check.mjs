@@ -180,8 +180,8 @@ eq(marked, PYQ_RECORDS.length, 'every record was put through the real marker');
 ok(optionsChecked >= 30, `enough MCQs had their four options checked (${optionsChecked})`);
 
 // ── 4. Coverage matches the records ──────────────────────────────────────────
-// pyqCoverage.js is hand-maintained so indiaProduct.js can consult it without a
-// dynamic import. That is only safe while it is exactly what the records say.
+// pyqCoverage.js (on demand) and pyqIndex.js (the shell's ids and rungs) are
+// maintained with the records. That is only safe while it is exactly what the records say.
 const rebuilt = new Map();
 for (const rec of PYQ_RECORDS) {
   const id = pyqGeneratorId(rec.track, rec.chapterId);
@@ -190,6 +190,13 @@ for (const rec of PYQ_RECORDS) {
   row.exams.add(rec.examId); row.difficulties.add(rec.difficulty); row.years.add(rec.year); row.records += 1;
 }
 eq(Object.keys(PYQ_COVERAGE).length, rebuilt.size, 'the coverage table names every generator the records produce');
+// The shell carries only pyqIndex.js (ids and rungs; the rest is on demand), so
+// it must be exactly the coverage table's ids and rungs.
+{
+  const { PYQ_INDEX_IDS, pyqRungsOf } = await import('../src/engine/pyq/pyqIndex.js');
+  eq([...PYQ_INDEX_IDS].sort().join('|'), Object.keys(PYQ_COVERAGE).sort().join('|'), 'the shell index names exactly the coverage table\'s generators');
+  for (const [id, row] of Object.entries(PYQ_COVERAGE)) eq(pyqRungsOf(id)?.difficulties.join(','), row.difficulties.join(','), `index ${id}: the same rungs as the coverage table`);
+}
 for (const [id, want] of rebuilt) {
   const got = PYQ_COVERAGE[id];
   if (!got) { failures.push(`coverage: ${id} is missing from the table`); continue; }
