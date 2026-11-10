@@ -375,16 +375,10 @@ export function stepCoachEvidence(q, lines, answerText) {
   if (!list.length) return [];
   const meta = stepMetaFor(q);
   const form = answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix });
-  let stages = [];
-  let finalStage = -1;
-  if (meta?.kind === 'plan' && Array.isArray(meta.stages) && meta.stages.length) {
-    finalStage = meta.stages.filter(Boolean).length - 1;
-    try {
-      const rows = stepCheck(meta, list.join('\n'), { prompt: q.prompt })?.lines || [];
-      stages = list.map((_, i) => (Number.isInteger(rows[i]?.stage) ? rows[i].stage : -1));
-    } catch { return allFinal(); }
-  }
-  let attemptAt = firstFinalAttempt(list, form, { stages, finalStage });
+  // Decided by each line's form alone (finalAttempt.js, 9699d375c): no
+  // Step Check stage tag takes part, so a wrong final value is never told
+  // apart from a right one.
+  let attemptAt = firstFinalAttempt(list, form);
   // Live, every finished line is checked, so the guard is stricter than the
   // one-off line check: where the answer is a constant (it names no letter
   // beyond the asked unknowns), a line with any constant side ("n = 6",
