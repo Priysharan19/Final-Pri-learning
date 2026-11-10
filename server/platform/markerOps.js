@@ -16,12 +16,16 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
+import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
+import { markGeometry } from '../../client/src/engine/geometryFacts.js';
+import { checkProof } from '../../client/src/engine/proofSteps.js';
 // The policy is plain data the pool puts into every operation (D12). This
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
 import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
-import { answerForm, firstFinalAttempt, planGivens } from './finalAttempt.js';
+import { answerForm, effectiveSymbols, firstFinalAttempt, planGivens, readClaimForm } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -134,7 +138,7 @@ export function practiceMarksEarned(q, result, evidence, marksPossible) {
 }
 
 // ── Examination marking, in the two stages the pool can tell apart ──────────
-const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
+const OBJECTIVE = new Set(['mcq', 'multi-mcq', 'matrix-match']);
 const blank = v => v === undefined || v === null || String(v).trim() === '';
 
 /**
@@ -159,6 +163,44 @@ export function examAnswerStage(q, given, working, grid) {
     return { final: true, response: { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
       partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
       outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'matrix-match') {
+    let r;
+    try { r = markMatrixMatch(grid, given, q.answer?.matrix); } catch { r = { awarded: 0, outcome: 'invalid', feedback: 'This grid cannot be checked.' }; }
+    return { final: true, response: { unanswered: r.outcome === 'unanswered', correct: r.outcome === 'full', awarded: r.awarded,
+      feedback: String(r.feedback || '').slice(0, 3000), partial: r.outcome === 'partial' ? { awarded: r.awarded, note: r.feedback } : null,
+      markingScheme: 'objective-per-row', outcome: r.outcome === 'full' ? 'correct' : r.outcome } };
+  }
+  if (q.answerType === 'graph-sketch') {
+    // Each assessed feature earns its scheme marks; review features earn nothing until a person marks them.
+    const g = q.answer?.graph, set = readFeatureSet(given);
+    let r = null;
+    if (set && g?.spec && g?.scheme) { try { r = markGraphSketch(g.spec, set, g.scheme, g.tol); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This sketch could not be read.' : r.needsReview ? 'Part of this sketch needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the features that match.' } : null, features: r?.features || null,
+      needsReview: !!r?.needsReview, markingScheme: 'graph-features', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
+  if (q.answerType === 'geometry') {
+    // Measurable facts earn their part marks; a construction step waits for a person.
+    let response = given, r = null;
+    if (typeof given === 'string') { try { response = given.length <= 4096 ? JSON.parse(given) : null; } catch { response = null; } }
+    if (response && typeof response === 'object') { try { r = markGeometry(q.answer?.geometry, response); } catch { r = null; } }
+    const awarded = Math.max(0, Math.min(marks, r ? r.awarded : 0));
+    const correct = !!r && !r.needsReview && r.possible > 0 && r.awarded === r.possible;
+    const note = !r ? 'This answer could not be read.' : r.needsReview ? 'A construction step needs a teacher to check it.' : '';
+    return { final: true, response: { unanswered: false, correct, awarded: correct ? marks : awarded, feedback: note,
+      partial: !correct && awarded > 0 ? { awarded, note: 'Marks for the parts that are right.' } : null, parts: r?.parts || null,
+      needsReview: !!r?.needsReview, markingScheme: 'geometry-parts', outcome: correct ? 'correct' : awarded > 0 ? 'partial' : 'wrong' } };
+  }
+  if (q.answerType === 'proof') {
+    // A proof earns marks from a person only. The algebra report goes with it as evidence.
+    let r;
+    try { r = checkProof(q, given); } catch { r = { feedback: 'This proof could not be read.' }; }
+    return { final: true, response: { unanswered: false, correct: false, awarded: 0, feedback: String(r.feedback || '').slice(0, 3000), partial: null,
+      proofReport: r.proofReport || null, needsReview: true, markingScheme: 'teacher-review', outcome: 'needs-review' } };
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
@@ -199,6 +241,25 @@ export function examWorkingStage(q, working, grid, stage) {
     response.markingScheme = 'step-marked';
   } catch { /* the final-answer mark stands */ }
   return response;
+}
+
+/**
+ * A sketch inside the working (q.answer.sketchMethod = { spec, features, marks,
+ * label }). Method credit only: off unless the marking policy turns method
+ * marks on (D12), never for a right answer (it already has full marks), and
+ * capped one below full marks like every method mark.
+ */
+export function sketchWorkingStage(q, sketch, grid, response, policy) {
+  const rule = q.answer?.sketchMethod;
+  if (!rule || !policyOf({ policy }).methodMarks || response.correct || response.unanswered) return response;
+  const set = readFeatureSet(sketch);
+  if (!set) return response;
+  let credit;
+  try { credit = sketchMethodCredit(rule.spec, set, rule); } catch { return response; }
+  const marks = Number(grid.correct);
+  const awarded = Math.max(0, Math.min(marks - 1, credit.awarded));
+  if (awarded <= (response.awarded || 0)) return response;
+  return { ...response, awarded, partial: { awarded, note: credit.label ? `Method: ${credit.label}.` : 'Method: the sketch in your working.' }, markingScheme: 'step-marked' };
 }
 
 /**
@@ -283,8 +344,84 @@ export const MARKER_OPS = Object.freeze({
    */
   lineCheck({ q, lines, answerText }) {
     return lineCheckEvidence(q, lines, answerText);
+  },
+  /** The live step coach (F1): one verdict per working line, never a value. */
+  stepCoach({ q, lines, answerText }) {
+    return stepCoachEvidence(q, lines, answerText);
   }
 });
+
+/**
+ * The live step coach's evidence (F1): one row per line, in order.
+ *
+ *   { status: 'ok', step }  the engine verified this line; `step` is the
+ *                           1-based stage of an authored plan, else null
+ *   { status: 'break' }     the FIRST line that does not follow from the
+ *                           lines above it (a location only, never the fix)
+ *   { status: 'unsure' }    the engine could not place it — say nothing
+ *   { status: 'final' }     a final-answer attempt (finalAttempt.js, by FORM,
+ *                           never value): only "Press Check"
+ *
+ * Lines from the first final-answer attempt on are 'final', and the Step
+ * Check is run on the lines BEFORE it only, so a final line's value never
+ * reaches the checker here: a right and a wrong final line get identical rows.
+ * Lines after the first break or the first unplaced line are 'unsure' (a
+ * chain broken above them cannot vouch for them). Unreadable answer form or a checker fault fails closed:
+ * every line is 'final'.
+ */
+export function stepCoachEvidence(q, lines, answerText) {
+  const list = Array.isArray(lines) ? lines : [];
+  const allFinal = () => list.map(() => ({ status: 'final' }));
+  if (!list.length) return [];
+  const meta = stepMetaFor(q);
+  const form = answerForm({ answerText, variable: meta?.kind === 'equation' ? meta.variable : null, prefix: q.answerPrefix });
+  // Decided by each line's form alone (finalAttempt.js, 9699d375c): no
+  // Step Check stage tag takes part, so a wrong final value is never told
+  // apart from a right one.
+  let attemptAt = firstFinalAttempt(list, form);
+  // Live, every finished line is checked, so the guard is stricter than the
+  // one-off line check: where the answer is a constant (it names no letter
+  // beyond the asked unknowns), a line with any constant side ("n = 6",
+  // "4 - (-1) + 1", "2·3 = 6") could carry that constant, so it is an attempt.
+  if (form && answerIsConstant(answerText, form)) {
+    const at = list.findIndex(constantSided);
+    if (at >= 0 && (attemptAt < 0 || at < attemptAt)) attemptAt = at;
+  }
+  const open = attemptAt >= 0 ? list.slice(0, attemptAt) : list;
+  let judged = [];
+  if (meta && open.length) {
+    try { judged = stepCheck(meta, open.join('\n'), { prompt: q.prompt })?.lines || []; } catch { return allFinal(); }
+  }
+  // "Doesn't follow from the line above" is said only where there IS a line
+  // above that the engine verified: a first line, or one under a line the
+  // engine could not place, is never flagged (a false break is the costly
+  // error while the student is still writing).
+  let stopped = false;
+  let prevOk = false;
+  return list.map((_, i) => {
+    if (attemptAt >= 0 && i >= attemptAt) return { status: 'final' };
+    const row = judged[i];
+    if (stopped || !row) { stopped = true; return { status: 'unsure' }; }
+    if (row.status === 'break') { stopped = true; return prevOk ? { status: 'break' } : { status: 'unsure' }; }
+    if (row.status === 'ok') { prevOk = true; return { status: 'ok', step: meta?.kind === 'plan' && Number.isInteger(row.stage) && row.stage >= 0 ? row.stage + 1 : null }; }
+    prevOk = false;
+    return { status: 'unsure' };
+  });
+}
+
+/** Does the escrowed answer name no letter beyond the asked unknowns? Unreadable → yes. */
+function answerIsConstant(answerText, form) {
+  const c = readClaimForm(answerText);
+  if (!c) return true;
+  return [...c.symbols].every(v => form.unknowns.has(v));
+}
+/** Has this line a side (or is it an expression) free of every letter? Unreadable → yes. */
+function constantSided(line) {
+  const c = readClaimForm(line);
+  if (!c) return true;
+  if (!c.sides) return c.symbols.size === 0;
+  return c.sides.some(side => { const eff = effectiveSymbols(side); return !eff || eff.size === 0; });
+}
 
 /** The line check's evidence: { attemptAt, firstBreak, verifiedLines, misconception }. */
 export function lineCheckEvidence(q, lines, answerText) {

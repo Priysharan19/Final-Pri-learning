@@ -37,7 +37,7 @@ export default function SectionTime({ report, offered }) {
     if (!offered) return null;
     return (
       <p className="muted" data-section-time-offer style={{ fontSize: 13 }}>
-        {t('sectionTime.offer')} <PageLink to={PAYWALL_ROUTE}>{t('sectionTime.offerLink')}</PageLink>
+        {t('sectionTime.offer')} <PageLink to={PAYWALL_ROUTE} state={{ from: 'time-report' }}>{t('sectionTime.offerLink')}</PageLink>
       </p>
     );
   }

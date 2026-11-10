@@ -1,27 +1,22 @@
 // Pri Learning · what the previous-year archive covers
 //
-// The statically-imported half of the PYQ layer. indiaProduct.js resolves a
-// practice target on every question a student asks for and cannot wait on a
-// dynamic import to do it, so the shape of the archive — which (track, chapter)
-// pairs it serves and at which difficulty rungs — lives here, and the questions
-// themselves stay in pyqArchive.js, which generators/index.js pulls in as its
-// own chunk the first time one is actually drawn.
+// The full coverage rows and the manifest of transcribed papers. This module is
+// ON DEMAND (vite.config.js): the app shell carries only pyqIndex.js — ids and
+// rungs, which is all indiaProduct.js needs synchronously — and this file, the
+// sources it reads and the records are fetched when past papers are asked for.
 //
-// The table below is hand-maintained, exactly like INDIA_BANK_OF in
-// generators/index.js: adding a record means adding its (track, chapter) row
-// here too. Nothing silently papers over a mismatch — india-pyq-check.mjs
+// The table below is maintained with the records: adding a record means adding
+// its (track, chapter) row here, and its rungs in pyqIndex.js. Nothing silently papers over a mismatch — india-pyq-check.mjs
 // rebuilds this table from the records and fails if a single field differs, so
 // a forgotten row is a red suite rather than a chapter that quietly stops
 // serving past papers.
 
 import { PYQ_ABSENT_EXAMS, PYQ_EXAMS } from './pyqSources.js';
+import { pyqGeneratorId, hasPyqGenerator, pyqCoversChapter, pyqCellsFor } from './pyqIndex.js';
 
 export { PYQ_ABSENT_EXAMS, PYQ_EXAMS };
-
-/** The generator id a (track, chapter) pair is served under. */
-export function pyqGeneratorId(track, chapterId) {
-  return `pyq-${track}-${chapterId}`;
-}
+// One implementation of the lookups, the shell's (pyqIndex.js).
+export { pyqGeneratorId, hasPyqGenerator, pyqCoversChapter, pyqCellsFor };
 
 /**
  * Every generator the archive publishes. `difficulties` are the rungs that
@@ -77,7 +72,24 @@ export const PYQ_COVERAGE = Object.freeze({
   'pyq-jee-advanced-c12-matrices': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-matrices', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2019, 2022, 2024, 2025, 2026]), records: 6 }),
   'pyq-jee-advanced-c12-probability': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-probability', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([2, 3, 4]), years: Object.freeze([2019, 2022, 2023, 2024, 2025, 2026]), records: 12 }),
   'pyq-jee-advanced-c12-relations-functions': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-relations-functions', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([3, 4]), years: Object.freeze([2024, 2025, 2026]), records: 4 }),
-  'pyq-jee-advanced-c12-vector-algebra': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-vector-algebra', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([2, 3, 4]), years: Object.freeze([2019, 2023, 2024, 2025, 2026]), records: 9 })
+  'pyq-jee-advanced-c12-vector-algebra': Object.freeze({ track: 'jee-advanced', chapterId: 'c12-vector-algebra', exams: Object.freeze(['jee-advanced']), difficulties: Object.freeze([2, 3, 4]), years: Object.freeze([2019, 2023, 2024, 2025, 2026]), records: 9 }),
+  'pyq-jee-main-c11-complex-numbers': Object.freeze({ track: 'jee-main', chapterId: 'c11-complex-numbers', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c11-conic-sections': Object.freeze({ track: 'jee-main', chapterId: 'c11-conic-sections', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c11-limits-derivatives': Object.freeze({ track: 'jee-main', chapterId: 'c11-limits-derivatives', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c11-permutations-combinations': Object.freeze({ track: 'jee-main', chapterId: 'c11-permutations-combinations', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c11-probability': Object.freeze({ track: 'jee-main', chapterId: 'c11-probability', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c11-relations-functions': Object.freeze({ track: 'jee-main', chapterId: 'c11-relations-functions', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c11-sequences-series': Object.freeze({ track: 'jee-main', chapterId: 'c11-sequences-series', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c11-statistics': Object.freeze({ track: 'jee-main', chapterId: 'c11-statistics', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c11-straight-lines': Object.freeze({ track: 'jee-main', chapterId: 'c11-straight-lines', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c11-trig-functions': Object.freeze({ track: 'jee-main', chapterId: 'c11-trig-functions', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c12-3d-geometry': Object.freeze({ track: 'jee-main', chapterId: 'c12-3d-geometry', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c12-applications-derivatives': Object.freeze({ track: 'jee-main', chapterId: 'c12-applications-derivatives', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c12-determinants': Object.freeze({ track: 'jee-main', chapterId: 'c12-determinants', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c12-differential-equations': Object.freeze({ track: 'jee-main', chapterId: 'c12-differential-equations', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c12-integrals': Object.freeze({ track: 'jee-main', chapterId: 'c12-integrals', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 2 }),
+  'pyq-jee-main-c12-matrices': Object.freeze({ track: 'jee-main', chapterId: 'c12-matrices', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 }),
+  'pyq-jee-main-c12-vector-algebra': Object.freeze({ track: 'jee-main', chapterId: 'c12-vector-algebra', exams: Object.freeze(['jee-main']), difficulties: Object.freeze([3]), years: Object.freeze([2026]), records: 1 })
 });
 
 /**
@@ -107,14 +119,10 @@ export const PYQ_MANIFEST = Object.freeze({
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/1/3', section: 'Section A', records: 8 }),
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/2/1', section: 'Section A', records: 17 }),
     Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/2/1', section: 'Section A', records: 17 }),
-    Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/2/1', section: 'Section B', records: 1 })
+    Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/2/1', section: 'Section B', records: 1 }),
+    Object.freeze({ exam: 'jee-main', year: 2026, paper: '1 (B.E./B.Tech)', section: 'Mathematics · 2 April 2026 Shift 1', records: 25 })
   ])
 });
-
-/** Does the archive publish this generator id? */
-export function hasPyqGenerator(generatorId) {
-  return Object.prototype.hasOwnProperty.call(PYQ_COVERAGE, String(generatorId || ''));
-}
 
 /** The coverage row for a generator id, or null. */
 export function pyqCoverageOf(generatorId) {
@@ -122,33 +130,8 @@ export function pyqCoverageOf(generatorId) {
   return (Object.hasOwn(PYQ_COVERAGE, key) && PYQ_COVERAGE[key]) || null;
 }
 
-/** Does the archive publish anything for this track and chapter? */
-export function pyqCoversChapter(track, chapterId) {
-  return hasPyqGenerator(pyqGeneratorId(track, chapterId));
-}
-
 /** The tracks the archive can serve at all, in track order. */
 export const PYQ_TRACKS = Object.freeze([...new Set(Object.values(PYQ_COVERAGE).map(row => row.track))].sort());
-
-/**
- * The reviewed-PYQ cells a chapter can offer inside a difficulty window, in the
- * `{ generator, difficulty, pyq }` shape indiaExamComposer.js draws from. The
- * window is honoured the same way chapterCells honours it: rungs inside the
- * window if there are any, otherwise the nearest rung outside it, so a paper
- * gets the archive's closest real question rather than nothing.
- */
-export function pyqCellsFor(track, chapterId, { min = 1, max = 4 } = {}) {
-  const id = pyqGeneratorId(track, chapterId);
-  const row = pyqCoverageOf(id);
-  if (!row) return [];
-  const inside = row.difficulties.filter(d => d >= min && d <= max);
-  const gap = d => Math.min(Math.abs(d - min), Math.abs(d - max));
-  const best = inside.length ? inside : (() => {
-    const nearest = Math.min(...row.difficulties.map(gap));
-    return row.difficulties.filter(d => gap(d) === nearest);
-  })();
-  return best.map(difficulty => ({ generator: id, difficulty, pyq: true }));
-}
 
 /** Why a track a student might expect PYQs for has none, or null. */
 export function pyqAbsenceFor(track) {

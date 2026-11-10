@@ -275,6 +275,17 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     // "Check this line so far": the marker pool decides, by form and never by
     // value, where the first final-answer attempt is, and Step Checks the lines
     // only when there is none. Did not run → `unchecked`, for any lines.
+    // The live step coach (F1): per-line rows from the marker pool, by form
+    // and never by value. Did not run → null (the caller says nothing).
+    async stepCoachEvidence(lines) {
+      if (!Array.isArray(lines) || !lines.length) return null;
+      if (await markerCooldownUntil(db, accountId)) return null;
+      let outcome;
+      try { outcome = await markerPool().run('stepCoach', { q, lines, answerText: String(answerTextFor(q) ?? '') }, { key: accountId }); } catch { return null; }
+      if (outcome.ok && Array.isArray(outcome.value)) return outcome.value;
+      if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      return null;
+    },
     async lineCheckEvidence(lines) {
       const unchecked = { firstBreak: -1, verifiedLines: 0, misconception: null, attemptAt: -1, unchecked: true };
       if (!Array.isArray(lines) || !lines.length) return { ...unchecked, unchecked: false, attemptAt: 0 };

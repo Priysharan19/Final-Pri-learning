@@ -13,6 +13,8 @@ const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
+import { checkGeometry } from './geometryFacts.js';
+import { checkProof } from './proofSteps.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -43,6 +45,12 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  // A sketch's feature set is structured data with its own 8 kB cap (graphFeatures.readFeatureSet).
+  if (question?.answerType === 'graph-sketch') return coreCheckAnswer(question, rawInput);
+  // A diagram question's parts, each marked by the rule for its kind (geometryFacts.js).
+  if (question?.answerType === 'geometry') return checkGeometry(question, rawInput);
+  // A proof is never marked automatically: its algebra is checked as evidence for a teacher (proofSteps.js).
+  if (question?.answerType === 'proof') return checkProof(question, rawInput);
   const long = answerTooLong(rawInput);
   if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {

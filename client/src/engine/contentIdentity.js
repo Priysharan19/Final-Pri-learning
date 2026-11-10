@@ -34,15 +34,25 @@
 // option, written in one factor order; no wrong option expands to the key.
 // 2026.11.7 — Merge Train 8: the JEE archive (#795, 2026.11.6) and the Class 9
 // widening (#812, 2026.11.2 above) together; neither version alone describes it.
+// 2026.11.8 — Distinct-question widening (L5): Class X surface-area combinations
+// (any multiple-of-7 radius, every whole-number cone, a capsule form, free cube
+// radius), trigonometry triples and heights, situational quadratics, linear-pair
+// methods; Class 9 rectangle-from-vertices and two-point linear relation ranges.
+// Every form, answer type, hint and worked step is unchanged in kind.
+// 2026.11.14 — c10-linear-pair-methods D2 back on its original ranges, so its certified seeds reproduce (#838 D25).
 // 2026.11.9 — CBSE Class X 2025 Set 30/1/2 Section A: ten official questions
 // with the Board's key and Pri-authored steps join the archive (the eight it
 // shares with 30/1/1 are not repeated). (2026.11.8 is the distinct-question
 // widening, #838; whichever lands second re-derives the digest.)
 // 2026.11.10 — the same tranche grown to Sets 30/1/3 and 30/2/1 (25 more records).
 // 2026.11.11 — CBSE Class XII 2025 Set 65/2/1 Section A: 17 official questions.
-// 2026.11.12 — the first Section B record on the Board-scheme contract (65/2/1 Q24).
-// 2026.11.13 — the same record on the corrected contract (D25: lines match value points one-to-one).
-export const CONTENT_VERSION = '2026.11.13';
+// 2026.11.15 — Merge Train 15: the archive on demand (#847), CBSE X 2025 30/1/2,
+// 30/1/3, 30/2/1 and XII 65/2/1 Section A (#840, #845), JEE Main 2026 S2 (#842),
+// the distinct-question widening (#838) and the Board-scheme contract (#844)
+// together; no single PR's version above describes the merged content.
+// 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
+// contract (#846), restacked on Train 15.
+export const CONTENT_VERSION = '2026.11.16';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

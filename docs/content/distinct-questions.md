@@ -8,8 +8,8 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 |---|---|---|---|---|---|
 | Class 7 | 103 | ≥ 2.98×10^8 | 2 | 74 | met |
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
-| Class 9 | 32 | 8.26×10^7 | 0 | 9 | not met |
-| Class 10 | 92 | 3.61×10^7 | 0 | 69 | not met |
+| Class 9 | 32 | ≥ 2.43×10^8 | 2 | 9 | met |
+| Class 10 | 110 | ≥ 1.46×10^8 | 1 | 76 | met |
 | Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
 | Class 12 | 93 | ≥ 3.83×10^8 | 2 | 69 | met |
 
@@ -200,22 +200,14 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c10-surface-area-combo` | 2 | 2000 | 3 | 3 |
-| `c10-surface-area-combo` | 3 | 2000 | 3 | 3 |
-| `c10-trig-applications-current` | 3 | 2000 | 4 | 4 |
-| `c10-trig-applications-current` | 4 | 2000 | 4 | 4 |
 | `c10-areas-circles` | 3 | 2000 | 4 | 4 |
 | `c10-circles` | 1 | 2000 | 7 | 7 |
 | `c10-circles` | 2 | 2000 | 7 | 7 |
 | `c10-circles` | 3 | 2000 | 7 | 7 |
-| `c10-quadratic-context` | 3 | 2000 | 8 | 8 |
 | `c10-probability-classical` | 4 | 2000 | 9 | 9 |
 | `c10-polynomial-zeroes` | 1 | 2000 | 10 | 10 |
 | `c10-triangles-current` | 1 | 2000 | 10 | 10 |
-| `c10-trigonometry-current` | 3 | 2000 | 10 | 10 |
 | `c10-probability-classical` | 2 | 2000 | 10 | 10 |
-| `c10-quadratic-context` | 2 | 2000 | 12 | 12 |
-| `c10-trigonometry-current` | 1 | 2000 | 15 | 15 |
 | `c10-areas-circles` | 2 | 2000 | 16 | 16 |
 | `c10-surface-volume-combo` | 1 | 2000 | 21 | 21 |
 | `c10-surface-volume-combo` | 2 | 2000 | 21 | 21 |
@@ -224,18 +216,16 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-trig-boundary-relations` | 3 | 2000 | 24 | 24 |
 | `c10-trig-boundary-relations` | 4 | 2000 | 24 | 24 |
 | `c10-trigonometry-current` | 4 | 2000 | 24 | 24 |
-| `c10-quadratic-context` | 1 | 2000 | 32 | 32 |
 | `c10-areas-circles` | 1 | 2000 | 32 | 32 |
-| `c10-surface-area-combo` | 4 | 2000 | 34 | 34 |
-| `c10-surface-area-combo` | 1 | 2000 | 57 | 57 |
+| `c10-quadratic-k-forms` | 3 | 2000 | 59 | 59 |
 | `c10-irrationality-proofs` | 1 | 2000 | 72 | 72 |
 | `c10-irrationality-proofs` | 2 | 2000 | 72 | 72 |
 | `c10-irrationality-proofs` | 3 | 2000 | 72 | 72 |
 | `c10-triangles-current` | 3 | 2000 | 72 | 72 |
-| `c10-quadratic-context` | 4 | 2000 | 81 | 81 |
+| `c10-quadratic-k-forms` | 2 | 2000 | 76 | 76 |
+| `c10-quadratic-triangle-competency` | 3 | 2000 | 80 | 80 |
 | `c10-quadratic-roots` | 3 | 2000 | 121 | 121 |
 | `c10-triangles-current` | 4 | 2000 | 126 | 126 |
-| `c10-trig-applications-current` | 2 | 2000 | 129 | 129 |
 | `c10-polynomial-zeroes` | 2 | 2000 | 134 | 134 |
 | `c10-irrationality-proofs` | 4 | 2000 | 144 | 144 |
 | `c10-quadratic-discriminant` | 2 | 2000 | 144 | 144 |
@@ -243,16 +233,21 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-polynomial-zeroes-reasoning` | 3 | 2000 | 180 | 180 |
 | `c10-polynomial-zeroes` | 3 | 2000 | 182 | 182 |
 | `c10-polynomial-zeroes` | 4 | 2000 | 182 | 182 |
-| `c10-trig-applications-current` | 1 | 2000 | 183 | 183 |
 | `c10-linear-graphs` | 1 | 2000 | 192 | 192 |
 | `c10-volume-combination-reasoning` | 3 | 2000 | 231 | 231 |
 | `c10-probability-classical` | 3 | 2000 | 238 | 238 |
 | `c10-trigonometry-current` | 2 | 2000 | 287 | 288 |
 | `c10-linear-pair-situations-reasoning` | 3 | 2000 | 289 | 294 |
+| `c10-trig-applications-current` | 3 | 2000 | 296 | 297 |
 | `c10-circles` | 4 | 2000 | 343 | 344 |
+| `c10-quadratic-context` | 3 | 2000 | 394 | 395 |
 | `c10-quadratic-discriminant` | 1 | 2000 | 467 | 472 |
+| `c10-quadratic-context` | 4 | 2000 | 515 | 533 |
+| `c10-trig-applications-current` | 4 | 2000 | 567 | 587 |
 | `c10-quadratic-discriminant` | 3 | 2000 | 575 | 597 |
+| `c10-trigonometry-current` | 3 | 2000 | 662 | 701 |
 | `c10-bpt-reasoning` | 3 | 2000 | 568 | 752 |
+| `c10-quadratic-context` | 2 | 2000 | 718 | 787 |
 | `c10-quadratic-roots` | 4 | 2000 | 850 | 989 |
 | `c10-sector-reasoning` | 3 | 2000 | 582 | 1023 |
 | `c10-real-numbers` | 2 | 2000 | 915 | 1075 |
@@ -260,15 +255,27 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-probability-reasoning` | 3 | 2000 | 634 | 1185 |
 | `c10-quadratic-discriminant` | 4 | 2000 | 909 | 1227 |
 | `c10-quadratic-roots` | 2 | 2000 | 1000 | 1251 |
-| `c10-linear-pair-methods` | 1 | 2000 | 1023 | 1278 |
+| `c10-trigonometry-current` | 1 | 2000 | 1012 | 1292 |
 | `c10-probability-classical` | 1 | 2000 | 1020 | 1313 |
+| `c10-ap-inverse-competency` | 3 | 2000 | 1174 | 1577 |
+| `c10-trig-applications-current` | 1 | 2000 | 1189 | 1733 |
+| `c10-trig-applications-current` | 2 | 2000 | 1189 | 1733 |
 | `c10-triangles-current` | 2 | 2000 | 1234 | 1912 |
 | `c10-quadratic-factorisation-reasoning` | 3 | 2000 | 941 | 1967 |
 | `c10-tangent-length-reasoning` | 3 | 2000 | 989 | 2252 |
+| `c10-zero-coefficient-forms` | 3 | 2000 | 944 | 2482 |
+| `c10-quadratic-k-forms` | 1 | 2000 | 864 | 2874 |
 | `c10-ap-daily-life-reasoning` | 3 | 2000 | 1323 | 3445 |
 | `c10-linear-graphs` | 4 | 2000 | 1503 | 3698 |
 | `c10-linear-graphs` | 2 | 2000 | 1568 | 4039 |
+| `c10-zero-coefficient-forms` | 2 | 2000 | 1558 | 4043 |
+| `c10-zero-coefficient-forms` | 1 | 2000 | 1549 | 4339 |
+| `c10-surface-area-combo` | 3 | 2000 | 1553 | 4794 |
+| `c10-ap-sum-forms` | 1 | 2000 | 1287 | 5809 |
+| `c10-ap-term-forms` | 3 | 2000 | 1639 | 6229 |
 | `c10-coordinate-geometry` | 1 | 2000 | 1741 | 6872 |
+| `c10-surface-area-combo` | 1 | 2000 | 1750 | 7228 |
+| `c10-quadratic-context` | 1 | 2000 | 1776 | 7965 |
 
 ### Class 11
 

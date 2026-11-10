@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const NUDGE = 'Look at what is being added to the unknown, and undo it first.';
 const CAPTION = 'Tutor note: undo the operation furthest from the unknown first.';
 

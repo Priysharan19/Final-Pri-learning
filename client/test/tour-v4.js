@@ -3,8 +3,15 @@
 //
 // An exam is the one screen where an hour of a student's work exists as React
 // state and nothing else until they press submit. It generates a paper, holds
-// answers for eleven questions across a clock, and then marks the lot in a
-// single pass. Nothing outside a browser can drive that.
+// answers across a clock, and then marks the lot in a single pass. Nothing
+// outside a browser can drive that.
+//
+// THE PAPER. V1 ships the India course only (D2), and the server issues no
+// NSW bank or NSW-era practice paper (D15). The released India paper is the
+// JEE Main Mathematics simulation: 25 questions, Section A (20 multiple
+// choice) and Section B (5 numerical value), +4 / −1. This flow sat an NSW
+// Year 9 practice paper with a structured Section II until November 2026; each
+// check below keeps its intent on the JEE paper (the PR lists the mapping).
 //
 // WHO MARKS, AND HOW A CORRECT ANSWER IS KNOWN. The paper is issued by the
 // server to a signed-in account; the device stores only the public paper and
@@ -12,19 +19,24 @@
 // question paper only (#230) — the flow proves the in-progress sheet states
 // nothing and that no stored question holds an answer. The right answers come
 // from the server's sealed paper, read at the test's desk (never from the
-// page). They are typed into the room and must be marked right by the server;
-// after submission the printed sheet must state an answer for every question.
-// One question is answered with nonsense on purpose, and the arithmetic of the
-// final score is checked against the per-question marks.
+// page): typed into a Section B box, or chosen among a Section A question's
+// options, and they must be marked right by the server. After submission the
+// printed sheet must state an answer for every question. One question is
+// answered with nonsense on purpose, and the arithmetic of the final score is
+// checked against the per-question marks.
 //
 // Run on its own:  node client/test/tour-v4.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
-const YEAR = 9;
-const LENGTH = 10;
+const YEAR = 12;
+const TRACK = 'jee-main';
+const LENGTH = 25;                 // the JEE Main Mathematics paper
+const SECTION_B_FROM = 21;         // questions 21–25 are Section B (numerical value)
+const WRONG_MARK = -1;             // JEE Main: a wrong answer in either section
 const NONSENSE = 'zzz-not-an-answer';
 const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the server's sealed paper
+const TYPED_FROM_SOLUTION = 4;    // of those, typed into Section B; the rest chosen in Section A
 
 // Every route in the sidebar, with the title the shell is supposed to set for
 // it. A page that renders the wrong route still renders; the title is what says
@@ -75,6 +87,25 @@ async function stripFurniture(page, mathText, stated) {
   return typed || stated;
 }
 
+/**
+ * The correct option of each multiple-choice question, keyed by question
+ * number: read at the test's desk from the server's sealed paper, the same
+ * sealed copy online.examAnswers() reads for typed answers (it returns typed
+ * answers only). Nothing is read from, or handed to, the page.
+ */
+async function sealedChoices(online, examId) {
+  const serverId = await online.examServerId(examId);
+  if (!serverId) return new Map();
+  const row = online.platform.h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='exam-paper' AND key=?").get(serverId);
+  if (!row) return new Map();
+  const out = new Map();
+  for (const [i, entry] of (JSON.parse(row.response_json).questions || []).entries()) {
+    const q = entry?.payload || entry;
+    if (q?.answerType === 'mcq' && Number.isInteger(q.answer?.correctIndex)) out.set(i + 1, q.answer.correctIndex);
+  }
+  return out;
+}
+
 /** Every marked question in the review, as {n, awarded, marks, given}. */
 const reviewRows = (page) => page.evaluate(() => {
   const rows = [];
@@ -83,11 +114,19 @@ const reviewRows = (page) => page.evaluate(() => {
     if (!meta) continue;
     const label = meta.innerText.replace(/\s+/g, ' ');
     const q = /Q(\d+)\b/.exec(label);
+    // "✔ 4/4 marks", "✖ 0/4 marks", or a JEE Main wrong answer's
+    // "✖ −1 (negative mark) of 4" (examRoom.tagNegative).
     const marks = /(\d+)\/(\d+) marks/.exec(label);
-    if (!q || !marks) continue;
+    const negative = /[-−](\d+) \(negative mark\) of (\d+)/.exec(label);
+    if (!q || (!marks && !negative)) continue;
     const body = card.innerText.replace(/\s+/g, ' ');
     const given = /Your answer:\s*(.*?)\s*Correct answer:/.exec(body);
-    rows.push({ n: Number(q[1]), awarded: Number(marks[1]), marks: Number(marks[2]), given: given ? given[1] : null });
+    rows.push({
+      n: Number(q[1]),
+      awarded: negative ? -Number(negative[1]) : Number(marks[1]),
+      marks: Number((negative || marks)[2]),
+      given: given ? given[1] : null
+    });
   }
   return rows;
 });
@@ -99,7 +138,7 @@ export const flow = {
 
   async run({ page, base, check, note, goto, createProfile, mathText, settle, online }) {
     await goto('/');
-    await createProfile({ name: 'Emmy Noether', year: YEAR });
+    await createProfile({ name: 'Emmy Noether', year: YEAR, track: TRACK });
 
     // ── 1 · every screen in the shell renders ────────────────────────────────
     // Cheap, and it is the difference between "the exam room broke" and "the
@@ -126,23 +165,24 @@ export const flow = {
     // why this flow's oracle can still read the stored paper.
     await online.signIn({ name: 'Emmy Noether' });
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('button:has-text("Start practice paper")', { timeout: 30000 });
-    await page.locator('.card').first().locator('select').nth(1).selectOption(String(LENGTH));
-    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
+    await start.waitFor({ timeout: 30000 });
+    await start.click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 });
     const examId = new URL(page.url()).pathname.split('/').pop();
 
     const dots = await page.locator('.exam-dot').count();
-    await check('a paper of the asked-for length is generated, plus Section II',
-      dots === LENGTH + 1, `${dots} questions on the paper, expected ${LENGTH} + 1 structured`);
+    await check('the paper has the pattern\'s length: 25 questions, Section A then Section B',
+      dots === LENGTH, `${dots} questions on the paper, expected ${LENGTH}`);
     await page.locator('.exam-dot').nth(dots - 1).click();
     await settle();
-    await check('Section II is a structured question',
-      (await page.locator('.q-meta').innerText()).includes('Structured'),
+    await check('the last question is in Section B (numerical value)',
+      /Section B/.test(await page.locator('.q-meta').innerText()),
       `the last question reads ${JSON.stringify((await page.locator('.q-meta').innerText()).replace(/\s+/g, ' '))}`);
-    const parts = await page.locator('.answer-row input.answer-input, .mcq').count();
-    await check('the structured question takes an answer for each of its parts', parts >= 2,
-      `${parts} answer controls on a multi-part question`);
+    const parts = await page.locator('.answer-row input.answer-input').count();
+    const options = await page.locator('.mcq .mcq-opt').count();
+    await check('the numerical-value question takes one typed answer, not options', parts === 1 && options === 0,
+      `${parts} answer boxes and ${options} options on a Section B question`);
     await page.locator('.exam-dot').nth(0).click();
     await settle();
     await check('the clock is running',
@@ -176,12 +216,15 @@ export const flow = {
       return { questions: (exam?.questionIds || []).length, withAnswer, serverId: exam?.server?.examId || null, version: exam?.paperVersion || null };
     }, examId);
     await check('the paper was issued by the server and the device holds only the public paper: no answer in any stored question',
-      !!heldOnDevice.serverId && heldOnDevice.questions === LENGTH + 1 && heldOnDevice.withAnswer === 0 && /^sv1-/.test(String(heldOnDevice.version)),
+      !!heldOnDevice.serverId && heldOnDevice.questions === LENGTH && heldOnDevice.withAnswer === 0 && /^sv1-/.test(String(heldOnDevice.version)),
       JSON.stringify(heldOnDevice));
-    // The oracle: the server's sealed paper, read at the test's desk.
+    // The oracle: the server's sealed paper, read at the test's desk — the
+    // typed answer of a Section B question, the correct option of a Section A one.
     const stated = new Map(await online.examAnswers(examId));
-    await check('the server\'s sealed paper yields a typed answer for enough single questions',
-      stated.size >= ANSWER_WITH_SOLUTION, `${stated.size} sealed answers for ${LENGTH} single questions`);
+    const chosen = await sealedChoices(online, examId);
+    await check('the server\'s sealed paper yields an answer for enough single questions',
+      stated.size >= TYPED_FROM_SOLUTION && stated.size + chosen.size >= ANSWER_WITH_SOLUTION,
+      `${stated.size} sealed typed answers and ${chosen.size} sealed options for ${LENGTH} questions`);
 
     // ── 4 · the paper is sat ─────────────────────────────────────────────────
     await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
@@ -190,12 +233,11 @@ export const flow = {
     const answerBox = page.locator('.answer-row input.answer-input');
     const answered = [];
     let nonsenseAt = null;
-    for (let i = 0; i < dots && answered.length < ANSWER_WITH_SOLUTION; i++) {
+    // Section B first: typed answers, leaving one box for the nonsense below.
+    for (let i = SECTION_B_FROM - 1; i < dots && answered.length < TYPED_FROM_SOLUTION; i++) {
       await page.locator('.exam-dot').nth(i).click();
       await settle();
-      const meta = await page.locator('.q-meta').innerText();
-      if (meta.includes('Structured')) continue;
-      if (await answerBox.count() !== 1) continue;      // multiple choice or full working
+      if (await answerBox.count() !== 1) continue;
       const n = i + 1;
       const say = stated.get(n);
       if (!say) continue;
@@ -207,11 +249,21 @@ export const flow = {
       await answerBox.fill(typed);
       answered.push({ n, typed });
     }
+    // Then Section A: the option the sealed paper marks correct.
+    for (let i = 0; i < SECTION_B_FROM - 1 && answered.length < ANSWER_WITH_SOLUTION; i++) {
+      const n = i + 1;
+      if (!chosen.has(n)) continue;
+      await page.locator('.exam-dot').nth(i).click();
+      await settle();
+      const option = page.locator('.mcq .mcq-opt').nth(chosen.get(n));
+      if (!await option.count()) continue;
+      await option.click();
+      answered.push({ n, typed: `option ${chosen.get(n) + 1}` });
+    }
     for (let i = dots - 1; i >= 0 && nonsenseAt === null; i--) {
       if (answered.some(a => a.n === i + 1)) continue;
       await page.locator('.exam-dot').nth(i).click();
       await settle();
-      if ((await page.locator('.q-meta').innerText()).includes('Structured')) continue;
       if (await answerBox.count() !== 1) continue;
       await answerBox.fill(NONSENSE);
       nonsenseAt = i + 1;
@@ -237,7 +289,8 @@ export const flow = {
     await check('the paper is marked and scored', !!shown,
       `headline reads ${JSON.stringify(headline)}`);
     const summary = await page.locator('.card').first().innerText();
-    const scored = /(\d+) of (\d+) marks/.exec(summary.replace(/\s+/g, ' '));
+    // Signed, as tour-exam-india.js reads it: JEE Main marking can go below zero.
+    const scored = /(-?\d+) of (\d+) marks/.exec(summary.replace(/\s+/g, ' '));
     if (!await check('the result is stated in marks, not just a percentage', !!scored,
       `summary reads ${JSON.stringify(summary.replace(/\s+/g, ' ').slice(0, 160))}`)) return;
     const [, score, total] = scored.map(Number);
@@ -262,8 +315,8 @@ export const flow = {
         row ? `awarded ${row.awarded} of ${row.marks} marks` : 'no review row for that question');
     }
     const bad = rows.find(r => r.n === nonsenseAt);
-    await check(`Q${nonsenseAt} answered with nonsense earns nothing`,
-      !!bad && bad.awarded === 0, bad ? `awarded ${bad.awarded} of ${bad.marks}` : 'no review row');
+    await check(`Q${nonsenseAt} answered with nonsense earns no credit: the JEE Main mark for a wrong answer (${WRONG_MARK})`,
+      !!bad && bad.awarded === WRONG_MARK, bad ? `awarded ${bad.awarded} of ${bad.marks}` : 'no review row');
     await check('the review shows back what was actually submitted',
       !!bad && (bad.given || '').includes(NONSENSE),
       `review says the answer given was ${JSON.stringify(bad?.given)}`);
