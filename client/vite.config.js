@@ -157,6 +157,12 @@ export const ON_DEMAND = [
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
 
+  // The graph sketch reader (#793) and the comparer that judges a confirmed
+  // sketch: both load behind import() only when a student reads a page or
+  // asks about a sketched graph, so they cost the first visit nothing. Like
+  // the recogniser, a student who reads once online keeps them.
+  [/(^|\/)(graphSketchKit|graphCompare)-[^/]*\.js$/, 'graph sketch reader'],
+
   // Inter ships one file per script. Latin is the only one an Indian student
   // reading English maths paints from; the browser fetches a subset only when a
   // glyph inside its unicode-range appears, so precaching Cyrillic, Greek and

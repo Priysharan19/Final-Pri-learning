@@ -37,9 +37,8 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
-import { splitSketchRegion } from './graphSketch.js';
-import { proposeSketch } from './graphLabels.js';
-import GraphSketchConfirm from './GraphSketchConfirm.jsx';
+// The graph sketch reader loads with the first read, in its own chunk.
+const loadSketchKit = () => import('./graphSketchKit.js');
 import { neqWorthCheck, relationChoices, swapRelation } from './relationSwap.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
@@ -297,12 +296,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
     // A page may hold a sketched graph beside written lines: the graph is read
     // as geometry (its labels alone, answer-blind), the rest as lines.
-    const region = splitSketchRegion(strokes);
+    // If the reader's chunk cannot load, the whole page is read as lines.
+    loadSketchKit().catch(() => null).then(kit => {
+    if (seq !== readSeqRef.current || disabledRef.current) { landed(); return; }
+    const region = kit ? kit.splitSketchRegion(strokes) : { sketch: [], writing: strokes };
     const lineStrokes = region.sketch.length ? region.writing : strokes;
     if (region.sketch.length) {
-      proposeSketch(region.sketch, { user: who, signal: controller?.signal }).then(proposal => {
+      kit.proposeSketch(region.sketch, { user: who, signal: controller?.signal }).then(proposal => {
         if (seq !== readSeqRef.current || disabledRef.current) return;
-        setSketch({ signature, proposal, confirmed: null });
+        setSketch({ signature, proposal, confirmed: null, Confirm: kit.GraphSketchConfirm });
       }).catch(() => {});
       if (!lineStrokes.length) { landed(); setStatus(null); return; }
     }
@@ -357,6 +359,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // A refusal that escaped still names its reason (401 → sign in, 403
       // EMAIL_UNVERIFIED → verify); only an unknown throw is "not answering".
       waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
+    });
     });
   }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -705,8 +708,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         </div>
       )}
 
-      {sketch?.proposal && (
-        <GraphSketchConfirm key={sketch.signature} proposal={sketch.proposal} confirmed={!!sketch.confirmed}
+      {sketch?.proposal && sketch.Confirm && (
+        <sketch.Confirm key={sketch.signature} proposal={sketch.proposal} confirmed={!!sketch.confirmed}
           onConfirm={features => { setSketch(s => (s ? { ...s, confirmed: features } : s)); try { onGraphRef.current?.(features); } catch { /* reporting only */ } }} />
       )}
 
