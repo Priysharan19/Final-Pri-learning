@@ -207,6 +207,9 @@ jobs:
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 174244 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent' suites.log
           grep -Fq '59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed' suites.log
           grep -Fq 'INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points' suites.log
+          # Question variants (L5): every live India cell and every official CBSE record yields variants at each band,
+          # each credited by the deterministic marker on its own key and distinct by content hash.
+          grep -Fq 'QUESTION VARIANTS: PASS — 576 generated seeds (0 cells skipped: seed not credited by its own key), 4598 variants verified by the marker and distinct by content hash, 2296/2304 bands filled, 964/1148 same-band variants keep the seed's shape; 28 official CBSE records → 110 Pri variants on their chapter (2 bands with no serving generator).' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
