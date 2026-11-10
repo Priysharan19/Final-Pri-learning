@@ -260,7 +260,7 @@ jobs:
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
-          grep -Fq 'BOARD MOCK: PASS — 45/45 checks' suites.log
+          grep -Fq 'BOARD MOCK: PASS — 64/64 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
           # 61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4).
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
@@ -711,6 +711,11 @@ jobs:
           set -o pipefail
           node server/test/exam-time-check.mjs 2>&1 | tee exam-time.log
           grep -Fq 'EXAM TIME: PASS — 23/23 checks' exam-time.log
+      - name: Targeted board mocks — capped lean, Premium-gated, server-written key (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/targeted-mock-check.mjs 2>&1 | tee targeted-mock.log
+          grep -Fq 'TARGETED MOCK: PASS — 43/43 checks' targeted-mock.log
       - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
         run: |
           set -o pipefail
@@ -739,7 +744,7 @@ jobs:
           grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 84/84 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 85/85 suites' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -769,6 +774,8 @@ jobs:
           grep -Fq '✓ board-mock-check.mjs' platform-postgres.log
           # 83 → 84 (L6, plan F10): where the time went, on Postgres.
           grep -Fq '✓ exam-time-check.mjs' platform-postgres.log
+          # 84 → 85 (L6, plan F3): targeted board mocks on Postgres.
+          grep -Fq '✓ targeted-mock-check.mjs' platform-postgres.log
           # +5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80).
           # 61 → 62 (#659): the parent weekly report runs on real Postgres too.
           grep -Fq '✓ parent-report-check.mjs' platform-postgres.log
