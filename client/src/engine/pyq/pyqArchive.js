@@ -23,6 +23,7 @@ import { JEE_ADVANCED_2024_RECORDS } from './records-jee-advanced-2024.js';
 import { JEE_ADVANCED_2025_RECORDS } from './records-jee-advanced-2025.js';
 import { JEE_ADVANCED_2026_P2_RECORDS } from './records-jee-advanced-2026-p2.js';
 import { CBSE_PYQ_RECORDS } from './records-cbse.js';
+import { JEE_MAIN_2026_RECORDS } from './records-jee-main-2026.js';
 
 function validateAll(records) {
   const seen = new Set();
@@ -46,7 +47,7 @@ function validateAll(records) {
 }
 
 /** Every published record, validated. */
-export const PYQ_RECORDS = validateAll([...JEE_ADVANCED_PYQ_RECORDS, ...JEE_ADVANCED_2026_P2_RECORDS, ...JEE_ADVANCED_2025_RECORDS, ...JEE_ADVANCED_2024_RECORDS, ...JEE_ADVANCED_2023_RECORDS, ...JEE_ADVANCED_2022_RECORDS, ...JEE_ADVANCED_2019_RECORDS, ...CBSE_PYQ_RECORDS]);
+export const PYQ_RECORDS = validateAll([...JEE_ADVANCED_PYQ_RECORDS, ...JEE_ADVANCED_2026_P2_RECORDS, ...JEE_ADVANCED_2025_RECORDS, ...JEE_ADVANCED_2024_RECORDS, ...JEE_ADVANCED_2023_RECORDS, ...JEE_ADVANCED_2022_RECORDS, ...JEE_ADVANCED_2019_RECORDS, ...CBSE_PYQ_RECORDS, ...JEE_MAIN_2026_RECORDS]);
 
 /** The records a generator id serves, in archive order. */
 export function pyqRecordsFor(generatorId) {

@@ -70,7 +70,24 @@ const CELLS = Object.freeze({
   'jee-advanced-c12-matrices': [3, 4],
   'jee-advanced-c12-probability': [2, 3, 4],
   'jee-advanced-c12-relations-functions': [3, 4],
-  'jee-advanced-c12-vector-algebra': [2, 3, 4]
+  'jee-advanced-c12-vector-algebra': [2, 3, 4],
+  'jee-main-c11-complex-numbers': [3],
+  'jee-main-c11-conic-sections': [3],
+  'jee-main-c11-limits-derivatives': [3],
+  'jee-main-c11-permutations-combinations': [3],
+  'jee-main-c11-probability': [3],
+  'jee-main-c11-relations-functions': [3],
+  'jee-main-c11-sequences-series': [3],
+  'jee-main-c11-statistics': [3],
+  'jee-main-c11-straight-lines': [3],
+  'jee-main-c11-trig-functions': [3],
+  'jee-main-c12-3d-geometry': [3],
+  'jee-main-c12-applications-derivatives': [3],
+  'jee-main-c12-determinants': [3],
+  'jee-main-c12-differential-equations': [3],
+  'jee-main-c12-integrals': [3],
+  'jee-main-c12-matrices': [3],
+  'jee-main-c12-vector-algebra': [3]
 });
 
 /** The generator id a (track, chapter) pair is served under. */

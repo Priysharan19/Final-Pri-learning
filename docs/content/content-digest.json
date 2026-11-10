@@ -347,6 +347,23 @@
   "pyq-jee-advanced-c12-matrices": "1bccc105a03b3f76",
   "pyq-jee-advanced-c12-probability": "95f402deadf9c22b",
   "pyq-jee-advanced-c12-relations-functions": "3c4052340bafa0ab",
-  "pyq-jee-advanced-c12-vector-algebra": "1bf89b20f180452d"
+  "pyq-jee-advanced-c12-vector-algebra": "1bf89b20f180452d",
+  "pyq-jee-main-c11-complex-numbers": "b7d37e0bbd93cf5a",
+  "pyq-jee-main-c11-conic-sections": "fea8523281e21463",
+  "pyq-jee-main-c11-limits-derivatives": "d283447bed366ea2",
+  "pyq-jee-main-c11-permutations-combinations": "c83bafbb33e19150",
+  "pyq-jee-main-c11-probability": "325e5743910b4d92",
+  "pyq-jee-main-c11-relations-functions": "288e37532fce9232",
+  "pyq-jee-main-c11-sequences-series": "24382438882f61e3",
+  "pyq-jee-main-c11-statistics": "ee66bf13bbe014f2",
+  "pyq-jee-main-c11-straight-lines": "2db9e9d39d467392",
+  "pyq-jee-main-c11-trig-functions": "0bdf335996bfa466",
+  "pyq-jee-main-c12-3d-geometry": "ec90d255cb1b9146",
+  "pyq-jee-main-c12-applications-derivatives": "e044fabbb47b2c62",
+  "pyq-jee-main-c12-determinants": "8cf0cb8bf23f1a02",
+  "pyq-jee-main-c12-differential-equations": "810e4b2d9f92a7f8",
+  "pyq-jee-main-c12-integrals": "8045a1eb7fb90b9a",
+  "pyq-jee-main-c12-matrices": "5272e00bf9118ae2",
+  "pyq-jee-main-c12-vector-algebra": "e22aacf3e8e7fb32"
  }
 }
