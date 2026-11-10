@@ -51,6 +51,20 @@ const CBSE_2025_X_SET2 = Object.freeze({
   answerSource: 'cbse-2025-x-30-1-2-marking-scheme'
 });
 
+const CBSE_2025_X_SET3 = Object.freeze({
+  ...CBSE_2025_X,
+  setCode: '30/1/3',
+  promptSource: ['cbse-2025-x-30-1-3-marking-scheme', 'cbse-2025-x-30-1-3-questions'],
+  answerSource: 'cbse-2025-x-30-1-3-marking-scheme'
+});
+
+const CBSE_2025_X_2_1 = Object.freeze({
+  ...CBSE_2025_X,
+  setCode: '30/2/1',
+  promptSource: ['cbse-2025-x-30-2-1-marking-scheme', 'cbse-2025-x-30-2-1-questions'],
+  answerSource: 'cbse-2025-x-30-2-1-marking-scheme'
+});
+
 // The four Assertion–Reason codes, printed once above Q19 and Q20 of the paper.
 const AR_CODES = Object.freeze([
   'Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of the Assertion (A).',
@@ -659,6 +673,364 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
       { h: 'Assertion', d: 'Every outcome of the draw is one of the numbers $1$ to $20$, so selecting one of them is certain: the probability is $\\dfrac{20}{20} = 1$. (A) is true.' },
       { h: 'Reason', d: 'An event with probability $1$ is by definition a sure event, so (R) is true.' },
       { h: 'Does (R) explain (A)?', d: 'Yes: the event in (A) is a sure event, which is exactly why its probability is $1$.' }
+    ]
+  },
+  // ── CBSE Class 10 Mathematics Standard (041) · 2025 · Set 30/1/3 · Section A ─
+  // Twelve of 30/1/3's Section A items reprint 30/1/1 or 30/1/2 questions and are
+  // not repeated; its Q6 and Q7 depend on a printed figure.
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q1',
+    questionNumber: 1,
+    chapterId: 'c10-statistics',
+    difficulty: 2,
+    prompt: 'What is the mode of a data if median and mean of the same data are $9.6$ and $10.5$, respectively?',
+    mcqOptions: ['$7.8$', '$12.3$', '$8.4$', '$7$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'The empirical relationship', d: '$\\text{Mode} = 3\\,\\text{Median} - 2\\,\\text{Mean}$.' },
+      { h: 'Substitute', d: '$3(9.6) - 2(10.5) = 28.8 - 21 = 7.8$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q2',
+    questionNumber: 2,
+    chapterId: 'c10-trigonometry',
+    difficulty: 2,
+    prompt: 'The value of $(\\tan A\\,\\mathrm{cosec}\\,A)^2 - (\\sin A\\,\\sec A)^2$ is',
+    mcqOptions: ['$0$', '$1$', '$-1$', '$2$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'First bracket', d: '$\\tan A\\,\\mathrm{cosec}\\,A = \\dfrac{\\sin A}{\\cos A} \\cdot \\dfrac{1}{\\sin A} = \\sec A$.' },
+      { h: 'Second bracket', d: '$\\sin A\\,\\sec A = \\dfrac{\\sin A}{\\cos A} = \\tan A$.' },
+      { h: 'Identity', d: '$\\sec^2 A - \\tan^2 A = 1$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q3',
+    questionNumber: 3,
+    chapterId: 'c10-trig-applications',
+    difficulty: 1,
+    prompt: 'A kite is flying at a height of $150$ m from the ground. It is attached to a string inclined at an angle of $30^{\\circ}$ to the horizontal. The length of the string is',
+    mcqOptions: ['$100\\sqrt{3}$ m', '$300$ m', '$150\\sqrt{2}$ m', '$150\\sqrt{3}$ m'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'The right triangle', d: 'The height $150$ m is opposite the $30^{\\circ}$ angle and the string $L$ is the hypotenuse.' },
+      { h: 'Sine', d: '$\\sin 30^{\\circ} = \\dfrac{150}{L} = \\dfrac{1}{2}$, so $L = 300$ m.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q11',
+    questionNumber: 11,
+    chapterId: 'c10-polynomials',
+    difficulty: 1,
+    prompt: 'The sum of the zeroes of the polynomial $p(x) = 5x - 7x^2 + 3$ is',
+    mcqOptions: ['$\\dfrac{-7}{5}$', '$\\dfrac{7}{5}$', '$\\dfrac{5}{7}$', '$\\dfrac{-5}{7}$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Standard form', d: '$p(x) = -7x^2 + 5x + 3$, so $a = -7$, $b = 5$.' },
+      { h: 'Sum of zeroes', d: '$-\\dfrac{b}{a} = -\\dfrac{5}{-7} = \\dfrac{5}{7}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q13',
+    questionNumber: 13,
+    chapterId: 'c10-areas-circles',
+    difficulty: 2,
+    prompt: 'If a sector of a circle has an area of $40\\pi$ sq. units and a central angle of $72^{\\circ}$, the radius of the circle is',
+    mcqOptions: ['$200$ units', '$100$ units', '$20$ units', '$10\\sqrt{2}$ units'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Sector area', d: '$\\dfrac{72}{360}\\pi r^2 = \\dfrac{1}{5}\\pi r^2 = 40\\pi$.' },
+      { h: 'Solve', d: '$r^2 = 200$, so $r = \\sqrt{200} = 10\\sqrt{2}$ units.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q16',
+    questionNumber: 16,
+    chapterId: 'c10-coordinate-geometry',
+    difficulty: 2,
+    prompt: 'The end points of a diameter of circle are $(2, 4)$ and $(-3, -1)$. The length of its radius is',
+    mcqOptions: ['$\\dfrac{5\\sqrt{2}}{2}$ units', '$5\\sqrt{2}$ units', '$3\\sqrt{2}$ units', '$\\pm\\dfrac{5\\sqrt{2}}{2}$ units'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Diameter', d: '$\\sqrt{(2 - (-3))^2 + (4 - (-1))^2} = \\sqrt{25 + 25} = 5\\sqrt{2}$.' },
+      { h: 'Radius', d: 'Half the diameter: $\\dfrac{5\\sqrt{2}}{2}$ units. A length is never negative, so the $\\pm$ option is wrong.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q17',
+    questionNumber: 17,
+    chapterId: 'c10-arithmetic-progressions',
+    difficulty: 1,
+    prompt: 'The $11^{\\text{th}}$ and $13^{\\text{th}}$ term of an AP are $39$ and $45$, respectively. What is the common difference of the AP?',
+    mcqOptions: ['$42$', '$21$', '$6$', '$3$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Two steps apart', d: '$a_{13} - a_{11} = 2d$.' },
+      { h: 'Solve', d: '$2d = 45 - 39 = 6$, so $d = 3$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET3,
+    id: 'cbse-2025-x-30-1-3-q18',
+    questionNumber: 18,
+    chapterId: 'c10-probability',
+    difficulty: 2,
+    prompt: 'A card is drawn at random from a pack of $52$ cards. What is the probability that the card drawn is a spade or a king?',
+    mcqOptions: ['$\\dfrac{1}{13}$', '$\\dfrac{2}{13}$', '$\\dfrac{4}{13}$', '$\\dfrac{9}{13}$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Count without double counting', d: '$13$ spades and $4$ kings, but the king of spades is in both: $13 + 4 - 1 = 16$ cards.' },
+      { h: 'Divide', d: '$P = \\dfrac{16}{52} = \\dfrac{4}{13}$.' }
+    ]
+  },
+  // ── CBSE Class 10 Mathematics Standard (041) · 2025 · Set 30/2/1 · Section A ─
+  // Q7 and Q8 depend on a printed figure. Q4 is left out because the Board's own
+  // marking scheme says none of its printed options is correct ("full marks may
+  // be awarded to every attempt"), so it has no official key to carry.
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q1',
+    questionNumber: 1,
+    chapterId: 'c10-trigonometry',
+    difficulty: 2,
+    prompt: 'If $7\\cos^2\\theta + 3\\sin^2\\theta = 4$, then the value of $\\theta$ is',
+    mcqOptions: ['$30^{\\circ}$', '$45^{\\circ}$', '$60^{\\circ}$', '$90^{\\circ}$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Use $\\sin^2	heta = 1 - \\cos^2	heta$', d: '$7\\cos^2\\theta + 3 - 3\\cos^2\\theta = 4$, so $4\\cos^2\\theta = 1$.' },
+      { h: 'Solve', d: '$\\cos\\theta = \\dfrac{1}{2}$ (the options are acute angles), so $\\theta = 60^{\\circ}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q2',
+    questionNumber: 2,
+    chapterId: 'c10-probability',
+    difficulty: 1,
+    prompt: 'The probability of drawing an even prime number out of numbers from $1$ to $30$ is',
+    mcqOptions: ['$\\dfrac{1}{30}$', '$\\dfrac{4}{15}$', '$\\dfrac{7}{30}$', '$0$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Favourable outcomes', d: 'The only even prime is $2$.' },
+      { h: 'Probability', d: '$P = \\dfrac{1}{30}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q3',
+    questionNumber: 3,
+    chapterId: 'c10-quadratic-equations',
+    difficulty: 2,
+    prompt: 'The quadratic equation whose roots are $7$ and $\\dfrac{1}{7}$ is',
+    mcqOptions: ['$7x^2 - 50x + 7 = 0$', '$7x^2 - 50x + 1 = 0$', '$7x^2 + 50x - 7 = 0$', '$7x^2 + 50x - 1 = 0$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Sum and product', d: 'Sum $= 7 + \\dfrac{1}{7} = \\dfrac{50}{7}$, product $= 1$.' },
+      { h: 'Form the equation', d: '$x^2 - \\dfrac{50}{7}x + 1 = 0$; multiply by $7$: $7x^2 - 50x + 7 = 0$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q5',
+    questionNumber: 5,
+    chapterId: 'c10-coordinate-geometry',
+    difficulty: 1,
+    prompt: 'The coordinates of the end points of a diameter of a circle are $(5, -2)$ and $(5, 2)$. The length of the radius of the circle is',
+    mcqOptions: ['$\\pm 2$', '$\\pm 4$', '$4$', '$2$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Diameter', d: 'The points share $x = 5$, so the diameter is $|2 - (-2)| = 4$.' },
+      { h: 'Radius', d: '$\\dfrac{4}{2} = 2$. A length is positive, so not $\\pm 2$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q6',
+    questionNumber: 6,
+    chapterId: 'c10-coordinate-geometry',
+    difficulty: 2,
+    prompt: 'The points $(-5, 0)$, $(5, 0)$ and $(0, 4)$ are the vertices of a triangle which is a/an',
+    mcqOptions: ['right-angled triangle', 'isosceles triangle', 'equilateral triangle', 'scalene triangle'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Side lengths', d: 'Between $(-5,0)$ and $(5,0)$: $10$. From $(0,4)$ to each: $\\sqrt{25 + 16} = \\sqrt{41}$.' },
+      { h: 'Classify', d: 'Two sides are equal and the third is not, so it is isosceles. It is not right-angled: $41 + 41 \\ne 100$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q9',
+    questionNumber: 9,
+    chapterId: 'c10-triangles',
+    difficulty: 1,
+    prompt: 'Which of the following statements is incorrect?',
+    mcqOptions: ['Two congruent figures are always similar.', 'A square and a rhombus of the same area are always similar.', 'Two equilateral triangles are always similar.', 'Two similar triangles need not be congruent.'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Similar polygons', d: 'Similar polygons need equal corresponding angles and proportional sides.' },
+      { h: 'Square and rhombus', d: 'A rhombus need not have right angles, so it need not be similar to a square, whatever its area. That statement is the incorrect one.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q10',
+    questionNumber: 10,
+    chapterId: 'c10-real-numbers',
+    difficulty: 1,
+    prompt: 'The sum of the exponents of prime factors in the prime factorisation of $4004$ is',
+    mcqOptions: ['$5$', '$4$', '$3$', '$2$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Factorise', d: '$4004 = 4 \\times 1001 = 2^2 \\times 7 \\times 11 \\times 13$.' },
+      { h: 'Add the exponents', d: '$2 + 1 + 1 + 1 = 5$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q11',
+    questionNumber: 11,
+    chapterId: 'c10-probability',
+    difficulty: 1,
+    prompt: 'In a cricket match, a batsman hits the boundary $7$ times out of the $42$ balls he plays. The probability of his not hitting a boundary is',
+    mcqOptions: ['$\\dfrac{1}{7}$', '$\\dfrac{2}{7}$', '$\\dfrac{5}{6}$', '$\\dfrac{1}{6}$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Not a boundary', d: '$42 - 7 = 35$ balls.' },
+      { h: 'Probability', d: '$\\dfrac{35}{42} = \\dfrac{5}{6}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q12',
+    questionNumber: 12,
+    chapterId: 'c10-areas-circles',
+    difficulty: 1,
+    prompt: 'If a large circular pizza is divided into $5$ equal sectors, then the central angle of each sector will be',
+    mcqOptions: ['$60^{\\circ}$', '$90^{\\circ}$', '$45^{\\circ}$', '$72^{\\circ}$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Share the full turn', d: '$\\dfrac{360^{\\circ}}{5} = 72^{\\circ}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q13',
+    questionNumber: 13,
+    chapterId: 'c10-trigonometry',
+    difficulty: 1,
+    prompt: 'If $\\sin 30^{\\circ}\\tan 45^{\\circ} = \\dfrac{\\sec 60^{\\circ}}{k}$, then the value of $k$ is',
+    mcqOptions: ['$4$', '$3$', '$2$', '$1$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Standard values', d: '$\\sin 30^{\\circ} = \\dfrac{1}{2}$, $\\tan 45^{\\circ} = 1$, $\\sec 60^{\\circ} = 2$.' },
+      { h: 'Solve', d: '$\\dfrac{1}{2} = \\dfrac{2}{k}$, so $k = 4$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q14',
+    questionNumber: 14,
+    chapterId: 'c10-pair-linear-equations',
+    difficulty: 1,
+    prompt: 'The line represented by the equation $x - y = 0$ is',
+    mcqOptions: ['parallel to $x$-axis', 'parallel to $y$-axis', 'passing through the origin', 'passing through the point $(3, 2)$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Test the origin', d: '$0 - 0 = 0$, so $(0, 0)$ lies on the line.' },
+      { h: 'Rule out the rest', d: 'The line is $y = x$, which is slanted, and $(3, 2)$ gives $3 - 2 = 1 \\ne 0$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q15',
+    questionNumber: 15,
+    chapterId: 'c10-arithmetic-progressions',
+    difficulty: 2,
+    prompt: 'The $10^{\\text{th}}$ term of the AP $5, \\dfrac{19}{4}, \\dfrac{9}{2}, \\dfrac{17}{4}, \\ldots$ is',
+    mcqOptions: ['$\\dfrac{11}{4}$', '$\\dfrac{4}{11}$', '$\\dfrac{13}{4}$', '$\\dfrac{4}{13}$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Common difference', d: '$d = \\dfrac{19}{4} - 5 = -\\dfrac{1}{4}$.' },
+      { h: 'Tenth term', d: '$a_{10} = 5 + 9\\left(-\\dfrac{1}{4}\\right) = \\dfrac{20 - 9}{4} = \\dfrac{11}{4}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q16',
+    questionNumber: 16,
+    chapterId: 'c10-polynomials',
+    difficulty: 1,
+    prompt: 'If $-4$ is a zero of the polynomial $p(x) = x^2 - x - (2 + 2k)$, then the value of $k$ is',
+    mcqOptions: ['$3$', '$9$', '$6$', '$-9$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Substitute the zero', d: '$p(-4) = 16 + 4 - 2 - 2k = 18 - 2k$.' },
+      { h: 'Solve', d: '$18 - 2k = 0$, so $k = 9$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q17',
+    questionNumber: 17,
+    chapterId: 'c10-pair-linear-equations',
+    difficulty: 1,
+    prompt: 'The equation of a line parallel to the $x$-axis and at a distance of $3$ units below $x$-axis is',
+    mcqOptions: ['$x = 3$', '$x = -3$', '$y = -3$', '$y = 3$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Parallel to the $x$-axis', d: 'Such a line has the form $y = c$.' },
+      { h: 'Below the axis', d: 'Three units below means $c = -3$: $y = -3$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q18',
+    questionNumber: 18,
+    chapterId: 'c10-real-numbers',
+    difficulty: 1,
+    prompt: 'The HCF of $40$, $110$ and $360$ is',
+    mcqOptions: ['$40$', '$110$', '$360$', '$10$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Factorise', d: '$40 = 2^3 \\times 5$, $110 = 2 \\times 5 \\times 11$, $360 = 2^3 \\times 3^2 \\times 5$.' },
+      { h: 'Common factors', d: 'The lowest powers common to all three: $2 \\times 5 = 10$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q19',
+    questionNumber: 19,
+    chapterId: 'c10-arithmetic-progressions',
+    difficulty: 1,
+    prompt: 'Assertion (A): Common difference of the AP $5, 1, -3, -7, \\ldots$ is $4$.\n\nReason (R): Common difference of the AP $a_1, a_2, a_3, \\ldots, a_n$ is obtained by $d = a_n - a_{n-1}$.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Assertion', d: '$d = 1 - 5 = -4$, not $4$, so (A) is false.' },
+      { h: 'Reason', d: 'Any term minus the term before it gives the common difference, so (R) is true.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_1,
+    id: 'cbse-2025-x-30-2-1-q20',
+    questionNumber: 20,
+    chapterId: 'c10-pair-linear-equations',
+    difficulty: 2,
+    prompt: 'Assertion (A): The pair of linear equations $px + 3y + 59 = 0$ and $2x + 6y + 118 = 0$ will have infinitely many solutions if $p = 1$.\n\nReason (R): If the pair of linear equations $px + 3y + 19 = 0$ and $2x + 6y + 157 = 0$ has a unique solution, then $p \\ne 1$.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Assertion', d: 'With $p = 1$: $\\dfrac{1}{2} = \\dfrac{3}{6} = \\dfrac{59}{118}$, so the lines coincide and there are infinitely many solutions. (A) is true.' },
+      { h: 'Reason', d: 'A unique solution needs $\\dfrac{p}{2} \\ne \\dfrac{3}{6}$, i.e. $p \\ne 1$. (R) is true.' },
+      { h: 'Does (R) explain (A)?', d: 'No: (R) is about a different pair and the unique-solution condition, while (A) rests on all three ratios being equal.' }
     ]
   }
 ]);

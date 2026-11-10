@@ -1,23 +1,23 @@
 {
  "summary": {
-  "contentVersion": "2026.11.9",
+  "contentVersion": "2026.11.10",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
   "pastPapers": {
    "enabled": false,
    "reason": "rights-opinion-pending",
-   "paths": 70,
+   "paths": 71,
    "advertised": 0
   },
-  "paths": 816,
+  "paths": 817,
   "advertisedPaths": 746,
-  "passed": 816,
+  "passed": 817,
   "failed": 0,
   "questionsServed": 80880,
   "questionsFailed": 0,
   "emptyAdvertisedPaths": 0,
-  "unadvertisedEmptyPaths": 70,
+  "unadvertisedEmptyPaths": 71,
   "difficultySnapped": 10080,
   "difficultyBelowWindow": 0,
   "difficultyMismatch": 0,
@@ -53,8 +53,8 @@
     "chapters": 8
    },
    "cbse · Class 10": {
-    "paths": 62,
-    "passed": 62,
+    "paths": 63,
+    "passed": 63,
     "served": 5880,
     "chapters": 14
    },
@@ -405,6 +405,7 @@
   ["cbse/10/c10-quadratic-equations#2", "cbse", 10, 120, 0, 0, 78, 80, 0, 0, 0, 0, true],
   ["cbse/10/c10-quadratic-equations#3", "cbse", 10, 120, 0, 0, 115, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-quadratic-equations#4", "cbse", 10, 120, 0, 0, 50, 0, 0, 0, 0, 54, true],
+  ["cbse/10/c10-quadratic-equations?pyq", "cbse", 10, 0, 0, 120, 0, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-arithmetic-progressions", "cbse", 10, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/10/c10-arithmetic-progressions#1", "cbse", 10, 120, 0, 0, 120, 40, 0, 0, 0, 0, true],
   ["cbse/10/c10-arithmetic-progressions#2", "cbse", 10, 120, 0, 0, 120, 40, 0, 0, 0, 0, true],

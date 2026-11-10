@@ -38,7 +38,8 @@
 // with the Board's key and Pri-authored steps join the archive (the eight it
 // shares with 30/1/1 are not repeated). (2026.11.8 is the distinct-question
 // widening, #838; whichever lands second re-derives the digest.)
-export const CONTENT_VERSION = '2026.11.9';
+// 2026.11.10 — the same tranche grown to Sets 30/1/3 and 30/2/1 (25 more records).
+export const CONTENT_VERSION = '2026.11.10';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
