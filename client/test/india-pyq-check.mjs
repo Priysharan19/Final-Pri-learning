@@ -235,7 +235,12 @@ const covered = indiaChapter('c12-matrices');
 const pyqOnlyTarget = resolveIndiaTarget(covered, { track: 'cbse', grade: 12, difficulty: 2, pyqOnly: true, random: () => 0 });
 ok(pyqOnlyTarget?.pyq === true, 'past-papers-only practice on a covered chapter resolves to the archive');
 eq(pyqOnlyTarget?.generator, 'pyq-cbse-c12-matrices', 'past-papers-only practice names the archive generator');
-const uncovered = indiaChapter('c12-3d-geometry');
+// A Class 12 chapter the CBSE archive does not cover, read from the coverage
+// table rather than named, so growing the archive cannot silently empty this check.
+const uncoveredId = ['c12-relations-functions', 'c12-inverse-trigonometric', 'c12-matrices', 'c12-determinants', 'c12-continuity-differentiability', 'c12-applications-derivatives', 'c12-integrals', 'c12-applications-integrals', 'c12-differential-equations', 'c12-vector-algebra', 'c12-3d-geometry', 'c12-linear-programming', 'c12-probability']
+  .find(id => !hasPyqGenerator(`pyq-cbse-${id}`));
+ok(!!uncoveredId, 'some Class 12 chapter is still uncovered, so the refusal below is exercised');
+const uncovered = indiaChapter(uncoveredId);
 eq(resolveIndiaTarget(uncovered, { track: 'cbse', grade: 12, difficulty: 2, pyqOnly: true, random: () => 0 }), null,
   'past-papers-only practice refuses a chapter the archive does not cover, rather than serving authored practice');
 // Dot-point practice stays on the authored generators: the archive routes at

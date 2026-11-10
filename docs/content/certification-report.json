@@ -1,23 +1,23 @@
 {
  "summary": {
-  "contentVersion": "2026.11.10",
+  "contentVersion": "2026.11.11",
   "mode": "full",
   "drawsPerDifficulty": 40,
   "examSeeds": 6,
   "pastPapers": {
    "enabled": false,
    "reason": "rights-opinion-pending",
-   "paths": 71,
+   "paths": 73,
    "advertised": 0
   },
-  "paths": 817,
+  "paths": 819,
   "advertisedPaths": 746,
-  "passed": 817,
+  "passed": 819,
   "failed": 0,
   "questionsServed": 80880,
   "questionsFailed": 0,
   "emptyAdvertisedPaths": 0,
-  "unadvertisedEmptyPaths": 71,
+  "unadvertisedEmptyPaths": 73,
   "difficultySnapped": 10080,
   "difficultyBelowWindow": 0,
   "difficultyMismatch": 0,
@@ -65,8 +65,8 @@
     "chapters": 14
    },
    "cbse · Class 12": {
-    "paths": 61,
-    "passed": 61,
+    "paths": 63,
+    "passed": 63,
     "served": 6240,
     "chapters": 13
    },
@@ -513,6 +513,7 @@
   ["cbse/12/c12-inverse-trigonometric#1", "cbse", 12, 120, 0, 0, 64, 0, 0, 0, 0, 47, true],
   ["cbse/12/c12-inverse-trigonometric#2", "cbse", 12, 120, 0, 0, 21, 40, 0, 0, 0, 69, true],
   ["cbse/12/c12-inverse-trigonometric#3", "cbse", 12, 120, 0, 0, 9, 80, 0, 0, 0, 82, true],
+  ["cbse/12/c12-inverse-trigonometric?pyq", "cbse", 12, 0, 0, 120, 0, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-matrices", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-matrices#1", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-matrices#2", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
@@ -556,6 +557,7 @@
   ["cbse/12/c12-3d-geometry#1", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-3d-geometry#2", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-3d-geometry#3", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
+  ["cbse/12/c12-3d-geometry?pyq", "cbse", 12, 0, 0, 120, 0, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-linear-programming", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-linear-programming#1", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],
   ["cbse/12/c12-linear-programming#2", "cbse", 12, 120, 0, 0, 120, 0, 0, 0, 0, 0, true],

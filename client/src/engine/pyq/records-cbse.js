@@ -65,6 +65,13 @@ const CBSE_2025_X_2_1 = Object.freeze({
   answerSource: 'cbse-2025-x-30-2-1-marking-scheme'
 });
 
+const CBSE_2025_XII_2_1 = Object.freeze({
+  ...CBSE_2025_XII,
+  setCode: '65/2/1',
+  promptSource: ['cbse-2025-xii-65-2-1-marking-scheme', 'cbse-2025-xii-65-2-1-questions'],
+  answerSource: 'cbse-2025-xii-65-2-1-marking-scheme'
+});
+
 // The four Assertion–Reason codes, printed once above Q19 and Q20 of the paper.
 const AR_CODES = Object.freeze([
   'Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of the Assertion (A).',
@@ -1031,6 +1038,185 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
       { h: 'Assertion', d: 'With $p = 1$: $\\dfrac{1}{2} = \\dfrac{3}{6} = \\dfrac{59}{118}$, so the lines coincide and there are infinitely many solutions. (A) is true.' },
       { h: 'Reason', d: 'A unique solution needs $\\dfrac{p}{2} \\ne \\dfrac{3}{6}$, i.e. $p \\ne 1$. (R) is true.' },
       { h: 'Does (R) explain (A)?', d: 'No: (R) is about a different pair and the unique-solution condition, while (A) rests on all three ratios being equal.' }
+    ]
+  },
+  // ── CBSE Class 12 Mathematics (041) · 2025 · Set 65/2/1 · Section A ─────────
+  // Q6 is left out: the Board's marking scheme says no printed option is correct.
+  // Q14's options are diagrams and Q15 depends on a printed figure.
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q1', questionNumber: 1, chapterId: 'c12-vector-algebra', difficulty: 1,
+    prompt: 'The projection vector of vector $\\vec{a}$ on vector $\\vec{b}$ is',
+    mcqOptions: ['$\\left(\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{b}|^2}\\right)\\vec{b}$', '$\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{b}|}$', '$\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{a}|}$', '$\\left(\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{a}|^2}\\right)\\vec{b}$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Scalar projection', d: 'The length of the projection of $\\vec{a}$ on $\\vec{b}$ is $\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{b}|}$.' },
+      { h: 'Make it a vector', d: 'Multiply by the unit vector $\\dfrac{\\vec{b}}{|\\vec{b}|}$: $\\left(\\dfrac{\\vec{a}\\cdot\\vec{b}}{|\\vec{b}|^2}\\right)\\vec{b}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q2', questionNumber: 2, chapterId: 'c12-applications-derivatives', difficulty: 1,
+    prompt: 'The function $f(x) = x^2 - 4x + 6$ is increasing in the interval',
+    mcqOptions: ['$(0, 2)$', '$(-\\infty, 2]$', '$[1, 2]$', '$[2, \\infty)$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Derivative', d: '$f\'(x) = 2x - 4$.' },
+      { h: 'Sign', d: '$f\'(x) \\ge 0$ exactly when $x \\ge 2$, so $f$ is increasing on $[2, \\infty)$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q3', questionNumber: 3, chapterId: 'c12-integrals', difficulty: 2,
+    prompt: 'If $f(2a - x) = f(x)$, then $\\displaystyle\\int_0^{2a} f(x)\\,dx$ is',
+    mcqOptions: ['$\\displaystyle\\int_0^{2a} f\\left(\\dfrac{x}{2}\\right)dx$', '$\\displaystyle\\int_0^{a} f(x)\\,dx$', '$2\\displaystyle\\int_a^{0} f(x)\\,dx$', '$2\\displaystyle\\int_0^{a} f(x)\\,dx$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Split at $a$', d: '$\\displaystyle\\int_0^{2a} f = \\int_0^{a} f(x)\\,dx + \\int_a^{2a} f(x)\\,dx$.' },
+      { h: 'Substitute $x = 2a - t$ in the second', d: 'It becomes $\\displaystyle\\int_0^{a} f(2a - t)\\,dt = \\int_0^{a} f(t)\\,dt$.' },
+      { h: 'Add', d: '$2\\displaystyle\\int_0^{a} f(x)\\,dx$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q4', questionNumber: 4, chapterId: 'c12-matrices', difficulty: 1,
+    prompt: 'If $A = \\begin{bmatrix}1&12&4y\\\\6x&5&2x\\\\8x&4&6\\end{bmatrix}$ is a symmetric matrix, then $(2x + y)$ is',
+    mcqOptions: ['$-8$', '$0$', '$6$', '$8$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Symmetric means $a_{ij} = a_{ji}$', d: '$6x = 12$ gives $x = 2$, and $4y = 8x = 16$ gives $y = 4$. (Check: $2x = 4$ matches the entry $4$.)' },
+      { h: 'Evaluate', d: '$2x + y = 4 + 4 = 8$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q5', questionNumber: 5, chapterId: 'c12-inverse-trigonometric', difficulty: 1,
+    prompt: 'If $y = \\sin^{-1}x$, $-1 \\le x \\le 0$, then the range of $y$ is',
+    mcqOptions: ['$\\left(-\\dfrac{\\pi}{2}, 0\\right)$', '$\\left[-\\dfrac{\\pi}{2}, 0\\right]$', '$\\left[-\\dfrac{\\pi}{2}, 0\\right)$', '$\\left(-\\dfrac{\\pi}{2}, 0\\right]$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Endpoints', d: '$\\sin^{-1}(-1) = -\\dfrac{\\pi}{2}$ and $\\sin^{-1}(0) = 0$; both endpoints are in the domain.' },
+      { h: 'Increasing', d: '$\\sin^{-1}$ is increasing, so the range is the closed interval $\\left[-\\dfrac{\\pi}{2}, 0\\right]$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q7', questionNumber: 7, chapterId: 'c12-probability', difficulty: 2,
+    prompt: 'If $E$ and $F$ are two events such that $P(E) > 0$ and $P(F) \\ne 1$, then $P(\\overline{E} \\mid \\overline{F})$ is',
+    mcqOptions: ['$\\dfrac{P(\\overline{E})}{P(\\overline{F})}$', '$1 - P(\\overline{E} \\mid F)$', '$1 - P(E \\mid F)$', '$\\dfrac{1 - P(E \\cup F)}{P(\\overline{F})}$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Definition', d: '$P(\\overline{E} \\mid \\overline{F}) = \\dfrac{P(\\overline{E} \\cap \\overline{F})}{P(\\overline{F})}$, defined because $P(F) \\ne 1$.' },
+      { h: 'De Morgan', d: '$\\overline{E} \\cap \\overline{F} = \\overline{E \\cup F}$, so the numerator is $1 - P(E \\cup F)$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q8', questionNumber: 8, chapterId: 'c12-matrices', difficulty: 1,
+    prompt: 'Which of the following can be both a symmetric and skew-symmetric matrix?',
+    mcqOptions: ['Unit Matrix', 'Diagonal Matrix', 'Null Matrix', 'Row Matrix'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Both conditions', d: '$A^{T} = A$ and $A^{T} = -A$ together give $A = -A$, so $A = O$.' },
+      { h: 'Conclude', d: 'Only the null matrix is both.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q9', questionNumber: 9, chapterId: 'c12-3d-geometry', difficulty: 1,
+    prompt: 'The equation of a line parallel to the vector $3\\hat{i} + \\hat{j} + 2\\hat{k}$ and passing through the point $(4, -3, 7)$ is',
+    mcqOptions: ['$x = 4t + 3$, $y = -3t + 1$, $z = 7t + 2$', '$x = 3t + 4$, $y = t + 3$, $z = 2t + 7$', '$x = 3t + 4$, $y = t - 3$, $z = 2t + 7$', '$x = 3t + 4$, $y = -t + 3$, $z = 2t + 7$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Parametric form', d: 'Through $(x_0, y_0, z_0)$ with direction $(a, b, c)$: $x = x_0 + at$, $y = y_0 + bt$, $z = z_0 + ct$.' },
+      { h: 'Substitute', d: '$x = 3t + 4$, $y = t - 3$, $z = 2t + 7$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q10', questionNumber: 10, chapterId: 'c12-matrices', difficulty: 2,
+    prompt: 'Four friends Abhay, Bina, Chhaya and Devesh were asked to simplify $4AB + 3(AB + BA) - 4BA$, where $A$ and $B$ are both matrices of order $2 \\times 2$. It is known that $A \\ne B \\ne I$ and $A^{-1} \\ne B$. Their answers are given as: Abhay: $6AB$; Bina: $7AB - BA$; Chhaya: $8AB$; Devesh: $7BA - AB$. Who answered it correctly?',
+    mcqOptions: ['Abhay', 'Bina', 'Chhaya', 'Devesh'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Expand', d: '$4AB + 3AB + 3BA - 4BA = 7AB - BA$.' },
+      { h: 'Do not combine $AB$ and $BA$', d: 'Matrix multiplication is not commutative in general, so $AB$ and $BA$ stay separate: Bina is right.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q11', questionNumber: 11, chapterId: 'c12-applications-derivatives', difficulty: 2,
+    prompt: 'A cylindrical tank of radius $10$ cm is being filled with sugar at the rate of $100\\pi$ cm$^3$/s. The rate, at which the height of the sugar inside the tank is increasing, is',
+    mcqOptions: ['$0.1$ cm/s', '$0.5$ cm/s', '$1$ cm/s', '$1.1$ cm/s'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Volume', d: '$V = \\pi r^2 h = 100\\pi h$, with the radius fixed.' },
+      { h: 'Differentiate', d: '$\\dfrac{dV}{dt} = 100\\pi\\dfrac{dh}{dt} = 100\\pi$, so $\\dfrac{dh}{dt} = 1$ cm/s.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q12', questionNumber: 12, chapterId: 'c12-vector-algebra', difficulty: 2,
+    prompt: 'Let $\\vec{p}$ and $\\vec{q}$ be two unit vectors and $\\alpha$ be the angle between them. Then $(\\vec{p} + \\vec{q})$ will be a unit vector for what value of $\\alpha$?',
+    mcqOptions: ['$\\dfrac{\\pi}{4}$', '$\\dfrac{\\pi}{3}$', '$\\dfrac{\\pi}{2}$', '$\\dfrac{2\\pi}{3}$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Square the length', d: '$|\\vec{p} + \\vec{q}|^2 = 1 + 1 + 2\\cos\\alpha$.' },
+      { h: 'Set it to 1', d: '$2 + 2\\cos\\alpha = 1$, so $\\cos\\alpha = -\\dfrac{1}{2}$ and $\\alpha = \\dfrac{2\\pi}{3}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q13', questionNumber: 13, chapterId: 'c12-3d-geometry', difficulty: 1,
+    prompt: 'The line $x = 1 + 5\\mu$, $y = -5 + \\mu$, $z = -6 - 3\\mu$ passes through which of the following point?',
+    mcqOptions: ['$(1, -5, 6)$', '$(1, 5, 6)$', '$(1, -5, -6)$', '$(-1, -5, 6)$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Take $\\mu = 0$', d: 'The point is $(1, -5, -6)$.' },
+      { h: 'The others', d: '$x = 1$ forces $\\mu = 0$, and then $y = -5$, $z = -6$, so no other option lies on the line.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q16', questionNumber: 16, chapterId: 'c12-linear-programming', difficulty: 1,
+    prompt: 'A factory produces two products $X$ and $Y$. The profit earned by selling $X$ and $Y$ is represented by the objective function $Z = 5x + 7y$, where $x$ and $y$ are the number of units of $X$ and $Y$ respectively sold. Which of the following statement is correct?',
+    mcqOptions: [
+      'The objective function maximizes the difference of the profit earned from products X and Y.',
+      'The objective function measures the total production of products X and Y.',
+      'The objective function maximizes the combined profit earned from selling X and Y.',
+      'The objective function ensures the company produces more of product X than product Y.'
+    ],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Read the function', d: '$5x$ is the profit from $X$ and $7y$ the profit from $Y$; $Z$ is their sum.' },
+      { h: 'Conclude', d: 'Maximising $Z$ maximises the combined profit from selling $X$ and $Y$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q17', questionNumber: 17, chapterId: 'c12-matrices', difficulty: 2,
+    prompt: 'If $A$ and $B$ are square matrices of order $m$ such that $A^2 - B^2 = (A - B)(A + B)$, then which of the following is always correct?',
+    mcqOptions: ['$A = B$', '$AB = BA$', '$A = 0$ or $B = 0$', '$A = I$ or $B = I$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Expand the right side', d: '$(A - B)(A + B) = A^2 + AB - BA - B^2$.' },
+      { h: 'Compare', d: '$A^2 - B^2 = A^2 + AB - BA - B^2$ gives $AB = BA$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q18', questionNumber: 18, chapterId: 'c12-differential-equations', difficulty: 2,
+    prompt: 'If $p$ and $q$ are respectively the order and degree of the differential equation $\\dfrac{d}{dx}\\left(\\dfrac{dy}{dx}\\right)^3 = 0$, then $(p - q)$ is',
+    mcqOptions: ['$0$', '$1$', '$2$', '$3$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Carry out the derivative', d: '$3\\left(\\dfrac{dy}{dx}\\right)^2\\dfrac{d^2y}{dx^2} = 0$.' },
+      { h: 'Order and degree', d: 'The highest derivative is $\\dfrac{d^2y}{dx^2}$ (order $p = 2$), appearing to the first power (degree $q = 1$), so $p - q = 1$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q19', questionNumber: 19, chapterId: 'c12-matrices', difficulty: 1,
+    prompt: 'Assertion (A): $A = \\mathrm{diag}\\,[3\\ 5\\ 2]$ is a scalar matrix of order $3 \\times 3$.\n\nReason (R): If a diagonal matrix has all non-zero elements equal, it is known as a scalar matrix.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Assertion', d: 'A scalar matrix has every diagonal entry equal; $3$, $5$, $2$ are not, so (A) is false.' },
+      { h: 'Reason', d: 'A diagonal matrix whose diagonal entries are all equal is a scalar matrix, which is what (R) states; the Board takes (R) as true.' }
+    ]
+  },
+  {
+    ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q20', questionNumber: 20, chapterId: 'c12-linear-programming', difficulty: 2,
+    prompt: 'Assertion (A): Every point of the feasible region of a Linear Programming Problem is an optimal solution.\n\nReason (R): The optimal solution for a Linear Programming Problem exists only at one or more corner point(s) of the feasible region.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Assertion', d: 'A feasible point is one that satisfies the constraints; it is optimal only if it gives the best value of $Z$, which in general only some points do. (A) is false.' },
+      { h: 'Reason', d: 'By the corner point theorem, when an optimal value exists it is attained at a corner point of the feasible region; the Board takes (R) as true.' }
     ]
   }
 ]);
