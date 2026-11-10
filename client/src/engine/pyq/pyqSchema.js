@@ -80,7 +80,7 @@ function checkBoardScheme(rec) {
     return;
   }
   if (rec.answerType !== 'numeric') fail(rec, `is a ${rec.section} record without a numeric final answer the engine can check; a proof or a construction cannot be marked deterministically and stays out.`);
-  const problems = boardSchemeProblems(rec.boardScheme, rec.marks);
+  const problems = boardSchemeProblems(rec.boardScheme, rec.marks, rec.stepcheck || null);
   if (problems.length) fail(rec, `has a Board scheme the engine cannot mark: ${problems.join('; ')}.`);
   if (!rec.stepcheck || rec.stepcheck.kind !== 'equation' || !Array.isArray(rec.stepcheck.solutions) || !rec.stepcheck.solutions.length) fail(rec, 'has no step-check metadata, so no line of its scheme could ever be verified.');
   if (!asList(rec.answerSource).some(id => pyqSource(id)?.kind === 'official-marking-scheme')) fail(rec, 'carries a Board scheme that is not read from the Board\'s marking scheme.');

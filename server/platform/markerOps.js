@@ -20,7 +20,7 @@ import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaEx
 // module reads no environment itself: markingPolicy.js imports nothing.
 import { policyOf } from './markingPolicy.js';
 import { annotateMilestones } from '../../client/src/engine/milestones.js';
-import { awardBoardScheme } from '../../client/src/engine/boardScheme.js';
+import { awardBoardScheme, matchBoardPoints } from '../../client/src/engine/boardScheme.js';
 import { answerForm, firstFinalAttempt, planGivens } from './finalAttempt.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -87,11 +87,13 @@ export function stepEvidence(q, answer, steps, result) {
   // can be graded by method alone.
   const blankFinal = typeof answer === 'string' && answer.trim() === '';
   if (meta && steps && !result.correct && (!result.invalid || blankFinal) && Array.isArray(q.boardScheme)) {
-    // The Board's own scheme: value points ticked down the page by lines the
-    // deterministic step check verified. methodMarks' generic rubric is not
-    // used — the record says how the Board marked this question.
+    // The Board's own scheme: each value point earned by its own line, one line
+    // per point, in order, verified by the deterministic step check
+    // (matchBoardPoints). methodMarks' generic rubric is not used — the record
+    // says how the Board marked this question.
     const okLines = (report?.lines || []).filter(l => l?.status === 'ok').length;
-    const award = awardBoardScheme({ scheme: q.boardScheme, okLines, correct: false });
+    const ticked = matchBoardPoints({ scheme: q.boardScheme, lines: report?.lines || [], meta });
+    const award = awardBoardScheme({ scheme: q.boardScheme, ticked, correct: false });
     if (okLines > 0) partial = { okLines, awarded: award.method, note: award.method > 0 ? `${award.method} of ${award.total} marks for the method the Board's marking scheme credits.` : 'Your working does not yet reach a whole mark of the Board\'s marking scheme.', lines: (report?.lines || []).map(l => ({ status: l?.status, text: l?.text })), lost: award.total - award.method, boardScheme: true };
   } else if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
     try {

@@ -8,10 +8,18 @@
 // marks. The rules are the contract:
 //
 //   · The deterministic engine decides every mark. A point is earned only by a
-//     working line that stepCheck (checker.js) verifies as `ok`; the final
-//     answer only by checkAnswer. No model output — no AI reading, no tutor
-//     reply, no cloud transcription verdict — is an input here. Lines are
-//     ticked down the page in order, the way an examiner ticks value points.
+//     working line that stepCheck (checker.js) verifies as `ok` AND that is
+//     that point's own line as written (writtenAsLine); the final answer only
+//     by checkAnswer. No model output — no AI reading, no tutor reply, no
+//     cloud transcription verdict — is an input here.
+//
+//   · Lines and points match one-to-one and in order (matchBoardPoints): each
+//     line earns at most one point, each point is earned by at most one line,
+//     and a point is matched only by a line below the line that matched the
+//     point before it. Counting verified lines is NOT matching them: `x = 3`
+//     written four times verifies four times and is still one line, and it is
+//     not the Board's working (D25 review of #844). A line that only states the
+//     final value never earns a working point, and a scheme may not name one.
 //
 //   · Every non-answer point must carry the line that earns it, and the record
 //     is refused unless that line verifies under the record's own `stepcheck`
@@ -30,11 +38,13 @@
 //     credits the final answer.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { writtenAsLine, statesOnlyFinalAnswer } from './checker.js';
+
 const HALF = x => Math.round(x * 2) === x * 2;
 const text = v => String(v ?? '').trim();
 
 /** Problems with a transcribed scheme for a question worth `marks`; [] when it is sound. */
-export function boardSchemeProblems(scheme, marks) {
+export function boardSchemeProblems(scheme, marks, meta = null) {
   const out = [];
   if (!Number.isInteger(marks) || marks < 2 || marks > 6) out.push(`marks ${JSON.stringify(marks)} is not a whole number from 2 to 6`);
   if (!Array.isArray(scheme) || scheme.length < 2) { out.push('the scheme needs at least one working point and the answer point'); return out; }
@@ -45,6 +55,7 @@ export function boardSchemeProblems(scheme, marks) {
     if (last && p?.answer !== true) out.push('the last point must be the final answer (answer: true)');
     if (!last && p?.answer === true) out.push(`point ${i + 1} is marked as the answer but is not last`);
     if (!last && !text(p?.line)) out.push(`point ${i + 1} has no line the deterministic checker can verify`);
+    if (!last && meta && text(p?.line) && statesOnlyFinalAnswer(p.line, meta)) out.push(`point ${i + 1}'s line only states the final value, which is the answer point's to earn`);
   });
   const total = scheme.reduce((s, p) => s + Number(p?.marks || 0), 0);
   if (Math.abs(total - marks) > 1e-9) out.push(`the points add to ${total}, not ${marks}`);
@@ -69,25 +80,51 @@ export function wholeMarkGroups(scheme) {
 }
 
 /**
+ * Which working points the student's lines earn, matched one-to-one and in order.
+ *
+ *   scheme   the record's boardScheme
+ *   lines    the engine's step report lines, [{ status, text }], in page order
+ *   meta     the record's stepcheck metadata
+ *
+ * Returns a boolean per scheme point (the answer point is always false here:
+ * checkAnswer decides it). A line is considered only when its status is exactly
+ * `ok`; it then ticks the first not-yet-ticked working point, below the last
+ * one ticked, whose line it is as written. It is used up either way.
+ */
+export function matchBoardPoints({ scheme, lines = [], meta = null }) {
+  const ticked = scheme.map(() => false);
+  let next = 0;
+  for (const l of Array.isArray(lines) ? lines : []) {
+    if (l?.status !== 'ok') continue;
+    const written = text(l.text);
+    if (!written || (meta && statesOnlyFinalAnswer(written, meta))) continue;
+    for (let j = next; j < scheme.length; j++) {
+      if (scheme[j].answer === true) break;
+      if (writtenAsLine(written, scheme[j].line)) { ticked[j] = true; next = j + 1; break; }
+    }
+  }
+  return Object.freeze(ticked);
+}
+
+/**
  * Marks against the Board's transcribed scheme.
  *
  *   scheme     the record's boardScheme
- *   okLines    how many of the student's working lines stepCheck verified `ok`
- *              (counted from the engine's report — never from a model)
+ *   ticked     matchBoardPoints' verdict per point (never a count of lines)
  *   correct    checkAnswer's verdict on the final answer
  *
  * Returns { awarded, total, method, groups: [{ marks, earned, points }] } with
  * whole numbers throughout. `method` is the marks earned before the answer group.
  */
-export function awardBoardScheme({ scheme, okLines = 0, correct = false }) {
+export function awardBoardScheme({ scheme, ticked, correct = false, ...rest }) {
+  if ('okLines' in rest) throw new TypeError('awardBoardScheme takes the points matchBoardPoints ticked, not a count of verified lines');
+  if (!Array.isArray(ticked) || ticked.length !== scheme.length) throw new TypeError('awardBoardScheme needs one ticked verdict per scheme point');
   const groups = wholeMarkGroups(scheme);
-  const workingPoints = scheme.length - 1;
-  const ticked = Math.max(0, Math.min(workingPoints, Math.floor(Number(okLines) || 0)));
   const rows = [];
   let method = 0, awarded = 0;
   for (const g of groups) {
     const working = g.points.filter(j => !scheme[j].answer);
-    const allTicked = working.every(j => j < ticked);
+    const allTicked = working.every(j => ticked[j] === true);
     const earned = g.answer ? (correct && allTicked ? g.marks : 0) : (allTicked ? g.marks : 0);
     if (!g.answer) method += earned;
     awarded += earned;
