@@ -83,13 +83,20 @@ ok(Math.pow(worst, seekBudget(WINDOW - 1)) < 1e-12, `the new budget misses at th
 // ── 2. Seeded sittings on the real chapter ──────────────────────────────────
 const CHAPTER = 'c10-quadratic-equations';
 const DIFFICULTY = 2;
-const chapter = IN_CHAPTER_BY_ID[CHAPTER];
-assert.ok(chapter, `${CHAPTER} is an India chapter`);
+const live = IN_CHAPTER_BY_ID[CHAPTER];
+assert.ok(live, `${CHAPTER} is an India chapter`);
+// #540 reproduces on the chapter's cell mix as it was when the bug was found.
+// Later additional forms (curriculum-in-forms-covers.js, #800) put a larger
+// D2 cell in this chapter, which hides the old budget's miss; they are left
+// out of the reproduction and checked against the seek budget separately below.
+const { INDIA_FORMS_COVERS } = await import('../../client/src/engine/curriculum-in-forms-covers.js');
+const LATER = new Set(Object.values(INDIA_FORMS_COVERS).flat().map(c => c.gen));
+const chapter = { ...live, covers: live.covers.filter(c => !LATER.has(c.gen)) };
 
 // Every cell a chapter-level request can land on, and each cell's real pool.
 const cells = new Map();
-for (let i = 0; i < 3000; i++) {
-  const t = resolveIndiaTarget(chapter, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: () => i / 3000 });
+for (let i = 0; i < 3000; i++) for (const ch of [chapter, live]) {
+  const t = resolveIndiaTarget(ch, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: () => i / 3000 });
   if (t) cells.set(t.generator, t);
 }
 const poolOf = new Map();
@@ -111,14 +118,14 @@ ok([...poolOf.values()].some(s => s.size >= 2 * WINDOW), 'and the chapter as a w
  * when the cell's whole pool was already in the window (no budget can help),
  * `missed` when a fresh item existed and the picker gave up on it.
  */
-function sitting(seed, tries) {
+function sitting(seed, tries, on = chapter) {
   const choose = mulberry32(seed);
   const dice = mulberry32(seed ^ 0x9e3779b9);
   const draw = () => Math.floor(dice() * 0x80000000);
   const recent = [];
   const repeats = [];
   for (let i = 0; i < WINDOW; i++) {
-    const t = resolveIndiaTarget(chapter, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: choose });
+    const t = resolveIndiaTarget(on, { difficulty: DIFFICULTY, track: 'cbse', grade: 10, random: choose });
     const avoid = new Set(recent.map(opaqueContentHash));
     const { q, repeat } = chooseQuestion({ generator: t.generator, difficulty: t.difficulty, avoid, trap: null }, null, tries === null ? { draw } : { draw, tries });
     if (repeat) {
@@ -136,9 +143,9 @@ function sitting(seed, tries) {
 }
 
 const SITTINGS = 600;
-const sweep = tries => {
+const sweep = (tries, on = chapter) => {
   const all = [];
-  for (let seed = 1; seed <= SITTINGS; seed++) all.push(...sitting(seed, tries));
+  for (let seed = 1; seed <= SITTINGS; seed++) all.push(...sitting(seed, tries, on));
   return { missed: all.filter(r => r.kind === 'missed'), exhausted: all.filter(r => r.kind === 'exhausted') };
 };
 const before = sweep(OLD_FLAT_BUDGET);
@@ -147,6 +154,8 @@ ok(before.missed.length > 0, `the old flat budget gave up on a fresh item it cou
 ok(before.missed.every(r => r.pool < WINDOW), 'every such miss was on the cell smaller than the window, with items of it still fresh');
 eq(after.missed, [], `with the seek budget the picker never returns a repeat while the cell still has a fresh item (${SITTINGS} seeded sittings)`);
 ok(after.exhausted.every(r => r.pool < WINDOW && r.avoided >= r.pool), `the repeats that remain are cells whose whole pool is in the window — ${after.exhausted.length} of ${SITTINGS} sittings, none avoidable by drawing more`);
+const liveAfter = sweep(null, live);
+eq(liveAfter.missed, [], `on the live chapter, with its later forms, the seek budget never returns a repeat while a fresh item remains (${SITTINGS} seeded sittings)`);
 console.log(`seeded sittings: ${SITTINGS} · old flat budget: ${before.missed.length} missed, ${before.exhausted.length} exhausted · seek budget: ${after.missed.length} missed, ${after.exhausted.length} exhausted`);
 // What the picker cannot do is the device's job: a request that lands on a
 // spent cell is re-asked on another cell of the same terms
