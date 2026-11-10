@@ -6,12 +6,12 @@ This report certifies what the **runtime serves** on every V1 launch path (CBSE/
 
 `client/test/content-report-fresh-check.mjs` fails CI when this report is older than the content it describes: a different CONTENT_VERSION, a changed generator digest, a different path or exam count, or a different past-papers default.
 
-- Content version: `2026.11.7`
+- Content version: `2026.11.9`
 - Mode: full, 40 seeded draws per (path, difficulty); 6 paper(s) per exam selection
-- Paths: **813/813 pass** (746 advertised)
-- Past papers: OFF by default (rights-opinion-pending; decision D23) — 67 archive paths enumerated, 0 advertised; the declared state of each is the INDIA_PYQ_UNAVAILABLE refusal, and no timed paper holds a previous-year item
+- Paths: **816/816 pass** (746 advertised)
+- Past papers: OFF by default (rights-opinion-pending; decision D23) — 70 archive paths enumerated, 0 advertised; the declared state of each is the INDIA_PYQ_UNAVAILABLE refusal, and no timed paper holds a previous-year item
 - Questions served and validated: 80880 (0 failed)
-- Advertised paths that served nothing: 0; unadvertised (shown "coming soon") paths with no form: 67
+- Advertised paths that served nothing: 0; unadvertised (shown "coming soon") paths with no form: 70
 - Difficulty: 0 questions served at a rung other than the one the resolver chose. The in-memory sample above asks every window rung on every path through the engine's resolver, which answers from the nearest authored rung and says so: 10080 such requests, 0 of them outside the track window. The product path is the end-to-end section below: through the backend a named level with no authored form is refused with DIFFICULTY_UNAVAILABLE, never snapped (issue #408)
 - Repeats in a 20-question window: 0 avoidable (pool of 40+ distinct items met and still repeated); 5847 from smaller pools, each flagged to the student as a repeat
 - Low-variety paths (≤2 distinct items across the sample): 0
@@ -27,7 +27,7 @@ This report certifies what the **runtime serves** on every V1 launch path (CBSE/
 | cbse · Class 7 | 15 | 73 | 73 | 8760 |
 | cbse · Class 8 | 13 | 52 | 52 | 6240 |
 | cbse · Class 9 | 8 | 32 | 32 | 3840 |
-| cbse · Class 10 | 14 | 59 | 59 | 5880 |
+| cbse · Class 10 | 14 | 62 | 62 | 5880 |
 | cbse · Class 11 | 14 | 56 | 56 | 6720 |
 | cbse · Class 12 | 13 | 61 | 61 | 6240 |
 | jee-main · Class 11 | 27 | 108 | 108 | 12960 |

@@ -34,7 +34,11 @@
 // option, written in one factor order; no wrong option expands to the key.
 // 2026.11.7 — Merge Train 8: the JEE archive (#795, 2026.11.6) and the Class 9
 // widening (#812, 2026.11.2 above) together; neither version alone describes it.
-export const CONTENT_VERSION = '2026.11.7';
+// 2026.11.9 — CBSE Class X 2025 Set 30/1/2 Section A: ten official questions
+// with the Board's key and Pri-authored steps join the archive (the eight it
+// shares with 30/1/1 are not repeated). (2026.11.8 is the distinct-question
+// widening, #838; whichever lands second re-derives the digest.)
+export const CONTENT_VERSION = '2026.11.9';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

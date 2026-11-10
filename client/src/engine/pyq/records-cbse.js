@@ -44,6 +44,21 @@ const CBSE_2025_X = Object.freeze({
   answerType: 'mcq'
 });
 
+const CBSE_2025_X_SET2 = Object.freeze({
+  ...CBSE_2025_X,
+  setCode: '30/1/2',
+  promptSource: ['cbse-2025-x-30-1-2-marking-scheme', 'cbse-2025-x-30-1-2-questions'],
+  answerSource: 'cbse-2025-x-30-1-2-marking-scheme'
+});
+
+// The four Assertion–Reason codes, printed once above Q19 and Q20 of the paper.
+const AR_CODES = Object.freeze([
+  'Both Assertion (A) and Reason (R) are true and Reason (R) is the correct explanation of the Assertion (A).',
+  'Both Assertion (A) and Reason (R) are true, but Reason (R) is not the correct explanation of the Assertion (A).',
+  'Assertion (A) is true, but Reason (R) is false.',
+  'Assertion (A) is false, but Reason (R) is true.'
+]);
+
 export const CBSE_PYQ_RECORDS = Object.freeze([
   // ── CBSE Class 12 Mathematics (041) · 2025 · Set 65/1/1 · Section A ─────────
   {
@@ -492,6 +507,158 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     steps: [
       { h: 'Count the favourable cards', d: 'The face cards are jack, queen and king; the red suits are hearts and diamonds, so there are $3 \\times 2 = 6$ red face cards.' },
       { h: 'Divide', d: '$P = \\dfrac{6}{52} = \\dfrac{3}{26}$.' }
+    ]
+  },
+  // ── CBSE Class 10 Mathematics Standard (041) · 2025 · Set 30/1/2 · Section A ─
+  // Set 30/1/2 reprints eight of 30/1/1's Section A questions in a new order
+  // (its Q5, Q8, Q9, Q10, Q12, Q16, Q17, Q18); those are not repeated here. Q1
+  // and Q6 depend on a printed figure and are left out for the reason above.
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q2',
+    questionNumber: 2,
+    chapterId: 'c10-areas-circles',
+    difficulty: 2,
+    prompt: 'A piece of wire $20$ cm long is bent into the form of an arc of a circle of radius $\\dfrac{60}{\\pi}$ cm. The angle subtended by the arc at the centre of the circle is',
+    mcqOptions: ['$30^{\\circ}$', '$60^{\\circ}$', '$90^{\\circ}$', '$50^{\\circ}$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Arc length', d: 'An arc subtending $\\theta^{\\circ}$ has length $\\dfrac{\\theta}{360} \\times 2\\pi r$.' },
+      { h: 'Substitute', d: '$20 = \\dfrac{\\theta}{360} \\times 2\\pi \\times \\dfrac{60}{\\pi} = \\dfrac{\\theta}{360} \\times 120$.' },
+      { h: 'Solve', d: '$\\theta = \\dfrac{20 \\times 360}{120} = 60^{\\circ}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q3',
+    questionNumber: 3,
+    chapterId: 'c10-arithmetic-progressions',
+    difficulty: 1,
+    prompt: 'Three numbers in AP have the sum $30$. What is its middle term?',
+    mcqOptions: ['$4$', '$10$', '$16$', '$8$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Name the terms', d: 'Write three terms in AP as $a - d$, $a$, $a + d$.' },
+      { h: 'Add', d: 'The $d$ terms cancel: $(a - d) + a + (a + d) = 3a = 30$.' },
+      { h: 'Middle term', d: '$a = 10$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q4',
+    questionNumber: 4,
+    chapterId: 'c10-areas-circles',
+    difficulty: 2,
+    prompt: 'An arc of a circle is of length $5\\pi$ cm and the sector it bounds has an area of $20\\pi$ cm$^2$. Its radius is',
+    mcqOptions: ['$10$ cm', '$1$ cm', '$5$ cm', '$8$ cm'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Sector area from arc length', d: 'A sector with arc length $l$ and radius $r$ has area $\\dfrac{1}{2}lr$.' },
+      { h: 'Substitute', d: '$20\\pi = \\dfrac{1}{2} \\times 5\\pi \\times r$.' },
+      { h: 'Solve', d: '$r = \\dfrac{40\\pi}{5\\pi} = 8$ cm.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q7',
+    questionNumber: 7,
+    chapterId: 'c10-trigonometry',
+    difficulty: 2,
+    prompt: 'If $\\alpha + \\beta = 90^{\\circ}$ and $\\alpha = 2\\beta$, then $\\cos^2\\alpha + \\sin^2\\beta$ is equal to',
+    mcqOptions: ['$0$', '$\\dfrac{1}{2}$', '$1$', '$2$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Find the angles', d: '$2\\beta + \\beta = 90^{\\circ}$, so $\\beta = 30^{\\circ}$ and $\\alpha = 60^{\\circ}$.' },
+      { h: 'Standard values', d: '$\\cos 60^{\\circ} = \\dfrac{1}{2}$ and $\\sin 30^{\\circ} = \\dfrac{1}{2}$.' },
+      { h: 'Evaluate', d: '$\\cos^2\\alpha + \\sin^2\\beta = \\dfrac{1}{4} + \\dfrac{1}{4} = \\dfrac{1}{2}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q11',
+    questionNumber: 11,
+    chapterId: 'c10-real-numbers',
+    difficulty: 2,
+    prompt: 'Which of the following is a rational number between $\\sqrt{3}$ and $\\sqrt{5}$?',
+    mcqOptions: ['$1.4142387954012\\ldots$', '$2.32\\overline{6}$', '$\\pi$', '$1.857142$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Locate the bounds', d: '$\\sqrt{3} \\approx 1.732$ and $\\sqrt{5} \\approx 2.236$.' },
+      { h: 'Rule out the irrationals', d: 'A non-terminating, non-repeating decimal and $\\pi$ are irrational.' },
+      { h: 'Check the rationals', d: '$2.32\\overline{6}$ is rational but greater than $2.236$. $1.857142$ terminates, so it is rational, and $1.732 < 1.857142 < 2.236$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q13',
+    questionNumber: 13,
+    chapterId: 'c10-circles',
+    difficulty: 1,
+    prompt: 'If the length of a chord of a circle is equal to its radius, then the angle subtended by the chord at the centre is',
+    mcqOptions: ['$60^{\\circ}$', '$30^{\\circ}$', '$120^{\\circ}$', '$90^{\\circ}$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'The triangle at the centre', d: 'The chord and the two radii to its ends form a triangle with all three sides equal to $r$.' },
+      { h: 'Equilateral', d: 'An equilateral triangle has every angle $60^{\\circ}$, so the chord subtends $60^{\\circ}$ at the centre.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q14',
+    questionNumber: 14,
+    chapterId: 'c10-real-numbers',
+    difficulty: 2,
+    prompt: 'The greatest number which divides $70$ and $125$, leaving remainders $5$ and $8$ respectively, is',
+    mcqOptions: ['$13$', '$65$', '$875$', '$1750$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Remove the remainders', d: 'The number divides $70 - 5 = 65$ and $125 - 8 = 117$ exactly.' },
+      { h: 'Greatest common divisor', d: '$65 = 5 \\times 13$ and $117 = 3^2 \\times 13$, so $\\mathrm{HCF}(65, 117) = 13$.' },
+      { h: 'Check', d: '$70 = 5 \\times 13 + 5$ and $125 = 9 \\times 13 + 8$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q15',
+    questionNumber: 15,
+    chapterId: 'c10-trig-applications',
+    difficulty: 1,
+    prompt: 'A ladder $14$ m long leans against a wall. If the foot of the ladder is $7$ m from the wall, then the angle of elevation of the top of the wall is',
+    mcqOptions: ['$15^{\\circ}$', '$30^{\\circ}$', '$45^{\\circ}$', '$60^{\\circ}$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'The right triangle', d: 'The ladder is the hypotenuse ($14$ m) and the distance from the wall is the side adjacent to the angle at the foot ($7$ m).' },
+      { h: 'Cosine', d: '$\\cos\\theta = \\dfrac{7}{14} = \\dfrac{1}{2}$.' },
+      { h: 'Read the angle', d: '$\\theta = 60^{\\circ}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q19',
+    questionNumber: 19,
+    chapterId: 'c10-surface-volume',
+    difficulty: 1,
+    prompt: 'Assertion (A): If we join two hemispheres of same radius along their bases, then we get a sphere.\n\nReason (R): Total Surface Area of a sphere of radius $r$ is $3\\pi r^2$.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Assertion', d: 'Two hemispheres of the same radius joined along their flat circular bases make a complete sphere, so (A) is true.' },
+      { h: 'Reason', d: 'The surface area of a sphere is $4\\pi r^2$; $3\\pi r^2$ is the total surface area of a solid hemisphere ($2\\pi r^2$ curved $+ \\pi r^2$ base). So (R) is false.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_SET2,
+    id: 'cbse-2025-x-30-1-2-q20',
+    questionNumber: 20,
+    chapterId: 'c10-probability',
+    difficulty: 1,
+    prompt: 'Assertion (A): The probability of selecting a number at random from the numbers $1$ to $20$ is $1$.\n\nReason (R): For any event $E$, if $P(E) = 1$, then $E$ is called a sure event.',
+    mcqOptions: [...AR_CODES],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Assertion', d: 'Every outcome of the draw is one of the numbers $1$ to $20$, so selecting one of them is certain: the probability is $\\dfrac{20}{20} = 1$. (A) is true.' },
+      { h: 'Reason', d: 'An event with probability $1$ is by definition a sure event, so (R) is true.' },
+      { h: 'Does (R) explain (A)?', d: 'Yes: the event in (A) is a sure event, which is exactly why its probability is $1$.' }
     ]
   }
 ]);
