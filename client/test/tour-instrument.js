@@ -1,9 +1,10 @@
-// Pri Learning · E2E flow — the v1.1 instrument interface (PRI_FEATURE_INSTRUMENT).
+// Pri Learning · E2E flow — the Instrument interface, the one student interface
+// every build ships (client/interface.config.mjs, V1 decision D7).
 //
-// Builds the client WITH the flag (the other suites build without it, so they
-// keep testing the interface production ships) and walks the new shell as a
-// signed-in Class 10 student, in paper and night, at phone, tablet and web:
-//   · the flag is really on: html.ui-instrument, the tab bar, no rail;
+// Walks the shell as a signed-in Class 10 student, in paper and night, at
+// phone, tablet and web (every other browser suite now runs on the same
+// interface; this one owns its own shell, Index, command bar and offline tabs):
+//   · the interface is really the Instrument: html.ui-instrument, the tab bar, no rail;
 //   · the Index lists the syllabus from the server, a chapter opens its plate,
 //     the plate's figures are the server's (answers / correct), accuracy is
 //     withheld below the floor, and the scope actually draws;
@@ -15,9 +16,8 @@
 //   · nothing moves after paint (Chromium layout-shift entries).
 // Screens are written to PRI_VISUAL_OUT (or a temp dir) for review.
 //
-// Usage: node client/test/tour-instrument.js [--browser=webkit]
-// Leaves an instrument build in client/dist: CI runs it last in its group.
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+// Usage: node client/test/tour-instrument.js [--no-build] [--browser=webkit]
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -39,14 +39,38 @@ const AUDIT = () => {
   const controls = [...document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, [role=button]')]
     .filter(el => visible(el) && !el.closest('[aria-hidden="true"], [inert]'));
   const unnamed = controls.filter(el => !nameOf(el)).map(el => `${el.tagName}.${String(el.className).slice(0, 40)}`);
+  // The hit area, not the drawn box, probed 21px either side of the centre
+  // (the same measurement as tour-interface-quality.js). The control is
+  // scrolled into view first: elementFromPoint answers null for any point
+  // outside the viewport, so a control below the fold could never pass, and
+  // the Index is now taller than a phone screen.
   const small = controls.filter(el => {
+    el.scrollIntoView({ block: 'center', inline: 'center' });
     const r = el.getBoundingClientRect();
     if (r.width >= 43.5 && r.height >= 43.5) return false;
     const cx = r.left + r.width / 2; const cy = r.top + r.height / 2;
     const owns = (x, y) => { const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); };
     return ![[cx - 21, cy], [cx + 21, cy], [cx, cy - 21], [cx, cy + 21]].every(([x, y]) => owns(x, y));
   }).map(el => `${nameOf(el).slice(0, 24) || el.tagName} ${Math.round(el.getBoundingClientRect().width)}×${Math.round(el.getBoundingClientRect().height)}`);
+  window.scrollTo(0, 0);
   return { count: controls.length, unnamed, small };
+};
+
+// The native shells' accessibility smoke, as android/app/src/androidTest/…/
+// WebViewAccessibilityTest.kt writes it: every visible button or link has a
+// name (aria-hidden subtrees included), and every visible .btn and phone-bar
+// control is at least 43.5 px tall by its own box.
+const SHELL_AUDIT = () => {
+  const visible = el => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
+  const nameOf = el => (el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '').trim();
+  const out = [];
+  for (const el of document.querySelectorAll('button, a[href], [role=button]')) if (visible(el) && !nameOf(el)) out.push(`unnamed ${el.tagName}.${el.className}`);
+  for (const el of document.querySelectorAll('.btn, .mobilenav button, .mobilenav a')) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height < 43.5) out.push(`small target ${Math.round(r.height)}px ${nameOf(el).slice(0, 20)}`);
+  }
+  return out;
 };
 
 export const flow = {
@@ -118,6 +142,75 @@ export const flow = {
     await page.locator('[data-instrument-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
     await check('Practise this chapter opens Practice for that chapter', new URL(page.url()).searchParams.get('subtopic') === id, page.url());
+
+    // Home parity (audit-interface item 2): what the v1.0 Home offered besides
+    // the chapters is on the Index too, each as its own entry.
+    await goto('/');
+    await settle();
+    await page.waitForSelector('[data-instrument-also]', { timeout: 15000 });
+    await check('the Index offers the review queue', await page.locator('[data-instrument-review-queue]').count() === 1 && /\/practice$/.test(await page.locator('[data-instrument-review-queue]').getAttribute('href')));
+    await check('a new student is told nothing is due, in words, with the shell’s own figure', await page.locator('[data-instrument-review-due="0"]').count() === 1 && /Nothing is due/.test(await page.locator('[data-instrument-review-due]').textContent()));
+    await check('the Index offers the study plan', await page.locator('[data-instrument-plan][href="/plan"]').count() === 1);
+    await check('the Index offers photo practice (the one link to /practise-photo)', await page.locator('[data-home-photo-practise][href="/practise-photo"]').count() === 1);
+    await check('the Index offers the exact-topic generator', await page.locator('[data-instrument-generator] .genbar-toggle').count() === 1 && await page.getByTestId('choose-topic').count() === 1);
+    await page.getByTestId('choose-topic').click();
+    await page.waitForSelector('#gen-panel', { timeout: 10000 }).catch(() => {});
+    await check('the generator opens on the Index and lists the class or track step', await page.locator('#gen-panel').count() === 1 && await page.locator('#gen-panel .gen-cat').count() === 5);
+    // A new profile has no track chosen: the Topics step is disabled until
+    // one is, so the pane offers the tracks first and choosing one moves on
+    // to the topics (as on the v1.0 Home).
+    const topicsTab = page.locator('.gen-cat', { hasText: en['home.catTopics'] });
+    if (await topicsTab.isDisabled()) {
+      await page.locator('#gen-pane .gen-opt').first().click();
+      await page.waitForFunction(() => !!document.querySelector('.gen-cat[aria-selected="true"]:not([disabled])'), null, { timeout: 5000 }).catch(() => {});
+    }
+    await topicsTab.click();
+    await check('its topics pane lists the syllabus chapters', await topicsTab.getAttribute('aria-selected') === 'true' && await page.locator('#gen-pane .gen-opt').count() >= 5, `${await page.locator('#gen-pane .gen-opt').count()} options`);
+    await page.locator('#gen-pane .gen-opt:not([disabled])').first().click();
+    await page.locator('.genbar-head .btn-ghost', { hasText: 'Generate' }).click();
+    await page.waitForURL(/\/practice/, { timeout: 15000 }).catch(() => {});
+    await check('Generate opens Practice for the chosen topic', /\/practice\?/.test(page.url()) && !!new URL(page.url()).searchParams.get('subtopic'), page.url());
+
+    // Navigation parity: on an iPad and the web every non-tab destination has
+    // a visible entry (the More menu beside the tabs); on a phone the Map has
+    // a slot in the bottom bar and the rest sit behind More.
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await goto('/');
+    await settle();
+    const moreBtn = page.locator('[data-instrument-more] .in-more');
+    await check('iPad: a More menu button sits beside the tabs', await moreBtn.isVisible() && await moreBtn.getAttribute('aria-haspopup') === 'menu' && await moreBtn.getAttribute('aria-expanded') === 'false');
+    await moreBtn.click();
+    await page.waitForSelector('#in-more-menu[role=menu]', { timeout: 5000 }).catch(() => {});
+    const moreItems = await page.locator('#in-more-menu [role=menuitem]').allTextContents();
+    await check('iPad: More lists Exams, Tasks, Plan and Settings as menu items', ['Exams', 'Tasks', 'Plan', 'Settings'].every(w => moreItems.some(x => x.trim() === w)), JSON.stringify(moreItems));
+    await check('iPad: opening More moves focus into the menu', await page.evaluate(() => document.activeElement?.getAttribute('role') === 'menuitem'));
+    await page.keyboard.press('Escape');
+    await check('iPad: Escape closes More and returns focus to its button', await page.locator('#in-more-menu').count() === 0 && await page.evaluate(() => document.activeElement?.classList.contains('in-more')));
+    await moreBtn.click();
+    await page.locator('#in-more-menu [role=menuitem]', { hasText: 'Exams' }).click();
+    await page.waitForURL(/\/exams$/, { timeout: 15000 }).catch(() => {});
+    await check('iPad: choosing Exams from More opens Exams', new URL(page.url()).pathname === '/exams', page.url());
+    await goto('/tasks'); await settle();
+    await check('iPad: Tasks renders under the instrument bar', await page.locator('[data-instrument-bar]').count() === 1 && new URL(page.url()).pathname === '/tasks');
+    await goto('/plan'); await settle();
+    await check('iPad: Plan renders under the instrument bar', await page.locator('[data-instrument-bar]').count() === 1 && new URL(page.url()).pathname === '/plan');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await goto('/');
+    await settle();
+    const barHrefs = await page.locator('.mobilenav .mnav-item[href]').evaluateAll(els => els.map(e => e.getAttribute('href')));
+    await check('phone: the bottom bar holds Index, Practice, Map and Report', JSON.stringify(barHrefs) === JSON.stringify(['/', '/practice', '/map', '/progress']), JSON.stringify(barHrefs));
+    await check('phone: the More menu beside the tabs is not drawn (the sheet has its list)', !(await page.locator('[data-instrument-more]').isVisible().catch(() => false)));
+    await page.locator('.mobilenav .mnav-item[href="/map"]').click();
+    await page.waitForSelector('[data-map-chapter]', { timeout: 15000 }).catch(() => {});
+    await check('phone: the Map tab opens the Map', new URL(page.url()).pathname === '/map' && await page.locator('[data-map-chapter]').count() === chapters, page.url());
+    await goto('/'); await settle();
+    await page.getByRole('button', { name: 'More' }).click();
+    await settle();
+    const sheetHrefs = await page.locator('.mnav-sheet-item[href]').evaluateAll(els => els.map(e => e.getAttribute('href')));
+    await check('phone: More holds Scripts, Notes, Plan, Tasks, Exams and Settings', ['/review', '/notes', '/plan', '/tasks', '/exams', '/settings'].every(h => sheetHrefs.includes(h)), JSON.stringify(sheetHrefs));
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1440, height: 900 });
     await goto('/');
     await settle();
 
@@ -215,7 +308,42 @@ export const flow = {
         const a = await page.evaluate(AUDIT);
         await check(`${tag}: every control has an accessible name`, a.unnamed.length === 0, JSON.stringify(a.unnamed.slice(0, 6)));
         if (size.phone && chromium) await check(`${tag}: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 8)));
+        if (size.phone) {
+          const unnamed = (await page.evaluate(SHELL_AUDIT)).filter(x => x.startsWith('unnamed'));
+          await check(`${tag}: no button is unnamed, not even in the aria-hidden chapter strip (the shells' audit)`, unnamed.length === 0, JSON.stringify(unnamed.slice(0, 6)));
+        }
+        // iPad portrait: the spine kept no gutter (the greeting and resume
+        // card ran into the edge) and the plate's figures clipped "Covered".
+        if (size.id === 'tablet') {
+          const fit = await page.evaluate(() => {
+            const g = document.querySelector('.in-greet')?.getBoundingClientRect();
+            const boxes = [...document.querySelectorAll('.in-kpis, .in-kpis > div')];
+            return { left: g ? Math.round(g.left) : null, clipped: boxes.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.textContent.trim().slice(0, 30)) };
+          });
+          await check(`${tag}: the spine keeps a gutter (greeting ${fit.left}px from the edge)`, fit.left !== null && fit.left >= 12, JSON.stringify(fit));
+          await check(`${tag}: no figure on the plate is clipped`, fit.clipped.length === 0, JSON.stringify(fit.clipped));
+        }
         writeFileSync(join(outDir, `index-${size.id}-${scheme}.png`), await page.screenshot({ animations: 'disabled' }));
+      }
+    }
+    // An iPad is a touch screen too, and until this no suite measured one: the
+    // 44px rule above is phone-only, so the compact bar's 32px ⌘K button
+    // passed everywhere. Every kept route, portrait, with a coarse pointer.
+    if (cdp) {
+      await page.setViewportSize({ width: 820, height: 1180 });
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      for (const route of ['/', '/practice', '/map', '/progress', '/review', '/notes', '/plan', '/tasks', '/exams', '/settings']) {
+        await goto(route);
+        await settle();
+        const a = await page.evaluate(AUDIT);
+        await check(`${route}@ipad: every control is ≥ 44×44`, a.small.length === 0, JSON.stringify(a.small.slice(0, 30)));
+        // The shells' own audits (android WebViewAccessibilityTest, the iPhone
+        // journey's a11yAudit) measure each control's box and do not skip an
+        // aria-hidden subtree, so neither may this: on CI they found 22 px
+        // Settings switches and the phone Index's unnamed chapter strip.
+        const shell = await page.evaluate(SHELL_AUDIT);
+        await check(`${route}@ipad: every .btn box is ≥ 44 px tall and every button has a name, as the native shells measure them`, shell.length === 0, JSON.stringify(shell.slice(0, 10)));
       }
     }
     if (cdp) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
@@ -598,8 +726,238 @@ export const hindiFlow = {
   }
 };
 
+// Issue #658: a student opens the app online, sees the Index, loses the
+// connection and taps a tab they have never opened. This flow never visits the
+// Map, the Report or Scripts online, so what opens them offline can only be
+// the warm pass. install-budget-check.mjs --instrument holds the manifest; this
+// proves the tabs actually paint from it.
+export const offlineFlow = {
+  id: 'instrument-offline',
+  name: 'Instrument · Map, Report and Scripts open on a first visit offline',
+  online: true,
+  async run({ page, check, goto, settle, createProfile, online, note, browserName = 'chromium' }) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await goto('/');
+    await createProfile({ name: 'Diya Instrument', year: 10, course: 'in' });
+    await online.signIn({ name: 'Diya Instrument' });
+    await settle();
+    await goto('/');
+    await page.waitForSelector('.in-ch', { timeout: 30000 });
+    // The same question the page asks at boot (local/offlineWarm.js), awaited
+    // here so the check cannot race the worker.
+    const held = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.ready;
+      const worker = navigator.serviceWorker.controller || registration.active;
+      return new Promise((resolve) => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = e => resolve(e.data || null);
+        worker.postMessage({ type: 'pri-warm', optional: false }, [channel.port2]);
+        setTimeout(() => resolve(null), 180000);
+      });
+    });
+    // Complete, not merely answered: {warmed: 0, of: N} is a reply too.
+    await check('the service worker finished the offline build', !!held && held.of > 0 && held.warmed === held.of, JSON.stringify(held));
+    await page.context().setOffline(true);
+    await page.waitForFunction(() => !navigator.onLine, null, { timeout: 5000 }).catch(() => {});
+    // The bar says what cannot happen offline, and on demand what still works.
+    const banner = page.locator('[data-offline-banner]');
+    await banner.waitFor({ timeout: 10000 }).catch(() => {});
+    await check('offline, a one-line banner says checking answers needs a connection',
+      await banner.count() === 1 && /Checking answers needs a connection/.test(await banner.innerText()));
+    await banner.locator('summary').click().catch(() => {});
+    await check('and "What still works" opens to list scripts, the report and notes opened before, with the work kept on the device',
+      /Your scripts/.test(await banner.innerText()) && /Your report/.test(await banner.innerText()) && /kept on this device/.test(await banner.innerText()));
+    // Playwright's WebKit offline mode also stops WebKit's service worker from
+    // answering: even a plain fetch() of a file the worker has just reported
+    // holding fails ("WebKit encountered an internal error"). That is a limit
+    // of the harness, not of the app (the same one tour-activation-gate notes
+    // for an offline reload), so in WebKit the network is cut at the network
+    // layer instead: every request that reaches it is aborted, and only what
+    // the worker answers from its cache can load. The negative control below
+    // records the limitation on every run, so it is visible if it changes.
+    // Neither method is evidence about Safari or WKWebView on a device.
+    const heldChunk = await page.evaluate(async () => {
+      const name = (await caches.keys()).find(k => k.startsWith('pri-'));
+      const keys = name ? await (await caches.open(name)).keys() : [];
+      return keys.map(r => new URL(r.url).pathname).find(p => /\/MapPage-[^/]+\.js$/.test(p)) || null;
+    });
+    if (browserName === 'webkit') {
+      const underEmulation = await page.evaluate(async url => { try { return (await fetch(url)).status; } catch (e) { return `failed: ${e.message}`; } }, heldChunk);
+      note(`WebKit negative control: under Playwright's offline mode a fetch of ${heldChunk} (held by the worker) gives ${JSON.stringify(underEmulation)}; the tabs are therefore opened with the network cut by aborting every request that reaches it`);
+      await page.context().setOffline(false);
+      await page.context().route('**/*', route => route.abort('internetdisconnected'));
+      const throughWorker = await page.evaluate(async url => { try { return (await fetch(url)).status; } catch (e) { return `failed: ${e.message}`; } }, heldChunk);
+      await check('WebKit, network cut: the service worker answers a held tab chunk from its cache', throughWorker === 200, `${heldChunk}: ${JSON.stringify(throughWorker)}`);
+    }
+    for (const [name, href, ready] of [['the Map', '/map', '[data-map-chapter]'], ['the Report', '/progress', '[data-instrument-report]'], ['Scripts', '/review', '.in-led-bar, [data-state="empty"]']]) {
+      await page.locator(`.in-tab[href="${href}"]`).click();
+      const painted = await page.waitForSelector(ready, { timeout: 30000 }).then(() => true, () => false);
+      const crashed = await page.locator('text=This page stopped mid-render').count() > 0;
+      await check(`offline, ${name} opens on its first visit`, painted && !crashed && new URL(page.url()).pathname === href, page.url());
+    }
+    if (browserName === 'webkit') await page.context().unroute('**/*');
+    await page.context().setOffline(false);
+  }
+};
+
+// V1 decisions D7–D9: the Aurora skin dresses the chrome and nothing else.
+// aurora.css is scoped to html.skin-aurora, so removing that class on the same
+// page is exactly the 'instrument' skin for everything the stylesheet does;
+// the flow compares the two on one page. aurora-skin-check.mjs holds the
+// stylesheet itself (scope, reach, AA contrast).
+const INSTRUMENT_CSS = readFileSync(new URL('../src/instrument/instrument.css', import.meta.url), 'utf8');
+const CONTENT_TOKENS = [...new Set([...INSTRUMENT_CSS.matchAll(/(--in-[a-z0-9-]+)\s*:/g)].map(m => m[1]))]
+  .concat(['--page', '--surface', '--surface-2', '--paper', '--ink', '--ink-2', '--ink-3', '--accent', '--hairline', '--good', '--bad']);
+const CONTENT_SURFACES = ['.qpage', '.q-prompt', '.q-prompt .katex', '.ws-actions', '.ws-bar', '.editor-body', '.ink-stage', '.ink-canvas-live'];
+const SURFACE_PROPS = ['color', 'background-color', 'background-image', 'box-shadow', 'backdrop-filter', 'filter', 'font-family', 'border-top-color', 'opacity'];
+export const auroraFlow = {
+  id: 'instrument-aurora',
+  name: 'Instrument · the Aurora skin stays on chrome: content tokens, ink alignment, pools, motion and transparency (D7–D9)',
+  online: true,
+  async run({ page, check, goto, settle, createProfile, online, note, browserName = 'chromium' }) {
+    const chromium = browserName === 'chromium';
+    const setSkin = on => page.evaluate(v => document.documentElement.classList.toggle('skin-aurora', v), on);
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await goto('/');
+    await createProfile({ name: 'Aurora Student', year: 7 });
+    await online.signIn({ name: 'Aurora Student' });
+    await settle();
+    await goto('/');
+    await page.waitForSelector('.in-ch', { timeout: 30000 });
+    await check('the setting\'s default skin is on: html.skin-aurora', await page.evaluate(() => document.documentElement.classList.contains('skin-aurora')));
+    await check('on the Index the light pools are drawn behind the page',
+      await page.locator('.a-aurora').count() === 1 && await page.evaluate(() => document.documentElement.hasAttribute('data-aurora-pools')));
+    const alphaOf = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
+    await check('the Index plate, which holds the chapter\'s mathematics, is opaque over them',
+      alphaOf(await page.locator('.in-plate').first().evaluate(el => getComputedStyle(el).backgroundColor)) === 1);
+    const barGlass = async () => page.locator('[data-instrument-bar]').evaluate(el => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter || 'none');
+    await check('the tab bar is glass', /blur/.test(await barGlass()), await barGlass());
+    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=y7-integers', '.q-prompt', false]]) {
+      await goto(path);
+      await page.waitForSelector(ready, { timeout: 30000 }).catch(() => {});
+      await settle();
+      const drawn = await page.locator('.a-aurora').count();
+      await check(`${path}: light pools ${want ? 'drawn' : 'never drawn (a question, script or report is on screen)'}`, want ? drawn === 1 : drawn === 0, `${drawn} pool layers`);
+    }
+
+    // Content is the Instrument's under both skins: every content token and
+    // every content surface computes the same with and without the skin.
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+    if (await tab.count()) await tab.click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    await settle();
+    const contentSnapshot = () => page.evaluate(([tokens, surfaces, props]) => {
+      const root = getComputedStyle(document.documentElement);
+      const out = { tokens: Object.fromEntries(tokens.map(t => [t, root.getPropertyValue(t).trim()])), surfaces: {}, glassInside: 0 };
+      for (const sel of surfaces) {
+        const el = document.querySelector(sel);
+        out.surfaces[sel] = el ? Object.fromEntries(props.map(p => [p, getComputedStyle(el).getPropertyValue(p)])) : null;
+      }
+      for (const el of document.querySelectorAll('.qpage *')) {
+        const s = getComputedStyle(el);
+        if ((s.backdropFilter && s.backdropFilter !== 'none') || (s.webkitBackdropFilter && s.webkitBackdropFilter !== 'none')) out.glassInside++;
+      }
+      return out;
+    }, [CONTENT_TOKENS, CONTENT_SURFACES, SURFACE_PROPS]);
+    const withSkin = await contentSnapshot();
+    await setSkin(false); await page.waitForTimeout(300);
+    const without = await contentSnapshot();
+    await setSkin(true); await page.waitForTimeout(300);
+    const tokenDiff = CONTENT_TOKENS.filter(t => withSkin.tokens[t] !== without.tokens[t]);
+    await check(`every content token is identical under both skins (${CONTENT_TOKENS.length} tokens)`, tokenDiff.length === 0, JSON.stringify(tokenDiff.slice(0, 5)));
+    const surfaceDiff = CONTENT_SURFACES.filter(s => JSON.stringify(withSkin.surfaces[s]) !== JSON.stringify(without.surfaces[s]));
+    await check('the question, its KaTeX, the working area, the action bar and the ink surface compute the same under both skins', surfaceDiff.length === 0, JSON.stringify(surfaceDiff));
+    await check('no glass anywhere inside the question card', withSkin.glassInside === 0, `${withSkin.glassInside} elements with a backdrop filter`);
+
+    // Ink alignment: the canvas sits on the same pixels, maps them the same
+    // way and holds the same bitmap under both skins.
+    const canvas = page.locator('.ink-canvas-live').first();
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box.x + 60, box.y + 60); await page.mouse.down();
+    for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 9, box.y + 60 + (i % 4) * 7);
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    const inkState = () => canvas.evaluate(c => {
+      const r = c.getBoundingClientRect();
+      let h = 0; const d = c.toDataURL(); for (let i = 0; i < d.length; i += 7) h = (h * 31 + d.charCodeAt(i)) | 0;
+      const chain = []; for (let n = c; n; n = n.parentElement) { const s = getComputedStyle(n); chain.push([s.transform, s.filter, s.backdropFilter || s.webkitBackdropFilter || 'none'].join('|')); }
+      return { rect: [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100), size: [c.width, c.height], dpr: devicePixelRatio, bitmap: `${d.length}:${h}`, chain: chain.join(' / ') };
+    });
+    let a = await inkState();
+    await page.waitForTimeout(500);
+    const a2 = await inkState();
+    if (JSON.stringify(a) !== JSON.stringify(a2)) { note('ink surface still settling; re-read'); await page.waitForTimeout(1500); a = await inkState(); }
+    await setSkin(false); await page.waitForTimeout(600);
+    const b = await inkState();
+    await setSkin(true); await page.waitForTimeout(300);
+    await check('ink alignment: the canvas has the same position, size and pixel ratio under both skins', JSON.stringify([a.rect, a.size, a.dpr]) === JSON.stringify([b.rect, b.size, b.dpr]), JSON.stringify({ aurora: a.rect, instrument: b.rect }));
+    await check('ink alignment: the same strokes hold the same bitmap under both skins', a.bitmap === b.bitmap, JSON.stringify({ aurora: a.bitmap, instrument: b.bitmap }));
+    await check('nothing above the canvas transforms or filters it under the skin', !/blur|matrix|scale|translate/.test(a.chain.replace(/none/g, '')), a.chain.slice(0, 200));
+
+    // Motion, transparency, forced colours (on the Index, where the pools are).
+    await goto('/');
+    await page.waitForSelector('.a-aurora i', { timeout: 30000 });
+    const poolAnim = () => page.locator('.a-aurora i').first().evaluate(el => getComputedStyle(el).animationName);
+    const poolShown = () => page.locator('.a-aurora').evaluate(el => getComputedStyle(el).display !== 'none');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await check('with motion allowed the pools drift', await poolAnim() === 'au-drift', await poolAnim());
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await check('under Reduce Motion they stand still', await poolAnim() === 'none', await poolAnim());
+    // The iOS shell's Reduce Transparency class (WebShell.swift): WebKit does not
+    // answer the media query, so the class alone must make the chrome opaque.
+    await page.evaluate(() => document.documentElement.classList.add('a11y-reduce-transparency'));
+    await check('with the shell\'s Reduce Transparency class the bar is opaque and no pool is drawn', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+    await page.evaluate(() => document.documentElement.classList.remove('a11y-reduce-transparency'));
+    await check('and without it the glass and the pools return', /blur/.test(await barGlass()) && await poolShown(), `${await barGlass()} / pools ${await poolShown()}`);
+    if (chromium) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await check('under Reduce Transparency the bar is opaque and no pool is drawn', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await check('in forced colours there is no glass and no pool', !/blur/.test(await barGlass()) && !(await poolShown()), `${await barGlass()} / pools ${await poolShown()}`);
+      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+    } else note('Reduce Transparency and forced colours are emulated in Chromium only (CDP); aurora-skin-check holds the rules for every engine');
+
+    // D8: the plain skin is the class away. Without it nothing Aurora remains.
+    await setSkin(false); await page.waitForTimeout(300);
+    await check('without the skin (D8\'s fallback): no pools drawn, no glass bar', !(await poolShown()) && !/blur/.test(await barGlass()), `${await barGlass()}`);
+    await setSkin(true);
+  }
+};
+
+// The first screen on a touch phone. #487 measured the welcome footer's legal
+// links at 15 px tall; on a coarse pointer each is a 44 px target now. V1
+// decision D11: the language switch stays, and choosing Hindi says at once
+// that questions and worked solutions stay in English.
+export const welcomeFlow = {
+  id: 'instrument-welcome',
+  name: 'Instrument · the welcome screen on a touch phone: 44px legal links, the language note (D11)',
+  async run({ page, check, goto, settle }) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await goto('/');
+    await page.waitForSelector('.login-legal a', { timeout: 30000 });
+    const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
+    await check('the phone context is a coarse pointer, as a phone is', coarse);
+    const small = await page.locator('.login-legal a').evaluateAll(els => els.map(el => {
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { link: el.textContent.trim(), w: Math.round(r.width), h: Math.round(r.height) };
+    }).filter(x => x.w < 43.5 || x.h < 43.5));
+    await check('every legal link on the welcome screen is a 44×44 touch target', small.length === 0, JSON.stringify(small));
+    await check('in English the screen adds no language note', await page.locator('[data-lang-note]').count() === 0);
+    await page.locator('button[lang="hi"][aria-pressed]').first().click();
+    await page.waitForSelector('[data-lang-note]', { timeout: 15000 }).catch(() => {});
+    await settle();
+    const note = await page.locator('[data-lang-note]').first().innerText().catch(() => '');
+    await check('choosing Hindi says, in Hindi, that questions and worked solutions stay in English', /अंग्रेज़ी/.test(note), JSON.stringify(note));
+    await page.locator('button[lang="en"][aria-pressed]').first().click();
+    await settle();
+    await check('and back in English the note goes again', await page.locator('[data-lang-note]').count() === 0);
+  }
+};
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  process.env.PRI_FEATURE_INSTRUMENT = '1';
   const { runFlows } = await import('./e2e.mjs');
-  process.exit(await runFlows([flow, writeFlow, hindiFlow]) ? 1 : 0);
+  process.exit(await runFlows([flow, writeFlow, hindiFlow, offlineFlow, welcomeFlow, auroraFlow]) ? 1 : 0);
 }

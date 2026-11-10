@@ -234,7 +234,10 @@ async function run() {
   try {
     const html = readFileSync(`${CLIENT}index.html`, 'utf8');
     const description = /<meta name="description" content="([^"]*)"/.exec(html)?.[1] || '';
-    ok('index.html describes the app for Indian students', /NCERT/.test(description) && /JEE/.test(description) && /olympiad/i.test(description),
+    // The Olympiad track is off in a production build (V1 decision; the
+    // description is held to that by onboarding-scope-check.mjs), so the
+    // description names NCERT and JEE only and must not advertise it.
+    ok('index.html describes the app for Indian students', /NCERT/.test(description) && /JEE/.test(description) && !/olympiad/i.test(description),
       `description reads ${show(description)}`);
     ok('and never mentions the HSC or an iPad', !/HSC|iPad/i.test(description), `description reads ${show(description)}`);
     ok('the document language is English', /<html lang="en[^"]*">/.test(html));

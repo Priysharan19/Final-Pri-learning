@@ -231,6 +231,13 @@ export const ALERT_RULES = Object.freeze([
     id: 'ERROR_SINK_FAILURES',
     thresholds: { count: 5, minutes: 15 },
     evaluate: ({ sum }, t) => sum('error_sink_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
+  },
+  {
+    // The paid-call ceiling (spendCeiling.js) at 80% of its hour or day
+    // window: warn before students start being refused (tutor, reading).
+    id: 'PAID_CEILING_HIGH',
+    thresholds: { count: 1, minutes: 60 },
+    evaluate: ({ sum }, t) => sum('paid_ceiling_high_total', { minutes: t.minutes }) >= t.count
   }
 ]);
 
@@ -247,6 +254,11 @@ export const metrics = createMetrics();
 
 function statusClass(status) {
   return `${Math.floor(Number(status) / 100)}xx`;
+}
+
+/** One paid call that took the hour or day ceiling window to 80% or more. */
+export function recordPaidCeilingHigh(window) {
+  metrics.inc('paid_ceiling_high_total', { window: window === 'day' ? 'day' : 'hour' });
 }
 
 export function recordHttpResponse(status, ms) {
