@@ -832,7 +832,7 @@ export const auroraFlow = {
       alphaOf(await page.locator('.in-plate').first().evaluate(el => getComputedStyle(el).backgroundColor)) === 1);
     const barGlass = async () => page.locator('[data-instrument-bar]').evaluate(el => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter || 'none');
     await check('the tab bar is glass', /blur/.test(await barGlass()), await barGlass());
-    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=y7-integers', '.q-prompt', false]]) {
+    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=c7-integer-operations-current', '.q-prompt', false]]) {
       await goto(path);
       await page.waitForSelector(ready, { timeout: 30000 }).catch(() => {});
       await settle();
