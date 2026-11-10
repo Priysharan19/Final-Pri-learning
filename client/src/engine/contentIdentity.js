@@ -39,7 +39,8 @@
 // radius), trigonometry triples and heights, situational quadratics, linear-pair
 // methods; Class 9 rectangle-from-vertices and two-point linear relation ranges.
 // Every form, answer type, hint and worked step is unchanged in kind.
-export const CONTENT_VERSION = '2026.11.8';
+// 2026.11.14 — c10-linear-pair-methods D2 back on its original ranges, so its certified seeds reproduce (#838 D25).
+export const CONTENT_VERSION = '2026.11.14';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

@@ -85,9 +85,12 @@ export const indiaClass10Core = {
       };
     }
     if (diff === 2) {
-      const x0 = nz(rng, -40, 40), y0 = nz(rng, -40, 40);
-      const a = ri(rng, 2, 15), b = nz(rng, -15, 15);
-      const c = ri(rng, 2, 15), d = nz(rng, -15, 15);
+      // D2 keeps its original ranges: its seeds are certified fixtures (the
+      // two-mark elimination question at seed 7 in the browser and server
+      // marking suites), and widening them re-rolled every one (#838 D25).
+      const x0 = nz(rng, -7, 9), y0 = nz(rng, -7, 9);
+      const a = ri(rng, 2, 6), b = nz(rng, -6, 6);
+      const c = ri(rng, 2, 6), d = nz(rng, -6, 6);
       if (a * d - b * c === 0) return indiaClass10Core['c10-linear-pair-methods'](rng, 3);
       const r1 = a * x0 + b * y0;
       const r2 = c * x0 + d * y0;
