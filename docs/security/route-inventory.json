@@ -2370,6 +2370,29 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/root-gap/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account and device_id = 'server-grader'); the root-gap reading only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise a count; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "root-gap",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/practice/:id/hint",
       "auth": "session",
