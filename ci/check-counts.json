@@ -156,7 +156,7 @@
         {"has":"WORKING INDICATOR: PASS — 62/62 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
         {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
         {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
-        {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
+        {"has":"PAYWALL HONESTY: PASS — 80/80 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
         {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
         {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
         {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
@@ -382,7 +382,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 163/163 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
       ]
     },
     "platform/practice-http.log#6": {
@@ -402,6 +402,7 @@
         {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
         {"has":"READINESS FORECAST: PASS — 29/29 checks"},
         {"has":"MISTAKE DNA: PASS — 16/16 checks"},
+        {"has":"ROOT GAP: PASS — 24/24 checks"},
         {"has":"METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks"},
         {"has":"FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks"},
         {"has":"OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks"},

@@ -11,17 +11,22 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireRole, requireSession, requireVerifiedEmail } from './security.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
+import { bankPolicy } from './editionBanks.js';
 import { rootGaps } from '../../client/src/engine/rootGap.js';
 
 export const ROOT_GAP_CAPABILITY = 'advanced-analytics';
 const SCAN = 2000;
 
-export function createRootGapRouter(rawDb) {
+// The prerequisite graph it walks is the India curriculum's; the Prithagoras
+// edition has no such graph yet, so it answers with the edition's own refusal
+// instead of reading an India map over NSW answers.
+export function createRootGapRouter(rawDb, { banks = bankPolicy() } = {}) {
   const db = asStore(rawDb);
   const router = asyncRouter();
   router.use(requireSession(db), requireVerifiedEmail, requireRole('student'));
 
   router.get('/', rateLimit(db, 'root-gap', { limit: 120, windowMs: 3600000 }), async (req, res) => {
+    if (banks.curriculum !== 'in') return res.status(banks.outside.status).json({ error: { code: banks.outside.code, message: banks.outside.message } });
     const accountId = req.platformSession.account_id;
     const now = Date.now();
     const attempts = (await db.all(

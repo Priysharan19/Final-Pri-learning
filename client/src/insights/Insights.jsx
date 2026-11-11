@@ -300,7 +300,9 @@ export default function Insights() {
       <p className="in-note">{t('insights.lead')}</p>
       {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} />}</Load>}
       <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} />}</Load>
-      <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} />}</Load>
+      {gap.status === 'error' && gap.code === 'PRACTICE_BANK_OUTSIDE_CURRICULUM'
+        ? null
+        : <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} />}</Load>}
     </div>
   );
 }
