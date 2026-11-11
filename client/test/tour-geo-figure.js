@@ -47,6 +47,8 @@ export const flow = {
       /\$AB = 9\$ cm, \$BC = 19\$ cm and \$CA = 14\$ cm/.test(known.prompt || '') && known.kind === 'text', JSON.stringify({ known, issued }).slice(0, 1200))) return;
 
     await check('no figure before the solution exists', await page.locator(FIG).count() === 0);
+    const typing = page.getByRole('button', { name: 'Answer by typing' });
+    if (await typing.count()) await typing.click();
     await page.locator('[data-final-answer]').fill(known.text);
     await page.locator('.ws-actions .btn-primary').click();
     await page.locator('.eval-card').waitFor({ state: 'visible', timeout: 30000 });
