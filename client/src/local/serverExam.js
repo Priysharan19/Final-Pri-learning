@@ -124,6 +124,28 @@ export async function issueExamLayout(pid, blueprint) {
 }
 
 /**
+ * The subtopics a targeted paper would lean toward for this account now
+ * (GET /v1/exams/targets, Premium). The server works them out from its own
+ * records and writes the paper's key itself; these only steer composition.
+ * A refusal (402 on the free plan) is thrown in the shape the paywall reads.
+ */
+export async function examTargets(pid) {
+  const linked = await requireExamAccount(pid);
+  let out;
+  try { out = await cloud.examTargets(); }
+  catch (cause) {
+    const kind = unavailableKind(cause);
+    if (kind) throw checkUnavailable(kind, cause);
+    if (cause?.status === 402) {
+      throw Object.assign(new Error(cause.message), { status: 402, code: cause.code || 'PREMIUM_REQUIRED', capability: cause.capability || 'premium-exams', reason: 'server-refused', refreshRequired: true });
+    }
+    throw Object.assign(new Error(cause?.message || 'This paper could not be started.'), { status: cause?.status || 502, code: cause?.code || 'EXAM_START_FAILED' });
+  }
+  if (out?.accountId !== undefined && String(out.accountId) !== linked) throw checkUnavailable('sign-in');
+  return Array.isArray(out?.targets) ? out.targets : [];
+}
+
+/**
  * Have the server issue a paper from `spec`. `signature` identifies what the
  * student asked for (track, class, length…): a start that failed after the
  * request left is retried with the SAME spec and idempotency key for a few

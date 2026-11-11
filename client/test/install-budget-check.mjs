@@ -50,6 +50,7 @@ const INSTRUMENT = INSTRUMENT_BUILD;
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
 const LABEL = 'INSTALL BUDGET';
+let PYQ_ARCHIVE_MEASURED = null;
 
 // ── The budget ───────────────────────────────────────────────────────────────
 // Measured on the build these numbers were first set against: 1,159 kB raw /
@@ -394,9 +395,39 @@ ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes(
 ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('aria-busy') ? {} : null) } }), 'an aria-busy control counts as a Check in flight');
 ok(!studentBusy({ navigator: {}, document: { querySelector: () => null } }), 'and neither on screen means idle');
 
+// ── The previous-year archive adds 0 bytes to the measure ───────────────────
+// Past papers are online-only and behind a switch. Their records, schema,
+// cited sources and coverage manifest are on demand; the shell carries only
+// pyq/pyqIndex.js (ids and rungs). Proved three ways, so a transcribed paper can
+// never again move the install or the whole offline build:
+//   · no archive chunk is installed or warmed;
+//   · no record id and no cited document's sha256 appears in any byte that is;
+//   · the index chunk stays small, so a new chapter costs a line, not a paper.
+{
+  const measured = [...PRECACHE, ...WARM];
+  const archiveChunks = emitted().filter(url => /(^|\/)(pyqArchive|pyqCoverage|pyqSources|pyqSchema|records-[a-z0-9-]+)-[^/]*\.js$/.test(url.slice(1)));
+  ok(archiveChunks.some(u => /pyqArchive-/.test(u)), 'the build emits the archive as its own chunk');
+  const carried = archiveChunks.filter(u => measured.includes(u));
+  eq(carried.length, 0, `no previous-year archive chunk is installed or warmed: ${JSON.stringify(carried)}`);
+  const { PYQ_RECORDS } = await import('../src/engine/pyq/pyqArchive.js');
+  const { PYQ_SOURCES } = await import('../src/engine/pyq/pyqSources.js');
+  const needles = [
+    ...PYQ_RECORDS.map(r => r.id),
+    ...new Set(JSON.stringify(PYQ_SOURCES).match(/\b[0-9a-f]{64}\b/g) || [])
+  ];
+  ok(needles.length > 0, 'there are archive records and source hashes to look for');
+  const body = measured.filter(u => /\.(js|html)$/.test(u)).map(u => { try { return readFileSync(join(DIST, fileOf(u)), 'utf8'); } catch { return ''; } }).join('\n');
+  const leaked = needles.filter(n => body.includes(n));
+  eq(leaked.length, 0, `no archive record id or source sha256 is in an installed or warmed file: ${JSON.stringify(leaked.slice(0, 4))}`);
+  const index = emitted().filter(url => /(^|\/)pyqIndex-[^/]*\.js$/.test(url.slice(1)));
+  const indexRaw = total(index, raw);
+  ok(indexRaw <= 4096, `the archive index the shell carries is ${indexRaw} bytes, over 4096 — the archive's growth belongs on demand`);
+  PYQ_ARCHIVE_MEASURED = { chunks: archiveChunks.length, onDemandRaw: total(archiveChunks, raw), indexRaw };
+}
+
 // ── Report ───────────────────────────────────────────────────────────────────
 
 console.log(failures.length
   ? `${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `${LABEL}: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered.`);
+  : `${LABEL}: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered; previous-year archive 0 kB of it (${PYQ_ARCHIVE_MEASURED?.chunks} chunks, ${kb(PYQ_ARCHIVE_MEASURED?.onDemandRaw || 0)} on demand).`);
 process.exit(failures.length ? 1 : 0);

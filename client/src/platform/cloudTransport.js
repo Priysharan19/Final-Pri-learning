@@ -482,6 +482,7 @@ export const cloud = Object.freeze({
   // The layout of a blueprint paper is the server's choice: the device asks for
   // the seed, composes for it, and a create under any other seed is refused.
   examLayout: body => cloudRequest('/v1/exams/layout', { method: 'POST', body }),
+  examTargets: () => cloudRequest('/v1/exams/targets'),
   createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
   // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
   saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),
@@ -597,6 +598,8 @@ export const cloud = Object.freeze({
   // question's lines; names a step, never a value. Sends only the id and lines.
   tutorLineCheck: (body, { signal = null, timeoutMs = 20000 } = {}) =>
     cloudRequest('/v1/tutor/line-check', { method: 'POST', body, signal, timeoutMs }),
+  // The live step coach (F1): one status per finished line, never a value.
+  // Sends only the issued question's id and the student's own read lines.
   // The same body, answered as server-sent events (see cloudStreamRequest).
   tutorStream: (body, { onEvent, signal = null, timeoutMs = 45000 } = {}) =>
     cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),

@@ -45,10 +45,42 @@ eq('the free column says exactly the free plan', FREE_ROWS.map(row), [
   '20 practice questions a day', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
 ]);
 eq('the Premium column says exactly what Premium adds', PREMIUM_ROWS.map(row), [
-  'Unlimited practice questions', 'Unlimited timed papers', 'The JEE Advanced track', '25 reads of your writing and 25 question photos a day'
+  'Unlimited practice questions', 'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
+  'The JEE Advanced track', '25 reads of your writing and 25 question photos a day',
+  'An estimate of your mark from your own practice, with its range and how much of the paper it covers',
+  'The slips you make most often, across chapters'
 ]);
 ok('the plan rows hold no figure of their own: every number comes from a definition', !/\b(5|20|25|30)\b/.test(plans.replace(/\/\/.*$/gm, '')));
 eq('the Premium screen has one address', PAYWALL_ROUTE, '/premium');
+
+// 1b · the screen sells only what the SERVER enforces (paywall review, L6)
+const { PREMIUM_CAPABILITIES } = await import('../../server/platform/entitlements.js');
+const { CAPABILITY_ENFORCEMENT } = await import('../src/local/entitlementGate.js');
+const srv = rel => readFileSync(new URL(`../../server/platform/${rel}`, import.meta.url), 'utf8');
+for (const r of PREMIUM_ROWS) {
+  ok(`${r.key} names a Premium capability the server grants`, PREMIUM_CAPABILITIES.includes(r.capability), r.capability);
+  ok(`${r.key} is sold on a server enforcement point, not the device's word`, /^server · /.test(CAPABILITY_ENFORCEMENT[r.capability] || ''), CAPABILITY_ENFORCEMENT[r.capability]);
+}
+ok('a capability enforced nowhere is not sold on the screen', !PREMIUM_ROWS.some(r => /^none · /.test(CAPABILITY_ENFORCEMENT[r.capability] || '')));
+ok('adaptive Pri Explain is not sold: it is gated nowhere and plays in full on every plan',
+  !PREMIUM_ROWS.some(r => r.capability === 'advanced-pri-explain') && /^none · /.test(CAPABILITY_ENFORCEMENT['advanced-pri-explain']));
+ok('the enforcement map no longer claims device gates that do not exist (priorities, knowledge map)',
+  !/^client · Progress priorities/.test(CAPABILITY_ENFORCEMENT['advanced-analytics']) && /forecast\.js/.test(CAPABILITY_ENFORCEMENT['advanced-analytics']) && /mistakeDna\.js/.test(CAPABILITY_ENFORCEMENT['advanced-analytics']));
+ok('the forecast answers a free account with coverage only, from the server\'s own record',
+  /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(FORECAST_CAPABILITY\)\) \{[\s\S]{0,200}premium: false[^}]*coverage: now_\.coverage, coveredMarks: now_\.coveredMarks, unseenMarks: now_\.unseenMarks \}\);/.test(srv('forecast.js')));
+ok('mistake patterns answer a free account with a count only, from the server\'s own record',
+  /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(DNA_CAPABILITY\)\) \{\s*return res\.status\(200\)\.json\(\{ premium: false, capability: DNA_CAPABILITY, habitCount: dna\.habits\.length, answered: dna\.answered \}\);/.test(srv('mistakeDna.js')));
+{
+  const exams = srv('exams.js');
+  ok('the time report is added only for premium-exams, on every result read',
+    /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\('premium-exams'\)\) return \{ \.\.\.view, timeReportOffered: true \};/.test(exams) &&
+    (exams.match(/await withTimeReport\(db, accountId, /g) || []).length === 3);
+}
+const sectionTime = read('components/SectionTime.jsx');
+const insights = read('insights/Insights.jsx');
+ok('the time-report offer says why the student arrived', /PageLink to=\{PAYWALL_ROUTE\} state=\{\{ from: 'time-report' \}\}/.test(sectionTime) && ARRIVAL_KEYS['time-report']);
+ok('both Insights offers say why the student arrived', (insights.match(/<PageLink to="\/premium" state=\{\{ from: 'insights' \}\}>/g) || []).length === 2 && !/<PageLink to="\/premium">/.test(insights) && ARRIVAL_KEYS.insights);
+ok('an arrival from a Premium reading says what stays free', /stay on the free plan/.test(en['paywall.from.timeReport']) && /stay on the free plan/.test(en['paywall.from.insights']));
 
 // 2 · no price in the source or the copy
 const PRICE = /₹\s*\d|\bRs\.?\s*\d|\bINR\s*\d|\b(199|1,?499|125)\b/;

@@ -40,7 +40,7 @@ const online = await startOnlineAuthority({ label: 'india-pyq' });
 const { PYQ_RECORDS, buildPyqBank, pyqArchiveSnapshot, pyqGenerator } = await import('../src/engine/pyq/pyqArchive.js');
 const { PYQ_COVERAGE, PYQ_MANIFEST, PYQ_ABSENT_EXAMS, hasPyqGenerator, pyqCellsFor, pyqGeneratorId, pyqAbsenceFor } =
   await import('../src/engine/pyq/pyqCoverage.js');
-const { PYQ_SOURCES, PYQ_EXAMS, PYQ_PROVENANCE, PYQ_PUBLISHABLE } = await import('../src/engine/pyq/pyqSources.js');
+const { PYQ_SOURCES, PYQ_EXAMS, PYQ_PROVENANCE, PYQ_PROVENANCE_LABEL, PYQ_PUBLISHABLE } = await import('../src/engine/pyq/pyqSources.js');
 const { validatePyqRecord, pyqPayload, PYQ_STEPS_AUTHORSHIP } = await import('../src/engine/pyq/pyqSchema.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
 const { bankOf, loadBanks, loadAllBanks, generateQuestion } = await import('../src/engine/generators/index.js');
@@ -69,7 +69,9 @@ eq(PYQ_MANIFEST.records, PYQ_MANIFEST.papers.reduce((n, p) => n + p.records, 0),
 for (const paper of PYQ_MANIFEST.papers) {
   const held = PYQ_RECORDS.filter(r => r.examId === paper.exam && r.year === paper.year
     && (paper.paper === undefined || r.paper === paper.paper)
-    && (paper.setCode === undefined || r.setCode === paper.setCode)).length;
+    && (paper.setCode === undefined || r.setCode === paper.setCode)
+    // A CBSE set is counted per section: Section A and the Board-scheme sections are separate lines.
+    && (!String(paper.exam).startsWith('cbse-') || paper.section === undefined || r.section === paper.section)).length;
   eq(held, paper.records, `manifest: ${paper.exam} ${paper.year} ${paper.paper || paper.setCode} holds the number of records it claims`);
 }
 
@@ -99,7 +101,7 @@ for (const [id, src] of Object.entries(PYQ_SOURCES)) {
   ok(!!src.authority && !!src.title && !!src.kind, `source ${id}: names its authority, title and kind`);
   ok(/^\d{4}-\d{2}-\d{2}$/.test(String(src.retrieved || '')), `source ${id}: records the day it was retrieved`);
 }
-ok(Object.values(PYQ_SOURCES).every(src => /(jeeadv\.ac\.in|cbse\.gov\.in)/.test(String(src.archivedAt || src.url))),
+ok(Object.values(PYQ_SOURCES).every(src => /(jeeadv\.ac\.in|cbse\.gov\.in)/.test(String(src.archivedAt || src.url)) || (/^https:\/\/cdnbbsr\.s3waas\.gov\.in\/s3f8e59f4b2fe7c5705bf878bbd494ccdf\//.test(String(src.url)) && /^https:\/\/jeemain\.nta\.nic\.in\//.test(String(src.listedAt)))),
   'every cited document comes from the exam authority itself');
 
 // Two records for the same printed question would mean one of them is a
@@ -180,8 +182,8 @@ eq(marked, PYQ_RECORDS.length, 'every record was put through the real marker');
 ok(optionsChecked >= 30, `enough MCQs had their four options checked (${optionsChecked})`);
 
 // ── 4. Coverage matches the records ──────────────────────────────────────────
-// pyqCoverage.js is hand-maintained so indiaProduct.js can consult it without a
-// dynamic import. That is only safe while it is exactly what the records say.
+// pyqCoverage.js (on demand) and pyqIndex.js (the shell's ids and rungs) are
+// maintained with the records. That is only safe while it is exactly what the records say.
 const rebuilt = new Map();
 for (const rec of PYQ_RECORDS) {
   const id = pyqGeneratorId(rec.track, rec.chapterId);
@@ -190,6 +192,13 @@ for (const rec of PYQ_RECORDS) {
   row.exams.add(rec.examId); row.difficulties.add(rec.difficulty); row.years.add(rec.year); row.records += 1;
 }
 eq(Object.keys(PYQ_COVERAGE).length, rebuilt.size, 'the coverage table names every generator the records produce');
+// The shell carries only pyqIndex.js (ids and rungs; the rest is on demand), so
+// it must be exactly the coverage table's ids and rungs.
+{
+  const { PYQ_INDEX_IDS, pyqRungsOf } = await import('../src/engine/pyq/pyqIndex.js');
+  eq([...PYQ_INDEX_IDS].sort().join('|'), Object.keys(PYQ_COVERAGE).sort().join('|'), 'the shell index names exactly the coverage table\'s generators');
+  for (const [id, row] of Object.entries(PYQ_COVERAGE)) eq(pyqRungsOf(id)?.difficulties.join(','), row.difficulties.join(','), `index ${id}: the same rungs as the coverage table`);
+}
 for (const [id, want] of rebuilt) {
   const got = PYQ_COVERAGE[id];
   if (!got) { failures.push(`coverage: ${id} is missing from the table`); continue; }
@@ -205,8 +214,8 @@ for (const [id, want] of rebuilt) {
 // An archive that names an absent exam has to say why, not just be empty.
 ok(PYQ_ABSENT_EXAMS.length > 0, 'the archive names the exams it deliberately carries nothing for');
 ok(PYQ_ABSENT_EXAMS.every(row => row.reason && row.reason.length > 40), 'each absent exam carries a real reason, not a placeholder');
-ok(!!pyqAbsenceFor('jee-main'), 'the JEE Main gap is stated rather than silent');
-ok(!PYQ_RECORDS.some(r => r.track === 'jee-main'), 'no record is served on a track the archive says it cannot serve');
+// No record is served on a track the archive says it cannot serve.
+for (const row of PYQ_ABSENT_EXAMS) ok(!PYQ_RECORDS.some(r => r.track === row.track), `no record is served on ${row.track}, which the archive says it cannot serve`);
 
 // ── 5. The generator registry can actually load one ──────────────────────────
 const someGenerator = Object.keys(PYQ_COVERAGE)[0];
@@ -235,7 +244,12 @@ const covered = indiaChapter('c12-matrices');
 const pyqOnlyTarget = resolveIndiaTarget(covered, { track: 'cbse', grade: 12, difficulty: 2, pyqOnly: true, random: () => 0 });
 ok(pyqOnlyTarget?.pyq === true, 'past-papers-only practice on a covered chapter resolves to the archive');
 eq(pyqOnlyTarget?.generator, 'pyq-cbse-c12-matrices', 'past-papers-only practice names the archive generator');
-const uncovered = indiaChapter('c12-3d-geometry');
+// A Class 12 chapter the CBSE archive does not cover, read from the coverage
+// table rather than named, so growing the archive cannot silently empty this check.
+const uncoveredId = ['c12-relations-functions', 'c12-inverse-trigonometric', 'c12-matrices', 'c12-determinants', 'c12-continuity-differentiability', 'c12-applications-derivatives', 'c12-integrals', 'c12-applications-integrals', 'c12-differential-equations', 'c12-vector-algebra', 'c12-3d-geometry', 'c12-linear-programming', 'c12-probability']
+  .find(id => !hasPyqGenerator(`pyq-cbse-${id}`));
+ok(!!uncoveredId, 'some Class 12 chapter is still uncovered, so the refusal below is exercised');
+const uncovered = indiaChapter(uncoveredId);
 eq(resolveIndiaTarget(uncovered, { track: 'cbse', grade: 12, difficulty: 2, pyqOnly: true, random: () => 0 }), null,
   'past-papers-only practice refuses a chapter the archive does not cover, rather than serving authored practice');
 // Dot-point practice stays on the authored generators: the archive routes at
@@ -316,14 +330,43 @@ for (const [label, profile] of [
     `${label}: every marked past-paper question shows its answer`);
 }
 
-// ── 8. Nothing claims a JEE Main past paper ──────────────────────────────────
-// The NTA does not publish the JEE Main question paper outside the candidate
-// portal, so a "JEE Main 2025" label in this repository would be a reprint from
-// somewhere else wearing an official name.
-const archiveText = JSON.stringify(PYQ_RECORDS.map(r => ({ e: r.examId, s: r.pyqSource, l: r.chapterId })));
-ok(!/jee-main/.test(archiveText), 'no record is labelled JEE Main');
-ok(pyqAbsenceFor('jee-main').reason.includes('candidate portal'), 'the JEE Main gap names the reason it exists');
-
+// ── 8. JEE Main: official paper + separate official key (Director, 2026-11-10) ─
+// NTA publishes the CBT question paper and, separately, the final answer key,
+// joined only by NTA's Question Id. Those records sit on their own rung, which
+// says so on the card, pins both files by sha256, and is refused whenever the
+// join could be wrong.
+{
+  const { readFileSync } = await import('node:fs');
+  const manifest = JSON.parse(readFileSync(new URL('../../tools/jee-question-department/official-sources.json', import.meta.url), 'utf8'));
+  const byUrl = new Map(manifest.documents.map(d => [d.url, d]));
+  const jm = PYQ_RECORDS.filter(r => r.examId === 'jee-main');
+  ok(jm.length > 0, 'JEE Main records exist now that the separate-key rung is defined');
+  ok(!pyqAbsenceFor('jee-main'), 'JEE Main is no longer listed as absent');
+  ok(jm.every(r => r.provenance === PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY), 'every JEE Main record is on the paper-plus-separate-key rung, never the single-document one');
+  ok(PYQ_PROVENANCE_LABEL[PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY] !== PYQ_PROVENANCE_LABEL[PYQ_PROVENANCE.OFFICIAL_PAPER_AND_KEY], 'the two official rungs read differently on the card');
+  for (const r of jm) {
+    const payload = pyqPayload(r);
+    ok(/separate NTA key/.test(payload.pyqSource), `${r.id}: the card label says the key is separate`);
+    eq(payload.archive.provenanceLabel, PYQ_PROVENANCE_LABEL[PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY], `${r.id}: the payload carries the rung's own wording`);
+    eq(payload.archive.authorityQuestionId, r.authorityQuestionId, `${r.id}: the payload carries NTA's Question Id`);
+    for (const c of payload.archive.citations) {
+      ok(/^https:\/\/cdnbbsr\.s3waas\.gov\.in\//.test(c.url), `${r.id}: cites NTA's own CDN, not a reprint (${c.url})`);
+      const doc = byUrl.get(c.url);
+      ok(!!doc && doc.sha256 === c.sha256, `${r.id}: ${c.id} has the same sha256 as the department manifest`);
+    }
+    if (r.answerType === 'mcq') eq(r.authorityOptionIds[r.answer.correctIndex], r.keyedOptionId, `${r.id}: the keyed option id is the option at correctIndex`);
+  }
+  // The rung refuses a join it cannot stand behind.
+  const jmSample = jm.find(r => r.answerType === 'mcq');
+  const refusesJm = (patch, label) => {
+    try { validatePyqRecord({ ...jmSample, ...patch }); failures.push(`schema: accepted a separate-key record that ${label}`); } catch { pass++; }
+  };
+  refusesJm({ keyedOptionId: jmSample.authorityOptionIds[(jmSample.answer.correctIndex + 1) % 4] }, 'keys an option id that is not the option at correctIndex');
+  refusesJm({ authorityQuestionId: undefined }, 'carries no NTA Question Id');
+  refusesJm({ authorityOptionIds: jmSample.authorityOptionIds.slice(0, 3) }, 'has three option ids');
+  refusesJm({ answerSource: jmSample.promptSource }, 'cites the question paper as its own key');
+  refusesJm({ promptSource: 'cbse-2025-x-30-1-1-marking-scheme' }, 'reads its prompt from something other than a question paper');
+}
 await online.close();
 const snapshot = pyqArchiveSnapshot();
 const summary = Object.entries(snapshot.byExam).map(([exam, n]) => `${n} ${PYQ_EXAMS[exam].label}`).join(', ');
