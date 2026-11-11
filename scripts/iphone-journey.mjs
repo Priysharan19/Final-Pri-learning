@@ -165,7 +165,7 @@ function builtApp(derived) {
 // read that blocks the runner would hold the switch back past the page's own
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
-function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
+function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75, deadlineMs = 480_000 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
   // origin override and the journey's fixture account from it).
@@ -205,6 +205,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   const t0 = Date.now();
   let duringDone = !during;
   for (let i = 0; i < loops; i++) {
+    if (Date.now() - t0 > deadlineMs) { console.log(`  (${phase}: no summary after ${Math.round(deadlineMs / 1000)} s; stopped reading)`); break; }
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {
@@ -233,7 +234,11 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // A pass that reads nothing does not count toward `loops`: the phase keeps
     // the same bound in reads as before, it just stops paying for a log read
     // on every pass.
-    else if (reportFile && pass % 5 !== 0) { i--; continue; }
+    // Every pass counts toward `loops` (a skipped log read is still a pass), and
+    // the phase also stops at `deadlineMs` of wall time: a phase whose summary
+    // never arrives is reported "not reported" in minutes, never left polling a
+    // slow `log show` until the job limit cancels the run and its log is lost.
+    else if (reportFile && pass % 5 !== 0) continue;
     else try {
       viaLog++;
       log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,

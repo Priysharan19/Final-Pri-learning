@@ -1079,6 +1079,11 @@ enum JourneySelfCheck {
       const all = [];
       for (const path of ['/', '/practice', '/progress', '/settings']) {
         history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate'));
+        // A lazily loaded screen (/progress) can still be its loading state
+        // after a fixed second on a busy runner: wait for the route to render a
+        // heading (bounded), then audit it as before. A screen that never
+        // renders one is still reported "no heading" by the audit.
+        try { await waitFor(() => location.pathname === path && document.querySelector('h1, h2, [role=heading]'), 20000); } catch (e) { /* the audit reports it */ }
         await sleep(1000);
         all.push(...audit(path));
       }

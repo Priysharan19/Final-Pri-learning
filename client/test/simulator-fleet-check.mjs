@@ -299,7 +299,14 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   // (Native Ink spent ~22 minutes in one offline phase on log reads, Train 18).
   const j = src('scripts/iphone-journey.mjs');
   ok(/if \(bytes\.length < offset\) offset = 0;/.test(j), 'a report file shorter than at launch is read from its start');
-  ok(/else if \(reportFile && pass % 5 !== 0\) \{ i--; continue; \}/.test(j), 'with a report file, the unified log is read at most every fifth pass, and skipped passes do not shorten the bound');
+  ok(/else if \(reportFile && pass % 5 !== 0\) continue;/.test(j), 'with a report file, the unified log is read at most every fifth pass');
+  ok(!/i--; continue/.test(j), 'a pass that skips the log read still counts toward the bound (a silent phase must not poll 5x longer)');
+  ok(/deadlineMs = 480_000/.test(j) && /if \(Date\.now\(\) - t0 > deadlineMs\)/.test(j), 'a phase stops reading at a wall-clock deadline, so a silent phase fails in minutes instead of running into the job limit');
+  for (const pkg of ['ios/PriLearning.swiftpm', 'ios/PriLearning 2.swiftpm']) {
+    const sc = src(`${pkg}/JourneySelfCheck.swift`);
+    ok(/location\.pathname === path && document\.querySelector\('h1, h2, \[role=heading\]'\)/.test(sc), `${pkg}: the a11y audit waits for each route to render (lazy /progress) before auditing`);
+    ok(/if \(!document\.querySelector\('h1, h2, \[role=heading\]'\)\) problems\.push\(where \+ ': no heading'\)/.test(sc), `${pkg}: the audit still reports a screen with no heading`);
+  }
   ok(/report-file read\(s\), \$\{viaLog\} unified-log read\(s\)/.test(j), 'each phase reports its time and which channel it read');
 }
 {
