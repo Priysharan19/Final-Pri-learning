@@ -65,6 +65,13 @@ const CBSE_2025_X_2_1 = Object.freeze({
   answerSource: 'cbse-2025-x-30-2-1-marking-scheme'
 });
 
+const CBSE_2025_X_2_2 = Object.freeze({
+  ...CBSE_2025_X,
+  setCode: '30/2/2',
+  promptSource: ['cbse-2025-x-30-2-2-marking-scheme', 'cbse-2025-x-30-2-2-questions'],
+  answerSource: 'cbse-2025-x-30-2-2-marking-scheme'
+});
+
 const CBSE_2025_XII_2_1 = Object.freeze({
   ...CBSE_2025_XII,
   setCode: '65/2/1',
@@ -1038,6 +1045,123 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
       { h: 'Assertion', d: 'With $p = 1$: $\\dfrac{1}{2} = \\dfrac{3}{6} = \\dfrac{59}{118}$, so the lines coincide and there are infinitely many solutions. (A) is true.' },
       { h: 'Reason', d: 'A unique solution needs $\\dfrac{p}{2} \\ne \\dfrac{3}{6}$, i.e. $p \\ne 1$. (R) is true.' },
       { h: 'Does (R) explain (A)?', d: 'No: (R) is about a different pair and the unique-solution condition, while (A) rests on all three ratios being equal.' }
+    ]
+  },
+  // ── CBSE Class 10 Mathematics Standard (041) · 2025 · Set 30/2/2 · Section A ─
+  // Q9 and Q15 depend on a printed figure. Q8 is left out because the Board's own
+  // marking scheme says none of its printed options is correct (the least such
+  // square is 400), so it has no official key to carry. Q4–Q7, Q10, Q16, Q17,
+  // Q19 and Q20 are printed word for word in Set 30/2/1 and are carried there once.
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q1',
+    questionNumber: 1,
+    chapterId: 'c10-quadratic-equations',
+    difficulty: 2,
+    prompt: 'The quadratic equation whose sum and product of roots are $a$ and $\\dfrac{1}{a}$ respectively is',
+    mcqOptions: ['$ax^2 - ax + 1 = 0$', '$ax^2 - a^2x + 1 = 0$', '$ax^2 + ax + 1 = 0$', '$ax^2 + a^2x - 1 = 0$'],
+    answer: { correctIndex: 1 },
+    steps: [
+      { h: 'Form the equation', d: '$x^2 - (\\text{sum})x + \\text{product} = 0$: $x^2 - ax + \\dfrac{1}{a} = 0$.' },
+      { h: 'Clear the fraction', d: 'Multiply by $a$: $ax^2 - a^2x + 1 = 0$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q2',
+    questionNumber: 2,
+    chapterId: 'c10-arithmetic-progressions',
+    difficulty: 2,
+    prompt: 'The $9^{\\text{th}}$ term from the end (towards first term) of the AP $7, 11, 15, 19, \\ldots, 147$ is',
+    mcqOptions: ['$135$', '$125$', '$115$', '$39$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Read the AP backwards', d: 'From the end it starts at $147$ with common difference $-4$.' },
+      { h: 'Ninth term', d: '$147 + 8(-4) = 115$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q3',
+    questionNumber: 3,
+    chapterId: 'c10-coordinate-geometry',
+    difficulty: 1,
+    prompt: 'The perimeter of the triangle formed by the vertices $(0, 0)$, $(2, 0)$ and $(0, 2)$ is',
+    mcqOptions: ['$4$ units', '$6$ units', '$6\\sqrt{2}$ units', '$(4 + 2\\sqrt{2})$ units'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Sides', d: 'The legs along the axes are $2$ and $2$; the third side is $\\sqrt{2^2 + 2^2} = 2\\sqrt{2}$.' },
+      { h: 'Perimeter', d: '$2 + 2 + 2\\sqrt{2} = 4 + 2\\sqrt{2}$ units.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q11',
+    questionNumber: 11,
+    chapterId: 'c10-trigonometry',
+    difficulty: 1,
+    prompt: 'If $\\sin(\\alpha + \\beta) = 1$, then the value of $\\sin\\left(\\dfrac{\\alpha + \\beta}{2}\\right)$ is',
+    mcqOptions: ['$\\dfrac{1}{\\sqrt{2}}$', '$\\dfrac{1}{2}$', '$0$', '$1$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Find the angle', d: '$\\sin 90^{\\circ} = 1$, so $\\alpha + \\beta = 90^{\\circ}$.' },
+      { h: 'Halve it', d: '$\\sin 45^{\\circ} = \\dfrac{1}{\\sqrt{2}}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q12',
+    questionNumber: 12,
+    chapterId: 'c10-real-numbers',
+    difficulty: 2,
+    prompt: 'If $1080 = 2^p \\times 3^q \\times 5$, then $(p - q)$ is equal to',
+    mcqOptions: ['$6$', '$-1$', '$1$', '$0$'],
+    answer: { correctIndex: 3 },
+    steps: [
+      { h: 'Factorise', d: '$1080 = 8 \\times 135 = 2^3 \\times 3^3 \\times 5$.' },
+      { h: 'Compare', d: '$p = 3$, $q = 3$, so $p - q = 0$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q13',
+    questionNumber: 13,
+    chapterId: 'c10-probability',
+    difficulty: 2,
+    prompt: 'If all the red face cards are removed from the deck of $52$ playing cards, then the probability of getting a black jack from the remaining cards is',
+    mcqOptions: ['$\\dfrac{2}{46}$', '$\\dfrac{2}{52}$', '$\\dfrac{4}{48}$', '$\\dfrac{2}{23}$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Remaining cards', d: 'The $6$ red face cards go: $52 - 6 = 46$ remain.' },
+      { h: 'Favourable', d: 'The two black jacks are still there: $P = \\dfrac{2}{46}$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q14',
+    questionNumber: 14,
+    chapterId: 'c10-coordinate-geometry',
+    difficulty: 1,
+    prompt: 'The equation of a line parallel to the x-axis and at a distance of $3$ units below x-axis is',
+    mcqOptions: ['$x = 3$', '$x = -3$', '$y = -3$', '$y = 3$'],
+    answer: { correctIndex: 2 },
+    steps: [
+      { h: 'Parallel to the x-axis', d: 'Such a line has the form $y = c$.' },
+      { h: 'Below the axis', d: '$3$ units below means $y = -3$.' }
+    ]
+  },
+  {
+    ...CBSE_2025_X_2_2,
+    id: 'cbse-2025-x-30-2-2-q18',
+    questionNumber: 18,
+    chapterId: 'c10-trigonometry',
+    difficulty: 1,
+    prompt: 'If $\\sin 30^{\\circ} \\tan 45^{\\circ} = \\dfrac{\\sec 60^{\\circ}}{k}$, then the value of $k$ is',
+    mcqOptions: ['$4$', '$3$', '$2$', '$1$'],
+    answer: { correctIndex: 0 },
+    steps: [
+      { h: 'Values', d: '$\\sin 30^{\\circ} \\tan 45^{\\circ} = \\dfrac{1}{2} \\cdot 1 = \\dfrac{1}{2}$ and $\\sec 60^{\\circ} = 2$.' },
+      { h: 'Solve', d: '$\\dfrac{2}{k} = \\dfrac{1}{2}$, so $k = 4$.' }
     ]
   },
   // ── CBSE Class 12 Mathematics (041) · 2025 · Set 65/2/1 · Section A ─────────
