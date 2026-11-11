@@ -24,7 +24,7 @@ import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/r
 import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
-import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/engine/generators/index.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
 // this thread: markerOps.js holds the operations and markerPool.js runs them in
 // worker threads under a hard deadline. Only the two pure rubric helpers
@@ -47,6 +47,10 @@ import { timePhase } from './requestTiming.js';
 import { verifyReadReceipt } from './readReceipt.js';
 // D15: only the India curriculum's banks are issued (indiaBanks.js).
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
+import { serverEntitlementCapabilities } from './entitlements.js';
+import { PYQ_RECORDS } from '../../client/src/engine/pyq/pyqArchive.js';
+import { pyqPayload } from '../../client/src/engine/pyq/pyqSchema.js';
+import { JEE_BAND_IDS, jeeBandCatalog, jeeBandRecords } from '../../client/src/engine/pyq/jeeBands.js';
 import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -56,7 +60,18 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band']);
+// F7: practice of official JEE questions by length-of-working band (jeeBands.js).
+// Premium, decided by the server's entitlement record before anything is drawn.
+export const JEE_BAND_CAPABILITY = 'premium-exams';
+const JEE_PYQ = /^pyq-jee-(main|advanced)-[a-z0-9-]+$/;
+
+/** The band's own pick: one of its records, chosen by the question's seeded rng. */
+function bandPick(request) {
+  if (!request.band) return null;
+  const rows = jeeBandRecords(PYQ_RECORDS, request.generator, request.band);
+  return rng => pyqPayload(rows[Math.floor(Math.max(0, Math.min(0.999999999, Number(rng()))) * rows.length)]);
+}
 const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
 const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
 // One answer settles the question in these modes.
@@ -384,7 +399,17 @@ function readQuestionRequest(body, fields) {
   if (body.written !== undefined && typeof body.written !== 'boolean') {
     return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid answer-form preference.'] };
   }
-  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true };
+  let band = null;
+  if (body.band !== undefined) {
+    if (typeof body.band !== 'string' || !JEE_BAND_IDS.includes(body.band) || !JEE_PYQ.test(generator) || body.dotpoint !== undefined || body.trap !== undefined) {
+      return { error: [400, 'PRACTICE_BAND_INVALID', 'A band is chosen for an official JEE chapter only.'] };
+    }
+    if (!jeeBandRecords(PYQ_RECORDS, generator, body.band).length) {
+      return { error: [422, 'PRACTICE_BAND_EMPTY', 'This chapter has no official question in that band.'] };
+    }
+    band = body.band;
+  }
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true, band };
 }
 
 /**
@@ -401,7 +426,9 @@ function readQuestionRequest(body, fields) {
  * the earliest drawn. Every resolved question met adds to the budget exactly
  * as an avoided one does, since it rules out one more item of the pool.
  */
-function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), trap, written = false }, { draw, tries, batches }) {
+function* seekQuestion(request, { draw, tries, batches }) {
+  const { generator, difficulty, dotpoint, avoid = new Set(), trap, written = false } = request;
+  const pick = bandPick(request);
   // `written` asks for a form the student writes out; a multiple-choice
   // item can be guessed, which a diagnostic must avoid where it can.
   const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
@@ -411,7 +438,7 @@ function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), tra
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       const hash = opaqueContentHash(q.contentHash);
@@ -444,7 +471,7 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   // D15: a bank outside the India covers is never drawn from, by any route (a twin included).
   if (!indiaBank(generator)) throw Object.assign(new Error(BANK_OUTSIDE_INDIA.message), { code: BANK_OUTSIDE_INDIA.code });
   if (seed !== null) {
-    const q = generateQuestion(generator, difficulty, seed, dotpoint);
+    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request));
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
   const seek = seekQuestion(request, { draw, tries, batches: [1] });
@@ -577,6 +604,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (request.error) return reject(res, ...request.error);
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (request.band) {
+        const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+        if (!serverEntitlementCapabilities(snapshot, now).includes(JEE_BAND_CAPABILITY)) {
+          res.set('Cache-Control', 'no-store');
+          return res.status(402).json({ error: { code: 'PREMIUM_REQUIRED', message: 'Practice by band is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.', capability: JEE_BAND_CAPABILITY, plan: 'free', retryable: false } });
+        }
+        // The archive's chapter bank is loaded on demand (it is not in loadAllBanks).
+        await loadBanksFor([request.generator]);
+      }
       let seed = null;
       if (body.seed !== undefined) {
         if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
@@ -591,12 +627,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
       q._generator = request.generator;
+      if (request.band) q._band = request.band;
     }
     // Optional issue idempotency: normal practice may request a fresh question;
     // network retries can opt into the same server question with a stable key.
     const idem = String(req.get('idempotency-key') || '');
     if (idem && !ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_INVALID', 'Invalid issuance idempotency key.');
-    const requestDigest = digest({ generator: q.subtopic, difficulty: q.difficulty, seed: seedGiven ? q.seed : null, prepared: preparedNonce, curriculum: 'in', mode: practiceMode });
+    const requestDigest = digest({ generator: q.subtopic, difficulty: q.difficulty, seed: seedGiven ? q.seed : null, prepared: preparedNonce, curriculum: 'in', mode: practiceMode, ...(q._band ? { band: q._band } : {}) });
     // The issuance mode is escrowed with the answer. A later submission cannot
     // falsely claim or downgrade the one-try Rush/Match policy.
     q._practiceMode = practiceMode;
@@ -1448,6 +1485,17 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     return out;
   };
+
+  // F7: which bands each JEE chapter can be practised in — counts of official
+  // records by recorded working length, never a rank or a score. Readable on
+  // every plan (it is what the paywall shows); issuing by band is Premium.
+  router.get('/bands', rateLimit(db, 'practice-bands', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    const catalog = jeeBandCatalog(PYQ_RECORDS, String(req.query.track || ''));
+    if (!catalog) return reject(res, 400, 'PRACTICE_BAND_TRACK_INVALID', 'Choose JEE Main or JEE Advanced.');
+    const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [req.platformSession.account_id]);
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ ...catalog, premium: serverEntitlementCapabilities(snapshot, Date.now()).includes(JEE_BAND_CAPABILITY), capability: JEE_BAND_CAPABILITY });
+  });
 
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;

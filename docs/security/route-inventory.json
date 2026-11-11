@@ -2325,6 +2325,29 @@
     },
     {
       "method": "GET",
+      "path": "/v1/practice/bands",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; counts of the bundled official JEE archive records by chapter and recorded-steps band (no account data except this account's own entitlement snapshot, read to say whether band practice is Premium for it); no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "practice-bands",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/practice/notebook",
       "auth": "session",
       "roles": [
