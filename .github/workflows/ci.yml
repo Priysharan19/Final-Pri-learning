@@ -602,12 +602,15 @@ jobs:
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
+          # F7 (L5): official JEE questions by recorded-working band, Premium only.
+          node server/test/jee-band-practice-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
+          grep -Fq 'JEE BAND PRACTICE: PASS — 32/32 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
           grep -Fq 'READINESS FORECAST: PASS — 29/29 checks' practice-http.log
           grep -Fq 'MISTAKE DNA: PASS — 16/16 checks' practice-http.log
