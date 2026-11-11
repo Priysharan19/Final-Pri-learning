@@ -415,7 +415,7 @@ function ChapterNotes({ chapterId }) {
     if (IN_CHAPTER_BY_ID[chapterId]) rememberRecentNotesChapter(user?.id, chapterId);
   }, [user?.id, chapterId]);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
-  const [visibleExamples, setVisibleExamples] = useState(3);
+  const [visibleExamples, setVisibleExamples] = useState(6);
   const [visualOnly, setVisualOnly] = useState(false);
   const notes = all?.[chapterId];
   const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
@@ -436,7 +436,7 @@ function ChapterNotes({ chapterId }) {
 
   const root = useRef(null);
   useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
-  useEffect(() => { setVisibleExamples(3); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
+  useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -531,7 +531,7 @@ function ChapterNotes({ chapterId }) {
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
                   aria-pressed={visualOnly}
-                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(3); }}>
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
                   {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
                 </button>
               </div>
@@ -540,9 +540,9 @@ function ChapterNotes({ chapterId }) {
             {selectedExamples.length > visibleExamples && (
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
-                  onClick={() => setVisibleExamples(v => Math.min(v + 3, selectedExamples.length))}
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
                   aria-label={t('notes.showMoreExamples')}>
-                  {t('nav.more')} ({Math.min(visibleExamples + 3, selectedExamples.length)}/{selectedExamples.length})
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
                 </button>
               </div>
             )}
