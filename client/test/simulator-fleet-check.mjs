@@ -271,6 +271,15 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
     `the iOS 27 lane runs every iPad step before the first iPhone step (got ${steps.join(' → ')})`);
 }
 
+{
+  // Importing the self-check for its judge must never need a runtime pin: the
+  // Suites shard imports it under CI=true with no PRI_SIM_RUNTIME (#850 review).
+  const { spawnSync } = await import('node:child_process');
+  const env = { ...process.env, CI: 'true' }; delete env.PRI_SIM_RUNTIME;
+  const r = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./scripts/native-bridge-selfcheck.mjs'); console.log('IMPORTED')"],
+    { cwd: new URL('../../', import.meta.url), env, encoding: 'utf8', timeout: 30_000 });
+  ok(r.status === 0 && /IMPORTED/.test(r.stdout), `the bridge self-check imports under CI=true with no PRI_SIM_RUNTIME (status ${r.status}: ${(r.stderr || '').trim().split('\n').pop()})`);
+}
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.

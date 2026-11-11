@@ -60,8 +60,10 @@ function launchApp(device, bundleId, args = [], opts = {}) {
 // installed, so on the iOS 27 lane the iPhone self-check booted an iOS 27.2
 // phone the journey then shut down for its own iOS 27.0 one: two cold boots
 // (about seven minutes each) and a self-check off the pinned iOS.
-const PINNED_RUNTIME = requiredRuntime();
+// The pin is read when a device is picked, never at import: a suite that
+// imports judgeContentEnd under CI=true has no PRI_SIM_RUNTIME and no simulator.
 function pickDevice() {
+  const PINNED_RUNTIME = requiredRuntime();
   const named = argOf('device');
   const family = (argOf('family') || 'ipad').toLowerCase() === 'iphone' ? 'iPhone' : 'iPad';
   const listing = run('xcrun', ['simctl', 'list', 'devices', 'available']);
