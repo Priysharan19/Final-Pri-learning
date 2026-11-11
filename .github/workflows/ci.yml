@@ -416,7 +416,7 @@ jobs:
           # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
           grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
           grep -Fq 'INSIGHTS VIEW: PASS — 38/38 checks' suites.log
-          grep -Fq 'GEO FIGURE: PASS — 27/27 checks' suites.log
+          grep -Fq 'GEO FIGURE: PASS — 29/29 checks' suites.log
           grep -Fq 'IOS BUNDLE FLAG POLICY: PASS — 8/8 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 174/174 checks' suites.log
           # The committed certification report describes the content in the tree (version, digest, scope, result).

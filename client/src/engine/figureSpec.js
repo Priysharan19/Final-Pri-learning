@@ -54,7 +54,12 @@ function triangleFrom(text) {
   return { kind: 'triangle', unit: unit.toLowerCase(), sides, ...built };
 }
 
+// A part of a circle (quarter circle, semicircle) drawn as a whole circle
+// would misdescribe the shape; those get no figure.
+const PART_CIRCLE = /\b(?:quarter|semi)[\s-]?circle|\bquadrant\b/i;
+
 function circleFrom(text) {
+  if (PART_CIRCLE.test(text)) return null;
   const m = text.match(CIRCLE);
   if (!m) return null;
   const value = +m[2];

@@ -34,6 +34,8 @@ const circle = figureSpecFor({ prompt: 'A circle has radius 7 cm. Find its area.
 ok('circle by radius', circle?.kind === 'circle' && circle.radius === 7 && circle.unit === 'cm');
 const dia = figureSpecFor({ prompt: 'Find the circumference of a circle of diameter 10 m.' });
 ok('circle by diameter halves', dia?.radius === 5 && dia.given === 'diameter');
+ok('a quarter circle or semicircle is never drawn as a whole circle', figureSpecFor({ prompt: 'Find the perimeter of a quarter circle with radius $29$ cm.' }) === null && figureSpecFor({ prompt: 'A semicircle of radius 7 cm.' }) === null && figureSpecFor({ prompt: 'A semi-circle has diameter 10 cm.' }) === null);
+ok('a real generator prompt (c9-herons-formula) is read', figureSpecFor({ prompt: 'A triangle has sides $9$, $12$ and $15$. Find its semi-perimeter $s$.' })?.sides.c === 9);
 ok('no lengths, no figure', figureSpecFor({ prompt: 'Solve 2x + 3 = 7.' }) === null && figureSpecFor({ prompt: 'Draw a circle.' }) === null);
 ok('question with its own figure gets none', figureSpecFor({ prompt: 'A circle has radius 7 cm.', hasFigure: true }) === null);
 
