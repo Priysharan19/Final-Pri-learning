@@ -21,9 +21,9 @@ function stubSpeech() {
     cancel() {}, pause() {}, resume() {}, speaking: false, pending: false, paused: false
   });
   Object.defineProperty(window, 'speechSynthesis', { configurable: true, get: () => synth });
-  if (typeof window.SpeechSynthesisUtterance === 'undefined') {
-    window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
-  }
+  // The real utterance only accepts a real SpeechSynthesisVoice; the stub's
+  // voices are plain objects, so the utterance is stubbed too.
+  window.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
   window.__priSpeech = state;
 }
 const front = page => page.locator('.qpage[data-question-id]');
