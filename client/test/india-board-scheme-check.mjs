@@ -181,6 +181,28 @@ for (const r of real) {
   const rep = stepCheck(r.stepcheck, lines.join('\n'), { prompt: r.prompt });
   eq(rep.lines.map(l => l.status), lines.map(() => 'ok'), `${r.id}: every Board point's line is verified by the engine`);
   ok(r.stepcheck.solutions.some(s => Math.abs(s - r.answer.value) < 1e-9), `${r.id}: the keyed answer is a solution of the step metadata`);
+  // End to end on the server's practice operation, with the real payload.
+  const pq = pyqPayload(r);
+  eq(marksPossibleFor(pq), r.marks, `${r.id}: worth the Board's printed marks`);
+  const right = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value), working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  eq(right.result.correct, true, `${r.id}: the keyed answer is credited by checkAnswer`);
+  const wrongR = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value + 1), working: lines.join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  const board = r.boardScheme.filter(p => !p.answer).reduce((s, p) => s + p.marks, 0);
+  ok((wrongR.evidence?.partial?.awarded ?? 0) <= board, `${r.id}: a wrong answer's method marks never exceed the Board's method marks`);
+  // A right answer is worth the printed marks only with every point's own line.
+  const rightMarks = work => { const x = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value), working: work, evidenceIfWrong: true, policy: { methodMarks: true } }, () => {}); return practiceMarksEarned(pq, x.result, x.evidence, r.marks); };
+  eq(rightMarks(lines.join('\n')), r.marks, `${r.id}: right answer with the Board's working earns the printed marks`);
+  for (const [label, work] of [['no working', ''], ['junk working', 'abc\n= ='], ['the final value four times', Array(4).fill(`${r.stepcheck.variable} = ${r.answer.value}`).join('\n')]]) {
+    const m = rightMarks(work);
+    const boardAnswer = r.boardScheme.filter(p => p.answer).reduce((t, p) => t + p.marks, 0);
+    ok(m <= boardAnswer, `${r.id}: right answer with ${label} earns ${m}, never above the Board's ${boardAnswer} for the answer alone`);
+  }
+  eq(matchBoardPoints({ scheme: r.boardScheme, lines: rep.lines, meta: r.stepcheck }), r.boardScheme.map(p => !p.answer), `${r.id}: the Board's own lines tick every working point, one each`);
+  const finalLine = `${r.stepcheck.variable} = ${r.answer.value}`;
+  const dupR = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value + 1), working: Array(4).fill(finalLine).join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  eq(dupR.evidence?.partial?.awarded ?? 0, 0, `${r.id}: the final value written four times earns no method mark`);
+  const repeatR = MARKER_OPS.practice({ q: pq, answer: String(r.answer.value + 1), working: Array(4).fill(lines[0]).join('\n'), evidenceIfWrong: true, policy: { methodMarks: true } }, () => {});
+  ok((repeatR.evidence?.partial?.awarded ?? 0) <= Math.floor(r.boardScheme[0].marks), `${r.id}: the first point's line written four times earns at most that one point`);
 }
 
 console.log(`BOARD SCHEME CONTRACT: PASS — ${checks}/${checks} checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; ${real.length} Section B–E archive records, every scheme line engine-verified. [SYNTHETIC fixtures]`);
