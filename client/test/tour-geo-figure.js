@@ -52,6 +52,9 @@ export const flow = {
     await page.locator('[data-final-answer]').fill(known.text);
     await page.locator('.ws-actions .btn-primary').click();
     await page.locator('.eval-card').waitFor({ state: 'visible', timeout: 30000 });
+    // A correct answer keeps the worked solution behind "another method".
+    const panel = page.locator('details.solution-panel summary');
+    if (await panel.count()) await panel.first().click();
     const fig = page.locator(FIG);
     await fig.waitFor({ state: 'visible', timeout: 30000 });
 
