@@ -9,6 +9,10 @@
 //     stronger copy to show.
 //   · Mistake DNA (server/platform/mistakeDna.js): the moves the student's
 //     slips keep making, each with its chances ("7 of 12"), across chapters.
+//   · Where a gap starts (server/platform/rootGap.js): a failing chapter
+//     followed down the prerequisite graph, link by link, only while the
+//     chapter below has its own failing answers; every link shows its
+//     evidence, and chapters with too few answers are named as unchecked.
 //
 // Premium is the server's decision (`advanced-analytics`). A free account is
 // shown what the server sends it — the coverage, and how many habits exist —
@@ -26,6 +30,7 @@ import './insights.css';
 
 const loadForecast = q => cloudRequest(`/v1/forecast?${q}`);
 const loadHabits = () => cloudRequest('/v1/habits');
+const loadRootGap = () => cloudRequest('/v1/root-gap');
 
 function useChapterNames() {
   const [names, setNames] = useState({});
@@ -229,6 +234,48 @@ function Dna({ data, names, t, locale }) {
   );
 }
 
+function RootGap({ data, names, t }) {
+  const name = id => names[id] || id;
+  if (!data.premium) {
+    return (
+      <section className="ins-sheet" aria-labelledby="ins-gap" data-insights-gap="free">
+        <h2 className="sc-label" id="ins-gap">{t('insights.gapTitle')}</h2>
+        <p>{data.gapCount ? t('insights.gapFreeCount', { count: data.gapCount, n: data.gapCount }) : t('insights.gapNone')}</p>
+        <p className="ins-premium" data-premium-gate="gap">
+          {t('insights.gapPremium')} <PageLink to="/premium" state={{ from: 'insights' }}>{t('insights.seePremium')}</PageLink>
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="ins-sheet" aria-labelledby="ins-gap" data-insights-gap="premium">
+      <h2 className="sc-label" id="ins-gap">{t('insights.gapTitle')}</h2>
+      {data.gaps.length ? (
+        <ul className="ins-habits">
+          {data.gaps.map(g => (
+            <li key={g.from} className="ins-habit" data-gap-from={g.from} data-gap-root={g.root}>
+              <p className="ins-habit-name">{g.root === g.from
+                ? t('insights.gapHere', { chapter: name(g.from) })
+                : t('insights.gapStarts', { chapter: name(g.from), root: name(g.root) })}</p>
+              <ol className="in-note" data-gap-chain>
+                {g.chain.map(l => (
+                  <li key={l.chapter} data-gap-link={l.chapter}>
+                    <span lang="en">{name(l.chapter)}</span>{': '}
+                    <b data-gap-chances>{t('insights.gapWrong', { wrong: l.wrong, count: l.chances, n: l.chances })}</b>
+                    {l.skill ? <> · <span lang="en">{l.skill}</span></> : null}
+                  </li>
+                ))}
+              </ol>
+              {g.unchecked.length > 0 && <p className="in-note" data-gap-unchecked>{t('insights.gapUnchecked')}{' '}<span lang="en">{g.unchecked.map(name).join(', ')}</span></p>}
+            </li>
+          ))}
+        </ul>
+      ) : <p>{t('insights.gapNone')}</p>}
+      <p className="in-note">{t('insights.gapHonesty')}</p>
+    </section>
+  );
+}
+
 export default function Insights() {
   const { user } = useApp();
   const t = useT();
@@ -237,11 +284,13 @@ export default function Insights() {
   const names = useChapterNames();
   const [forecast, setForecast] = useState({ status: q ? 'loading' : 'none' });
   const [dna, setDna] = useState({ status: 'loading' });
+  const [gap, setGap] = useState({ status: 'loading' });
 
   useEffect(() => {
     let live = true;
     if (q) loadForecast(q).then(data => live && setForecast({ status: 'ready', data }), err => live && setForecast({ status: 'error', code: err?.code }));
     loadHabits().then(data => live && setDna({ status: 'ready', data }), err => live && setDna({ status: 'error', code: err?.code }));
+    loadRootGap().then(data => live && setGap({ status: 'ready', data }), err => live && setGap({ status: 'error', code: err?.code }));
     return () => { live = false; };
   }, [q]);
 
@@ -251,6 +300,7 @@ export default function Insights() {
       <p className="in-note">{t('insights.lead')}</p>
       {forecast.status !== 'none' && <Load state={forecast} t={t}>{data => <Forecast data={data} t={t} locale={locale} />}</Load>}
       <Load state={dna} t={t}>{data => <Dna data={data} names={names} t={t} locale={locale} />}</Load>
+      <Load state={gap} t={t}>{data => <RootGap data={data} names={names} t={t} />}</Load>
     </div>
   );
 }
