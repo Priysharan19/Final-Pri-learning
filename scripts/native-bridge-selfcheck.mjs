@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, restartAfterCrashLoop, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -238,6 +238,12 @@ if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
 }
 
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* already gone */ }
+// The crash loop kills WebContent many times on the pinned device, and the
+// journey runs next on that same device (#850). Left booted, the iOS 26.5
+// image then gave every later launch slow or silent web content (the iPad
+// journey never finished on Train 18). The device is shut down so the next
+// step boots it fresh, as it did when the self-check used another device.
+restartAfterCrashLoop(device);
 for (const line of lines) console.log(`  ${line.replace(/^PRIBRIDGE\s*/, '')}`);
 for (const line of contentLog) console.log(`  [content leg] ${line}`);
 

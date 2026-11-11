@@ -205,7 +205,18 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   const t0 = Date.now();
   let duringDone = !during;
   for (let i = 0; i < loops; i++) {
-    if (Date.now() - t0 > deadlineMs) { console.log(`  (${phase}: no summary after ${Math.round(deadlineMs / 1000)} s; stopped reading)`); break; }
+    if (Date.now() - t0 > deadlineMs) {
+      // Fail closed and fast: one silent phase stops the journey, with its
+      // channel state printed, instead of every later phase also running to
+      // the deadline until the job limit cancels the run and loses the log.
+      let size = 'no file';
+      try { if (reportFile && existsSync(reportFile)) size = `${readFileSync(reportFile).length} bytes (offset ${offset})`; } catch { /* unreadable */ }
+      console.log(`  ✗ ${phase}: no summary after ${Math.round(deadlineMs / 1000)} s (${pass} passes, ${viaFile} report-file read(s), ${viaLog} unified-log read(s); report file ${reportFile || 'not found'}: ${size}; last line: ${lines[lines.length - 1] || 'none'})`);
+      try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
+      console.log(`\nNATIVE JOURNEY: FAIL — ${phase} never reported; stopped at the first silent phase`);
+      process.exit(1);
+    }
+    if (pass > 0 && pass % 30 === 0) console.log(`  … ${phase}: ${Math.round((Date.now() - t0) / 1000)} s, ${pass} passes, ${viaFile} file / ${viaLog} log read(s), ${lines.length} line(s) so far`);
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {

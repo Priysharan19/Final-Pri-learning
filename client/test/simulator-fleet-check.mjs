@@ -300,6 +300,9 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   const j = src('scripts/iphone-journey.mjs');
   ok(/if \(bytes\.length < offset\) offset = 0;/.test(j), 'a report file shorter than at launch is read from its start');
   ok(/else if \(reportFile && pass % 5 !== 0\) continue;/.test(j), 'with a report file, the unified log is read at most every fifth pass');
+  ok(/NATIVE JOURNEY: FAIL — \$\{phase\} never reported/.test(j) && /process\.exit\(1\)/.test(j), 'the first silent phase fails the journey at once (non-zero), with its channel state printed');
+  ok(/\nrestartAfterCrashLoop\(device\);/.test(src('scripts/native-bridge-selfcheck.mjs')), 'the bridge self-check shuts its device down after the crash loop, so the journey boots it fresh');
+  ok([...src('.github/workflows/native-ink.yml').matchAll(/journey \(simulator\)\n\s+timeout-minutes: 25\n/g)].length === 2, 'each Native Ink journey step has a 25-minute step limit below the 60-minute job limit, so its log is kept');
   ok(!/i--; continue/.test(j), 'a pass that skips the log read still counts toward the bound (a silent phase must not poll 5x longer)');
   ok(/deadlineMs = 480_000/.test(j) && /if \(Date\.now\(\) - t0 > deadlineMs\)/.test(j), 'a phase stops reading at a wall-clock deadline, so a silent phase fails in minutes instead of running into the job limit');
   for (const pkg of ['ios/PriLearning.swiftpm', 'ios/PriLearning 2.swiftpm']) {
