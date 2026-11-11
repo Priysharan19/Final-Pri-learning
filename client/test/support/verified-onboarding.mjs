@@ -119,15 +119,24 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
 /**
  * A student inside the app: a verified adult account made on the landing
  * card, with this device's profile linked to it, past the gate. Options keep
- * the old helper's names so the flows read as before; a password, an avatar
- * or an Australian syllabus is not something the card asks for and is noted,
- * never silently honoured with a different identity.
+ * the old helper's names so the flows read as before; a password or an avatar
+ * is not something the card asks for and is noted, never silently honoured
+ * with a different identity.
+ *
+ * Every student is on the India course, the only one V1 ships (D2): `year` is
+ * the CBSE class (7–12, Class 11–12 for a JEE track) and `track` is 'cbse',
+ * 'jee-main' or 'jee-advanced'. The server refuses every question bank outside
+ * the India covers (D15, server/platform/indiaBanks.js), so a flow that asked
+ * for another course would only be refused later, less clearly; it is refused
+ * here.
  */
 export async function createVerifiedProfile(page, platform, {
-  name = 'E2E Student', year = 9, email = null, track = null, course = 'nsw', role = 'student',
+  name = 'E2E Student', year = 9, email = null, track = null, course = 'in', role = 'student',
   language = 'en', fromPicker = false, age = 18, landing = 'home', note = null
 } = {}) {
-  const say = message => { if (typeof note === 'function') note(message); };
+  if (course !== 'in') {
+    throw new Error(`verified onboarding: course "${course}" — V1 ships only the India course (D2) and the server issues no other bank (D15); make "${name}" a CBSE or JEE student instead`);
+  }
   const classOf = JEE_TRACKS.has(track) ? Math.max(11, Math.min(12, Number(year) || 12)) : Math.max(7, Math.min(12, Number(year) || 9));
   if (role === 'teacher') return createTeacherProfile(page, platform, { name, year: classOf, email, language, note });
 
@@ -170,22 +179,23 @@ export async function createVerifiedProfile(page, platform, {
   // keeps its accounts there; the shared platform is checked when it holds the address.
   const row = platform.h.db.prepare('SELECT id FROM accounts WHERE email=?').get(address);
   if (row && String(row.id) !== String(me.data.account.id)) throw new Error('the live session is not the account the card made for this address');
-  // The card offers Classes 7–12 (CBSE / JEE): a flow that studies an
-  // Australian syllabus changes it where a student would — Settings → Profile
-  // — after entering, through the shipped form; the account is unchanged.
-  if (course !== 'in') {
-    await switchSyllabus(page, platform, { course, year: Number(year) || classOf });
-    say(`verified onboarding: "${name}" entered as Class ${classOf} and switched to ${course.toUpperCase()} Year ${Number(year) || classOf} in Settings`);
-  }
+  // The card's class and track are the profile's course: nothing is switched
+  // afterwards in Settings (the NSW detour these suites used to take ended
+  // with D15, which refuses the NSW banks at the server).
   if (landing === 'home') {
     await page.goto(`${platform.origin}/`, { waitUntil: 'domcontentloaded' });
     // Home is the greeting, or — in a PRI_FEATURE_INSTRUMENT build — the Index.
     await page.locator('.home-greet, [data-instrument-index]').first().waitFor({ timeout: 30000 });
   }
-  return { email: address, accountId: String(me.data.account.id), year: course !== 'in' ? Number(year) || classOf : classOf, name, pending: false };
+  return { email: address, accountId: String(me.data.account.id), year: classOf, name, pending: false };
 }
 
-/** Change the signed-in profile's syllabus and year through Settings → Profile Information → Edit. */
+/**
+ * Change the signed-in profile's syllabus and year through Settings → Profile
+ * Information → Edit. No student flow calls it any more: every student is made
+ * on the India course (D2), and the server refuses the other courses' banks
+ * (D15). It drives the Settings form itself, for a flow that tests that form.
+ */
 export async function switchSyllabus(page, platform, { course, year }) {
   await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
   const card = page.locator('.card', { has: page.getByRole('heading', { name: 'Profile Information' }) });

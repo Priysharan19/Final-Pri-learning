@@ -1714,6 +1714,27 @@
     },
     {
       "method": "POST",
+      "path": "/v1/tutor/step-coach",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "404 (before any session lookup) unless PRI_FEATURE_STEP_COACH=1 — and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1 (#826, off by default). Closed body { context, serverQuestionId, lines }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). Premium only, decided from the server's entitlement snapshot (403 STEP_COACH_PREMIUM). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) ticks finished lines against the worked steps; a final-answer line gets only 'Press Check', right and wrong final lines get identical rows. No values, no headings, no marks, no model call. STEP_COACH_READS_PER_QUESTION checks per issued question per account (bucket step-coach:sha256(account:id), 30-day window, peeked before and taken after the check ran; then 409 STEP_COACH_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run spends neither. The client route holds the question lock (runGated).",
+      "rateLimits": [
+        {
+          "key": "tutor-step-coach",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/telemetry/",
       "auth": "session",
       "roles": null,
@@ -2416,6 +2437,29 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/targets",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, Premium only (premium-exams from the server's entitlement snapshot, else 402 PREMIUM_REQUIRED): the subtopics a targeted board mock would lean toward, derived only from this account's own server-graded attempts (due dot points and unfixed mistakes); no question, answer or other account's data; Cache-Control no-store. The server re-derives the targets when it seals a targeted paper and writes the 'why these questions' key itself.",
+      "rateLimits": [
+        {
+          "key": "exam-targets",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     },
     {
       "method": "POST",

@@ -449,8 +449,9 @@ let platformForWalk = null;
  * A student inside the app, made as a student makes one: the landing card,
  * the server's emailed code, name, age and agreement, class — then the gate
  * (support/verified-onboarding.mjs). On a device with saved profiles the
- * picker offers another Pri account through the same card. The NSW Year 10
- * syllabus the walk audits is chosen afterwards in Settings, by the fixture.
+ * picker offers another Pri account through the same card. The walk audits
+ * a CBSE Class 10 student, the class chosen on the card (V1 is India only,
+ * D2; the server issues no NSW bank, D15).
  */
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
@@ -458,7 +459,7 @@ async function signInToDemo(page, base) {
   await wait(page, 500);
   if (await page.locator('.shell').count()) return;
   const fromPicker = await page.getByTestId('picker-create-account').count() > 0;
-  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'nsw', fromPicker, landing: 'home' });
+  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'in', fromPicker, landing: 'home' });
   await wait(page, 900);
 }
 
@@ -680,12 +681,14 @@ async function run() {
       await click(page, '.genbar-toggle');
     });
 
-    for (const label of ['Course', 'Topics', 'Dot Points', 'Difficulty']) {
+    // The walk's student is on the India course (D2), whose generator names
+    // the second tab "Track" (home.catTrack) where Australia says "Course".
+    for (const label of ['Track', 'Topics', 'Dot Points', 'Difficulty']) {
       await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
         const tab = page.locator('.gen-cat', { hasText: label }).first();
         if (await tab.isDisabled()) {
           // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Course' });
+          await click(page, '.gen-cat', { text: 'Track' });
           await click(page, '.gen-pane .gen-opt');
           await click(page, '.gen-pane .gen-opt');
         }
@@ -1028,28 +1031,19 @@ async function run() {
 
     await step('progress · overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
-      await page.waitForSelector('.band-card, .skeleton', { timeout: 20000 });
+      // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
+      // chapter table is the page's content; the skeleton alone is not.
+      await page.waitForSelector('.pg-table', { timeout: 20000 });
       await wait(page, 900);
     });
 
-    await step('progress · priorities', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Priorities' });
-      await wait(page, 700);
-    });
-
-    await step('progress · knowledge map', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Knowledge map' });
-      await wait(page, 1200);
-    });
-
-    await step('progress · knowledge map · curriculum', '/progress', async () => {
-      await click(page, '.kmap-foot .btn');
+    // The Australian Progress tabs (Priorities, Knowledge map) are never shown
+    // to an India student, so this walk cannot reach them (D2: V1 is India
+    // only). The India page's own control is a chapter's practise button.
+    await step('progress · a chapter opened in practice', '/practice', async () => {
+      await click(page, '.pg-table .btn');
+      await page.waitForSelector('.q-prompt, .qpage', { timeout: 30000 });
       await wait(page, 600);
-    });
-
-    await step('progress · knowledge map · a year opened', '/progress', async () => {
-      await click(page, '.kmap-panel .nav-item');
-      await wait(page, 500);
     });
 
     // This walk's profile is Australian, so the placement route renders its
@@ -1079,7 +1073,10 @@ async function run() {
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
-      await click(page, 'button.btn-primary', { text: 'Start practice paper' });
+      // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
+      // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
+      await page.locator('[data-exam-board-mock]').click({ timeout: 30000 });
+      await wait(page, SETTLE);
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
         throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
       });
@@ -1156,6 +1153,9 @@ async function run() {
 
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
+      // The concept map sits behind a disclosure; open it so the map is audited too.
+      await page.waitForSelector('.nt-map-disclosure summary', { timeout: 20000 });
+      await click(page, '.nt-map-disclosure summary');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
       await wait(page, 1200);
     });

@@ -491,15 +491,22 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
 // its items are all still inside the window — in three sittings, so that at
 // least one chapter-level request lands on the spent cell whatever the seed
 // (each has a two-in-three chance per request).
+//
+// The fixture is a cell that is small BY DESIGN, not by accident of today's
+// ranges: c10-quadratic-context was widened past the window (#838), so the
+// spent cell is now Class XII Probability's random-variable form at D2 (14
+// items), the only cell of the chapter's third dot point, beside conditional
+// probability and Bayes — again three cells, each a third of chapter requests.
+// The precondition below still refuses a fixture that has grown.
 {
-  const CELL = 'c10-quadratic-context', DOTPOINT = 3, D = 2, SITTINGS = 3;
+  const CELL = 'c12-random-variable', DOTPOINT = 2, D = 2, SITTINGS = 3;
   // Hashes on a served row are the server's opaque form of the content hash.
   const { opaqueContentHash } = await import('../../server/platform/contentSeen.js');
   const pool = new Set();
   for (let s = 0; s < 4000; s++) pool.add(opaqueContentHash(generateQuestion(CELL, D, s).contentHash));
   ok(pool.size < REPEAT_WINDOW, `precondition: the cell behind dot point ${DOTPOINT + 1} holds fewer items (${pool.size}) than the window (${REPEAT_WINDOW})`);
   const ask = async body => {
-    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-quadratic-equations', track: 'cbse', difficulty: D, ...body });
+    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c12-probability', track: 'cbse', difficulty: D, ...body });
     const row = await idb.get('questions', r.question.id);
     await dispatch('POST', `/practice/${r.question.id}/discard`, {});
     return { hash: row.payload.contentHash, generator: row.generator, repeat: !!r.repeat };
@@ -507,7 +514,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   const issuesBefore = online.traffic.issue;
   let chapterAsked = 0;
   for (let k = 1; k <= SITTINGS; k++) {
-    await premiumProfile({ name: `Cert Spent Cell ${k}`, course: 'in', indiaTrack: 'cbse', year: 10 });
+    await premiumProfile({ name: `Cert Spent Cell ${k}`, course: 'in', indiaTrack: 'cbse', year: 12 });
     // Spend the cell: its dot point has no other cell at this level.
     const spent = [];
     for (let i = 0; i < pool.size; i++) spent.push(await ask({ dotpoint: DOTPOINT }));

@@ -13,6 +13,8 @@ const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
+import { checkGeometry } from './geometryFacts.js';
+import { checkProof } from './proofSteps.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -43,6 +45,12 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  // A sketch's feature set is structured data with its own 8 kB cap (graphFeatures.readFeatureSet).
+  if (question?.answerType === 'graph-sketch') return coreCheckAnswer(question, rawInput);
+  // A diagram question's parts, each marked by the rule for its kind (geometryFacts.js).
+  if (question?.answerType === 'geometry') return checkGeometry(question, rawInput);
+  // A proof is never marked automatically: its algebra is checked as evidence for a teacher (proofSteps.js).
+  if (question?.answerType === 'proof') return checkProof(question, rawInput);
   const long = answerTooLong(rawInput);
   if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
@@ -1915,6 +1923,32 @@ function methodProgressDuplicate(line, reference) {
   if (!same) return false;
   const size = sides => sides.reduce((t, side) => t + symbolCount(side), 0);
   return size(ls) >= size(rs);
+}
+
+/**
+ * Is this student line the given scheme line, as written? The same symbols,
+ * allowing spacing, unicode notation, the order of a sum or a product, the two
+ * sides swapped and identities padded in (`+0`, `*1`). NOT mere equivalence:
+ * every correct line of a one-unknown linear equation is equivalent to every
+ * other, so equivalence would let any correct line — `x = 3` written four
+ * times — stand for any value point (boardScheme.js, D25 review of #844).
+ */
+export function writtenAsLine(studentText, schemeText) {
+  const a = readClaim(studentText), b = readClaim(schemeText);
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (sameWrittenClaim(a, b)) return true;
+  const strip = c => c.kind === 'relation'
+    ? { ...c, relation: { ...c.relation, l: withoutNeutralArithmetic(c.relation.l), r: withoutNeutralArithmetic(c.relation.r) } }
+    : c.kind === 'equation'
+      ? { ...c, ast: { ...c.ast, l: withoutNeutralArithmetic(c.ast.l), r: withoutNeutralArithmetic(c.ast.r) } }
+      : { ...c, ast: withoutNeutralArithmetic(c.ast) };
+  try { return sameWrittenClaim(strip(a), strip(b)); } catch { return false; }
+}
+
+/** Is this line only the final value (`x = 3`)? An answer claim, never a working point. */
+export function statesOnlyFinalAnswer(text, meta) {
+  const claim = readClaim(text);
+  return !!claim && isolatedFinalAnswer(claim, meta);
 }
 
 /** An isolated final value is an answer claim, not a new method step. */

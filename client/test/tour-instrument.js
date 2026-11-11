@@ -390,7 +390,7 @@ export const writeFlow = {
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await check('server reading is on for this profile', await turnOnServerReading(page, base));
 
-    await page.goto(`${base}/practice?subtopic=y7-integers`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${base}/practice?subtopic=c7-integer-operations-current&difficulty=2`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
     let right = null;
@@ -675,10 +675,10 @@ export const writeFlow = {
     if (reply) {
       await page.goto(`${base}/map`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('[data-map-chapter]', { timeout: 15000 }).catch(() => {});
-      const node = page.locator('[data-map-chapter="y7-integers"]');
+      const node = page.locator('[data-map-chapter="c7-integer-operations-current"]');
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
-        const shownMarks = await page.locator('[data-map-card="y7-integers"] [data-map-marks]').getAttribute('data-map-marks');
+        const shownMarks = await page.locator('[data-map-card="c7-integer-operations-current"] [data-map-marks]').getAttribute('data-map-marks');
         await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} / ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
         await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
@@ -832,7 +832,7 @@ export const auroraFlow = {
       alphaOf(await page.locator('.in-plate').first().evaluate(el => getComputedStyle(el).backgroundColor)) === 1);
     const barGlass = async () => page.locator('[data-instrument-bar]').evaluate(el => getComputedStyle(el).backdropFilter || getComputedStyle(el).webkitBackdropFilter || 'none');
     await check('the tab bar is glass', /blur/.test(await barGlass()), await barGlass());
-    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=y7-integers', '.q-prompt', false]]) {
+    for (const [path, ready, want] of [['/map', '[data-map-chapter]', true], ['/settings', 'main h1, .settings-grid', true], ['/review', '.in-led-bar, [data-state="empty"]', false], ['/progress', '[data-instrument-report]', false], ['/practice?subtopic=c7-integer-operations-current&difficulty=2', '.q-prompt', false]]) {
       await goto(path);
       await page.waitForSelector(ready, { timeout: 30000 }).catch(() => {});
       await settle();
@@ -843,7 +843,15 @@ export const auroraFlow = {
     // Content is the Instrument's under both skins: every content token and
     // every content surface computes the same with and without the skin.
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    // The India chapter mixes multiple-choice items (no writing surface) with
+    // written ones: move on, within a bound, to a question that can be written.
     const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+    for (let i = 0; i < 8 && !(await tab.count()) && !(await page.locator('.ink-canvas-live').count()); i++) {
+      const leaving = await page.locator('.qpage').getAttribute('data-question-id');
+      await page.locator('.ctx-next').click();
+      await page.waitForFunction(id => { const e = document.querySelector('.qpage[data-question-id]'); return e && e.getAttribute('data-question-id') !== id; }, leaving, { timeout: 30000 });
+      await settle();
+    }
     if (await tab.count()) await tab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await settle();

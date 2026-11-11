@@ -55,7 +55,7 @@ if (built.built) console.log(`  built client in ${built.ms} ms`);
 const server = await startOnlinePlatform();
 const browser = await chromium.launch();
 try {
-  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
   const errors = [];
@@ -89,6 +89,9 @@ try {
   await page.locator('.nt-map-disclosure summary').click();
   await page.waitForSelector('.nt-map-node');
   await check('the chapter map draws a node per chapter', await page.locator('.nt-map-node').count() === 14);
+  await check('expanded chapter map nodes are actually visible',
+    await page.locator('.nt-map-node').evaluateAll(nodes =>
+      nodes.every(node => getComputedStyle(node).opacity === '1' && getComputedStyle(node).transform === 'none')));
   await page.waitForTimeout(1400);
   await shot(page, 'map-open');
 
@@ -108,8 +111,8 @@ try {
     await page.locator('.nt-toc a[href^="#"]').count() >= 6);
   await check('the first lesson section is readable before any scroll animation',
     await page.locator('.nt-section').first().evaluate(el => getComputedStyle(el.querySelector('.nt-section-h')).opacity === '1'));
-  await check('only three worked examples mount initially to prioritise learning',
-    await page.locator('.nt-example').count() === 3);
+  await check('initial worked-example mount stays bounded at six (the notes browser contract)',
+    await page.locator('.nt-example').count() === 6);
   for (const h of ['Key ideas', 'Definitions', 'Formulas', 'Important points', 'Common mistakes', 'Worked examples']) {
     await check(`the chapter has a “${h}” section`, await page.getByRole('heading', { name: h, exact: true }).count() === 1);
   }
@@ -133,11 +136,25 @@ try {
   await check('tapping a concept unfolds it', await second.getAttribute('aria-expanded') === 'true' &&
     await page.locator('.nt-concept').nth(1).locator('.nt-concept-body').isVisible());
 
-  // A worked example, stepped through to its checked answer.
+  // The first example offers optional self-explanation before revealing each step.
+  // This is never graded or submitted: the learner checks their own prediction.
   const ex = page.locator('.nt-example').first();
   await ex.scrollIntoViewIfNeeded();
+  await check('prediction editor is opt-in, not mandatory', await ex.getByTestId('notes-step-prediction').count() === 0);
+  await ex.getByRole('button', { name: 'Try the next step first' }).click();
+  const prediction = ex.getByRole('textbox', { name: 'Your next step (optional)' });
+  await prediction.fill('I would split the middle term using product ac');
+  await check('prediction is explicitly ungraded and stays on this page',
+    (await ex.locator('.nt-predict-editor').innerText()).includes('Nothing is submitted or graded'));
+  await check('prediction does not reveal the solution automatically', await ex.locator('.nt-step').count() === 0);
+  await ex.getByRole('button', { name: 'Show next step' }).click();
+  await check('learner compares their own attempt with the revealed mathematical step',
+    (await ex.locator('.nt-step-attempt').innerText()).includes('I would split the middle term'));
+  await check('prediction editor closes after reveal', await ex.getByTestId('notes-step-prediction').count() === 0);
   await ex.getByRole('button', { name: 'Show all steps' }).click();
   await check('the worked example reaches its answer', await ex.locator('.nt-answer').isVisible());
+  await check('practice follows the worked example in the same chapter',
+    (await ex.getByRole('link', { name: 'Try a question from this chapter' }).getAttribute('href')).includes('subtopic=c10-quadratic-equations'));
   await check('the answer says the engine checked it', /checked by the maths engine/.test(await ex.locator('.nt-answer').innerText()));
   await shot(page, 'example');
   await page.locator('.nt-mistakes').scrollIntoViewIfNeeded();

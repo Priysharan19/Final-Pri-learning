@@ -19,7 +19,7 @@
 import { allGenerators, IN_CHAPTERS } from '../../client/src/engine/curriculum-in.js';
 import { indiaPyqCells } from '../../client/src/engine/indiaExamCells.js';
 import { hasJeePyqGenerator } from '../../client/src/engine/generators/jee-pyq-runtime.js';
-import { hasPyqGenerator } from '../../client/src/engine/pyq/pyqCoverage.js';
+import { hasPyqGenerator } from '../../client/src/engine/pyq/pyqIndex.js';
 
 // The covers' generators, and the India previous-year banks the exam cells
 // draw on (the source-cited archive and the reviewed JEE department catalog).

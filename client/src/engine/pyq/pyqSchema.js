@@ -17,6 +17,14 @@
 //   · its answer contract is one checker.js cannot mark;
 //   · it is a four-option MCQ whose four options are not four distinct texts.
 //
+// Records on the official-paper-plus-separate-key rung (JEE Main: NTA publishes
+// the paper and the final key as two documents) are held to more: one official
+// question paper and one official final key, two different documents, both
+// pinned by sha256, joined by the authority's own question id, and for an MCQ
+// the keyed option id must be the paper's option at correctIndex
+// (checkSeparateKey). The card names the rung (PYQ_PROVENANCE_LABEL), so it is
+// never read as the single-document rung.
+//
 // That last one is not theoretical. hasFourDistinctOptions in
 // indiaExamComposer.js exists because a three-distinct-option question reached
 // a JEE Main slot and turned a promised one-in-four guess into one in three;
@@ -24,8 +32,9 @@
 // archive refuses it at the door rather than downstream.
 
 import { IN_CHAPTER_BY_ID } from '../curriculum-in.js';
-import { PYQ_PROVENANCE, PYQ_PUBLISHABLE, pyqExam, pyqSource } from './pyqSources.js';
+import { PYQ_PROVENANCE, PYQ_PROVENANCE_LABEL, PYQ_PUBLISHABLE, pyqExam, pyqSource } from './pyqSources.js';
 import { figureHasExternalRef } from '../figureRefs.js';
+import { boardSchemeProblems } from '../boardScheme.js';
 
 /** Answer contracts the archive can carry, and checker.js can mark. */
 export const PYQ_ANSWER_TYPES = Object.freeze(['mcq', 'numeric']);
@@ -62,6 +71,57 @@ function checkFigure(rec, figure, where) {
   if (!/^<svg[\s>]/i.test(svg) || !/<\/svg>$/i.test(svg)) fail(rec, `gives ${where} a figure that is not a single inline <svg> element.`);
   if (FIGURE_FORBIDDEN.test(svg)) fail(rec, `gives ${where} a figure with script, an event handler, an external reference or an embedded object.`);
   if (figureHasExternalRef(svg)) fail(rec, `gives ${where} a figure that references something outside itself; only url(#localId) and href="#localId" are allowed.`);
+}
+
+const SHA256 = /^[0-9a-f]{64}$/;
+
+/**
+ * The official-paper-plus-separate-key rung: the question comes from the
+ * authority's question paper and the answer from the authority's separate final
+ * key, and nothing joins them but the authority's own question id. So:
+ *   · the prompt is read from exactly one official question paper, the answer
+ *     from exactly one official final answer key, and they are two documents;
+ *   · both documents carry the sha256 of the file that was read;
+ *   · the record carries the authority's question id, and for an MCQ the four
+ *     option ids printed on the paper and the option id the key names, which
+ *     must be the option at correctIndex — the key is checked against the
+ *     paper's own ids, never against an option's position.
+ */
+function checkSeparateKey(rec) {
+  const prompts = asList(rec.promptSource), answers = asList(rec.answerSource);
+  if (prompts.length !== 1 || pyqSource(prompts[0])?.kind !== 'official-question-paper') fail(rec, 'is on the paper-plus-separate-key rung, so its prompt must come from exactly one official question paper.');
+  if (answers.length !== 1 || pyqSource(answers[0])?.kind !== 'official-final-answer-key') fail(rec, 'is on the paper-plus-separate-key rung, so its answer must come from exactly one official final answer key.');
+  if (prompts[0] === answers[0]) fail(rec, 'names one document as both paper and key; that is the single-document rung, not this one.');
+  for (const id of [prompts[0], answers[0]]) {
+    if (!SHA256.test(String(pyqSource(id)?.sha256 || ''))) fail(rec, `cites "${id}" without the sha256 of the file that was read.`);
+  }
+  if (!/^\d{4,}$/.test(String(rec.authorityQuestionId || ''))) fail(rec, 'carries no authority question id to join the paper to its separate key.');
+  if (rec.answerType === 'mcq') {
+    const ids = rec.authorityOptionIds;
+    if (!Array.isArray(ids) || ids.length !== 4 || new Set(ids.map(String)).size !== 4 || !ids.every(x => /^\d{4,}$/.test(String(x)))) fail(rec, 'is an MCQ on the paper-plus-separate-key rung without the four option ids printed on the paper.');
+    if (String(rec.keyedOptionId) !== String(ids[rec.answer?.correctIndex])) fail(rec, `keys option id ${rec.keyedOptionId}, which is not the option at correctIndex ${rec.answer?.correctIndex} (${ids[rec.answer?.correctIndex]}).`);
+  }
+}
+
+/**
+ * Sections B–E of a CBSE paper are marked per value point, so a record from one
+ * carries the Board's scheme (boardScheme.js) and is refused without it: the
+ * marks, the transcribed points (each working point with the line that earns it),
+ * a numeric final answer the engine checks, the step-check metadata the lines
+ * are verified against, and the Board's marking scheme as its answer source.
+ * A Section A record carries none of this, and may not.
+ */
+function checkBoardScheme(rec) {
+  const stepped = rec.examId?.startsWith?.('cbse-') && isText(rec.section) && rec.section !== 'Section A';
+  if (!stepped) {
+    if (rec.boardScheme !== undefined || rec.marks !== undefined) fail(rec, 'carries a Board marking scheme, which only a CBSE Section B–E record may.');
+    return;
+  }
+  if (rec.answerType !== 'numeric') fail(rec, `is a ${rec.section} record without a numeric final answer the engine can check; a proof or a construction cannot be marked deterministically and stays out.`);
+  const problems = boardSchemeProblems(rec.boardScheme, rec.marks, rec.stepcheck || null);
+  if (problems.length) fail(rec, `has a Board scheme the engine cannot mark: ${problems.join('; ')}.`);
+  if (!rec.stepcheck || rec.stepcheck.kind !== 'equation' || !Array.isArray(rec.stepcheck.solutions) || !rec.stepcheck.solutions.length) fail(rec, 'has no step-check metadata, so no line of its scheme could ever be verified.');
+  if (!asList(rec.answerSource).some(id => pyqSource(id)?.kind === 'official-marking-scheme')) fail(rec, 'carries a Board scheme that is not read from the Board\'s marking scheme.');
 }
 
 function checkSources(rec, field) {
@@ -108,7 +168,9 @@ export function validatePyqRecord(rec) {
     });
     if (!official) fail(rec, 'claims an official key but names no official answer key or marking scheme as its answer source.');
   }
+  if (rec.provenance === PYQ_PROVENANCE.OFFICIAL_PAPER_PLUS_SEPARATE_KEY) checkSeparateKey(rec);
 
+  checkBoardScheme(rec);
   if (!isText(rec.prompt)) fail(rec, 'has no prompt.');
   if (!Number.isInteger(rec.difficulty) || rec.difficulty < 1 || rec.difficulty > 4) fail(rec, `has difficulty ${JSON.stringify(rec.difficulty)}; it must be an integer 1-4.`);
   if (!Array.isArray(rec.steps) || !rec.steps.length) fail(rec, 'has no worked steps. A PYQ a student gets wrong with no explanation is worse than no PYQ.');
@@ -171,7 +233,7 @@ export function pyqLabel(rec) {
 function archiveMeta(rec) {
   const cite = id => {
     const src = pyqSource(id);
-    return { id, authority: src.authority, title: src.title, kind: src.kind, url: src.url, file: src.file || null, archivedAt: src.archivedAt || null, retrieved: src.retrieved };
+    return { id, authority: src.authority, title: src.title, kind: src.kind, url: src.url, file: src.file || null, archivedAt: src.archivedAt || null, sha256: src.sha256 || null, retrieved: src.retrieved };
   };
   const ids = [...new Set([...asList(rec.promptSource), ...asList(rec.answerSource)])];
   return Object.freeze({
@@ -187,6 +249,9 @@ function archiveMeta(rec) {
     questionNumber: rec.questionNumber,
     chapterId: rec.chapterId,
     provenance: rec.provenance,
+    provenanceLabel: PYQ_PROVENANCE_LABEL[rec.provenance],
+    shift: rec.shift || null,
+    authorityQuestionId: rec.authorityQuestionId || null,
     citations: Object.freeze(ids.map(cite)),
     stepsAuthorship: PYQ_STEPS_AUTHORSHIP
   });
@@ -215,6 +280,13 @@ export function pyqPayload(rec) {
     archive: archiveMeta(rec)
   };
   if (rec.figure) base.figure = String(rec.figure);
+  // Server-private: the scheme and its step metadata never reach a device
+  // (PUBLIC_Q in server/platform/practice.js does not list them).
+  if (Array.isArray(rec.boardScheme)) {
+    base.marks = rec.marks;
+    base.boardScheme = rec.boardScheme.map(p => ({ ...p }));
+    base.stepcheck = { ...rec.stepcheck };
+  }
   if (rec.answerType === 'mcq') {
     return { ...base, answerType: 'mcq', mcqOptions: rec.mcqOptions.map(String), answer: { correctIndex: rec.answer.correctIndex } };
   }

@@ -20,7 +20,6 @@
 // finish cannot be marked at all.
 import { get, put, del, byIndex } from './idb.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
-import { pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
 import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
@@ -32,6 +31,7 @@ import {
 } from '../engine/indiaExams.js';
 import { composeIndiaPaper, composerNotes, answerText, paperSpecOf } from '../engine/indiaExamComposer.js';
 import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../engine/boardMock.js';
+import { whyTheseQuestions, TARGETED_LABEL } from '../engine/targetedMock.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence, withExamLock } from './backend.js';
 import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
@@ -40,7 +40,7 @@ import {
 } from './examSession.js';
 import { analyseExam } from './examAnalysis.js';
 import {
-  isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, serverFieldOf, scheduleCheckpoint,
+  isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, examTargets, serverFieldOf, scheduleCheckpoint,
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
@@ -134,12 +134,23 @@ function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
   };
 }
 
+// What the archive holds is on demand (pyq/pyqIndex.js says why); a paper whose
+// fetch of it fails says nothing about the archive rather than failing.
+async function pyqAboutArchive() {
+  try { return await import('../engine/pyq/pyqCoverage.js'); } catch { return null; }
+}
+const pyqAbsenceFor = (about, track) => about.pyqAbsenceFor(track);
+
 async function createIndiaExam(profile, body = {}) {
+  const pyqAbout = await pyqAboutArchive();
   const grade = Number(profile.year);
   const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', grade);
   // A board mock (engine/boardMock.js, D22) is the Standard paper of a board
   // class only, sat typed.
-  const mock = body.mock === true;
+  // A targeted paper (engine/targetedMock.js, Premium) is a board mock whose
+  // questions lean toward this account's weak and due subtopics.
+  const targeted = body.targeted === true;
+  const mock = body.mock === true || targeted;
   const variant = !mock && body.variant === 'basic' ? 'basic' : 'standard';
   if (mock && !boardMockOf({ track, grade, variant })) throw error('Board mocks are set for CBSE Class X and Class XII.', 409, 'MOCK_NOT_AVAILABLE');
   const blueprint = indiaExamBlueprint({ track, grade, variant });
@@ -153,7 +164,8 @@ async function createIndiaExam(profile, body = {}) {
   await loadBanksFor([...new Set(chapters.flatMap(c => (c.covers || []).map(x => x.gen)))]);
   const pyqCells = await pyqCellsByChapter(track, chapters);
   const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
-  const title = mock ? mockTitleOf({ track, grade, variant }) : titleFor(spec, count + 1);
+  const title = mock ? mockTitleOf({ track, grade, variant }) + (targeted ? ' · targeted' : '') : titleFor(spec, count + 1);
+  const targets = targeted ? await examTargets(profile.id) : null;
   let seed = null;
   let paper = null;
   let issued = null;
@@ -174,8 +186,15 @@ async function createIndiaExam(profile, body = {}) {
       // one-mark Section A slot should not be handed a D4 JEE Advanced item just
       // because the chapter has one, but a chapter whose only past-paper question
       // sits a rung outside the window is still better than no past paper at all.
-      pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
+      pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range),
+      targets
     });
+    // A chapter whose only cells are target subtopics can push a paper past
+    // the cap; such a paper is composed again without leaning on anything,
+    // and the server's key says how many questions fell on a target anyway.
+    if (targets && !whyTheseQuestions(paper.questions, targets).withinCap) {
+      paper = composeIndiaPaper(spec, { seed, draw: generateQuestion, chapters, pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range) });
+    }
     if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
       throw error(
         'The reviewed JEE PYQ archive cannot currently supply enough unique questions for a reviewed-only Mathematics-section simulation.',
@@ -188,8 +207,8 @@ async function createIndiaExam(profile, body = {}) {
     // What goes to the server is the recipe of each item; the server chooses the
     // questions, and no answer to any of them comes back until it has marked.
     try {
-      issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), ...(mock ? { mock: true } : {}) },
-        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}${mock ? ':mock' : ''}`,
+      issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), ...(mock ? { mock: true } : {}), ...(targeted ? { targeted: true } : {}) },
+        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}${mock ? ':mock' : ''}${targeted ? ':targeted' : ''}`,
         { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
     } catch (err) {
       // EXAM_LAYOUT_NOT_ISSUED: the layout was spent meanwhile (another device
@@ -235,6 +254,7 @@ async function createIndiaExam(profile, body = {}) {
     pathway: null,
     title,
     ...(mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
+    ...(issued.targeted ? { targeted: true, targetedLabel: TARGETED_LABEL, why: issued.why || null } : {}),
     durationMin: issued.durationMin,
     questionIds,
     createdAt: now,
@@ -269,8 +289,8 @@ async function createIndiaExam(profile, body = {}) {
       pyq: {
         used: composition.pyq,
         questions: issued.questions.length,
-        archive: PYQ_MANIFEST,
-        absent: pyqAbsenceFor(track)
+        archive: pyqAbout?.PYQ_MANIFEST || null,
+        absent: pyqAbout ? pyqAbsenceFor(pyqAbout, track) : null
       },
       composition,
       reducedPattern: composed.reducedPattern,
@@ -358,6 +378,8 @@ async function examView(profile, id) {
     serverIssued: isServerPaper(exam),
     // A board mock (D22) is labelled on every surface and sat typed.
     ...(exam.mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
+    // A targeted paper (Premium) carries the server's "why these questions" key.
+    ...(exam.targeted ? { targeted: true, targetedLabel: TARGETED_LABEL, why: exam.why || null } : {}),
     indiaExam: exam.indiaExam
   };
 }

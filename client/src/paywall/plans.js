@@ -8,7 +8,15 @@
 //              5 reads of your writing and 5 question photos a day, and the
 //              mistake notebook;
 //   Premium  — unlimited practice questions and timed papers, the JEE
-//              Advanced track, 25 reads and 25 photos a day.
+//              Advanced track, 25 reads and 25 photos a day; and, on the
+//              server's own entitlement record, where the time went in each
+//              section of a timed paper (premium-exams), the estimate from
+//              practice and the mistake patterns on Insights
+//              (advanced-analytics).
+// Every row names the capability the SERVER checks for it, so the screen
+// cannot sell something only the device decides (client/test/
+// paywall-honesty-check.mjs). Features that ship dark (the parent weekly
+// report, "Why this step?") are not listed until they are on.
 // Nothing else is claimed: no accuracy, no outcome, no "complete" (D24).
 // ─────────────────────────────────────────────────────────────────────────────
 import { FREE_PRACTICE_ALLOWANCE, READ_ALLOWANCE } from '../engine/practiceAllowance.js';
@@ -24,10 +32,13 @@ export const FREE_ROWS = Object.freeze([
 ]);
 
 export const PREMIUM_ROWS = Object.freeze([
-  Object.freeze({ key: 'paywall.premium.questions' }),
-  Object.freeze({ key: 'paywall.premium.papers' }),
-  Object.freeze({ key: 'paywall.premium.jeeAdvanced' }),
-  Object.freeze({ key: 'paywall.premium.reads', vars: plural(READ_ALLOWANCE.premium) })
+  Object.freeze({ key: 'paywall.premium.questions', capability: 'unlimited-practice' }),
+  Object.freeze({ key: 'paywall.premium.papers', capability: 'premium-exams' }),
+  Object.freeze({ key: 'paywall.premium.timeReport', capability: 'premium-exams' }),
+  Object.freeze({ key: 'paywall.premium.jeeAdvanced', capability: 'jee-advanced-content' }),
+  Object.freeze({ key: 'paywall.premium.reads', vars: plural(READ_ALLOWANCE.premium), capability: 'additional-ai-usage' }),
+  Object.freeze({ key: 'paywall.premium.forecast', capability: 'advanced-analytics' }),
+  Object.freeze({ key: 'paywall.premium.habits', capability: 'advanced-analytics' })
 ]);
 
 /** Why the student arrived, said first and plainly. Unknown reasons say nothing. */
@@ -35,5 +46,7 @@ export const ARRIVAL_KEYS = Object.freeze({
   practice: 'paywall.from.practice',
   exams: 'paywall.from.exams',
   'jee-advanced': 'paywall.from.jeeAdvanced',
-  reads: 'paywall.from.reads'
+  reads: 'paywall.from.reads',
+  'time-report': 'paywall.from.timeReport',
+  insights: 'paywall.from.insights'
 });

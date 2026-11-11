@@ -534,16 +534,25 @@ struct WebShell: UIViewRepresentable {
         // so they are dropped first. A page that keeps dying gets a native
         // screen instead of a reload loop: the same policy as Android's
         // onRenderProcessGone (MainActivity.kt, more than 2 within 30 s).
+        // The run is chained, not a fixed window: an end counts toward it when
+        // it comes within 30 s of the end before it. A fixed window let a page
+        // that took more than 15 s to reload and die again reload forever, two
+        // ends always in view (iPad Pro 13-inch on iOS 26 in CI, Train 4/12).
         static let maxContentTerminations = 2
         static let contentTerminationWindow: TimeInterval = 30
         private var contentTerminations: [Date] = []
         private weak var shellContainer: UIView?
         private var stoppedView: UIView?
 
-        /// The terminations still inside the window (this one included), and
-        /// whether the page may be reloaded once more.
+        /// The unbroken run of terminations ending with this one (each within
+        /// the window of the one before), and whether the page may be reloaded
+        /// once more.
         static func recovery(after earlier: [Date], at now: Date) -> (recent: [Date], reload: Bool) {
-            let recent = earlier.filter { now.timeIntervalSince($0) <= contentTerminationWindow } + [now]
+            var recent = [now]
+            for end in earlier.reversed() {
+                guard let next = recent.first, next.timeIntervalSince(end) <= contentTerminationWindow else { break }
+                recent.insert(end, at: 0)
+            }
             return (recent, recent.count <= maxContentTerminations)
         }
 

@@ -128,6 +128,9 @@ function NotesIndex() {
   const [recentId] = useState(() => readRecentNotesChapter(user?.id));
   const recentChapter = IN_CHAPTER_BY_ID[recentId];
   const [onlyMarked, setOnlyMarked] = useState(false);
+  // A closed <details> still lays out its content in Chromium, so a mounted map
+  // would expose 14 unreachable buttons. Mount it only while it is open.
+  const [mapGrade, setMapGrade] = useState(null);
   const [query, setQuery] = useState(() =>
     readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
   useEffect(() => {
@@ -229,12 +232,12 @@ function NotesIndex() {
               </ol>
             </section>
             {notes && group && (
-              <details className="nt-map-disclosure" key={grade}>
+              <details className="nt-map-disclosure" key={grade} onToggle={e => setMapGrade(e.currentTarget.open ? grade : null)}>
                 <summary>
                   <span>{t('notes.mapTitle')}</span>
                   <span className="nt-map-disclosure-hint">{t('notes.mapHint')}</span>
                 </summary>
-                <ChapterMap group={group} notes={notes} />
+                {mapGrade === grade && <ChapterMap group={group} notes={notes} />}
               </details>
             )}
           </>
@@ -415,7 +418,7 @@ function ChapterNotes({ chapterId }) {
     if (IN_CHAPTER_BY_ID[chapterId]) rememberRecentNotesChapter(user?.id, chapterId);
   }, [user?.id, chapterId]);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
-  const [visibleExamples, setVisibleExamples] = useState(3);
+  const [visibleExamples, setVisibleExamples] = useState(6);
   const [visualOnly, setVisualOnly] = useState(false);
   const notes = all?.[chapterId];
   const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
@@ -436,7 +439,7 @@ function ChapterNotes({ chapterId }) {
 
   const root = useRef(null);
   useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
-  useEffect(() => { setVisibleExamples(3); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
+  useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -531,18 +534,18 @@ function ChapterNotes({ chapterId }) {
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
                   aria-pressed={visualOnly}
-                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(3); }}>
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
                   {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
                 </button>
               </div>
             )}
-            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} />)}
+            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} practiceLink={practiceLink} />)}
             {selectedExamples.length > visibleExamples && (
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
-                  onClick={() => setVisibleExamples(v => Math.min(v + 3, selectedExamples.length))}
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
                   aria-label={t('notes.showMoreExamples')}>
-                  {t('nav.more')} ({Math.min(visibleExamples + 3, selectedExamples.length)}/{selectedExamples.length})
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
                 </button>
               </div>
             )}
@@ -707,10 +710,17 @@ function Formula({ f, i }) {
   );
 }
 
-function Example({ ex, n }) {
+function Example({ ex, n, practiceLink }) {
   const t = useT();
   // The student first sees only the problem, never an unsolicited solution.
   const [shown, setShown] = useState(0);
+  // Only component state: no persistence, server call, telemetry or marking.
+  const [predictionOpen, setPredictionOpen] = useState(false);
+  const [predictions, setPredictions] = useState({});
+  const reveal = (count) => {
+    setPredictionOpen(false);
+    setShown(current => Math.min(ex.steps.length, Math.max(current, count)));
+  };
   const done = shown >= ex.steps.length;
   return (
     <div className="nt-example nt-reveal">
@@ -727,15 +737,39 @@ function Example({ ex, n }) {
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
           <MathText text={s} />
           {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
+          {predictions[i]?.trim() && (
+            <div className="nt-step-attempt">
+              <span>{t('notes.yourAttempt')}</span>
+              <p>{predictions[i].trim()}</p>
+            </div>
+          )}
         </li>)}
       </ol>
       {!done ? (
-        <div className="nt-example-more">
-          <button type="button" className="btn btn-secondary" onClick={() => setShown(s => s + 1)}>{t('notes.nextStep')}</button>
-          <button type="button" className="nt-link-btn" onClick={() => setShown(ex.steps.length)}>{t('notes.allSteps')}</button>
+        <div className="nt-example-learning">
+          <button type="button" className="nt-predict-toggle" aria-expanded={predictionOpen}
+            onClick={() => setPredictionOpen(value => !value)}>
+            {t('notes.tryNextStep')}
+          </button>
+          {predictionOpen && (
+            <div className="nt-predict-editor">
+              <label>
+                <span>{t('notes.predictionLabel')}</span>
+                <textarea rows={2} maxLength={360} value={predictions[shown] || ''}
+                  onChange={event => setPredictions(prev => ({ ...prev, [shown]: event.target.value }))}
+                  data-testid="notes-step-prediction" />
+              </label>
+              <p>{t('notes.predictionPrivacy')}</p>
+            </div>
+          )}
+          <div className="nt-example-more">
+            <button type="button" className="btn btn-secondary" onClick={() => reveal(shown + 1)}>{t('notes.nextStep')}</button>
+            <button type="button" className="nt-link-btn" onClick={() => reveal(ex.steps.length)}>{t('notes.allSteps')}</button>
+          </div>
         </div>
       ) : (
-        <div className="nt-answer nt-step">
+        <>
+          <div className="nt-answer nt-step">
           <span className="nt-tag">{t('notes.answer')}</span>
           <MathText text={ex.answer} />
           <span className="nt-checked">{t('notes.engineChecked')}</span>
@@ -745,7 +779,9 @@ function Example({ ex, n }) {
               <MathText block text={ex.alternative} />
             </details>
           )}
-        </div>
+          </div>
+          <PageLink className="nt-example-practice" to={practiceLink}>{t('notes.tryChapterPractice')}</PageLink>
+        </>
       )}
     </div>
   );

@@ -536,29 +536,29 @@ Answer type: numeric (unit "units"). Printed answer: `15 units`.
 
 ## Introduction to Trigonometry (Class 10) · `c10-trigonometry-current` D1 seed 1
 
-> In the right-angled triangle shown, find $\sin\theta$ exactly.
+> In the right-angled triangle shown, find $\tan\theta$ exactly.
 
-Answer type: numeric. Printed answer: `7/25`.
+Answer type: numeric. Printed answer: `989/660`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `7/25` | ✓ credited | |
-| a neighbouring value | `0.2828` | ✗ wrong | |
-| a contradicting unit | `7/25 kg` | unread | |
+| key | `989/660` | ✓ credited | |
+| a neighbouring value | `1.51346969697` | ✗ wrong | |
+| a contradicting unit | `989/660 kg` | unread | |
 
 ## Some Applications of Trigonometry (Class 10) · `c10-trig-applications-current` D1 seed 1
 
-> From a point $20$ m from the base of a vertical tower, the angle of elevation of its top is $45^\circ$. Find the tower height, correct to 1 decimal place.
+> From a point $11$ m from the base of a vertical tower, the angle of elevation of its top is $45^\circ$. Find the tower height, correct to 1 decimal place.
 
-Answer type: numeric (unit "m"). Printed answer: `20 m`.
+Answer type: numeric (unit "m"). Printed answer: `11 m`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `20` | ✓ credited | |
-| with the box unit | `20 m` | ✓ credited | |
-| as a sum still to do | `19 + 1` | refused (D13) | |
-| a neighbouring value | `21` | ✗ wrong | |
-| a contradicting unit | `20 kg` | ✗ wrong | |
+| key | `11` | ✓ credited | |
+| with the box unit | `11 m` | ✓ credited | |
+| as a sum still to do | `10 + 1` | refused (D13) | |
+| a neighbouring value | `12` | ✗ wrong | |
+| a contradicting unit | `11 kg` | ✗ wrong | |
 
 ## Circles (Class 10) · `c10-circles` D1 seed 1
 
@@ -589,17 +589,17 @@ Answer type: numeric (unit "cm²"). Printed answer: `231/2`.
 
 ## Surface Areas and Volumes (Class 10) · `c10-surface-area-combo` D1 seed 1
 
-> A solid is a cylinder of radius $14$ cm and height $6$ cm with a hemisphere of the same radius fixed on top. Find the total exposed surface area. Take $\pi=\dfrac{22}{7}$.
+> A solid is a cylinder of radius $133$ cm and height $5$ cm with a hemisphere of the same radius fixed on top. Find the total exposed surface area. Take $\pi=\dfrac{22}{7}$.
 
-Answer type: numeric (unit "cm²"). Printed answer: `2376 cm²`.
+Answer type: numeric (unit "cm²"). Printed answer: `170962 cm²`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `2376` | ✓ credited | |
-| with the box unit | `2376 cm²` | ✓ credited | |
-| as a sum still to do | `2375 + 1` | refused (D13) | |
-| a neighbouring value | `2377` | ✗ wrong | |
-| a contradicting unit | `2376 kg` | ✗ wrong | |
+| key | `170962` | ✓ credited | |
+| with the box unit | `170962 cm²` | ✓ credited | |
+| as a sum still to do | `170961 + 1` | refused (D13) | |
+| a neighbouring value | `170963` | ✗ wrong | |
+| a contradicting unit | `170962 kg` | ✗ wrong | |
 
 ## Statistics (Class 10) · `c10-statistics` D1 seed 1
 
@@ -1062,4 +1062,4 @@ Answer type: numeric. Printed answer: `378`.
 | a neighbouring value | `379` | ✗ wrong | |
 | a contradicting unit | `378 kg` | unread | |
 
-**Sample digest (sha256 of everything above this line):** `9eac4f66344bff7691bce31f42447066f264070b9bb4c2c91c89025eec15a8c6`
+**Sample digest (sha256 of everything above this line):** `75b4d09cffd221ce265d6337ff516942b324cdb38dd46619880cc30f1602e3e9`
