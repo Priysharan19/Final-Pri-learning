@@ -29,7 +29,6 @@ import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
-import ListenButton from './ListenButton.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
@@ -128,6 +127,8 @@ const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/Tut
 // "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
 // "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
+// "Listen" on a worked step: its own lazy chunk, fetched with the solution.
+const ListenButton = React.lazy(() => import('./ListenButton.jsx'));
 const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
 // The live step coach (F1): its requests and per-line verdicts, on demand.
 const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
@@ -2228,7 +2229,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div>
               <div className="step-h"><MathText text={s.h} /></div>
               <div className="step-d"><MathText text={s.d} /></div>
-              <ListenButton text={[s.h, s.d].filter(Boolean).join('. ')} />
+              <React.Suspense fallback={null}><ListenButton text={[s.h, s.d].filter(Boolean).join('. ')} /></React.Suspense>
               {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
               {WhyStep && tutorEnabled && !diagnostic && resolved && (
                 <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}

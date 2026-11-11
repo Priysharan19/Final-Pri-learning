@@ -31,5 +31,11 @@ export function listenPlan(voices, language, { region } = {}) {
 export function listenText(textFor, plan) {
   if (!plan) return '';
   const raw = typeof textFor === 'function' ? textFor(plan.spoken) : textFor;
+  // A plain string carries no English version. When only an English voice
+  // exists, Hindi (Devanagari) text has nothing it may be read as: say nothing,
+  // and the control hides, rather than an English voice reading Hindi.
+  if (plan.spoken !== 'hi' && HINDI_SCRIPT.test(String(raw || ''))) return '';
   return speechText(raw, plan.spoken);
 }
+
+const HINDI_SCRIPT = /[\u0900-\u097F]/;

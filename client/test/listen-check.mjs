@@ -33,6 +33,9 @@ ok('Hindi square', /x का वर्ग/.test(say('$x^2$', hiPlan)));
 ok('no LaTeX left in what is spoken', !/[\\${}^]/.test(say('$\\frac{x^2+1}{\\sqrt{2}} \\le 3$', enPlan)), say('$\\frac{x^2+1}{\\sqrt{2}} \\le 3$', enPlan));
 ok('same input, same words', say('$2x+3=7$', hiPlan) === say('$2x+3=7$', hiPlan));
 ok('English fallback speaks the English text', listenText(lang => (lang === 'hi' ? 'हिंदी' : 'English words'), net) === 'English words');
+ok('a plain Hindi string is never read by an English voice', listenText('x का मान 5 है', net) === '' && listenText('$x$ बराबर 5', enPlan) === '');
+ok('the same Hindi string is read by a Hindi voice', listenText('x का मान 5 है', hiPlan).length > 0);
+ok('a plain English string still reads with English fallback', listenText('Subtract 3 from both sides.', net) === 'Subtract 3 from both sides.');
 ok('no plan, nothing spoken', listenText('x', null) === '');
 
 // Strings and wiring.
@@ -43,6 +46,7 @@ ok('button is a real toggle button', /type="button"/.test(btn) && /aria-pressed/
 ok('no network in the listen path', !/fetch\(|api\.|XMLHttpRequest|WebSocket/.test(btn + readFileSync(new URL('../src/explain/listen.js', import.meta.url), 'utf8')));
 const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 ok('Listen on each worked step', /<ListenButton text=\{\[s\.h, s\.d\]/.test(qc));
+ok('ListenButton is loaded on demand in QuestionCard, not in the main chunk', /const ListenButton = React\.lazy\(\(\) => import\('\.\/ListenButton\.jsx'\)\)/.test(qc) && !/^import ListenButton/m.test(qc));
 const tutor = readFileSync(new URL('../src/tutor/TutorHelp.jsx', import.meta.url), 'utf8');
 ok('Listen on tutor replies, not the student\'s own turns', /turn\.role !== 'student' && turn\.text && <ListenButton/.test(tutor));
 
