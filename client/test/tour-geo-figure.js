@@ -18,9 +18,12 @@ export const flow = {
     await goto('/');
     await createProfile({ name: 'Figure Student', year: 10, course: 'in' });
     await online.signIn({ name: 'Figure Student' });
+    const issued = [];
     await page.route(POST_ISSUE, async route => {
       const original = route.request().postDataJSON() || {};
-      await route.fulfill({ response: await route.fetch({ postData: JSON.stringify({ ...original, ...PIN }) }) });
+      const response = await route.fetch({ postData: JSON.stringify({ ...original, ...PIN }) });
+      issued.push({ status: response.status(), body: (await response.text()).slice(0, 300), original });
+      await route.fulfill({ response });
     });
     await page.goto(`${base}/practice?subtopic=c10-linear-pair-methods`, { waitUntil: 'domcontentloaded' });
     await front(page).locator('.q-prompt').waitFor({ timeout: 30000 });
@@ -41,7 +44,7 @@ export const flow = {
       known = await issuedAnswer();
     }
     if (!await check('the real server issued the pinned 9-12-15 triangle question',
-      /sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || '') && known.kind === 'text', JSON.stringify(known).slice(0, 400))) return;
+      /sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || '') && known.kind === 'text', JSON.stringify({ known, issued }).slice(0, 1200))) return;
 
     await check('no figure before the solution exists', await page.locator(FIG).count() === 0);
     await page.locator('[data-final-answer]').fill(known.text);
