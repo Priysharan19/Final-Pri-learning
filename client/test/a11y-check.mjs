@@ -1153,6 +1153,9 @@ async function run() {
 
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
+      // The concept map sits behind a disclosure; open it so the map is audited too.
+      await page.waitForSelector('.nt-map-disclosure summary', { timeout: 20000 });
+      await click(page, '.nt-map-disclosure summary');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
       await wait(page, 1200);
     });

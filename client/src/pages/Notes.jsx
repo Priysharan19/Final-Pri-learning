@@ -128,6 +128,9 @@ function NotesIndex() {
   const [recentId] = useState(() => readRecentNotesChapter(user?.id));
   const recentChapter = IN_CHAPTER_BY_ID[recentId];
   const [onlyMarked, setOnlyMarked] = useState(false);
+  // A closed <details> still lays out its content in Chromium, so a mounted map
+  // would expose 14 unreachable buttons. Mount it only while it is open.
+  const [mapGrade, setMapGrade] = useState(null);
   const [query, setQuery] = useState(() =>
     readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
   useEffect(() => {
@@ -229,12 +232,12 @@ function NotesIndex() {
               </ol>
             </section>
             {notes && group && (
-              <details className="nt-map-disclosure" key={grade}>
+              <details className="nt-map-disclosure" key={grade} onToggle={e => setMapGrade(e.currentTarget.open ? grade : null)}>
                 <summary>
                   <span>{t('notes.mapTitle')}</span>
                   <span className="nt-map-disclosure-hint">{t('notes.mapHint')}</span>
                 </summary>
-                <ChapterMap group={group} notes={notes} />
+                {mapGrade === grade && <ChapterMap group={group} notes={notes} />}
               </details>
             )}
           </>
