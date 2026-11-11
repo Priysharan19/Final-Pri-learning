@@ -70,6 +70,8 @@ ok('the forecast answers a free account with coverage only, from the server\'s o
   /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(FORECAST_CAPABILITY\)\) \{[\s\S]{0,200}premium: false[^}]*coverage: now_\.coverage, coveredMarks: now_\.coveredMarks, unseenMarks: now_\.unseenMarks \}\);/.test(srv('forecast.js')));
 ok('mistake patterns answer a free account with a count only, from the server\'s own record',
   /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(DNA_CAPABILITY\)\) \{\s*return res\.status\(200\)\.json\(\{ premium: false, capability: DNA_CAPABILITY, habitCount: dna\.habits\.length, answered: dna\.answered \}\);/.test(srv('mistakeDna.js')));
+ok('the root-gap reading answers a free account with a count only, from the server\'s own record',
+  /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(ROOT_GAP_CAPABILITY\)\) \{\s*return res\.status\(200\)\.json\(\{ premium: false, capability: ROOT_GAP_CAPABILITY, gapCount: gap\.gaps\.length, answered: gap\.answered \}\);/.test(srv('rootGap.js')));
 {
   const exams = srv('exams.js');
   ok('the time report is added only for premium-exams, on every result read',
@@ -79,7 +81,7 @@ ok('mistake patterns answer a free account with a count only, from the server\'s
 const sectionTime = read('components/SectionTime.jsx');
 const insights = read('insights/Insights.jsx');
 ok('the time-report offer says why the student arrived', /PageLink to=\{PAYWALL_ROUTE\} state=\{\{ from: 'time-report' \}\}/.test(sectionTime) && ARRIVAL_KEYS['time-report']);
-ok('both Insights offers say why the student arrived', (insights.match(/<PageLink to="\/premium" state=\{\{ from: 'insights' \}\}>/g) || []).length === 2 && !/<PageLink to="\/premium">/.test(insights) && ARRIVAL_KEYS.insights);
+ok('all three Insights offers (forecast, Mistake DNA, root gap) say why the student arrived', (insights.match(/<PageLink to="\/premium" state=\{\{ from: 'insights' \}\}>/g) || []).length === 3 && !/<PageLink to="\/premium">/.test(insights) && ARRIVAL_KEYS.insights);
 ok('an arrival from a Premium reading says what stays free', /stay on the free plan/.test(en['paywall.from.timeReport']) && /stay on the free plan/.test(en['paywall.from.insights']));
 
 // 2 · no price in the source or the copy
