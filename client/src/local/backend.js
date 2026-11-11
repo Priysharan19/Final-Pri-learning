@@ -3856,6 +3856,15 @@ const routes = {
       : null)
       : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
     const work = tutorWork(q, body?.work);
+    // A sketched graph the student confirmed: compared with the engine's own
+    // graph of the function the question states. Engine-verified features
+    // only; while the question is open it names the feature, never the value.
+    // Folded out of a tutor-off production build (this route then refuses above).
+    const graph = TUTOR_BUILT_OUT ? null : await graphWork(q, solution, body?.work?.graph, { resolved: resolvedRow });
+    if (graph) {
+      if (!resolvedRow && used < 1) { row.tutorLevel = 1; await put('questions', row); }
+      return { source: 'deterministic', diagnosis: { didRight: '', wentWrong: graph.wentWrong, nextStep: '', wentWrongLine: -1 }, code: null, tutorLevel: Number(row.tutorLevel) || 0 };
+    }
     // Nothing written: nothing to diagnose, and nothing charged (F5).
     if (!work.lines.length && !work.typedAnswer) {
       return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: used };
@@ -5646,6 +5655,27 @@ function examQuestionLocked(message) {
  * What the tutor may see of the student's attempt: their own lines and typed
  * answer, bounded, plus where the deterministic checker says it broke.
  */
+/** A confirmed sketch's first wrong feature, from the engine's graph of the stated function; null when none or not applicable. */
+// The graph comparer and plot spec load only for a confirmed sketch, so they
+// stay out of the install and warm set (first-visit budget).
+async function graphWork(q, solution, raw, { resolved = false } = {}) {
+  if (!raw || raw.confirmedByStudent !== true) return null;
+  const nums = v => (Array.isArray(v) ? v.map(Number).filter(Number.isFinite).slice(0, 20) : []);
+  const pts = v => (Array.isArray(v) ? v.filter(p => Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y))).slice(0, 20)
+    .map(p => ({ x: Number(p.x), y: Number(p.y), ...(p.kind === 'max' || p.kind === 'min' ? { kind: p.kind } : {}) })) : []);
+  const confirmed = {
+    confirmedByStudent: true,
+    intercepts: { x: nums(raw.intercepts?.x), y: nums(raw.intercepts?.y) },
+    turning: pts(raw.turning),
+    asymptotes: (Array.isArray(raw.asymptotes) ? raw.asymptotes : []).filter(a => (a?.axis === 'x' || a?.axis === 'y') && Number.isFinite(Number(a.value))).slice(0, 10).map(a => ({ axis: a.axis, value: Number(a.value) }))
+  };
+  const [{ plotSpecFor }, { compareGraphFeatures, graphDiagnosis, graphTruth }] = await Promise.all([import('../engine/plotSpec.js'), import('../engine/graphCompare.js')]);
+  const spec = plotSpecFor({ prompt: q?.prompt || q?.text || '', solutionText: solution?.solutionText || '', steps: solution?.steps || [] });
+  if (!spec?.fn) return null;
+  const truth = graphTruth(spec.fn, Number.isFinite(spec.xMin) ? { xMin: spec.xMin, xMax: spec.xMax } : null);
+  return graphDiagnosis(compareGraphFeatures(confirmed, truth), { resolved });
+}
+
 function tutorWork(q, raw) {
   const lines = (Array.isArray(raw?.lines) ? raw.lines : [])
     .map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);

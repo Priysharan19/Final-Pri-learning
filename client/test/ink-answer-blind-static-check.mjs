@@ -67,6 +67,12 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // nothing about the question, the submission's content or its mark, and
   // never reaches the reader request.
   'checkingEarlier',
+  // Reviewed 2026-11-10 (#793, L4 graph sketch reader): an OUTGOING callback.
+  // The surface calls it with the features the student confirmed from their
+  // own sketch (intercepts, turning points, asymptotes); nothing about the
+  // question, its answer or marks flows into the surface through it, and it
+  // never reaches the reader request.
+  'onGraphFeatures',
   // Reviewed 2026-11-10 (audit #2, L4): a boolean computed on the card as
   // exactly `asksForInequality(question.prompt)` — whether the VISIBLE prompt
   // the student reads asks for an inequality. Pinned below to that one
@@ -75,6 +81,14 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // solution or marks, and never reaches the reader request (the request is
   // still the picture alone, checked by CLOUD_OPTION_KEYS).
   'promptAsksInequality',
+  // Reviewed 2026-11-11 (#793, L4 graph sketch reader): a boolean computed on
+  // the card as exactly `questionAsksForGraph(question.answerType,
+  // question.prompt)` — whether the item is a graph-sketch item or its VISIBLE
+  // prompt asks for a graph to be drawn. Pinned below to that one expression;
+  // the helper takes those two values only. It only decides whether the page
+  // is read for a sketch at all; it never reads the expected answer, solution
+  // or marks and never reaches the reader request.
+  'graphAnswer',
   // Reviewed 2026-11-10 (F1 live step coach, L4): a boolean, true where the
   // server says the coach is on for this account (its switch and Premium) and
   // the attempt is open. It only lets the surface read the page on its own
@@ -420,6 +434,21 @@ for (const [expr, want] of [
   ['true', false]
 ]) ok(PROMPT_ONLY_INEQUALITY.test(expr) === want, `promptAsksInequality pin ${want ? 'accepts' : 'rejects'} {${expr}}`);
 
+/** The only value graphAnswer may take: the answer type and the visible prompt, through the pure helper. */
+export const TYPE_AND_PROMPT_GRAPH = /^questionAsksForGraph\((question|q|item)\.answerType, \1\.prompt\)$/;
+for (const [expr, want] of [
+  ['questionAsksForGraph(question.answerType, question.prompt)', true],
+  ['questionAsksForGraph(question)', false],
+  ['questionAsksForGraph(question.answerType, question.answer)', false],
+  ['questionAsksForGraph(question.answerType, question.solution)', false],
+  ['true', false]
+]) ok(TYPE_AND_PROMPT_GRAPH.test(expr) === want, `graphAnswer pin ${want ? 'accepts' : 'rejects'} {${expr}}`);
+{
+  const helper = readFileSync(join(ROOT, 'client/src/ink/graphAnswer.js'), 'utf8').replace(/\/\/.*$/gm, '');
+  ok(/export function questionAsksForGraph\(answerType, prompt\)/.test(helper) && !/\b(answer|expected|solution|marks?)\b(?!Type)/.test(helper.replace(/answerType/g, '')) && !/import /.test(helper),
+    'graphAnswer.js reads the answer type and visible prompt only and imports nothing');
+}
+
 // ── 2 · the real tree ────────────────────────────────────────────────────────
 const files = walk(SRC);
 ok(files.length > 50, `scanned ${files.length} files under client/src (excluding client/src/ink/)`);
@@ -441,6 +470,9 @@ for (const file of files) {
   // liveRead is the coach's on/off switch and nothing else.
   for (const m of source.matchAll(/liveRead=\{([^}]*)\}/g)) {
     ok(/^coachOn && !resolved$/.test(m[1].trim()), `${rel}: liveRead must be exactly {coachOn && !resolved}, got {${m[1].trim()}}`);
+  }
+  for (const m of source.matchAll(/graphAnswer=\{([^}]*)\}/g)) {
+    ok(TYPE_AND_PROMPT_GRAPH.test(m[1].trim()), `${rel}: graphAnswer must be exactly questionAsksForGraph(<question>.answerType, <question>.prompt), got {${m[1].trim()}}`);
   }
   for (const m of source.matchAll(/promptAsksInequality=\{([^}]*)\}/g)) {
     ok(PROMPT_ONLY_INEQUALITY.test(m[1].trim()), `${rel}: promptAsksInequality must be exactly asksForInequality(<question>.prompt), got {${m[1].trim()}}`);
