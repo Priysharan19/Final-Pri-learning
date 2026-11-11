@@ -163,18 +163,18 @@ ok(/onGraphFeatures=\{setGraphFeatures\}/.test(card) && /graph: graphFeatures \}
 // ── only a graph question is read for a sketch (#793 regression) ─────────────
 // A single written "4" on a Class 7 "Finding the Unknown" item opened the sketch
 // panel and left the server reading stale, so Submit never completed.
-ok(!questionAsksForGraph({ answerType: 'numeric', prompt: 'Find the unknown: x + 9 = 13. What is x?' }), 'a numeric Finding-the-Unknown item does not ask for a graph');
-ok(!questionAsksForGraph({ answerType: 'working', prompt: 'Solve x^2 - 5x + 6 = 0.' }), 'a solve item does not ask for a graph');
-ok(!questionAsksForGraph({ answerType: 'numeric', prompt: 'The graph shows sales. How many in May?' }), 'reading a given graph is not drawing one');
-ok(!questionAsksForGraph(null) && !questionAsksForGraph({}), 'no question, no sketch');
-ok(questionAsksForGraph({ answerType: 'graph-sketch', prompt: 'y = x^2' }), 'a graph-sketch item asks for a graph');
-ok(questionAsksForGraph({ answerType: 'working', prompt: 'Sketch the graph of y = x^2 - 4.' }), 'a prompt that asks for a sketched graph asks for one');
+ok(!questionAsksForGraph('numeric', 'Find the unknown: x + 9 = 13. What is x?'), 'a numeric Finding-the-Unknown item does not ask for a graph');
+ok(!questionAsksForGraph('working', 'Solve x^2 - 5x + 6 = 0.'), 'a solve item does not ask for a graph');
+ok(!questionAsksForGraph('numeric', 'The graph shows sales. How many in May?'), 'reading a given graph is not drawing one');
+ok(!questionAsksForGraph(undefined, undefined) && !questionAsksForGraph('numeric', ''), 'no prompt, no sketch');
+ok(questionAsksForGraph('graph-sketch', 'y = x^2'), 'a graph-sketch item asks for a graph');
+ok(questionAsksForGraph('working', 'Sketch the graph of y = x^2 - 4.'), 'a prompt that asks for a sketched graph asks for one');
 {
   const ink = readFileSync(join(ROOT, 'client/src/ink/InkAnswer.jsx'), 'utf8');
   ok(/graphAnswer = false/.test(ink), 'InkAnswer reads no sketch unless told the question asks for one');
   ok(ink.includes("(graphAnswer ? loadSketchKit().catch(() => null) : Promise.resolve(null))"), 'the sketch kit loads only for a graph question');
   const card = readFileSync(join(ROOT, 'client/src/components/QuestionCard.jsx'), 'utf8');
-  ok(/graphAnswer=\{questionAsksForGraph\(question\)\}/.test(card), 'the card tells InkAnswer whether its question declares a graph answer');
+  ok(/graphAnswer=\{questionAsksForGraph\(question\.answerType, question\.prompt\)\}/.test(card), 'the card tells InkAnswer whether its question declares a graph answer');
 }
 
 // ── answer-blind ──────────────────────────────────────────────────────────────

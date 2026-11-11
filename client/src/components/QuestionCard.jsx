@@ -2691,7 +2691,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} graphAnswer={questionAsksForGraph(question)} onGraphFeatures={setGraphFeatures} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} graphAnswer={questionAsksForGraph(question.answerType, question.prompt)} onGraphFeatures={setGraphFeatures} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
