@@ -23,7 +23,12 @@ ok('non-positive length declined', constructTriangle(0, 2, 2) === null && constr
 
 // Reading the question.
 const listed = figureSpecFor({ prompt: 'Construct a triangle with sides 5 cm, 6 cm and 7 cm.' });
-ok('listed sides read as AB, BC, CA', listed?.kind === 'triangle' && listed.sides.c === 5 && listed.sides.a === 6 && listed.sides.b === 7 && listed.unit === 'cm', JSON.stringify(listed));
+ok('listed sides read in order, with no invented vertex letters', listed?.kind === 'triangle' && listed.sides.c === 5 && listed.sides.a === 6 && listed.sides.b === 7 && listed.unit === 'cm' && listed.vertices === null, JSON.stringify(listed));
+const pqr = figureSpecFor({ prompt: 'In triangle PQR, PQ = 6 cm, QR = 8 cm and RP = 10 cm.' });
+ok('the question\'s own letters are kept (PQR, never ABC)', pqr?.vertices?.join('') === 'PQR' && pqr.sides.c === 6 && pqr.sides.a === 8 && pqr.sides.b === 10, JSON.stringify(pqr));
+const xyz = figureSpecFor({ prompt: 'In $\\triangle XYZ$, $YZ = 5$ cm, $XZ = 4$ cm and $XY = 3$ cm.' });
+ok('sides stated in any order and direction keep their letters', xyz?.vertices?.join('') === 'YZX' && xyz.sides.c === 5 && near(xyz.angles.C, 90), JSON.stringify(xyz?.vertices) + JSON.stringify(xyz?.angles));
+ok('two letters that do not close a triangle are declined', figureSpecFor({ prompt: 'AB = 3 cm, CD = 4 cm and EF = 5 cm.' }) === null);
 const named = figureSpecFor({ prompt: 'In triangle ABC, AB = 6 cm, BC = 8 cm and CA = 10 cm. Find the area.' });
 ok('named sides read', named?.sides.c === 6 && named.sides.a === 8 && named.sides.b === 10 && near(named.angles.B, 90));
 const latex = figureSpecFor({ prompt: 'In $\\triangle ABC$, $AB = 6$, $BC = 8$, $AC = 10$.' });
@@ -47,12 +52,19 @@ const ratio = dist(g.points.B, g.points.C) / dist(g.points.A, g.points.B);
 ok('drawn to scale (BC/AB = 8/6)', Math.abs(ratio - 8 / 6) < 1e-6, String(ratio));
 ok('base along the bottom', near(g.points.A[1], g.points.B[1]) && g.points.C[1] < g.points.A[1]);
 ok('edge labels carry the given lengths', g.edges.map(e => e.label).join('|') === '6 cm|8 cm|10 cm');
+ok('vertex labels are the question\'s own', Object.values(figureGeometry(pqr).vertexLabels).join('') === 'PQR');
+ok('unnamed triangle: lengths only, no vertex labels', figureGeometry(listed).vertexLabels === null);
 const gc = figureGeometry(circle);
 ok('circle fits the box', gc.circle.r > 0 && gc.circle.cx + gc.circle.r <= gc.size && gc.label === '7 cm');
 
 // Text alternative, both languages.
 const altEn = figureAlt(named, tFor(en));
-ok('English alt names every length and angle', /AB 6 cm/.test(altEn) && /BC 8 cm/.test(altEn) && /CA 10 cm/.test(altEn) && /B 90°/.test(altEn), altEn);
+ok('English alt names every length and angle', /^Triangle ABC/.test(altEn) && /AB 6 cm/.test(altEn) && /BC 8 cm/.test(altEn) && /CA 10 cm/.test(altEn) && /B 90°/.test(altEn), altEn);
+const altPqr = figureAlt(pqr, tFor(en));
+ok('alt uses the question\'s letters', /^Triangle PQR/.test(altPqr) && /PQ 6 cm, QR 8 cm, RP 10 cm/.test(altPqr) && /Q 90°/.test(altPqr) && !/\bA[BC]?\b/.test(altPqr), altPqr);
+const altListed = figureAlt(listed, tFor(en));
+ok('unnamed sides: the alt says "sides 5, 6, 7" with no letters', altListed === 'Triangle drawn to scale with sides 5, 6, 7 cm.', altListed);
+ok('Hindi unnamed alt carries the lengths', figureAlt(listed, tFor(hi)).includes('5, 6, 7 cm'));
 const altHi = figureAlt(circle, tFor(hi));
 ok('Hindi alt is Hindi and complete', /त्रिज्या 7 cm/.test(altHi) && /व्यास 14 cm/.test(altHi) && !/\{/.test(altHi), altHi);
 ok('alt has no unfilled placeholder', !/\{/.test(figureAlt(listed, tFor(en))) && !/\{/.test(figureAlt(dia, tFor(en))));

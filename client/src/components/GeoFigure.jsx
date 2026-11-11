@@ -37,8 +37,8 @@ export default function GeoFigure({ spec }) {
             {g.edges.map(e => (
               <text key={e.from + e.to} x={e.at[0]} y={e.at[1]} dy={e.from === 'A' ? 16 : -4} textAnchor="middle" fill={MUTED} fontSize="12">{e.label}</text>
             ))}
-            {Object.entries(g.points).map(([k, [x, y]]) => (
-              <text key={k} x={x} y={y} dy={k === 'C' ? -6 : 14} dx={k === 'A' ? -8 : k === 'B' ? 8 : 0} textAnchor="middle" fill={INK} fontSize="13">{k}</text>
+            {g.vertexLabels && Object.entries(g.points).map(([k, [x, y]]) => (
+              <text key={k} x={x} y={y} dy={k === 'C' ? -6 : 14} dx={k === 'A' ? -8 : k === 'B' ? 8 : 0} textAnchor="middle" fill={INK} fontSize="13">{g.vertexLabels[k]}</text>
             ))}
           </g>
         )}

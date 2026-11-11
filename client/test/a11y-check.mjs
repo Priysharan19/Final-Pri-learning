@@ -535,6 +535,7 @@ async function run() {
   const views = [];
   const skipped = [];
   let liveVerdict = null;
+  const figureStates = [];
   let skipLink = null;
   let selfTest = null;
 
@@ -546,7 +547,9 @@ async function run() {
     // real platform server (support/online-session.mjs) from its own origin.
     // The walk starts signed out — every screen up to the first refused check
     // is audited as a signed-out student sees it — and signs in on the card.
-    platform = await startOnlinePlatform({ dist });
+    // allowSeededPractice: the test server (never deployed) accepts a pinned
+    // issue seed, so the figure states below reach known SSS and circle items.
+    platform = await startOnlinePlatform({ dist, allowSeededPractice: true });
     platformForWalk = platform;
     const BASE = platform.origin;
     ok('the build is being served', !!BASE);
@@ -1029,6 +1032,57 @@ async function run() {
       liveVerdict = { before, after, grades: (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(?:submit|reveal)$/)).filter(c => c.status === 200 && c.json?.authoritative === true).length };
     });
 
+    // ── F6: constructed figures in a worked solution, light and dark ────────
+    // Real server-issued items (pinned seed, test server only): an SSS
+    // triangle and a circle by radius. Each is answered so the server resolves
+    // it, the worked solution is opened, and the whole view — solution block
+    // and figure included — is audited in both themes.
+    const FIGURE_ITEMS = [
+      { kind: 'triangle', pin: { generator: 'c10-tangent-length-reasoning', difficulty: 1, curriculum: 'in', seed: 1 } },
+      { kind: 'circle', pin: { generator: 'c10-areas-circles', difficulty: 1, curriculum: 'in', seed: 1 } }
+    ];
+    for (const item of FIGURE_ITEMS) {
+      for (const scheme of ['light', 'dark']) {
+        await step(`practice · worked solution with a ${item.kind} figure (${scheme})`, '/practice', async () => {
+          await page.emulateMedia({ colorScheme: scheme });
+          const pinIssue = async route => {
+            const original = route.request().postDataJSON() || {};
+            await route.fulfill({ response: await route.fetch({ postData: JSON.stringify({ ...original, ...item.pin }) }) });
+          };
+          await page.route(/\/v1\/practice\/issue(?:\?.*)?$/, pinIssue);
+          try {
+            await goTo(page, BASE, '/practice?subtopic=c10-linear-pair-methods');
+            await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+            let known = await online.answerOf();
+            for (let i = 0; i < 20 && known.kind === 'unissued'; i++) { await wait(page, 500); known = await online.answerOf(); }
+            const typing = page.getByRole('button', { name: 'Answer by typing' });
+            if (await typing.count()) await typing.click();
+            await page.locator('[data-final-answer]').fill(known.text);
+            await page.locator('.ws-actions .btn-primary').click();
+            await page.waitForSelector('.eval-card', { timeout: 30000 });
+            const panel = page.locator('details.solution-panel summary');
+            if (await panel.count()) await panel.first().click();
+            const fig = page.locator(`[data-geo-figure="${item.kind}"]`);
+            await fig.waitFor({ state: 'visible', timeout: 20000 });
+            const theme = await page.evaluate(() => document.documentElement.dataset.theme);
+            const seen = await fig.evaluate(el => {
+              const svg = el.querySelector('svg');
+              const title = svg?.querySelector('title');
+              return { role: svg?.getAttribute('role'), title: (title?.textContent || '').trim(),
+                labelled: !!title && svg.getAttribute('aria-labelledby') === title.id,
+                caption: (el.querySelector('figcaption')?.textContent || '').trim() };
+            });
+            const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+            const exposed = nodes.some(n => !n.ignored && ['image', 'img'].includes(n.role?.value) && n.name?.value === seen.title);
+            figureStates.push({ kind: item.kind, scheme, theme, ...seen, exposed });
+          } finally {
+            await page.unroute(/\/v1\/practice\/issue(?:\?.*)?$/, pinIssue);
+          }
+        });
+      }
+    }
+    await page.emulateMedia({ colorScheme: null });
+
     await step('progress · overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
       // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
@@ -1493,6 +1547,16 @@ async function run() {
       ok('the verdict lands inside a live region once the question is marked',
         /(correct|not quite|revealed)/i.test(spoken) && /marks?/i.test(spoken),
         `the live regions on the marked page said ${JSON.stringify(liveVerdict.after)}`);
+    }
+
+    section('constructed figures');
+    for (const kind of ['triangle', 'circle']) {
+      for (const scheme of ['light', 'dark']) {
+        const f = figureStates.find(x => x.kind === kind && x.scheme === scheme);
+        ok(`a worked solution's ${kind} figure was walked in the ${scheme} theme`, !!f && f.theme === scheme, JSON.stringify(f) || 'never reached');
+        ok(`  and it is an image named by its text alternative, shown again as its caption (${kind}, ${scheme})`,
+          !!f && f.role === 'img' && f.labelled && f.title.length > 20 && f.caption === f.title && f.exposed, JSON.stringify(f));
+      }
     }
 
     section('online-only checking');

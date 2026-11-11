@@ -15,7 +15,7 @@ const NUM = '(\\d+(?:\\.\\d+)?)';
 const UNIT = '\\s*(cm|mm|m|km|units?)?';
 const SEP = '\\s*(?:,|and|,\\s*and)\\s*';
 const TRIANGLE_SIDES = new RegExp(`\\btriangle\\b[^.]*?\\bsides?\\b[^.\\d]*?${NUM}${UNIT}${SEP}${NUM}${UNIT}${SEP}${NUM}${UNIT}`, 'i');
-const SIDE = name => new RegExp(`\\b${name}\\s*=\\s*${NUM}${UNIT}`, 'i');
+const NAMED_SIDE = new RegExp(`\\b([A-Z])([A-Z])\\s*=\\s*${NUM}${UNIT}`, 'g');
 const CIRCLE = new RegExp(`\\bcircle\\b[^.]*?\\b(radius|diameter)\\b\\s*(?:of|is|=)?\\s*${NUM}${UNIT}`, 'i');
 
 const round = v => Math.round(v * 100) / 100;
@@ -35,23 +35,35 @@ export function constructTriangle(a, b, c) {
   };
 }
 
+/** Three stated sides joining exactly three vertices, in the question's own letters. */
+function namedSides(text) {
+  const found = [];
+  for (const m of text.matchAll(NAMED_SIDE)) if (m[1] !== m[2]) found.push({ p: m[1], q: m[2], value: +m[3], unit: m[4] || '' });
+  for (let i = 0; i + 3 <= found.length; i++) {
+    const three = found.slice(i, i + 3);
+    const letters = [...new Set(three.flatMap(s => [s.p, s.q]))];
+    if (letters.length !== 3) continue;
+    const pairs = new Set(three.map(s => [s.p, s.q].sort().join('')));
+    if (pairs.size !== 3) continue;
+    // The first stated side is the base X→Y; Z is the remaining vertex.
+    const X = three[0].p, Y = three[0].q, Z = letters.find(l => l !== X && l !== Y);
+    const len = (u, v) => three.find(s => [s.p, s.q].sort().join('') === [u, v].sort().join('')).value;
+    return { vertices: [X, Y, Z], sides: { c: len(X, Y), a: len(Y, Z), b: len(Z, X) }, unit: three.map(s => s.unit).find(Boolean) || '' };
+  }
+  return null;
+}
+
 function triangleFrom(text) {
-  let sides = null, unit = '';
-  const named = ['AB', 'BC', '(?:CA|AC)'].map(n => text.match(SIDE(n)));
-  if (named.every(Boolean)) {
-    const [ab, bc, ca] = named;
-    sides = { a: +bc[1], b: +ca[1], c: +ab[1] };
-    unit = ab[2] || bc[2] || ca[2] || '';
-  } else {
+  let found = namedSides(text);
+  if (!found) {
     const m = text.match(TRIANGLE_SIDES);
     if (!m) return null;
-    // Listed in order: the first is the base AB, then BC, then CA.
-    sides = { c: +m[1], a: +m[3], b: +m[5] };
-    unit = m[2] || m[4] || m[6] || '';
+    // Listed without names: drawn in the order given, and labelled by length only.
+    found = { vertices: null, sides: { c: +m[1], a: +m[3], b: +m[5] }, unit: m[2] || m[4] || m[6] || '' };
   }
-  const built = constructTriangle(sides.a, sides.b, sides.c);
+  const built = constructTriangle(found.sides.a, found.sides.b, found.sides.c);
   if (!built) return null;
-  return { kind: 'triangle', unit: unit.toLowerCase(), sides, ...built };
+  return { kind: 'triangle', unit: found.unit.toLowerCase(), sides: found.sides, vertices: found.vertices, listed: [found.sides.c, found.sides.a, found.sides.b], ...built };
 }
 
 // A part of a circle (quarter circle, semicircle) drawn as a whole circle
@@ -80,11 +92,14 @@ export function figureAlt(spec, t) {
   if (!spec) return '';
   const u = spec.unit ? ` ${spec.unit}` : '';
   if (spec.kind === 'triangle') {
+    if (!spec.vertices) return t('figure.triangle.sides', { sides: spec.listed.map(fmt).join(', ') + u });
+    const [X, Y, Z] = spec.vertices;
     const { a, b, c } = spec.sides;
     const { A, B, C } = spec.angles;
-    return t('figure.triangle.alt', {
-      ab: fmt(c) + u, bc: fmt(a) + u, ca: fmt(b) + u,
-      a: fmt(A), b: fmt(B), c: fmt(C)
+    return t('figure.triangle.named', {
+      name: X + Y + Z,
+      sides: `${X}${Y} ${fmt(c)}${u}, ${Y}${Z} ${fmt(a)}${u}, ${Z}${X} ${fmt(b)}${u}`,
+      angles: `${X} ${fmt(A)}°, ${Y} ${fmt(B)}°, ${Z} ${fmt(C)}°`
     });
   }
   return t('figure.circle.alt', { r: fmt(spec.radius) + u, d: fmt(spec.radius * 2) + u });
@@ -107,9 +122,11 @@ export function figureGeometry(spec, size = 240, pad = 28) {
   const P = Object.fromEntries(Object.entries(spec.points).map(([k, v]) => [k, map(v)]));
   const u = spec.unit ? ` ${spec.unit}` : '';
   const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+  const names = spec.vertices || null;
   return {
     size,
     points: P,
+    vertexLabels: names ? { A: names[0], B: names[1], C: names[2] } : null,
     edges: [
       { from: 'A', to: 'B', at: mid(P.A, P.B), label: fmt(spec.sides.c) + u },
       { from: 'B', to: 'C', at: mid(P.B, P.C), label: fmt(spec.sides.a) + u },
