@@ -25,7 +25,12 @@ export const flow = {
     await page.goto(`${base}/practice?subtopic=c10-linear-pair-methods`, { waitUntil: 'domcontentloaded' });
     await front(page).locator('.q-prompt').waitFor({ timeout: 30000 });
     await settle();
-    let known = await online.answerOf();
+    const issuedAnswer = async () => {
+      let a = await online.answerOf();
+      for (let i = 0; i < 40 && a.kind === 'unissued'; i++) { await page.waitForTimeout(500); a = await online.answerOf(); }
+      return a;
+    };
+    let known = await issuedAnswer();
     for (let n = 0; n < 4 && !/sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || ''); n++) {
       const before = await front(page).getAttribute('data-question-id');
       await page.locator('.ctx-next').click();
@@ -33,7 +38,7 @@ export const flow = {
         const q = document.querySelector('.qpage[data-question-id]');
         return q && q.getAttribute('data-question-id') !== id && !!q.querySelector('.q-prompt');
       }, before, { timeout: 30000 });
-      known = await online.answerOf();
+      known = await issuedAnswer();
     }
     if (!await check('the real server issued the pinned 9-12-15 triangle question',
       /sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || '') && known.kind === 'text', JSON.stringify(known).slice(0, 400))) return;
