@@ -302,6 +302,15 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   ok(/else if \(reportFile && pass % 5 !== 0\) \{ i--; continue; \}/.test(j), 'with a report file, the unified log is read at most every fifth pass, and skipped passes do not shorten the bound');
   ok(/report-file read\(s\), \$\{viaLog\} unified-log read\(s\)/.test(j), 'each phase reports its time and which channel it read');
 }
+{
+  // The crash-loop leg kills each new WebContent process as soon as it starts,
+  // with no wait between kills (a killed spare ends nothing; waiting after it
+  // let the shell's 30 s window lapse, Train 18). The verdict stays the judge's.
+  const b = src('scripts/native-bridge-selfcheck.mjs');
+  const leg = b.slice(b.indexOf('// Crash loop:'), b.indexOf("waitFor(() => readLines().includes('PRIBRIDGE contentStopped shown')"));
+  ok(leg.length > 0 && !/waitFor\(/.test(leg) && /execSync\('sleep 0\.5'\)/.test(leg), 'the crash loop polls every half second and never waits between kills');
+  ok(/const content = judgeContentEnd\(lines\)/.test(b) && /stopped\.n !== 3/.test(b), 'the content-process verdict still needs the stop on the third end inside 30 s');
+}
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.

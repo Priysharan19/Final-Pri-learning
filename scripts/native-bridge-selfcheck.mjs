@@ -213,14 +213,25 @@ if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
     if (!first.length) contentLog.push('no WebContent process found under this device');
     first.forEach(kill);
     waitFor(() => readLines().some(l => l.startsWith('PRIBRIDGE recovery 1 summary')), 120);
-    // Crash loop: kill each new process as it starts, until the shell stops reloading.
+    // Crash loop: kill each new process as it starts, until the shell stops
+    // reloading. Polled every half second with no wait between kills: a new
+    // process can be a spare WebKit starts beside the page's own, and killing
+    // it ends nothing. The loop used to wait up to 20 s for an end after each
+    // kill, so a spare could hold the page's real kill back past the shell's
+    // 30 s window and reset its count (Train 18, c71e21be4: ends n=1,2,1,2
+    // from 5 kills). The verdict is unchanged: judgeContentEnd still needs the
+    // stop on the third end inside 30 s and the native stopped screen.
     let seen = new Set(first);
-    for (let k = 0; k < 4 && !readLines().some(l => /action=stopped/.test(l)); k++) {
-      const fresh = waitFor(() => { const now = webContentPids().filter(p => !seen.has(p)); return now.length ? now : null; }, 30);
-      if (!fresh) { contentLog.push('no new WebContent process started'); break; }
-      fresh.forEach(p => { seen.add(p); kill(p); });
-      waitFor(() => readLines().filter(l => l.startsWith('PRIBRIDGE contentProcessEnded')).length >= k + 2, 20);
+    const ends = () => readLines().filter(l => l.startsWith('PRIBRIDGE contentProcessEnded')).length;
+    const loopStart = Date.now();
+    let lastNew = Date.now();
+    while (!readLines().some(l => /action=stopped/.test(l)) && ends() < 6 && Date.now() - loopStart < 120_000) {
+      const fresh = webContentPids().filter(p => !seen.has(p));
+      if (fresh.length) { lastNew = Date.now(); fresh.forEach(p => { seen.add(p); kill(p); }); }
+      else if (Date.now() - lastNew > 30_000) { contentLog.push('no new WebContent process started'); break; }
+      execSync('sleep 0.5');
     }
+    contentLog.push(`crash loop: ${seen.size - first.length} process(es) killed after the first end, ${ends()} end(s) seen in ${Math.round((Date.now() - loopStart) / 1000)} s`);
     waitFor(() => readLines().includes('PRIBRIDGE contentStopped shown'), 20);
   }
   lines = readLines();
