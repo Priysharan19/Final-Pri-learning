@@ -111,8 +111,8 @@ try {
     await page.locator('.nt-toc a[href^="#"]').count() >= 6);
   await check('the first lesson section is readable before any scroll animation',
     await page.locator('.nt-section').first().evaluate(el => getComputedStyle(el.querySelector('.nt-section-h')).opacity === '1'));
-  await check('only three worked examples mount initially to prioritise learning',
-    await page.locator('.nt-example').count() === 3);
+  await check('initial worked-example mount stays bounded at six (the notes browser contract)',
+    await page.locator('.nt-example').count() === 6);
   for (const h of ['Key ideas', 'Definitions', 'Formulas', 'Important points', 'Common mistakes', 'Worked examples']) {
     await check(`the chapter has a “${h}” section`, await page.getByRole('heading', { name: h, exact: true }).count() === 1);
   }
