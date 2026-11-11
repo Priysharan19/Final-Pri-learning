@@ -157,6 +157,11 @@ export const ON_DEMAND = [
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
 
+  // The graph sketch reader (#793) and the comparer that judges a confirmed
+  // sketch: both load behind import() only when a student reads a page or
+  // asks about a sketched graph, so they cost the first visit nothing. Like
+  // the recogniser, a student who reads once online keeps them.
+  [/(^|\/)(graphSketchKit|graphCompare)-[^/]*\.js$/, 'graph sketch reader'],
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
   // account, so it costs the first visit nothing.

@@ -55,6 +55,7 @@ import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnsw
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { asksForInequality } from '../ink/relationSwap.js';
+import { questionAsksForGraph } from '../ink/graphAnswer.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
@@ -314,6 +315,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The ink surface mounts only once the answer is in, so a kept page is
   // always the page it starts from.
   const [restoredInk, setRestoredInk] = useState(undefined);
+  // The graph features the student confirmed from a sketch on the page (ink/graphSketch.js), or null.
+  const [graphFeatures, setGraphFeatures] = useState(null);
   // Kept with the page: the transcript the student was shown (and corrected)
   // and a final answer they typed over the proposal. Restored with the ink so
   // a reload neither reads the page again nor brings back an overridden answer.
@@ -1409,7 +1412,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), ...(viaInk && graphFeatures ? { graph: graphFeatures } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
@@ -2688,7 +2691,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} graphAnswer={questionAsksForGraph(question.answerType, question.prompt)} onGraphFeatures={setGraphFeatures} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
@@ -2879,7 +2882,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.diagnose.asking')}</div>}>
                     <MistakeDiagnosis
                       questionId={question.id}
-                      work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
+                      work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300), ...(graphFeatures ? { graph: graphFeatures } : {}) }}
                       finalAnswer={finalAnswerStatus(state.res)}
                       locale={language === 'hi' ? 'hi' : 'en'}
                       onUsed={level => setTutorUsed(u => Math.max(u, level))}

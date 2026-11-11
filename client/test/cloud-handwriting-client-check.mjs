@@ -544,7 +544,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const unplaced = toReading({ ...tr, lines: tr.lines.slice(0, 2), text: '2x+3=11\n2x=8' }, { lines: segs });
   ok(!unplaced.alignedToLocalLines && unplaced.lines.every(l => !l.box), 'when they differ, no box is guessed — panel badges only');
   const inkSrc = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
-  ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
+  // lineStrokes: the page minus a sketched graph (#793), which is read as geometry, not lines.
+  ok(/segmentInkLines\((strokes|lineStrokes)\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(!/inkResult\?\.afterWait/.test(qc) && !/autoMarkedRef/.test(qc), 'ink read after waiting is shown, never sent to be marked without the student\'s Submit');
   ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.kind === INK_READER_STATE\.READ_FAILED/.test(qc),
