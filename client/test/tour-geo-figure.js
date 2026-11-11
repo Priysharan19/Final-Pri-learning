@@ -30,7 +30,7 @@ export const flow = {
     await settle();
     const issuedAnswer = async () => {
       let a = await online.answerOf();
-      for (let i = 0; i < 40 && a.kind === 'unissued'; i++) { await page.waitForTimeout(500); a = await online.answerOf(); }
+      for (let i = 0; i < 10 && a.kind === 'unissued'; i++) { await page.waitForTimeout(500); a = await online.answerOf(); }
       return a;
     };
     let known = await issuedAnswer();
