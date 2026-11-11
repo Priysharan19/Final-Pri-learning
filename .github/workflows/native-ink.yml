@@ -160,6 +160,15 @@ jobs:
       - name: priNative bridge self-check (iPad simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family ipad --app "$PRI_SIM_APP"
 
+      - name: Server dependencies for the local Pri server
+        run: npm ci --prefix server
+
+      # Every iPad step runs before the first iPhone step and every step picks
+      # the same pinned device, so each simulator cold-boots once (#850 did the
+      # same for the iOS 27 lane). The iPad journey's legs are described below.
+      - name: iPad journey (simulator)
+        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
+
       # CP-04 × #504: main is the V1 Apple shipping target — iPhone (portrait)
       # and iPad (all orientations), bundle id com.prilearning.app
       # (PRI_V1_RELEASE_SCOPE §22).
@@ -194,15 +203,11 @@ jobs:
       # unsent answer, an in-shell accessibility smoke, and the largest
       # accessibility text size with no sideways overflow.
       # Both journeys start the real server (the marking leg always; the
-      # iPhone run also for the account journey).
-      - name: Server dependencies for the local Pri server
-        run: npm ci --prefix server
-
+      # iPhone run also for the account journey); its dependencies install
+      # before the iPad journey above.
       - name: iPhone certification journey (simulator)
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
 
-      - name: iPad journey (simulator)
-        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
 
       - name: The evidence names the pinned runtime
         if: always()

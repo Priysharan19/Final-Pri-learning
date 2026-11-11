@@ -176,14 +176,30 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // `log show`). Only what THIS launch appends is read: the size is taken first,
   // so a summary left by an earlier run can never pass this one.
   let reportFile = null, offset = 0;
-  try {
-    const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
-    if (container) { reportFile = join(container, 'Documents', 'PRIJOURNEY.log'); offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0; }
-  } catch { /* no data container yet: the log is the only channel */ }
-  const fromFile = () => {
-    try { return reportFile && existsSync(reportFile) ? readFileSync(reportFile).subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY')) : []; }
-    catch { return []; }
+  const findContainer = () => {
+    try {
+      const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
+      if (container) return join(container, 'Documents', 'PRIJOURNEY.log');
+    } catch { /* no data container yet */ }
+    return null;
   };
+  reportFile = findContainer();
+  if (reportFile) offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0;
+  // The file is the fast, complete channel. A file shorter than the size taken
+  // at launch was replaced: it is read from its start (only lines after this
+  // launch's own "started <phase>" count, below), never skipped for the rest
+  // of the phase — that left the phase on the slow unified-log read for all
+  // its passes (about 18 s each on the iOS 26 image: ~22 minutes for one
+  // phase, which put Native Ink past its 60-minute limit).
+  const fromFile = () => {
+    try {
+      if (!reportFile || !existsSync(reportFile)) return [];
+      const bytes = readFileSync(reportFile);
+      if (bytes.length < offset) offset = 0;
+      return bytes.subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY'));
+    } catch { return []; }
+  };
+  let viaLog = 0, viaFile = 0, pass = 0;
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
@@ -206,10 +222,20 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // journey with nothing reported. A read that does not come back is not a
     // result — the next pass reads again, and a phase whose summary is never
     // read is reported "not reported" and fails the journey.
+    // No container at launch (a first launch makes it): look again.
+    pass++;
+    if (!reportFile && pass % 5 === 0) { reportFile = findContainer(); offset = 0; }
     const filed = fromFile();
     let log;
-    if (filed.length) log = filed.join('\n');
+    if (filed.length) { log = filed.join('\n'); viaFile++; }
+    // The unified log is a fallback, not the poll: with a report file it is
+    // read at most every fifth pass, so a slow `log show` cannot set the pace.
+    // A pass that reads nothing does not count toward `loops`: the phase keeps
+    // the same bound in reads as before, it just stops paying for a log read
+    // on every pass.
+    else if (reportFile && pass % 5 !== 0) { i--; continue; }
     else try {
+      viaLog++;
       log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
         '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
     } catch (e) {
@@ -224,6 +250,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
+  console.log(`  (${phase}: ${Math.round((Date.now() - t0) / 1000)} s, ${viaFile} report-file read(s), ${viaLog} unified-log read(s))`);
   return lines;
 }
 

@@ -287,6 +287,21 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   rmSync(dir, { recursive: true, force: true });
   ok(r.status === 0 && /IMPORTED/.test(r.stdout), `the bridge self-check imports under CI=true with no PRI_SIM_RUNTIME (status ${r.status}: ${(r.stderr || '').trim().split('\n').pop()})`);
 }
+{
+  // Native Ink (iOS 26) boots each family once too: every iPad step before the first iPhone step.
+  const wf = src('.github/workflows/native-ink.yml');
+  const steps = [...wf.matchAll(/--family (ipad|iphone)/g)].map(m => m[1]);
+  const firstPhone = steps.indexOf('iphone');
+  ok(firstPhone > 0 && steps.slice(firstPhone).every(f => f === 'iphone') && wf.indexOf('npm ci --prefix server') < wf.indexOf('iphone-journey.mjs --family ipad'),
+    `Native Ink runs every iPad step (and the server install before them) before the first iPhone step (got ${steps.join(' → ')})`);
+  // The journey polls its report file, not the slow unified log: a replaced
+  // file is read from its start, and `log show` runs at most every fifth pass
+  // (Native Ink spent ~22 minutes in one offline phase on log reads, Train 18).
+  const j = src('scripts/iphone-journey.mjs');
+  ok(/if \(bytes\.length < offset\) offset = 0;/.test(j), 'a report file shorter than at launch is read from its start');
+  ok(/else if \(reportFile && pass % 5 !== 0\) \{ i--; continue; \}/.test(j), 'with a report file, the unified log is read at most every fifth pass, and skipped passes do not shorten the bound');
+  ok(/report-file read\(s\), \$\{viaLog\} unified-log read\(s\)/.test(j), 'each phase reports its time and which channel it read');
+}
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.
