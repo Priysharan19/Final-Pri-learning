@@ -391,7 +391,7 @@ jobs:
           grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
-          grep -Fq 'PAYWALL HONESTY: PASS — 68/68 checks' suites.log
+          grep -Fq 'PAYWALL HONESTY: PASS — 69/69 checks' suites.log
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
@@ -609,12 +609,14 @@ jobs:
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/root-gap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'PREMIUM PRACTICE CONTENT: PASS — 41/41 checks' practice-http.log
           grep -Fq 'MISTAKE NOTEBOOK: PASS — 49/49 checks' practice-http.log
           grep -Fq 'READINESS FORECAST: PASS — 29/29 checks' practice-http.log
           grep -Fq 'MISTAKE DNA: PASS — 16/16 checks' practice-http.log
+          grep -Fq 'ROOT GAP: PASS — 24/24 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
