@@ -596,8 +596,12 @@ jobs:
           node server/test/practice-seek-budget-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-trap-seek-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-hints-notebook-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-hint-work-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'PRACTICE HINT WORK: PASS — 19/19 checks' practice-http.log
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/spaced-review-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'SPACED REVIEW: PASS — 16/16 checks' practice-http.log
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
