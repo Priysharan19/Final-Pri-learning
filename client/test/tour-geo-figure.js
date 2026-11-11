@@ -16,13 +16,13 @@ export const flow = {
   online: true,
   async run({ page, base, goto, createProfile, online, check, note, settle }) {
     await goto('/');
-    await createProfile({ name: 'Figure Student', year: 9, course: 'in' });
+    await createProfile({ name: 'Figure Student', year: 10, course: 'in' });
     await online.signIn({ name: 'Figure Student' });
     await page.route(POST_ISSUE, async route => {
       const original = route.request().postDataJSON() || {};
       await route.fulfill({ response: await route.fetch({ postData: JSON.stringify({ ...original, ...PIN }) }) });
     });
-    await page.goto(`${base}/practice?subtopic=c9-herons-formula`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${base}/practice?subtopic=c10-linear-pair-methods`, { waitUntil: 'domcontentloaded' });
     await front(page).locator('.q-prompt').waitFor({ timeout: 30000 });
     await settle();
     let known = await online.answerOf();
