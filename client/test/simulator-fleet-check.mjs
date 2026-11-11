@@ -276,8 +276,15 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   // Suites shard imports it under CI=true with no PRI_SIM_RUNTIME (#850 review).
   const { spawnSync } = await import('node:child_process');
   const env = { ...process.env, CI: 'true' }; delete env.PRI_SIM_RUNTIME;
-  const r = spawnSync(process.execPath, ['--input-type=module', '-e', "await import('./scripts/native-bridge-selfcheck.mjs'); console.log('IMPORTED')"],
-    { cwd: new URL('../../', import.meta.url), env, encoding: 'utf8', timeout: 30_000 });
+  // From a module file, as the suites import it (an -e script has no argv[1]).
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'pri-selfcheck-import-'));
+  const probe = join(dir, 'probe.mjs');
+  writeFileSync(probe, `await import(${JSON.stringify(new URL('../../scripts/native-bridge-selfcheck.mjs', import.meta.url).href)}); console.log('IMPORTED');\n`);
+  const r = spawnSync(process.execPath, [probe], { env, encoding: 'utf8', timeout: 30_000 });
+  rmSync(dir, { recursive: true, force: true });
   ok(r.status === 0 && /IMPORTED/.test(r.stdout), `the bridge self-check imports under CI=true with no PRI_SIM_RUNTIME (status ${r.status}: ${(r.stderr || '').trim().split('\n').pop()})`);
 }
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
