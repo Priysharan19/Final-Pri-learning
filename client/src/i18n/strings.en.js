@@ -3311,6 +3311,8 @@ export default {
   "parentEmail.unsubscribed": 'Done. No more reports will be sent to this address.',
   "parentEmail.invalid": 'This link has expired or was already used.',
   "parentEmail.failed": 'That did not work. Check your connection and try again.',
+  "listen.play": 'Listen',
+  "listen.stop": 'Stop',
   "insights.title": 'Readiness and habits',
   "insights.lead": 'Read from your own marked practice. Nothing here is a predicted board score.',
   "insights.loading": 'Loading…',
