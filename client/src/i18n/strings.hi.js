@@ -3366,6 +3366,8 @@ export default {
   "parentEmail.unsubscribed": 'हो गया। इस पते पर अब कोई रिपोर्ट नहीं भेजी जाएगी।',
   "parentEmail.invalid": 'यह लिंक समाप्त हो चुका है या पहले ही इस्तेमाल हो चुका है।',
   "parentEmail.failed": 'यह नहीं हो पाया। अपना कनेक्शन जाँचें और फिर कोशिश करें।',
+  "listen.play": 'सुनें',
+  "listen.stop": 'रोकें',
   "insights.title": 'तैयारी और आदतें',
   "insights.lead": 'आपके अपने जाँचे गए अभ्यास से। यहाँ कुछ भी बोर्ड अंकों का पूर्वानुमान नहीं है।',
   "insights.loading": 'लोड हो रहा है…',

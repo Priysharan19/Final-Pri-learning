@@ -29,6 +29,7 @@ import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
+import ListenButton from './ListenButton.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
@@ -2227,6 +2228,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div>
               <div className="step-h"><MathText text={s.h} /></div>
               <div className="step-d"><MathText text={s.d} /></div>
+              <ListenButton text={[s.h, s.d].filter(Boolean).join('. ')} />
               {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
               {WhyStep && tutorEnabled && !diagnostic && resolved && (
                 <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}

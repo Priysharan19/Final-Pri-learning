@@ -27,6 +27,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { MathText } from '../lib/latex.jsx';
+import ListenButton from '../components/ListenButton.jsx';
 import { useT } from '../i18n/index.js';
 import { buildDeterministicStoryboard } from '../explain/visualEngine.js';
 import { safeCaptions } from './captionRule.js';
@@ -248,6 +249,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
                 {turn.offline && <small className="tutor-note-why">{t('tutor.fallbackOffline')}</small>}
                 {turn.guarded && <small className="tutor-note-why">{t('tutor.fallbackGuarded')}</small>}
                 {turn.text ? <MathText text={turn.text} /> : <span>{t('tutor.noHint')}</span>}
+                {turn.role !== 'student' && turn.text && <ListenButton text={turn.text} />}
               </div>
             ))}
             {asking && (
