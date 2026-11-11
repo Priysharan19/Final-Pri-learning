@@ -31,6 +31,7 @@ import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { figureSpecFor } from '../engine/figureSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
@@ -127,6 +128,8 @@ const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/Tut
 // "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
 const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
 // "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
+// A constructed triangle/circle for a worked solution, its own lazy chunk.
+const GeoFigure = React.lazy(() => import('./GeoFigure.jsx'));
 const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
 // The live step coach (F1): its requests and per-line verdicts, on demand.
 const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
@@ -926,6 +929,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       });
     } catch { return null; }
   }, [question.prompt, question.subtopic, question.chapterId, res]);
+
+  // A figure constructed from the lengths the question states (SSS triangle,
+  // circle by radius/diameter). Declines whenever the question draws its own.
+  const geoSpec = useMemo(() => {
+    if (!res?.solution) return null;
+    try { return figureSpecFor({ prompt: question.prompt, hasFigure: !!figure }); } catch { return null; }
+  }, [question.prompt, figure, res]);
 
   // The recogniser is only fetched once something on screen needs its LaTeX.
   // Outside write mode the only strings that reach texOf are these two.
@@ -2219,6 +2229,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="q-plot" style={{ margin: '4px 0 14px' }}>
           <PriPlot spec={plotSpec} progress={1} reduceMotion />
         </div>
+      )}
+      {geoSpec && (
+        <React.Suspense fallback={null}>
+          <GeoFigure spec={geoSpec} />
+        </React.Suspense>
       )}
       <div className="steps">
         {res.solution.steps.map((s, i) => (
