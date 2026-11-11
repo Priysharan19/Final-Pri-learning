@@ -144,20 +144,24 @@ jobs:
       - name: priNative bridge self-check (iPad simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family ipad --app "$PRI_SIM_APP"
 
+      - name: Server dependencies for the local Pri server
+        run: npm ci --prefix server
+
+      # Every iPad step runs before the first iPhone step, and every step picks
+      # the same pinned device, so each simulator cold-boots once (a cold boot
+      # is three to seven minutes on this image; switching families twice put
+      # the lane past its 60-minute limit on 2026-11-09/10).
+      - name: iPad journey (simulator, iOS 27)
+        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad-ios27.json
+
       - name: Apple shipping target is iPhone + iPad (V1)
         run: node scripts/apple-shipping-target.mjs --check-v1
 
       - name: priNative bridge self-check (iPhone simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
 
-      - name: Server dependencies for the local Pri server
-        run: npm ci --prefix server
-
       - name: iPhone certification journey (simulator, iOS 27)
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone-ios27.json
-
-      - name: iPad journey (simulator, iOS 27)
-        run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad-ios27.json
 
       - name: The evidence names the pinned runtime
         if: always()
