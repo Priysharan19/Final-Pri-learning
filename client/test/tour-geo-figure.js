@@ -1,11 +1,11 @@
 // F6: a worked solution shows a triangle CONSTRUCTED from the sides the
 // question states, as inline SVG with a text alternative a screen reader hears.
-// The question is real: the test server issues c9-herons-formula seed 1
-// ("A triangle has sides 9, 12 and 15…"), and the real server marks it. Only
+// The question is real: the test server issues c10-tangent-length-reasoning seed 1
+// ("…AB = 9 cm, BC = 19 cm and CA = 14 cm, find BD"), and the real server marks it. Only
 // the issue SEED is pinned (test server only, never deployed). Synthetic run.
 import { pathToFileURL } from 'node:url';
 
-const PIN = { generator: 'c9-herons-formula', difficulty: 1, curriculum: 'in', seed: 1 };
+const PIN = { generator: 'c10-tangent-length-reasoning', difficulty: 1, curriculum: 'in', seed: 1 };
 const POST_ISSUE = /\/v1\/practice\/issue(?:\?.*)?$/;
 const FIG = '[data-geo-figure="triangle"]';
 const front = page => page.locator('.qpage[data-question-id]');
@@ -34,7 +34,7 @@ export const flow = {
       return a;
     };
     let known = await issuedAnswer();
-    for (let n = 0; n < 4 && !/sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || ''); n++) {
+    for (let n = 0; n < 4 && !/\$AB = 9\$ cm, \$BC = 19\$ cm and \$CA = 14\$ cm/.test(known.prompt || ''); n++) {
       const before = await front(page).getAttribute('data-question-id');
       await page.locator('.ctx-next').click();
       await page.waitForFunction(id => {
@@ -43,8 +43,8 @@ export const flow = {
       }, before, { timeout: 30000 });
       known = await issuedAnswer();
     }
-    if (!await check('the real server issued the pinned 9-12-15 triangle question',
-      /sides \$9\$, \$12\$ and \$15\$/.test(known.prompt || '') && known.kind === 'text', JSON.stringify({ known, issued }).slice(0, 1200))) return;
+    if (!await check('the real server issued the pinned AB 9, BC 19, CA 14 triangle question',
+      /\$AB = 9\$ cm, \$BC = 19\$ cm and \$CA = 14\$ cm/.test(known.prompt || '') && known.kind === 'text', JSON.stringify({ known, issued }).slice(0, 1200))) return;
 
     await check('no figure before the solution exists', await page.locator(FIG).count() === 0);
     await page.locator('[data-final-answer]').fill(known.text);
@@ -68,9 +68,9 @@ export const flow = {
       };
     });
     await check('the figure is inline SVG, no images', drawn.images === 0 && drawn.role === 'img', JSON.stringify(drawn));
-    await check('drawn to scale from the stated sides (BC/AB = 12/9)', Math.abs(drawn.ratio - 12 / 9) < 0.01, String(drawn.ratio));
-    await check('every stated length is labelled on the figure', ['9', '12', '15'].every(n => drawn.labels.includes(n)), drawn.labels.join('|'));
-    await check('the text alternative names the sides and the right angle', /AB 9/.test(drawn.title) && /BC 12/.test(drawn.title) && /CA 15/.test(drawn.title) && /B 90°/.test(drawn.title), drawn.title);
+    await check('drawn to scale from the stated sides (BC/AB = 19/9)', Math.abs(drawn.ratio - 19 / 9) < 0.01, String(drawn.ratio));
+    await check('every stated length is labelled on the figure', ['9 cm', '19 cm', '14 cm'].every(n => drawn.labels.includes(n)), drawn.labels.join('|'));
+    await check('the text alternative names every side and angle', /AB 9 cm/.test(drawn.title) && /BC 19 cm/.test(drawn.title) && /CA 14 cm/.test(drawn.title) && /A [\d.]+°, B [\d.]+°, C [\d.]+°/.test(drawn.title), drawn.title);
     await check('the SVG is labelled by its <title>, and the caption shows the same words', drawn.labelled && drawn.caption === drawn.title);
 
     // What the browser's accessibility tree actually exposes (CDP, Chromium).
