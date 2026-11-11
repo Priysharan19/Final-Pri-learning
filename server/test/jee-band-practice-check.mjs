@@ -104,6 +104,22 @@ try {
   const marked = await grade(premium.jar, first.id, first.q.answerType === 'mcq' ? String(first.q.answer.correctIndex) : right);
   c.deq([marked.status, marked.data?.correct], [200, true], `a band question is marked by the server like any other: its official key is credited (${marked.status} ${JSON.stringify(marked.data?.correct)})`);
 
+  // ── a thin band runs out: the repeat is served and labelled, never refused ─
+  const thin = jeeBandCatalog(PYQ_RECORDS, 'jee-main').chapters.find(ch => ch.counts.short === 1);
+  c.ok(!!thin, `a JEE Main chapter whose short band holds one record: ${thin?.generator}`);
+  const fresh = await registerAccount(h, { email: 'band.thin@example.test', deviceId: 'ipad-band-thin' });
+  await verifyEmail(h, fresh.account.id);
+  await paid(fresh.account.id, Date.now() + 30 * DAY);
+  const once = await issue(fresh.jar, thin.generator, { band: 'short' });
+  c.deq([once.status, once.data?.repeat ?? false], [201, false], 'its one record is issued fresh the first time');
+  const avoided = await issue(fresh.jar, thin.generator, { band: 'short', avoid: [once.data.question.contentHash] });
+  c.deq([avoided.status, avoided.data?.repeat, avoided.data?.question?.contentHash], [201, true, once.data.question.contentHash],
+    'with that record on the device\'s avoid list and nothing else in the band, it is issued again and labelled repeat: true');
+  const q1 = await sealed(once.data.question.id);
+  await grade(fresh.jar, once.data.question.id, q1.answerType === 'mcq' ? String(q1.answer.correctIndex) : q1.answer.value);
+  const resolved = await issue(fresh.jar, thin.generator, { band: 'short' });
+  c.deq([resolved.status, resolved.data?.repeat], [201, true], 'once the account has resolved it, an empty avoid list still gets it back labelled repeat: true');
+
   // ── refusals ───────────────────────────────────────────────────────────────
   const code = r => `${r.status} ${r.data?.error?.code}`;
   c.eq(code(await issue(premium.jar, GEN, { band: EMPTY })), '422 PRACTICE_BAND_EMPTY', `a band the chapter has nothing in ("${EMPTY}") is refused`);
