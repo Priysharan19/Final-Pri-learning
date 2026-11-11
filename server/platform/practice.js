@@ -21,6 +21,7 @@ import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById 
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
+import { spacedSchedule, LADDER_DAYS, MISS_DROP } from '../../client/src/engine/spacedReview.js';
 import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
@@ -1660,8 +1661,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const queue = dueDotpoints({ ratings, reviews, now });
     const pick = r => ({ subtopic: r.subtopic, dotpoint: r.dotpoint, attempts: r.attempts, correct: r.correct,
       lastAt: r.lastAt, recall: r.recall, target: r.target, dueAt: r.dueAt, overdueDays: r.overdueDays });
+    // The spaced ladder (engine/spacedReview.js): each dot point's interval,
+    // grown by a correct recall and shrunk by a miss, from the server's marks.
+    const spaced = spacedSchedule(attempts, now);
+    const step = r => ({ subtopic: r.subtopic, dotpoint: r.dotpoint, rung: r.rung, intervalDays: r.intervalDays, lastAt: r.lastAt, dueAt: r.dueAt });
     res.set('Cache-Control', 'no-store');
-    return res.status(200).json({ due: queue.due.map(pick), upcoming: queue.upcoming.map(pick), dueCount: queue.dueCount, counted: queue.counted, at: now });
+    return res.status(200).json({ due: queue.due.map(pick), upcoming: queue.upcoming.map(pick), dueCount: queue.dueCount, counted: queue.counted, at: now,
+      spaced: { today: spaced.today.slice(0, 40).map(step), todayCount: spaced.today.length, ladderDays: LADDER_DAYS, missDrop: MISS_DROP } });
   });
 
   return router;

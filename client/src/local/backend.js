@@ -3085,7 +3085,11 @@ async function serverReviewQueue(p) {
       // The history the estimate rests on, as the server counted it.
       attempts: Math.max(0, Number(r.attempts) || 0), correct: Math.max(0, Number(r.correct) || 0), lastAt: Number(r.lastAt) || 0 };
   };
-  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
+  // Due today on the server's spaced ladder (engine/spacedReview.js).
+  const today = (Array.isArray(out?.spaced?.today) ? out.spaced.today : []).map(r => ({ ...decorate(r),
+    intervalDays: Math.max(0, Number(r.intervalDays) || 0), dueAt: Number(r.dueAt) || 0 }));
+  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0,
+    today, todayCount: Number(out?.spaced?.todayCount) || today.length };
 }
 
 const routes = {
