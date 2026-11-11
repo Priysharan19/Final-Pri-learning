@@ -50,7 +50,9 @@
 // 30/1/3, 30/2/1 and XII 65/2/1 Section A (#840, #845), JEE Main 2026 S2 (#842),
 // the distinct-question widening (#838) and the Board-scheme contract (#844)
 // together; no single PR's version above describes the merged content.
-export const CONTENT_VERSION = '2026.11.15';
+// 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
+// contract (#846), restacked on Train 15.
+export const CONTENT_VERSION = '2026.11.16';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
