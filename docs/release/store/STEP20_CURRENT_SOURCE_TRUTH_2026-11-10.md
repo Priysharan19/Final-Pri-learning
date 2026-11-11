@@ -2,6 +2,7 @@
 
 **Status: INTERNAL SOURCE-TRUTH DRAFT, NOT APPROVED PUBLIC STORE COPY.**
 Tested engineering source: `35159d3c4e32df18a0cf5315457f818c007f495c`.
+**11 Nov 2026:** not re-run on the newest `main`, `9162147ef3ff47d9fdafc317cb91e668b2ebb102`; every result below is for `35159d3c4` only.
 This document supersedes no Console configuration or legal approval. Earlier price-gated
 store listing drafts remain historical and must not be published verbatim.
 
@@ -67,7 +68,7 @@ marking until the independent examiner gate closes.
 
 **Step 20:** Verify canonical source, true package identity, app UI/bridge integration,
 file/hashes, native compile, in-scope simulator/accessibility/security tests,
-and prepare *accurate* draft copy/assets. The two current technical uncertainties
+and prepare draft copy/assets that state only what this evidence shows. The two current technical uncertainties
 are the inconsistent hosted iOS WebContent-recovery gates and missing fresh
 product-story screenshots, not merely unsigned store approvals.
 
