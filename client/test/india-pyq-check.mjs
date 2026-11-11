@@ -69,7 +69,9 @@ eq(PYQ_MANIFEST.records, PYQ_MANIFEST.papers.reduce((n, p) => n + p.records, 0),
 for (const paper of PYQ_MANIFEST.papers) {
   const held = PYQ_RECORDS.filter(r => r.examId === paper.exam && r.year === paper.year
     && (paper.paper === undefined || r.paper === paper.paper)
-    && (paper.setCode === undefined || r.setCode === paper.setCode)).length;
+    && (paper.setCode === undefined || r.setCode === paper.setCode)
+    // A CBSE set is counted per section: Section A and the Board-scheme sections are separate lines.
+    && (!String(paper.exam).startsWith('cbse-') || paper.section === undefined || r.section === paper.section)).length;
   eq(held, paper.records, `manifest: ${paper.exam} ${paper.year} ${paper.paper || paper.setCode} holds the number of records it claims`);
 }
 
