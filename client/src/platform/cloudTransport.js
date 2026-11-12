@@ -6,6 +6,7 @@
 // (CP-02) — on Apple that is NativeCloudBridge, which owns HTTPS cookies/CSRF
 // outside the `prilearning://` WKWebView. JavaScript never sees those cookies.
 import { priNative } from './native/index.js';
+import { EDITION, EDITION_HEADER, editionConflict } from './edition.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -116,6 +117,8 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       if (byteLength(text) > 64 * 1024) return null;
       const data = parseJson(text);
       if (data?.service !== HEALTH_SERVICE) return null;
+      serverEditionAsked = true;
+      hearServerEdition(data.edition);
       const origin = normalizeCloudOrigin(loc.origin);
       globalThis.__PRI_CLOUD_ORIGIN__ = origin;
       return origin;
@@ -132,6 +135,55 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   const attempt = discovery;
   attempt.then(found => { if (!found && discovery === attempt) discovery = null; });
   return discovery;
+}
+
+// ── One app, one edition (ADR-0002, plan E2) ────────────────────────────────
+// This build is one edition (platform/edition.js) and so is the server it
+// reaches. Every /v1 request from a browser declares the build's edition in
+// X-Pri-Edition, which the server uses only to refuse (409 EDITION_MISMATCH);
+// a native shell's own HTTP stack sends no such header, so the health reply's
+// `edition` is compared here instead. Either way the outcome is one remembered
+// conflict that main.jsx turns into the blocking screen. A server that names
+// no edition (one from before editions) is not a conflict.
+let editionMismatchState = null;
+let serverEditionAsked = false;
+let editionListener = null;
+
+function hearServerEdition(serverEdition) {
+  const conflict = editionConflict(serverEdition);
+  if (!conflict || editionMismatchState) return;
+  editionMismatchState = conflict;
+  editionListener?.(conflict);
+}
+
+/** The conflict found so far ({ service }), or null. */
+export const editionMismatch = () => editionMismatchState;
+
+/** Call `listener(conflict)` once, when a conflict is found (one listener: the app root). */
+export function onEditionMismatch(listener) { editionListener = listener; }
+
+// A refusal's own field, on the error a caller sees: the server's edition id,
+// or null when the body did not carry a plain one (the caller still gets the
+// coded error; only a named service becomes the blocking screen).
+function editionRefusal(err, data) {
+  if (err.code !== 'EDITION_MISMATCH') return;
+  err.serverEdition = editionConflict(data?.error?.serverEdition)?.service ?? null;
+  hearServerEdition(err.serverEdition);
+}
+
+/**
+ * Once per start: learn the server's edition and compare. In a browser served
+ * by the platform the boot probe has already heard it and this asks nothing;
+ * otherwise (a native shell, an injected origin) it reads /v1/health once.
+ * Resolves to the conflict or null; never throws. An unreachable server is no
+ * answer, and is asked again on the next start.
+ */
+export async function checkServerEdition() {
+  if (!serverEditionAsked && cloudAvailable()) {
+    serverEditionAsked = true;
+    try { hearServerEdition((await cloudRequest('/v1/health'))?.edition); } catch { /* not reachable now */ }
+  }
+  return editionMismatchState;
 }
 
 export function normalizeCloudOrigin(raw = envOrigin()) {
@@ -264,6 +316,7 @@ export async function cloudRequest(path, {
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
+      editionRefusal(err, data);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -283,7 +336,7 @@ export async function cloudRequest(path, {
     throw err;
   }
 
-  const headers = { Accept: 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1' };
+  const headers = { Accept: 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf && verb !== 'GET') headers['X-Pri-CSRF'] = csrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
@@ -332,6 +385,7 @@ export async function cloudRequest(path, {
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
+      editionRefusal(err, data);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -407,7 +461,7 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
   const payload = JSON.stringify(body ?? {});
   if (byteLength(payload) > 1024 * 1024) throw new Error('Cloud request is too large');
   const rid = requestId();
-  const headers = { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1' };
+  const headers = { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf) headers['X-Pri-CSRF'] = csrf;
 
@@ -439,6 +493,7 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      editionRefusal(err, data);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }

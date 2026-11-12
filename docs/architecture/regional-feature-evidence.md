@@ -25,6 +25,13 @@ The machine-readable counterpart is the `capabilities` table in `client/edition.
 | Accounts and identity | `/v1` accounts, MFA for staff, Supabase Mumbai (ADR-0001) | None | Isolated Australian region; consent and recovery tests (H1, H2, H4) |
 | Payments | Razorpay, INR (`server/platform/billing.js`) | None | Australian provider, reconciliation and refund tests (E5, H3) |
 
+## Changes since the baseline
+
+- **Verified marking, Prithagoras (plan G3, first slice).** A Prithagoras server now issues and marks NSW practice
+  from the generators mapped to a current syllabus, on the final answer only, with jurisdiction, syllabus version and
+  outcome sealed on every question. The student app does not ask for it yet, and no rubric is certified. See
+  [nsw-practice-banks.md](nsw-practice-banks.md); suites `test:nsw:banks`, `server/test/nsw-practice-check.mjs`.
+
 ## Integration dependency map — the smallest safe first changes
 
 1. **E1, edition manifest** (PR #862). Behaviour unchanged: the Priyabhata bundle is byte-identical to `main` apart from
