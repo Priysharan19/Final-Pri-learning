@@ -203,6 +203,10 @@ try {
     c.deq([r.status, r.data?.error?.code], [400, 'DESK_QUESTIONS_INVALID'], `refused: ${label}`);
   }
 
+  // A prototype key sent as raw JSON (JSON.parse makes it an own property) is refused, and pollutes nothing.
+  const proto = await call(au, `/v1/desk/attempts/${a1.id}/questions`, { method: 'PATCH', jar: A.jar, rawBody: '{"changes":{"__proto__":{"done":true},"constructor":{"done":true}}}' });
+  c.deq([proto.status, proto.data?.error?.code, ({}).done], [400, 'DESK_QUESTIONS_INVALID', undefined], 'refused: a __proto__ / constructor question key');
+
   // Closing.
   const rev = (await get(A, a1.id)).data.attempt.rev;
   const f1 = await clock(A, a1.id, { intent: 'finish', rev });

@@ -585,7 +585,7 @@ jobs:
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
           node server/test/desk-check.mjs 2>&1 | tee desk.log
-          grep -Fq 'desk-check (sqlite): 140 checks passed' desk.log
+          grep -Fq 'desk-check (sqlite): 141 checks passed' desk.log
           node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
           grep -Fq 'DESK ISOLATION: PASS — 39/39 checks' desk.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need

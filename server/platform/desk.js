@@ -290,21 +290,23 @@ export function createDeskRouter(db, { edition = serverEdition(process.env), now
       if (!row) return { status: 404 };
       const paper = parse(row.paper_json, null);
       if (entries.some(([key]) => Number(key) > paper.questionCount)) return { status: 400 };
-      const questions = readQuestions(parse(row.questions_json, null), paper.questionCount);
+      // A Map, so no property name is ever taken from the request (each key is
+      // also a validated question number, 1..questionCount, above).
+      const questions = new Map(Object.entries(readQuestions(parse(row.questions_json, null), paper.questionCount)));
       const stale = [];
       for (const [key, change] of entries) {
-        const entry = { done: false, flagged: false, note: '', noteRev: 0, ms: 0, ...(questions[key] || {}) };
+        const entry = { done: false, flagged: false, note: '', noteRev: 0, ms: 0, ...(questions.get(key) || {}) };
         if (change.done !== undefined) entry.done = change.done;
         if (change.flagged !== undefined) entry.flagged = change.flagged;
         if (change.note !== undefined) {
           if (change.noteRev > entry.noteRev) { entry.note = change.note; entry.noteRev = change.noteRev; } else stale.push(Number(key));
         }
         if (change.ms !== undefined) entry.ms = Math.max(entry.ms, change.ms);
-        questions[key] = entry;
+        questions.set(key, entry);
       }
-      const kept = readQuestions(questions, paper.questionCount);
+      const kept = readQuestions(Object.fromEntries(questions), paper.questionCount);
       await db.run('UPDATE desk_attempts SET questions_json=?, rev=rev+1, updated_at=? WHERE id=? AND account_id=?', [JSON.stringify(kept), now, id, accountId]);
-      return { rev: Number(row.rev) + 1, stale: stale.sort((a, b) => a - b), questions: Object.fromEntries(entries.map(([key]) => [key, kept[key] || null])) };
+      return { rev: Number(row.rev) + 1, stale: stale.sort((a, b) => a - b), questions: Object.fromEntries(entries.map(([key]) => [key, Object.hasOwn(kept, key) ? kept[key] : null])) };
     });
     if (outcome.status === 404) return notFound(res);
     if (outcome.status === 400) return invalid();
