@@ -19,11 +19,15 @@ ARG PRI_FEATURE_EXTENDED_TRACKS
 # sets it for this image, the iOS bundles and the Android app alike (D7).
 ARG PRI_FEATURE_PAST_PAPERS
 ARG PRI_FEATURE_PARENT_REPORT
+# The regional edition this image serves (client/edition.config.mjs, ADR-0002).
+# Unset = Priyabhata. The server reads the same variable at run time.
+ARG PRI_EDITION
 ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
     PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
     PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS} \
     PRI_FEATURE_PAST_PAPERS=${PRI_FEATURE_PAST_PAPERS} \
-    PRI_FEATURE_PARENT_REPORT=${PRI_FEATURE_PARENT_REPORT}
+    PRI_FEATURE_PARENT_REPORT=${PRI_FEATURE_PARENT_REPORT} \
+    PRI_EDITION=${PRI_EDITION}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
@@ -48,10 +52,15 @@ RUN npm ci --prefix server --omit=dev
 FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS runtime
 ARG PRI_RELEASE_SHA
 ARG PRI_BUILD_TIMESTAMP
+# The image's edition defaults to the one its client was built for, so a plain
+# `docker run` reports the edition it serves (a run-time -e still overrides;
+# plan E2 holds the two equal).
+ARG PRI_EDITION
 ENV NODE_ENV=production \
     PORT=4000 \
     PRI_RELEASE_SHA=${PRI_RELEASE_SHA} \
-    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP}
+    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP} \
+    PRI_EDITION=${PRI_EDITION}
 WORKDIR /app
 # Only the production runtime enters the image: the process entry, the /v1
 # control plane, the operator tools and the built client. The legacy /api
@@ -68,6 +77,9 @@ COPY client/src/engine ./client/src/engine
 # and plural rules (engine/lost-marks.js, engine/cbseMarking.js). Only these two
 # self-contained files; no other client source enters the image.
 COPY client/src/i18n/strings.en.js client/src/i18n/languages.js ./client/src/i18n/
+# The regional edition table (ADR-0002): /v1/health reports which edition this
+# image serves. Data only; it imports nothing outside the i18n files above.
+COPY client/edition.config.mjs ./client/edition.config.mjs
 COPY client/package.json ./client/package.json
 COPY release ./release
 COPY --from=server-deps /app/server/node_modules ./server/node_modules
