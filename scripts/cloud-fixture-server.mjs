@@ -92,11 +92,13 @@ const child = spawn(process.execPath, ['--import', outboxTap, entry], {
 child.unref();
 
 const base = `http://127.0.0.1:${port}`;
-for (let i = 0; ; i++) {
-  // Each probe has its own bound, so a half-dead listener cannot hang one fetch
-  // past the launcher's own 60 × 500 ms limit below.
+const readyT0 = Date.now();
+for (;;) {
+  // Each probe has its own bound and the loop a 90 s wall-clock deadline, below
+  // the journey's 120 s bound on this launcher, so this message (and the
+  // journey's server.log tail) is what a stuck start prints.
   try { if ((await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(3_000) })).ok) break; } catch { /* starting */ }
-  if (i > 60) { console.error(`server did not start (log: ${join(dir, 'server.log')})`); process.exit(1); }
+  if (Date.now() - readyT0 > 90_000) { try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* gone */ } } console.error(`server did not start within 90 s (log: ${join(dir, 'server.log')})`); process.exit(1); }
   await new Promise(r => setTimeout(r, 500));
 }
 // The answer must come from OUR child, not a stale server left on the port.

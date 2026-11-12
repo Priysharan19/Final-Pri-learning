@@ -133,10 +133,14 @@ function stopServerAndProve(pid, port) {
   let how = 'exited on SIGTERM';
   if (alive()) { how = 'did not exit within 10 s of SIGTERM; SIGKILL sent'; try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } execSync('sleep 0.5'); }
   console.log(`  (cloud server ${pid} ${how} after ${((Date.now() - t) / 1000).toFixed(1)} s)`);
-  let open = true;
-  try { run('/usr/bin/nc', ['-z', '-G', '2', '127.0.0.1', String(port)], { timeout: 10_000 }); } catch { open = false; }
-  console.log(`  (port ${port} ${open ? 'STILL ACCEPTS connections' : 'is closed'})`);
-  if (open || alive()) abortJourney(`the cloud server on port ${port} is still up after it was stopped; the offline leg would not be offline`);
+  // Closed means nc's clean refusal: exit status 1 with "Connection refused".
+  // nc missing, timing out or any other answer is not proof, and stops the run.
+  let state;
+  try { run('/usr/bin/nc', ['-z', '-v', '-G', '2', '127.0.0.1', String(port)], { timeout: 10_000 }); state = 'open'; }
+  catch (e) { state = e.status === 1 && /refused/i.test(`${e.stderr || ''}`) ? 'closed' : `unknown (nc ${e.code || e.signal || `status ${e.status}`})`; }
+  console.log(`  (port ${port} ${state === 'open' ? 'STILL ACCEPTS connections' : state === 'closed' ? 'is closed' : `could not be proven closed: ${state}`})`);
+  if (state !== 'closed' || alive()) abortJourney(`the cloud server on port ${port} was not proven gone after it was stopped (${state}); the offline leg would not be offline`);
+  untrackServer(pid);
 }
 
 // A freshly booted simulator can refuse a launch until SpringBoard is ready
@@ -352,6 +356,7 @@ process.on('uncaughtException', error => {
   abortJourney(`uncaught: ${String(error?.message || error).split('\n')[0].slice(0, 160)}`);
 });
 process.on('exit', code => { if (code) exitReport(); });
+const untrackServer = pid => { liveServerPids.delete(pid); try { writeFileSync(serverPidFile, liveServerPids.size ? `${[...liveServerPids].join('\n')}\n` : ''); } catch { /* the in-process set is authoritative */ } };
 const trackServer = pid => { if (!pid) return; liveServerPids.add(pid); try { writeFileSync(serverPidFile, `${[...liveServerPids].join('\n')}\n`); } catch { /* the in-process set still covers abortJourney */ } };
 // Every early stop cleans up as the normal path's finally blocks do: local
 // servers stopped, the text size reset. CI evidence for a stopped run is the
