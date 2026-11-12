@@ -1382,6 +1382,14 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
+      # Plan E4: this build carries only its own edition's brand, and the
+      # other edition's build (made here into a temporary folder) differs from
+      # it only in the brand files and the one chunk holding the wordmark.
+      - name: Each edition's build carries only its own brand
+        run: |
+          set -euo pipefail
+          node client/test/brand-build-check.mjs --both | tee brand-build.log
+          grep -Fq 'BRAND BUILD: PASS — 32/32 checks — both editions built' brand-build.log
       # The iOS web bundles are generated here, never read from git (decision
       # D28): sync copies client/dist into both packages, check proves each
       # copy is complete and byte-exact, then the shipped bytes are inspected.
