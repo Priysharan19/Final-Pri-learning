@@ -53,7 +53,7 @@ const likeEscape = s => s.replace(/[\\%_]/g, c => `\\${c}`);
 
 // What every read may return: published, offered to this edition, and linked
 // over https (a 'hosted' row from a later mission is never served by F1).
-const VISIBLE = `r.review_state='published' AND r.availability='external' AND r.url LIKE 'https://%'
+export const VISIBLE = `r.review_state='published' AND r.availability='external' AND r.url LIKE 'https://%'
   AND EXISTS (SELECT 1 FROM resource_editions e WHERE e.resource_id=r.id AND e.edition=?)`;
 
 /**

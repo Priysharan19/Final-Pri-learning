@@ -19,6 +19,7 @@ import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
+import { createDeskRouter } from './desk.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -65,7 +66,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -249,6 +250,12 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // The shared resource library (ADR-0002 plan F1): published resources of
   // this server's edition, for signed-in accounts. Read-only.
   router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
+  // The Exam Desk (ADR-0002 §8 plan F4): the UNMARKED mode of the
+  // examination system — practice at a library paper under reading and
+  // working time, notes and flags, never a mark. A sibling of /exams that
+  // shares none of its marking, counting or allowance code (desk.js). Same
+  // eligibility as a marked paper; free on every plan.
+  router.use('/desk', requireGuardianConsent(db), createDeskRouter(db, { edition: resources.edition, ...desk }));
   router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
