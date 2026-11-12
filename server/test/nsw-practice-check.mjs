@@ -55,7 +55,6 @@ const { startApp, checks, registerAccount, verifyEmail } = await import('./suppo
 const { requestedEngine } = await import('./support/engine.mjs');
 const { bankPolicy, FINAL_ANSWER_MARKING } = await import('../platform/editionBanks.js');
 const { nswBank, nswCell, NSW_BANK_LEDGER, NSW_BANK_COUNT, NSW_CELL_COUNT, nswCurriculumResponse } = await import('../platform/nswBanks.js');
-const { indiaBank } = await import('../platform/indiaBanks.js');
 const { FINAL_ANSWER_ONLY } = await import('../platform/markingPolicy.js');
 const { editionMarkingPolicy: markingPolicy, editionMethodMarksRefusal: methodMarksRefusal } = await import('../platform/editionMarking.js');
 const { MARKER_OPS } = await import('../platform/markerOps.js');
