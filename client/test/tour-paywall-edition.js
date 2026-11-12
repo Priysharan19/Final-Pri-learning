@@ -13,7 +13,10 @@
 //   · a shell that announces App Store billing is given no store: the screen
 //     stays the same and the shell's billing bridge is never called;
 //   · the server tells the page nothing is available and refuses a checkout
-//     the page tries anyway.
+//     the page tries anyway;
+//   · CONTROL: the same announced shell on a Priyabhata build and server does
+//     select the App Store and does ask for its bootstrap, so the silence
+//     above is the edition's doing and not a probe that could never fire.
 //
 // WHAT IS REAL: the built Prithagoras client, the platform server and its
 // SQLite database, the account. WHAT IS SYNTHETIC: the "native shell" is two
@@ -44,12 +47,12 @@ const check = (name, condition, detail = '') => {
   console.log(`  ${condition ? '✓' : '✗'} ${name}${condition || !detail ? '' : ` — ${detail}`}`);
 };
 
-function build() {
-  const out = mkdtempSync(join(tmpdir(), 'pri-paywall-edition-'));
+function build(edition = EDITION) {
+  const out = mkdtempSync(join(tmpdir(), `pri-paywall-${edition}-`));
   const vite = join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
   const result = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_EDITION: EDITION } });
-  if (result.status !== 0 || !existsSync(join(out, 'index.html'))) throw new Error(`the ${EDITION} build failed:\n${result.stdout || ''}${result.stderr || ''}`);
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_EDITION: edition } });
+  if (result.status !== 0 || !existsSync(join(out, 'index.html'))) throw new Error(`the ${edition} build failed:\n${result.stdout || ''}${result.stderr || ''}`);
   return out;
 }
 
@@ -59,7 +62,28 @@ const shown = (page, selector) => page.evaluate(sel => [...document.querySelecto
 const enabledButtons = (page, selector) => page.evaluate(sel => [...document.querySelectorAll(`${sel} button, ${sel} [role="button"]`)]
   .filter(el => el.getClientRects().length > 0 && !el.disabled).map(el => (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim()), selector);
 
+/** A shell that announces App Store billing; every bridge message is kept. */
+async function announcedShell(browser, platform, name) {
+  const shell = await browser.newContext({ viewport: { width: 1024, height: 1366 } });
+  await shell.addInitScript(() => {
+    window.__PRI_BILLING_BRIDGE_CALLS__ = [];
+    window.__PRI_NATIVE_BILLING__ = true;
+    window.webkit = { messageHandlers: { priBilling: { postMessage(message) { window.__PRI_BILLING_BRIDGE_CALLS__.push(message); } } } };
+  });
+  const tablet = await shell.newPage();
+  const requests = [];
+  tablet.on('request', request => { const url = new URL(request.url()); if (url.pathname.startsWith('/v1/billing/')) requests.push(`${request.method()} ${url.pathname}`); });
+  await tablet.goto(platform.origin, { waitUntil: 'domcontentloaded' });
+  await tablet.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
+  await createVerifiedProfile(tablet, platform, { name, year: 10, fromPicker: await tablet.getByTestId('picker-create-account').count() > 0 });
+  await tablet.goto(`${platform.origin}/premium`, { waitUntil: 'domcontentloaded' });
+  await tablet.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 30000 });
+  await tablet.waitForTimeout(1200);
+  return { shell, tablet, requests };
+}
+
 let dist = null;
+let control = null;
 let platform = null;
 let browser = null;
 try {
@@ -134,21 +158,7 @@ try {
   await ctx.close();
 
   // ── a shell that announces App Store billing ───────────────────────────────
-  const shell = await browser.newContext({ viewport: { width: 1024, height: 1366 } });
-  await shell.addInitScript(() => {
-    window.__PRI_BILLING_BRIDGE_CALLS__ = [];
-    window.__PRI_NATIVE_BILLING__ = true;
-    window.webkit = { messageHandlers: { priBilling: { postMessage(message) { window.__PRI_BILLING_BRIDGE_CALLS__.push(message); } } } };
-  });
-  const tablet = await shell.newPage();
-  const shellBilling = [];
-  tablet.on('request', request => { const url = new URL(request.url()); if (url.pathname.startsWith('/v1/billing/')) shellBilling.push(`${request.method()} ${url.pathname}`); });
-  await tablet.goto(platform.origin, { waitUntil: 'domcontentloaded' });
-  await tablet.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
-  await createVerifiedProfile(tablet, platform, { name: 'Shell Student', year: 10, fromPicker: await tablet.getByTestId('picker-create-account').count() > 0 });
-  await tablet.goto(`${platform.origin}/premium`, { waitUntil: 'domcontentloaded' });
-  await tablet.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 30000 });
-  await tablet.waitForTimeout(1200);
+  const { shell, tablet, requests: shellBilling } = await announcedShell(browser, platform, 'Shell Student');
   const shellPaywall = await visibleText(tablet, '[data-paywall]');
   check('with a billing bridge announced, the screen still selects no store and says not on sale',
     await tablet.locator('[data-paywall]').getAttribute('data-paywall-store') === 'web' && await shown(tablet, '[data-paywall-not-on-sale]') === 1 && !AMOUNT.test(shellPaywall), shellPaywall.slice(0, 200));
@@ -160,17 +170,28 @@ try {
   check('the billing bridge was never called: no product, price, purchase or restore was asked of the store', bridgeCalls === 0, `${bridgeCalls} calls`);
   check('and the server was asked for no store bootstrap', !shellBilling.some(entry => /bootstrap|transaction|purchase|restore|checkout/.test(entry)), JSON.stringify(shellBilling));
   await shell.close();
+  await platform.close();
+  platform = null;
+
+  // ── CONTROL: the same shell where Premium is on sale ───────────────────────
+  control = build('priyabhata');
+  platform = await startOnlinePlatform({ dist: control, env: { PRI_EDITION: null } });
+  const india = await announcedShell(browser, platform, 'Control Student');
+  await india.tablet.waitForFunction(() => document.querySelector('[data-paywall-not-on-sale], [data-paywall-plans] p, [data-paywall-plan]'), null, { timeout: 15000 }).catch(() => {});
+  check('CONTROL: on a Priyabhata build the same shell selects the App Store', await india.tablet.locator('[data-paywall]').getAttribute('data-paywall-store') === 'app-store' && await shown(india.tablet, '[data-paywall-in-app]') === 0);
+  check('CONTROL: and its server is asked for the App Store bootstrap', india.requests.includes('GET /v1/billing/apple/bootstrap'), JSON.stringify(india.requests));
+  await india.shell.close();
 } catch (error) {
   failures.push(`the tour stopped: ${String(error?.stack || error).split('\n').slice(0, 4).join(' | ')}`);
 } finally {
   await browser?.close().catch(() => {});
   await platform?.close?.().catch(() => {});
-  if (dist) rmSync(dist, { recursive: true, force: true });
+  for (const dir of [dist, control]) if (dir) rmSync(dir, { recursive: true, force: true });
 }
 
 if (failures.length) {
   console.log('\nfailures:');
   for (const line of failures) console.log(`  ${line}`);
 }
-console.log(`\nPAYWALL PER EDITION: ${failures.length ? 'FAIL' : 'PASS'} — ${pass}/${pass + failures.length} checks — SYNTHETIC shell; a built Prithagoras client on the real platform server shows no price, plan or purchase control and reaches no store`);
+console.log(`\nPAYWALL PER EDITION: ${failures.length ? 'FAIL' : 'PASS'} — ${pass}/${pass + failures.length} checks — SYNTHETIC shell; a built Prithagoras client on the real platform server shows no price, plan or purchase control and reaches no store; the same shell on a Priyabhata build does`);
 process.exit(failures.length ? 1 : 0);
