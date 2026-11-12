@@ -1,0 +1,96 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · NSW curriculum model (Prithagoras) · Mathematics K–10 Syllabus (2022)
+//
+// Focus-area names, NESA outcome codes as NESA publishes them on
+// curriculum.nsw.edu.au, read from each focus-area page's published data on
+// 2026-11-13 and checked against the rendered outcomes page. No NESA outcome or
+// dot-point wording is stored: NESA syllabus text is Crown copyright and its
+// schools licence excludes tutoring companies and publishers
+// (docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md §5.7).
+// Focus areas carry no NESA code; curriculum.nsw.edu.au URL ids are not codes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const NSW_MATHEMATICS_K10_2022 = Object.freeze({
+  id: 'nsw-mathematics-k-10-2022',
+  jurisdiction: 'NSW',
+  authority: 'NESA',
+  title: 'Mathematics K–10 Syllabus (2022)',
+  version: '2022',
+  status: 'current',
+  stages: Object.freeze([4, 5]),
+  years: Object.freeze([7, 8, 9, 10]),
+  implementation: Object.freeze({ years7And9From: 2024, years8And10From: 2025 }),
+  overarchingOutcome: 'MAO-WM-01',
+  sources: Object.freeze([
+    Object.freeze({ url: 'https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022', accessed: '2026-11-13', supports: 'Current syllabus listing' }),
+    Object.freeze({ url: 'https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/outcomes', accessed: '2026-11-13', supports: 'Outcome codes, Core/Path, suggested Stage 6 path labels' }),
+    Object.freeze({ url: 'https://curriculum.nsw.edu.au/learning-areas/mathematics/mathematics-k-10-2022/content', accessed: '2026-11-13', supports: 'Stage 4 and Stage 5 focus areas (one page per focus area)' }),
+    Object.freeze({ url: 'https://education.nsw.gov.au/teaching-and-learning/curriculum/mathematics/leading-mathematics-k-12/leading-mathematics-7-12/mathematics-7-10-syllabus-information', accessed: '2026-11-13', supports: 'NSW Department of Education: Years 7 and 9 from 2024, Years 8 and 10 from 2025 (corroborating, not NESA)' }),
+  ]),
+  focusAreas: Object.freeze([
+    Object.freeze({ name: 'Algebraic techniques', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-ALG-C-01']) }),
+    Object.freeze({ name: 'Angle relationships', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-ANG-C-01']) }),
+    Object.freeze({ name: 'Area', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-ARE-C-01']) }),
+    Object.freeze({ name: 'Data classification and visualisation', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-DAT-C-01']) }),
+    Object.freeze({ name: 'Data analysis', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-DAT-C-02']) }),
+    Object.freeze({ name: 'Equations', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-EQU-C-01']) }),
+    Object.freeze({ name: 'Fractions, decimals and percentages', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-FRC-C-01']) }),
+    Object.freeze({ name: 'Properties of geometrical figures', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-GEO-C-01']) }),
+    Object.freeze({ name: 'Indices', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-IND-C-01']) }),
+    Object.freeze({ name: 'Computation with integers', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-INT-C-01']) }),
+    Object.freeze({ name: 'Length', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-LEN-C-01']) }),
+    Object.freeze({ name: 'Linear relationships', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-LIN-C-01']) }),
+    Object.freeze({ name: 'Probability', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-PRO-C-01']) }),
+    Object.freeze({ name: 'Right-angled triangles (Pythagoras’ theorem)', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-PYT-C-01']) }),
+    Object.freeze({ name: 'Ratios and rates', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-RAT-C-01']) }),
+    Object.freeze({ name: 'Volume', stage: 4, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA4-VOL-C-01']) }),
+    Object.freeze({ name: 'Algebraic techniques A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-ALG-C-01']) }),
+    Object.freeze({ name: 'Area and surface area A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-ARE-C-01']) }),
+    Object.freeze({ name: 'Data analysis A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-DAT-C-01']) }),
+    Object.freeze({ name: 'Data analysis B', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-DAT-C-02']) }),
+    Object.freeze({ name: 'Equations A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-EQU-C-01']) }),
+    Object.freeze({ name: 'Financial mathematics A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-FIN-C-01']) }),
+    Object.freeze({ name: 'Financial mathematics B', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-FIN-C-02']) }),
+    Object.freeze({ name: 'Properties of geometrical figures A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-GEO-C-01']) }),
+    Object.freeze({ name: 'Indices A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-IND-C-01']) }),
+    Object.freeze({ name: 'Linear relationships A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-LIN-C-01']) }),
+    Object.freeze({ name: 'Linear relationships B', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-LIN-C-02']) }),
+    Object.freeze({ name: 'Numbers of any magnitude', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-MAG-C-01']) }),
+    Object.freeze({ name: 'Non-linear relationships A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-NLI-C-01']) }),
+    Object.freeze({ name: 'Non-linear relationships B', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-NLI-C-02']) }),
+    Object.freeze({ name: 'Probability A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-PRO-C-01']) }),
+    Object.freeze({ name: 'Trigonometry A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-TRG-C-01']) }),
+    Object.freeze({ name: 'Trigonometry B', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-TRG-C-02']) }),
+    Object.freeze({ name: 'Volume A', stage: 5, kind: 'core', pathLabels: Object.freeze([]), outcomes: Object.freeze(['MA5-VOL-C-01']) }),
+    Object.freeze({ name: 'Algebraic techniques B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-ALG-P-01']) }),
+    Object.freeze({ name: 'Algebraic techniques C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-ALG-P-02']) }),
+    Object.freeze({ name: 'Area and surface area B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-ARE-P-01']) }),
+    Object.freeze({ name: 'Circle geometry (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Ext']), outcomes: Object.freeze(['MA5-CIR-P-01']) }),
+    Object.freeze({ name: 'Data analysis C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-DAT-P-01']) }),
+    Object.freeze({ name: 'Equations B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-EQU-P-01']) }),
+    Object.freeze({ name: 'Equations C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-EQU-P-02']) }),
+    Object.freeze({ name: 'Functions and other graphs (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-FNC-P-01']) }),
+    Object.freeze({ name: 'Properties of geometrical figures B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Ext']), outcomes: Object.freeze(['MA5-GEO-P-01']) }),
+    Object.freeze({ name: 'Properties of geometrical figures C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Ext']), outcomes: Object.freeze(['MA5-GEO-P-02']) }),
+    Object.freeze({ name: 'Indices B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-IND-P-01']) }),
+    Object.freeze({ name: 'Indices C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-IND-P-02']) }),
+    Object.freeze({ name: 'Linear relationships C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-LIN-P-01']) }),
+    Object.freeze({ name: 'Logarithms (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-LOG-P-01']) }),
+    Object.freeze({ name: 'Introduction to networks (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn']), outcomes: Object.freeze(['MA5-NET-P-01']) }),
+    Object.freeze({ name: 'Non-linear relationships C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-NLI-P-01']) }),
+    Object.freeze({ name: 'Polynomials (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv', 'Ext']), outcomes: Object.freeze(['MA5-POL-P-01']) }),
+    Object.freeze({ name: 'Probability B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-PRO-P-01']) }),
+    Object.freeze({ name: 'Variation and rates of change A (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-RAT-P-01']) }),
+    Object.freeze({ name: 'Variation and rates of change B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-RAT-P-02']) }),
+    Object.freeze({ name: 'Trigonometry C (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-TRG-P-01']) }),
+    Object.freeze({ name: 'Trigonometry D (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Adv']), outcomes: Object.freeze(['MA5-TRG-P-02']) }),
+    Object.freeze({ name: 'Volume B (Path)', stage: 5, kind: 'path', pathLabels: Object.freeze(['Stn', 'Adv']), outcomes: Object.freeze(['MA5-VOL-P-01']) }),
+  ]),
+  todo: Object.freeze([
+    'Only Stages 4 and 5 (Years 7–10) are encoded; Early Stage 1 to Stage 3 are out of scope.',
+    'NESA assigns outcomes to stages, not to Years 7, 8, 9 or 10: a Pri year label is a Pri programming choice (research §4.1).',
+    'K–10 content-group titles are sentence-length NESA content statements and are not stored (copyright).',
+    'Mathematics Life Skills 11–12 (2024) is out of scope for this model.',
+    'Whether recording outcome codes and focus-area names as alignment metadata needs NESA permission is not verified (research §5.7); ask NESA before any student-facing use.',
+  ])
+});
