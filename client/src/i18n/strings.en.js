@@ -3402,4 +3402,6 @@ export default {
   "library.attributionLabel": 'Attribution',
   "library.rightsLabel": 'Rights',
   "library.disclaimerLabel": 'Disclaimer',
+  // The app and the server are different regional editions (plan E2); {app} and {service} are brand names.
+  'edition.mismatchBody': 'This app is {app}. It cannot sign in to {service}\'s service.',
 };

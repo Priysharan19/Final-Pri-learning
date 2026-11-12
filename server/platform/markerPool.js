@@ -54,7 +54,10 @@ import { asStore, assertNoOpenTransaction } from './store.js';
 import { consumeRateLimit, sha256 } from './security.js';
 import { logEvent } from './observability.js';
 import { metrics } from './metrics.js';
-import { markingPolicy, methodMarksRefusal } from './markingPolicy.js';
+// The policy is the edition's (editionMarking.js): the process-wide switch of
+// markingPolicy.js, limited to the final answer for an edition with no
+// certified rubric of its own.
+import { editionMarkingPolicy, editionMethodMarksRefusal } from './editionMarking.js';
 
 export const MARKING_TOO_COMPLEX = 'MARKING_TOO_COMPLEX';
 export const MARKING_BUSY = 'MARKING_BUSY';
@@ -127,7 +130,7 @@ export function createMarkerPool({
   }
   // A method-mark switch that is not honoured is said once, at start: marking
   // stays on the final answer only (markingPolicy.js), never open.
-  const refusal = methodMarksRefusal(env);
+  const refusal = editionMethodMarksRefusal(env);
   if (refusal) logEvent('warn', 'platform_error', { code: refusal.code });
   const slots = [];
   const queue = [];
@@ -264,7 +267,7 @@ export function createMarkerPool({
     if (closed) return Promise.resolve({ ok: false, code: MARKING_BUSY, reason: 'closed', partials: [], ms: 0 });
     // D12: the server's marking policy rides with every operation, over
     // whatever the caller put there — a request can never choose it.
-    args = { ...args, policy: markingPolicy(env) };
+    args = { ...args, policy: editionMarkingPolicy(env) };
     if (inline) return runInline(op, args);
     return new Promise((resolve, reject) => {
       const job = { id: nextId++, op, args, key: key === null ? null : String(key), deadlineMs: Math.max(1, Math.round(limit)),

@@ -346,6 +346,49 @@ try {
   reset();
   out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--expect-config', join(scratch, 'missing.md')]);
   ok(out.code === 2 && /no such file/.test(out.stderr), 'a missing manifest is a usage error');
+
+  // ── --edition: one deployment, one edition, server and client alike (plan E2) ──
+  const asEdition = (server, client) => {
+    reset();
+    if (server !== undefined) routes['/v1/health'][1].edition = server;
+    if (client !== undefined) routes['/features.json'][1].edition = client;
+  };
+  const editionRows = report => report.results.slice(-3).map(item => [item.ok, item.label]);
+  asEdition('priyabhata', 'priyabhata');
+  let checked = await run({ edition: 'priyabhata' });
+  ok(checked.ok && checked.results.length === 13 + 3, 'a Priyabhata deployment passes --edition priyabhata, with three more rows');
+  eq(editionRows(checked), [[true, 'server edition is priyabhata'], [true, 'web client was built for priyabhata'], [true, 'server and web client are the same edition']], 'the three rows name the server, the client and their agreement');
+  eq([...requests].sort(), [...threeGets, 'GET /features.json'].sort(), '--edition costs exactly one more GET (/features.json)');
+  asEdition('priyabhata', 'priyabhata');
+  checked = await run({ edition: 'prithagoras' });
+  ok(!checked.ok, '--edition prithagoras FAILS against a Priyabhata deployment');
+  eq(editionRows(checked), [[false, 'server edition is prithagoras'], [false, 'web client was built for prithagoras'], [true, 'server and web client are the same edition']], 'both sides are reported as the wrong edition, and as agreeing with each other');
+  asEdition('prithagoras', 'prithagoras');
+  ok((await run({ edition: 'prithagoras' })).ok, 'a Prithagoras deployment passes --edition prithagoras');
+  asEdition('prithagoras', 'priyabhata');
+  checked = await run({ edition: 'prithagoras' });
+  eq(editionRows(checked), [[true, 'server edition is prithagoras'], [false, 'web client was built for prithagoras'], [false, 'server and web client are the same edition']], 'a Prithagoras server shipping a Priyabhata client fails');
+  asEdition('priyabhata', 'prithagoras');
+  ok(!(await run({ edition: 'prithagoras' })).ok && !(await run({ edition: 'priyabhata' })).ok, 'a split deployment passes under neither edition');
+  asEdition(undefined, undefined);
+  checked = await run({ edition: 'priyabhata' });
+  eq(editionRows(checked).map(([pass]) => pass), [false, false, false], 'a deployment from before editions (no edition on either side) fails all three rows, never passes by both being absent');
+  asEdition('priyabhata', undefined);
+  ok(!(await run({ edition: 'priyabhata' })).ok, 'a client build that names no edition fails');
+  asEdition('priyabhata', 'priyabhata');
+  delete routes['/features.json'];
+  checked = await run({ edition: 'priyabhata' });
+  ok(!checked.ok && checked.results.some(item => !item.ok && item.label === 'web client was built for priyabhata' && item.detail === 'status 404'), 'a deployment with no /features.json fails and says so');
+  asEdition('priyabhata', 'priyabhata');
+  out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--edition', 'prithagoras']);
+  ok(out.code === 1 && /✗ server edition is prithagoras {2}\(\/v1\/health edition "priyabhata"\)/.test(out.stdout) && out.stdout.endsWith('DEPLOYMENT VERIFIED: FAIL — 14/16\n'), 'the CLI exits 1 for --edition prithagoras against a Priyabhata deployment and names what is running');
+  asEdition('priyabhata', 'priyabhata');
+  out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--edition', 'priyabhata']);
+  ok(out.code === 0 && out.stdout.startsWith(golden(false).split('\nDEPLOYMENT VERIFIED')[0]) && out.stdout.endsWith('DEPLOYMENT VERIFIED: PASS — 16/16\n'), 'the CLI passes the right edition 16/16, with the standard rows first and unchanged');
+  reset();
+  out = await cli(['--origin', origin, '--sha', SHA, '--allow-http', '--edition', 'typo']);
+  ok(out.code === 2 && /--edition must be one of priyabhata, prithagoras/.test(out.stderr) && requests.length === 0, 'an unknown edition is a usage error (exit 2) and nothing is requested');
+  eq(parseArgs(['--origin', origin, '--sha', SHA]).edition, null, 'without --edition no edition is expected');
 } finally {
   server.close();
   rmSync(scratch, { recursive: true, force: true });

@@ -27,7 +27,7 @@
 // prints the open gaps of both editions on every run.
 //
 // E4 (brand): the student app reads the edition through one module,
-// client/src/brand/build-edition.js, which the build replaces with its own
+// client/src/platform/edition-record.js (plan E2), which the build replaces with its own
 // edition's record — the wordmark, the icon cut, and the {brand} every
 // catalogue string uses. The build reads it in vite.config.js
 // (index.html, the web manifest, icons). Sign-up course defaults (E2/E3),
@@ -78,6 +78,11 @@ export const CAPABILITIES = Object.freeze([
 const pending = text => Object.freeze({ pending: text });
 
 const NSW_CONTENT = pending('No approved NSW question banks, answer specifications or certified Australian marking guidelines yet (plan G2, G3, G6).');
+// Plan G3, first slice (server/platform/nswBanks.js): a Prithagoras server now
+// issues and marks NSW practice. These two stay pending until the whole
+// capability works end to end for the edition; each says what is still owed.
+const NSW_MARKING = pending('The server issues and marks NSW practice from generators mapped to the current syllabuses, on the final answer only; still owed: the student app asking a Prithagoras server for it, and HSC examiner certification before any method mark (plan G3, G6).');
+const NSW_ADAPTIVE = pending('NSW questions are issued by outcome, but many current outcomes have no issued question yet (GET /v1/curriculum lists which) and the student app\'s adaptive selection and spaced revision are not yet driven by NSW outcomes (plan G3).');
 const PUBLISHING = pending('Resource publishing with review and version history, replacing hand-committed JSON (plan F3).');
 const EXAM_DESK = pending('Prithagoras\'s practice desk becomes the one examination system\'s unmarked Exam Desk, for both editions (plan F4).');
 
@@ -140,10 +145,10 @@ export const EDITIONS = Object.freeze({
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
-      verifiedMarking: NSW_CONTENT,
+      verifiedMarking: NSW_MARKING,
       stepFeedback: NSW_CONTENT,
       notesAndWorkedExamples: pending('NSW notes and worked examples are not yet authored to the current syllabus (plan G2, G3).'),
-      adaptivePractice: NSW_CONTENT,
+      adaptivePractice: NSW_ADAPTIVE,
       timedExams: pending('No HSC-style blueprints built from approved NSW questions yet (plan G4).'),
       examDesk: EXAM_DESK,
       resourceLibrary: true,

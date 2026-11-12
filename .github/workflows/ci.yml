@@ -239,6 +239,8 @@ jobs:
           grep -Fq 'INTERIM MARKING POLICY (D13, D14): PASS — 11285/11285 checks' suites.log
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
+          # Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render.
+          grep -Fq 'NSW BANK QUALITY: PASS — 75 generators, 267 cells issued' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
@@ -349,7 +351,7 @@ jobs:
           # 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards).
           # 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check).
           # 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost "P" and "Pri Learning." and gained Priyabhata, Prithagoras, प्रियभट and "by Pri Learning".
-          grep -Fq 'I18N COVERAGE: PASS — 94/94 checks — 79 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 94/94 checks — 80 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -401,6 +403,10 @@ jobs:
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
           grep -Fq 'DESK CLOCK: PASS — 30/30 checks' suites.log
           grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
+          # Plan E2: the app knows its own edition from its build, declares it on
+          # every /v1 request, and shows a blocking screen at the other's server.
+          # 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen).
+          grep -Fq 'EDITION CLIENT (E2): PASS — 136/136 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -591,6 +597,11 @@ jobs:
           grep -Fq 'desk-check (sqlite): 141 checks passed' desk.log
           node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
           grep -Fq 'DESK ISOLATION: PASS — 39/39 checks' desk.log
+          # One deployment, one edition (ADR-0002 plan E2): the server starts only
+          # over a client built for its own edition, X-Pri-Edition only ever
+          # refuses (409 everywhere but health and readiness), no request chooses it.
+          node server/test/edition-agreement-check.mjs 2>&1 | tee edition-agreement.log
+          grep -Fq 'EDITION AGREEMENT (E2): PASS — 155/155 checks' edition-agreement.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
@@ -623,6 +634,10 @@ jobs:
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
           node server/test/practice-seen-aware-pick-check.mjs 2>&1 | tee -a practice-http.log
+          # Plan G3: the edition decides the bank. Prithagoras issues only mapped NSW content, seals jurisdiction/syllabus/outcome,
+          # marks the final answer only with the method-mark switch on, and Priyabhata is unchanged. SQLite here; Postgres below.
+          node server/test/nsw-practice-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'NSW PRACTICE (G3): PASS — 164/164 checks' practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
@@ -789,7 +804,9 @@ jobs:
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
           # 85 → 86 (plan F1): the shared resource library on Postgres.
           # 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16).
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 87/87 suites' platform-postgres.log
+          # 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 88/88 suites' platform-postgres.log
+          grep -Fq '✓ nsw-practice-check.mjs' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
           grep -Fq '✓ desk-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log

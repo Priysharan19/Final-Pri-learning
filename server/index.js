@@ -18,7 +18,19 @@ import { applyVerifiedEntitlement } from './platform/entitlements.js';
 import { startHousekeeping } from './platform/housekeeping.js';
 import { startParentReportWorker } from './platform/parentReport.js';
 import { startAlertNotifier } from './platform/alertNotifier.js';
-import { createServerApp } from './app.js';
+import { createServerApp, DEFAULT_DIST } from './app.js';
+import { assertEditionAgreement } from './platform/edition.js';
+
+// One deployment, one edition (ADR-0002, plan E2). Before the database is
+// opened or a socket is bound: an unknown PRI_EDITION, or a built client made
+// for the other edition, stops the process with one line naming both sides.
+try {
+  const agreed = assertEditionAgreement({ dist: DEFAULT_DIST });
+  console.log('platform_edition', { edition: agreed.edition, builtClient: agreed.client, checked: agreed.checked });
+} catch (error) {
+  writeSync(2, `${error?.message || 'edition check failed'}\n`);
+  process.exit(1);
+}
 
 // The platform store: Supabase Postgres when PRI_DATABASE_URL is set (ADR-0001),
 // otherwise the SQLite file. A configured Postgres that is malformed,

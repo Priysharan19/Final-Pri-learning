@@ -14,10 +14,14 @@
 //   4. the build records the edition (features.json, __PRI_EDITION__), the
 //      Dockerfile forwards PRI_EDITION to the client build and ships the table
 //      to the runtime image, and /v1/health reports the server's edition;
-//   5. the brand (E4): each edition has a well-formed identity whose accent
+//   5. the student app reads the edition table through one module only
+//      (client/src/platform/edition-record.js, which a build replaces with its
+//      own edition's record; plan E2) and reaches that through the helper
+//      client/src/platform/edition.js.
+//   6. the brand (E4): each edition has a well-formed identity whose accent
 //      meets WCAG AA (4.5:1) on every Instrument surface in both themes —
-//      computed here from instrument.css, never copied — and the student app
-//      reads the edition through client/src/brand/edition.js alone.
+//      computed here from instrument.css, never copied — and the record a
+//      build carries holds its own name, cut and wordmark only.
 //
 // It ends by printing each edition's open gaps — the parity debt still owed.
 //
@@ -119,7 +123,35 @@ ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build 
   ok(/const edition = serverEdition\(\);/.test(router) && /^\s+edition,$/m.test(router), '/v1/health reports the edition');
 }
 
-// 5. The brand (E4): identity, accent contrast, and one reader.
+// 5. One reader of the table under client/src (plan E2).
+{
+  const grep = (...patterns) => {
+    try {
+      return execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-l', ...patterns.flatMap(p => ['-e', p]), '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n').filter(Boolean).sort();
+    } catch (e) {
+      if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
+      return [];
+    }
+  };
+  // The files allowed to import the edition table. A build replaces each with
+  // the record of the edition it resolved, so no bundle carries the table.
+  const TABLE_READERS = ['client/src/platform/edition-record.js'];
+  const readers = grep('edition\\.config');
+  ok(JSON.stringify(readers) === JSON.stringify(TABLE_READERS), `client/src reads the edition table only through ${TABLE_READERS.join(', ')} (${readers.join(', ')})`);
+  const defined = grep('__PRI_EDITION__');
+  ok(defined.length === 0, `nothing under client/src reads the bare __PRI_EDITION__ define: the edition comes from the build's record (${defined.join(', ')})`);
+  // Everything else asks the helper. Only the helper imports the record.
+  const importers = grep("from '[./]*edition-record\\.js'", "from '[./a-z]*/edition-record\\.js'");
+  ok(JSON.stringify(importers) === JSON.stringify(['client/src/platform/edition.js']), `only client/src/platform/edition.js imports the record (${importers.join(', ')})`);
+  const plugin = vite.editionRecordPlugin('prithagoras');
+  const built = plugin.load(vite.EDITION_RECORD_MODULE);
+  ok(typeof built === 'string' && built.includes('brand: "Prithagoras"') && !/Priyabhata|priyabhata|edition\.config|capabilities/.test(built), 'a Prithagoras build replaces edition-record.js with its own record alone');
+  ok(plugin.load('/elsewhere/module.js') === null, 'and leaves every other module alone');
+  const helper = await import('../src/platform/edition.js');
+  ok(helper.EDITION === ed.DEFAULT_EDITION && helper.defaultCourse() === ed.EDITIONS[ed.DEFAULT_EDITION].defaultCourse, 'outside a build the app is the default edition, with its default course');
+}
+
+// 6. The brand (E4): identity, accent contrast, and the record's brand.
 {
   ok(ed.COMPANY_LINE === `by ${ed.COMPANY}`, 'the company line is "by Pri Learning"');
   ok(JSON.stringify(ed.CUTS) === JSON.stringify(['jya', 'square']), 'the cuts are jya and square');
@@ -161,21 +193,16 @@ ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build 
     }
   }
 
-  // One reader: only client/src/brand/build-edition.js imports the table, and nothing reads __PRI_EDITION__
-  // (the build replaces that module with its own edition's record).
-  let readers = '';
-  try {
-    readers = execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-l', '-e', 'edition.config', '-e', '__PRI_EDITION__', '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch (e) {
-    if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
+  // The record a build carries holds this edition's brand, and nothing of the other's.
+  const record = await import('../src/platform/edition-record.js');
+  for (const id of ed.EDITION_IDS) {
+    const r = record.editionRecord(id).identity;
+    ok(r.cut === ed.EDITIONS[id].identity.cut && r.brandHi === ed.EDITIONS[id].identity.brandHi && r.companyLine === ed.COMPANY_LINE, `${id}: the record carries the edition's cut, Hindi name and the company line`);
+    ok(typeof r.wordmark?.d === 'string' && typeof r.cutPath === 'string' && !('accent' in r), `${id}: the record carries its wordmark and cut path, and no accent (the build writes the accent into index.html)`);
   }
-  ok(readers === 'client/src/brand/build-edition.js', `E4: client/src reads the edition only through client/src/brand/build-edition.js (${readers.split('\n').join(', ')})`);
-  const vite = await import('../vite.config.js');
-  const plugin = vite.editionBrand('prithagoras');
-  const { BUILD_EDITION_MODULE } = await import('../brand/edition-brand.mjs');
-  const built = plugin.load(BUILD_EDITION_MODULE);
-  ok(typeof built === 'string' && built.includes('"brand":"Prithagoras"') && !/Priyabhata|edition\.config|#0a6670/.test(built), 'a Prithagoras build replaces build-edition.js with its own record alone');
-  ok(plugin.load('/elsewhere/module.js') === null, 'and leaves every other module alone');
+  const pritha = vite.editionRecordPlugin('prithagoras').load(vite.EDITION_RECORD_MODULE);
+  const { PRIYABHATA_WORDMARK } = await import('../src/brand/paths.js');
+  ok(!pritha.includes(PRIYABHATA_WORDMARK.d.slice(-40)) && !pritha.includes('प्रियभट') && !pritha.includes('#0a6670'), 'a Prithagoras build\'s record holds no Priyabhata wordmark, Hindi name or accent');
   const brand = await import('../src/brand/edition.js');
   ok(brand.BRAND === 'Priyabhata' && brand.CUT === 'jya', 'outside a build the app is the default edition');
   ok(brand.brandVars('hi').brand === 'प्रियभट' && brand.brandVars('en').brand === 'Priyabhata' && brand.brandVars('en').company === 'Pri Learning', 'brandVars: प्रियभट in Hindi, Priyabhata in English, and the company');
