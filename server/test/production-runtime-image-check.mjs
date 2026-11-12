@@ -46,11 +46,13 @@ const requiredClientCopies = [
   ['/app/client/dist', './client/dist'],
   // The marker's explanations: the English catalogue and plural rules only.
   ['client/src/i18n/strings.en.js', './client/src/i18n/'],
-  ['client/src/i18n/languages.js', './client/src/i18n/']
+  ['client/src/i18n/languages.js', './client/src/i18n/'],
+  // The regional edition table (ADR-0002) /v1/health reports from: data only.
+  ['client/edition.config.mjs', './client/edition.config.mjs']
 ];
 const stablePairs = arr => arr.map(pair => pair.join(' -> ')).sort();
 c.eq(JSON.stringify(stablePairs(clientRuntimeCopies)), JSON.stringify(stablePairs(requiredClientCopies)),
-  'runtime allowlists ONLY the private maths engine, its ESM package marker, the two i18n files the marker explains with, and compiled web dist');
+  'runtime allowlists ONLY the private maths engine, its ESM package marker, the two i18n files the marker explains with, the edition table, and compiled web dist');
 
 const userIndex = runtime.findIndex(line => /^USER\s+node\s*$/.test(line));
 const lastCopy = runtime.reduce((last, line, index) => (/^COPY\s/.test(line) ? index : last), -1);

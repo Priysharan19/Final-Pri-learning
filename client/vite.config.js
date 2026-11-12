@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
+import { resolveEdition } from './edition.config.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -474,7 +475,9 @@ const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
+  // The regional edition (client/edition.config.mjs, ADR-0002) this build
+  // serves: PRI_EDITION, unset = Priyabhata. An unknown value stops the build.
+  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN, edition: resolveEdition(env) };
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);
@@ -486,7 +489,8 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
-    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin)
+    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
+    __PRI_EDITION__: JSON.stringify(states.edition)
   };
 }
 

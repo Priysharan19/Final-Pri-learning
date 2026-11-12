@@ -338,7 +338,10 @@ try {
   {
     const anonymous = await h.request('/v1/health');
     c.eq(anonymous.status, 200, 'health answers anonymously');
-    c.deq(Object.keys(anonymous.data).sort(), ['billingSchemaVersion', 'checkedAt', 'database', 'environment', 'ok', 'releaseIdentity', 'schemaVersion', 'service', 'syncQuota'], 'the anonymous body carries ok, release identity, schema versions, engine, reachability, the quota limits and the declared environment — nothing else');
+    c.deq(Object.keys(anonymous.data).sort(), ['billingSchemaVersion', 'checkedAt', 'database', 'edition', 'environment', 'ok', 'releaseIdentity', 'schemaVersion', 'service', 'syncQuota'], 'the anonymous body carries ok, release identity, schema versions, engine, reachability, the quota limits, the declared environment and the regional edition — nothing else');
+    // The edition (ADR-0002) is the public brand id a deployment serves; it is
+    // one of the two ids in client/edition.config.mjs, never free text.
+    c.ok(['priyabhata', 'prithagoras'].includes(anonymous.data.edition), 'the edition is one of the two known edition ids');
     c.ok(anonymous.data.environment === null || /^[a-z0-9-]{1,32}$/.test(anonymous.data.environment), 'the declared environment is a short token or null, never a URL or host');
     c.ok(anonymous.data.ok === true && typeof anonymous.data.releaseIdentity === 'object' && anonymous.data.database.reachable === true, 'ok, release identity and reachability are kept');
     const operator = await h.request('/v1/health', { headers: { Authorization: `Bearer ${process.env.PRI_METRICS_TOKEN}` } });
