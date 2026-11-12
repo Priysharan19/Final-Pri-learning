@@ -51,9 +51,11 @@ export function sectionProblems(sections, { questionCount = null, marks = null }
       p.push(`${at} must start at question ${prev.lastQuestion + 1} (sections are contiguous)`);
     }
   });
-  if (Number.isInteger(marks) && sections.every(s => Number.isInteger(s?.marks))) {
-    const sum = sections.reduce((n, s) => n + s.marks, 0);
-    if (sum !== marks) p.push(`section marks add up to ${sum}, not the resource's ${marks}`);
+  if (Number.isInteger(marks)) {
+    const marked = sections.filter(s => Number.isInteger(s?.marks));
+    const sum = marked.reduce((n, s) => n + s.marks, 0);
+    if (marked.length === sections.length && sum !== marks) p.push(`section marks add up to ${sum}, not the resource's ${marks}`);
+    else if (marked.length < sections.length && sum > marks) p.push(`section marks already add up to ${sum}, more than the resource's ${marks}`);
   }
   return p;
 }
@@ -200,13 +202,17 @@ export function seedResourcesSqlite(db) {
 function parseTags(json) {
   try { const v = JSON.parse(json || '[]'); return Array.isArray(v) ? v.filter(t => typeof t === 'string') : []; } catch { return []; }
 }
-/** Stored sections as sent: well-formed entries only, in order; anything else is none. */
-function parseSections(json) {
+/**
+ * Stored sections as sent. A row that reached the table without the validator
+ * is held to the same rules here: sections that break any of them are not sent
+ * at all (an empty list), never sent in part.
+ */
+function parseSections(json, row) {
   try {
     const v = JSON.parse(json || '[]');
-    if (!Array.isArray(v)) return [];
-    return v.filter(s => s && typeof s.label === 'string' && Number.isInteger(s.firstQuestion) && Number.isInteger(s.lastQuestion) && SECTION_KINDS.includes(s.kind))
-      .map(s => ({ label: s.label, firstQuestion: s.firstQuestion, lastQuestion: s.lastQuestion, kind: s.kind, marks: Number.isInteger(s.marks) ? s.marks : null }));
+    const context = { questionCount: num(row?.question_count), marks: num(row?.marks) };
+    if (!Array.isArray(v) || sectionProblems(v, context).length) return [];
+    return v.map(s => ({ label: s.label, firstQuestion: s.firstQuestion, lastQuestion: s.lastQuestion, kind: s.kind, marks: Number.isInteger(s.marks) ? s.marks : null }));
   } catch { return []; }
 }
 const num = v => (v === null || v === undefined ? null : Number(v));
@@ -226,7 +232,7 @@ export function resourcePublic(row) {
     durationMinutes: num(row.duration_minutes),
     readingMinutes: num(row.reading_minutes),
     questionCount: num(row.question_count),
-    sections: parseSections(row.sections_json),
+    sections: parseSections(row.sections_json, row),
     tags: parseTags(row.tags_json),
     course: row.course,
     syllabusVersion: row.syllabus_version ?? null,

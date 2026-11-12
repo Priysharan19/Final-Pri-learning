@@ -578,7 +578,7 @@ jobs:
           # The shared resource library (ADR-0002 plan F1): signed-in only, published
           # only, the server's own edition only; the seed equals the migration's.
           node server/test/resources-check.mjs 2>&1 | tee resources.log
-          grep -Fq 'resources-check (sqlite): 101 checks passed' resources.log
+          grep -Fq 'resources-check (sqlite): 105 checks passed' resources.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and

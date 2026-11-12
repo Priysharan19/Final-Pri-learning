@@ -83,6 +83,9 @@ secRefused([{ ...sec('A', 1, 10), answer: 'C' }], /unknown fields/, 'sections: n
 secRefused([sec('A', 1, 10, 'multiple-choice', { marks: 10 }), sec('B', 11, 27, 'extended-response', { marks: 80 })], /add up to 90, not the resource's 100/,
   'sections: marks that do not add up to the total are refused', { questionCount: 27, marks: 100 });
 secRefused('Section I', /list/, 'sections: must be a list');
+secRefused([sec('A', 1, 10, 'multiple-choice', { marks: 200 }), sec('B', 11, 27)], /more than the resource's 100/,
+  'sections: partial section marks may not exceed the total', { questionCount: 27, marks: 100 });
+c.deq(sectionProblems([sec('A', 1, 10, 'multiple-choice', { marks: 10 }), sec('B', 11, 27)], { questionCount: 27, marks: 100 }), [], 'sections: partial marks within the total are allowed');
 c.ok(resourceProblems(variant({ sections: [sec('A', 1, 30)] })).some(p => /beyond the 27/.test(p)), 'the resource contract applies the section rules');
 
 // ── 2 · The seed: one real resource, copied, no fabrication ─────────────────
@@ -166,6 +169,12 @@ try {
     { label: 'Section II', firstQuestion: 11, lastQuestion: 27, kind: 'extended-response', marks: 90 }
   ], 'the API sends the paper\'s sections');
   c.deq(list.data.resources.find(r => r.id === 'shared-solutions')?.sections, [], 'a resource with no sections is sent an empty list');
+  // Sections that reached the table without the validator are not sent at all.
+  await store.run("UPDATE resources SET sections_json=? WHERE id='shared-solutions'",
+    [JSON.stringify([{ label: 'A', firstQuestion: 1, lastQuestion: 10, kind: 'multiple-choice' }, { label: 'B', firstQuestion: 15, lastQuestion: 99, kind: 'extended-response' }])]);
+  c.deq((await get('/v1/resources/shared-solutions')).data?.resource?.sections, [], 'stored sections that break the rules (gap, past the count) are sent as none, never in part');
+  await store.run("UPDATE resources SET sections_json='not json' WHERE id='shared-solutions'");
+  c.deq((await get('/v1/resources/shared-solutions')).data?.resource?.sections, [], 'unreadable stored sections are sent as none');
   c.deq(list.data.facets, { types: ['paper', 'solutions'], subjects: ['Mathematics Advanced', 'Mathematics Extension 1'], years: [2027, 2026], courses: ['nsw'] }, 'facets come from visible rows only');
 
   c.deq(ids(await get('/v1/resources?edition=priyabhata')), [SEED.id, 'shared-solutions'], 'a client ?edition= is ignored: the server decides the edition');
