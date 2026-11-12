@@ -158,6 +158,13 @@ export const ON_DEMAND = [
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
 
+  // The shared resource library's page (ADR-0002 plan F1, PRI_FEATURE_LIBRARY):
+  // behind import() in App.jsx, and online-only — every resource it lists comes
+  // from GET /v1/resources and opens on its publisher's site — so a copy kept
+  // for offline would only ever draw "needs a connection". Off in a production
+  // build, where the chunk is never reached at all.
+  [/(^|\/)Library-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
   // account, so it costs the first visit nothing.
