@@ -111,7 +111,7 @@ const sqlLiteral = v => (v === null ? 'null' : typeof v === 'number' ? String(v)
 c.ok(MIGRATION.includes(`values (\n  ${resourceRowValues(SEED).map(sqlLiteral).join(',\n  ')}\n);`), 'the Postgres migration inserts exactly the seed values');
 c.ok(MIGRATION.includes("insert into pri.resource_editions (resource_id, edition) values ('2027-mathematics-advanced-assessment-1', 'prithagoras');")
   && (MIGRATION.match(/insert into pri\.resource_editions/g) || []).length === 1, 'and offers it to Prithagoras only');
-c.ok(/update pri\.platform_meta set value = '15' where key = 'schema_version';/.test(MIGRATION) && SCHEMA_VERSION === 15, 'the migration and the build agree on schema 15');
+c.ok(/update pri\.platform_meta set value = '15' where key = 'schema_version';/.test(MIGRATION) && SCHEMA_VERSION >= 15, 'the migration sets schema 15, and the build is at 15 or later (16: the Exam Desk)');
 try { createResourceRouter(createPlatformDb(':memory:'), { edition: 'australia' }); c.ok(false, 'an unknown edition must stop the router'); }
 catch (e) { c.ok(/unknown edition/.test(e.message), 'an unknown server edition stops the router instead of serving a library'); }
 
@@ -263,7 +263,7 @@ try {
       const file = join(dir, 'platform.db');
       const first = createPlatformDb(file);
       const names = () => first.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'resource%' ORDER BY name").all().map(r => r.name);
-      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['resource_editions', 'resources'], '15'], 'SQLite: the build creates both tables at schema 15');
+      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['resource_editions', 'resources'], String(SCHEMA_VERSION)], 'SQLite: the build creates both tables at its schema version');
       const row = first.prepare('SELECT * FROM resources WHERE id=?').get(SEED.id);
       c.deq(Object.values(row), resourceRowValues(SEED), 'SQLite: the seeded row equals RESOURCE_SEED');
       first.prepare("UPDATE resources SET title='kept' WHERE id=?").run(SEED.id);

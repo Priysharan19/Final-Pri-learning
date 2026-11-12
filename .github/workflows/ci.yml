@@ -399,6 +399,8 @@ jobs:
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
+          grep -Fq 'DESK CLOCK: PASS — 30/30 checks' suites.log
+          grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -582,6 +584,13 @@ jobs:
           # only, the server's own edition only; the seed equals the migration's.
           node server/test/resources-check.mjs 2>&1 | tee resources.log
           grep -Fq 'resources-check (sqlite): 105 checks passed' resources.log
+          # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
+          # clock, one open attempt per paper, the import, never a mark — and the
+          # static proof that it reaches nothing of the marking path.
+          node server/test/desk-check.mjs 2>&1 | tee desk.log
+          grep -Fq 'desk-check (sqlite): 141 checks passed' desk.log
+          node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
+          grep -Fq 'DESK ISOLATION: PASS — 39/39 checks' desk.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
@@ -726,7 +735,8 @@ jobs:
           node server/test/rls-account-coverage-check.mjs 2>&1 | tee -a security-p2.log
           node server/test/otp-delete-asymmetry-check.mjs 2>&1 | tee -a security-p2.log
           grep -Fq 'admin-mfa-class-routes-check: 77/77 checks passed (sqlite)' security-p2.log
-          grep -Fq 'account-export-completeness-check (sqlite): 78 checks passed' security-p2.log
+          # 78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest.
+          grep -Fq 'account-export-completeness-check (sqlite): 82 checks passed' security-p2.log
           grep -Fq 'RLS ACCOUNT COVERAGE: PASS — 20/20 checks' security-p2.log
           grep -Fq 'OTP DELETE ASYMMETRY: PASS — 15/15 checks' security-p2.log
       - name: Server-authoritative examination papers (SQLite)
@@ -778,8 +788,10 @@ jobs:
           # 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too.
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
           # 85 → 86 (plan F1): the shared resource library on Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 86/86 suites' platform-postgres.log
+          # 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16).
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 87/87 suites' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
+          grep -Fq '✓ desk-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
           # 61 → 66: the reveal/submit race, deletion mid-mark, billing event order,
           # the SQLite -> Postgres cutover rehearsal and guardian-consent coverage.
@@ -1089,6 +1101,9 @@ jobs:
             # npm run test:e2e, part 1: the canonical suite (it builds the
             # client), then the focused flows that run on the dist it built.
             node client/test/e2e.mjs 2>&1 | tee -a browser.log
+            # The sign-in card helper the gate and login tours sign in with:
+            # a card that leaves the page is read in one look, never waited on.
+            node client/test/signin-card-step-check.mjs 2>&1 | tee -a browser.log
             node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/tour-explain-v2.js --no-build 2>&1 | tee -a browser.log

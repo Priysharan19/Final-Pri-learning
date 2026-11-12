@@ -489,7 +489,9 @@ try {
     c.ok(exported.data.receipts.every(row => !('request_digest' in row) && !('requestDigest' in row)), 'no receipt carries its request digest');
     const ownPhones = (await db.all('SELECT phone_e164 FROM account_phones WHERE account_id=?', [alice.id])).length;
     c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
+    const ownDesk = (await db.all('SELECT id FROM desk_attempts WHERE account_id=? ORDER BY created_at, id', [alice.id])).map(row => row.id);
+    c.deq(exported.data.deskAttempts.map(row => row.id), ownDesk, 'export deskAttempts are exactly Alice\'s');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'deskAttempts', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');

@@ -187,6 +187,16 @@ account-bearing shared tables, inside account-scope transactions only. The sente
 means in the code today. Extending account scope to more handlers, or giving the shared tables
 their own policies, is tracked as R-15 in `accepted-risks.md`.
 
+**Exam Desk attempts (schema 16, plan F4a).** `desk_attempts` is account-owned under the same
+`pri_scope_required` + RESTRICTIVE `pri_account_scope` policies, and `desk.js` reads and writes it only
+inside `transaction({ accountScope })`, keyed on (account, id, edition). Its notes are the student's
+own account data, not marking input: nothing on the desk is marked, no handwriting is read, and
+`desk-isolation-check` proves `desk.js` reaches none of the marking path (exams, practice, the
+marker, content-seen, recognition, handwriting, the learning-event writer). The clock accepts only
+an intent and a revision; the server stamps every time, so a device clock cannot extend or invent a
+sitting. An imported prithagoras-web file is validated by the server against its own edition's
+library and never carries its timer across (`desk-check`).
+
 ## 8. Out of scope here
 
 External penetration testing; Supabase project configuration (RLS on the hosted project, network

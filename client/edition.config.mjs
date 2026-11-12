@@ -79,7 +79,7 @@ const pending = text => Object.freeze({ pending: text });
 
 const NSW_CONTENT = pending('No approved NSW question banks, answer specifications or certified Australian marking guidelines yet (plan G2, G3, G6).');
 const PUBLISHING = pending('Resource publishing with review and version history, replacing hand-committed JSON (plan F3).');
-const EXAM_DESK = pending('Prithagoras\'s Exam Desk becomes an unmarked mode of /v1/exams for both editions (plan F4).');
+const EXAM_DESK = pending('Prithagoras\'s practice desk becomes the one examination system\'s unmarked Exam Desk, for both editions (plan F4).');
 
 export const EDITIONS = Object.freeze({
   priyabhata: Object.freeze({
