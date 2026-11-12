@@ -20,6 +20,7 @@ import { createPracticeRouter, createPracticePrepareRoute } from './practice.js'
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
 import { createDeskRouter } from './desk.js';
+import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -264,6 +265,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // shares none of its marking, counting or allowance code (desk.js). Same
   // eligibility as a marked paper; free on every plan.
   router.use('/desk', requireGuardianConsent(db), createDeskRouter(db, { edition: resources.edition, ...desk }));
+  // The curriculum this edition teaches, with honest availability (plan G3):
+  // the current NSW outcomes on a Prithagoras server. Read-only; its own
+  // guards are on the route (curriculum.js).
+  router.use('/curriculum', createCurriculumRouter(db, { edition }));
   router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
