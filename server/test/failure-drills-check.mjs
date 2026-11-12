@@ -197,14 +197,19 @@ async function verifiedStudent(app, email, deviceId = 'ipad-drill') {
  */
 function connectionLeaks(lines, { hosts = [], ports = [], urls = [] } = {}) {
   const out = [];
-  // A configured port standing as its own number: not next to a hex digit, a
-  // letter or "-" (so a UUID that happens to contain the digits still passes).
-  const portRe = ports.length ? new RegExp(`(?:^|[^0-9a-z-])(?:${ports.join('|')})(?:$|[^0-9a-z-])`, 'i') : null;
+  // A configured port standing as its own number: not preceded or followed by
+  // another digit. Ids are removed first — UUID-shaped chains (an 8-hex group then two or
+  // more dash groups) and hex runs of six or more —
+  // so a request id that happens to contain the digits is not a port.
+  const portRe = ports.length ? new RegExp(`(?:^|[^0-9])(?:${ports.join('|')})(?:$|[^0-9])`) : null;
   const hostRe = hosts.length ? new RegExp(`(?:^|[^0-9a-z.-])(?:${hosts.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:$|[^0-9a-z.-])`, 'i') : null;
-  const leaky = (key, v) => /postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
-    (portRe && portRe.test(v)) || (/host|port|addr|url|dsn|connection/i.test(key) && ports.some(p => v.includes(p)));
-  // Every leaf, with its own key and its path from the top-level field.
+  const withoutIds = v => v.replace(/[0-9a-f]{8}(?:-[0-9a-f]{1,12}){2,}/gi, ' ').replace(/[0-9a-f]{6,}/gi, ' ');
+  const forms = v => { const out = [v]; try { const d = decodeURIComponent(v); if (d !== v) out.push(d); } catch { /* not encoded */ } return out; };
+  const leaky = (key, raw) => forms(raw).some(v => /postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
+    (portRe && portRe.test(withoutIds(v))) || (/host|port|addr|url|dsn|connection/i.test(key) && ports.some(p => v.includes(p))));
+  // Every key and every leaf, with its path from the top-level field.
   const walk = (path, key, value, hit) => {
+    if (key && leaky('', key)) hit.add(path);
     if (value && typeof value === 'object') { for (const [k, v] of Object.entries(value)) walk(`${path}.${k}`, k, v, hit); return; }
     if (leaky(key, String(value))) hit.add(path);
   };
@@ -238,6 +243,12 @@ const counter = key => metrics.snapshot().counters[key]?.total || 0;
     ['SQLite fault, nested address/port', { err: { address: '127.0.0.1', port: 5432 } }, S, ['0.err.address', '0.err.port']],
     ['SQLite fault, (host:port)', { message: 'connect ECONNREFUSED (127.0.0.1:5432)' }, S, ['0.message']],
     ['SQLite fault, host:port; retrying', { message: 'refused 127.0.0.1:5432; retrying' }, S, ['0.message']],
+    ['port glued to letters', { a: 'port5432', b: 'p5432', c: 'db-5432', d: 'port-5432' }, C, ['0.a', '0.b', '0.c', '0.d']],
+    ['port range and suffix', { a: 'ports 5432-5433', b: '0.0.0.0:5432-tcp' }, C, ['0.a', '0.b']],
+    ['URL-encoded connection string', { m: 'postgres%3A%2F%2Fu%3Ap%40h%3A5432%2Fx' }, C, ['0.m']],
+    ['host:port as a key', { pools: { '127.0.0.1:5432': { idle: 1 } } }, S, ['0.pools.127.0.0.1:5432']],
+    ['port as a key', { err: { '5432': 'refused' } }, C, ['0.err.5432']],
+    ['hex id and a different port', { id: 'deadbeef5432cafe', ts: '2026-11-12T04:44:13.182Z', n: 'port 54321' }, C, []],
     ['UUID containing 5432', { requestId: 'f085042b-eb94-5432-8c88-c04fd1e43951', other: 'a5432b' }, C, []]
   ]) c.deq(connectionLeaks([line(row)], conf), want, `leak scan: ${label}`);
 }
