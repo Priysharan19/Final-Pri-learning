@@ -3453,4 +3453,5 @@ export default {
   "library.attributionLabel": 'श्रेय',
   "library.rightsLabel": 'अधिकार',
   "library.disclaimerLabel": 'अस्वीकरण',
+  'edition.mismatchBody': 'यह ऐप {app} है। यह {service} की सेवा में साइन इन नहीं कर सकता।',
 };
