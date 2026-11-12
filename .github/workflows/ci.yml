@@ -800,8 +800,8 @@ jobs:
           # 61 → 62: a parent who approves by email code is sent the withdrawal credential.
           # 85 → 86 (plan F1): the shared resource library on Postgres.
           # 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16).
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 87/87 suites' platform-postgres.log
-          # 86 → 87 (plan G3): Prithagoras NSW practice on Postgres.
+          # 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 88/88 suites' platform-postgres.log
           grep -Fq '✓ nsw-practice-check.mjs' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
           grep -Fq '✓ desk-check.mjs' platform-postgres.log
