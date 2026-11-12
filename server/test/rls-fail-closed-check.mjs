@@ -444,8 +444,9 @@ if (engine === 'postgres') {
   // Later migrations, each proven by its own suite: account RLS for the shared
   // tables (rls-account-coverage-check.mjs), the parent report's two
   // account-scoped tables (parent-report-check.mjs; pgSchemaParity pins them)
-  // and the resource library's two global tables (resources-check.mjs).
-  const LATER = ['20261019000000_rls_account_coverage.sql', '20261022000000_parent_report.sql', '20261113000000_resource_library.sql'];
+  // the resource library's two global tables (resources-check.mjs) and the
+  // Exam Desk's account-scoped desk_attempts (desk-check.mjs; pgSchemaParity pins it).
+  const LATER = ['20261019000000_rls_account_coverage.sql', '20261022000000_parent_report.sql', '20261113000000_resource_library.sql', '20261113010000_desk_attempts.sql'];
   ok(!!forward && JSON.stringify(all.slice(all.findIndex(m => m.name === FORWARD) + 1).map(m => m.name)) === JSON.stringify(LATER),
     `${FORWARD} runs after every earlier migration; only ${LATER.join(', ')} follow it`);
   const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });
