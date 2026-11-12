@@ -71,7 +71,12 @@ const NSW_CONTENT = pending('No approved NSW question banks, answer specificatio
 const NSW_MARKING = pending('The server issues and marks NSW practice from generators mapped to the current syllabuses, on the final answer only; still owed: the student app asking a Prithagoras server for it, and HSC examiner certification before any method mark (plan G3, G6).');
 const NSW_ADAPTIVE = pending('NSW questions are issued by outcome, but many current outcomes have no issued question yet (GET /v1/curriculum lists which) and the student app\'s adaptive selection and spaced revision are not yet driven by NSW outcomes (plan G3).');
 const PUBLISHING = pending('Resource publishing with review and version history, replacing hand-committed JSON (plan F3).');
-const EXAM_DESK = pending('Prithagoras\'s practice desk becomes the one examination system\'s unmarked Exam Desk, for both editions (plan F4).');
+// The Exam Desk is built for both editions (server /v1/desk, interface behind
+// the PRI_FEATURE_EXAM_DESK build flag; typed notes, no ink yet). It stays pending
+// here until it is actually offered: that is the owner turning the flag on,
+// and, for Prithagoras, its own region existing first (ADR-0002 §9).
+const EXAM_DESK = pending('The unmarked Exam Desk is built and ships dark behind the PRI_FEATURE_EXAM_DESK build flag; it is offered when the owner turns the flag on (plan F4).');
+const EXAM_DESK_AU = pending('The unmarked Exam Desk is built and ships dark behind the PRI_FEATURE_EXAM_DESK build flag; it is offered when the owner turns the flag on, once the Australian region exists to hold its attempts (plan F4, H1).');
 
 export const EDITIONS = Object.freeze({
   priyabhata: Object.freeze({
@@ -117,7 +122,7 @@ export const EDITIONS = Object.freeze({
       notesAndWorkedExamples: pending('NSW notes and worked examples are not yet authored to the current syllabus (plan G2, G3).'),
       adaptivePractice: NSW_ADAPTIVE,
       timedExams: pending('No HSC-style blueprints built from approved NSW questions yet (plan G4).'),
-      examDesk: EXAM_DESK,
+      examDesk: EXAM_DESK_AU,
       resourceLibrary: true,
       resourcePublishing: PUBLISHING,
       progressBookmarksExports: true,
