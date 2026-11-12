@@ -240,7 +240,8 @@ const counter = key => metrics.snapshot().counters[key]?.total || 0;
     [{ m: 'cut escape %3' + 'A5432%' }, C], [{ m: 'p\\u0035432' }, C], 
     [{ pools: { '127.0.0.1:5432': { idle: 1 } } }, S], [{ err: { '5432': 'refused' } }, C],
     [{ a: 'db5432' }, C], [{ a: 'ECONNREFUSED5432' }, C], [{ a: 'pri-db-0a1b2c3d-5432-1' }, C], [{ a: '20261112-5432-5433' }, C],
-    [{ a: 'addr:5432' }, C], [{ id: 'deadbeef5432cafe' }, C], [{ requestId: 'e7887703-5432-49be-a1c5' }, C], [{ n: 'port 54321' }, C]
+    [{ a: 'addr:5432' }, C], [{ id: 'deadbeef5432cafe' }, C], [{ requestId: 'e7887703-5432-49be-a1c5' }, C], [{ n: 'port 54321' }, C],
+    [{ id: 'f085042b-eb94-4a1b-8c88-c04fd1e45432a' }, C], [{ id: 'a54320000-eb94-4a1b-8c88-c04fd1e43951' }, C]
   ];
   c.ok(connectionLeaks(['{"m":"54\\u00332"}'], C).length > 0, 'leak scan: a \\u-escaped port fails');
   leaking.forEach(([row, conf], n) => c.ok(connectionLeaks([line(row)], conf).length > 0, `leak scan: review row ${n} fails`));
@@ -248,7 +249,7 @@ const counter = key => metrics.snapshot().counters[key]?.total || 0;
   for (const id of ['54320000-eb94-4a1b-8c88-c04fd1e43951', 'f085042b-5432-4a1b-8c88-c04fd1e43951', 'f085042b-eb94-5432-8c88-c04fd1e43951',
     'f085042b-eb94-4a1b-5432-c04fd1e43951', 'f085042b-eb94-4a1b-8c88-c04fd1e45432'])
     c.deq(connectionLeaks([line({ requestId: id, code: 'PLATFORM_DB_UNAVAILABLE' })], S), [], `leak scan: UUID ${id} passes`);
-  const secret = 'postgres://u:hunter2@db.internal:5432/x';
+  const secret = ['postgres:/', '/u:', 'hunter2', '@db.internal:5432/x'].join('');
   const said = connectionLeaks([line({ pools: { [secret]: 1 } })], C);
   c.ok(said.length > 0 && !said.some(s => /hunter2|db\.internal|5432|postgres/.test(s)), 'leak scan: the failure names a line and category, never the leaking key');
 }
