@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { describeRuntimes, installApp, restartAfterCrashLoop, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, shutDownAfterCrashLoop, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -243,7 +243,7 @@ try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* alre
 // image then gave every later launch slow or silent web content (the iPad
 // journey never finished on Train 18). The device is shut down so the next
 // step boots it fresh, as it did when the self-check used another device.
-restartAfterCrashLoop(device);
+shutDownAfterCrashLoop(device);
 for (const line of lines) console.log(`  ${line.replace(/^PRIBRIDGE\s*/, '')}`);
 for (const line of contentLog) console.log(`  [content leg] ${line}`);
 

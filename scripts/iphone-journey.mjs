@@ -61,7 +61,7 @@
 //   node scripts/iphone-journey.mjs --staging --family iphone|ipad --app <DEBUG .app> [--origin <url>] --evidence out.json
 //     (the deployed staging service, the real reader, a real emailed code: scripts/journey-staging.mjs)
 // ─────────────────────────────────────────────────────────────────────────────
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync, execSync, spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -213,8 +213,11 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
       try { if (reportFile && existsSync(reportFile)) size = `${readFileSync(reportFile).length} bytes (offset ${offset})`; } catch { /* unreadable */ }
       console.log(`  ✗ ${phase}: no summary after ${Math.round(deadlineMs / 1000)} s (${pass} passes, ${viaFile} report-file read(s), ${viaLog} unified-log read(s); report file ${reportFile || 'not found'}: ${size}; last line: ${lines[lines.length - 1] || 'none'})`);
       try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
-      console.log(`\nNATIVE JOURNEY: FAIL — ${phase} never reported; stopped at the first silent phase`);
-      process.exit(1);
+      abortJourney(`${phase} never reported; stopped at the first silent phase`);
+    }
+    if (Date.now() - JOURNEY_T0 > JOURNEY_DEADLINE_MS) {
+      try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
+      abortJourney(`the whole journey passed its ${JOURNEY_DEADLINE_MS / 60_000}-minute bound during ${phase}`);
     }
     if (pass > 0 && pass % 30 === 0) console.log(`  … ${phase}: ${Math.round((Date.now() - t0) / 1000)} s, ${pass} passes, ${viaFile} file / ${viaLog} log read(s), ${lines.length} line(s) so far`);
     // With an oracle to serve, look twice a second-and-a-half rather than
@@ -232,8 +235,8 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // One read is bounded: on a loaded machine `log show` inside a simulator
     // has hung for many minutes, and an unbounded read then hangs the whole
     // journey with nothing reported. A read that does not come back is not a
-    // result — the next pass reads again, and a phase whose summary is never
-    // read is reported "not reported" and fails the journey.
+    // result — the next pass reads again; a phase that ends without its
+    // summary stops the journey (below).
     // No container at launch (a first launch makes it): look again.
     pass++;
     if (!reportFile && pass % 5 === 0) { reportFile = findContainer(); offset = 0; }
@@ -242,13 +245,8 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (filed.length) { log = filed.join('\n'); viaFile++; }
     // The unified log is a fallback, not the poll: with a report file it is
     // read at most every fifth pass, so a slow `log show` cannot set the pace.
-    // A pass that reads nothing does not count toward `loops`: the phase keeps
-    // the same bound in reads as before, it just stops paying for a log read
-    // on every pass.
     // Every pass counts toward `loops` (a skipped log read is still a pass), and
-    // the phase also stops at `deadlineMs` of wall time: a phase whose summary
-    // never arrives is reported "not reported" in minutes, never left polling a
-    // slow `log show` until the job limit cancels the run and its log is lost.
+    // the phase also stops at `deadlineMs` of wall time.
     else if (reportFile && pass % 5 !== 0) continue;
     else try {
       viaLog++;
@@ -267,7 +265,36 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   }
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
   console.log(`  (${phase}: ${Math.round((Date.now() - t0) / 1000)} s, ${viaFile} report-file read(s), ${viaLog} unified-log read(s))`);
+  // Out of passes with neither a summary nor a script failure: silent too.
+  if (!lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`) || /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) {
+    console.log(`  ✗ ${phase}: no summary after ${pass} passes (last line: ${lines[lines.length - 1] || 'none'})`);
+    abortJourney(`${phase} never reported; stopped at the first silent phase`);
+  }
   return lines;
+}
+
+// The journey's own wall-clock bound, below the workflow's 40-minute step
+// limit: a run that reaches it fails here, with its log, instead of being
+// cancelled. A watchdog process enforces it even while a synchronous child
+// (simctl, log show) blocks this one: SIGTERM, then SIGKILL 15 s later.
+const JOURNEY_T0 = Date.now();
+const JOURNEY_DEADLINE_MS = 37 * 60_000;
+const liveServerPids = new Set();
+let textSizeRaised = false;
+{
+  const wd = spawn('/bin/sh', ['-c', `sleep ${JOURNEY_DEADLINE_MS / 1000 + 60}; echo "NATIVE JOURNEY: FAIL — watchdog: still running after the ${JOURNEY_DEADLINE_MS / 60_000}-minute bound" >&2; kill -TERM ${process.pid}; sleep 15; kill -KILL ${process.pid}`], { stdio: ['ignore', 'ignore', 'inherit'], detached: true });
+  wd.unref();
+  process.on('exit', () => { try { process.kill(-wd.pid, 'SIGKILL'); } catch { /* gone */ } });
+  process.on('SIGTERM', () => abortJourney('terminated (watchdog or step limit)'));
+}
+// Every early stop cleans up as the normal path's finally blocks do: local
+// servers stopped, the text size reset. CI evidence for a stopped run is the
+// log; the evidence step skips a journey file that was never written.
+function abortJourney(reason) {
+  for (const pid of liveServerPids) { try { process.kill(pid); } catch { /* gone */ } }
+  if (textSizeRaised) { try { run('xcrun', ['simctl', 'ui', udid, 'content_size', 'large']); } catch { /* best effort */ } }
+  console.log(`\nNATIVE JOURNEY: FAIL — ${reason}`);
+  process.exit(1);
 }
 
 const sim = pickDevice();
@@ -331,6 +358,7 @@ if (WANT_CLOUD) try {
     execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4331', '--host', '127.0.0.1', '--out', out], { stdio: 'inherit' });
     fixture = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
     cloudServer = fixture;
+    if (fixture?.PRI_CLOUD_SERVER_PID) liveServerPids.add(Number(fixture.PRI_CLOUD_SERVER_PID));
   }
   if (!cloudServer && process.env.PRI_CLOUD_SERVER_LOG) fixture.PRI_CLOUD_SERVER_LOG = process.env.PRI_CLOUD_SERVER_LOG;
   // The codes: only those the server's TEST email adapter issued, from its
@@ -386,6 +414,7 @@ if (WANT_CLOUD) try {
     const out = join(mkdtempSync(join(tmpdir(), 'pri-fixture-')), 'restart.env');
     execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', String(port), '--host', '127.0.0.1', '--db', fixture.PRI_CLOUD_DB, '--restart', '--out', out], { stdio: 'inherit' });
     cloudServer.PRI_CLOUD_SERVER_PID = readFileSync(out, 'utf8').match(/PRI_CLOUD_SERVER_PID=(\d+)/)[1];
+    liveServerPids.add(Number(cloudServer.PRI_CLOUD_SERVER_PID));
   }
   const logoutsBefore = serverLogouts(fixture);
   cloudRelaunchLines = launchAndRead(udid, bundleId, '--journey-cloud-relaunch', 'cloudRelaunch', childEnv);
@@ -443,6 +472,7 @@ if (WANT_A11Y) {
 
 if (WANT_DYNAMIC) {
   console.log('\nLargest accessibility text size …');
+  textSizeRaised = true;
   run('xcrun', ['simctl', 'ui', udid, 'content_size', 'accessibility-extra-extra-extra-large']);
   try { dynamicLines = launchAndRead(udid, bundleId, '--journey-dynamic-type', 'dynamicType', { PRI_CLOUD_ORIGIN: cloudEnv.PRI_CLOUD_ORIGIN }); }
   finally { try { run('xcrun', ['simctl', 'ui', udid, 'content_size', 'large']); } catch { /* best effort */ } }
@@ -472,6 +502,7 @@ let offlineRelaunchLines = [];
       execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4332', '--host', '127.0.0.1', '--synthetic-reader', '--out', out], { stdio: 'inherit' });
     } catch (error) { throw new Error(`the local server did not start (${String(error?.message || error).split('\n')[0]})`); }
     server = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+    if (server?.PRI_CLOUD_SERVER_PID) liveServerPids.add(Number(server.PRI_CLOUD_SERVER_PID));
     if (server.PRI_CLOUD_READER !== 'synthetic') throw new Error('the local server is not running the synthetic reader');
     writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
     // The server's own database, read-only: the "teacher's desk" (shared with

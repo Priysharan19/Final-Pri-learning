@@ -127,10 +127,13 @@ export function keepOnlySimulator(udid, { ci = Boolean(process.env.CI), exec = s
 }
 
 // After a harness has crash-looped WebContent on a device, the next step must
-// not inherit it: on CI the device is shut down so that step boots it fresh.
-export function restartAfterCrashLoop(udid, { ci = Boolean(process.env.CI), exec = simctl, log = console.log } = {}) {
+// not inherit it: on CI the device is shut down, and the next step's own
+// ensureBooted boots it fresh. A shutdown that fails is logged, so the log
+// shows when a journey inherited the crash-looped device.
+export function shutDownAfterCrashLoop(udid, { ci = Boolean(process.env.CI), exec = simctl, log = console.log } = {}) {
   if (!ci) return false;
-  try { exec(['shutdown', udid], { timeout: 120_000 }); } catch { return false; }
+  try { exec(['shutdown', udid], { timeout: 120_000 }); }
+  catch (error) { log(`  (could not shut down ${udid} after the crash loop: ${String(error?.message || error).slice(0, 80)}; the next step inherits it)`); return false; }
   log(`  (shut down ${udid} after the crash loop; the next step boots it fresh)`);
   return true;
 }

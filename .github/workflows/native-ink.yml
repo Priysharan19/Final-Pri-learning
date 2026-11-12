@@ -83,6 +83,11 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
 jobs:
+  # The lane is two jobs on two runners, one per family (Train 18): one serial
+  # job (build + two bridge checks + two journeys) no longer fit 60 minutes on
+  # the slow, variable hosted iOS 26.5 simulator (cancelled on main b4fefed8e
+  # and 35159d3c4 too). Each job builds once, keeps one booted simulator and
+  # keeps its own 60-minute limit; together they run every step of the lane.
   native-ink:
     name: Swift build, capture gate and bridge smoke test (iOS 26)
     runs-on: macos-26
@@ -163,12 +168,90 @@ jobs:
       - name: Server dependencies for the local Pri server
         run: npm ci --prefix server
 
-      # Every iPad step runs before the first iPhone step and every step picks
-      # the same pinned device, so each simulator cold-boots once (#850 did the
-      # same for the iOS 27 lane). The iPad journey's legs are described below.
+      # Every step picks the same pinned iPad, so it cold-boots once. The
+      # journey's legs are described in the iPhone job below.
       - name: iPad journey (simulator)
-        timeout-minutes: 25
+        timeout-minutes: 40
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
+
+      - name: The evidence names the pinned runtime
+        if: always()
+        run: |
+          set -euo pipefail
+          for f in journey-ipad.json; do
+            test -s "$f" || continue
+            node -e "const e=require('./$f'); if (e.simulator.runtimePinned !== true || e.simulator.pinnedRuntime !== process.env.PRI_SIM_RUNTIME || !/^iOS-26-5$/.test(e.simulator.runtime)) { console.error('$f ran on', e.simulator.runtime, 'pinned', e.simulator.pinnedRuntime); process.exit(1); } console.log('$f: ' + e.simulator.name + ' on ' + e.simulator.runtime + ' (pinned ' + e.simulator.pinnedRuntime + ') ' + e.result);"
+          done
+
+      - name: Simulator evidence records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-simulator-evidence-ipad
+          path: |
+            journey-ipad.json
+            xcode-version.txt
+            runtimes.txt
+          if-no-files-found: warn
+
+  native-ink-iphone:
+    name: Swift build, iPhone bridge and certification journey (iOS 26)
+    runs-on: macos-26
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      - name: Canonical native source has no stale duplicate
+        run: node scripts/check-native-package-sync.mjs
+
+      # The web bundle inside the package is generated, never tracked (decision
+      # D28): Package.swift copies Resources/Web, so the client is built and
+      # synced into both packages before the one xcodebuild below, and the
+      # sync is proven complete. Without this the simulator app would carry an
+      # empty Web folder and every journey below would fail at the first page.
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Build the web client and generate the iOS web bundles
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      # The toolchain is what this lane says it is, or the lane stops here.
+      - name: Pinned toolchain (Xcode 26.6, iOS 26.5 simulator runtime)
+        run: |
+          set -euo pipefail
+          test -d "$PRI_XCODE_APP" || { echo "::error::$PRI_XCODE_APP is not on this image; the macos-26 image changed. Re-pin deliberately."; ls /Applications | grep -i xcode; exit 1; }
+          xcodebuild -version | tee xcode-version.txt
+          grep -Eq "^Xcode ${PRI_XCODE_VERSION//./\\.}(\.[0-9]+)?$" xcode-version.txt || { echo "::error::xcodebuild is not Xcode $PRI_XCODE_VERSION"; exit 1; }
+          xcrun simctl list runtimes | tee runtimes.txt
+          grep -Eq "^iOS ${PRI_SIM_RUNTIME//./\\.}(\.[0-9]+)? " runtimes.txt || { echo "::error::the iOS $PRI_SIM_RUNTIME simulator runtime is not installed on this image. Install it or re-pin deliberately; this lane never runs on another iOS."; exit 1; }
+
+      # This job is the iPhone family on its own runner: only the iPhone is
+      # booted (the iPad job boots the iPad). Fails when the pinned runtime or
+      # a device type of a family is missing.
+      - name: iPad and iPhone simulators on iOS ${{ env.PRI_SIM_RUNTIME }}
+        run: node scripts/ci-provision-simulators.mjs --boot iphone
+
+      # One simulator build of the canonical shipping package itself (no
+      # scratch copy), reused by every simulator step below.
+      # A generic destination needs no booted simulator.
+      - name: Build the simulator app (canonical iPhone + iPad package)
+        run: |
+          set -euo pipefail
+          (cd ios/PriLearning.swiftpm && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
+          test -n "$APP"
+          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
 
       # CP-04 × #504: main is the V1 Apple shipping target — iPhone (portrait)
       # and iPad (all orientations), bundle id com.prilearning.app
@@ -178,6 +261,9 @@ jobs:
 
       - name: Apple shipping-target gate refuses wrong declarations
         run: node client/test/apple-shipping-target-check.mjs
+
+      - name: Server dependencies for the local Pri server
+        run: npm ci --prefix server
 
       # The same shell on an iPhone simulator, and the native student journey
       # on iPhone and iPad. Grading is online-only and server-authoritative
@@ -204,18 +290,16 @@ jobs:
       # unsent answer, an in-shell accessibility smoke, and the largest
       # accessibility text size with no sideways overflow.
       # Both journeys start the real server (the marking leg always; the
-      # iPhone run also for the account journey); its dependencies install
-      # before the iPad journey above.
+      # iPhone run also for the account journey).
       - name: iPhone certification journey (simulator)
-        timeout-minutes: 25
+        timeout-minutes: 40
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
-
 
       - name: The evidence names the pinned runtime
         if: always()
         run: |
           set -euo pipefail
-          for f in journey-iphone.json journey-ipad.json; do
+          for f in journey-iphone.json; do
             test -s "$f" || continue
             node -e "const e=require('./$f'); if (e.simulator.runtimePinned !== true || e.simulator.pinnedRuntime !== process.env.PRI_SIM_RUNTIME || !/^iOS-26-5$/.test(e.simulator.runtime)) { console.error('$f ran on', e.simulator.runtime, 'pinned', e.simulator.pinnedRuntime); process.exit(1); } console.log('$f: ' + e.simulator.name + ' on ' + e.simulator.runtime + ' (pinned ' + e.simulator.pinnedRuntime + ') ' + e.result);"
           done
@@ -224,9 +308,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: native-simulator-evidence
+          name: native-simulator-evidence-iphone
           path: |
-            journey-*.json
+            journey-iphone.json
             xcode-version.txt
             runtimes.txt
           if-no-files-found: warn
