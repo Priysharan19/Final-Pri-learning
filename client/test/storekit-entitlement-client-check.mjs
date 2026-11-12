@@ -17,7 +17,7 @@ resetStorage();
 globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
 
 const { get, put } = await import('../src/local/idb.js');
-const { cloudAccountLink, loginCloudAccount, refreshCloudEntitlement, cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
+const { cloudAccountLink, loginCloudAccount, refreshCloudEntitlement, cloudLinkRowId, markCloudSynced, noteCloudClock, verifyCloudSession } = await import('../src/platform/cloudAccount.js');
 const { cloud } = await import('../src/platform/cloudTransport.js');
 const { normalizeEntitlementSnapshot, MAX_OFFLINE_MS } = await import('../src/platform/entitlements.js');
 const { cloudEntitlement, configureEntitlementGate, requireCapability } = await import('../src/local/entitlementGate.js');
@@ -102,6 +102,24 @@ ok('restore: this account\'s transaction is accepted', restored.accepted === 1);
 ok('restore: the refusal is still reported', restored.lastError === mismatch);
 const none = await acceptEachTransaction([{ id: 'other' }], async () => { throw mismatch; });
 ok('restore: when nothing is accepted the refusal is what the student sees', none.accepted === 0 && none.lastError === mismatch);
+
+// 6. A plan refresh is never undone by a write that lands beside it. Each
+//    link-row writer copies the row back whole, so a sync stamp, a clock
+//    note or a session check that read the row before the refresh wrote it
+//    used to put the old (free) plan back over the Premium one.
+{
+  const linkRow = cloudLinkRowId('p1');
+  for (let round = 0; round < 5; round++) {
+    const before = await get('device', linkRow);
+    await put('device', { ...before, entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
+    answer = { accountId: 'acct-A', entitlement: premium() };
+    const syncedAt = now + 1000 + round;
+    await Promise.all([refreshCloudEntitlement('p1'), markCloudSynced('p1', syncedAt), noteCloudClock('p1', syncedAt), verifyCloudSession('p1'), markCloudSynced('p1', syncedAt)]);
+    const after = await get('device', linkRow);
+    ok(`round ${round}: Premium filed beside a sync, a clock note and a session check stays filed`, after?.entitlement?.plan === 'premium', JSON.stringify(after?.entitlement));
+    ok(`round ${round}: and the sync stamp beside it is kept too`, after?.lastSyncAt === syncedAt, String(after?.lastSyncAt));
+  }
+}
 
 if (failures.length) {
   console.error(`STOREKIT ENTITLEMENT CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks\n  · ${failures.join('\n  · ')}`);

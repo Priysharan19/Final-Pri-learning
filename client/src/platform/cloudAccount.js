@@ -21,6 +21,23 @@ function linkRowId(pid) {
   return `${LINK_PREFIX}${pid}`;
 }
 
+/**
+ * Every read-modify-write of one link row runs alone, in the order asked.
+ * Each writer copies the whole row back (`{ ...prior, field }`), so two
+ * interleaved writers lose one's field: an automatic sync stamping
+ * `lastSyncAt` while the plan was being refreshed wrote the old entitlement
+ * back over a Premium one this device had just been told about.
+ */
+const linkRowQueues = new Map();
+function withLinkRow(pid, change) {
+  const id = linkRowId(pid);
+  const run = (linkRowQueues.get(id) || Promise.resolve()).then(() => change(id));
+  const settled = run.then(() => {}, () => {});
+  linkRowQueues.set(id, settled);
+  settled.then(() => { if (linkRowQueues.get(id) === settled) linkRowQueues.delete(id); });
+  return run;
+}
+
 /** The device row that holds a profile's link — read-only for the local gate. */
 export const cloudLinkRowId = linkRowId;
 
@@ -82,7 +99,7 @@ async function profilesLinkedTo(accountId) {
 
 async function saveAccount(pid, account, patch = {}) {
   if (!account?.id) throw new Error('Cloud account response is missing an account id');
-  const id = linkRowId(pid);
+  await withLinkRow(pid, async id => {
   const prior = await get('device', id).catch(() => null);
   if (prior?.accountId && String(prior.accountId) !== String(account.id)) {
     const error = new Error('This local profile is linked to a different Pri Learning account. Disconnect it explicitly before linking another account.');
@@ -109,6 +126,7 @@ async function saveAccount(pid, account, patch = {}) {
   delete row.email;
   delete row.name;
   await put('device', row);
+  });
   return cloudAccountLink(pid);
 }
 
@@ -218,7 +236,7 @@ export async function verifyCloudSession(pid) {
 export async function refreshCloudEntitlement(pid) {
   const result = await cloud.entitlements();
   const entitlement = normalizeEntitlementSnapshot(result.entitlement || {});
-  const id = linkRowId(pid);
+  await withLinkRow(pid, async id => {
   const prior = await get('device', id).catch(() => null);
   if (!prior?.accountId) throw new Error('This local profile is not linked to a cloud account');
   // The cloud session is device-wide, the link is per local profile. When the
@@ -232,15 +250,17 @@ export async function refreshCloudEntitlement(pid) {
     throw error;
   }
   await put('device', { ...prior, entitlement: { ...result.entitlement }, lastVerifiedAt: Date.now() });
+  });
   announceEntitlementChange({ localProfileId: String(pid), plan: entitlement.plan, status: entitlement.status, active: entitlement.active });
   return entitlement;
 }
 
 export async function markCloudSynced(pid, at = Date.now()) {
-  const id = linkRowId(pid);
-  const prior = await get('device', id).catch(() => null);
-  if (!prior) return;
-  await put('device', { ...prior, lastSyncAt: at });
+  return withLinkRow(pid, async id => {
+    const prior = await get('device', id).catch(() => null);
+    if (!prior) return;
+    await put('device', { ...prior, lastSyncAt: at });
+  });
 }
 
 /**
@@ -248,7 +268,7 @@ export async function markCloudSynced(pid, at = Date.now()) {
  * for this profile. Written only by platform/accountActivation.js.
  */
 export async function recordCloudActivation(pid, accountId, at = Date.now()) {
-  const id = linkRowId(pid);
+  return withLinkRow(pid, async id => {
   const prior = await get('device', id);
   if (!prior) return;
   if (accountId && String(prior.accountId) !== String(accountId)) return;
@@ -256,14 +276,16 @@ export async function recordCloudActivation(pid, accountId, at = Date.now()) {
     ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
     clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
   });
+  });
 }
 
 /** Raise the clock high-water mark the offline grace checks against. */
 export async function noteCloudClock(pid, at = Date.now()) {
-  const id = linkRowId(pid);
-  const prior = await get('device', id);
-  if (!prior || (Number(prior.clockSeenAt) || 0) >= at) return;
-  await put('device', { ...prior, clockSeenAt: at });
+  return withLinkRow(pid, async id => {
+    const prior = await get('device', id);
+    if (!prior || (Number(prior.clockSeenAt) || 0) >= at) return;
+    await put('device', { ...prior, clockSeenAt: at });
+  });
 }
 
 /** The device half of ending a link: native session, replica state, link row. */
@@ -358,10 +380,12 @@ export const DELETE_STAMP_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Drop a pending-deletion stamp from the link row, leaving the link itself. */
 async function clearDeleteStamp(pid) {
-  const current = await get('device', linkRowId(pid)).catch(() => null);
-  if (!current?.deleteRequestedAt) return;
-  const { deleteRequestedAt, ...rest } = current;
-  await put('device', rest).catch(() => {});
+  return withLinkRow(pid, async id => {
+    const current = await get('device', id).catch(() => null);
+    if (!current?.deleteRequestedAt) return;
+    const { deleteRequestedAt, ...rest } = current;
+    await put('device', rest).catch(() => {});
+  });
 }
 
 export async function deleteCloudAccount(pid, proof) {
