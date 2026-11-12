@@ -18,6 +18,7 @@
 //     NSW course, the generators and the practice server byte-unchanged.
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -248,6 +249,23 @@ const toyReport = nswCoverage({
 })[0];
 check(toyReport.mapped === 1 && toyReport.partial === 1 && toyReport.missing === 1, 'coverage: mapped/partial/missing, and a row without a generator reaches nothing');
 
+// ── Reviewed-data digests ───────────────────────────────────────────────────
+// The structural checks above cannot tell a wrong-but-valid code from a right
+// one. These digests pin the NESA data and the crosswalk as reviewed on
+// 2026-11-13 (PR #865), so any edit (a code moved between focus areas, a path
+// label changed, a crosswalk code swapped) fails until the digest is updated
+// in the same reviewed change. Recompute with --print-digests.
+const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 16);
+const DIGESTS = {
+  syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
+  crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
+};
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '734ccaefd08e7091' };
+if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
+for (const k of Object.keys(PINNED_DIGESTS)) {
+  check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);
+}
+
 // ── Isolation ───────────────────────────────────────────────────────────────
 const IMPORT = /\bimport\s*(?:[^'"()]*?\bfrom\s*)?\(?\s*['"]([^'"]+)['"]/g;
 for (const name of readdirSync(modelDir)) {
@@ -312,4 +330,4 @@ if (failures.length) {
   process.exit(1);
 }
 const summary = report.map(s => `${s.id.replace('nsw-mathematics-', '')} ${s.mapped}/${s.total}`).join(', ');
-console.log(`NSW CURRICULUM MODEL: PASS — ${checks}/${checks} checks — ${LEGACY_CROSSWALK.length} subtopics crosswalked, ${NEW_OUTCOME_GAPS.length} outcomes with no generator — mapped: ${summary}`);
+console.log(`NSW CURRICULUM MODEL: PASS — ${checks}/${checks} checks — ${LEGACY_CROSSWALK.length} subtopics crosswalked, ${NEW_OUTCOME_GAPS.length} outcomes with no generator — outcomes reached (a floor, not syllabus coverage): ${summary}`);

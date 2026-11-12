@@ -68,7 +68,7 @@ const same = (code) => [[code], [code], [code]];
 export const LEGACY_CROSSWALK = Object.freeze([
   // ── Years 7–8 → Mathematics K–10 (2022), Stage 4 ──────────────────────────
   row('y7-integers', K10, [], same('MA4-INT-C-01'), 'mapped', 'as-labelled',
-    'G1 had partial: order of operations with integers is in Computation with integers ("Apply the 4 operations to integers").'),
+    'G1 had partial: order of operations with integers is content of Computation with integers.'),
   row('y7-fractions', K10, [], same('MA4-FRC-C-01'), 'mapped', 'as-labelled'),
   row('y7-decimals-perc', K10, [], same('MA4-FRC-C-01'), 'mapped', 'as-labelled'),
   row('y7-ratio', K10, [], same('MA4-RAT-C-01'), 'mapped', 'as-labelled'),
@@ -92,7 +92,7 @@ export const LEGACY_CROSSWALK = Object.freeze([
   row('y8-volume', K10, [], same('MA4-VOL-C-01'), 'mapped', 'as-labelled'),
   row('y8-rates', K10, [], same('MA4-RAT-C-01'), 'mapped', 'as-labelled',
     'G1 had unverified: speed from distance–time graphs, converting rate units and best buys are all in Ratios and rates.'),
-  row('y8-probability', K10, [], same('MA4-PRO-C-01'), 'mapped', 'as-labelled',
+  row('y8-probability', K10, [], [['MA4-PRO-C-01'], ['MA4-PRO-C-01'], ['MA4-PRO-C-01', 'MST-12-S1-07', 'MST-12-S2-09']], 'mapped', 'elsewhere-in-part',
     'Relative frequency is Stage 4; "expected number of outcomes" (np) is named explicitly only in Stage 6 Standard.'),
 
   // ── Years 9–10 → Mathematics K–10 (2022), Stage 5 ─────────────────────────
