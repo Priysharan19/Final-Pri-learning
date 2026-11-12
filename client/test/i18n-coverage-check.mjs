@@ -318,6 +318,11 @@ for (const rel of ['src/pages/PracticeBase.jsx', 'src/components/QuestionCard.js
 // ─────────────────────────────────────────────────────────────────────────────
 const missingParams = [];
 let callsChecked = 0;
+// {brand} and {company} are ambient: client/src/i18n/index.js fills them in
+// every lookup from the build's edition (plan E4), so no call passes them.
+const { brandVars } = await import('../src/brand/edition.js');
+const AMBIENT = new Set(Object.keys(brandVars('en')));
+ok(JSON.stringify([...AMBIENT].sort()) === JSON.stringify(['brand', 'company']), 'the ambient placeholders are exactly {brand} and {company}');
 for (const rel of sourceFiles('src')) {
   if (rel.includes('/i18n/strings.')) continue;
   for (const { key, passed } of callsIn(rel)) {
@@ -325,7 +330,7 @@ for (const rel of sourceFiles('src')) {
     callsChecked++;
     const need = [...slotsOf(en[key])];
     if (typeof en[key] === 'object') need.push('count');
-    const absent = need.filter(slot => !passed.has(slot));
+    const absent = need.filter(slot => !passed.has(slot) && !AMBIENT.has(slot));
     if (absent.length) missingParams.push(`${rel}: t('${key}') is missing {${absent.join(', ')}}`);
   }
 }
@@ -367,7 +372,8 @@ for (const bp of blueprints) {
   ok(Boolean(keys), `lib/blueprintKeys.js has catalogue keys for blueprint ${bp.id}`);
   if (!keys) continue;
   eq(en[keys[0]], bp.label, `the English label of ${bp.id} matches the engine`);
-  eq(en[keys[1]], bp.releaseNote, `the English release note of ${bp.id} matches the engine`);
+  // A note may name the company as {company}; the lookup fills it as the engine writes it.
+  eq(String(en[keys[1]]).replace('{company}', brandVars('en').company), bp.releaseNote, `the English release note of ${bp.id} matches the engine`);
 }
 eq(en['exams.claim.none'], exams.indiaExamClaim(null).reason, 'the no-blueprint claim matches the engine');
 for (const [authenticity, key] of [['official-mathematics-section', 'exams.claim.officialSection'], ['official-structure-dynamic-marking', 'exams.claim.officialStructure']]) {

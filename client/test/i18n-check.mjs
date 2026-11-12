@@ -242,14 +242,13 @@ const SPOKEN_ATTRIBUTES = new Set(['aria-label', 'aria-description', 'aria-place
 // Literals a reader does see, which are correctly not translated. Same rule as
 // the catalogue allowlist: a reason, in writing, about the language.
 const LITERAL_ALLOWLIST = new Map([
-  ['Pri Learning', 'the product’s name'],
+  ['Pri Learning', 'the company’s name, written the same in every language (students meet the edition’s name, {brand})'],
+  ['by Pri Learning', 'the company line under an edition wordmark, the same in every language'],
   ['ABCD', 'the option letters of a multiple-choice item, indexed into rather than read'],
   ['Standard', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Advanced', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 1', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 2', 'the proper name of an NSW course, shown only on the Australian branch'],
-  ['Pri Learning.', 'the product’s name with the wordmark’s full stop'],
-  ['P', 'the letter on the brand tile, aria-hidden beside the full wordmark'],
   ['XP', 'the app’s own unit, written XP in every language'],
   ['D', 'the D1–D4 difficulty shorthand, read as a code'],
   ['Evaluation', 'inside the wordmark block, translated separately as verdict.evaluation'],

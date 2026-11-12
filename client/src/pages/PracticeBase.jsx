@@ -21,6 +21,7 @@ import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js'
 import { queueTelemetry } from '../platform/telemetry.js';
 import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
+import { BRAND } from '../brand/edition.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -318,8 +319,8 @@ function ProfilePractice() {
   }, [load, assignmentMode, replaceSession]);
 
   useEffect(() => {
-    if (serve?.question?.subtopicName) document.title = `${serve.question.subtopicName} · Pri Learning`;
-    return () => { document.title = 'Pri Learning'; };
+    if (serve?.question?.subtopicName) document.title = `${serve.question.subtopicName} · ${BRAND}`;
+    return () => { document.title = BRAND; };
   }, [serve]);
 
   const assignmentTarget = assignmentContext ? assignmentQuestionTarget(assignmentContext.specification) : 0;

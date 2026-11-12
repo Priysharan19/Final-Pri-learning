@@ -232,7 +232,10 @@ async function run() {
   // ── the product describes itself as Indian ─────────────────────────────────
   section('product identity');
   try {
-    const html = readFileSync(`${CLIENT}index.html`, 'utf8');
+    // The page and manifest a Priyabhata build serves (plan E4: both come from
+    // the build's edition, client/brand/edition-brand.mjs).
+    const brand = await import('../brand/edition-brand.mjs');
+    const html = brand.builtIndexHtml('priyabhata');
     const description = /<meta name="description" content="([^"]*)"/.exec(html)?.[1] || '';
     // The Olympiad track is off in a production build (V1 decision; the
     // description is held to that by onboarding-scope-check.mjs), so the
@@ -240,13 +243,13 @@ async function run() {
     ok('index.html describes the app for Indian students', /NCERT/.test(description) && /JEE/.test(description) && !/olympiad/i.test(description),
       `description reads ${show(description)}`);
     ok('and never mentions the HSC or an iPad', !/HSC|iPad/i.test(description), `description reads ${show(description)}`);
-    ok('the document language is English', /<html lang="en[^"]*">/.test(html));
-    const manifest = JSON.parse(readFileSync(`${CLIENT}public/manifest.webmanifest`, 'utf8'));
-    eq('the manifest names the app', manifest.name, 'Pri Learning');
+    ok('the document language is English', /<html lang="en[^"]*"[ >]/.test(html));
+    const manifest = brand.webManifest('priyabhata');
+    eq('the manifest names the app', manifest.name, 'Priyabhata');
     ok('the manifest describes the Indian product', /NCERT/.test(manifest.description) && /JEE/.test(manifest.description) && !/HSC|iPad/i.test(manifest.description),
       `manifest description reads ${show(manifest.description)}`);
     eq('the manifest is in Indian English', manifest.lang, 'en-IN');
-    ok('the manifest theme matches the page', manifest.theme_color === manifest.background_color && html.includes(`content="${manifest.theme_color}"`),
+    ok('the manifest theme matches the page', manifest.theme_color === manifest.background_color && readFileSync(`${CLIENT}public/theme-boot.js`, 'utf8').includes(manifest.theme_color),
       `theme ${manifest.theme_color}, background ${manifest.background_color}`);
 
     const login = readFileSync(`${CLIENT}src/pages/Login.jsx`, 'utf8');

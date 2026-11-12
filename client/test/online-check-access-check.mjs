@@ -170,10 +170,13 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   // that nothing opens until it is signed in to a Pri account.
   ok(/Pri account/.test(en['login.localOnlySub']) && /Before anything opens/.test(en['login.localOnlySub']) && !/[Dd]evice-only mode/.test(en['login.localOnlySub']),
     'a device profile says nothing opens before it is signed in to a Pri account');
-  const html = read('index.html');
-  ok(!/marked on your device|Offline-first|account is optional/.test(html) && /checked by Pri’s server/.test(html), 'the page description says answers are checked by Pri\'s server');
-  const manifest = read('public/manifest.webmanifest');
-  ok(!/marked on your device|Offline-first|account is optional/.test(manifest) && /checked by Pri’s server/.test(manifest), 'and so does the install manifest');
+  const brand = await import('../brand/edition-brand.mjs');
+  for (const id of brand.BRAND_EDITION_IDS) {
+    const html = brand.builtIndexHtml(id);
+    ok(!/marked on your device|Offline-first|account is optional/.test(html) && /checked by our server/.test(html), `the ${id} page description says answers are checked by our server`);
+    const manifest = JSON.stringify(brand.webManifest(id));
+    ok(!/marked on your device|Offline-first|account is optional/.test(manifest) && /checked by our server/.test(manifest), `and so does the ${id} install manifest`);
+  }
 }
 
 // ── 3 · A refused check: no verdict, and the same submission on Retry ────────

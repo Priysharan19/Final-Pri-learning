@@ -2142,6 +2142,9 @@ html.theme-switching, html.theme-switching * {
    ─────────────────────────────────────────────────────────────────────── */
  .home-greet, .pg-head h1 { font-weight: 400; letter-spacing: 0; }
 .brand-wordmark { display: block; flex: none; color: var(--ink); }
+/* "by Pri Learning" under an edition wordmark (sign-in, sign-up, account pages;
+   never the header bar). Quiet ink, tracked mono capitals; real text. */
+.brand-byline { display: block; margin-top: 8px; font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
 
 /* ── Motion system ────────────────────────────────────────────────────────
    Purposeful and quiet: motion explains where something came from or that

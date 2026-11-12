@@ -14,7 +14,10 @@
 //   4. the build records the edition (features.json, __PRI_EDITION__), the
 //      Dockerfile forwards PRI_EDITION to the client build and ships the table
 //      to the runtime image, and /v1/health reports the server's edition;
-//   5. E1 changes no student behaviour: nothing under client/src reads it yet.
+//   5. the brand (E4): each edition has a well-formed identity whose accent
+//      meets WCAG AA (4.5:1) on every Instrument surface in both themes —
+//      computed here from instrument.css, never copied — and the student app
+//      reads the edition through client/src/brand/edition.js alone.
 //
 // It ends by printing each edition's open gaps — the parity debt still owed.
 //
@@ -116,15 +119,59 @@ ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build 
   ok(/const edition = serverEdition\(\);/.test(router) && /^\s+edition,$/m.test(router), '/v1/health reports the edition');
 }
 
-// 5. No behaviour change in the student app yet.
+// 5. The brand (E4): identity, accent contrast, and one reader.
 {
+  ok(ed.COMPANY_LINE === `by ${ed.COMPANY}`, 'the company line is "by Pri Learning"');
+  ok(JSON.stringify(ed.CUTS) === JSON.stringify(['jya', 'square']), 'the cuts are jya and square');
+  ok(ed.EDITIONS.priyabhata.identity.cut === 'jya' && ed.EDITIONS.prithagoras.identity.cut === 'square', 'Priyabhata carries the jyā cut, Prithagoras the square');
+  ok(ed.EDITIONS.priyabhata.identity.brandHi === 'प्रियभट', 'the Hindi name is प्रियभट (one ट)');
+  ok(ed.EDITIONS.prithagoras.identity.brandHi === null && !ed.EDITIONS.prithagoras.languages.includes('hi'), 'Prithagoras has no Hindi name, and offers no Hindi');
+  ok(ed.EDITION_IDS.every(id => Object.isFrozen(ed.EDITIONS[id].identity) && Object.isFrozen(ed.EDITIONS[id].identity.accent)), 'each identity is frozen');
+  const sameCut = JSON.parse(JSON.stringify(ed.EDITIONS));
+  sameCut.prithagoras.identity.cut = 'jya';
+  ok(ed.editionProblems(sameCut).some(p => p.includes('cut')), 'two editions with one cut is a problem');
+  const noHindiName = JSON.parse(JSON.stringify(ed.EDITIONS));
+  noHindiName.priyabhata.identity.brandHi = null;
+  ok(ed.editionProblems(noHindiName).some(p => p.includes('brandHi')), 'an edition offering Hindi without a Hindi name is a problem');
+  const noIdentity = JSON.parse(JSON.stringify(ed.EDITIONS));
+  delete noIdentity.prithagoras.identity;
+  ok(ed.editionProblems(noIdentity).some(p => p.includes('identity')), 'an edition without an identity is a problem');
+  const badAccent = JSON.parse(JSON.stringify(ed.EDITIONS));
+  badAccent.priyabhata.identity.accent.dark = 'teal';
+  ok(ed.editionProblems(badAccent).some(p => p.includes('accent.dark')), 'an accent that is not a #rrggbb colour is a problem');
+
+  // WCAG 2 contrast, computed from the real Instrument surfaces.
+  const css = read('client/src/instrument/instrument.css');
+  const block = sel => { const i = css.indexOf(`${sel} {`); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+  const token = (text, name) => (text.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1];
+  const lum = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const themes = { light: block('html.ui-instrument'), dark: block('html.ui-instrument[data-theme="dark"]') };
+  for (const id of ed.EDITION_IDS) {
+    for (const [mode, text] of Object.entries(themes)) {
+      for (const surface of ['in-base', 'in-l1', 'in-void']) {
+        const bg = token(text, surface);
+        const accent = ed.EDITIONS[id].identity.accent[mode];
+        const r = bg ? ratio(accent, bg) : 0;
+        ok(r >= 4.5, `${id} ${mode} accent ${accent} on --${surface} ${bg} is ${r.toFixed(2)}:1 (WCAG AA needs 4.5)`);
+      }
+    }
+  }
+
+  // One reader: only client/src/brand/edition.js imports the table or reads __PRI_EDITION__.
   let readers = '';
   try {
-    readers = execFileSync('git', ['-C', ROOT, 'grep', '-l', '-e', 'edition.config', '-e', '__PRI_EDITION__', '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    readers = execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-l', '-e', 'edition.config', '-e', '__PRI_EDITION__', '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch (e) {
     if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
   }
-  ok(readers === '', `E1: nothing under client/src reads the edition yet (${readers})`);
+  ok(readers === 'client/src/brand/edition.js', `E4: client/src reads the edition only through client/src/brand/edition.js (${readers.split('\n').join(', ')})`);
+  const brand = await import('../src/brand/edition.js');
+  ok(brand.BRAND === 'Priyabhata' && brand.CUT === 'jya', 'outside a build (no __PRI_EDITION__) the app is the default edition');
+  ok(brand.brandVars('hi').brand === 'प्रियभट' && brand.brandVars('en').brand === 'Priyabhata' && brand.brandVars('en').company === 'Pri Learning', 'brandVars: प्रियभट in Hindi, Priyabhata in English, and the company');
 }
 
 const gaps = ed.parityGaps();
