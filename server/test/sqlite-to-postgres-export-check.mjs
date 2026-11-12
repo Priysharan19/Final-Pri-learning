@@ -214,7 +214,7 @@ try {
   // The resource library (plan F1) is seeded by its migration and not copied, so
   // a source whose library holds anything else is refused rather than dropped.
   for (const [label, sql] of [
-    ['a library row added after the seed', "INSERT INTO resources SELECT 'added-later-row',title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at FROM resources"],
+    ['a library row added after the seed', "INSERT INTO resources SELECT 'added-later-row',title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at FROM resources"],
     ['a withdrawn seed row', "UPDATE resources SET review_state='withdrawn'"],
     ['a seed row offered to another edition', "INSERT INTO resource_editions(resource_id,edition) SELECT id,'priyabhata' FROM resources"]
   ]) {

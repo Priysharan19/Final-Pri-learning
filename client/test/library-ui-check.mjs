@@ -35,7 +35,7 @@ const server = await createServer({
 
 // The seed exactly as the server sends it.
 const COLS = ['id', 'title', 'subtitle', 'description', 'type', 'subject', 'year', 'grade', 'marks', 'duration_minutes', 'reading_minutes',
-  'question_count', 'tags_json', 'course', 'syllabus_version', 'certification_state', 'availability', 'url', 'source', 'attribution',
+  'question_count', 'sections_json', 'tags_json', 'course', 'syllabus_version', 'certification_state', 'availability', 'url', 'source', 'attribution',
   'rights_note', 'disclaimer', 'review_state', 'created_at', 'updated_at', 'published_at'];
 const SEED = RESOURCE_SEED[0];
 const sent = resourcePublic(Object.fromEntries(COLS.map((k, i) => [k, resourceRowValues(SEED)[i]])));

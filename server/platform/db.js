@@ -560,6 +560,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     duration_minutes INTEGER,
     reading_minutes INTEGER,
     question_count INTEGER,
+    sections_json TEXT NOT NULL,
     tags_json TEXT NOT NULL,
     course TEXT NOT NULL CHECK(course IN ('in','nsw')),
     syllabus_version TEXT,

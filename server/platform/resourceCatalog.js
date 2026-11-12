@@ -14,6 +14,49 @@ export const RESOURCE_COURSES = Object.freeze(['in', 'nsw']);
 export const CERTIFICATION_STATES = Object.freeze(['uploaded', 'structured', 'verified', 'issued', 'certified']);
 export const AVAILABILITIES = Object.freeze(['external', 'hosted']);
 export const REVIEW_STATES = Object.freeze(['draft', 'published', 'withdrawn']);
+// A section of a paper (plan F4's Exam Desk reads them): the question numbers
+// it spans and its format. Only the formats a recorded paper actually uses.
+export const SECTION_KINDS = Object.freeze(['multiple-choice', 'extended-response']);
+const MAX_SECTIONS = 20;
+
+/**
+ * Every way a resource's sections break the contract, as strings. Empty is
+ * allowed (a resource with no recorded sections). Otherwise each section has a
+ * label, whole question numbers first ≤ last and a known kind; consecutive
+ * sections are contiguous (no gap, no overlap); every bound lies within
+ * 1..questionCount; and where every section carries marks and the resource has
+ * a total, the sections' marks add up to it.
+ */
+export function sectionProblems(sections, { questionCount = null, marks = null } = {}) {
+  if (sections === undefined || sections === null) return [];
+  if (!Array.isArray(sections) || sections.length > MAX_SECTIONS) return [`sections must be a list of at most ${MAX_SECTIONS}`];
+  if (!sections.length) return [];
+  const p = [];
+  if (!Number.isInteger(questionCount) || questionCount < 1) p.push('sections need the resource question count');
+  sections.forEach((s, i) => {
+    const at = `section ${i + 1}`;
+    if (!s || typeof s !== 'object' || Array.isArray(s)) { p.push(`${at} must be an object`); return; }
+    const unknown = Object.keys(s).filter(k => !['label', 'firstQuestion', 'lastQuestion', 'kind', 'marks'].includes(k));
+    if (unknown.length) p.push(`${at} has unknown fields ${unknown.join(', ')}`);
+    if (!text(s.label, 60)) p.push(`${at} needs a label (≤60)`);
+    if (!Number.isInteger(s.firstQuestion) || !Number.isInteger(s.lastQuestion) || s.firstQuestion < 1 || s.lastQuestion < s.firstQuestion) {
+      p.push(`${at} needs whole question numbers with firstQuestion ≤ lastQuestion`);
+    } else if (Number.isInteger(questionCount) && s.lastQuestion > questionCount) {
+      p.push(`${at} ends at question ${s.lastQuestion}, beyond the ${questionCount} questions`);
+    }
+    if (!SECTION_KINDS.includes(s.kind)) p.push(`${at} kind must be one of ${SECTION_KINDS.join(', ')}`);
+    if (!optionalCount(s.marks, 1000)) p.push(`${at} marks must be a whole number`);
+    const prev = sections[i - 1];
+    if (i > 0 && Number.isInteger(prev?.lastQuestion) && Number.isInteger(s.firstQuestion) && s.firstQuestion !== prev.lastQuestion + 1) {
+      p.push(`${at} must start at question ${prev.lastQuestion + 1} (sections are contiguous)`);
+    }
+  });
+  if (Number.isInteger(marks) && sections.every(s => Number.isInteger(s?.marks))) {
+    const sum = sections.reduce((n, s) => n + s.marks, 0);
+    if (sum !== marks) p.push(`section marks add up to ${sum}, not the resource's ${marks}`);
+  }
+  return p;
+}
 
 const ID = /^[a-z0-9][a-z0-9-]{2,119}$/;
 const SUBJECT_MAX = 120;
@@ -52,6 +95,7 @@ export function resourceProblems(r) {
   if (!optionalCount(r.durationMinutes, 1440)) p.push('durationMinutes must be whole minutes');
   if (!optionalCount(r.readingMinutes, 240)) p.push('readingMinutes must be whole minutes');
   if (!optionalCount(r.questionCount, 1000)) p.push('questionCount must be a whole number');
+  p.push(...sectionProblems(r.sections, { questionCount: r.questionCount ?? null, marks: r.marks ?? null }));
   if (!Array.isArray(r.tags) || r.tags.length > 20 || !r.tags.every(t => text(t, 60))) p.push('tags must be up to 20 short texts');
   if (!Array.isArray(r.editions) || !r.editions.length || new Set(r.editions).size !== r.editions.length || !r.editions.every(e => EDITION_IDS.includes(e))) {
     p.push(`editions must be a non-empty list of ${EDITION_IDS.join(', ')}`);
@@ -101,6 +145,12 @@ export const RESOURCE_SEED = Object.freeze([
     durationMinutes: 180,
     readingMinutes: 10,
     questionCount: 27,
+    // resources.json "sections": Section I 1–10 "Multiple choice" 10 marks,
+    // Section II 11–27 "Extended response" 90 marks.
+    sections: Object.freeze([
+      Object.freeze({ label: 'Section I', firstQuestion: 1, lastQuestion: 10, kind: 'multiple-choice', marks: 10 }),
+      Object.freeze({ label: 'Section II', firstQuestion: 11, lastQuestion: 27, kind: 'extended-response', marks: 90 })
+    ]),
     tags: Object.freeze(['Practice examination', '2027 HSC', '100 marks']),
     editions: Object.freeze(['prithagoras']),
     course: 'nsw',
@@ -122,7 +172,7 @@ export const RESOURCE_SEED = Object.freeze([
 /** A resource record as the row values, in the resources table's column order. */
 export function resourceRowValues(r) {
   return [r.id, r.title, r.subtitle ?? null, r.description, r.type, r.subject, r.year, r.grade ?? null, r.marks ?? null,
-    r.durationMinutes ?? null, r.readingMinutes ?? null, r.questionCount ?? null, JSON.stringify(r.tags), r.course,
+    r.durationMinutes ?? null, r.readingMinutes ?? null, r.questionCount ?? null, JSON.stringify(r.sections ?? []), JSON.stringify(r.tags), r.course,
     r.syllabusVersion ?? null, r.certificationState, r.availability, r.url ?? null, r.source, r.attribution, r.rightsNote,
     r.disclaimer, r.reviewState, r.createdAt, r.updatedAt, r.publishedAt ?? null];
 }
@@ -133,9 +183,9 @@ export function resourceRowValues(r) {
  */
 export function seedResourcesSqlite(db) {
   const insert = db.prepare(`INSERT OR IGNORE INTO resources(id,title,subtitle,description,type,subject,year,grade,marks,
-    duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,
+    duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,syllabus_version,certification_state,availability,url,
     source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const edition = db.prepare('INSERT OR IGNORE INTO resource_editions(resource_id, edition) VALUES (?, ?)');
   db.transaction(() => {
     for (const r of RESOURCE_SEED) {
@@ -149,6 +199,15 @@ export function seedResourcesSqlite(db) {
 
 function parseTags(json) {
   try { const v = JSON.parse(json || '[]'); return Array.isArray(v) ? v.filter(t => typeof t === 'string') : []; } catch { return []; }
+}
+/** Stored sections as sent: well-formed entries only, in order; anything else is none. */
+function parseSections(json) {
+  try {
+    const v = JSON.parse(json || '[]');
+    if (!Array.isArray(v)) return [];
+    return v.filter(s => s && typeof s.label === 'string' && Number.isInteger(s.firstQuestion) && Number.isInteger(s.lastQuestion) && SECTION_KINDS.includes(s.kind))
+      .map(s => ({ label: s.label, firstQuestion: s.firstQuestion, lastQuestion: s.lastQuestion, kind: s.kind, marks: Number.isInteger(s.marks) ? s.marks : null }));
+  } catch { return []; }
 }
 const num = v => (v === null || v === undefined ? null : Number(v));
 
@@ -167,6 +226,7 @@ export function resourcePublic(row) {
     durationMinutes: num(row.duration_minutes),
     readingMinutes: num(row.reading_minutes),
     questionCount: num(row.question_count),
+    sections: parseSections(row.sections_json),
     tags: parseTags(row.tags_json),
     course: row.course,
     syllabusVersion: row.syllabus_version ?? null,

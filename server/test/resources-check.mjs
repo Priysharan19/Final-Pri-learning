@@ -27,7 +27,7 @@ import './support/hermetic.mjs';
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { RESOURCE_SEED, resourceProblems, resourceRowValues } from '../platform/resourceCatalog.js';
+import { RESOURCE_SEED, resourceProblems, resourceRowValues, sectionProblems } from '../platform/resourceCatalog.js';
 import { createResourceRouter } from '../platform/resources.js';
 import { createPlatformDb } from '../platform/db.js';
 import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
@@ -61,6 +61,30 @@ for (const field of ['source', 'attribution', 'rightsNote', 'disclaimer']) refus
 refused({ id: '../etc' }, /id must be/, 'an id is a lowercase slug');
 refused({ publishedAt: null }, /publishedAt/, 'a published resource records when');
 
+// Sections (plan F4 reads them): optional; contiguous; within the question count.
+const sec = (label, firstQuestion, lastQuestion, kind = 'extended-response', extra = {}) => ({ label, firstQuestion, lastQuestion, kind, ...extra });
+c.deq(sectionProblems([], { questionCount: 27 }), [], 'sections: an empty list is allowed');
+c.deq(sectionProblems(undefined), [], 'sections: none recorded is allowed');
+c.deq(resourceProblems(variant({ sections: [] })), [], 'a resource with empty sections meets the contract');
+c.deq(sectionProblems([sec('A', 1, 10, 'multiple-choice'), sec('B', 11, 27)], { questionCount: 27 }), [], 'sections: contiguous and within the count');
+c.deq(sectionProblems([sec('B', 11, 27)], { questionCount: 27 }), [], 'sections: one section within the count');
+const secRefused = (sections, pattern, label, opts = { questionCount: 27 }) => c.ok(sectionProblems(sections, opts).some(p => pattern.test(p)), label);
+secRefused([sec('A', 1, 10), sec('B', 12, 27)], /contiguous/, 'sections: a gap between sections is refused');
+secRefused([sec('A', 1, 10), sec('B', 10, 27)], /contiguous/, 'sections: overlapping sections are refused');
+secRefused([sec('A', 11, 27), sec('B', 1, 10)], /contiguous/, 'sections: out-of-order sections are refused');
+secRefused([sec('A', 1, 10), sec('B', 11, 28)], /beyond the 27 questions/, 'sections: a bound past the question count is refused');
+secRefused([sec('A', 0, 10)], /whole question numbers/, 'sections: question 0 is refused');
+secRefused([sec('A', 10, 9)], /firstQuestion ≤ lastQuestion/, 'sections: first after last is refused');
+secRefused([sec('A', 1.5, 9)], /whole question numbers/, 'sections: fractional bounds are refused');
+secRefused([sec('A', 1, 10)], /question count/, 'sections: a resource without a question count cannot have sections', { questionCount: null });
+secRefused([sec('A', 1, 10, 'essay')], /kind must be/, 'sections: an unknown kind is refused');
+secRefused([sec('', 1, 10)], /label/, 'sections: a section needs a label');
+secRefused([{ ...sec('A', 1, 10), answer: 'C' }], /unknown fields/, 'sections: no other fields (nothing answer-shaped) are accepted');
+secRefused([sec('A', 1, 10, 'multiple-choice', { marks: 10 }), sec('B', 11, 27, 'extended-response', { marks: 80 })], /add up to 90, not the resource's 100/,
+  'sections: marks that do not add up to the total are refused', { questionCount: 27, marks: 100 });
+secRefused('Section I', /list/, 'sections: must be a list');
+c.ok(resourceProblems(variant({ sections: [sec('A', 1, 30)] })).some(p => /beyond the 27/.test(p)), 'the resource contract applies the section rules');
+
 // ── 2 · The seed: one real resource, copied, no fabrication ─────────────────
 c.eq(RESOURCE_SEED.length, 1, 'exactly one resource is seeded');
 c.deq([SEED.id, SEED.editions, SEED.course, SEED.certificationState, SEED.availability, SEED.reviewState],
@@ -74,6 +98,11 @@ c.deq([SEED.title, SEED.marks, SEED.questionCount, SEED.durationMinutes, SEED.re
     'https://boredofstudies.org/resources/2027-hsc-mathematics-advanced-ultimate-100-mark-assessment-1-practice-paper.21171/'],
   'its title, marks, questions, times, year, source and link are the source values');
 c.eq(SEED.syllabusVersion, null, 'the source states no syllabus version, so none is claimed');
+// Pinned to resources.json "sections" (label, start, end, format, marks).
+c.deq(SEED.sections.map(x => ({ ...x })), [
+  { label: 'Section I', firstQuestion: 1, lastQuestion: 10, kind: 'multiple-choice', marks: 10 },
+  { label: 'Section II', firstQuestion: 11, lastQuestion: 27, kind: 'extended-response', marks: 90 }
+], 'its two sections are the source sections exactly: 1–10 multiple choice (10 marks), 11–27 extended response (90 marks)');
 c.ok(!RESOURCE_SEED.some(r => r.editions.includes('priyabhata')), 'no India resource is invented');
 const sqlLiteral = v => (v === null ? 'null' : typeof v === 'number' ? String(v) : `'${String(v).replace(/'/g, "''")}'`);
 c.ok(MIGRATION.includes(`values (\n  ${resourceRowValues(SEED).map(sqlLiteral).join(',\n  ')}\n);`), 'the Postgres migration inserts exactly the seed values');
@@ -90,9 +119,9 @@ const india = await startApp({ engine, log: () => {}, resources: { edition: 'pri
 try {
   const store = asStore(au.db);
   const insert = async (patch, editions) => {
-    const r = variant({ editions, description: `Test row ${patch.id}.`, subtitle: null, tags: ['Test'], ...patch });
-    await store.run(`INSERT INTO resources(id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at)
-      VALUES (${Array(26).fill('?').join(',')})`, resourceRowValues(r));
+    const r = variant({ editions, description: `Test row ${patch.id}.`, subtitle: null, tags: ['Test'], sections: [], ...patch });
+    await store.run(`INSERT INTO resources(id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at)
+      VALUES (${Array(27).fill('?').join(',')})`, resourceRowValues(r));
     for (const e of editions) await store.run('INSERT INTO resource_editions(resource_id,edition) VALUES (?,?)', [r.id, e]);
   };
   await insert({ id: 'draft-notes', title: 'Draft calculus notes', type: 'notes', reviewState: 'draft', publishedAt: null }, ['prithagoras']);
@@ -132,6 +161,11 @@ try {
   const first = list.data.resources[0];
   c.deq([first.title, first.disclaimer, first.certificationState, first.url, first.course, first.type], [SEED.title, SEED.disclaimer, 'uploaded', SEED.url, 'nsw', 'paper'], 'the seeded paper is served as recorded');
   c.ok(!('editions' in first) && !('reviewState' in first) && !('review_state' in first), 'edition and review internals are not sent');
+  c.deq(first.sections, [
+    { label: 'Section I', firstQuestion: 1, lastQuestion: 10, kind: 'multiple-choice', marks: 10 },
+    { label: 'Section II', firstQuestion: 11, lastQuestion: 27, kind: 'extended-response', marks: 90 }
+  ], 'the API sends the paper\'s sections');
+  c.deq(list.data.resources.find(r => r.id === 'shared-solutions')?.sections, [], 'a resource with no sections is sent an empty list');
   c.deq(list.data.facets, { types: ['paper', 'solutions'], subjects: ['Mathematics Advanced', 'Mathematics Extension 1'], years: [2027, 2026], courses: ['nsw'] }, 'facets come from visible rows only');
 
   c.deq(ids(await get('/v1/resources?edition=priyabhata')), [SEED.id, 'shared-solutions'], 'a client ?edition= is ignored: the server decides the edition');
@@ -178,7 +212,7 @@ try {
 
   if (au.engine === 'postgres') {
     const row = await asStore(au.db).get('SELECT * FROM resources WHERE id=?', [SEED.id]);
-    const cols = ['id', 'title', 'subtitle', 'description', 'type', 'subject', 'year', 'grade', 'marks', 'duration_minutes', 'reading_minutes', 'question_count', 'tags_json', 'course', 'syllabus_version', 'certification_state', 'availability', 'url', 'source', 'attribution', 'rights_note', 'disclaimer', 'review_state', 'created_at', 'updated_at', 'published_at'];
+    const cols = ['id', 'title', 'subtitle', 'description', 'type', 'subject', 'year', 'grade', 'marks', 'duration_minutes', 'reading_minutes', 'question_count', 'sections_json', 'tags_json', 'course', 'syllabus_version', 'certification_state', 'availability', 'url', 'source', 'attribution', 'rights_note', 'disclaimer', 'review_state', 'created_at', 'updated_at', 'published_at'];
     c.deq(cols.map(k => (row[k] === null ? null : typeof resourceRowValues(SEED)[cols.indexOf(k)] === 'number' ? Number(row[k]) : row[k])), resourceRowValues(SEED), 'Postgres: the migrated seed row equals RESOURCE_SEED');
 
     const { scratchDatabase, migrationFiles } = await import('./support/postgres.mjs');

@@ -6,7 +6,8 @@
 --
 -- resources          one row per paper, solutions or notes: what it is, the
 --                    course and syllabus version it was written for, how far it
---                    has climbed ADR-0002 §7's certification states, where it is
+--                    has climbed ADR-0002 §7's certification states, its sections
+--                    (question ranges and formats, JSON; plan F4), where it is
 --                    published (availability 'external' with an https link;
 --                    'hosted' is reserved for plan F3), its source, attribution,
 --                    rights note and disclaimer, and its review state.
@@ -46,6 +47,7 @@ create table pri.resources (
   duration_minutes bigint,
   reading_minutes bigint,
   question_count bigint,
+  sections_json text not null,
   tags_json text not null,
   course text not null check (course in ('in','nsw')),
   syllabus_version text,
@@ -96,7 +98,7 @@ begin
 end $$;
 
 insert into pri.resources (id, title, subtitle, description, type, subject, year, grade, marks, duration_minutes,
-  reading_minutes, question_count, tags_json, course, syllabus_version, certification_state, availability, url,
+  reading_minutes, question_count, sections_json, tags_json, course, syllabus_version, certification_state, availability, url,
   source, attribution, rights_note, disclaimer, review_state, created_at, updated_at, published_at)
 values (
   '2027-mathematics-advanced-assessment-1',
@@ -111,6 +113,7 @@ values (
   180,
   10,
   27,
+  '[{"label":"Section I","firstQuestion":1,"lastQuestion":10,"kind":"multiple-choice","marks":10},{"label":"Section II","firstQuestion":11,"lastQuestion":27,"kind":"extended-response","marks":90}]',
   '["Practice examination","2027 HSC","100 marks"]',
   'nsw',
   null,

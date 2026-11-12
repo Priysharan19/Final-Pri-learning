@@ -77,7 +77,7 @@ export const SEEDED_TABLES = Object.freeze(['platform_meta', 'sync_cursors', 're
 const byteOrder = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const LIBRARY_SEED_ROWS = [...RESOURCE_SEED].sort((a, b) => byteOrder(a.id, b.id)).map(r => resourceRowValues(r).map(v => (v === null ? null : String(v))));
 const LIBRARY_SEED_EDITIONS = RESOURCE_SEED.flatMap(r => r.editions.map(e => [r.id, e])).sort((a, b) => byteOrder(a[0], b[0]) || byteOrder(a[1], b[1]));
-const LIBRARY_COLUMNS = 'id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at';
+const LIBRARY_COLUMNS = 'id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at';
 function assertLibraryIsSeedOnly(db, present) {
   const rows = present.has('resources')
     ? db.prepare(`SELECT ${LIBRARY_COLUMNS} FROM resources ORDER BY id`).raw().all().map(row => row.map(v => (v === null ? null : String(v))))
