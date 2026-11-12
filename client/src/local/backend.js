@@ -75,6 +75,7 @@ import {
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
 import { pendingSummary } from './examPages.js';
+import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -6161,6 +6162,12 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
       return { q: out.question, fields: { prepared: out.prepared, preparedExpiresAt: Number(out.expiresAt) || null }, trapDelivered: false, repeat: out.repeat === true };
     }
   } catch { /* no server: an offline draft */ }
+  // Requests cancelled because the page is navigating away fail exactly like a
+  // dropped connection, and WebKit lets this code run on before the page goes.
+  // A draft stored then could never be marked, though the student was online
+  // all along: when the page has said it is leaving, wait — a page that really
+  // unloads never gets here (client/src/local/pageLeaving.js).
+  await settleIfLeaving();
   const local = localDraft();
   return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
 }

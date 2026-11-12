@@ -424,6 +424,24 @@ function onlineSession(platform, ctx, page) {
   }));
 
   /**
+   * The server's sealed record of the question on screen, read at the test's
+   * desk: { serverQuestionId, accountId, generator } for a question the server
+   * issued, null for one it only prepared (or a draft). Practice resumes an
+   * unfinished question of the chapter it is asked for — the first one issued
+   * right after sign-in included, whichever of the chapter's generators that
+   * was drawn from — so a flow that needs a particular generator asks this
+   * rather than assuming a fresh question.
+   */
+  async function issuedShown() {
+    const shown = await shownRow();
+    if (!shown?.serverQuestionId) return null;
+    const sealed = platform.h.db.prepare("SELECT account_id, response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId);
+    if (!sealed) return null;
+    const q = JSON.parse(sealed.response_json);
+    return { serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), generator: typeof q._generator === 'string' ? q._generator : (q.subtopic ?? null) };
+  }
+
+  /**
    * The right answer to the question on screen, read at the test's desk from
    * the server's own sealed copy of the question it issued. Returns
    * { answerType, kind, text, index, prompt, serverQuestionId }; `kind` is
@@ -514,7 +532,7 @@ function onlineSession(platform, ctx, page) {
 
   const session = {
     platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
-    settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
+    settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, issuedShown, answerOf, disconnect, reconnect,
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId),
     /** Test desk only: the stand-in reader was re-scripted — forget this account's kept reads. */
     forgetKeptReads: () => platform.forgetKeptReads(session.account?.id),
