@@ -350,6 +350,24 @@ try {
     const unknown = await call('/billing/restore/stripe', { method: 'POST', jar, body: {} });
     check(unknown.status === 404 && unknown.code === 'BILLING_PROVIDER_UNSUPPORTED', 'Prithagoras: an unknown provider is unsupported, as everywhere');
 
+    // The guardian-consent gate is mounted in front of the billing router, so
+    // a child account awaiting consent is refused there first. Refused either
+    // way: no adapter, no provider call, no billing row.
+    {
+      const childJar = {};
+      const child = await call('/account/register', { method: 'POST', jar: childJar, body: { name: 'Edition Child', email: 'child@prithagoras.example.test', password: 'edition-pass-123', deviceId: 'device-child', isAdult: false, guardianName: 'A Parent', guardianEmail: 'parent@prithagoras.example.test' } });
+      check(child.status === 201, `a child account registers (${child.status} ${child.text})`);
+      const billingRows = async () => { const all = await au.rows(); return TABLES.filter(t => t.startsWith('billing_')).map(t => all[t]); };
+      const beforeChild = await billingRows();
+      for (const [method, path, body] of PURCHASE_ROUTES) {
+        const answer = await call(path, { method, jar: childJar, body });
+        check((answer.status === 403 && /^GUARDIAN_CONSENT/.test(answer.code || '')) || (answer.status === 404 && answer.code === REFUSED),
+          `Prithagoras: ${method} ${path} for a child awaiting consent is refused, by the consent gate or the edition gate (${answer.status} ${answer.code})`);
+      }
+      same(await billingRows(), beforeChild, 'Prithagoras: and wrote no billing row');
+      same(au.calls, { provider: 0, adapters: 0 }, 'Prithagoras: and still no adapter ran');
+    }
+
     // What an account already holds is not a purchase.
     const manage = await call('/billing/manage', { jar });
     same(manage.data, { web: { provider: null, cancellable: false, cancelling: false, status: 'none', currentPeriodEnd: null, cancelRequestedAt: null } }, 'Prithagoras: /billing/manage answers, names no provider and offers nothing to cancel');

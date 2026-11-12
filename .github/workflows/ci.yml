@@ -528,7 +528,7 @@ jobs:
           # Plan E5: billing provider per edition. Priyabhata answers as main
           # does; Prithagoras sells nothing and applies no payment event.
           node server/test/billing-edition-check.mjs | tee billing-edition.log
-          grep -Fq 'BILLING PER EDITION: PASS — 111/111 checks —' billing-edition.log
+          grep -Fq 'BILLING PER EDITION: PASS — 123/123 checks —' billing-edition.log
       - name: Assignment targeting, syllabus snapshot and class analytics
         run: |
           node server/test/india-syllabus-snapshot-check.mjs

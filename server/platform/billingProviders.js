@@ -6,10 +6,13 @@
 // Prithagoras lists none until the owner chooses an Australian provider
 // (decision O2, plan H3), so on a Prithagoras server Premium is not on sale:
 // /billing/config offers no price, product or checkout, every purchase route
-// answers 404 BILLING_NOT_AVAILABLE_IN_EDITION before it touches a session,
-// the database or an adapter, and a payment event for an unlisted provider is
-// refused however well it is signed — an Australian server never applies an
-// Indian payment.
+// answers 404 BILLING_NOT_AVAILABLE_IN_EDITION before the billing router's own
+// session check, rate limit or adapter, and a payment event for an unlisted
+// provider is refused however well it is signed — an Australian server never
+// applies an Indian payment. (The guardian-consent gate mounted in front of
+// the billing router runs first: a child account awaiting consent is refused
+// there, with the consent code. Account deletion still asks the web adapter
+// to cancel a subscription; with no way to create one it finds none.)
 //
 // What an account already holds (an administrator's grant, a trial) is not a
 // purchase and is untouched: /billing/status and /billing/manage still answer.

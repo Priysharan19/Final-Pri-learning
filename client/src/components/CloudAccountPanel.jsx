@@ -863,7 +863,7 @@ export default function CloudAccountPanel() {
           {nativeShell && googlePlay && <GooglePlayBilling user={user} canSync={canSync} premium={premium}
             onChanged={() => reload({ verify: false })} />}
 
-          {nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          {PREMIUM_ON_SALE && nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             {t('cloud.noStoreBilling')}
           </div>}
         </div>
@@ -904,7 +904,7 @@ export default function CloudAccountPanel() {
       {(() => {
         const note = nativeStoreKit && appleProducts.length
           ? t('cloud.appleAuthorityNote')
-          : pricingText(pricing, t);
+          : PREMIUM_ON_SALE ? pricingText(pricing, t) : '';
         return note ? <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>{note}</div> : null;
       })()}
 

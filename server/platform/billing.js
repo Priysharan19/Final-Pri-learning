@@ -111,10 +111,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
 
   // THE EDITION GATE (plan E5). A route family whose provider this server's
   // edition does not sell through answers 404 before anything else on the
-  // route runs: no session is read, no rate-limit row is written and no
-  // adapter is reached, so nothing can be bought, restored or cancelled
-  // there. Resolved once, when the router is built; on an edition that lists
-  // the provider it is a pass-through and the route is what it always was.
+  // route runs: this router's own session check, rate limit and adapter are
+  // never reached, so nothing can be bought, restored or cancelled there.
+  // (What is mounted in front of this router still runs first: a child
+  // account awaiting its guardian is refused there with the consent code.)
+  // Resolved once, when the router is built; on an edition that lists the
+  // provider it is a pass-through and the route is what it always was.
   const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family)])));
   const soldHere = family => (req, res, next) => (sold[family] ? next() : billingNotAvailable(res));
   // /restore/:provider and /webhook/:provider name the family in the path. An
