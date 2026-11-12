@@ -151,7 +151,9 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
     (paywall.match(/<PlanCard /g) || []).length === 2 && paywall.indexOf('<PlanCard ') > paywall.indexOf('data-paywall-plans>'));
   ok('with no store and nothing on sale the screen says so, and does not send the student to an app to buy',
     /\{!premium && !apple && !google && \(PREMIUM_ON_SALE\s*\? <p[^>]*data-paywall-in-app>\{t\('paywall\.inAppOnly'\)\}<\/p>\s*: <p[^>]*data-paywall-not-on-sale>\{t\('paywall\.notOnSale'\)\}<\/p>\s*\)\}/.test(paywall));
-  ok('the account panel offers web checkout only where Premium is on sale', panel.includes('const canUseWebBilling = PREMIUM_ON_SALE && canSync && webCheckout && !nativeShell;'));
+  ok('the account panel offers web checkout only where Premium is on sale: the one place that turns it on asks the build first',
+    (panel.match(/setWebCheckout\(/g) || []).length === 3 && panel.includes("setWebCheckout(PREMIUM_ON_SALE && result?.webCheckout?.configured === true);") &&
+    (panel.match(/setWebCheckout\(false\)/g) || []).length === 2 && panel.includes('const canUseWebBilling = canSync && webCheckout && !nativeShell;'));
   ok('and says Premium is not on sale where it is not', /\{!PREMIUM_ON_SALE && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
   ok('every web price and checkout button in the panel is behind that', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 2 &&
     panel.indexOf('{canUseWebBilling && <div') < panel.indexOf('price(pricing.monthly') && (panel.match(/startWebCheckout\('/g) || []).length === 2 && /async function startWebCheckout\(cadence\) \{\s*if \(!canUseWebBilling\) return;/.test(panel));

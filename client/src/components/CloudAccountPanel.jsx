@@ -124,7 +124,7 @@ export default function CloudAccountPanel() {
       .catch(() => { if (live) setGuardian(null); });
     return () => { live = false; };
   }, [enabled, link?.accountId]);
-  const canUseWebBilling = PREMIUM_ON_SALE && canSync && webCheckout && !nativeShell;
+  const canUseWebBilling = canSync && webCheckout && !nativeShell;
   const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
   const liveAccount = session?.connected ? session.account : null;
   const appleMonthly = appleProducts.find(product => product.id === appleBootstrap?.products?.monthly) || null;
@@ -187,7 +187,8 @@ export default function CloudAccountPanel() {
       .then(result => {
         if (!live) return;
         setPricing(normalizeCommercialDisplay(result?.display));
-        setWebCheckout(result?.webCheckout?.configured === true);
+        // Never where the build's edition has nothing to sell (plan E5).
+        setWebCheckout(PREMIUM_ON_SALE && result?.webCheckout?.configured === true);
       })
       .catch(() => {
         if (!live) return;
