@@ -138,8 +138,10 @@ try {
     JSON.stringify(settingsButtons.filter(label => purchaseLabels.includes(label))));
 
   // ── what the server told the page, and what it does to a checkout anyway ──
+  await page.evaluate(() => fetch('/v1/billing/config', { credentials: 'include' }).then(response => response.text()));
+  await page.waitForTimeout(300);
   const configs = billing.filter(entry => entry.path === '/v1/billing/config');
-  check('the server told the page nothing is available, in AUD, with no product',
+  check('asked, the server tells the page nothing is available, in AUD, with no product',
     configs.length >= 1 && configs.every(entry => { const c = JSON.parse(entry.body); return c.available === false && c.display.currency === 'AUD' && c.display.monthly === null && Object.values(c.products).every(v => v === null) && c.webCheckout.provider === null; }),
     JSON.stringify(configs.map(entry => entry.body.slice(0, 120))));
   check('the page asked the server for no purchase, bootstrap, restore or checkout',

@@ -178,7 +178,9 @@ export default function CloudAccountPanel() {
 
   useEffect(() => {
     let live = true;
-    if (!enabled) {
+    // Where the build's edition has nothing to sell (plan E5) there is no
+    // price or checkout to ask the server about.
+    if (!enabled || !PREMIUM_ON_SALE) {
       setPricing(null);
       setWebCheckout(false);
       return () => { live = false; };
@@ -187,8 +189,7 @@ export default function CloudAccountPanel() {
       .then(result => {
         if (!live) return;
         setPricing(normalizeCommercialDisplay(result?.display));
-        // Never where the build's edition has nothing to sell (plan E5).
-        setWebCheckout(PREMIUM_ON_SALE && result?.webCheckout?.configured === true);
+        setWebCheckout(result?.webCheckout?.configured === true);
       })
       .catch(() => {
         if (!live) return;
