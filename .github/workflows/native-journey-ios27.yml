@@ -152,6 +152,7 @@ jobs:
       # is three to seven minutes on this image; switching families twice put
       # the lane past its 60-minute limit on 2026-11-09/10).
       - name: iPad journey (simulator, iOS 27)
+        timeout-minutes: 40
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad-ios27.json
 
       - name: Apple shipping target is iPhone + iPad (V1)
@@ -161,6 +162,7 @@ jobs:
         run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
 
       - name: iPhone certification journey (simulator, iOS 27)
+        timeout-minutes: 40
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone-ios27.json
 
       - name: The evidence names the pinned runtime

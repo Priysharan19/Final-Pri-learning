@@ -314,6 +314,13 @@ let textSizeRaised = false;
   wd.unref();
   process.on('SIGTERM', () => abortJourney(`terminated after ${Math.round((Date.now() - JOURNEY_T0) / 1000)} s (watchdog or step limit)`));
 }
+// Any non-zero exit (a failed step, an abort, an uncaught throw) names the
+// machine's busiest processes and its load, so a red run on a starved runner
+// says what was burning the CPU.
+process.on('exit', code => {
+  if (!code) return;
+  try { console.log(`\n  --- load and busiest processes at exit ---\n${execFileSync('/bin/sh', ['-c', 'uptime; ps -Ao pcpu,pmem,etime,comm -r | head -15'], { encoding: 'utf8', timeout: 20_000 })}`); } catch { /* best effort */ }
+});
 const trackServer = pid => { if (!pid) return; liveServerPids.add(pid); try { writeFileSync(serverPidFile, `${[...liveServerPids].join('\n')}\n`); } catch { /* the in-process set still covers abortJourney */ } };
 // Every early stop cleans up as the normal path's finally blocks do: local
 // servers stopped, the text size reset. CI evidence for a stopped run is the

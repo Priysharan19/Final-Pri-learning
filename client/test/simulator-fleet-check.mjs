@@ -331,6 +331,8 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
     'an early stop kills the local servers, resets the text size, prints FAIL and exits non-zero');
   ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j),
     'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open');
+  ok(/process\.on\('exit', code => \{\n  if \(!code\) return;/.test(j) && j.includes("uptime; ps -Ao pcpu,pmem,etime,comm -r | head -15"), 'any failing exit prints the load and the busiest processes');
+  ok([...src('.github/workflows/native-journey-ios27.yml').matchAll(/journey \(simulator, iOS 27\)\n\s+timeout-minutes: 40\n/g)].length === 2, 'the iOS 27 journey steps have the same 40-minute step limit');
   ok(/end=\$\(\( \$\(date \+%s\) \+/.test(j) && /\$\(date \+%s\) -ge \$end/.test(j), 'the watchdog reads the wall clock, not a count of sleeps');
   ok(/timeout: 300_000, killSignal: 'SIGKILL', \.\.\.opts/.test(j), 'every simctl call the journey makes is bounded and killed when it overruns');
   ok(/function startFixture/.test(j) && /last 40 lines/.test(j) && !/execFileSync\(process\.execPath, \[join\(HERE, 'cloud-fixture-server/.test(j),
