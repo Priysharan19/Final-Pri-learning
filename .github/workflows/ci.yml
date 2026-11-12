@@ -1304,12 +1304,12 @@ jobs:
           grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
           # The Exam Desk (plan F4b), in Chromium and in WebKit: dark without
           # its flag (5 checks), then a sitting, the import and the Hindi desk
-          # (120 more; the tour prints the running total, 125 across 4 flows).
+          # (121 more; the tour prints the running total, 126 across 4 flows).
           grep -Fq 'Exam desk · dark without PRI_FEATURE_EXAM_DESK: no way in from a library paper, no /desk route' browser.log
           grep -Fq 'Exam desk · a sitting: reading, working, notes, reload, stale revision, device clock, hidden, offline, time up while away, closed once — never a mark' browser.log
           grep -Fq 'Exam desk · import from the Prithagoras website: nothing stored without the press; the same file twice is one record; tampered and other-edition files refused' browser.log
           grep -Fq 'Exam desk · in Hindi: reading time ends while away; the closed desk says it is unmarked and carries no mark wording' browser.log
-          test "$(grep -Fc 'E2E SUITE PASSED — 125/125 checks across 4 flows' browser.log)" -ge 2
+          test "$(grep -Fc 'E2E SUITE PASSED — 126/126 checks across 4 flows' browser.log)" -ge 2
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*65/65.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
