@@ -85,11 +85,11 @@ const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').r
  */
 export function brandIndexHtml(html, id) {
   const e = editionOf(id);
-  const hi = e.languages.includes('hi') ? e.identity.brandHi : null;
+  const hi = e.languages.includes('hi') && e.identity.brandHi ? escapeHtml(e.identity.brandHi) : null;
   const values = {
     PRI_EDITION: e.id,
     PRI_BRAND: escapeHtml(e.brand),
-    PRI_BRAND_HI: escapeHtml(hi || e.brand),
+    PRI_BRAND_HI: hi || escapeHtml(e.brand),
     PRI_DESCRIPTION: escapeHtml(e.identity.description),
     PRI_ACCENT: e.identity.accent.light,
     PRI_EDITION_TOKENS: editionTokensCss(id),

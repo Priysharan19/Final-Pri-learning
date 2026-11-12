@@ -83,6 +83,35 @@ for (const key of ['app.logoHome', 'verdict.reloadApp', 'login.welcomeTitle', 'b
   ok(en[key]?.includes('{brand}') && hi[key]?.includes('{brand}'), `${key} names the app as {brand} in English and Hindi`);
 }
 
+// Every real lookup path — t()/translate, useTx() and tLater() — fills {brand}
+// and {company} with no vars passed, in English and Hindi. (Review of #869:
+// useTx/tLater once left them standing; this renders through React to prove it.)
+{
+  const React = (await import('react')).default;
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const i18n = await import('../src/i18n/index.js');
+  const branded = Object.keys(en).filter(k => forms(en[k]).some(t => /\{(brand|company)\}/.test(t)));
+  ok(branded.length > 60, `the brand keys were found (${branded.length})`);
+  const unescape = s => s.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  for (const language of ['en', 'hi']) {
+    await i18n.setLanguage(language);
+    const expected = language === 'hi' ? 'प्रियभट' : 'Priyabhata';
+    for (const key of branded) {
+      const v = { count: 2, n: 2 };
+      const viaT = String(i18n.translate(key, v));
+      const viaTx = unescape(renderToStaticMarkup(React.createElement(function Tx() { return i18n.useTx()(key, v); })));
+      const viaLater = unescape(renderToStaticMarkup(i18n.tLater(key, v)));
+      for (const [path, text] of [['t', viaT], ['useTx', viaTx], ['tLater', viaLater]]) {
+        if (/\{(brand|company)\}/.test(text)) failures.push(`${language} ${key} via ${path} leaves {brand}/{company} standing: ${JSON.stringify(text.slice(0, 100))}`);
+        else pass++;
+      }
+      const usesBrand = forms((language === 'hi' ? hi : en)[key]).some(t => t.includes('{brand}'));
+      if (usesBrand) ok(viaTx.includes(expected) && viaLater.includes(expected), `${language} ${key} names ${expected} through useTx and tLater`);
+    }
+  }
+  await i18n.setLanguage('en');
+}
+
 // The real lookup fills {brand} and {company} with no vars passed.
 {
   const i18n = await import('../src/i18n/index.js');

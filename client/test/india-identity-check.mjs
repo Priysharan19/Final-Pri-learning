@@ -249,7 +249,7 @@ async function run() {
     ok('the manifest describes the Indian product', /NCERT/.test(manifest.description) && /JEE/.test(manifest.description) && !/HSC|iPad/i.test(manifest.description),
       `manifest description reads ${show(manifest.description)}`);
     eq('the manifest is in Indian English', manifest.lang, 'en-IN');
-    ok('the manifest theme matches the page', manifest.theme_color === manifest.background_color && readFileSync(`${CLIENT}public/theme-boot.js`, 'utf8').includes(manifest.theme_color),
+    ok('the manifest theme matches the page', manifest.theme_color === manifest.background_color && html.includes(`content="${manifest.theme_color}"`),
       `theme ${manifest.theme_color}, background ${manifest.background_color}`);
 
     const login = readFileSync(`${CLIENT}src/pages/Login.jsx`, 'utf8');

@@ -103,7 +103,7 @@
     var r = doc.documentElement;
     return (lang === 'hi' && r.getAttribute('data-brand-hi')) || r.getAttribute('data-brand') || '';
   }
-  function words(text, lang) { return text.replace('{brand}', brandIn(lang)); }
+  function words(text, lang) { return text.replace('{brand}', function () { return brandIn(lang); }); }
 
   // The language chosen on the sign-in screen is the only one readable before
   // the app runs (a profile's own language is in its database record).
