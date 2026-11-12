@@ -682,11 +682,12 @@ export const preparedTaken = {
   online: true,
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
-    await goto('/');
-    await createProfile({ name: 'Late Binder', year: 7 });
-    const account = await online.signIn({ name: 'Late Binder' });
     // While armed, a fresh issue (no prepared token) fails at the route, so
     // serveQuestion falls back to a prepared question for this signed-in student.
+    // Armed before the app opens: the home page can ask for a question as soon
+    // as the student is signed in, and the practice page resumes that one
+    // rather than asking again — so a route installed later can miss the only
+    // issue call there is.
     let armed = true;
     let refusedIssues = 0;
     const issueRoute = url => url.origin === online.origin && url.pathname === '/v1/practice/issue';
@@ -696,6 +697,9 @@ export const preparedTaken = {
       return route.continue();
     };
     await ctx.route(issueRoute, handler);
+    await goto('/');
+    await createProfile({ name: 'Late Binder', year: 7 });
+    const account = await online.signIn({ name: 'Late Binder' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     const found = await findTyped(page, settle);
