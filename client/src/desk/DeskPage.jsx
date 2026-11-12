@@ -38,7 +38,8 @@ import { saveStateKey, useAutosave } from '../examShell/useAutosave.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import { useAnnounce } from '../examShell/useAnnounce.js';
 import { deskApi, isAttemptId, newKey, unreachable } from './deskApi.js';
-import { dropCache, dropOtherAccounts, linkedAccount, readCache, sweepCache, writeCache } from './deskCache.js';
+import { dropCache, dropOtherAccounts, linkedAccount, openDeskCache, readCache, sweepCache, writeCache } from './deskCache.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { changesOf, confirmQuestions, editQuestion, entryOf, fromCache, groupsOf, nextFlagged, overlay, projectEvents, sectionOf, settleSave, timeLedger } from './deskState.js';
 import '../examShell/examShell.css';
 import './desk.css';
@@ -147,6 +148,9 @@ function Desk({ attemptId }) {
   const adopt = useCallback((reply, extra = {}) => {
     if (reply?.attempt?.id !== attemptId) return live.current;
     const s = live.current;
+    // A reply older than what a later reply already brought (a slow first read
+    // overtaken by a save) is not put back on screen.
+    if (s.synced && s.attempt && Number(reply.attempt.rev) < Number(s.attempt.rev)) return s;
     const pending = extra.pending ?? s.pending ?? {};
     if (away.current === 'returning') away.current = 'back';
     return commit({
@@ -208,14 +212,18 @@ function Desk({ attemptId }) {
       while (live.current.intents.length) { await sendPress(live.current.intents[0]); talked = true; }
       const sent = changesOf(live.current.pending);
       if (Object.keys(sent).length) {
+        const revBefore = live.current.attempt.rev;
         const reply = await deskApi.questions(attemptId, sent);
         const s = live.current;
         const settled = settleSave(s.questions, s.pending, sent, reply);
         // The confirmed entries are the server's now: they go into the kept
         // copy of the attempt too, so a reload with no connection still has them.
-        commit({ ...settled, synced: true, problem: null, offset: Number(reply.now) - tick(),
+        commit({ ...settled, synced: true, checking: false, problem: null, offset: Number(reply.now) - tick(),
           attempt: { ...s.attempt, rev: reply.rev, questions: confirmQuestions(s.attempt.questions, reply.questions) } });
         talked = true;
+        // The revision moved by more than this save: something else changed
+        // the attempt (a clock press on another device). Read it.
+        if (reply.rev !== revBefore + 1) adopt(await deskApi.read(attemptId));
       }
       // Nothing to send: on a heartbeat, a return or a reconnect, read the
       // attempt again — that is how the page re-learns the server's time.
@@ -224,7 +232,7 @@ function Desk({ attemptId }) {
       return undefined;
     } catch (err) {
       // Deleted on another device: there is nothing left to save to.
-      if (err?.code === 'DESK_ATTEMPT_NOT_FOUND') commit({ status: 'error', code: err.code, attempt: null }, { persist: false });
+      if (err?.code === 'DESK_ATTEMPT_NOT_FOUND') { if (live.current.accountId) void dropCache(live.current.accountId, attemptId); commit({ status: 'error', code: err.code, attempt: null }, { persist: false }); }
       else commit({ synced: false, problem: unreachable(err) ? 'offline' : err?.status === 401 ? 'signed-out' : 'failed' }, { persist: false });
       throw err;
     }
@@ -234,7 +242,13 @@ function Desk({ attemptId }) {
   const { state: saveState, schedule, flush } = useAutosave({ send: sync, enabled: ready });
   // Leaving the page (another screen of the app, another attempt): what is
   // unsent goes now, not after a debounce that will never fire.
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  // Signed out of the account on this device while the desk is open (here or
+  // in another tab): the device cache has been forgotten, so the page stops
+  // and says to sign in, rather than claiming anything is kept.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected === false) { live.current = { ...live.current, attempt: null }; commit({ status: 'error', code: 'AUTH_REQUIRED', attempt: null }, { persist: false }); }
+  }), [commit]);
 
   // While the server cannot be reached, try again every few seconds: unsent
   // notes and clock presses go as soon as it can, without waiting for the
@@ -265,7 +279,8 @@ function Desk({ attemptId }) {
         online = false;
         accountId = await linkedAccount();
       }
-      const kept = accountId ? await readCache(accountId, attemptId) : null;
+      openDeskCache();
+      const kept = accountId ? await readCache(accountId, attemptId).catch(() => null) : null;
       if (!alive) return;
       if (kept) {
         commit({
@@ -324,7 +339,8 @@ function Desk({ attemptId }) {
   const questions = view.questions || {};
   const groups = useMemo(() => (paper ? groupsOf(paper, kind => (Object.hasOwn(KIND_KEYS, kind) ? t(KIND_KEYS[kind]) : ''), t('shell.questions')) : []), [paper, t]);
   const finished = clock?.phase === 'finished';
-  const estimate = ready && (view.intents?.length > 0) && view.synced === false;
+  // Until the server has been heard from, the face is this device's projection, and says so.
+  const estimate = ready && view.synced === false && !view.checking && attempt?.state !== 'finished';
 
   // Phase changes are said once, politely: reading time ending, five minutes
   // of working time left, working time ending (the paper stays open).
@@ -401,6 +417,8 @@ function Desk({ attemptId }) {
     setBusy(true);
     try {
       await deskApi.remove(attemptId);
+      // Nothing of a deleted attempt is kept or written back.
+      live.current = { ...live.current, attempt: null, pending: {}, intents: [] };
       if (view.accountId) await dropCache(view.accountId, attemptId);
       navigate(`/library/${attempt.resource.id}`);
     } catch (err) {
@@ -463,7 +481,7 @@ function Desk({ attemptId }) {
 
       <p className="dk-status" data-desk-status>
         {saveKey && <span data-save-state={view.problem || saveState}>{t(saveKey)}</span>}
-        {estimate && <span data-desk-estimate-note>{t('desk.estimateNote')}</span>}
+        {estimate && view.intents?.length > 0 && <span data-desk-estimate-note>{t('desk.estimateNote')}</span>}
         {over && <span data-desk-over>{t('desk.overLine', { count: minutesOf(clock.overtimeMs), n: minutesOf(clock.overtimeMs) })}</span>}
         {clock.phase === 'ready' && <span data-desk-ready>{t('desk.readyLine')}</span>}
       </p>

@@ -33,7 +33,7 @@ export function Sheet({ open, title, onClose, closeLabel, children, actions = nu
     const items = [...(ref.current?.querySelectorAll(FOCUSABLE) || [])];
     if (!items.length) return;
     const first = items[0], last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === ref.current)) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   };
   return (

@@ -402,7 +402,7 @@ jobs:
           # The exam shell and the Exam Desk as drawn (plan F4b): navigator labels,
           # shortcuts inert while typing, a clock face that computes nothing,
           # autosave order, the save merge, no mark wording in either language.
-          grep -Fq 'DESK UI: PASS — 184/184 checks' suites.log
+          grep -Fq 'DESK UI: PASS — 186/186 checks' suites.log
           grep -Fq 'DESK CLOCK: PASS — 30/30 checks' suites.log
           grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
           # Plan E2: the app knows its own edition from its build, declares it on

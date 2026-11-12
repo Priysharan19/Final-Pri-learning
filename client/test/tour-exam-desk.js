@@ -438,9 +438,23 @@ export const flowSitting = {
     await check('LEFT WITHIN THE DEBOUNCE: the note typed a moment before going back to the paper reached the server', questionsOf(rowOf(platform, id))['8']?.note === 'typed, then straight back to the paper');
     await page.locator('[data-desk-continue]').waitFor({ timeout: 20000 });
     await check('the library paper now offers "Continue your attempt", not a second start', await page.locator('[data-desk-start]').count() === 0);
+    // The cache was forgotten (a sign-out elsewhere in this page's lifetime): the next desk opened keeps again.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('pri:cloud-session-change', { detail: { connected: false, relayOnly: true } })));
+    for (let i = 0; i < 40 && (await cacheRows(page)).length; i++) await page.waitForTimeout(50);
+    const forgotten = (await cacheRows(page)).length === 0;
+    await page.goto(`${base}/library/${PAPER}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-desk-continue]').waitFor({ timeout: 30000 });
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('pri:cloud-session-change', { detail: { connected: false } })));
+    await page.waitForTimeout(400);
     await page.locator('[data-desk-continue]').click();
     await phaseIs(page, 'working', true);
     await page.locator('.xs-nav button[data-q="8"]').click();
+    await page.locator('[data-desk-done]').click();
+    await savedIs(page);
+    for (let i = 0; i < 40 && !(await cacheRows(page)).length; i++) await page.waitForTimeout(50);
+    await check('FORGOTTEN, THEN KEPT AGAIN: a sign-out signal empties the desk\'s device cache, and a desk opened afterwards in the same page keeps its record again',
+      forgotten && (await cacheRows(page)).some(r => r.attemptId === id && r.accountId === account.id));
+    await page.locator('[data-desk-done]').click();
     await page.locator('textarea[data-notes-for="8"]').fill('');
     await savedIs(page);
 

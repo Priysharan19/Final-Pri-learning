@@ -211,6 +211,12 @@ try {
     leaver.schedule(); leaver.stop({ leave: true }); leaver.flush(); leaver.schedule();
     await leaver.settled();
     eq(leaving, [{ urgent: true, reason: 'leave' }], 'leaving the page sends what is outstanding now (the debounce would never fire), and nothing after');
+    // Torn down and set up again without being left (React's development double-mount): saving resumes.
+    const again = [];
+    const remount = autosave.createAutosave({ debounceMs: 600, setTimer: () => 1, clearTimer() {}, send: async o => { again.push(o.reason); } });
+    remount.stop(); remount.start(); await remount.flush(false, 'after'); await remount.settled();
+    eq(again, ['after'], 'a saver stopped by a teardown saves again once the page is set up again');
+    ok(/saver\.start\(\); return \(\) => saver\.stop/.test(code('src/examShell/useAutosave.js')) && /mounted\.current = true; return \(\) => \{ mounted\.current = false; \}/.test(code('src/desk/DeskPage.jsx')), 'the hook and the page re-arm on every setup, so the development double-mount leaves a working desk');
     eq([autosave.saveStateKey('saving'), autosave.saveStateKey('saved'), autosave.saveStateKey('unsaved'), autosave.saveStateKey('idle')], ['shell.saving', 'shell.saved', 'shell.unsaved', null], 'the status line\'s three sentences');
     const hook = code('src/examShell/useAutosave.js');
     ok(/visibilitychange/.test(hook) && /pagehide/.test(hook) && /'online'/.test(hook) && /setInterval/.test(hook), 'the hook saves when the page hides, returns, reconnects, and on a heartbeat');

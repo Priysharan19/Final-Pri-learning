@@ -31,6 +31,7 @@
 // connection) the desk still works online, it just cannot paint from cache.
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, hasDataKey, openField, sealField } from '../local/idb.js';
+import { INTENTS } from '../engine/deskClock.js';
 
 export const DESK_DB = 'pri-desk-v1';
 const STORE = 'attempts';
@@ -45,12 +46,14 @@ export const cacheKey = (accountId, attemptId) => `desk:v1:${accountId}:${attemp
 /** The device profile in use (the pointer the local store keeps), or null. Read only. */
 const profileId = () => { try { return globalThis.localStorage?.getItem('pri-current-profile') || null; } catch { return null; } };
 
+/** The desk is open again under an established account: keeping resumes after a sign-out forgot it. */
+export function openDeskCache() { forgotten = false; }
+
 /**
  * The account this device profile is linked to, read from the device's own
  * link row — who the desk belongs to when the server cannot be asked.
  */
 export async function linkedAccount() {
-  forgotten = false;
   const pid = profileId();
   if (!pid) return null;
   const row = await get('device', `${LINK_PREFIX}${pid}`).catch(() => null);
@@ -98,7 +101,13 @@ export async function readCache(accountId, attemptId) {
   const row = await run('readonly', s => s.get(cacheKey(accountId, attemptId)), null);
   if (!row || row.accountId !== String(accountId) || row.attemptId !== attemptId) return null;
   const body = await unpack(row);
-  return body?.attempt?.id === attemptId ? { accountId: row.accountId, attemptId, at: row.at, ...body } : null;
+  // Only a record of the shape this build keeps is used; anything else reads as no cache.
+  const a = body?.attempt;
+  const whole = a?.id === attemptId && a.mode === 'unmarked' && Number.isInteger(a.paper?.questionCount) && Array.isArray(a.events) && Number.isSafeInteger(a.rev)
+    && (a.state !== 'finished' || (a.clock && a.clock.phase === 'finished'));
+  if (!whole) return null;
+  const intents = (Array.isArray(body.intents) ? body.intents : []).filter(p => INTENTS.includes(p?.intent) && Number.isFinite(p.at)).map(p => ({ intent: p.intent, early: p.early === true, at: p.at }));
+  return { accountId: row.accountId, attemptId, at: row.at, attempt: a, serverNow: body.serverNow, pending: body.pending && typeof body.pending === 'object' ? body.pending : {}, intents };
 }
 
 /** Keep what the server last said and what it has not been told yet. */

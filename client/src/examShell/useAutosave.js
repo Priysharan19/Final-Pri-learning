@@ -60,7 +60,9 @@ export function createAutosave({ send, onState = () => {}, debounceMs = SAVE_DEB
   };
   // Stopping (the page is being left): what is outstanding is sent now, once.
   const stop = ({ leave = false } = {}) => { if (leave && !stopped) flush(true, 'leave'); stopped = true; cancel(); };
-  return { schedule, flush, stop, settled: () => chain.catch(() => {}) };
+  // A page can be torn down and set up again without being left (React's development double-mount): saving resumes.
+  const start = () => { stopped = false; };
+  return { schedule, flush, stop, start, settled: () => chain.catch(() => {}) };
 }
 
 export function useAutosave({ send, debounceMs = SAVE_DEBOUNCE_MS, heartbeatMs = HEARTBEAT_MS, enabled = true }) {
@@ -71,7 +73,7 @@ export function useAutosave({ send, debounceMs = SAVE_DEBOUNCE_MS, heartbeatMs =
   // Leaving the page inside the app (no pagehide fires): save now.
   const started = useRef(false);
   started.current = enabled;
-  useEffect(() => () => saver.stop({ leave: started.current }), [saver]);
+  useEffect(() => { saver.start(); return () => saver.stop({ leave: started.current }); }, [saver]);
   useEffect(() => {
     if (!enabled) return undefined;
     const onVisibility = () => { if (document.visibilityState === 'hidden') saver.flush(true, 'hidden'); else saver.flush(false, 'visible'); };
