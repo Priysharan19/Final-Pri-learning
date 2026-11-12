@@ -6,6 +6,8 @@
 - **Does not reopen:** the frozen V1 India release scope (`docs/release/PRI_V1_RELEASE_SCOPE.md`, decision D2 "V1 is India-only").
   Australia enters through the phases below, after V1, as reviewed changes.
 - **Migration plan:** [`docs/architecture/regional-editions-plan.md`](regional-editions-plan.md).
+- **Evidence baseline:** [`docs/architecture/regional-feature-evidence.md`](regional-feature-evidence.md).
+- **Inputs:** management direction (2026-11-13) and the management research paper *Pri Learning Global — Architecture and Launch Strategy* (same date). Its external findings are recorded below as inputs to verify, not as legal or curriculum sign-off.
 
 ## Context
 
@@ -83,19 +85,50 @@ student data off the device.
    marking before it is certified. Australian rubrics (HSC-style marking guidelines) are certified separately from
    CBSE rubrics; a CBSE certification never implies an Australian one.
 
-7. **A paper is auto-markable only by question identity.** An uploaded paper (e.g. a PDF) is a *resource*. A question
-   becomes server-markable only when it has an approved question identity, a verified answer specification and a
-   marking rubric in the content system. Until then it can be practised in the Exam Desk mode (timed, unmarked,
-   work kept for the student) but receives no mark.
+7. **A paper is auto-markable only by question identity, and climbs explicit certification states.** Every paper and
+   question carries one state, and the product offers only what that state allows:
+   1. *uploaded document* — browsable and downloadable; never graded;
+   2. *structured question data* — question text, diagrams, parts, marks, syllabus outcomes;
+   3. *mathematically verified* — validated answers, accepted alternative methods, rubric, independent examiner review;
+   4. *issued server examination* — issued question ids, answer-blind transcription, server-authoritative marking;
+   5. *certified digital examination* — only the certified marking capabilities are enabled or advertised.
+   A question specification names its **jurisdiction and syllabus version** (for example *NSW Mathematics Advanced
+   11–12 (2024)*), the outcome assessed, the validated answers and alternatives, the marking scheme and its certification
+   status. Management research reports that the 2027 HSC is the first to examine the 2024 Mathematics Advanced syllabus.
+   Plan G1 confirms this against NESA's own publications. Either way, the NSW generators already in the repository
+   (mapped to pre-2024 codes) are not reused for Prithagoras without that versioned mapping.
 
-8. **One examination system.** Prithagoras's Exam Desk is not added as a competing exam system. Its timing model and
-   workspace become an *unmarked mode* of the server examination room (`/v1/exams`) for resources without approved
-   question identity; papers built from approved questions use the existing sealed, server-marked path.
+8. **One examination system, two modes.** Prithagoras's Exam Desk is not added as a competing exam system. *Unmarked
+   practice mode*: read the paper, time yourself, flag questions, keep notes; no graded outcome is implied. *Authenticated
+   assessment mode*: the server issues the paper, owns its deadline and the responses, and decides which marks may be
+   awarded. The two share navigation, accessible controls, autosave and resource presentation, but only the
+   authenticated mode can award marks. A local timer can never extend or override a server deadline. Students' existing
+   Prithagoras browser notes and flags move across only through an explicit, tested import, never silently.
 
-9. **Regional data isolation.** Each edition's accounts and learning records live in that edition's region and
-   deployment. Australian student data is not stored in the Mumbai project, and Indian student data is not stored in
-   an Australian one. There is no cross-region account linking until a separate decision says how. Provisioning an
-   Australian region (database, hosting, email, payment provider) is an owner action (`BLOCKED_EXTERNAL` until done).
+9. **Shared code, regionally isolated deployments (silo model).** Each edition runs its own deployment: accounts,
+   database, storage, secrets, payment account and AI usage budget. Australian student data is not stored in the Mumbai
+   project, and Indian student data is not stored in an Australian one. There is no cross-region account linking until a
+   separate decision says how. Inside each region, the authorization rules of `AGENTS.md` still apply in full: server
+   authorization on every client-reachable record, with RLS as defence in depth, and identity always taken from
+   server-verified context, never from a client-supplied edition or tenant value. Provisioning the Australian region
+   is an owner action (`BLOCKED_EXTERNAL` until done).
+
+   | Deployment model | Main problem | Decision |
+   | --- | --- | --- |
+   | Two independent applications | Duplicate marking, OCR, tests and security maintenance | Rejected |
+   | One application, one worldwide database | Larger security and migration blast radius; harder regional compliance | Not initially |
+   | Shared backend, two unrelated frontends | Exam and learning UX diverge; double the regression work | Transitional only |
+   | **One codebase, two regional deployments** | Extra deployment, operations and test cost | **Chosen** |
+
+10. **No in-country AI processing claims without proof.** Regional *storage* with a model provider is not regional
+    *processing*. Neither edition may say student handwriting or work "stays in India" or "stays in Australia" unless
+    that exact processing path is verified contractually and technically. Each region carries its own per-account and
+    regional AI usage limits, with safe degradation when a limit is reached.
+
+11. **Protect V1 first (two workstreams).** Workstream A finishes the Indian V1 release under its frozen scope.
+    Workstream B builds the shared platform on reviewed branches that leave the V1 release path unchanged in behaviour
+    (E1, for example, keeps the Priyabhata bundle byte-identical). If B ever needs to change V1 behaviour, that change is
+    a V1 scope decision for the owner, not something B decides for itself.
 
 ## Consequences
 
@@ -111,6 +144,17 @@ student data off the device.
 - The Australian content gap is real: the NSW curriculum model exists, but approved Australian question banks,
   notes, worked examples, rubrics and exam papers at the depth of the India content do not. Phase 3 is content- and
   certification-heavy, not just code.
+
+## Regulatory inputs to verify (not legal sign-off)
+
+From the management research paper. Each one must be confirmed by jurisdiction-specific counsel before H4:
+
+- **India, DPDP Act:** a child is under 18. The DPDP Rules 2025 phase in obligations, including verifiable guardian
+  consent for children's data. Priyabhata needs versioned guardian consent, deletion and export, and disclosure of
+  international AI processing.
+- **Australia, OAIC:** the Children's Online Privacy Code is expected to be registered by 10 December 2026. Its
+  commencement and applicability must be checked before any authenticated Australian child account exists. APP 8
+  governs disclosure of personal information overseas, which includes AI providers.
 
 ## Non-goals
 

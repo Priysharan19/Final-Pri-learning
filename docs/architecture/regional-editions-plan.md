@@ -31,7 +31,7 @@ with the server, not `localStorage`, holding account data.
 | F1 | **Resource library.** A content-system resource type (paper, solutions, notes) with schema migrated from `prithagoras-web/resources.json` (`schemaVersion`, type, subject, year, marks, duration, questions, sections, availability, source, disclaimer). Searchable, filterable, edition- and course-scoped. | Rights/attribution and academic review fields are required, as in the studio. | R3 (migration ⇒ R4) |
 | F2 | **Bookmarks and command search** across resources and pages, server-stored per account. | Port behaviour, not markup; Instrument UI only. | R2 |
 | F3 | **Publishing.** Staff/editor publishing in the existing staff operations surface (MFA-gated), replacing "generate JSON and commit": validation, PDF upload to edition-region storage, review state, version history. | Never asks for a GitHub token. | R4 |
-| F4 | **Exam Desk as an unmarked mode of `/v1/exams`.** Port `session-core.mjs` semantics (reading vs working timers on deadlines, explicit start, pause/resume, ready-to-work stop, reset confirmation, flag/done, notes) into the examination room for resources *without* approved question identity. Work is saved to the account; no mark is produced or implied. | Reconciles, not duplicates, the exam system (ADR-0002 §8). Port the session-core tests. | R3 |
+| F4 | **Exam Desk as the unmarked mode of `/v1/exams`.** A local timer never overrides a server deadline; existing Prithagoras browser notes and flags arrive only through an explicit, tested import. Port `session-core.mjs` semantics (reading vs working timers on deadlines, explicit start, pause/resume, ready-to-work stop, reset confirmation, flag/done, notes) into the examination room for resources *without* approved question identity. Work is saved to the account; no mark is produced or implied. | Reconciles, not duplicates, the exam system (ADR-0002 §8). Port the session-core tests. | R3 |
 | F5 | **Exports.** Attempt and progress export (JSON now, PDF later), clearly labelled as not a grading result for unmarked attempts. | | R2 |
 | F6 | **Public site.** `prithagoras-web` links into the app for sign-in; its catalogue is fed from the platform's public resource endpoint instead of a hand-committed file. | Change in the other repository. | R1–R2 |
 
@@ -43,7 +43,7 @@ marks on approved NSW questions, with certification recorded per capability.
 | ID | Mission | Notes | Risk |
 | --- | --- | --- | --- |
 | G1 | **Research gate first.** Read `docs/research/README.md` and the curriculum-authority research; write the NSW counterpart of `CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md` (NESA syllabus authority, outcome codes, marking-guideline conventions, transportability limits of India-derived evidence). | No efficacy or threshold carried across populations without its limits. | R1 |
-| G2 | **NSW curriculum to current syllabus.** Reconcile `client/src/engine/curriculum.js` against the current NSW Mathematics K–10 and Stage 6 syllabuses with provenance per outcome; mark generator availability honestly (`curriculumAvailability.js`). | | R3 |
+| G2 | **NSW curriculum, versioned.** Model jurisdiction + syllabus version (e.g. *NSW Mathematics Advanced 11–12 (2024)*, first examined at the 2027 HSC) and map outcomes with provenance. The existing generators are mapped to pre-2024 codes and are reused only through that mapping; mark generator availability honestly (`curriculumAvailability.js`). | | R3 |
 | G3 | **Australian question banks and notes.** Generators, worked examples and notes per dot point, each with approved question identity and answer specification. | Content work; no syllabus-complete claims. | R3 |
 | G4 | **HSC-style papers from approved questions.** Exam blueprints for Years 11–12 Advanced/Extension, sealed and server-marked like the India boards. | | R4 |
 | G5 | **Handwriting/photo for Australian notation.** Same answer-blind pipeline; test fixtures for Australian conventions (e.g. pronumeral wording, units, `≈`, interval notation). | | R4 |
@@ -54,11 +54,17 @@ marks on approved NSW questions, with certification recorded per capability.
 | ID | Mission | Blocked on | Risk |
 | --- | --- | --- | --- |
 | H1 | Provision the Australian region: database project, hosting service pair (staging + production), email, storage. Record origins in `repository-authority.md`. | O1 (owner) | R4 |
-| H2 | Edition-region data isolation tests: an account in one region is unreachable from the other; no shared tables. | H1 | R4 |
+| H2 | Edition-region data isolation tests: an account in one region is unreachable from the other; no shared tables; identity never taken from a client-supplied edition. Backups, storage and admin access verified per region. | H1 | R4 |
+| H7 | Per-region AI usage budgets (per account and regional), monitoring, safe degradation; verify which model-processing paths are regional before any residency wording. | H1 | R3 |
 | H3 | Prithagoras payments and native in-app purchase. | O2 (owner) | R4 |
 | H4 | Australian legal and child-safeguard copy, consent flow and privacy notices. | O4 (owner/legal) | R4 |
 | H5 | Full student-journey acceptance under both brands on staging (web, iPad, iPhone, Android), with simulator and physical-device evidence kept separate. | H1–H4 | R2 |
 | H6 | Store listings, domains and bundle identifiers per edition. | O3 (owner) | R4 |
+
+## Paper certification states
+
+Uploaded document → structured question data → mathematically verified → issued server examination → certified digital
+examination (ADR-0002 §7). Resource-library items (F1) record their state, and the product offers only what that state allows.
 
 ## Owner decisions
 
