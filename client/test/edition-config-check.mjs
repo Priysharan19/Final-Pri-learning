@@ -103,6 +103,8 @@ ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build 
   const docker = read('Dockerfile');
   const clientStage = docker.split(/^FROM /m)[1];
   ok(/^ARG PRI_EDITION$/m.test(clientStage) && /PRI_EDITION=\$\{PRI_EDITION\}/.test(clientStage), 'the client-build stage declares and forwards PRI_EDITION');
+  const runtimeStage = docker.split(/^FROM /m).find(stage => / AS runtime\n/.test(stage)) || '';
+  ok(/^ARG PRI_EDITION$/m.test(runtimeStage) && /PRI_EDITION=\$\{PRI_EDITION\}/.test(runtimeStage), 'the runtime stage defaults the server to the edition the client was built for');
   ok(/^COPY client\/edition\.config\.mjs \.\/client\/edition\.config\.mjs$/m.test(docker), 'the runtime image ships the edition table');
 }
 {

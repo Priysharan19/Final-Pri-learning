@@ -93,9 +93,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // whether this replica can actually serve — is /v1/ready.
   //
   // EXPOSURE. Anonymous callers get the ok flag, the release identity, the
-  // regional edition, the
-  // schema versions, the engine name and whether the database answered — what
-  // an uptime check needs and nothing an attacker can act on. Which identity,
+  // regional edition, the schema versions, the engine name and whether the
+  // database answered — what an uptime check needs and nothing an attacker can
+  // act on. Which identity,
   // email and billing providers are configured, the Google notification
   // backlog and the housekeeping purge counts are operator detail: they are
   // answered only to the holder of PRI_METRICS_TOKEN (the /v1/metrics gate),

@@ -52,10 +52,15 @@ RUN npm ci --prefix server --omit=dev
 FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS runtime
 ARG PRI_RELEASE_SHA
 ARG PRI_BUILD_TIMESTAMP
+# The image's edition defaults to the one its client was built for, so a plain
+# `docker run` reports the edition it serves (a run-time -e still overrides;
+# plan E2 holds the two equal).
+ARG PRI_EDITION
 ENV NODE_ENV=production \
     PORT=4000 \
     PRI_RELEASE_SHA=${PRI_RELEASE_SHA} \
-    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP}
+    PRI_BUILD_TIMESTAMP=${PRI_BUILD_TIMESTAMP} \
+    PRI_EDITION=${PRI_EDITION}
 WORKDIR /app
 # Only the production runtime enters the image: the process entry, the /v1
 # control plane, the operator tools and the built client. The legacy /api
