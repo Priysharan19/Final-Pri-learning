@@ -70,6 +70,11 @@ export const flow = {
     // through the server's own grant route, and Settings refreshes the plan.
     await online.platform.grantPremium(account.id);
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
+    // The account panel (it verifies the session and refreshes the plan) lives
+    // under Account & Security; Settings may open on another section.
+    const accountTitle = page.locator('#cloud-account-title');
+    if (!await accountTitle.isVisible().catch(() => false)) await page.getByRole('button', { name: /Account & Security/ }).first().click().catch(() => {});
+    await accountTitle.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const premiumOnDevice = () => page.evaluate(() => new Promise(done => {
       const open = indexedDB.open('pri-learning');
       open.onerror = () => done(false);
