@@ -88,6 +88,15 @@ for (const chapter of live.chapters) {
       ok(`${chapter.id} D${diff} seed ${seed} declares its exact source outcome`, cover.dp.includes(q?.dotpoint));
       ok(`${chapter.id} D${diff} seed ${seed} has hints`, Array.isArray(q?.hints) && q.hints.length > 0);
       ok(`${chapter.id} D${diff} seed ${seed} has worked steps`, Array.isArray(q?.steps) && q.steps.length > 0);
+      if (chapter.id === 'c7-finding-unknown-current' && diff === 3) {
+        // Every step of a solved linear equation moves the equation on: a
+        // "Divide" step that only repeats x = … (the x terms collected to a
+        // single x) teaches nothing and leaves Pri Explain no equation to move.
+        const lastMath = d => String(d || '').match(/\$([^$]+)\$/g)?.at(-1) ?? null;
+        ok(`${chapter.id} D3 seed ${seed}: no worked step repeats the one before it`,
+          q.steps.every((step, i) => i === 0 || lastMath(step.d) !== lastMath(q.steps[i - 1].d)));
+        ok(`${chapter.id} D3 seed ${seed}: two worked steps, so the marks they define are unchanged`, q.steps.length === 2);
+      }
       if (q.answerType === 'mcq') {
         ok(`${chapter.id} D${diff} seed ${seed} has at least two options`, Array.isArray(q.mcqOptions) && q.mcqOptions.length >= 2);
         ok(`${chapter.id} D${diff} seed ${seed} has a valid correct option`, Number.isInteger(q.answer.correctIndex) && q.answer.correctIndex >= 0 && q.answer.correctIndex < q.mcqOptions.length);
