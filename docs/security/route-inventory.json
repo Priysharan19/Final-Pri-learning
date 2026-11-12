@@ -1578,6 +1578,190 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "POST",
+      "path": "/v1/desk/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Starts an attempt at a library paper THIS edition offers (published, external https, type paper, 1–200 questions); body {resourceId} only. Idempotency-Key required (a replay returns the same attempt; another body under the key is 409). At most one open attempt per account and paper (partial unique index): a second start returns the open one. The paper's desk configuration is frozen into the row.",
+      "rateLimits": [
+        {
+          "key": "desk-create",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/desk/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Lists this account's attempts in this edition, newest first, at most 50; optional ?resourceId= (a validated slug), any other parameter is 400. Summaries only: state, done/flagged/note tallies, time used.",
+      "rateLimits": [
+        {
+          "key": "desk-list",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/desk/attempts/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. One of this account's attempts: the frozen paper, the server-stamped clock log and the clock derived at the server's now, questions (done, flagged, notes).",
+      "rateLimits": [
+        {
+          "key": "desk-read",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/attempts/:id/clock",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Body {intent, rev, early?} only: the server stamps every event with its own clock; a body carrying a time, deadline, remaining time or any other field is 400 DESK_CLOCK_INVALID before anything is read. 409 DESK_REV_STALE / DESK_INTENT_NOT_ALLOWED / DESK_FINISHED carry the attempt as it stands; a closed attempt never restarts, closing twice writes one finish.",
+      "rateLimits": [
+        {
+          "key": "desk-clock",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/desk/attempts/:id/questions",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Body {changes: {<q>: {done?, flagged?, note?, noteRev?, ms?}}} only; q within the frozen paper; notes ≤5,000 characters without control characters, kept only on a newer noteRev (a stale one is reported, not applied); ms ≤24 h and only grows. Editable after the paper is closed.",
+      "rateLimits": [
+        {
+          "key": "desk-questions",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/desk/attempts/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. The student's own explicit delete of one attempt: body {confirm: <id>} must name it (400 DESK_DELETE_UNCONFIRMED otherwise). Deletes only that row.",
+      "rateLimits": [
+        {
+          "key": "desk-delete",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/import/preview",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Reads a prithagoras-web desk export ({export}, exportVersion 1, ≤256 KB) against THIS edition's library and returns what would come across; writes nothing. The other edition's paper is refused like an unknown one (404 DESK_IMPORT_UNKNOWN_PAPER); malformed, empty, changed-paper and other-version files are 422.",
+      "rateLimits": [
+        {
+          "key": "desk-import-preview",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/import",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Commits an export read as in the preview: Idempotency-Key required; the same content again (any key) returns the same record; it creates a closed, unmarked attempt with no clock events — the old timer (phase/running/remaining time) is never stored; only the export's date and phase name are kept for reference.",
+      "rateLimits": [
+        {
+          "key": "desk-import",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/handwriting/status",
       "auth": "session",
