@@ -28,6 +28,7 @@ import { readFileSync } from 'node:fs';
 import { chromium, webkit } from '@playwright/test';
 
 const MODULE = readFileSync(new URL('../src/local/pageLeaving.js', import.meta.url), 'utf8');
+const BACKEND = readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
 
 /** The page: one fetch that will not answer in time, and serveQuestion's fallback. */
 const PAGE = guarded => `<!doctype html><meta charset="utf-8"><script type="module">
@@ -68,6 +69,18 @@ async function leaveMidFetch(page, path) {
   await page.waitForTimeout(2500); // longer than the hold: a resumed page would have written by now
   return page.evaluate(() => localStorage.getItem('draft'));
 }
+
+console.log('The app holds before an offline draft (source)');
+await check('serveQuestion imports the guard and awaits it after prepare fails and before the draft is made', async () => {
+  const body = BACKEND.slice(BACKEND.indexOf('async function serveQuestion('));
+  const fn = body.slice(0, body.indexOf('\n}\n') + 2);
+  const prepareFailed = fn.indexOf('cloud.preparePractice(');
+  const guard = fn.indexOf('await settleIfLeaving()');
+  const draft = fn.indexOf('localDraft()');
+  assert(/import \{[^}]*\bsettleIfLeaving\b[^}]*\} from '\.\/pageLeaving\.js'/.test(BACKEND), 'backend.js does not import settleIfLeaving from ./pageLeaving.js');
+  assert(prepareFailed > 0 && guard > prepareFailed && draft > guard,
+    `in serveQuestion: prepare at ${prepareFailed}, guard at ${guard}, draft at ${draft} — the guard must sit between them`);
+});
 
 try {
   for (const engine of [webkit, chromium]) {

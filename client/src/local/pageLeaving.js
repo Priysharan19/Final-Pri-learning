@@ -10,11 +10,17 @@
 // can never be marked. (Chromium tears the page down first; the CI WebKit
 // browser shard caught this, issue: the responsive-matrix flake.)
 //
-// `beforeunload` fires before any of that in every engine. After it, a failed
-// request is held for a moment before anything is concluded from it: if the
-// page really is going, it goes and nothing is written; if the navigation was
-// cancelled (or the page comes back from the back-forward cache), the caller
-// carries on exactly as it would have.
+// `beforeunload` fires before any of that in desktop Chromium and WebKit (the
+// engines the browser suites run; client/test/page-leaving-draft-check.mjs).
+// After it, a failed request is held for a moment before anything is
+// concluded from it: if the page really is going, it goes and nothing is
+// written; if the navigation was cancelled (or the page comes back from the
+// back-forward cache), the caller carries on exactly as it would have.
+//
+// Limits, stated rather than hidden: iOS Safari and WKWebView do not reliably
+// fire `beforeunload`, so on the iPad shell this changes nothing (the earlier
+// behaviour stands there); and a next page slower than the hold lets the old
+// one resume and store its draft, as before. Neither is made worse.
 
 const HOLD_MS = 1500;
 
