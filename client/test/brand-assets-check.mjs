@@ -35,6 +35,21 @@ try {
   failures.push(`the committed brand files differ from tools/brand/build-assets.mjs:\n${e.stderr}`);
 }
 
+// 1b. Paths are written in their shortest exact spelling: every one draws exactly the source's coordinates.
+{
+  const { compactPath, absoluteSegments } = await import('../../tools/brand/compact-path.mjs');
+  const raw = JSON.parse(readFileSync(join(ROOT, 'tools/brand/wordmarks.json'), 'utf8')).wordmarks;
+  const sources = Object.entries(raw).flatMap(([k, v]) => ['d', 'prime', 'primeSmall'].filter(f => v[f]).map(f => [`${k}.${f}`, v[f]]));
+  sources.push(['an arc and implicit linetos', 'M49.5 27.22A14.5 14.5 0 0 1 49.5 55.78ZM82 5 92.5 7.2 83.5 30 77 28.4 82 5Z']);
+  for (const [name, d] of sources) {
+    const c = compactPath(d);
+    ok(JSON.stringify(absoluteSegments(c)) === JSON.stringify(absoluteSegments(d)) && c.length <= d.length, `${name}: the compact path draws exactly the source's coordinates, in fewer bytes`);
+  }
+  ok((() => { try { compactPath('M1.234 5Z'); return false; } catch { return true; } })(), 'a coordinate with more than two decimals is refused, never rounded');
+  const paths = await import('../src/brand/paths.js');
+  ok(JSON.stringify(absoluteSegments(paths.PRIYABHATA_WORDMARK.d)) === JSON.stringify(absoluteSegments(raw.priyabhata.d)), 'the shipped Priyabhata wordmark is the source outline');
+}
+
 // 2. PNG icons.
 const png = file => {
   const b = readFileSync(file);
