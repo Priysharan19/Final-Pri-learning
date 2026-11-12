@@ -13,8 +13,6 @@
 import { EDITIONS, COMPANY, COMPANY_LINE, DEFAULT_EDITION } from '../../edition.config.mjs';
 import { PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from './paths.js';
 
-// A literal after the build's define, so the bundler folds the choice below and
-// keeps only this edition's wordmark path data.
 const EDITION_ID = typeof __PRI_EDITION__ === 'string' ? __PRI_EDITION__ : DEFAULT_EDITION;
 
 export const EDITION = EDITIONS[EDITION_ID];
@@ -22,7 +20,9 @@ export const BRAND = EDITION.brand;
 /** The brand in Hindi running text (प्रियभट), or null for an edition without Hindi. */
 export const BRAND_HI = EDITION.identity.brandHi;
 export const CUT = EDITION.identity.cut;
-export const WORDMARK = EDITION_ID === 'prithagoras' ? PRITHAGORAS_WORDMARK : PRIYABHATA_WORDMARK;
+// Written against __PRI_EDITION__ itself, so the build sees two literals compared
+// and drops the other edition's wordmark (client/test/brand-build-check.mjs proves it).
+export const WORDMARK = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras' ? PRITHAGORAS_WORDMARK : PRIYABHATA_WORDMARK;
 export { COMPANY, COMPANY_LINE };
 
 /**

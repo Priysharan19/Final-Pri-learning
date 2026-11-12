@@ -172,9 +172,11 @@ for (const [id, e] of Object.entries(ED)) {
 // in font units (1000/em), baseline y = 0.
 export const P_PATH = ${JSON.stringify(P)};
 export const PRIME_PATH = ${JSON.stringify(PRIME)};
-export const CUT_PATHS = Object.freeze(${JSON.stringify(CUT)});
-export const PRIYABHATA_WORDMARK = Object.freeze(${JSON.stringify(wm('priyabhata'))});
-export const PRITHAGORAS_WORDMARK = Object.freeze(${JSON.stringify(wm('prithagoras'))});
+// Plain literals, not Object.freeze() calls: a call counts as a side effect, and
+// the bundler would then keep the other edition's wordmark in every build.
+export const CUT_PATHS = ${JSON.stringify(CUT)};
+export const PRIYABHATA_WORDMARK = ${JSON.stringify(wm('priyabhata'))};
+export const PRITHAGORAS_WORDMARK = ${JSON.stringify(wm('prithagoras'))};
 `;
   written.set(join(ROOT, 'client/src/brand/paths.js'), js);
 }
