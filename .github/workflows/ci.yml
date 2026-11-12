@@ -1078,6 +1078,9 @@ jobs:
             # npm run test:e2e, part 1: the canonical suite (it builds the
             # client), then the focused flows that run on the dist it built.
             node client/test/e2e.mjs 2>&1 | tee -a browser.log
+            # The sign-in card helper the gate and login tours sign in with:
+            # a card that leaves the page is read in one look, never waited on.
+            node client/test/signin-card-step-check.mjs 2>&1 | tee -a browser.log
             node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/tour-explain-v2.js --no-build 2>&1 | tee -a browser.log
