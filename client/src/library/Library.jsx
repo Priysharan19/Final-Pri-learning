@@ -66,9 +66,9 @@ function Detail({ id, t }) {
   }, [id]);
 
   const back = <PageLink to="/library" className="btn btn-ghost lib-back">{t('library.back')}</PageLink>;
-  if (state.status === 'loading') return <div className="lib-page">{back}<p role="status">{t('library.loading')}</p></div>;
+  if (state.status === 'loading') return <div className="lib-page">{back}<h1>{t('library.title')}</h1><p role="status">{t('library.loading')}</p></div>;
   if (state.status === 'error') {
-    return <div className="lib-page">{back}<p className="lib-honest" role="alert" data-library-error={state.code || 'unknown'}>{t(errorKey(state.code))}</p></div>;
+    return <div className="lib-page">{back}<h1>{t('library.title')}</h1><p className="lib-honest" role="alert" data-library-error={state.code || 'unknown'}>{t(errorKey(state.code))}</p></div>;
   }
   return (
     <div className="lib-page" data-library-detail={state.resource.id}>
