@@ -255,7 +255,6 @@ const LITERAL_ALLOWLIST = new Map([
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD', 'examination boards, printed in Latin on the Hindi admit card too'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED', 'examination boards (flag-off build, no Olympiad), printed in Latin on the Hindi admit card too'],
   ['you@example.com', 'an example address, not prose'],
-  ['Pri', 'the product’s short name beside its mark in the instrument bar'],
   ['⌘K', 'a key chord, printed as the keyboard prints it'],
   ['esc', 'the label on the Escape key, printed as the keyboard prints it'],
   ['Password', 'placeholder replaced by t(); any survivor here is a failure'],
