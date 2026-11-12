@@ -71,7 +71,10 @@ for (const id of EDITION_IDS) {
   ok(html.includes(`<title>${e.brand}</title>`) && html.includes(`data-edition="${id}"`), `${id}: the page is titled ${e.brand} and marked data-edition="${id}"`);
   ok(html.includes(`--edition-accent:${e.identity.accent.light}`) && html.includes(`--edition-accent:${e.identity.accent.dark}`), `${id}: the page carries its own accent tokens`);
   ok(!html.includes(other.brand) && !html.includes(other.identity.accent.light), `${id}: the page names nothing of ${other.brand}`);
-  ok(!/Pri Learning/.test(html.replace(/<!--[\s\S]*?-->/g, '')), `${id}: the page never calls the app "Pri Learning"`);
+  // Every "Pri Learning" in the page must sit inside an HTML comment (none is shown).
+  const comments = [...html.matchAll(/<!--[\s\S]*?-->/g)].map(m => [m.index, m.index + m[0].length]);
+  const shown = [...html.matchAll(/Pri Learning/g)].filter(m => !comments.some(([a, b]) => m.index >= a && m.index < b));
+  ok(shown.length === 0, `${id}: the page never calls the app "Pri Learning"`);
   ok(html.includes('<p lang="hi">') === e.languages.includes('hi'), `${id}: the boot fallback has a Hindi line exactly when the edition offers Hindi`);
   const m = webManifest(id);
   ok(m.name === e.brand && m.short_name === e.brand && m.short_name.length <= 12, `${id}: the manifest is named ${e.brand} (fits the 12-character home-screen label)`);

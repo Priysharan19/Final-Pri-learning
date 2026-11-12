@@ -92,7 +92,9 @@ for (const key of ['app.logoHome', 'verdict.reloadApp', 'login.welcomeTitle', 'b
   const i18n = await import('../src/i18n/index.js');
   const branded = Object.keys(en).filter(k => forms(en[k]).some(t => /\{(brand|company)\}/.test(t)));
   ok(branded.length > 60, `the brand keys were found (${branded.length})`);
-  const unescape = s => s.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  // One pass over the entities React writes, so no '&' is decoded twice.
+  const ENTITY = { '&amp;': '&', '&#x27;': "'", '&#39;': "'", '&quot;': '"', '&lt;': '<', '&gt;': '>' };
+  const unescape = s => s.replace(/&(?:amp|#x27|#39|quot|lt|gt);/g, e => ENTITY[e]);
   for (const language of ['en', 'hi']) {
     await i18n.setLanguage(language);
     const expected = language === 'hi' ? 'प्रियभट' : 'Priyabhata';
