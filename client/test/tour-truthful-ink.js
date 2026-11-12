@@ -63,7 +63,30 @@ export const flow = {
     note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "${flow.name}" is a scripted stand-in (it returns the lines this flow sets). The canvas, the server routes, the step reports, the receipts and every mark are real. Not real-handwriting, real-provider, real-device or real-student evidence.`);
     await goto('/');
     await createProfile({ name: 'Maryam Mirza', year: 7 });
-    await online.signIn({ name: 'Maryam Mirza' });
+    const account = await online.signIn({ name: 'Maryam Mirza' });
+    // This flow opens many questions (it skips to a whole-number one each
+    // time), so on the free plan it can meet the device's 20-a-day allowance
+    // part-way. The allowance is not its subject: the account is made Premium
+    // through the server's own grant route, and Settings refreshes the plan.
+    await online.platform.grantPremium(account.id);
+    await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
+    // The account panel (it verifies the session and refreshes the plan) lives
+    // under Account & Security; Settings may open on another section.
+    const accountTitle = page.locator('#cloud-account-title');
+    if (!await accountTitle.isVisible().catch(() => false)) await page.getByRole('button', { name: /Account & Security/ }).first().click().catch(() => {});
+    await accountTitle.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const premiumOnDevice = () => page.evaluate(() => new Promise(done => {
+      const open = indexedDB.open('pri-learning');
+      open.onerror = () => done(false);
+      open.onsuccess = () => {
+        const db = open.result; const r = db.transaction('device').objectStore('device').getAll();
+        r.onsuccess = () => { db.close(); done(r.result.some(row => row?.accountId && row?.entitlement?.plan === 'premium')); };
+        r.onerror = () => { db.close(); done(false); };
+      };
+    }));
+    let premium = false;
+    for (let i = 0; i < 60 && !(premium = await premiumOnDevice()); i++) await page.waitForTimeout(250);
+    if (!await check('the account is Premium on the server and on this device (the allowance is not this flow\'s subject)', premium)) return;
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await check('server reading is on for this signed-in profile', await turnOnServerReading(page, base));
 

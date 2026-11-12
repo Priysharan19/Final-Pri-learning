@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import {
-  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, describeRuntimes, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
+  FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, describeRuntimes, installApp, keepOnlySimulator, shutDownAfterCrashLoop, otherBooted, parseDevices, pickSimulator,
   requiredRuntime, runtimeMatches,
 } from '../../scripts/simulator-fleet.mjs';
 import { EXPECTED_CASES, MAX_DEVIATION_PX, judge } from '../../scripts/ink-native-check.mjs';
@@ -158,6 +158,16 @@ ok(JSON.stringify(otherBooted(LISTING, IPAD)) === JSON.stringify([IPHONE, BOOTIN
 ok(JSON.stringify(otherBooted(LISTING, IPAD.toLowerCase())) === JSON.stringify([IPHONE, BOOTING]), 'the target UDID is matched case-insensitively');
 ok(JSON.stringify(otherBooted(LISTING, 'NOT-A-DEVICE')) === JSON.stringify([IPHONE, IPAD, BOOTING]), 'with an unknown target every booted device is another');
 
+// ── shutDownAfterCrashLoop: CI shuts the crash-looped device down, says so ──
+{
+  const calls = [], logged = [];
+  ok(shutDownAfterCrashLoop(IPAD, { ci: false, exec: a => calls.push(a), log: m => logged.push(m) }) === false && calls.length === 0, 'off CI the device is left alone');
+  ok(shutDownAfterCrashLoop(IPAD, { ci: true, exec: a => calls.push(a), log: m => logged.push(m) }) === true && JSON.stringify(calls) === JSON.stringify([['shutdown', IPAD]]) && /boots it fresh/.test(logged[0]),
+    'on CI exactly that device is shut down, and the log says so');
+  ok(shutDownAfterCrashLoop(IPAD, { ci: true, exec: () => { throw new Error('busy'); }, log: m => logged.push(m) }) === false && /could not shut down .*inherits it/.test(logged[1]),
+    'a failed shutdown is logged, so a journey that inherited the device is visible');
+}
+
 // ── keepOnlySimulator: CI shuts the others down, a person's Mac is untouched ──
 {
   const calls = [];
@@ -250,10 +260,110 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   ok(/scripts\/ink-native-check\.mjs --app "\$PRI_SIM_APP"/.test(wf), 'the native self-check installs the already built app instead of building a second time');
   ok(/native-bridge-selfcheck\.mjs --family ipad --app "\$PRI_SIM_APP"/.test(wf) && /native-bridge-selfcheck\.mjs --family iphone --app "\$PRI_SIM_APP"/.test(wf),
     'both bridge self-checks reuse the built app');
-  ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, 'the workflow contains exactly one xcodebuild of the package');
+  ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 2, 'the workflow builds the package once per job (two jobs, one per family)');
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
 }
 
+{
+  // Every harness script picks its device by the shared PINNED rule. The bridge
+  // self-check once took the newest runtime installed: on the iOS 27 lane it
+  // cold-booted an iOS 27.2 iPhone the journey then shut down for its own
+  // 27.0 one, and the lane ran past its 60-minute limit.
+  for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfcheck.mjs', 'scripts/ink-native-check.mjs']) {
+    const text = src(script);
+    ok(/pickSimulator\(listing, \{[^}]*\bruntime(: PINNED_RUNTIME)?\b/.test(text) && /requiredRuntime\(\)/.test(text), `${script}: picks its simulator through pickSimulator on the pinned runtime`);
+  }
+  // The iOS 27 lane boots each family once: every iPad step before the first iPhone step.
+  const wf = src('.github/workflows/native-journey-ios27.yml');
+  const steps = [...wf.matchAll(/--family (ipad|iphone)/g)].map(m => m[1]);
+  const firstPhone = steps.indexOf('iphone');
+  ok(firstPhone > 0 && steps.slice(firstPhone).every(f => f === 'iphone') && wf.indexOf('ink-native-check.mjs') < wf.indexOf('--family iphone'),
+    `the iOS 27 lane runs every iPad step before the first iPhone step (got ${steps.join(' → ')})`);
+}
+
+{
+  // Importing the self-check for its judge must never need a runtime pin: the
+  // Suites shard imports it under CI=true with no PRI_SIM_RUNTIME (#850 review).
+  const { spawnSync } = await import('node:child_process');
+  const env = { ...process.env, CI: 'true' }; delete env.PRI_SIM_RUNTIME;
+  // From a module file, as the suites import it (an -e script has no argv[1]).
+  const { mkdtempSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'pri-selfcheck-import-'));
+  const probe = join(dir, 'probe.mjs');
+  writeFileSync(probe, `await import(${JSON.stringify(new URL('../../scripts/native-bridge-selfcheck.mjs', import.meta.url).href)}); console.log('IMPORTED');\n`);
+  const r = spawnSync(process.execPath, [probe], { env, encoding: 'utf8', timeout: 30_000 });
+  rmSync(dir, { recursive: true, force: true });
+  ok(r.status === 0 && /IMPORTED/.test(r.stdout), `the bridge self-check imports under CI=true with no PRI_SIM_RUNTIME (status ${r.status}: ${(r.stderr || '').trim().split('\n').pop()})`);
+}
+{
+  // Native Ink (iOS 26) is two jobs on two runners, one per family; each
+  // boots only its own family, builds once, keeps the 60-minute job limit,
+  // and between them every step of the lane runs exactly once.
+  const wf = src('.github/workflows/native-ink.yml');
+  const [ipadJob, phoneJob] = wf.split(/\n  native-ink-iphone:\n/);
+  ok(Boolean(phoneJob) && /\n  native-ink:\n    name: Swift build, capture gate and bridge smoke test \(iOS 26\)\n/.test(ipadJob),
+    'Native Ink keeps its iPad job (and its check name) and adds a separate iPhone job');
+  for (const [label, job, fam, other] of [['iPad', ipadJob, 'ipad', 'iphone'], ['iPhone', phoneJob || '', 'iphone', 'ipad']]) {
+    ok(/runs-on: macos-26\n    timeout-minutes: 60\n/.test(job), `${label} job: its own macos-26 runner, 60-minute job limit`);
+    ok(job.includes(`--boot ${fam}`) && !job.includes(`--boot ${other}`) && !job.includes(`--family ${other}`), `${label} job boots and runs only the ${label}`);
+    ok((job.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, `${label} job builds the app once`);
+    ok(job.includes('Pinned toolchain') && /grep -Eq "\^iOS \$\{PRI_SIM_RUNTIME/.test(job), `${label} job asserts the pinned runtime before building`);
+    ok(job.includes(`native-bridge-selfcheck.mjs --family ${fam}`) && job.includes(`iphone-journey.mjs --family ${fam}`), `${label} job runs its bridge self-check and journey`);
+    ok(job.indexOf('npm ci --prefix server') < job.indexOf(`iphone-journey.mjs --family ${fam}`), `${label} job installs the server before its journey`);
+    ok(job.includes(`for f in journey-${fam}.json; do`) && job.includes(`name: native-simulator-evidence-${fam}`), `${label} job checks and uploads its own evidence under a distinct name`);
+    ok(/journey \(simulator\)\n\s+timeout-minutes: 40\n/.test(job), `${label} journey step has a 40-minute step limit inside the 60-minute job`);
+  }
+  for (const once of ['npm run test:ink:bridge', 'ink-native-check.mjs --app', 'apple-shipping-target.mjs --check-v1', 'node client/test/apple-shipping-target-check.mjs', '--cloud --dynamic-type --lifecycle --a11y']) {
+    ok(wf.split(once).length === 2, `the lane runs "${once}" exactly once`);
+  }
+  // The journey polls its report file, not the slow unified log: a replaced
+  // file is read from its start, and `log show` runs at most every fifth pass
+  // (Native Ink spent ~22 minutes in one offline phase on log reads, Train 18).
+  const j = src('scripts/iphone-journey.mjs');
+  ok(/if \(bytes\.length < offset\) offset = 0;/.test(j), 'a report file shorter than at launch is read from its start');
+  ok(/else if \(reportFile && pass % 5 !== 0\) continue;/.test(j), 'with a report file, the unified log is read at most every fifth pass');
+  ok((j.match(/abortJourney\(`\$\{phase\} never reported; stopped at the first silent phase`\)/g) || []).length === 2,
+    'a phase that ends without its summary (deadline or out of passes) fails the journey at once');
+  const abort = j.slice(j.indexOf('function abortJourney'), j.indexOf('\n}\n', j.indexOf('function abortJourney')));
+  ok(/liveServerPids/.test(abort) && /content_size', 'large'/.test(abort) && /NATIVE JOURNEY: FAIL/.test(abort) && /process\.exit\(1\)/.test(abort),
+    'an early stop kills the local servers, resets the text size, prints FAIL and exits non-zero');
+  ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j) && (j.match(/'inherit'/g) || []).length === 1,
+    'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open; the heartbeat is the one exception');
+  ok(/const hb = spawn\('\/bin\/sh'/.test(j) && /while kill -0 \$p 2>\/dev\/null; do if \[ \$\(\( n % 30 \)\) -eq 0 \]/.test(j) && /alarm 10; exec @ARGV/.test(j) && /ps -Aco pcpu,comm -r/.test(j) && /memory_pressure -Q/.test(j) && /\{ stdio: \['ignore', 'inherit', 'ignore'\], detached: true \}\);\n  hb\.unref\(\);/.test(j),
+    'a heartbeat prints load, free memory and the five busiest process names every 60 s, each probe alarm-bounded, and exits within 2 s of the journey');
+  ok(/process\.on\('exit', code => \{ if \(code\) exitReport\(\); \}\)/.test(j) && /loadavg\(\)/.test(j) && /'\/bin\/ps', \['-Ao', 'pcpu,pmem,etime,comm', '-r'\]/.test(j) && /'\/usr\/bin\/top', \['-l', '1', '-n', '10', '-o', 'cpu'/.test(j) && /timeout: 8_000, killSignal: 'SIGKILL'/.test(j), 'any failing exit prints the load and the busiest processes, each probe bounded, top as the fallback');
+  ok(/process\.on\('uncaughtException'/.test(j), 'an uncaught throw goes through abortJourney, so servers stop and the exit report prints');
+  ok(/function stopServerAndProve/.test(j) && /did not exit within 10 s of SIGTERM; SIGKILL sent/.test(j) && /STILL ACCEPTS connections/.test(j) && /e\.status === 1 && \/refused\/i/.test(j) && /state !== 'closed' \|\| alive\(\)/.test(j) && /untrackServer\(pid\)/.test(j) && /stopServerAndProve\(Number\(cloudServer\.PRI_CLOUD_SERVER_PID\), port\)/.test(j), 'the offline leg starts only after the server pid has exited and its port is closed, both logged');
+  ok(/slow\('launch'/.test(j) && /slow\('container lookup'/.test(j) && /slow\('report-file read'/.test(j) && /slow\('unified-log read'/.test(j) && /ms > 30_000/.test(j), 'each journey pass names any call that took longer than 30 s');
+  ok(/fetch\(`\$\{base\}\/v1\/health`, \{ signal: AbortSignal\.timeout\(3_000\) \}\)/.test(src('scripts/cloud-fixture-server.mjs')) && /Date\.now\(\) - readyT0 > 90_000\) \{ try \{ process\.kill\(-child\.pid, 'SIGKILL'\)/.test(src('scripts/cloud-fixture-server.mjs')), 'every readiness probe of the fixture server has its own timeout');
+  ok([...src('.github/workflows/native-journey-ios27.yml').matchAll(/journey \(simulator, iOS 27\)\n\s+timeout-minutes: 40\n/g)].length === 2, 'the iOS 27 journey steps have the same 40-minute step limit');
+  ok(/end=\$\(\( \$\(date \+%s\) \+/.test(j) && /\$\(date \+%s\) -ge \$end/.test(j), 'the watchdog reads the wall clock, not a count of sleeps');
+  ok(/timeout: 300_000, killSignal: 'SIGKILL', \.\.\.opts/.test(j), 'every simctl call the journey makes is bounded and killed when it overruns');
+  ok(/function startFixture/.test(j) && /last 40 lines/.test(j) && !/execFileSync\(process\.execPath, \[join\(HERE, 'cloud-fixture-server/.test(j),
+    'a server that does not start prints the tail of its server.log into the step output');
+  ok(/Math\.min\(37 \* 60_000, Number\(process\.env\.PRI_JOURNEY_DEADLINE_MS\)/.test(j) && /Date\.now\(\) - JOURNEY_T0 > JOURNEY_DEADLINE_MS/.test(j) && /kill -TERM \$p; sleep 15; kill -KILL \$p/.test(j),
+    'the journey has its own 37-minute bound, enforced by a watchdog even while a child blocks it');
+  ok(/\nshutDownAfterCrashLoop\(device\);/.test(src('scripts/native-bridge-selfcheck.mjs')), 'the bridge self-check shuts its device down after the crash loop, so the journey boots it fresh');
+  ok(!/i--; continue/.test(j), 'a pass that skips the log read still counts toward the bound (a silent phase must not poll 5x longer)');
+  ok(/deadlineMs = 480_000/.test(j) && /if \(Date\.now\(\) - t0 > deadlineMs\)/.test(j), 'a phase stops reading at a wall-clock deadline, so a silent phase fails in minutes instead of running into the job limit');
+  for (const pkg of ['ios/PriLearning.swiftpm', 'ios/PriLearning 2.swiftpm']) {
+    const sc = src(`${pkg}/JourneySelfCheck.swift`);
+    ok(/location\.pathname === path && document\.querySelector\('h1, h2, \[role=heading\]'\)/.test(sc), `${pkg}: the a11y audit waits for each route to render (lazy /progress) before auditing`);
+    ok(/if \(!document\.querySelector\('h1, h2, \[role=heading\]'\)\) problems\.push\(where \+ ': no heading'\)/.test(sc), `${pkg}: the audit still reports a screen with no heading`);
+  }
+  ok(/report-file read\(s\), \$\{viaLog\} unified-log read\(s\)/.test(j), 'each phase reports its time and which channel it read');
+}
+{
+  // The crash-loop leg kills each new WebContent process as soon as it starts,
+  // with no wait between kills (a killed spare ends nothing; waiting after it
+  // let the shell's 30 s window lapse, Train 18). The verdict stays the judge's.
+  const b = src('scripts/native-bridge-selfcheck.mjs');
+  const leg = b.slice(b.indexOf('// Crash loop:'), b.indexOf("waitFor(() => readLines().includes('PRIBRIDGE contentStopped shown')"));
+  ok(leg.length > 0 && !/waitFor\(/.test(leg) && /execSync\('sleep 0\.5'\)/.test(leg), 'the crash loop polls every half second and never waits between kills');
+  ok(/const content = judgeContentEnd\(lines\)/.test(b) && /stopped\.n !== 3/.test(b), 'the content-process verdict still needs the stop on the third end inside 30 s');
+}
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.

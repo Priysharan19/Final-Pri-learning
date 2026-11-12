@@ -37,6 +37,8 @@ import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
+// The graph sketch reader loads with the first read, in its own chunk.
+const loadSketchKit = () => import('./graphSketchKit.js');
 import { neqWorthCheck, relationChoices, swapRelation } from './relationSwap.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
@@ -107,7 +109,7 @@ const MAX_PAGES = 4;
 /** The pen rests this long on a new line before the line above is read (liveRead). */
 export const LIVE_READ_REST_MS = 1500;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, graphAnswer = false, onGraphFeatures = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -177,6 +179,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const flyingRef = useRef(null);
   const readRef = useRef(null);
   const strokesRef = useRef([]);
+  // A sketched graph on the page: its proposal, and the set the student confirmed (graphSketch.js).
+  const [sketch, setSketch] = useState(null);
+  const onGraphRef = useRef(onGraphFeatures);
+  useEffect(() => { onGraphRef.current = onGraphFeatures; }, [onGraphFeatures]);
   const disabledRef = useRef(!!disabled);
   const liveReadRef = useRef(!!liveRead);
   liveReadRef.current = !!liveRead;
@@ -304,7 +310,22 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus({ kind: 'reading' });
     const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
     const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
+    // A page may hold a sketched graph beside written lines: the graph is read
+    // as geometry (its labels alone, answer-blind), the rest as lines.
+    // If the reader's chunk cannot load, the whole page is read as lines.
+    // Only a question that declares a graph answer is read for a sketch (#793).
+    (graphAnswer ? loadSketchKit().catch(() => null) : Promise.resolve(null)).then(kit => {
+    if (seq !== readSeqRef.current || disabledRef.current) { landed(); return; }
+    const region = kit ? kit.splitSketchRegion(strokes) : { sketch: [], writing: strokes };
+    const lineStrokes = region.sketch.length ? region.writing : strokes;
+    if (region.sketch.length) {
+      kit.proposeSketch(region.sketch, { user: who, signal: controller?.signal, read: readWithCloud }).then(proposal => {
+        if (seq !== readSeqRef.current || disabledRef.current) return;
+        setSketch({ signature, proposal, confirmed: null, Confirm: kit.GraphSketchConfirm });
+      }).catch(() => {});
+      if (!lineStrokes.length) { landed(); setStatus(null); return; }
+    }
+    readWithCloud(lineStrokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
@@ -312,7 +333,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // Line geometry comes from the strokes themselves (no recognition), so
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
-      try { geometry = { lines: segmentInkLines(strokes) }; } catch { geometry = null; }
+      try { geometry = { lines: segmentInkLines(lineStrokes) }; } catch { geometry = null; }
       // Only placed on the ink when each read line plausibly IS that written
       // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
       if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
@@ -356,7 +377,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // EMAIL_UNVERIFIED → verify); only an unknown throw is "not answering".
       waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
     });
-  }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
+    });
+  }, [publish, graphAnswer]); // eslint-disable-line react-hooks/exhaustive-deps
   const readRef2 = useRef(readNow);
   readRef2.current = readNow;
 
@@ -393,6 +415,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       }
     }
     setCorrecting(null);
+    // A changed page is a different sketch: what was confirmed no longer stands.
+    setSketch(prev => { if (prev) { try { onGraphRef.current?.(null); } catch { /* reporting only */ } } return null; });
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
@@ -717,6 +741,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             ? <PageLink className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</PageLink>
             : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
+      )}
+
+      {sketch?.proposal && sketch.Confirm && (
+        <sketch.Confirm key={sketch.signature} proposal={sketch.proposal} confirmed={!!sketch.confirmed}
+          onConfirm={features => { setSketch(s => (s ? { ...s, confirmed: features } : s)); try { onGraphRef.current?.(features); } catch { /* reporting only */ } }} />
       )}
 
       {rec.lines.length > 0 && (

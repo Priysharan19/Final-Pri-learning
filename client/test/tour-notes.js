@@ -55,7 +55,7 @@ if (built.built) console.log(`  built client in ${built.ms} ms`);
 const server = await startOnlinePlatform();
 const browser = await chromium.launch();
 try {
-  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true, deviceScaleFactor: 2, reducedMotion: 'no-preference' });
   const page = await ctx.newPage();
   page.setDefaultTimeout(30000);
   const errors = [];
@@ -64,16 +64,36 @@ try {
   await startDemo(page, server.origin);
 
   // ── 1 · Notes is in the navigation and opens on the student's class ───────
-  await page.locator('.sidebar a[href="/notes"]').first().click();
+  // The current Instrument shell places Notes in its accessible More menu,
+  // rather than the retired sidebar. Exercise the actual student navigation.
+  const notesTab = page.locator('[data-instrument-bar] .in-tab[href="/notes"]');
+  if (await notesTab.count()) {
+    await notesTab.click();
+  } else {
+    await page.locator('#in-more-btn').click();
+    await page.getByRole('menuitem', { name: 'Notes', exact: true }).click();
+  }
   await page.waitForSelector('[data-testid="notes-chapter"]');
   await check('Notes opens from the navigation', page.url().endsWith('/notes'));
   await check('it opens on Class 10, the student’s class',
     await page.locator('[role="tab"][aria-selected="true"]').innerText() === 'Class 10');
   await check('every Class 10 chapter is listed', await page.locator('[data-testid="notes-chapter"]').count() === 14);
+  await check('chapter list is presented before the optional concept map',
+    await page.locator('.nt-index').evaluate(el => {
+      const map = document.querySelector('.nt-map-disclosure');
+      return map && el.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING;
+    }));
+  await check('the chapter map is collapsed until requested',
+    await page.locator('.nt-map-disclosure').evaluate(el => !el.open));
+  await shot(page, 'index');
+  await page.locator('.nt-map-disclosure summary').click();
   await page.waitForSelector('.nt-map-node');
   await check('the chapter map draws a node per chapter', await page.locator('.nt-map-node').count() === 14);
+  await check('expanded chapter map nodes are actually visible',
+    await page.locator('.nt-map-node').evaluateAll(nodes =>
+      nodes.every(node => getComputedStyle(node).opacity === '1' && getComputedStyle(node).transform === 'none')));
   await page.waitForTimeout(1400);
-  await shot(page, 'index');
+  await shot(page, 'map-open');
 
   // Arrow keys move between classes like any tablist.
   await page.locator('[role="tab"][aria-selected="true"]').focus();
@@ -87,6 +107,12 @@ try {
   await page.locator(`a[href="/notes/${CHAPTER}"]`).first().click();
   await page.waitForSelector('.nt-formula');
   await check('the chapter opens with its title', (await page.locator('h1').innerText()).includes('Quadratic Equations'));
+  await check('the chapter provides accessible direct section navigation',
+    await page.locator('.nt-toc a[href^="#"]').count() >= 6);
+  await check('the first lesson section is readable before any scroll animation',
+    await page.locator('.nt-section').first().evaluate(el => getComputedStyle(el.querySelector('.nt-section-h')).opacity === '1'));
+  await check('initial worked-example mount stays bounded at six (the notes browser contract)',
+    await page.locator('.nt-example').count() === 6);
   for (const h of ['Key ideas', 'Definitions', 'Formulas', 'Important points', 'Common mistakes', 'Worked examples']) {
     await check(`the chapter has a “${h}” section`, await page.getByRole('heading', { name: h, exact: true }).count() === 1);
   }
@@ -110,11 +136,25 @@ try {
   await check('tapping a concept unfolds it', await second.getAttribute('aria-expanded') === 'true' &&
     await page.locator('.nt-concept').nth(1).locator('.nt-concept-body').isVisible());
 
-  // A worked example, stepped through to its checked answer.
+  // The first example offers optional self-explanation before revealing each step.
+  // This is never graded or submitted: the learner checks their own prediction.
   const ex = page.locator('.nt-example').first();
   await ex.scrollIntoViewIfNeeded();
+  await check('prediction editor is opt-in, not mandatory', await ex.getByTestId('notes-step-prediction').count() === 0);
+  await ex.getByRole('button', { name: 'Try the next step first' }).click();
+  const prediction = ex.getByRole('textbox', { name: 'Your next step (optional)' });
+  await prediction.fill('I would split the middle term using product ac');
+  await check('prediction is explicitly ungraded and stays on this page',
+    (await ex.locator('.nt-predict-editor').innerText()).includes('Nothing is submitted or graded'));
+  await check('prediction does not reveal the solution automatically', await ex.locator('.nt-step').count() === 0);
+  await ex.getByRole('button', { name: 'Show next step' }).click();
+  await check('learner compares their own attempt with the revealed mathematical step',
+    (await ex.locator('.nt-step-attempt').innerText()).includes('I would split the middle term'));
+  await check('prediction editor closes after reveal', await ex.getByTestId('notes-step-prediction').count() === 0);
   await ex.getByRole('button', { name: 'Show all steps' }).click();
   await check('the worked example reaches its answer', await ex.locator('.nt-answer').isVisible());
+  await check('practice follows the worked example in the same chapter',
+    (await ex.getByRole('link', { name: 'Try a question from this chapter' }).getAttribute('href')).includes('subtopic=c10-quadratic-equations'));
   await check('the answer says the engine checked it', /checked by the maths engine/.test(await ex.locator('.nt-answer').innerText()));
   await shot(page, 'example');
   await page.locator('.nt-mistakes').scrollIntoViewIfNeeded();
@@ -128,6 +168,17 @@ try {
   await page.reload();
   await page.waitForSelector('.nt-formula');
   await check('the bookmark is still there after a reload', await page.locator('.nt-mark-toggle').getAttribute('aria-pressed') === 'true');
+  const orderedSections = await page.locator('.nt-section').evaluateAll(nodes => nodes.map(n => n.id));
+  await check('learning order leads from concepts to formulas, examples and then reference',
+    ['ideas', 'formulas', 'examples', 'mistakes', 'points', 'definitions']
+      .every((id, i, arr) => i === 0 || orderedSections.indexOf(arr[i - 1]) < orderedSections.indexOf(id)));
+  await page.goto(server.origin + '/notes');
+  await page.getByTestId('notes-resume').waitFor();
+  await check('Notes remembers the previous chapter without inventing a mastery score',
+    (await page.getByTestId('notes-resume').innerText()).includes('Quadratic Equations'));
+  await page.getByTestId('notes-resume').getByRole('link').click();
+  await page.waitForSelector('.nt-formula');
+  await check('resume reopens the same chapter', page.url().includes('/notes/' + CHAPTER));
 
   // ── 4 · revise in five minutes ─────────────────────────────────────────────
   await page.getByTestId('notes-revise').click();

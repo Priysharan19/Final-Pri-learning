@@ -24,6 +24,7 @@ import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
+import { readRecentNotesChapter, rememberRecentNotesChapter } from './notesRecentChapter.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
 import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
 
@@ -124,7 +125,12 @@ function NotesIndex() {
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const [{ notes, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
+  const [recentId] = useState(() => readRecentNotesChapter(user?.id));
+  const recentChapter = IN_CHAPTER_BY_ID[recentId];
   const [onlyMarked, setOnlyMarked] = useState(false);
+  // A closed <details> still lays out its content in Chromium, so a mounted map
+  // would expose 14 unreachable buttons. Mount it only while it is open.
+  const [mapGrade, setMapGrade] = useState(null);
   const [query, setQuery] = useState(() =>
     readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
   useEffect(() => {
@@ -177,9 +183,19 @@ function NotesIndex() {
         ? <SearchResults query={query.trim()} />
         : (
           <>
+            {recentChapter && (
+              <section className="nt-resume" aria-label={t('home.kicker.continue')} data-testid="notes-resume">
+                <div className="nt-resume-content">
+                  <p className="nt-resume-eyebrow">{t('home.kicker.continue')} · {t('common.classNumber', { n: recentChapter.grade })} · {recentChapter.strand}</p>
+                  <h2>{recentChapter.name}</h2>
+                </div>
+                <PageLink className="nt-resume-link" to={chapterNotesLink(recentChapter, params)}>
+                  {t('classes.continue')}
+                </PageLink>
+              </section>
+            )}
             {failed && <LoadFailed retry={retry} />}
             {!failed && !notes && <p className="nt-status" role="status">{t('notes.loading')}</p>}
-            {notes && group && <ChapterMap group={group} notes={notes} key={grade} />}
             <section className="nt-index" aria-labelledby="nt-index-h">
               <div className="nt-index-head">
                 <h2 id="nt-index-h">{t('notes.chapters')}</h2>
@@ -215,6 +231,15 @@ function NotesIndex() {
                 })}
               </ol>
             </section>
+            {notes && group && (
+              <details className="nt-map-disclosure" key={grade} onToggle={e => setMapGrade(e.currentTarget.open ? grade : null)}>
+                <summary>
+                  <span>{t('notes.mapTitle')}</span>
+                  <span className="nt-map-disclosure-hint">{t('notes.mapHint')}</span>
+                </summary>
+                {mapGrade === grade && <ChapterMap group={group} notes={notes} />}
+              </details>
+            )}
           </>
         )}
     </div>
@@ -268,11 +293,7 @@ function ChapterMap({ group, notes }) {
   const focused = group.chapters.find(c => c.id === focus);
 
   return (
-    <section className="nt-map nt-reveal" aria-labelledby="nt-map-h">
-      <div className="nt-map-head">
-        <h2 id="nt-map-h">{t('notes.mapTitle')}</h2>
-        <p className="nt-quiet">{t('notes.mapHint')}</p>
-      </div>
+    <section className="nt-map" aria-label={t('notes.mapTitle')}>
       <div className="nt-map-frame">
         <ul className="nt-map-strands" aria-hidden="true">
           {strands.map((s, i) => <li key={s} style={{ top: `${((top + i * rowH) / H) * 100}%` }}>{s}</li>)}
@@ -386,12 +407,16 @@ function snippetFor(notes, terms) {
 // ── One chapter ──────────────────────────────────────────────────────────────
 function ChapterNotes({ chapterId }) {
   const t = useT();
+  const { user } = useApp() || {};
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
   const grade = gradeOfChapter(chapterId);
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
+  useEffect(() => {
+    if (IN_CHAPTER_BY_ID[chapterId]) rememberRecentNotesChapter(user?.id, chapterId);
+  }, [user?.id, chapterId]);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
   const [visibleExamples, setVisibleExamples] = useState(6);
   const [visualOnly, setVisualOnly] = useState(false);
@@ -480,38 +505,50 @@ function ChapterNotes({ chapterId }) {
       {all && !notes && <p className="nt-quiet">{t('notes.notFound')}</p>}
 
       {notes && (
-        <div className="nt-sheet">
-          <Section id="ideas" title={t('notes.sectionIdeas')}>
+        <div className="nt-study-layout">
+          <nav className="nt-toc" aria-label={t('study.choosePath')}>
+            <p className="nt-toc-label">{t('study.choosePath')}</p>
+            <a href="#ideas">{t('notes.sectionIdeas')}</a>
+            <a href="#formulas">{t('notes.sectionFormulas')}</a>
+            <a href="#examples">{t('notes.sectionExamples')}</a>
+            <a href="#mistakes">{t('notes.sectionMistakes')}</a>
+            <a href="#points">{t('notes.sectionPoints')}</a>
+            <a href="#definitions">{t('notes.sectionDefinitions')}</a>
+            {linkedResources.length > 0 && <a href="#resources">{t('notes.sectionResources')}</a>}
+            <button type="button" onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
+          </nav>
+          <div className="nt-sheet">
+            <Section id="ideas" title={t('notes.sectionIdeas')}>
             <Concepts concepts={notes.concepts} />
           </Section>
 
           {chapter.id === 'c11-complex-numbers' && <ComplexArgandFigure />}
-          <Section id="definitions" title={t('notes.sectionDefinitions')}>
-            <dl className="nt-defs">
-              {notes.definitions.map((d, i) => (
-                <div key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <dt><MathText text={d.term} /></dt>
-                  <dd><MathText text={d.meaning} /></dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-
           <Section id="formulas" title={t('notes.sectionFormulas')}>
             <div className="nt-formulas">
               {notes.formulas.map((f, i) => <Formula key={i} f={f} i={i} />)}
             </div>
           </Section>
 
-          <Section id="points" title={t('notes.sectionPoints')}>
-            <ol className="nt-points">
-              {notes.points.map((p, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <MathText className="nt-point-front" text={p.front} />
-                  <MathText className="nt-point-back" text={p.back} />
-                </li>
-              ))}
-            </ol>
+          <Section id="examples" title={t('notes.sectionExamples')}>
+            {notes.examples.some(ex => ex.figure) && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  aria-pressed={visualOnly}
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
+                  {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
+                </button>
+              </div>
+            )}
+            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} practiceLink={practiceLink} />)}
+            {selectedExamples.length > visibleExamples && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
+                  aria-label={t('notes.showMoreExamples')}>
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
+                </button>
+              </div>
+            )}
           </Section>
 
           <Section id="mistakes" title={t('notes.sectionMistakes')}>
@@ -525,26 +562,26 @@ function ChapterNotes({ chapterId }) {
             </ul>
           </Section>
 
-          <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.some(ex => ex.figure) && (
-              <div className="nt-example-more">
-                <button type="button" className="btn btn-secondary"
-                  aria-pressed={visualOnly}
-                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
-                  {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
-                </button>
-              </div>
-            )}
-            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} />)}
-            {selectedExamples.length > visibleExamples && (
-              <div className="nt-example-more">
-                <button type="button" className="btn btn-secondary"
-                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
-                  aria-label={t('notes.showMoreExamples')}>
-                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
-                </button>
-              </div>
-            )}
+          <Section id="points" title={t('notes.sectionPoints')}>
+            <ol className="nt-points">
+              {notes.points.map((p, i) => (
+                <li key={i} className="nt-reveal" style={{ '--i': i }}>
+                  <MathText className="nt-point-front" text={p.front} />
+                  <MathText className="nt-point-back" text={p.back} />
+                </li>
+              ))}
+            </ol>
+          </Section>
+
+          <Section id="definitions" title={t('notes.sectionDefinitions')}>
+            <dl className="nt-defs">
+              {notes.definitions.map((d, i) => (
+                <div key={i} className="nt-reveal" style={{ '--i': i }}>
+                  <dt><MathText text={d.term} /></dt>
+                  <dd><MathText text={d.meaning} /></dd>
+                </div>
+              ))}
+            </dl>
           </Section>
 
           {linkedResources.length > 0 && (
@@ -570,6 +607,7 @@ function ChapterNotes({ chapterId }) {
           <div className="nt-end nt-reveal">
             <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
+          </div>
           </div>
         </div>
       )}
@@ -672,29 +710,66 @@ function Formula({ f, i }) {
   );
 }
 
-function Example({ ex, n }) {
+function Example({ ex, n, practiceLink }) {
   const t = useT();
   // The student first sees only the problem, never an unsolicited solution.
   const [shown, setShown] = useState(0);
+  // Only component state: no persistence, server call, telemetry or marking.
+  const [predictionOpen, setPredictionOpen] = useState(false);
+  const [predictions, setPredictions] = useState({});
+  const reveal = (count) => {
+    setPredictionOpen(false);
+    setShown(current => Math.min(ex.steps.length, Math.max(current, count)));
+  };
   const done = shown >= ex.steps.length;
   return (
     <div className="nt-example nt-reveal">
       <p className="nt-example-n">{t('notes.exampleNumber', { n })}</p>
       <MathText block className="nt-example-q" text={ex.question} />
+      <div className="nt-example-progress" aria-label={t('notes.nextStep')}>
+        <span className="nt-example-progress-bar" aria-hidden="true">
+          <span style={{ width: `${(shown / ex.steps.length) * 100}%` }} />
+        </span>
+        <span>{shown} / {ex.steps.length}</span>
+      </div>
       {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
           <MathText text={s} />
           {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
+          {predictions[i]?.trim() && (
+            <div className="nt-step-attempt">
+              <span>{t('notes.yourAttempt')}</span>
+              <p>{predictions[i].trim()}</p>
+            </div>
+          )}
         </li>)}
       </ol>
       {!done ? (
-        <div className="nt-example-more">
-          <button type="button" className="btn btn-secondary" onClick={() => setShown(s => s + 1)}>{t('notes.nextStep')}</button>
-          <button type="button" className="nt-link-btn" onClick={() => setShown(ex.steps.length)}>{t('notes.allSteps')}</button>
+        <div className="nt-example-learning">
+          <button type="button" className="nt-predict-toggle" aria-expanded={predictionOpen}
+            onClick={() => setPredictionOpen(value => !value)}>
+            {t('notes.tryNextStep')}
+          </button>
+          {predictionOpen && (
+            <div className="nt-predict-editor">
+              <label>
+                <span>{t('notes.predictionLabel')}</span>
+                <textarea rows={2} maxLength={360} value={predictions[shown] || ''}
+                  onChange={event => setPredictions(prev => ({ ...prev, [shown]: event.target.value }))}
+                  data-testid="notes-step-prediction" />
+              </label>
+              <p>{t('notes.predictionPrivacy')}</p>
+            </div>
+          )}
+          <div className="nt-example-more">
+            <button type="button" className="btn btn-secondary" onClick={() => reveal(shown + 1)}>{t('notes.nextStep')}</button>
+            <button type="button" className="nt-link-btn" onClick={() => reveal(ex.steps.length)}>{t('notes.allSteps')}</button>
+          </div>
         </div>
       ) : (
-        <div className="nt-answer nt-step">
+        <>
+          <div className="nt-answer nt-step">
           <span className="nt-tag">{t('notes.answer')}</span>
           <MathText text={ex.answer} />
           <span className="nt-checked">{t('notes.engineChecked')}</span>
@@ -704,7 +779,9 @@ function Example({ ex, n }) {
               <MathText block text={ex.alternative} />
             </details>
           )}
-        </div>
+          </div>
+          <PageLink className="nt-example-practice" to={practiceLink}>{t('notes.tryChapterPractice')}</PageLink>
+        </>
       )}
     </div>
   );
