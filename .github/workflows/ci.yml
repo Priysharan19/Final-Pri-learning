@@ -396,7 +396,7 @@ jobs:
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
-          grep -Fq 'DESK CLOCK: PASS — 29/29 checks' suites.log
+          grep -Fq 'DESK CLOCK: PASS — 30/30 checks' suites.log
           grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question

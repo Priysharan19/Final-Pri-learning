@@ -137,6 +137,20 @@ check('a paused reading keeps its time; resume restarts it', () => {
   assert.equal(deriveClock(paper, events, at + 780_000).phase, 'ready');
 });
 
+check('the event cap never strands an attempt open: finish is always kept a slot', () => {
+  let events = run([['begin-working', at]]);
+  let t = at;
+  for (;;) {
+    const out = applyIntent(paper, events, deriveClock(paper, events, t + 1).running ? 'pause' : 'resume', t + 1);
+    if (!out.events) { assert.equal(out.refused, 'DESK_INTENT_NOT_ALLOWED'); break; }
+    events = out.events; t += 1;
+  }
+  assert.equal(events.length, 1998, 'other intents stop two short of the cap');
+  const closed = applyIntent(paper, events, 'finish', t + 1);
+  assert.ok(closed.events, 'finish is still accepted at the cap');
+  assert.equal(deriveClock(paper, closed.events, t + 2).phase, 'finished', 'and is read back: the log is within MAX_EVENTS');
+});
+
 // ── a zero-reading-time paper begins directly with working time ─────────────
 check('zero reading → working', () => {
   const generic = paperConfigOf({ ...library, readingMinutes: 0 });

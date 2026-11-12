@@ -262,7 +262,10 @@ export function applyIntent(paper, events, intent, now, { early = false } = {}) 
   const next = [...log];
   const { s } = fold(paper, log, at);
   if (s.readingEndedAt !== null && !s.readingEndRecorded) next.push({ t: 'reading-ended', at: s.readingEndedAt });
-  if (next.length >= MAX_EVENTS) return { refused: 'DESK_INTENT_NOT_ALLOWED' };
+  // The log is bounded, but closing the paper is never refused for length:
+  // two slots (a due end of reading, then the finish) are always kept for it,
+  // so an attempt cannot be stranded open at the cap.
+  if (intent !== 'finish' && next.length >= MAX_EVENTS - 2) return { refused: 'DESK_INTENT_NOT_ALLOWED' };
   // A zero-reading paper's "begin reading" begins working time, and the log says so.
   const t = intent === 'begin-reading' && paper.readingMinutes === 0 ? 'begin-working' : intent;
   next.push(t === 'finish' ? { t, at, reason: 'student' } : { t, at });
