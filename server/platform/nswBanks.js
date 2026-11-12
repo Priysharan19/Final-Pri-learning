@@ -88,6 +88,14 @@ export const NSW_QUALITY_EXCLUSIONS = Object.freeze({
   'ms12-bivariate|3': 'accepts 11.01 for the exact key 11',
   'ms12-bivariate|4': 'accepts -5.99 for the exact key -6',
   'me12-binomial|2': 'accepts 4.81 for the exact key 4.8',
+  // A list of solutions with a tolerance: one solution a hundredth (or a unit
+  // at the named precision) off is still marked correct.
+  'y10-quadratics|4': 'asks for 2 decimal places and accepts a root one hundredth off (e.g. 1.78, -2.27 for 1.77, -2.27)',
+  'y11-trigfunc|3': 'accepts an exact angle a hundredth of a degree off (e.g. 45.01 for 45)',
+  'me12-trigeq': 'every level accepts an exact angle a hundredth of a degree off (e.g. 60.01, 120 for 60, 120)',
+  // A right answer refused: the key keeps a zero-coefficient term.
+  'y7-algebra|2': 'when the expression simplifies to a constant the key is "0x + 9" and the right answer "9" is marked wrong, spending a try',
+  'y12-appdiff|3': 'for a horizontal tangent the key is "0x + -10" and the right answer "-10" is marked wrong, spending a try',
   'me11-poly|4': 'the answer shown after resolution is a raw float ("1.3333333333333333, 3" for 4/3, 3) on a question asked over the rationals',
   'me12-induction|4': 'every form is a proof answered by its working: there is no final answer to mark while marking is final answer only (plan G6)'
 });

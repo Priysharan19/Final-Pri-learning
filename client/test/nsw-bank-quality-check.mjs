@@ -156,8 +156,20 @@ function numericWrongs(q, a) {
   }
   return out;
 }
-function setWrongs(a) {
+/** The tolerance-independent offsets for one exact coordinate or solution: see numericWrongs. */
+function unitOffsets(q, v) {
+  const places = namedPrecision(`${q.prompt} ${q.answerSuffix || ''}`);
+  if (places != null) return [10 ** -places, -(10 ** -places)].map(off => Number((Number(v.toFixed(places)) + off).toFixed(places))).filter(x => Math.abs(x - v) > 0.5 * 10 ** -places * (1 + 1e-6));
+  const decimals = Number.isInteger(v) ? 0 : (String(Math.abs(v)).split('.')[1] || '').length;
+  if (/e/i.test(String(v)) || decimals > 4) return [];
+  const unit = 10 ** -Math.max(decimals, 2);
+  return [unit, -unit].map(off => Number((v + off).toFixed(Math.max(decimals, 2))));
+}
+function setWrongs(q, a) {
   const vals = a.values, out = [], tol = a.tol ?? 1e-6;
+  vals.forEach((value, i) => {
+    for (const x of unitOffsets(q, value)) out.push({ input: vals.map((v, j) => fmt(j === i ? x : v)).join(', '), why: `solution ${i + 1} a unit off, whatever the tolerance` });
+  });
   const has = x => vals.some(v => Math.abs(v - x) <= Math.max(tol, bandOf(v, a.tol)));
   const list = arr => arr.map(fmt).join(', ');
   if (vals.length > 1) out.push({ input: list(vals.slice(1)), why: 'a solution dropped' });
@@ -168,8 +180,10 @@ function setWrongs(a) {
   });
   return out;
 }
-function pointWrongs(a) {
+function pointWrongs(q, a) {
   const pt = (x, y) => `(${fmt(x)}, ${fmt(y)})`, out = [];
+  for (const x of unitOffsets(q, a.x)) out.push({ input: pt(x, a.y), why: 'x a unit off, whatever the tolerance' });
+  for (const y of unitOffsets(q, a.y)) out.push({ input: pt(a.x, y), why: 'y a unit off, whatever the tolerance' });
   if (differs(a.x, a.y)) out.push({ input: pt(a.y, a.x), why: 'coordinates swapped' });
   if (a.x !== 0) out.push({ input: pt(-a.x, a.y), why: 'x negated' });
   if (a.y !== 0) out.push({ input: pt(a.x, -a.y), why: 'y negated' });
@@ -199,6 +213,20 @@ function clearlyDifferent(e1, e2) {
   }
   return compared >= 4 && diff >= Math.ceil(compared / 2);
 }
+/** The value of an expression that is the same at every sample point, or null. */
+function constantValueOf(expr) {
+  let tree;
+  try { tree = parse(expr); } catch { return null; }
+  const values = [];
+  for (const p of [0.37, 1.3, -0.83, 3.9, 5.2, -2.4]) {
+    const scope = { theta: p, θ: p };
+    for (const [i, letter] of [...'abcdfghjklmnpqrstuvwxyz'].entries()) scope[letter] = p * (1 + 0.13 * i) + 0.07 * i;
+    try { const v = evaluate(tree, scope); if (Number.isFinite(v)) values.push(v); } catch { /* undefined here */ }
+  }
+  if (values.length < 4 || values.some(v => Math.abs(v - values[0]) > 1e-9 * Math.max(1, Math.abs(values[0])))) return null;
+  const rounded = Number(values[0].toFixed(9));
+  return /[a-df-z]/i.test(expr.replace(/sqrt|sin|cos|tan|log|ln|exp|pi/gi, '')) ? rounded : null;   // only a key that NAMES a variable
+}
 function expressionWrongs(q, a) {
   const e = a.expr;
   // An antiderivative is any one of a family: a constant added to it is still right.
@@ -213,8 +241,8 @@ function wrongsFor(q) {
   const a = q.answer || {};
   switch (q.answerType) {
     case 'numeric': return typeof a.value === 'number' ? numericWrongs(q, a) : [];
-    case 'set': return Array.isArray(a.values) && a.values.length ? setWrongs(a) : [];
-    case 'point': return pointWrongs(a);
+    case 'set': return Array.isArray(a.values) && a.values.length ? setWrongs(q, a) : [];
+    case 'point': return pointWrongs(q, a);
     case 'ratio': return ratioWrongs(a);
     case 'expression': return a.expr ? expressionWrongs(q, a) : [];
     case 'mcq': return (q.mcqOptions || []).map((_, i) => i).filter(i => i !== a.correctIndex).map(i => ({ input: String(i), why: `option ${i}` }));
@@ -341,8 +369,18 @@ function sweepCell(generator, difficulty, count = true, admitted = nswIssuable, 
       }
     } else if (count) totals.mcq++;
     // A precision this suite cannot read is not silently left unprobed.
-    if (q.answerType === 'numeric' && PRECISION_WORDS.test(String(q.prompt)) && namedPrecision(`${q.prompt} ${q.answerSuffix || ''}`) == null
-      && !/\b(?:measured|recorded|given)\b/i.test(String(q.prompt))) add('WRONG', `${where}: the prompt names a precision this gate cannot read: ${String(q.prompt).slice(0, 140)}`);
+    if (['numeric', 'set', 'point'].includes(q.answerType) && namedPrecision(`${q.prompt} ${q.answerSuffix || ''}`) == null
+      && PRECISION_WORDS.test(String(q.prompt).replace(/\b(?:measured|recorded|given)\b[^?!.]*?\bto the nearest \w+(?: \w+)?/gi, ''))) add('WRONG', `${where}: the prompt names a precision this gate cannot read: ${String(q.prompt).slice(0, 140)}`);
+    // A key whose value does not depend on its variables ("0x + 1") is the
+    // constant: the constant itself is a right answer and must be credited.
+    if (q.answerType === 'expression' && q.answer?.expr) {
+      const constant = constantValueOf(q.answer.expr);
+      if (constant != null) {
+        if (count) totals.keys++;
+        const plainly = verdict(q, fmt(constant));
+        if (plainly.correct !== true) add('KEY', `${where}: the key ${JSON.stringify(key)} is the constant ${fmt(constant)}, and ${JSON.stringify(fmt(constant))} is ${plainly.invalid ? 'unread' : 'marked wrong'}`);
+      }
+    }
     const wrongs = wrongsFor(q);
     if (!wrongs.length) add('WRONG', `${where}: no wrong answer could be built for ${q.answerType} key ${JSON.stringify(key)}`);
     for (const wrong of wrongs) {
