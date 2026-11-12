@@ -64,6 +64,9 @@ const args = process.argv.slice(2);
 const SEEDS = Number(args.find(a => /^\d+$/.test(a))) || 48;
 const SHOW_LEDGER = args.includes('--ledger');
 const DISTINCT_FLOOR = 6;
+// An excluded cell can fail on one rare form (y12-series D3: about one draw in a hundred), so the
+// "does it still fail?" re-sweep draws deeper than the issue sweep, whatever seed count was asked for.
+const EXCLUSION_SEEDS = Math.max(SEEDS, 400);
 const D13 = /Work it out first/;
 
 const fmt = x => (!Number.isFinite(x) ? String(x) : Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(12))));
@@ -103,6 +106,7 @@ function bandOf(v, tol) {
  * "correct to 2 decimal places"), or null. This suite's own reading of the
  * prompt: a precision the GIVEN data was measured to is not the answer's.
  */
+const PRECISION_WORDS = /\bnearest\b|decimal\s+place|\bd\.\s?p\b|significant|\bs\.\s?f\b/i;
 function namedPrecision(text) {
   const s = String(text || '').replace(/\b(?:measured|recorded|given)\b[^?!.]*?\bto the nearest \w+(?: \w+)?/gi, '');
   const words = { one: 1, two: 2, three: 3, four: 4, five: 5, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
@@ -129,6 +133,17 @@ function numericWrongs(q, a) {
     }
   }
   const push = (x, why) => { if (Number.isFinite(x) && Math.abs(x - v) > band * 1.0000001 && differs(x, v)) out.push({ input: fmt(x), why }); };
+  // An EXACT key (a whole number or a terminating decimal of at most four
+  // places) on a question that names no precision has no rounding to forgive:
+  // a hundredth off, or one unit off in the key's own last place, is a
+  // different number — a cent on a money answer — whatever the tolerance. Not
+  // filtered by the band either.
+  const decimals = Number.isInteger(v) ? 0 : (String(Math.abs(v)).split('.')[1] || '').length;
+  if (places == null && !/e/i.test(String(v)) && decimals <= 4 && !a.simplestFraction && !a.surdForm) {
+    for (const unit of new Set([10 ** -decimals, 10 ** -Math.max(decimals, 2)])) {
+      for (const off of [unit, -unit]) out.push({ input: fmt(Number((v + off).toFixed(Math.max(decimals, 2)))), why: `${unit} off an exact key, no precision named` });
+    }
+  }
   push(-v, 'sign'); push(v + 1, '+1'); push(v - 1, '-1');
   if (v !== 0 && Math.abs(v) !== 1) push(1 / v, 'reciprocal');
   push(v * 10, '×10'); push(v / 10, '÷10');
@@ -289,12 +304,12 @@ function identityFaults(q, generator) {
 const totals = { cells: 0, questions: 0, issuable: 0, notIssuable: 0, keys: 0, printed: 0, d13: 0, wrongs: 0, mcq: 0, mathSegments: 0 };
 const byType = {};
 /** Sweep one cell. Returns { faults: Map<kind, string[]>, issuable, distinct }. */
-function sweepCell(generator, difficulty, count = true, admitted = nswIssuable) {
+function sweepCell(generator, difficulty, count = true, admitted = nswIssuable, seeds = SEEDS) {
   const faults = new Map();
   const add = (kind, text) => { if (!faults.has(kind)) faults.set(kind, []); faults.get(kind).push(text); };
   const seen = new Set();
   let issuable = 0, generated = 0;
-  for (let i = 0; i < SEEDS; i++) {
+  for (let i = 0; i < seeds; i++) {
     const seed = ((i + 1) * 2654435761 + difficulty * 40503 + generator.length * 97) >>> 0 & 0x7fffffff;
     let q;
     try { q = generateQuestion(generator, difficulty, seed); } catch (err) { add('THROWS', `seed ${seed}: ${String(err.message).slice(0, 100)}`); continue; }
@@ -325,6 +340,9 @@ function sweepCell(generator, difficulty, count = true, admitted = nswIssuable) 
         }
       }
     } else if (count) totals.mcq++;
+    // A precision this suite cannot read is not silently left unprobed.
+    if (q.answerType === 'numeric' && PRECISION_WORDS.test(String(q.prompt)) && namedPrecision(`${q.prompt} ${q.answerSuffix || ''}`) == null
+      && !/\b(?:measured|recorded|given)\b/i.test(String(q.prompt))) add('WRONG', `${where}: the prompt names a precision this gate cannot read: ${String(q.prompt).slice(0, 140)}`);
     const wrongs = wrongsFor(q);
     if (!wrongs.length) add('WRONG', `${where}: no wrong answer could be built for ${q.answerType} key ${JSON.stringify(key)}`);
     for (const wrong of wrongs) {
@@ -333,7 +351,7 @@ function sweepCell(generator, difficulty, count = true, admitted = nswIssuable) 
     }
   }
   if (generated && !issuable) add('EMPTY', 'no question this cell generates has a final answer to mark');
-  else if (issuable && seen.size < Math.min(DISTINCT_FLOOR, SEEDS)) add('DISTINCT', `only ${seen.size} distinct questions in ${issuable} draws`);
+  else if (issuable && seen.size < Math.min(DISTINCT_FLOOR, seeds)) add('DISTINCT', `only ${seen.size} distinct questions in ${issuable} draws`);
   return { faults, issuable, distinct: seen.size };
 }
 const describe = faults => [...faults].map(([kind, list]) => `${kind} ×${list.length} — ${list[0]}`).join('; ');
@@ -383,7 +401,7 @@ for (const [key, reason] of Object.entries(NSW_QUALITY_EXCLUSIONS)) {
   if (!entry || typeof GENERATORS[generator] !== 'function') continue;
   const levels = d !== undefined ? [Number(d)] : entry.cells.map(cell => cell.difficulty);
   // A thin pool is not what any exclusion records: only a marking, rendering or final-answer fault keeps one alive.
-  const found = levels.map(level => ({ level, ...sweepCell(generator, level, false, nswCandidate) })).filter(r => [...r.faults.keys()].some(kind => kind !== 'DISTINCT'));
+  const found = levels.map(level => ({ level, ...sweepCell(generator, level, false, nswCandidate, EXCLUSION_SEEDS) })).filter(r => [...r.faults.keys()].some(kind => kind !== 'DISTINCT'));
   if (!found.length) fail(`exclusion ${key} ("${reason}") no longer fails the sweep: issue it, or record a reason the sweep can see`);
   else exclusionNotes.push(`${key}: ${found.map(r => `D${r.level} ${describe(r.faults)}`).join(' | ').slice(0, 300)}`);
 }
@@ -437,5 +455,5 @@ console.log(`${totals.issuable} issuable questions over ${totals.cells} cells ×
 const all = [...problems, ...cellFailures];
 console.log(all.length
   ? `NSW BANK QUALITY: FAIL — ${all.length} problems\n  · ${all.slice(0, Number(process.env.SWEEP_SHOW) || 80).join('\n  · ')}`
-  : `NSW BANK QUALITY: PASS — ${NSW_BANK_COUNT} generators, ${NSW_CELL_COUNT} cells issued; every stored answer accepted, every wrong answer refused, options distinct, prompts render, identity carried. [SYNTHETIC]`);
+  : `NSW BANK QUALITY: PASS — ${NSW_BANK_COUNT} generators, ${NSW_CELL_COUNT} cells issued; every stored answer accepted, every probed wrong answer refused, options distinct, prompts render, identity carried. [SYNTHETIC]`);
 process.exit(all.length ? 1 : 0);

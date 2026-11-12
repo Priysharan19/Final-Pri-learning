@@ -158,7 +158,7 @@ try {
   const SAMPLES = [
     { generator: 'y7-integers', difficulty: 1, seed: 11, syllabus: 'nsw-mathematics-k-10-2022', version: '2022', code: 'MA4-INT-C-01' },
     { generator: 'y12-series', difficulty: 2, seed: 5, syllabus: 'nsw-mathematics-advanced-11-12-2024', version: '2024', code: 'MAV-12-03' },
-    { generator: 'ms12-normal', difficulty: 1, seed: 3, syllabus: 'nsw-mathematics-standard-11-12-2024', version: '2024', code: 'MST-12-S2-10' },
+    { generator: 'ms12-nonright', difficulty: 1, seed: 3, syllabus: 'nsw-mathematics-standard-11-12-2024', version: '2024', code: 'MST-12-S2-04' },
     { generator: 'me12-vectors', difficulty: 2, seed: 9, syllabus: 'nsw-mathematics-extension1-11-12-2024', version: '2024', code: 'ME1-12-02' },
     { generator: 'mex-complex', difficulty: 1, seed: 4, syllabus: 'nsw-mathematics-extension2-11-12-2024', version: '2024', code: 'ME2-12-03' }
   ];
@@ -306,7 +306,7 @@ try {
       'curriculumAvailability reads it: a focus area with no issued question is not selectable');
     c.ok(!/outcome wording|students? (?:develop|select|appl)/i.test(JSON.stringify(r.data)) && all.every(dp => !('text' in dp)), 'it carries codes and Pri\'s focus-area names, no NESA wording');
     // What it advertises can be issued, and lands on the outcome it was advertised for.
-    const sample = all.filter(dp => dp.generated).filter((_, i) => i % 4 === 0);
+    const sample = all.filter(dp => dp.generated).filter((_, i) => i % 3 === 0);
     for (const dp of sample) {
       const target = dp.practice[0];
       const got = await issue({ generator: target.generator, difficulty: target.difficulties[0], dotpoint: target.dotpoint, curriculum: 'nsw' }, b.jar);

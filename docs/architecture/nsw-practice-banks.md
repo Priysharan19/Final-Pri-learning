@@ -28,7 +28,9 @@ A Prithagoras server issues a question only if all of these hold:
 4. **The quality gate.** `npm run test:nsw:banks` sweeps every issued cell over many seeds: the stored answer and the
    printed answer are accepted, near-miss wrong answers are refused, options are distinct, every `$…$` segment parses
    in KaTeX, and the identity is carried. Where a question names a precision ("to the nearest dollar"), an answer one
-   unit off in that place must be refused whatever tolerance the generator authored. A cell that fails is listed in `NSW_QUALITY_EXCLUSIONS` with its reason and
+   unit off in that place must be refused whatever tolerance the generator authored. Where it names none and the key
+   is exact (a whole number or a short terminating decimal), a hundredth off must be refused too. A generator's
+   tolerance never excuses a probe: whether a cent of rounding drift is acceptable is an examiner's ruling (plan G6). A cell that fails is listed in `NSW_QUALITY_EXCLUSIONS` with its reason and
    is not issued. The gate re-sweeps each exclusion and fails if one no longer fails.
 
 `npm run nsw:banks` prints the whole ledger: every legacy NSW generator, issued or not, and why.
@@ -71,6 +73,9 @@ only; no NESA wording is stored or served. On a Priyabhata server the route sits
 
 - **Client.** The student app still sends `curriculum: 'in'` and builds its curriculum on the device. It does not yet
   ask a Prithagoras server for NSW questions or read `/v1/curriculum` (plan E3, G3).
+- **Tolerances.** The largest group of exclusions is generators whose tolerance is wider than the answer's precision
+  (financial mathematics, statistics, Standard measurement). Tightening them is generator work that changes India's
+  shared content version, so it is not done here; each fix re-admits a cell.
 - **Coverage.** The outcomes with `generated: false`, the `partial` generators (`me11-comb`, `me12-calc`) and the
   excluded cells. Reaching an outcome is a floor, not syllabus coverage.
 - **Certification.** Method marks, criteria ladders with "or equivalent merit", and HSC-style papers (plan G4, G6).
