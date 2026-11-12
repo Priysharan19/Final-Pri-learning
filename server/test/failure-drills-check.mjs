@@ -158,6 +158,8 @@ async function openDrillDatabase(label) {
     let current = await open();
     return {
       relay,
+      // What the logs must never carry: every host, port and URL the server's store can name.
+      connection: { hosts: [url.hostname, '127.0.0.1'], ports: [String(url.port || 5432), String(relay.port)], urls: [scratchDb.url, relayed.toString()] },
       store: () => current,
       async reopen() { await current.close(); current = await open(); return current; },
       async close() { await current.close().catch(() => {}); await relay.close(); await scratchDb.close(); }
@@ -173,6 +175,7 @@ async function openDrillDatabase(label) {
   let current = open();
   return {
     relay: null,
+    connection: { hosts: [], ports: ['5432'], urls: [] },
     store: () => current.store,
     async reopen() { current.raw.close(); current = open(); return current.store; },
     async close() { if (current.raw.open) current.raw.close(); }
@@ -186,7 +189,41 @@ async function verifiedStudent(app, email, deviceId = 'ipad-drill') {
   return student;
 }
 
+/**
+ * The fields of structured log lines that carry a database connection detail:
+ * a postgres URL, a configured URL, a host:port pair, a configured host, or a
+ * configured port in a connection context (a host/port/address field, or after
+ * a colon). Returns `line#.field` names only — never the values.
+ */
+function connectionLeaks(lines, { hosts = [], ports = [], urls = [] } = {}) {
+  const out = [];
+  const portRe = ports.length ? new RegExp(`(?:^|[:@\\s])(?:${ports.join('|')})(?:$|[/\\s,])`) : null;
+  const hostRe = hosts.length ? new RegExp(`(?:^|[^0-9a-z.-])(?:${hosts.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:$|[^0-9a-z.-])`, 'i') : null;
+  lines.forEach((line, i) => {
+    let fields;
+    try { fields = JSON.parse(line); } catch { out.push(`${i}.<unparsed>`); return; }
+    for (const [name, raw] of Object.entries(fields)) {
+      const v = typeof raw === 'string' ? raw : JSON.stringify(raw);
+      const connectionField = /host|port|addr|url|dsn|connection/i.test(name);
+      if (/postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
+          (portRe && portRe.test(v)) || (connectionField && ports.some(p => v.includes(p)))) out.push(`${i}.${name}`);
+    }
+  });
+  return out;
+}
+
 const counter = key => metrics.snapshot().counters[key]?.total || 0;
+
+// The leak scan itself: a random id containing the port digits passes; the
+// real host, a port in connection context, and any postgres URL fail.
+{
+  const C = { hosts: ['db.internal'], ports: ['5432', '61234'], urls: ['postgres://u:p@db.internal:5432/x'] };
+  const line = o => JSON.stringify(o);
+  c.deq(connectionLeaks([line({ requestId: 'e7887703-5432-49be-a1c5', code: 'PLATFORM_DB_UNAVAILABLE' })], C), [], 'leak scan: digits inside a request id are not a port');
+  c.deq(connectionLeaks([line({ code: 'X', message: 'connect ECONNREFUSED db.internal:5432' })], C), ['0.message'], 'leak scan: host:port fails, named by field only');
+  c.deq(connectionLeaks([line({ dbPort: 61234 })], C), ['0.dbPort'], 'leak scan: a port in a port-named field fails');
+  c.deq(connectionLeaks([line({ m: 'see postgresql://anything' })], C), ['0.m'], 'leak scan: any postgres URL fails');
+}
 
 try {
   // ── Drill 1 · database unavailable at runtime ────────────────────────────
@@ -233,7 +270,11 @@ try {
     c.ok(counter('db_errors_total{code=PLATFORM_DB_UNAVAILABLE}') - outageStart >= 3, 'drill 1: the outage is counted');
     c.ok(metrics.snapshot().firing.includes('DB_CONNECTIVITY'), 'drill 1: and fires DB_CONNECTIVITY');
     const outageLines = logLines.filter(line => line.includes('"PLATFORM_DB_UNAVAILABLE"'));
-    c.ok(outageLines.length > 0 && outageLines.every(line => !line.includes('5432') && !line.includes('postgres://')), 'drill 1: logged by code, never by host, port or URL');
+    // Field by field, so a random request id that happens to contain "5432"
+    // is not mistaken for a port, while the real connection details still fail.
+    const leaks = connectionLeaks(outageLines, database.connection);
+    c.ok(outageLines.length > 0 && leaks.length === 0,
+      `drill 1: logged by code, never by host, port or URL (${outageLines.length} coded line(s); offending fields: ${leaks.join(', ') || 'none'})`);
 
     if (engine === 'postgres') await database.relay.restore();
     else fault.state.mode = null;
