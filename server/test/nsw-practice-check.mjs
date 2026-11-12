@@ -27,7 +27,7 @@
 //   PRIYABHATA (PRI_EDITION unset) — unchanged
 //   · India banks are issued with no sealed identity or marking limit; NSW
 //     banks and the NSW course are refused exactly as before (D15);
-//     /v1/curriculum is the platform's ordinary 404.
+//     /v1/curriculum serves nothing (404 to a signed-in account).
 //
 // SYNTHETIC: generated questions and a scripted client. Not evidence about
 // real students, an examiner's certification or NESA approval.
@@ -117,8 +117,9 @@ try {
     assert.equal(identity.jurisdiction, 'NSW');
     assert.equal(identity.authority, 'NESA');
     const entry = NSW_BANK_LEDGER.find(e => e.generator === generator);
-    assert.equal(identity.syllabus, entry.syllabus);
-    assert.equal(identity.syllabusVersion, NSW_SYLLABUS_BY_ID[entry.syllabus].version);
+    assert.equal(identity.labelledSyllabus, entry.syllabus);
+    assert.ok(identity.outcomes.some(o => o.syllabus === identity.syllabus), 'the named syllabus owns one of the outcomes');
+    assert.equal(identity.syllabusVersion, NSW_SYLLABUS_BY_ID[identity.syllabus].version);
     assert.ok(identity.outcomes.length >= 1);
     for (const o of identity.outcomes) {
       assert.equal(NSW_OUTCOME_BY_CODE[o.code]?.syllabus, o.syllabus, `${o.code} is a current outcome of ${o.syllabus}`);
@@ -157,7 +158,7 @@ try {
   const SAMPLES = [
     { generator: 'y7-integers', difficulty: 1, seed: 11, syllabus: 'nsw-mathematics-k-10-2022', version: '2022', code: 'MA4-INT-C-01' },
     { generator: 'y12-series', difficulty: 2, seed: 5, syllabus: 'nsw-mathematics-advanced-11-12-2024', version: '2024', code: 'MAV-12-03' },
-    { generator: 'ms12-annuity', difficulty: 1, seed: 3, syllabus: 'nsw-mathematics-standard-11-12-2024', version: '2024', code: 'MST-12-S2-03' },
+    { generator: 'ms12-normal', difficulty: 1, seed: 3, syllabus: 'nsw-mathematics-standard-11-12-2024', version: '2024', code: 'MST-12-S2-10' },
     { generator: 'me12-vectors', difficulty: 2, seed: 9, syllabus: 'nsw-mathematics-extension1-11-12-2024', version: '2024', code: 'ME1-12-02' },
     { generator: 'mex-complex', difficulty: 1, seed: 4, syllabus: 'nsw-mathematics-extension2-11-12-2024', version: '2024', code: 'ME2-12-03' }
   ];
@@ -243,6 +244,13 @@ try {
     const shared = await issue({ generator: 'y8-circles', difficulty: 4, seed: 7, curriculum: 'nsw' });
     const s2 = await sealedOf(a.account.id, shared.data.question.id);
     c.ok(s2._curriculum.exact === false && s2._curriculum.dotpoints.length === 2 && s2._curriculum.outcomes.length === 2, 'a cell that spans two dot points names both outcomes and says it is not exact');
+    // Content Pri labels Advanced that the 2024 syllabuses place in Extension 1 is filed where it sits.
+    const poly = await issue({ generator: 'y11-polynomials', difficulty: 1, seed: 2, curriculum: 'nsw' });
+    const s3 = await sealedOf(a.account.id, poly.data.question.id);
+    c.deq([s3._curriculum.syllabus, s3._curriculum.labelledSyllabus, s3._curriculum.outcomes[0].code],
+      ['nsw-mathematics-extension1-11-12-2024', 'nsw-mathematics-advanced-11-12-2024', 'ME1-11-02'], 'remainder-theorem items labelled Advanced are sealed as Extension 1 content');
+    c.deq([(await issue({ generator: 'y10-compound', difficulty: 1, curriculum: 'nsw' })).data?.error?.code, (await issue({ generator: 'me11-poly', difficulty: 4, curriculum: 'nsw' })).data?.error?.code],
+      ['PRACTICE_BANK_OUTSIDE_CURRICULUM', 'PRACTICE_CONTENT_UNSUPPORTED'], 'a bank the quality gate excluded whole, and a cell it excluded, are refused');
     // Asking a dot point whose only forms are not issued: y8-linear.3 lives at D3 (issued); y8-linear D4 has no dot point.
     c.deq([(await issue({ generator: 'y8-linear', difficulty: 4, curriculum: 'nsw' })).status], [422], 'y8-linear D4 assesses no dot point and is refused');
   }
@@ -376,12 +384,9 @@ try {
   }
   const indiaKind = await india.request('/v1/exams', { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'india-kind-control' }, body: { kind: 'india' } });
   c.ok(indiaKind.data?.error?.code !== 'EXAM_KIND_OUTSIDE_CURRICULUM', `Priyabhata: an India paper request is read as before (${indiaKind.status} ${indiaKind.data?.error?.code})`);
-  for (const jar of [undefined, a.jar]) {
-    const gone = await india.request('/v1/curriculum', jar ? { jar } : {});
-    c.deq([gone.status, gone.data], [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }], `Priyabhata: /v1/curriculum is the ordinary 404, ${jar ? 'signed in' : 'signed out'}`);
-  }
-  const unknown = await india.request('/v1/no-such-endpoint');
-  c.deq([unknown.status, unknown.data], [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }], 'Priyabhata: exactly as an unknown path answers');
+  c.eq((await india.request('/v1/curriculum')).status, 401, 'Priyabhata: /v1/curriculum sits behind the same session guard');
+  const gone = await india.request('/v1/curriculum', { jar: a.jar });
+  c.deq([gone.status, gone.data], [404, { error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }], 'Priyabhata: and serves nothing — its curriculum is built on the device');
 } finally {
   await india.close();
 }

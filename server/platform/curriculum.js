@@ -15,9 +15,10 @@
 // child), like the resource library beside it.
 //
 // Priyabhata's curriculum is built on the device from the bundled India
-// syllabus, as it always has been; this route has nothing to add there and
-// answers the platform's ordinary 404 before any other check, exactly as the
-// path did before the route existed.
+// syllabus, as it always has been; the server has none to add. The route is
+// the same route there, behind the same guards (one platform: every reviewed
+// /v1 route exists, guarded alike, on both editions), and a signed-in account
+// is told 404 NOT_FOUND. No India client calls it.
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession } from './security.js';
@@ -33,10 +34,10 @@ export function createCurriculumRouter(db, { edition = serverEdition(process.env
   if (!EDITION_IDS.includes(edition)) throw new Error(`curriculum: unknown edition ${JSON.stringify(edition)}`);
   const build = RESPONSES[edition] || null;
   const router = asyncRouter();
-  const served = (req, res, next) => (build ? next() : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
-  router.get('/', served, requireSession(db), requireGuardianConsent(db),
+  router.get('/', requireSession(db), requireGuardianConsent(db),
     rateLimit(db, 'curriculum-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
       res.set('Cache-Control', 'private, no-store');
+      if (!build) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } });
       return res.status(200).json(build());
     });
   return router;

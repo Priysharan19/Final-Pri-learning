@@ -15,7 +15,9 @@
 //             the answer the server prints after resolution accepted too (or
 //             refused only by the D13 "work it out first" rule, with guidance);
 //   WRONG     have every near-miss wrong answer REFUSED: sign, ±1, reciprocal,
-//             ×10, ÷10, just outside the tolerance; a dropped, extra, negated
+//             ×10, ÷10, just outside the generator's tolerance — and, where
+//             the question names a precision ("to the nearest dollar"), one
+//             unit off in that place WHATEVER the tolerance; a dropped, extra, negated
 //             or shifted solution; swapped or shifted coordinates; a reversed
 //             ratio; an expression negated, doubled, scaled or offset (each
 //             confirmed non-equivalent by direct evaluation first); every
@@ -96,8 +98,36 @@ function bandOf(v, tol) {
   const cap = places <= 2 ? 0.5 * 10 ** -places : 0.05;
   return Math.min(cap, Math.max(1e-6, Math.abs(v) * 1e-4));
 }
-function numericWrongs(a) {
+/**
+ * Decimal places the question itself asks for ("to the nearest dollar",
+ * "correct to 2 decimal places"), or null. This suite's own reading of the
+ * prompt: a precision the GIVEN data was measured to is not the answer's.
+ */
+function namedPrecision(text) {
+  const s = String(text || '').replace(/\b(?:measured|recorded|given)\b[^?!.]*?\bto the nearest \w+(?: \w+)?/gi, '');
+  const words = { one: 1, two: 2, three: 3, four: 4, five: 5, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 };
+  const m = s.match(/\b(\w+)\s*(?:decimal\s+places?|d\.\s?p\.?)/i);
+  if (m && words[m[1].toLowerCase()] != null) return words[m[1].toLowerCase()];
+  if (/nearest\s+(?:whole(?: number)?|integer|unit|dollar|degree|metre|centimetre|kilometre|cm|km|kg|gram|second|minute|hour|year|person|percent)\b/i.test(s)) return 0;
+  if (/nearest\s+cent\b/i.test(s)) return 2;
+  if (/nearest\s+tenth/i.test(s)) return 1;
+  if (/nearest\s+hundredth/i.test(s)) return 2;
+  return null;
+}
+function numericWrongs(q, a) {
   const v = a.value, band = bandOf(v, a.tol), out = [];
+  // A precision the question names is the answer's: one unit off in that
+  // place is wrong WHATEVER tolerance the generator authored, so these probes
+  // are not filtered by the band. (This is what catches a tolerance wider
+  // than the precision asked for.)
+  const places = namedPrecision(`${q.prompt} ${q.answerSuffix || ''}`);
+  if (places != null && !a.simplestFraction && !a.surdForm) {
+    const unit = 10 ** -places, rounded = Number(v.toFixed(places));
+    for (const off of [unit, -unit]) {
+      const x = Number((rounded + off).toFixed(places));
+      if (Math.abs(x - v) > 0.5 * unit * (1 + 1e-6)) out.push({ input: fmt(x), why: `one unit off at the ${places} d.p. the question names` });
+    }
+  }
   const push = (x, why) => { if (Number.isFinite(x) && Math.abs(x - v) > band * 1.0000001 && differs(x, v)) out.push({ input: fmt(x), why }); };
   push(-v, 'sign'); push(v + 1, '+1'); push(v - 1, '-1');
   if (v !== 0 && Math.abs(v) !== 1) push(1 / v, 'reciprocal');
@@ -167,7 +197,7 @@ function expressionWrongs(q, a) {
 function wrongsFor(q) {
   const a = q.answer || {};
   switch (q.answerType) {
-    case 'numeric': return typeof a.value === 'number' ? numericWrongs(a) : [];
+    case 'numeric': return typeof a.value === 'number' ? numericWrongs(q, a) : [];
     case 'set': return Array.isArray(a.values) && a.values.length ? setWrongs(a) : [];
     case 'point': return pointWrongs(a);
     case 'ratio': return ratioWrongs(a);
@@ -226,6 +256,8 @@ function renderFaults(q) {
   }
   const printed = answerTextFor(q);
   if (q.answerType !== 'mcq' && (typeof printed !== 'string' || !printed.trim() || BROKEN_TEXT.test(printed))) faults.push(`the printed answer is ${JSON.stringify(printed)}`);
+  // 1.3333333333333333 for 4/3: a float printed raw is not an answer a student should be shown.
+  else if (q.answerType !== 'mcq' && /\d\.\d{9,}/.test(printed)) faults.push(`the printed answer is a raw float: ${JSON.stringify(printed)}`);
   return faults;
 }
 function optionFaults(q) {
@@ -244,6 +276,7 @@ function identityFaults(q, generator) {
   const faults = [];
   if (id.jurisdiction !== 'NSW' || id.authority !== 'NESA') faults.push('wrong jurisdiction');
   if (NSW_SYLLABUS_BY_ID[id.syllabus]?.status !== 'current' || id.syllabusVersion !== NSW_SYLLABUS_BY_ID[id.syllabus].version) faults.push('syllabus is not a current one with its version');
+  if (!id.outcomes.some(o => o.syllabus === id.syllabus)) faults.push(`names syllabus ${id.syllabus}, which owns none of its outcomes`);
   if (!id.outcomes.length) faults.push('no outcome code');
   for (const o of id.outcomes) {
     const known = NSW_OUTCOME_BY_CODE[o.code];
@@ -349,7 +382,8 @@ for (const [key, reason] of Object.entries(NSW_QUALITY_EXCLUSIONS)) {
   const entry = NSW_BANK_LEDGER.find(e => e.generator === generator);
   if (!entry || typeof GENERATORS[generator] !== 'function') continue;
   const levels = d !== undefined ? [Number(d)] : entry.cells.map(cell => cell.difficulty);
-  const found = levels.map(level => ({ level, ...sweepCell(generator, level, false, nswCandidate) })).filter(r => r.faults.size);
+  // A thin pool is not what any exclusion records: only a marking, rendering or final-answer fault keeps one alive.
+  const found = levels.map(level => ({ level, ...sweepCell(generator, level, false, nswCandidate) })).filter(r => [...r.faults.keys()].some(kind => kind !== 'DISTINCT'));
   if (!found.length) fail(`exclusion ${key} ("${reason}") no longer fails the sweep: issue it, or record a reason the sweep can see`);
   else exclusionNotes.push(`${key}: ${found.map(r => `D${r.level} ${describe(r.faults)}`).join(' | ').slice(0, 300)}`);
 }

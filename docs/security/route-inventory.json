@@ -1585,7 +1585,7 @@
       "verifiedEmail": false,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only, no account data: the curriculum THIS server's edition teaches (PRI_EDITION, server/platform/edition.js; no request field selects it). On a Prithagoras server: every outcome code of the current NSW syllabuses with honest availability (generated true/false) and the practice targets the server issues (server/platform/nswBanks.js); the same reply for every account; codes and Pri's own focus-area names only, no NESA wording; private, no-store; nothing written. On an edition with no server-built curriculum (Priyabhata) the route answers the platform's ordinary 404 NOT_FOUND before any session, consent or rate-limit check, exactly as the path did before the route existed",
+      "ownership": "read-only, no account data: the curriculum THIS server's edition teaches (PRI_EDITION, server/platform/edition.js; no request field selects it). On a Prithagoras server: every outcome code of the current NSW syllabuses with honest availability (generated true/false) and the practice targets the server issues (server/platform/nswBanks.js); the same reply for every account; codes and Pri's own focus-area names only, no NESA wording; private, no-store; nothing written. On an edition with no server-built curriculum (Priyabhata) the same guards apply and a signed-in account is answered 404 NOT_FOUND",
       "rateLimits": [
         {
           "key": "curriculum-read",

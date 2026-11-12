@@ -240,7 +240,7 @@ jobs:
           # 124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124.
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render.
-          grep -Fq 'NSW BANK QUALITY: PASS — 82 generators, 319 cells issued' suites.log
+          grep -Fq 'NSW BANK QUALITY: PASS — 78 generators, 302 cells issued' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
@@ -616,7 +616,7 @@ jobs:
           # Plan G3: the edition decides the bank. Prithagoras issues only mapped NSW content, seals jurisdiction/syllabus/outcome,
           # marks the final answer only with the method-mark switch on, and Priyabhata is unchanged. SQLite here; Postgres below.
           node server/test/nsw-practice-check.mjs 2>&1 | tee -a practice-http.log
-          grep -Fq 'NSW PRACTICE (G3): PASS — 163/163 checks' practice-http.log
+          grep -Fq 'NSW PRACTICE (G3): PASS — 164/164 checks' practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log

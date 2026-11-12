@@ -27,7 +27,8 @@ A Prithagoras server issues a question only if all of these hold:
 3. **A final answer.** A question whose answer is its working (`answerType: 'working'`, a proof) is never issued.
 4. **The quality gate.** `npm run test:nsw:banks` sweeps every issued cell over many seeds: the stored answer and the
    printed answer are accepted, near-miss wrong answers are refused, options are distinct, every `$…$` segment parses
-   in KaTeX, and the identity is carried. A cell that fails is listed in `NSW_QUALITY_EXCLUSIONS` with its reason and
+   in KaTeX, and the identity is carried. Where a question names a precision ("to the nearest dollar"), an answer one
+   unit off in that place must be refused whatever tolerance the generator authored. A cell that fails is listed in `NSW_QUALITY_EXCLUSIONS` with its reason and
    is not issued. The gate re-sweeps each exclusion and fails if one no longer fails.
 
 `npm run nsw:banks` prints the whole ledger: every legacy NSW generator, issued or not, and why.
@@ -38,8 +39,10 @@ Every issued question is sealed (`_curriculum`, server-side only) with `jurisdic
 `syllabusVersion`, `outcomes[{ code, syllabus, syllabusVersion }]`, `dotpoints[]` and `exact`. The outcome is where the
 crosswalk located the question's dot point, which can be another Stage, Year or course than Pri's label (the crosswalk
 says where). `exact` is false when the question's cell spans several dot points and nothing says which one this
-question exercises. The graded attempt records the same identity. A question that cannot be given one is not issued.
-The device is sent none of it.
+question exercises. `syllabus` is the syllabus that owns the content; `labelledSyllabus` is the course Pri's label
+points at, which can differ. The graded attempt records the same identity. A question that cannot be given one is not
+issued. No question response carries it; the account's own devices receive it with the graded attempt through sync
+(it is not answer-derived: generator and dot point are already public).
 
 ## Marking
 
@@ -61,7 +64,8 @@ working marks (research §8.3). That wording is client work and is not in this s
 `GET /v1/curriculum` on a Prithagoras server lists every outcome of the five current syllabuses with
 `generated: true | false` and, where true, the practice targets (`generator`, `dotpoint`, `difficulties`) the server
 will issue. An outcome with no issued question is listed with `generated: false`. Codes and Pri's own focus-area names
-only; no NESA wording is stored or served. On a Priyabhata server the path is the ordinary 404, as before.
+only; no NESA wording is stored or served. On a Priyabhata server the route sits behind the same guards and answers
+404: that edition's curriculum is built on the device, as before.
 
 ## What remains
 

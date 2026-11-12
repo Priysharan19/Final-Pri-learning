@@ -54,6 +54,18 @@ export const NSW_QUALITY_EXCLUSIONS = Object.freeze({
   'y9-simint|4': 'a right answer is marked wrong on the rate form: the box reads "% p.a." and the marker refuses "12% p.a.", spending a try',
   'y11-quadfunc|1': 'the answer as the server prints it, "Δ = 97", cannot be read by the marker (the box is prefixed "Δ =")',
   'me11-functions|2': 'the answer in the form the question asks for, "x ≥ -1", cannot be read by the marker (the box is prefixed "x ≥")',
+  // A tolerance wider than the precision the question asks for: an answer one
+  // unit off in the named place is marked correct. Whether a cent or a dollar
+  // of rounding drift is acceptable is an examiner's ruling (plan G6), not a
+  // default; until then these are not issued.
+  'y10-compound': 'every level asks for the nearest cent or dollar and accepts an answer one cent or dollar off (e.g. 7900.80 for 7900.79)',
+  'ms12-loans': 'every level asks for the nearest cent and accepts an answer one cent off (e.g. 397.26 for 397.25)',
+  'ms12-annuity': 'every level asks for the nearest cent and accepts an answer one cent off (e.g. 8206.51 for 8206.50)',
+  'y12-financial|2': 'asks for the nearest cent and accepts an answer one cent off (e.g. 5061.93 for 5061.92)',
+  'y12-financial|3': 'asks for the nearest dollar and accepts an answer one dollar off (e.g. 37380 for 37379)',
+  'y12-financial|4': 'asks for the nearest cent and accepts an answer one cent off (e.g. 24248.13 for 24248.12)',
+  'ms11-energy|4': 'asks for the nearest dollar and accepts an answer one dollar off (e.g. 1105 for 1104)',
+  'me11-poly|4': 'the answer shown after resolution is a raw float ("1.3333333333333333, 3" for 4/3, 3) on a question asked over the rationals',
   'me12-induction|4': 'every form is a proof answered by its working: there is no final answer to mark while marking is final answer only (plan G6)'
 });
 
@@ -155,12 +167,20 @@ function identityIn(q, generator, cellAdmitted) {
   if (!ordinals.length || ordinals.length !== ids.length) return null;
   const codes = [...new Set(ordinals.flatMap(i => row.dotpoints[i] || []))];
   if (!codes.length || !codes.every(currentCode)) return null;
+  const outcomes = codes.map(code => ({ code, syllabus: NSW_OUTCOME_BY_CODE[code].syllabus, syllabusVersion: versionOf(NSW_OUTCOME_BY_CODE[code].syllabus) }));
+  // `syllabus` is the syllabus that OWNS the content: the labelled course's
+  // when one of the outcomes is in it, otherwise the first outcome's (the
+  // crosswalk lists the labelled course's codes first). `labelledSyllabus` is
+  // the course Pri's subtopic label points at, which can differ: remainder
+  // theorem items are labelled Advanced and are Extension 1 content.
+  const owner = outcomes.find(o => o.syllabus === row.syllabus) || outcomes[0];
   return {
-    jurisdiction: NSW_SYLLABUS_BY_ID[row.syllabus].jurisdiction,
-    authority: NSW_SYLLABUS_BY_ID[row.syllabus].authority,
-    syllabus: row.syllabus,
-    syllabusVersion: versionOf(row.syllabus),
-    outcomes: codes.map(code => ({ code, syllabus: NSW_OUTCOME_BY_CODE[code].syllabus, syllabusVersion: versionOf(NSW_OUTCOME_BY_CODE[code].syllabus) })),
+    jurisdiction: NSW_SYLLABUS_BY_ID[owner.syllabus].jurisdiction,
+    authority: NSW_SYLLABUS_BY_ID[owner.syllabus].authority,
+    syllabus: owner.syllabus,
+    syllabusVersion: owner.syllabusVersion,
+    labelledSyllabus: row.syllabus,
+    outcomes,
     dotpoints: ordinals.map(i => `${generator}.${i + 1}`),
     exact: ordinals.length === 1
   };
