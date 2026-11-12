@@ -329,8 +329,10 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   const abort = j.slice(j.indexOf('function abortJourney'), j.indexOf('\n}\n', j.indexOf('function abortJourney')));
   ok(/liveServerPids/.test(abort) && /content_size', 'large'/.test(abort) && /NATIVE JOURNEY: FAIL/.test(abort) && /process\.exit\(1\)/.test(abort),
     'an early stop kills the local servers, resets the text size, prints FAIL and exits non-zero');
-  ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j),
-    'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open');
+  ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j) && (j.match(/'inherit'/g) || []).length === 1,
+    'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open; the heartbeat is the one exception');
+  ok(/const hb = spawn\('\/bin\/sh'/.test(j) && /while kill -0 \$p 2>\/dev\/null; do if \[ \$\(\( n % 30 \)\) -eq 0 \]/.test(j) && /alarm 10; exec @ARGV/.test(j) && /ps -Aco pcpu,comm -r/.test(j) && /memory_pressure -Q/.test(j) && /\{ stdio: \['ignore', 'inherit', 'ignore'\], detached: true \}\);\n  hb\.unref\(\);/.test(j),
+    'a heartbeat prints load, free memory and the five busiest process names every 60 s, each probe alarm-bounded, and exits within 2 s of the journey');
   ok(/process\.on\('exit', code => \{ if \(code\) exitReport\(\); \}\)/.test(j) && /loadavg\(\)/.test(j) && /'\/bin\/ps', \['-Ao', 'pcpu,pmem,etime,comm', '-r'\]/.test(j) && /'\/usr\/bin\/top', \['-l', '1', '-n', '10', '-o', 'cpu'/.test(j) && /timeout: 8_000, killSignal: 'SIGKILL'/.test(j), 'any failing exit prints the load and the busiest processes, each probe bounded, top as the fallback');
   ok(/process\.on\('uncaughtException'/.test(j), 'an uncaught throw goes through abortJourney, so servers stop and the exit report prints');
   ok(/function stopServerAndProve/.test(j) && /did not exit within 10 s of SIGTERM; SIGKILL sent/.test(j) && /STILL ACCEPTS connections/.test(j) && /e\.status === 1 && \/refused\/i/.test(j) && /state !== 'closed' \|\| alive\(\)/.test(j) && /untrackServer\(pid\)/.test(j) && /stopServerAndProve\(Number\(cloudServer\.PRI_CLOUD_SERVER_PID\), port\)/.test(j), 'the offline leg starts only after the server pid has exited and its port is closed, both logged');

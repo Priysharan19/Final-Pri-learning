@@ -335,6 +335,14 @@ let textSizeRaised = false;
   const limit = Math.ceil(JOURNEY_DEADLINE_MS / 1000) + 30;
   const wd = spawn('/bin/sh', ['-c', `p=${process.pid}; end=$(( $(date +%s) + ${limit} )); while kill -0 $p 2>/dev/null; do if [ $(date +%s) -ge $end ]; then kill -TERM $p; sleep 15; kill -KILL $p 2>/dev/null; break; fi; sleep 2; done; for q in $(cat '${serverPidFile}'); do kill $q 2>/dev/null; done`], { stdio: 'ignore', detached: true });
   wd.unref();
+  // Heartbeat: every 60 s one line with the load, free memory and the five
+  // busiest process NAMES (no arguments, no environment), so a runner that
+  // freezes still leaves the minute it stopped in the job log. It is the one
+  // child that writes to the step's stdout: it checks this process every 2 s
+  // and exits within 2 s of it (stdin and stderr are not shared), and every
+  // probe is cut off by an alarm after 10 s.
+  const hb = spawn('/bin/sh', ['-c', `p=${process.pid}; b() { perl -e 'alarm 10; exec @ARGV' "$@" 2>/dev/null; }; n=0; while kill -0 $p 2>/dev/null; do if [ $(( n % 30 )) -eq 0 ]; then echo "  [heartbeat $(date -u +%H:%M:%S)] load $(b sysctl -n vm.loadavg) | $(b memory_pressure -Q | tail -1) | top: $(b ps -Aco pcpu,comm -r | sed -n 2,6p | awk '{c=$1; $1=""; printf "%s%%%s; ", c, $0}')"; fi; n=$((n + 1)); sleep 2; done`], { stdio: ['ignore', 'inherit', 'ignore'], detached: true });
+  hb.unref();
   process.on('SIGTERM', () => abortJourney(`terminated after ${Math.round((Date.now() - JOURNEY_T0) / 1000)} s (watchdog or step limit)`));
 }
 // Any non-zero exit (a failed step, an abort, an uncaught throw) names the
