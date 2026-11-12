@@ -82,6 +82,10 @@ export const ENGINE_SUITES = [
   // An account's questions pass over content it has resolved, read from its
   // own records on whichever engine holds them (not the device's avoid list).
   'practice-seen-aware-pick-check.mjs',
+  // Plan G3: Prithagoras issues and marks NSW practice — the sealed curriculum
+  // identity, final-answer-only at the commit and the curriculum route, as
+  // pri_server under RLS; and Priyabhata unchanged beside it.
+  'nsw-practice-check.mjs',
   // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
   // question of the free day — decided under the same lock and RLS scope.
   'premium-practice-content-check.mjs',

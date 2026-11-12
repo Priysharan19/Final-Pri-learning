@@ -19,6 +19,7 @@ import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
+import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -249,6 +250,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // The shared resource library (ADR-0002 plan F1): published resources of
   // this server's edition, for signed-in accounts. Read-only.
   router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
+  // The curriculum this edition teaches, with honest availability (plan G3):
+  // the current NSW outcomes on a Prithagoras server. Read-only; its own
+  // guards are on the route (curriculum.js).
+  router.use('/curriculum', createCurriculumRouter(db, { edition }));
   router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
