@@ -190,67 +190,67 @@ async function verifiedStudent(app, email, deviceId = 'ipad-drill') {
 }
 
 /**
- * The fields of structured log lines that carry a database connection detail:
- * a postgres URL, a configured URL, a host:port pair, a configured host, or a
- * configured port in a connection context (a host/port/address field, or after
- * a colon). Returns `line#.field` names only — never the values.
+ * The outage log lines that carry a database connection detail. At least as
+ * strict as a plain substring check: only canonical UUIDs (8-4-4-4-12 hex) are
+ * removed, then the raw line, and a copy with every %XX and \uXXXX escape
+ * decoded until stable, must not contain '5432', a postgres URL, a configured
+ * host, port or URL. Returns "line N: category" only — never a key or value.
  */
 function connectionLeaks(lines, { hosts = [], ports = [], urls = [] } = {}) {
   const out = [];
-  // A configured port standing as its own number: not preceded or followed by
-  // another digit. Ids are removed first — UUID-shaped chains (an 8-hex group then two or
-  // more dash groups) and hex runs of six or more —
-  // so a request id that happens to contain the digits is not a port.
-  const portRe = ports.length ? new RegExp(`(?:^|[^0-9])(?:${ports.join('|')})(?:$|[^0-9])`) : null;
-  const hostRe = hosts.length ? new RegExp(`(?:^|[^0-9a-z.-])(?:${hosts.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:$|[^0-9a-z.-])`, 'i') : null;
-  const withoutIds = v => v.replace(/[0-9a-f]{8}(?:-[0-9a-f]{1,12}){2,}/gi, ' ').replace(/[0-9a-f]{6,}/gi, ' ');
-  const forms = v => { const out = [v]; try { const d = decodeURIComponent(v); if (d !== v) out.push(d); } catch { /* not encoded */ } return out; };
-  const leaky = (key, raw) => forms(raw).some(v => /postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
-    (portRe && portRe.test(withoutIds(v))) || (/host|port|addr|url|dsn|connection/i.test(key) && ports.some(p => v.includes(p))));
-  // Every key and every leaf, with its path from the top-level field.
-  const walk = (path, key, value, hit) => {
-    if (key && leaky('', key)) hit.add(path);
-    if (value && typeof value === 'object') { for (const [k, v] of Object.entries(value)) walk(`${path}.${k}`, k, v, hit); return; }
-    if (leaky(key, String(value))) hit.add(path);
+  const decode = s => {
+    for (let i = 0; i < 20; i++) {
+      const next = s.replace(/%([0-9a-f]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+        .replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
+      if (next === s) return s;
+      s = next;
+    }
+    return s;
   };
   lines.forEach((line, i) => {
-    let fields;
-    try { fields = JSON.parse(line); } catch { out.push(`${i}.<unparsed>`); return; }
     const hit = new Set();
-    walk(String(i), '', fields, hit);
-    out.push(...hit);
+    try { JSON.parse(line); } catch { hit.add('unparsed'); }
+    for (const v of [line, decode(line)].map(s => s.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, ' '))) {
+      if (v.includes('5432') || ports.some(p => v.includes(p))) hit.add('port');
+      if (v.includes('postgres://') || /postgresql:\/\//i.test(v) || /postgres:\/\//i.test(v) || urls.some(u => v.includes(u))) hit.add('url');
+      if (hosts.some(h => v.toLowerCase().includes(h.toLowerCase()))) hit.add('host');
+    }
+    for (const k of hit) out.push(`line ${i}: ${k}`);
   });
   return out;
 }
 
 const counter = key => metrics.snapshot().counters[key]?.total || 0;
 
-// The leak scan itself: a random id containing the port digits passes; the
-// real host, a port in connection context, and any postgres URL fail.
+// The leak scan itself: every row from the three reviews fails; a canonical
+// UUID containing 5432 in any group passes; the output never carries a secret.
 {
   const C = { hosts: ['db.internal'], ports: ['5432', '61234'], urls: ['postgres://u:p@db.internal:5432/x'] };
-  const line = o => JSON.stringify(o);
-  c.deq(connectionLeaks([line({ requestId: 'e7887703-5432-49be-a1c5', code: 'PLATFORM_DB_UNAVAILABLE' })], C), [], 'leak scan: digits inside a request id are not a port');
-  c.deq(connectionLeaks([line({ code: 'X', message: 'connect ECONNREFUSED db.internal:5432' })], C), ['0.message'], 'leak scan: host:port fails, named by field only');
-  c.deq(connectionLeaks([line({ dbPort: 61234 })], C), ['0.dbPort'], 'leak scan: a port in a port-named field fails');
-  c.deq(connectionLeaks([line({ m: 'see postgresql://anything' })], C), ['0.m'], 'leak scan: any postgres URL fails');
   const S = { hosts: ['127.0.0.1'], ports: ['5432'], urls: [] };
-  for (const [label, row, conf, want] of [
-    ['Node error shape, nested port', { err: { code: 'ECONNREFUSED', syscall: 'connect', address: '::1', port: 5432 } }, C, ['0.err.port']],
-    ['nested string port', { detail: { port: '5432' } }, C, ['0.detail.port']],
-    ['libpq-style port=', { message: 'dbname=pri port=5432 user=pri_server' }, C, ['0.message']],
-    ['bare port before a full stop', { message: 'no listener on port 5432.' }, C, ['0.message']],
-    ['SQLite fault, nested address/port', { err: { address: '127.0.0.1', port: 5432 } }, S, ['0.err.address', '0.err.port']],
-    ['SQLite fault, (host:port)', { message: 'connect ECONNREFUSED (127.0.0.1:5432)' }, S, ['0.message']],
-    ['SQLite fault, host:port; retrying', { message: 'refused 127.0.0.1:5432; retrying' }, S, ['0.message']],
-    ['port glued to letters', { a: 'port5432', b: 'p5432', c: 'db-5432', d: 'port-5432' }, C, ['0.a', '0.b', '0.c', '0.d']],
-    ['port range and suffix', { a: 'ports 5432-5433', b: '0.0.0.0:5432-tcp' }, C, ['0.a', '0.b']],
-    ['URL-encoded connection string', { m: 'postgres%3A%2F%2Fu%3Ap%40h%3A5432%2Fx' }, C, ['0.m']],
-    ['host:port as a key', { pools: { '127.0.0.1:5432': { idle: 1 } } }, S, ['0.pools.127.0.0.1:5432']],
-    ['port as a key', { err: { '5432': 'refused' } }, C, ['0.err.5432']],
-    ['hex id and a different port', { id: 'deadbeef5432cafe', ts: '2026-11-12T04:44:13.182Z', n: 'port 54321' }, C, []],
-    ['UUID containing 5432', { requestId: 'f085042b-eb94-5432-8c88-c04fd1e43951', other: 'a5432b' }, C, []]
-  ]) c.deq(connectionLeaks([line(row)], conf), want, `leak scan: ${label}`);
+  const line = o => JSON.stringify(o);
+  const leaking = [
+    [{ message: 'connect ECONNREFUSED db.internal:5432' }, C], [{ dbPort: 61234 }, C], [{ m: 'see postgresql://anything' }, C],
+    [{ m: 'POSTGRES://x' }, C], [{ err: { code: 'ECONNREFUSED', address: '::1', port: 5432 } }, C], [{ detail: { port: '5432' } }, C],
+    [{ message: 'dbname=pri port=5432 user=pri_server' }, C], [{ message: 'no listener on port 5432.' }, C],
+    [{ err: { address: '127.0.0.1', port: 5432 } }, S], [{ message: 'connect ECONNREFUSED (127.0.0.1:5432)' }, S],
+    [{ message: 'refused 127.0.0.1:5432; retrying' }, S], [{ message: 'localhost on 127.0.0.1' }, S],
+    [{ a: 'port5432' }, C], [{ a: 'p5432' }, C], [{ a: 'db-5432' }, C], [{ a: 'port-5432' }, C],
+    [{ a: 'ports 5432-5433' }, C], [{ a: '0.0.0.0:5432-tcp' }, C],
+    [{ m: 'postgres%3A%2F%2Fu%3Ap%40h%3A5432%2Fx' }, C], [{ m: 'dbhost%3A5432 and 100% busy' }, C], [{ m: 'x%253A5432' }, C],
+    [{ m: 'cut escape %3' + 'A5432%' }, C], [{ m: 'p\\u0035432' }, C], 
+    [{ pools: { '127.0.0.1:5432': { idle: 1 } } }, S], [{ err: { '5432': 'refused' } }, C],
+    [{ a: 'db5432' }, C], [{ a: 'ECONNREFUSED5432' }, C], [{ a: 'pri-db-0a1b2c3d-5432-1' }, C], [{ a: '20261112-5432-5433' }, C],
+    [{ a: 'addr:5432' }, C], [{ id: 'deadbeef5432cafe' }, C], [{ requestId: 'e7887703-5432-49be-a1c5' }, C], [{ n: 'port 54321' }, C]
+  ];
+  c.ok(connectionLeaks(['{"m":"54\\u00332"}'], C).length > 0, 'leak scan: a \\u-escaped port fails');
+  leaking.forEach(([row, conf], n) => c.ok(connectionLeaks([line(row)], conf).length > 0, `leak scan: review row ${n} fails`));
+  c.deq(connectionLeaks(['not json'], C), ['line 0: unparsed'], 'leak scan: a non-JSON line is a leak');
+  for (const id of ['54320000-eb94-4a1b-8c88-c04fd1e43951', 'f085042b-5432-4a1b-8c88-c04fd1e43951', 'f085042b-eb94-5432-8c88-c04fd1e43951',
+    'f085042b-eb94-4a1b-5432-c04fd1e43951', 'f085042b-eb94-4a1b-8c88-c04fd1e45432'])
+    c.deq(connectionLeaks([line({ requestId: id, code: 'PLATFORM_DB_UNAVAILABLE' })], S), [], `leak scan: UUID ${id} passes`);
+  const secret = 'postgres://u:hunter2@db.internal:5432/x';
+  const said = connectionLeaks([line({ pools: { [secret]: 1 } })], C);
+  c.ok(said.length > 0 && !said.some(s => /hunter2|db\.internal|5432|postgres/.test(s)), 'leak scan: the failure names a line and category, never the leaking key');
 }
 
 try {
@@ -298,11 +298,10 @@ try {
     c.ok(counter('db_errors_total{code=PLATFORM_DB_UNAVAILABLE}') - outageStart >= 3, 'drill 1: the outage is counted');
     c.ok(metrics.snapshot().firing.includes('DB_CONNECTIVITY'), 'drill 1: and fires DB_CONNECTIVITY');
     const outageLines = logLines.filter(line => line.includes('"PLATFORM_DB_UNAVAILABLE"'));
-    // Field by field, so a random request id that happens to contain "5432"
-    // is not mistaken for a port, while the real connection details still fail.
+    // Only canonical UUIDs are removed before the substring checks.
     const leaks = connectionLeaks(outageLines, database.connection);
     c.ok(outageLines.length > 0 && leaks.length === 0,
-      `drill 1: logged by code, never by host, port or URL (${outageLines.length} coded line(s); offending fields: ${leaks.join(', ') || 'none'})`);
+      `drill 1: logged by code, never by host, port or URL (${outageLines.length} coded line(s); leaks: ${leaks.join(', ') || 'none'})`);
 
     if (engine === 'postgres') await database.relay.restore();
     else fault.state.mode = null;
