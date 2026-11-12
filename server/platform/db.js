@@ -585,6 +585,36 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_resource_editions_edition ON resource_editions(edition, resource_id);`);
   seedResourcesSqlite(db);
 
+  // Schema v16 — the Exam Desk (desk.js, ADR-0002 §8 plan F4): unmarked
+  // practice attempts at library papers. Account-owned; no column can hold a
+  // score, mark or result, and `mode` can only be 'unmarked'. The clock is a
+  // log of server-stamped events; an account has at most one open attempt per
+  // paper (the partial unique index).
+  db.exec(`CREATE TABLE IF NOT EXISTS desk_attempts (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    edition TEXT NOT NULL CHECK(edition IN ('priyabhata','prithagoras')),
+    mode TEXT NOT NULL DEFAULT 'unmarked' CHECK(mode = 'unmarked'),
+    origin TEXT NOT NULL CHECK(origin IN ('desk','prithagoras-import')),
+    resource_id TEXT NOT NULL REFERENCES resources(id),
+    paper_json TEXT NOT NULL,
+    clock_json TEXT NOT NULL,
+    questions_json TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('idle','reading','ready','working','finished')),
+    rev INTEGER NOT NULL DEFAULT 0 CHECK(rev >= 0),
+    create_key TEXT,
+    create_digest TEXT,
+    import_digest TEXT CHECK((origin = 'desk' AND import_digest IS NULL) OR (origin = 'prithagoras-import' AND import_digest IS NOT NULL)),
+    imported_from_json TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    finished_at INTEGER CHECK((state = 'finished') = (finished_at IS NOT NULL)),
+    UNIQUE(account_id, create_key),
+    UNIQUE(account_id, import_digest)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_desk_attempts_account_resource ON desk_attempts(account_id, resource_id, created_at);`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_desk_attempts_one_open ON desk_attempts(account_id, resource_id) WHERE state <> 'finished';`);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

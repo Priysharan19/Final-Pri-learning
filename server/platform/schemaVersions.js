@@ -42,7 +42,12 @@
 //    resource_editions, global tables under the fail-closed pri_scope_required
 //    policy, seeded with the one published Prithagoras paper
 //    (supabase/migrations/20261113000000_resource_library.sql).
-export const SCHEMA_VERSION = 15;
+// 16: the Exam Desk (ADR-0002 §8, plan F4) — desk_attempts, unmarked practice
+//    attempts at library papers: account-owned under RLS (pri_scope_required +
+//    RESTRICTIVE pri_account_scope), cascade with the account, no score or
+//    mark column, mode 'unmarked' only, at most one open attempt per account
+//    and paper (supabase/migrations/20261113010000_desk_attempts.sql).
+export const SCHEMA_VERSION = 16;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
