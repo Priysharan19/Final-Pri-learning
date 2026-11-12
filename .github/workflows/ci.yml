@@ -1328,7 +1328,8 @@ jobs:
           grep -Eq 'online-only checking +8/8' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*48/48.*13 groups' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*51/51.*14 groups' browser.log
-          grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
+          # 61 → 62 (plan E4, re-derived by running): the shell tells boot-guard.js the edition's name (data-brand, data-brand-hi).
+          grep -Fq 'BOOT RESILIENCE: PASS — 62/62 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'E2E SUITE.*41/41.*2 flows' browser.log
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
