@@ -29,7 +29,7 @@ import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
-import { serverEdition } from './edition.js';
+import { refuseOtherEdition, serverEdition } from './edition.js';
 import { readinessReport } from './readiness.js';
 import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
@@ -164,6 +164,14 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     }
     res.json(report);
   });
+
+  // EDITION (ADR-0002, plan E2). A client that declares another edition in
+  // X-Pri-Edition is refused here (409 EDITION_MISMATCH) on everything below.
+  // /v1/health and /v1/ready above stay open, so a mismatched app can still
+  // read the health reply that tells it which service it reached. The header
+  // only ever refuses: it selects no data, brand, currency or authorization,
+  // and a request without it passes unchanged (edition.js).
+  router.use(refuseOtherEdition(edition));
 
   // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
   // operator holding PRI_METRICS_TOKEN; closed in production without one.

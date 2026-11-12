@@ -346,7 +346,7 @@ jobs:
           # 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
           # 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards).
           # 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check).
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 79 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 80 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -396,6 +396,9 @@ jobs:
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
+          # Plan E2: the app knows its own edition from its build, declares it on
+          # every /v1 request, and shows a blocking screen at the other's server.
+          grep -Fq 'EDITION CLIENT (E2): PASS — 125/125 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -579,6 +582,11 @@ jobs:
           # only, the server's own edition only; the seed equals the migration's.
           node server/test/resources-check.mjs 2>&1 | tee resources.log
           grep -Fq 'resources-check (sqlite): 105 checks passed' resources.log
+          # One deployment, one edition (ADR-0002 plan E2): the server starts only
+          # over a client built for its own edition, X-Pri-Edition only ever
+          # refuses (409 everywhere but health and readiness), no request chooses it.
+          node server/test/edition-agreement-check.mjs 2>&1 | tee edition-agreement.log
+          grep -Fq 'EDITION AGREEMENT (E2): PASS — 149/149 checks' edition-agreement.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
