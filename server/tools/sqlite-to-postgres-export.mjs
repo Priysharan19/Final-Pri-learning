@@ -73,8 +73,10 @@ export const SEEDED_TABLES = Object.freeze(['platform_meta', 'sync_cursors', 're
 // the export REFUSES a source whose library holds anything but the seed (a
 // withdrawn or edited seed row, or a row added later). Publishing (plan F3)
 // must move these tables back to exportTables() before it writes library rows.
-const LIBRARY_SEED_ROWS = RESOURCE_SEED.map(r => resourceRowValues(r).map(v => (v === null ? null : String(v))));
-const LIBRARY_SEED_EDITIONS = RESOURCE_SEED.flatMap(r => r.editions.map(e => [r.id, e])).sort((a, b) => `${a}`.localeCompare(`${b}`));
+// Compared in SQLite's own ORDER BY order: BINARY collation, so byte order.
+const byteOrder = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+const LIBRARY_SEED_ROWS = [...RESOURCE_SEED].sort((a, b) => byteOrder(a.id, b.id)).map(r => resourceRowValues(r).map(v => (v === null ? null : String(v))));
+const LIBRARY_SEED_EDITIONS = RESOURCE_SEED.flatMap(r => r.editions.map(e => [r.id, e])).sort((a, b) => byteOrder(a[0], b[0]) || byteOrder(a[1], b[1]));
 const LIBRARY_COLUMNS = 'id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at';
 function assertLibraryIsSeedOnly(db, present) {
   const rows = present.has('resources')
@@ -85,8 +87,9 @@ function assertLibraryIsSeedOnly(db, present) {
     : [];
   if (JSON.stringify(rows) !== JSON.stringify(LIBRARY_SEED_ROWS) || JSON.stringify(editions) !== JSON.stringify(LIBRARY_SEED_EDITIONS)) {
     throw toolError('EXPORT_LIBRARY_NOT_SEED',
-      'the resource library (resources, resource_editions) holds rows other than the migration seed; they would be lost at cutover. ' +
-      'Copy them by hand after the import, or extend this tool (plan F3) before exporting.');
+      'the resource library (resources, resource_editions) holds rows other than the migration seed, and this export does not copy them. ' +
+      'Export from a copy whose library is back to the seed and re-apply the change on Postgres right after the import ' +
+      '(postgres-cutover.md §6a), or extend this tool (plan F3) to copy library rows.');
   }
 }
 

@@ -257,7 +257,11 @@ So, for every PR that changes `SCHEMA_VERSION` or `BILLING_SCHEMA_VERSION`:
 `platform_meta`, `sync_cursors` and (schema 15) the resource library's seed paper in `resources` /
 `resource_editions`. They never touch `public`, `auth` or `storage`. The SQLite export does not copy
 those seeded tables, and refuses (`EXPORT_LIBRARY_NOT_SEED`) a source whose library holds anything but
-the seed, so no library row is silently left behind.
+the seed, so no library row is silently left behind. To take a library resource down, set
+`review_state='withdrawn'` — never `DELETE` it (on SQLite the boot re-inserts a deleted seed row).
+A withdrawal made on SQLite before the cutover blocks the export: run the export from a backup
+copy with the row restored to the seed, then repeat the same `UPDATE` on Postgres straight after
+the import (§6a.3) and before the service is pointed at it.
 
 ---
 

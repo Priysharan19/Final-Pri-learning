@@ -110,6 +110,16 @@ try {
     c.deq([r.status, r.data?.error?.code], [401, 'AUTH_REQUIRED'], `signed out: ${path} is 401`);
   }
 
+  // A child account with no guardian consent on record is refused by the gate
+  // every student router carries, before the library is read.
+  const child = await registerAccount(au, { email: 'library-child@example.test' });
+  await store.run("UPDATE accounts SET age_basis='child' WHERE id=?", [child.account.id]);
+  for (const path of ['/v1/resources', `/v1/resources/${SEED.id}`]) {
+    const r = await au.request(path, { jar: child.jar });
+    c.ok(r.status === 403 && /^GUARDIAN_CONSENT_|^AGE_DECLARATION_/.test(r.data?.error?.code || '') && !r.text.includes(SEED.title),
+      `a child without guardian consent is refused: ${path} (${r.status} ${r.data?.error?.code})`);
+  }
+
   const { jar } = await registerAccount(au, { email: 'library-au@example.test' });
   const get = (path, h = au, j = jar) => h.request(path, { jar: j });
   const ids = r => (r.data?.resources || []).map(x => x.id);
