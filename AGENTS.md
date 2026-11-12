@@ -13,6 +13,7 @@ The canonical definitions are:
 - `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
 - `docs/architecture/authoritative-architecture.md` — current online-first web/server/native runtime authority.
 - `docs/architecture/adr-0001-online-first-runtime.md` — online-first decision (Railway, Supabase Mumbai, OpenAI) and its migration phases.
+- `docs/architecture/adr-0002-one-platform-two-editions.md` — one platform, two regional editions (Priyabhata · India, Prithagoras · Australia); edition vs course; build once, certify per edition.
 - `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
@@ -116,6 +117,7 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Security regressions are release-blocking.
 - Add a deterministic regression test for every production bug when feasible.
 - Do not make unsupported competitor-superiority, accuracy, syllabus-complete or production-ready claims.
+- One platform, two editions (ADR-0002): build every learning feature once in the shared platform and verify it against both Priyabhata and Prithagoras. Editions differ only in curriculum, presentation, language, commercial configuration and legal requirements — never in marking, OCR, feedback or examination behaviour. Certification gates (e.g. #499) bind both brands.
 - Work through branch + PR. Never directly update `main`.
 - Destructive production operations, irreversible migrations, secret rotation, payment-provider actions, App Store publishing and legal/privacy sign-off require explicit external authority even when the code is ready.
 
