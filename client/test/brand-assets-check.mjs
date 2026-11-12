@@ -6,8 +6,8 @@
 //      the output of tools/brand/build-assets.mjs (geometry and accents from
 //      client/edition.config.mjs — one source, nothing hand-edited);
 //   2. every PNG icon has the size the manifest and index.html declare, is
-//      opaque RGB (no alpha: the App Store rejects it), and differs between
-//      the editions;
+//      opaque (native icons RGB: the App Store rejects alpha; web icons RGB or
+//      lossless indexed), and differs between the editions;
 //   3. index.html leaves no %PRI_…% placeholder unfilled for either edition,
 //      and each edition's page and web manifest name only that edition;
 //   4. the old static brand files are gone from client/public, so a build can
@@ -53,7 +53,9 @@ for (const [rel, px] of Object.entries(SIZES)) {
     const f = brandFile(id, rel);
     if (!existsSync(f)) { failures.push(`${id}: ${rel} is missing — run tools/brand/rasterise-icons.mjs ${id}`); continue; }
     const p = png(f);
-    ok(p.width === px && p.height === px && p.colourType === 2 && !p.trns, `${id} ${rel} is ${px}×${px} opaque RGB (got ${p.width}×${p.height}, colour type ${p.colourType}${p.trns ? ', tRNS' : ''})`);
+    // Native icons must be RGB; a web icon may be indexed (lossless when it has ≤ 256 colours). Neither has alpha.
+    const types = rel.startsWith('icons/') ? [2, 3] : [2];
+    ok(p.width === px && p.height === px && types.includes(p.colourType) && !p.trns, `${id} ${rel} is ${px}×${px} and opaque, colour type ${types.join(' or ')} (got ${p.width}×${p.height}, colour type ${p.colourType}${p.trns ? ', tRNS' : ''})`);
     seen.push(p.bytes);
   }
   ok(seen.length === 2 && !seen[0].equals(seen[1]), `${rel} differs between the editions`);

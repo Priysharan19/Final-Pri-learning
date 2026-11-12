@@ -5,9 +5,10 @@
 //   node tools/brand/rasterise-icons.mjs <priyabhata|prithagoras>
 //
 // Renders with the Playwright Chromium the client already installs (the same way
-// tools/play-graphics.mjs does; no network). Every PNG is written opaque RGB
-// (colour type 2): the App Store rejects an alpha channel on the 1024 icon, and
-// the PWA icons are opaque too. Written under client/brand/<edition>/:
+// tools/play-graphics.mjs does; no network). Every PNG is opaque: the native
+// icons are RGB (colour type 2; the App Store rejects an alpha channel on the
+// 1024 icon), and a web icon is indexed (colour type 3, no tRNS) when it has at
+// most 256 colours — the same pixels in fewer bytes of every install. Written under client/brand/<edition>/:
 //
 //   icons/icon-180.png            apple-touch-icon     (index.html)
 //   icons/icon-192.png            manifest "any"       (the build's manifest.webmanifest; sw.js notification icon)
@@ -69,7 +70,7 @@ function chunk(type, data) {
   const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td) >>> 0);
   return Buffer.concat([len, td, crc]);
 }
-function toRgb(buf) {
+function toRgb(buf, palette = false) {
   const p = readPng(buf);
   // Always decoded and re-encoded (even when Chromium already wrote RGB), so
   // every icon gets the filtered encoding below.
@@ -118,7 +119,20 @@ function toRgb(buf) {
     best.copy(out, y * (rgbStride + 1) + 1);
   }
   const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 2;
-  return Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ih), chunk('IDAT', deflateSync(out, { level: 9, memLevel: 9 })), chunk('IEND', Buffer.alloc(0))]);
+  const asRgb = Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ih), chunk('IDAT', deflateSync(out, { level: 9, memLevel: 9 })), chunk('IEND', Buffer.alloc(0))]);
+  if (!palette) return asRgb;
+  // A web icon with at most 256 distinct colours is written as an indexed PNG
+  // (colour type 3, no tRNS, so still fully opaque): exactly the same pixels in
+  // fewer bytes. Larger palettes, and the native icons, stay RGB.
+  const index = new Map();
+  for (let i = 0; i < rgb.length; i += 3) { const k = rgb.readUIntBE(i, 3); if (!index.has(k)) { if (index.size === 256) return asRgb; index.set(k, index.size); } }
+  const plte = Buffer.alloc(index.size * 3);
+  for (const [k, i] of index) plte.writeUIntBE(k, i * 3, 3);
+  const idx = Buffer.alloc(h * (w + 1));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) idx[y * (w + 1) + 1 + x] = index.get(rgb.readUIntBE((y * w + x) * 3, 3));
+  const ihp = Buffer.from(ih); ihp[9] = 3;
+  const asPalette = Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ihp), chunk('PLTE', plte), chunk('IDAT', deflateSync(idx, { level: 9, memLevel: 9 })), chunk('IEND', Buffer.alloc(0))]);
+  return asPalette.length < asRgb.length ? asPalette : asRgb;
 }
 
 const browser = await chromium.launch();
@@ -131,10 +145,10 @@ try {
     await page.setViewportSize({ width: px, height: px });
     const svg = src(file).replace(/<svg /, `<svg width="${px}" height="${px}" `).replace(/ width="32" height="32"/, '');
     await page.setContent(`<!doctype html><html><head><style>html,body{margin:0;width:${px}px;height:${px}px;overflow:hidden}svg{display:block}</style></head><body>${svg}</body></html>`);
-    const png = toRgb(await page.screenshot({ type: 'png', omitBackground: false }));
+    const png = toRgb(await page.screenshot({ type: 'png', omitBackground: false }), rel.startsWith('icons/'));
     await page.close();
     const f = join(outDir, rel); mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, png);
-    const i = readPng(png), ok = i.width === px && i.height === px && i.colorType === 2 && !i.hasAlpha;
+    const i = readPng(png), ok = i.width === px && i.height === px && (i.colorType === 2 || (i.colorType === 3 && rel.startsWith('icons/'))) && !i.hasAlpha;
     if (!ok) fail = true;
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${rel} ${i.width}x${i.height} colourType=${i.colorType}`);
   }
