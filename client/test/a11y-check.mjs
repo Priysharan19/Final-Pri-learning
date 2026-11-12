@@ -136,8 +136,9 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too.)
-    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1' } });
+    // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
+    // and LIBRARY (plan F1) so /library and /library/:id are.)
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -1139,6 +1140,21 @@ async function run() {
       await goTo(page, BASE, '/parent-report');
       await page.waitForSelector('.parent-page h1', { timeout: 20000 });
       await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The shared resource library (ADR-0002 plan F1): built only with
+    // PRI_FEATURE_LIBRARY=1, which this walk sets. Signed in or not, the page
+    // settles on the library, its honest empty state or an honest error.
+    await step('library · search and filters, or why there is nothing', '/library', async () => {
+      await goTo(page, BASE, '/library');
+      await page.waitForSelector('.lib-page h1', { timeout: 20000 });
+      await page.waitForSelector('.lib-page [data-library-resource], .lib-page [data-library-empty], .lib-page [data-library-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('library · one resource, or why it cannot be shown', '/library/:id', async () => {
+      await goTo(page, BASE, '/library/2027-mathematics-advanced-assessment-1');
+      await page.waitForSelector('.lib-page [data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
       await wait(page, 600);
     });
 

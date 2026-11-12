@@ -376,7 +376,7 @@ try {
       first.prepare("INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES ('mig-a','mig-a@example.test','A','student',1,1)").run();
       first.prepare("INSERT INTO parent_report_links(account_id,recipient_email,status,requested_at) VALUES ('mig-a','parent@example.test','pending',1)").run();
       const names = () => first.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'parent_report_%' ORDER BY name").all().map(r => r.name);
-      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['parent_report_links', 'parent_report_sends'], '14'], 'SQLite: the build creates both tables at schema 14');
+      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['parent_report_links', 'parent_report_sends'], '15'], 'SQLite: the build creates both tables (schema 14; 15 since the resource library)');
       first.exec('DROP TABLE parent_report_sends; DROP TABLE parent_report_links;');
       c.deq([names(), first.prepare("SELECT count(*) AS n FROM accounts WHERE id='mig-a'").get().n], [[], 1], 'SQLite rollback: dropping the two tables leaves every other row');
       first.close();

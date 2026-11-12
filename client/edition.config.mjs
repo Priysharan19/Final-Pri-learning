@@ -65,7 +65,6 @@ export const CAPABILITIES = Object.freeze([
 const pending = text => Object.freeze({ pending: text });
 
 const NSW_CONTENT = pending('No approved NSW question banks, answer specifications or certified Australian marking guidelines yet (plan G2, G3, G6).');
-const LIBRARY = pending('The shared resource library is built in the platform for both editions (plan F1).');
 const PUBLISHING = pending('Resource publishing with review and version history, replacing hand-committed JSON (plan F3).');
 const EXAM_DESK = pending('Prithagoras\'s Exam Desk becomes an unmarked mode of /v1/exams for both editions (plan F4).');
 
@@ -89,7 +88,7 @@ export const EDITIONS = Object.freeze({
       adaptivePractice: true,
       timedExams: true,
       examDesk: EXAM_DESK,
-      resourceLibrary: LIBRARY,
+      resourceLibrary: true,
       resourcePublishing: PUBLISHING,
       progressBookmarksExports: true,
       aiTutor: true
@@ -114,7 +113,7 @@ export const EDITIONS = Object.freeze({
       adaptivePractice: NSW_CONTENT,
       timedExams: pending('No HSC-style blueprints built from approved NSW questions yet (plan G4).'),
       examDesk: EXAM_DESK,
-      resourceLibrary: LIBRARY,
+      resourceLibrary: true,
       resourcePublishing: PUBLISHING,
       progressBookmarksExports: true,
       aiTutor: true

@@ -56,12 +56,17 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
+// The shared resource library (ADR-0002 plan F1): its own chunk, built only
+// where PRI_FEATURE_LIBRARY is on.
+const Library = React.lazy(() => import('./library/Library.jsx'));
 const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
 // The parent weekly report's screen: off in a production build until counsel
 // has reviewed email about minors (D22, PRI_FEATURE_PARENT_REPORT).
 const PARENT_REPORT_ON = featureEnabled('parentReport');
+// The resource library's page: off in a production build (PRI_FEATURE_LIBRARY).
+const LIBRARY_ON = featureEnabled('library');
 // V1 decision D10 (1 Nov 2026): a student tab the V1 evidence does not cover
 // is hidden from students, starting with Classes. The classroom product is the
 // PRI_FEATURE_EXTENDED_TRACKS surface (platform/features.js: "the classroom/
@@ -125,7 +130,7 @@ const I = {
 // and the command bar's page list all read this one list, so a destination is
 // never reachable on one of them and missing from another.
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }, ...(LIBRARY_ON ? [{ to: '/library', key: 'nav.library', ico: I.notes }] : [])] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, ...(CLASSES_ON ? [{ to: '/classes', key: 'nav.classes', ico: I.classes }] : [])] },
   { label: 'nav.groupUnderstand', items: [
     { to: '/progress', key: 'nav.progress', ico: I.progress },
@@ -176,7 +181,7 @@ function isDestinationActive(location, to) {
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks', '/map': 'inst.tabMap',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
-  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/notes': 'nav.notes', '/library': 'nav.library', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -405,7 +410,7 @@ export default function App() {
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : loc.pathname.startsWith('/library/') ? t('nav.library') : null),
     [loc.pathname, t]
   );
 
@@ -653,6 +658,8 @@ export default function App() {
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
+                    {LIBRARY_ON && <Route path="/library" element={studentOnly(<Library />)} />}
+                    {LIBRARY_ON && <Route path="/library/:id" element={studentOnly(<Library />)} />}
                     <Route path="/rush" element={studentOnly(<Rush />)} />
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />

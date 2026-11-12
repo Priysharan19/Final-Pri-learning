@@ -1537,6 +1537,48 @@
     },
     {
       "method": "GET",
+      "path": "/v1/resources/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. Filters type/course/year/subject are closed sets or validated (400 RESOURCE_FILTER_INVALID); q ≤120 chars, at most 8 words, each a LIKE with %, _ and \\ escaped (400 RESOURCE_SEARCH_INVALID); at most 100 rows; facets from visible rows only",
+      "rateLimits": [
+        {
+          "key": "resources-list",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/:id",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. An unknown id, a malformed id, a draft or withdrawn row, a hosted or non-https row and another edition's row are the same 404 RESOURCE_NOT_FOUND, so the answer never reveals what exists elsewhere",
+      "rateLimits": [
+        {
+          "key": "resources-read",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/handwriting/status",
       "auth": "session",
       "roles": null,
