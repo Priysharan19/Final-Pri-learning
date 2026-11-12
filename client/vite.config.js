@@ -453,12 +453,22 @@ function releaseIdentityManifest(identity) {
 // is the one module that reads the edition table; a build or dev server loads
 // this edition's record in its place, so a bundle knows its own edition's
 // defaults (course, languages, locale, currency) and nothing of the other's.
+// A real build passes mustLoad: if the replacement never happened (the module
+// moved, or its path stopped matching), the bundle would carry the default
+// edition's record and the whole table while features.json named this
+// edition, so the build stops instead.
 export const EDITION_RECORD_MODULE = fileURLToPath(new URL('./src/platform/edition-record.js', import.meta.url));
-export function editionRecordPlugin(edition) {
+export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
+  let replaced = false;
   return {
     name: 'pri-edition-record',
     load(id) {
-      return id.split('?')[0] === EDITION_RECORD_MODULE ? editionRecordModule(edition) : null;
+      if (id.split('?')[0] !== EDITION_RECORD_MODULE) return null;
+      replaced = true;
+      return editionRecordModule(edition);
+    },
+    buildEnd(error) {
+      if (mustLoad && !error && !replaced) this.error(`pri-edition-record: ${EDITION_RECORD_MODULE} was never loaded, so this build does not carry the ${edition} record`);
     }
   };
 }
@@ -548,7 +558,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), editionRecordPlugin(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

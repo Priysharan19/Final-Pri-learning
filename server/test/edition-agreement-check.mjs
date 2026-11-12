@@ -114,6 +114,8 @@ try {
     c.eq(warnings.length, 0, `production: ${label} is refused without a warning`);
     c.deq(agree(dist, 'priyabhata', false), { edition: 'priyabhata', client: null, checked: false }, `development: ${label} starts`);
     c.ok(warnings.length === 1 && /^edition_undeclared: /.test(warnings[0]) && warnings[0].includes('priyabhata'), `development: ${label} is warned about, once`);
+    c.deq(agree(dist, 'priyabhata', false), { edition: 'priyabhata', client: null, checked: false }, `development: ${label} starts again when the app checks the same dist the entry point did`);
+    c.eq(warnings.length, 1, `development: and ${label} is not warned about a second time`);
     warnings.length = 0;
   }
   const fromEnv = thrown(() => assertEditionAgreement({ dist: OLD_BUILD, env: { NODE_ENV: 'production' }, warn }));

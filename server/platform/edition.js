@@ -55,6 +55,9 @@ export function builtClientEdition(dist) {
   return built.state === 'declared' ? built.edition : null;
 }
 
+// The entry point and the app both check the same dist; say it once per process.
+const warnedDists = new Set();
+
 // Printable in one log line whatever features.json held.
 const shown = value => JSON.stringify(String(value).slice(0, 40));
 
@@ -67,6 +70,7 @@ const shown = value => JSON.stringify(String(value).slice(0, 40));
  *   dist declares this edition     → start
  *   dist declares anything else    → refuse, in every environment
  *   dist declares no edition       → refuse in production; warn elsewhere
+ *                                    (once per dist per process)
  */
 export function assertEditionAgreement({ dist, env = process.env, production = env.NODE_ENV === 'production', warn = console.warn } = {}) {
   const edition = serverEdition(env);
@@ -83,7 +87,10 @@ export function assertEditionAgreement({ dist, env = process.env, production = e
   if (production) {
     throw Object.assign(new Error(`${line}; refusing to start`), { code: 'EDITION_UNDECLARED', serverEdition: edition, clientEdition: null });
   }
-  warn(`${line}; continuing because this is not a production process`);
+  if (!warnedDists.has(dist)) {
+    warnedDists.add(dist);
+    warn(`${line}; continuing because this is not a production process`);
+  }
   return { edition, client: null, checked: false };
 }
 

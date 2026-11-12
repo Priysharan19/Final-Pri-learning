@@ -82,7 +82,27 @@ const ssr = edition => createServer({
     ok(plugin.load(fileURLToPath(new URL('../src/platform/edition.js', import.meta.url))) === null && plugin.load('/elsewhere/edition-record.js') === null, 'and every other module is left alone');
   }
   const config = read('vite.config.js');
-  ok(/plugins: \[[^\]]*editionRecordPlugin\(featureStates\(command\)\.edition\)/.test(config), 'the real build installs the plugin for the edition it resolved from PRI_EDITION');
+  ok(/plugins: \[[^\]]*editionRecordPlugin\(featureStates\(command\)\.edition, \{ mustLoad: command === 'build' \}\)/.test(config), 'the real build installs the plugin for the edition it resolved from PRI_EDITION, and requires the replacement to happen');
+  {
+    // A build whose replacement never fired must stop, not ship the default record under another edition's name.
+    const stop = message => { throw new Error(message); };
+    const strict = vite.editionRecordPlugin('prithagoras', { mustLoad: true });
+    let refused = null;
+    try { strict.buildEnd.call({ error: stop }); } catch (error) { refused = error; }
+    ok(refused && /was never loaded/.test(refused.message) && refused.message.includes('prithagoras'), 'a build that never loaded the record module is stopped');
+    strict.load(vite.EDITION_RECORD_MODULE);
+    let passed = true;
+    try { strict.buildEnd.call({ error: stop }); } catch { passed = false; }
+    ok(passed, 'and one that did load it is not');
+    const lax = vite.editionRecordPlugin('prithagoras');
+    let quiet = true;
+    try { lax.buildEnd.call({ error: stop }); } catch { quiet = false; }
+    ok(quiet, 'outside a build (a dev or test server that never asks for the module) nothing is required');
+    const failing = vite.editionRecordPlugin('prithagoras', { mustLoad: true });
+    let masked = false;
+    try { failing.buildEnd.call({ error: stop }, new Error('another plugin failed')); } catch { masked = true; }
+    ok(!masked, 'a build that already failed for another reason is not given a second, misleading error');
+  }
 
   const server = await ssr('prithagoras');
   try {
@@ -246,6 +266,7 @@ try {
         ok(html.includes(escapeHtml(sentence)) && sentence.includes(app) && sentence.includes(service), `${own} build, ${lang}: the screen says this app is ${app} and cannot sign in to ${service}'s service`);
         ok(lang !== 'en' || sentence === `This app is ${app}. It cannot sign in to ${service}'s service.`, `${own} build, ${lang}: in exactly the decided words`);
         ok(/<h1[^>]*>/.test(html) && /role="alert"/.test(html) && html.includes(`data-edition-mismatch="${other}"`), `${own} build, ${lang}: as the page's heading, announced as an alert`);
+        ok(html.includes(`<div class="card-title">${app}</div>`) && html.indexOf('card-title') < html.indexOf('<h1'), `${own} build, ${lang}: under this app's own name, as the app's other cards are headed`);
         ok(!/<form|<input|<button|<a |<select|<textarea/.test(html), `${own} build, ${lang}: with no sign-in form, no field, no button and no link: nothing to retry`);
         const never = renderToStaticMarkup(React.createElement(view, { conflict: built.editionConflict('atlantis') }));
         ok(never.includes('Atlantis') && never.includes(app) && !/<form|<input|<button/.test(never), `${own} build, ${lang}: an edition this build never heard of is named from its id`);

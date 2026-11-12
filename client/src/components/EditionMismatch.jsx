@@ -12,11 +12,13 @@ import { translate } from '../i18n/index.js';
 import { edition, editionDisplayName } from '../platform/edition.js';
 
 export default function EditionMismatch({ conflict }) {
+  const app = edition().brand;
   return (
     <div className="crash-wrap">
       <section className="card crash-card" role="alert" data-edition-mismatch={conflict.service}>
+        <div className="card-title">{app}</div>
         <h1 className="crash-title">
-          {translate('edition.mismatchBody', { app: edition().brand, service: editionDisplayName(conflict.service) })}
+          {translate('edition.mismatchBody', { app, service: editionDisplayName(conflict.service) })}
         </h1>
       </section>
     </div>

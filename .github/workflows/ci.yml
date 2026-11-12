@@ -398,7 +398,7 @@ jobs:
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
           # Plan E2: the app knows its own edition from its build, declares it on
           # every /v1 request, and shows a blocking screen at the other's server.
-          grep -Fq 'EDITION CLIENT (E2): PASS — 125/125 checks' suites.log
+          grep -Fq 'EDITION CLIENT (E2): PASS — 133/133 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -586,7 +586,7 @@ jobs:
           # over a client built for its own edition, X-Pri-Edition only ever
           # refuses (409 everywhere but health and readiness), no request chooses it.
           node server/test/edition-agreement-check.mjs 2>&1 | tee edition-agreement.log
-          grep -Fq 'EDITION AGREEMENT (E2): PASS — 149/149 checks' edition-agreement.log
+          grep -Fq 'EDITION AGREEMENT (E2): PASS — 155/155 checks' edition-agreement.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and
