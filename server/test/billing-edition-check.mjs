@@ -179,13 +179,13 @@ async function serve(edition) {
     const out = {};
     for (const table of TABLES) {
       out[table] = testStore.scratch
-        ? Number((await testStore.scratch.client.query(`SELECT COUNT(*) AS n FROM ${table}`)).rows[0].n)
+        ? Number((await testStore.scratch.client.query(`SELECT COUNT(*) AS n FROM pri.${table}`)).rows[0].n)
         : Number(testStore.raw.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n);
     }
     return out;
   }
   async function owner(sql) {
-    if (testStore.scratch) await testStore.scratch.client.query(sql); else testStore.raw.exec(sql);
+    if (testStore.scratch) await testStore.scratch.client.query(sql.replace('UPDATE ', 'UPDATE pri.')); else testStore.raw.exec(sql);
   }
   function signedWebhook(eventId) {
     const raw = JSON.stringify({
