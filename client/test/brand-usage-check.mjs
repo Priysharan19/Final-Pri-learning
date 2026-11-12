@@ -46,7 +46,7 @@ for (const token of ['--edition-accent', '--edition-on-accent']) {
 }
 {
   const uses = grep('--edition-accent').filter(code).filter(l => fileOf(l) === 'client/src/components/BrandMark.jsx');
-  ok(uses.length === 1 && /CUT_PATHS\[CUT\]/.test(uses[0]), 'in BrandMark.jsx, the accent fills the counter cut and nothing else');
+  ok(uses.length === 1 && /CUT_PATH\b/.test(uses[0]), 'in BrandMark.jsx, the accent fills the counter cut and nothing else');
 }
 {
   const uses = grep('--brand-prime').filter(code);
@@ -60,7 +60,7 @@ for (const token of ['--edition-accent', '--edition-on-accent']) {
 {
   const src = readFileSync(join(ROOT, 'client/src/components/BrandMark.jsx'), 'utf8');
   const mark = src.slice(src.indexOf('export function BrandMark'), src.indexOf('export function BrandWordmark'));
-  const order = ['P_PATH', 'CUT_PATHS[CUT]', 'PRIME_PATH'].map(s => mark.indexOf(s));
+  const order = ['P_PATH', 'CUT_PATH}', 'PRIME_PATH'].map(s => mark.indexOf(s));
   ok(order.every(i => i > 0) && order[0] < order[1] && order[1] < order[2], 'BrandMark draws the P, then the cut, then the prime');
   ok(!/gradient|filter=|drop-shadow|glow/i.test(src), 'no gradient, filter or glow in the brand component');
 }

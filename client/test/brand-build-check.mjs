@@ -66,8 +66,8 @@ function checkBuild(dist) {
     const text = bytes.toString('utf8');
     if (text.includes(wordmarkTail(other))) leaks.push(`${rel} (${o.brand}'s wordmark)`);
     if (text.includes(wordmarkTail(edition))) ownWordmark++;
-    // The edition table itself is data both builds and the server share; outside it, no other-edition name or accent.
-    if (rel.endsWith('.js') && text.includes('defaultCourse')) continue;
+    // The edition table never reaches a bundle: the build replaces its one reader with this edition's record.
+    if (text.includes('defaultCourse') && text.includes('capabilities')) leaks.push(`${rel} (the edition table)`);
     if (text.includes(o.brand) || text.toLowerCase().includes(o.identity.accent.light) || text.toLowerCase().includes(o.identity.accent.dark)) leaks.push(`${rel} (${o.brand}'s name or accent)`);
   }
   ok(leaks.length === 0, `${edition}: no file carries anything of ${o.brand}: ${leaks.join(', ')}`);

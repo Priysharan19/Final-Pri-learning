@@ -1,29 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · the student app's one reader of the edition (plan E4)
+// Pri Learning · the brand the student app shows (plan E4)
 //
-// The build defines __PRI_EDITION__ from PRI_EDITION (client/vite.config.js);
-// this module turns it into the brand every surface shows. It is the only file
-// under client/src that may import client/edition.config.mjs or read
-// __PRI_EDITION__ (client/test/edition-config-check.mjs holds that), so the
-// edition's reach into the app stays one import wide.
-//
-// Outside a Vite build (Node test suites) there is no __PRI_EDITION__, and the
-// app is the default edition, Priyabhata, as an unset PRI_EDITION is.
+// Every surface reads the edition's name, mark and wordmark from here: the
+// header and sign-in wordmark (components/BrandMark.jsx), the document title,
+// and the {brand} and {company} every catalogue string may use
+// (i18n/index.js). The values come from this build's edition record,
+// ./build-edition.js, which the build fills from PRI_EDITION.
 // ─────────────────────────────────────────────────────────────────────────────
-import { EDITIONS, COMPANY, COMPANY_LINE, DEFAULT_EDITION } from '../../edition.config.mjs';
-import { PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from './paths.js';
+import { BUILD_EDITION } from './build-edition.js';
 
-const EDITION_ID = typeof __PRI_EDITION__ === 'string' ? __PRI_EDITION__ : DEFAULT_EDITION;
-
-export const EDITION = EDITIONS[EDITION_ID];
-export const BRAND = EDITION.brand;
+export const EDITION_ID = BUILD_EDITION.id;
+export const BRAND = BUILD_EDITION.brand;
 /** The brand in Hindi running text (प्रियभट), or null for an edition without Hindi. */
-export const BRAND_HI = EDITION.identity.brandHi;
-export const CUT = EDITION.identity.cut;
-// Written against __PRI_EDITION__ itself, so the build sees two literals compared
-// and drops the other edition's wordmark (client/test/brand-build-check.mjs proves it).
-export const WORDMARK = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras' ? PRITHAGORAS_WORDMARK : PRIYABHATA_WORDMARK;
-export { COMPANY, COMPANY_LINE };
+export const BRAND_HI = BUILD_EDITION.brandHi;
+/** The mark's counter cut ('jya' | 'square') and its path in the mark's units. */
+export const CUT = BUILD_EDITION.cut;
+export const CUT_PATH = BUILD_EDITION.cutPath;
+/** The outlined wordmark: { viewBox, d, prime, primeSmall }. */
+export const WORDMARK = BUILD_EDITION.wordmark;
+export const COMPANY = BUILD_EDITION.company;
+export const COMPANY_LINE = BUILD_EDITION.companyLine;
 
 /**
  * The variables every catalogue string may use: {brand} is the edition's name

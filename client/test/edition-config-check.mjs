@@ -161,16 +161,23 @@ ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build 
     }
   }
 
-  // One reader: only client/src/brand/edition.js imports the table or reads __PRI_EDITION__.
+  // One reader: only client/src/brand/build-edition.js imports the table, and nothing reads __PRI_EDITION__
+  // (the build replaces that module with its own edition's record).
   let readers = '';
   try {
     readers = execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-l', '-e', 'edition.config', '-e', '__PRI_EDITION__', '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   } catch (e) {
     if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
   }
-  ok(readers === 'client/src/brand/edition.js', `E4: client/src reads the edition only through client/src/brand/edition.js (${readers.split('\n').join(', ')})`);
+  ok(readers === 'client/src/brand/build-edition.js', `E4: client/src reads the edition only through client/src/brand/build-edition.js (${readers.split('\n').join(', ')})`);
+  const vite = await import('../vite.config.js');
+  const plugin = vite.editionBrand('prithagoras');
+  const { BUILD_EDITION_MODULE } = await import('../brand/edition-brand.mjs');
+  const built = plugin.load(BUILD_EDITION_MODULE);
+  ok(typeof built === 'string' && built.includes('"brand":"Prithagoras"') && !/Priyabhata|edition\.config|#0a6670/.test(built), 'a Prithagoras build replaces build-edition.js with its own record alone');
+  ok(plugin.load('/elsewhere/module.js') === null, 'and leaves every other module alone');
   const brand = await import('../src/brand/edition.js');
-  ok(brand.BRAND === 'Priyabhata' && brand.CUT === 'jya', 'outside a build (no __PRI_EDITION__) the app is the default edition');
+  ok(brand.BRAND === 'Priyabhata' && brand.CUT === 'jya', 'outside a build the app is the default edition');
   ok(brand.brandVars('hi').brand === 'प्रियभट' && brand.brandVars('en').brand === 'Priyabhata' && brand.brandVars('en').company === 'Pri Learning', 'brandVars: प्रियभट in Hindi, Priyabhata in English, and the company');
 }
 

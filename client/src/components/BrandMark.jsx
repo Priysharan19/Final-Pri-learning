@@ -16,15 +16,15 @@
 //   (client/test/brand-usage-check.mjs);
 // · "by Pri Learning" goes under the wordmark on sign-in, sign-up and the
 //   account pages, never in the header bar.
-import { P_PATH, PRIME_PATH, CUT_PATHS } from '../brand/paths.js';
-import { BRAND, COMPANY_LINE, CUT, WORDMARK } from '../brand/edition.js';
+import { P_PATH, PRIME_PATH } from '../brand/paths.js';
+import { BRAND, COMPANY_LINE, CUT_PATH, WORDMARK } from '../brand/edition.js';
 
 /** The edition's P′ mark with its counter cut: compact spaces (icons, tight rails). Decorative. */
 export function BrandMark({ size = 24 }) {
   return (
     <svg className="brand-mark" viewBox="10 0 88 93" width={size} height={size * 93 / 88} aria-hidden="true" focusable="false">
       <path d={P_PATH} fill="currentColor" />
-      <path d={CUT_PATHS[CUT]} fill="var(--edition-accent)" />
+      <path d={CUT_PATH} fill="var(--edition-accent)" />
       <path d={PRIME_PATH} fill="var(--brand-prime)" />
     </svg>
   );

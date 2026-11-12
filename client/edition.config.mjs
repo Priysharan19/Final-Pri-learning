@@ -27,8 +27,9 @@
 // prints the open gaps of both editions on every run.
 //
 // E4 (brand): the student app reads the edition through one module,
-// client/src/brand/edition.js — the wordmark, the icon cut and accent, and the
-// {brand} every catalogue string uses. The build reads it in vite.config.js
+// client/src/brand/build-edition.js, which the build replaces with its own
+// edition's record — the wordmark, the icon cut, and the {brand} every
+// catalogue string uses. The build reads it in vite.config.js
 // (index.html, the web manifest, icons). Sign-up course defaults (E2/E3),
 // billing (E5) and the retirement of PRI_FEATURE_AUSTRALIA (E3) read from here
 // in later missions.

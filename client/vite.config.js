@@ -7,7 +7,7 @@ import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/re
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
 import { resolveEdition } from './edition.config.mjs';
-import { WEB_FILES, brandFile, brandIndexHtml, webManifest } from './brand/edition-brand.mjs';
+import { BUILD_EDITION_MODULE, WEB_FILES, brandFile, brandIndexHtml, buildEditionModule, webManifest } from './brand/edition-brand.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -452,6 +452,9 @@ function releaseIdentityManifest(identity) {
 // %PRI_…% placeholders, manifest.webmanifest, the favicon, the splash and the
 // app icons all come from the edition this build resolved (PRI_EDITION), from
 // client/brand/<edition>/, and the build carries no other edition's files.
+// client/src/brand/build-edition.js, the app's one read of the edition table,
+// is replaced by this edition's record alone, so no bundle holds the other
+// edition's name, accent or wordmark.
 // The assets are emitted in generateBundle, before pri-precache's writeBundle
 // lists dist/, so the service worker installs them. The development server
 // serves the same files from the same place.
@@ -461,6 +464,10 @@ export function editionBrand(edition) {
   return {
     name: 'pri-edition-brand',
     transformIndexHtml: { order: 'pre', handler: html => brandIndexHtml(html, edition) },
+    load(id) {
+      if (id.split('?')[0] === BUILD_EDITION_MODULE) return buildEditionModule(edition);
+      return null;
+    },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
       for (const rel of WEB_FILES) this.emitFile({ type: 'asset', fileName: rel, source: readFileSync(brandFile(edition, rel)) });

@@ -71,27 +71,54 @@ function chunk(type, data) {
 }
 function toRgb(buf) {
   const p = readPng(buf);
-  if (p.colorType === 2 && !p.hasAlpha) return buf;
-  if (p.colorType !== 6 || p.bitDepth !== 8) throw new Error(`unexpected PNG colour type ${p.colorType}/${p.bitDepth}`);
-  const { width: w, height: h } = p, stride = w * 4, raw = inflateSync(p.idat), px = Buffer.alloc(h * stride);
+  // Always decoded and re-encoded (even when Chromium already wrote RGB), so
+  // every icon gets the filtered encoding below.
+  if (!(p.colorType === 6 || (p.colorType === 2 && !p.hasAlpha)) || p.bitDepth !== 8) throw new Error(`unexpected PNG colour type ${p.colorType}/${p.bitDepth}`);
+  const bpp = p.colorType === 6 ? 4 : 3;
+  const { width: w, height: h } = p, stride = w * bpp, raw = inflateSync(p.idat), px = Buffer.alloc(h * stride);
   for (let y = 0; y < h; y++) {
     const f = raw[y * (stride + 1)], row = raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1));
     for (let x = 0; x < stride; x++) {
-      const a = x >= 4 ? px[y * stride + x - 4] : 0, b = y ? px[(y - 1) * stride + x] : 0, c = x >= 4 && y ? px[(y - 1) * stride + x - 4] : 0;
+      const a = x >= bpp ? px[y * stride + x - bpp] : 0, b = y ? px[(y - 1) * stride + x] : 0, c = x >= bpp && y ? px[(y - 1) * stride + x - bpp] : 0;
       let v = row[x];
       if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
       else if (f === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
       px[y * stride + x] = v & 255;
     }
   }
-  const out = Buffer.alloc(h * (w * 3 + 1));
+  const rgbStride = w * 3, rgb = Buffer.alloc(h * rgbStride);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * stride + x * 4;
-    if (px[i + 3] !== 255) throw new Error('icon has non-opaque pixels');
-    px.copy(out, y * (w * 3 + 1) + 1 + x * 3, i, i + 3);
+    const i = y * stride + x * bpp;
+    if (bpp === 4 && px[i + 3] !== 255) throw new Error('icon has non-opaque pixels');
+    px.copy(rgb, y * rgbStride + x * 3, i, i + 3);
+  }
+  // Each row takes the PNG filter (None, Sub, Up, Average, Paeth) whose output
+  // has the smallest sum of absolute values — the usual heuristic, and on these
+  // flat-colour tiles about half the bytes of unfiltered rows. These icons are
+  // in every edition's install budget.
+  const out = Buffer.alloc(h * (rgbStride + 1));
+  const row = Buffer.alloc(rgbStride);
+  for (let y = 0; y < h; y++) {
+    let best = null, bestScore = Infinity, bestType = 0;
+    for (let type = 0; type < 5; type++) {
+      let score = 0;
+      for (let x = 0; x < rgbStride; x++) {
+        const v = rgb[y * rgbStride + x];
+        const a = x >= 3 ? rgb[y * rgbStride + x - 3] : 0, b = y ? rgb[(y - 1) * rgbStride + x] : 0, c = x >= 3 && y ? rgb[(y - 1) * rgbStride + x - 3] : 0;
+        let pred = 0;
+        if (type === 1) pred = a; else if (type === 2) pred = b; else if (type === 3) pred = (a + b) >> 1;
+        else if (type === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); pred = pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+        const f = (v - pred) & 255;
+        row[x] = f;
+        score += f < 128 ? f : 256 - f;
+      }
+      if (score < bestScore) { bestScore = score; bestType = type; best = Buffer.from(row); }
+    }
+    out[y * (rgbStride + 1)] = bestType;
+    best.copy(out, y * (rgbStride + 1) + 1);
   }
   const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 2;
-  return Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ih), chunk('IDAT', deflateSync(out, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
+  return Buffer.concat([buf.subarray(0, 8), chunk('IHDR', ih), chunk('IDAT', deflateSync(out, { level: 9, memLevel: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
 const browser = await chromium.launch();
