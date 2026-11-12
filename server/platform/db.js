@@ -604,13 +604,11 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     rev INTEGER NOT NULL DEFAULT 0 CHECK(rev >= 0),
     create_key TEXT,
     create_digest TEXT,
-    import_digest TEXT,
+    import_digest TEXT CHECK((origin = 'desk' AND import_digest IS NULL) OR (origin = 'prithagoras-import' AND import_digest IS NOT NULL)),
     imported_from_json TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    finished_at INTEGER,
-    CHECK((origin = 'desk' AND import_digest IS NULL) OR (origin = 'prithagoras-import' AND import_digest IS NOT NULL)),
-    CHECK((state = 'finished') = (finished_at IS NOT NULL)),
+    finished_at INTEGER CHECK((state = 'finished') = (finished_at IS NOT NULL)),
     UNIQUE(account_id, create_key),
     UNIQUE(account_id, import_digest)
   );`);
