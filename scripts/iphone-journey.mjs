@@ -99,8 +99,27 @@ const WANT_DYNAMIC = process.argv.includes('--dynamic-type');
 // `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
 const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
 const argOf = name => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
+// Every child is bounded (5 minutes unless a call says otherwise) and killed
+// outright when it overruns, so no hung simctl can hold this process — and
+// with it the CI step — past the journey's own bound.
 const run = (cmd, args, opts = {}) =>
-  execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, ...opts });
+  execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024, timeout: 300_000, killSignal: 'SIGKILL', ...opts });
+
+// The fixture server's launcher never shares this step's stdout/stderr: its
+// output is captured and printed here, and when the server does not start the
+// tail of its server.log is printed too (the launcher only names the file).
+function startFixture(args) {
+  try {
+    const text = run(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), ...args], { timeout: 120_000 });
+    if (text.trim()) console.log(text.trim());
+  } catch (error) {
+    const said = `${error?.stdout || ''}${error?.stderr || ''}`.trim();
+    if (said) console.log(said);
+    const logPath = (said.match(/\(log: ([^)]+)\)/) || [])[1];
+    if (logPath) { try { console.log(`  --- ${logPath} (last 40 lines) ---\n${readFileSync(logPath, 'utf8').split('\n').slice(-40).join('\n')}`); } catch { console.log(`  (${logPath} could not be read)`); } }
+    throw new Error(`the local server did not start (${said.split('\n').pop() || String(error?.message || error).split('\n')[0]})`);
+  }
+}
 
 // A freshly booted simulator can refuse a launch until SpringBoard is ready
 // ("denied by service delegate (SBMainWorkspace)"). Wait for the boot to finish,
@@ -275,18 +294,27 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
 
 // The journey's own wall-clock bound, below the workflow's 40-minute step
 // limit: a run that reaches it fails here, with its log, instead of being
-// cancelled. A watchdog process enforces it even while a synchronous child
-// (simctl, log show) blocks this one: SIGTERM, then SIGKILL 15 s later.
+// cancelled. PRI_JOURNEY_DEADLINE_MS may only LOWER it (the hang proof in
+// client/test uses seconds).
+// A watchdog enforces it even while a synchronous child blocks this process:
+// SIGTERM, then SIGKILL 15 s later. The watchdog holds NONE of this step's
+// pipes (stdio ignored), so it can never keep the step open. It reads the
+// wall clock (a background `sleep 2` loop can stretch far past its count on a
+// loaded Mac); it exits soon after this process ends, and then kills any local server this run started
+// (pids in a file), so a SIGKILLed journey leaves nothing behind either.
 const JOURNEY_T0 = Date.now();
-const JOURNEY_DEADLINE_MS = 37 * 60_000;
+const JOURNEY_DEADLINE_MS = Math.min(37 * 60_000, Number(process.env.PRI_JOURNEY_DEADLINE_MS) || Infinity);
 const liveServerPids = new Set();
+const serverPidFile = join(mkdtempSync(join(tmpdir(), 'pri-journey-')), 'server-pids');
+writeFileSync(serverPidFile, '');
 let textSizeRaised = false;
 {
-  const wd = spawn('/bin/sh', ['-c', `sleep ${JOURNEY_DEADLINE_MS / 1000 + 60}; echo "NATIVE JOURNEY: FAIL — watchdog: still running after the ${JOURNEY_DEADLINE_MS / 60_000}-minute bound" >&2; kill -TERM ${process.pid}; sleep 15; kill -KILL ${process.pid}`], { stdio: ['ignore', 'ignore', 'inherit'], detached: true });
+  const limit = Math.ceil(JOURNEY_DEADLINE_MS / 1000) + 30;
+  const wd = spawn('/bin/sh', ['-c', `p=${process.pid}; end=$(( $(date +%s) + ${limit} )); while kill -0 $p 2>/dev/null; do if [ $(date +%s) -ge $end ]; then kill -TERM $p; sleep 15; kill -KILL $p 2>/dev/null; break; fi; sleep 2; done; for q in $(cat '${serverPidFile}'); do kill $q 2>/dev/null; done`], { stdio: 'ignore', detached: true });
   wd.unref();
-  process.on('exit', () => { try { process.kill(-wd.pid, 'SIGKILL'); } catch { /* gone */ } });
-  process.on('SIGTERM', () => abortJourney('terminated (watchdog or step limit)'));
+  process.on('SIGTERM', () => abortJourney(`terminated after ${Math.round((Date.now() - JOURNEY_T0) / 1000)} s (watchdog or step limit)`));
 }
+const trackServer = pid => { if (!pid) return; liveServerPids.add(pid); try { writeFileSync(serverPidFile, `${[...liveServerPids].join('\n')}\n`); } catch { /* the in-process set still covers abortJourney */ } };
 // Every early stop cleans up as the normal path's finally blocks do: local
 // servers stopped, the text size reset. CI evidence for a stopped run is the
 // log; the evidence step skips a journey file that was never written.
@@ -355,10 +383,10 @@ if (WANT_CLOUD) try {
   } : null;
   if (!fixture) {
     const out = join(mkdtempSync(join(tmpdir(), 'pri-fixture-')), 'fixture.env');
-    execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4331', '--host', '127.0.0.1', '--out', out], { stdio: 'inherit' });
+    startFixture(['--port', '4331', '--host', '127.0.0.1', '--out', out]);
     fixture = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
     cloudServer = fixture;
-    if (fixture?.PRI_CLOUD_SERVER_PID) liveServerPids.add(Number(fixture.PRI_CLOUD_SERVER_PID));
+    if (fixture?.PRI_CLOUD_SERVER_PID) trackServer(Number(fixture.PRI_CLOUD_SERVER_PID));
   }
   if (!cloudServer && process.env.PRI_CLOUD_SERVER_LOG) fixture.PRI_CLOUD_SERVER_LOG = process.env.PRI_CLOUD_SERVER_LOG;
   // The codes: only those the server's TEST email adapter issued, from its
@@ -412,9 +440,9 @@ if (WANT_CLOUD) try {
     show(offlineLines);
     // Reconnect: the same server and database come back.
     const out = join(mkdtempSync(join(tmpdir(), 'pri-fixture-')), 'restart.env');
-    execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', String(port), '--host', '127.0.0.1', '--db', fixture.PRI_CLOUD_DB, '--restart', '--out', out], { stdio: 'inherit' });
+    startFixture(['--port', String(port), '--host', '127.0.0.1', '--db', fixture.PRI_CLOUD_DB, '--restart', '--out', out]);
     cloudServer.PRI_CLOUD_SERVER_PID = readFileSync(out, 'utf8').match(/PRI_CLOUD_SERVER_PID=(\d+)/)[1];
-    liveServerPids.add(Number(cloudServer.PRI_CLOUD_SERVER_PID));
+    trackServer(Number(cloudServer.PRI_CLOUD_SERVER_PID));
   }
   const logoutsBefore = serverLogouts(fixture);
   cloudRelaunchLines = launchAndRead(udid, bundleId, '--journey-cloud-relaunch', 'cloudRelaunch', childEnv);
@@ -498,11 +526,9 @@ let offlineRelaunchLines = [];
   try {
     console.log(`\nLeg 2 · a real local Pri server marks the work — ${TIER} …`);
     const out = join(mkdtempSync(join(tmpdir(), 'pri-marking-')), 'fixture.env');
-    try {
-      execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4332', '--host', '127.0.0.1', '--synthetic-reader', '--out', out], { stdio: 'inherit' });
-    } catch (error) { throw new Error(`the local server did not start (${String(error?.message || error).split('\n')[0]})`); }
+    startFixture(['--port', '4332', '--host', '127.0.0.1', '--synthetic-reader', '--out', out]);
     server = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
-    if (server?.PRI_CLOUD_SERVER_PID) liveServerPids.add(Number(server.PRI_CLOUD_SERVER_PID));
+    if (server?.PRI_CLOUD_SERVER_PID) trackServer(Number(server.PRI_CLOUD_SERVER_PID));
     if (server.PRI_CLOUD_READER !== 'synthetic') throw new Error('the local server is not running the synthetic reader');
     writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
     // The server's own database, read-only: the "teacher's desk" (shared with

@@ -329,7 +329,13 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   const abort = j.slice(j.indexOf('function abortJourney'), j.indexOf('\n}\n', j.indexOf('function abortJourney')));
   ok(/liveServerPids/.test(abort) && /content_size', 'large'/.test(abort) && /NATIVE JOURNEY: FAIL/.test(abort) && /process\.exit\(1\)/.test(abort),
     'an early stop kills the local servers, resets the text size, prints FAIL and exits non-zero');
-  ok(/const JOURNEY_DEADLINE_MS = 37 \* 60_000;/.test(j) && /Date\.now\(\) - JOURNEY_T0 > JOURNEY_DEADLINE_MS/.test(j) && /kill -TERM \$\{process\.pid\}; sleep 15; kill -KILL/.test(j),
+  ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j),
+    'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open');
+  ok(/end=\$\(\( \$\(date \+%s\) \+/.test(j) && /\$\(date \+%s\) -ge \$end/.test(j), 'the watchdog reads the wall clock, not a count of sleeps');
+  ok(/timeout: 300_000, killSignal: 'SIGKILL', \.\.\.opts/.test(j), 'every simctl call the journey makes is bounded and killed when it overruns');
+  ok(/function startFixture/.test(j) && /last 40 lines/.test(j) && !/execFileSync\(process\.execPath, \[join\(HERE, 'cloud-fixture-server/.test(j),
+    'a server that does not start prints the tail of its server.log into the step output');
+  ok(/Math\.min\(37 \* 60_000, Number\(process\.env\.PRI_JOURNEY_DEADLINE_MS\)/.test(j) && /Date\.now\(\) - JOURNEY_T0 > JOURNEY_DEADLINE_MS/.test(j) && /kill -TERM \$p; sleep 15; kill -KILL \$p/.test(j),
     'the journey has its own 37-minute bound, enforced by a watchdog even while a child blocks it');
   ok(/\nshutDownAfterCrashLoop\(device\);/.test(src('scripts/native-bridge-selfcheck.mjs')), 'the bridge self-check shuts its device down after the crash loop, so the journey boots it fresh');
   ok(!/i--; continue/.test(j), 'a pass that skips the log read still counts toward the bound (a silent phase must not poll 5x longer)');
