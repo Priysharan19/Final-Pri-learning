@@ -200,6 +200,29 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   }
 
   /**
+   * Premium for one account, through the product's own audited support-grant
+   * route (POST /v1/entitlements/admin/grant) by a real admin account with a
+   * real second factor — the path server/test and online-authority.mjs use.
+   * For a flow whose subject is not the free plan's daily allowance.
+   */
+  let admin = null;
+  async function grantPremium(accountId, durationMs = 30 * 86400000) {
+    h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%' OR bucket LIKE 'login%'").run();
+    if (!admin) {
+      const email = `e2e.${process.pid}.admin.${Date.now().toString(36)}@example.test`;
+      const reg = await desk(() => harness.registerAccount(h, { email, password: PASSWORD, name: 'Desk Admin', deviceId: 'e2e-desk-admin' }));
+      if (reg.status !== 201) throw new Error(`online-session: admin register answered ${reg.status} ${reg.text}`);
+      await desk(() => harness.verifyEmail(h, reg.account.id));
+      const mfa = await harness.promoteRole(h, reg.jar, reg.account.id, 'admin');
+      admin = { jar: reg.jar, secret: mfa.secret };
+    }
+    const grant = () => desk(() => h.request('/v1/entitlements/admin/grant', { method: 'POST', jar: admin.jar, body: { accountId: String(accountId), durationMs } }));
+    let granted = await grant();
+    if (granted.status === 403 && granted.data?.error?.code === 'MFA_STEP_UP_REQUIRED') { await harness.verifyMfa(h, admin.jar, admin.secret); granted = await grant(); }
+    if (granted.status !== 200) throw new Error(`online-session: Premium grant answered ${granted.status} ${granted.text}`);
+  }
+
+  /**
    * Another account, at the desk, takes up a prepared question first — what a
    * shared token "used elsewhere" means. Returns the server's reply status.
    */
@@ -244,7 +267,7 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   // from, and what a Submit that carries its picture reuses), newest first.
   const keptReadResults = accountId => h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>? ORDER BY created_at DESC")
     .all(accountId, Date.now()).map(r => { try { return JSON.parse(r.response_json).result || null; } catch { return null; } }).filter(Boolean);
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, keptReadResults, close };
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, grantPremium, forgetKeptReads, keptReads, recognitionProof, keptReadResults, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
