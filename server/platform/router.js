@@ -28,6 +28,7 @@ import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
+import { serverEdition } from './edition.js';
 import { readinessReport } from './readiness.js';
 import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
@@ -82,12 +83,17 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // Old native shells get a structured upgrade answer, not odd failures (CP-11).
   router.use(clientCompatibility());
 
+  // Resolved once, when the router is built: an unknown PRI_EDITION stops the
+  // server here rather than answering health checks under no edition.
+  const edition = serverEdition();
+
   // LIVENESS. Cheap, and up while the process is: a database outage is
   // reported here as a field, never as a failure of this endpoint, so an
   // orchestrator does not restart a healthy process in a loop. Readiness —
   // whether this replica can actually serve — is /v1/ready.
   //
   // EXPOSURE. Anonymous callers get the ok flag, the release identity, the
+  // regional edition, the
   // schema versions, the engine name and whether the database answered — what
   // an uptime check needs and nothing an attacker can act on. Which identity,
   // email and billing providers are configured, the Google notification
@@ -135,6 +141,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       // so a native archive's release evidence can tell staging from
       // production behind https://app.prilearning.com. A short token, never a URL.
       environment: deploymentEnvironment(),
+      // Which regional edition this deployment serves (client/edition.config.mjs,
+      // ADR-0002): a short id, 'priyabhata' or 'prithagoras'.
+      edition,
       // The per-account storage cap every device is held to: two numbers a
       // client may show, never a per-account figure.
       syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },
