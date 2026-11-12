@@ -175,7 +175,7 @@ async function openDrillDatabase(label) {
   let current = open();
   return {
     relay: null,
-    connection: { hosts: [], ports: ['5432'], urls: [] },
+    connection: { hosts: ['127.0.0.1'], ports: ['5432'], urls: [] },
     store: () => current.store,
     async reopen() { current.raw.close(); current = open(); return current.store; },
     async close() { if (current.raw.open) current.raw.close(); }
@@ -197,17 +197,23 @@ async function verifiedStudent(app, email, deviceId = 'ipad-drill') {
  */
 function connectionLeaks(lines, { hosts = [], ports = [], urls = [] } = {}) {
   const out = [];
-  const portRe = ports.length ? new RegExp(`(?:^|[:@\\s])(?:${ports.join('|')})(?:$|[/\\s,])`) : null;
+  // A configured port standing as its own number: not next to a hex digit, a
+  // letter or "-" (so a UUID that happens to contain the digits still passes).
+  const portRe = ports.length ? new RegExp(`(?:^|[^0-9a-z-])(?:${ports.join('|')})(?:$|[^0-9a-z-])`, 'i') : null;
   const hostRe = hosts.length ? new RegExp(`(?:^|[^0-9a-z.-])(?:${hosts.map(h => h.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:$|[^0-9a-z.-])`, 'i') : null;
+  const leaky = (key, v) => /postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
+    (portRe && portRe.test(v)) || (/host|port|addr|url|dsn|connection/i.test(key) && ports.some(p => v.includes(p)));
+  // Every leaf, with its own key and its path from the top-level field.
+  const walk = (path, key, value, hit) => {
+    if (value && typeof value === 'object') { for (const [k, v] of Object.entries(value)) walk(`${path}.${k}`, k, v, hit); return; }
+    if (leaky(key, String(value))) hit.add(path);
+  };
   lines.forEach((line, i) => {
     let fields;
     try { fields = JSON.parse(line); } catch { out.push(`${i}.<unparsed>`); return; }
-    for (const [name, raw] of Object.entries(fields)) {
-      const v = typeof raw === 'string' ? raw : JSON.stringify(raw);
-      const connectionField = /host|port|addr|url|dsn|connection/i.test(name);
-      if (/postgres(?:ql)?:\/\//i.test(v) || urls.some(u => v.includes(u)) || (hostRe && hostRe.test(v)) ||
-          (portRe && portRe.test(v)) || (connectionField && ports.some(p => v.includes(p)))) out.push(`${i}.${name}`);
-    }
+    const hit = new Set();
+    walk(String(i), '', fields, hit);
+    out.push(...hit);
   });
   return out;
 }
@@ -223,6 +229,17 @@ const counter = key => metrics.snapshot().counters[key]?.total || 0;
   c.deq(connectionLeaks([line({ code: 'X', message: 'connect ECONNREFUSED db.internal:5432' })], C), ['0.message'], 'leak scan: host:port fails, named by field only');
   c.deq(connectionLeaks([line({ dbPort: 61234 })], C), ['0.dbPort'], 'leak scan: a port in a port-named field fails');
   c.deq(connectionLeaks([line({ m: 'see postgresql://anything' })], C), ['0.m'], 'leak scan: any postgres URL fails');
+  const S = { hosts: ['127.0.0.1'], ports: ['5432'], urls: [] };
+  for (const [label, row, conf, want] of [
+    ['Node error shape, nested port', { err: { code: 'ECONNREFUSED', syscall: 'connect', address: '::1', port: 5432 } }, C, ['0.err.port']],
+    ['nested string port', { detail: { port: '5432' } }, C, ['0.detail.port']],
+    ['libpq-style port=', { message: 'dbname=pri port=5432 user=pri_server' }, C, ['0.message']],
+    ['bare port before a full stop', { message: 'no listener on port 5432.' }, C, ['0.message']],
+    ['SQLite fault, nested address/port', { err: { address: '127.0.0.1', port: 5432 } }, S, ['0.err.address', '0.err.port']],
+    ['SQLite fault, (host:port)', { message: 'connect ECONNREFUSED (127.0.0.1:5432)' }, S, ['0.message']],
+    ['SQLite fault, host:port; retrying', { message: 'refused 127.0.0.1:5432; retrying' }, S, ['0.message']],
+    ['UUID containing 5432', { requestId: 'f085042b-eb94-5432-8c88-c04fd1e43951', other: 'a5432b' }, C, []]
+  ]) c.deq(connectionLeaks([line(row)], conf), want, `leak scan: ${label}`);
 }
 
 try {
