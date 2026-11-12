@@ -100,6 +100,8 @@ for (const tokens of copies) {
         mkdirSync(join(destPath, 'assets'), { recursive: true });
         writeFileSync(join(destPath, 'index.html'), '<!doctype html><html><head><title>Pri</title><script type="module" src="/assets/app.js"></script></head><body><div id="root"></div></body></html>\n');
         writeFileSync(join(destPath, 'assets', 'app.js'), 'document.getElementById("root").textContent = "ok";\n');
+        // As a real build does (vite.config.js featureManifest): the image's client names its edition.
+        writeFileSync(join(destPath, 'features.json'), JSON.stringify({ edition: 'priyabhata' }));
       } else if (src.endsWith('node_modules')) {
         mkdirSync(dirname(destPath), { recursive: true });
         symlinkSync(join(ROOT, 'server', 'node_modules'), destPath, 'dir');
@@ -374,6 +376,55 @@ try {
   await stopImage(plain);
 }
 c.eq(plain.stderr.trim(), '', `plain PRI_*: no errors on stderr (${plain.stderr.trim().slice(0, 200)})`);
+c.match(plain.stdout, /platform_edition \{ edition: 'priyabhata', builtClient: 'priyabhata', checked: true \}/, 'plain PRI_*: the image logs that its edition was checked against its built client');
+
+// ── Case 3 · One image, one edition (ADR-0002, plan E2) ─────────────────────
+// The image's client was built for Priyabhata. The same image told to serve
+// Prithagoras, or shipping a client that names another or no edition, must
+// stop before it opens the database or listens: one line, exit 1.
+const featuresPath = join(stage, 'client', 'dist', 'features.json');
+async function refusedBoot(caseEnv) {
+  const run = await bootImage({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp, ...caseEnv });
+  const deadline = Date.now() + 20_000;
+  while (!run.exited && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+  const exited = run.exited;
+  await stopImage(run);
+  return { ...run, exited };
+}
+const oneLine = (run, pattern) => { const lines = run.stderr.trim().split('\n'); return lines.length === 1 && pattern.test(lines[0]); };
+const neverServed = run => !/platform_db_open|running on port/.test(run.stdout);
+{
+  const wrongServer = await refusedBoot({ PRI_EDITION: 'prithagoras' });
+  c.eq(wrongServer.exited?.code, 1, 'edition: PRI_EDITION=prithagoras over a Priyabhata client exits 1');
+  c.ok(oneLine(wrongServer, /^edition_mismatch: this server is prithagoras \(PRI_EDITION\) but the built client it would serve was made for "priyabhata"/), `edition: with one line naming both editions (${wrongServer.stderr.trim().slice(0, 200)})`);
+  c.ok(neverServed(wrongServer), 'edition: before the database is opened or the port is bound');
+
+  writeFileSync(featuresPath, JSON.stringify({ edition: 'prithagoras' }));
+  const wrongClient = await refusedBoot({});
+  c.eq(wrongClient.exited?.code, 1, 'edition: a Priyabhata server (PRI_EDITION unset) shipping a Prithagoras client exits 1');
+  c.ok(oneLine(wrongClient, /^edition_mismatch: this server is priyabhata \(PRI_EDITION\) but the built client it would serve was made for "prithagoras"/) && neverServed(wrongClient), 'edition: with one line naming both, and nothing served');
+
+  writeFileSync(featuresPath, JSON.stringify({ library: false }));
+  const undeclared = await refusedBoot({});
+  c.eq(undeclared.exited?.code, 1, 'edition: in production a client that names no edition exits 1');
+  c.ok(oneLine(undeclared, /^edition_undeclared: this server is priyabhata/) && neverServed(undeclared), 'edition: with one line, and nothing served');
+
+  const typo = await refusedBoot({ PRI_EDITION: 'priyabata' });
+  c.eq(typo.exited?.code, 1, 'edition: a mistyped PRI_EDITION exits 1');
+  c.ok(oneLine(typo, /PRI_EDITION="priyabata" is not an edition/) && neverServed(typo), 'edition: with one line, and nothing served');
+
+  writeFileSync(featuresPath, JSON.stringify({ edition: 'prithagoras' }));
+  const australia = await bootImage({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp, PRI_EDITION: 'prithagoras' });
+  try {
+    const body = await (await waitForHealth(australia)).json();
+    c.eq(body.edition, 'prithagoras', 'edition: the same image code serves Prithagoras when both the variable and the client say so');
+    const served = await (await fetch(`${origin}/features.json`)).json();
+    c.eq(served.edition, body.edition, 'edition: and the features.json it serves names the edition /v1/health does');
+  } finally {
+    await stopImage(australia);
+  }
+  c.eq(australia.stderr.trim(), '', `edition: with no errors on stderr (${australia.stderr.trim().slice(0, 200)})`);
+}
 rmSync(stage, { recursive: true, force: true });
 assert.ok(c.count() > 20);
 console.log(`PRODUCTION RUNTIME IMAGE — PASS — ${c.count()}/${c.count()} checks`);

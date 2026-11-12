@@ -14,7 +14,10 @@
 //   4. the build records the edition (features.json, __PRI_EDITION__), the
 //      Dockerfile forwards PRI_EDITION to the client build and ships the table
 //      to the runtime image, and /v1/health reports the server's edition;
-//   5. E1 changes no student behaviour: nothing under client/src reads it yet.
+//   5. the student app reads the edition table through one module only
+//      (client/src/platform/edition-record.js, which a build replaces with its
+//      own edition's record; plan E2) and reaches that through the helper
+//      client/src/platform/edition.js.
 //
 // It ends by printing each edition's open gaps — the parity debt still owed.
 //
@@ -132,15 +135,32 @@ ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'true' && vite.f
   ok(/const edition = serverEdition\(\);/.test(router) && /^\s+edition,$/m.test(router), '/v1/health reports the edition');
 }
 
-// 5. No behaviour change in the student app yet.
+// 5. One reader of the table under client/src (plan E2).
 {
-  let readers = '';
-  try {
-    readers = execFileSync('git', ['-C', ROOT, 'grep', '-l', '-e', 'edition.config', '-e', '__PRI_EDITION__', '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch (e) {
-    if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
-  }
-  ok(readers === '', `E1: nothing under client/src reads the edition yet (${readers})`);
+  const grep = (...patterns) => {
+    try {
+      return execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-l', ...patterns.flatMap(p => ['-e', p]), '--', 'client/src'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n').filter(Boolean).sort();
+    } catch (e) {
+      if (e.status !== 1) throw e; // git grep exits 1 when nothing matches
+      return [];
+    }
+  };
+  // The files allowed to import the edition table. A build replaces each with
+  // the record of the edition it resolved, so no bundle carries the table.
+  const TABLE_READERS = ['client/src/platform/edition-record.js'];
+  const readers = grep('edition\\.config');
+  ok(JSON.stringify(readers) === JSON.stringify(TABLE_READERS), `client/src reads the edition table only through ${TABLE_READERS.join(', ')} (${readers.join(', ')})`);
+  const defined = grep('__PRI_EDITION__');
+  ok(defined.length === 0, `nothing under client/src reads the bare __PRI_EDITION__ define: the edition comes from the build's record (${defined.join(', ')})`);
+  // Everything else asks the helper. Only the helper imports the record.
+  const importers = grep("from '[./]*edition-record\\.js'", "from '[./a-z]*/edition-record\\.js'");
+  ok(JSON.stringify(importers) === JSON.stringify(['client/src/platform/edition.js']), `only client/src/platform/edition.js imports the record (${importers.join(', ')})`);
+  const plugin = vite.editionRecordPlugin('prithagoras');
+  const built = plugin.load(vite.EDITION_RECORD_MODULE);
+  ok(typeof built === 'string' && built.includes('brand: "Prithagoras"') && !/Priyabhata|priyabhata|edition\.config|capabilities/.test(built), 'a Prithagoras build replaces edition-record.js with its own record alone');
+  ok(plugin.load('/elsewhere/module.js') === null, 'and leaves every other module alone');
+  const helper = await import('../src/platform/edition.js');
+  ok(helper.EDITION === ed.DEFAULT_EDITION && helper.defaultCourse() === ed.EDITIONS[ed.DEFAULT_EDITION].defaultCourse, 'outside a build the app is the default edition, with its default course');
 }
 
 const gaps = ed.parityGaps();

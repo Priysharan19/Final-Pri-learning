@@ -157,6 +157,7 @@ import {
 } from './markerPool.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
+import { bankPolicy } from './editionBanks.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
 import { indiaExamPaperSpec, markObjective } from '../../client/src/engine/indiaExams.js';
@@ -535,6 +536,12 @@ function readSpec(body) {
   // India curriculum's covers, so it is refused (indiaBanks.js).
   if (body.kind === 'practice-paper' && !practicePapersAllowed()) {
     return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of the India curriculum.');
+  }
+  // An India paper is composed from the India curriculum's banks: only the
+  // edition that issues them composes one (editionBanks.js). Another edition's
+  // own papers are a later mission (plan G4); until then it issues none.
+  if (body.kind === 'india' && bankPolicy().curriculum !== 'in') {
+    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
   }
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;

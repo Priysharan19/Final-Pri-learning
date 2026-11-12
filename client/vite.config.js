@@ -3,10 +3,12 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
 import { editionOf, resolveEdition } from './edition.config.mjs';
+import { editionRecordModule } from './src/platform/edition-record.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -447,6 +449,30 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// The app's own edition record (plan E2). client/src/platform/edition-record.js
+// is the one module that reads the edition table; a build or dev server loads
+// this edition's record in its place, so a bundle knows its own edition's
+// defaults (course, languages, locale, currency) and nothing of the other's.
+// A real build passes mustLoad: if the replacement never happened (the module
+// moved, or its path stopped matching), the bundle would carry the default
+// edition's record and the whole table while features.json named this
+// edition, so the build stops instead.
+export const EDITION_RECORD_MODULE = fileURLToPath(new URL('./src/platform/edition-record.js', import.meta.url));
+export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
+  let replaced = false;
+  return {
+    name: 'pri-edition-record',
+    load(id) {
+      if (id.split('?')[0] !== EDITION_RECORD_MODULE) return null;
+      replaced = true;
+      return editionRecordModule(edition);
+    },
+    buildEnd(error) {
+      if (mustLoad && !error && !replaced) this.error(`pri-edition-record: ${EDITION_RECORD_MODULE} was never loaded, so this build does not carry the ${edition} record`);
+    }
+  };
+}
+
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
@@ -535,7 +561,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',
