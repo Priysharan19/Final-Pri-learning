@@ -61,10 +61,14 @@ student data off the device.
      into another course only where that content is marked approved for cross-edition use, and their home stays
      their edition's.
 
-3. **No inferior edition.** The capability set is identical across editions. An edition may differ only in
-   curriculum, presentation, language, commercial configuration and legal requirements. A capability that is
-   switched off for one edition must name the regional/legal/certification reason in the edition configuration,
-   and a test fails when the two editions' capability sets differ without such a recorded reason.
+3. **No inferior edition — full parity, both ways.** Every feature of Priyabhata is owed to Prithagoras and every
+   feature of Prithagoras is owed to Priyabhata (owner instruction, 2026-11-13). Both editions declare exactly the same
+   platform capabilities in the edition configuration. A capability an edition does not offer yet is a written gap
+   naming the plan mission that closes it — a debt with an owner, never a lesser edition by design. A test fails a
+   capability missing from one edition, a gap without a mission, or a capability only one edition declares. Editions
+   may differ only in curriculum, presentation, language, commercial configuration and legal requirements.
+   The Prithagoras features that do not exist in the platform yet (resource library, resource publishing, the Exam
+   Desk) are therefore Priyabhata gaps as much as Prithagoras ones, and are built once for both.
 
 4. **Build once, certify per edition.** Every new learning feature lands in the shared platform and is verified
    against both editions. A feature becomes available to an edition when that edition's certification for it is
