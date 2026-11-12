@@ -254,7 +254,10 @@ So, for every PR that changes `SCHEMA_VERSION` or `BILLING_SCHEMA_VERSION`:
 `db push` reads `supabase/migrations/` from the linked checkout. The migrations create schema
 `pri`, the `NOLOGIN` role `pri_server`, every table with RLS on and a single
 `pri_server`-only policy, revoke everything from `anon`/`authenticated`, and seed
-`platform_meta` and `sync_cursors`. They never touch `public`, `auth` or `storage`.
+`platform_meta`, `sync_cursors` and (schema 15) the resource library's seed paper in `resources` /
+`resource_editions`. They never touch `public`, `auth` or `storage`. The SQLite export does not copy
+those seeded tables, and refuses (`EXPORT_LIBRARY_NOT_SEED`) a source whose library holds anything but
+the seed, so no library row is silently left behind.
 
 ---
 

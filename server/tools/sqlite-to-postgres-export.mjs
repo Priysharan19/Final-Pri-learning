@@ -35,6 +35,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../platform/schemaVersions.js';
 import { verifyPlatformDatabase } from './backup.mjs';
+import { RESOURCE_SEED, resourceRowValues } from '../platform/resourceCatalog.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const MIGRATIONS_DIR = join(here, '..', '..', 'supabase', 'migrations');
@@ -62,7 +63,32 @@ export function exportTables(dir = MIGRATIONS_DIR) {
 }
 
 /** Seeded by the migrations; verified, never copied. */
-export const SEEDED_TABLES = Object.freeze(['platform_meta', 'sync_cursors']);
+export const SEEDED_TABLES = Object.freeze(['platform_meta', 'sync_cursors', 'resources', 'resource_editions']);
+
+// The resource library (ADR-0002 plan F1, schema 15) is content, not account
+// data: 20261113000000_resource_library.sql seeds Postgres with exactly
+// RESOURCE_SEED, and SQLite seeds itself with the same rows at boot, so copying
+// them would collide with the migration's rows (the import refuses a non-empty
+// table). They are not copied — and so that nothing is silently left behind,
+// the export REFUSES a source whose library holds anything but the seed (a
+// withdrawn or edited seed row, or a row added later). Publishing (plan F3)
+// must move these tables back to exportTables() before it writes library rows.
+const LIBRARY_SEED_ROWS = RESOURCE_SEED.map(r => resourceRowValues(r).map(v => (v === null ? null : String(v))));
+const LIBRARY_SEED_EDITIONS = RESOURCE_SEED.flatMap(r => r.editions.map(e => [r.id, e])).sort((a, b) => `${a}`.localeCompare(`${b}`));
+const LIBRARY_COLUMNS = 'id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at';
+function assertLibraryIsSeedOnly(db, present) {
+  const rows = present.has('resources')
+    ? db.prepare(`SELECT ${LIBRARY_COLUMNS} FROM resources ORDER BY id`).raw().all().map(row => row.map(v => (v === null ? null : String(v))))
+    : [];
+  const editions = present.has('resource_editions')
+    ? db.prepare('SELECT resource_id, edition FROM resource_editions ORDER BY resource_id, edition').raw().all().map(row => row.map(String))
+    : [];
+  if (JSON.stringify(rows) !== JSON.stringify(LIBRARY_SEED_ROWS) || JSON.stringify(editions) !== JSON.stringify(LIBRARY_SEED_EDITIONS)) {
+    throw toolError('EXPORT_LIBRARY_NOT_SEED',
+      'the resource library (resources, resource_editions) holds rows other than the migration seed; they would be lost at cutover. ' +
+      'Copy them by hand after the import, or extend this tool (plan F3) before exporting.');
+  }
+}
 
 function toolError(code, message, details = {}) {
   return Object.assign(new Error(message), { code, ...details });
@@ -225,6 +251,7 @@ export function exportSqliteToPostgres({ dbPath, outDir, inserts = false, now = 
     // One read transaction: every table is read from the same snapshot.
     db.transaction(() => {
       const present = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row => String(row.name)));
+      assertLibraryIsSeedOnly(db, present);
       for (const table of EXPORT_TABLES) {
         ident(table);
         const target = pgColumns.get(table);
