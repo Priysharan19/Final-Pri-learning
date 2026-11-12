@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
-import { resolveEdition } from './edition.config.mjs';
+import { editionOf, resolveEdition } from './edition.config.mjs';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -502,7 +502,10 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
     __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
-    __PRI_EDITION__: JSON.stringify(states.edition)
+    __PRI_EDITION__: JSON.stringify(states.edition),
+    // Plan E5: false in a build of an edition with no payment provider, so its
+    // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0)
   };
 }
 

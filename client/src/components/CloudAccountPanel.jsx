@@ -13,7 +13,7 @@ import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { SYNC_EVENT, autoSyncStatus, noteManualSync } from '../platform/cloudSyncScheduler.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
-  finishNativeTransaction, getNativeProducts, nativeBillingStore,
+  finishNativeTransaction, getNativeProducts, nativeBillingStore, PREMIUM_ON_SALE,
   acceptEachTransaction, onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import GooglePlayBilling from './GooglePlayBilling.jsx';
@@ -124,7 +124,7 @@ export default function CloudAccountPanel() {
       .catch(() => { if (live) setGuardian(null); });
     return () => { live = false; };
   }, [enabled, link?.accountId]);
-  const canUseWebBilling = canSync && webCheckout && !nativeShell;
+  const canUseWebBilling = PREMIUM_ON_SALE && canSync && webCheckout && !nativeShell;
   const canUseAppleBilling = canSync && nativeStoreKit && !!appleBootstrap?.appAccountToken;
   const liveAccount = session?.connected ? session.account : null;
   const appleMonthly = appleProducts.find(product => product.id === appleBootstrap?.products?.monthly) || null;
@@ -832,6 +832,10 @@ export default function CloudAccountPanel() {
                 {busy === 'cancel-web' ? t('cloud.cancelling') : t('cloud.cancelSubscription')}
               </button>
             )}
+          </div>}
+
+          {!PREMIUM_ON_SALE && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
+            {t('paywall.notOnSale')}
           </div>}
 
           {nativeShell && nativeStoreKit && appleNotOnSale && <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
