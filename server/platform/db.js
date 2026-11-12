@@ -8,6 +8,7 @@ import { asStore, platformDatabaseUrl } from './store.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
 import { SCHEMA_VERSION } from './schemaVersions.js';
+import { seedResourcesSqlite } from './resourceCatalog.js';
 
 export { SCHEMA_VERSION };
 
@@ -542,6 +543,47 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     PRIMARY KEY(account_id, week_start)
   );`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_sends_due ON parent_report_sends(status, next_attempt_at);`);
+
+  // Schema v15 — the shared resource library (resources.js, ADR-0002 plan F1):
+  // papers, solutions and notes linked where they are published, each offered
+  // to one or both editions through resource_editions. Global, like content.
+  db.exec(`CREATE TABLE IF NOT EXISTS resources (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    description TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('paper','solutions','notes')),
+    subject TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    grade TEXT,
+    marks INTEGER,
+    duration_minutes INTEGER,
+    reading_minutes INTEGER,
+    question_count INTEGER,
+    sections_json TEXT NOT NULL,
+    tags_json TEXT NOT NULL,
+    course TEXT NOT NULL CHECK(course IN ('in','nsw')),
+    syllabus_version TEXT,
+    certification_state TEXT NOT NULL CHECK(certification_state IN ('uploaded','structured','verified','issued','certified')),
+    availability TEXT NOT NULL CHECK(availability IN ('external','hosted')),
+    url TEXT,
+    source TEXT NOT NULL,
+    attribution TEXT NOT NULL,
+    rights_note TEXT NOT NULL,
+    disclaimer TEXT NOT NULL,
+    review_state TEXT NOT NULL CHECK(review_state IN ('draft','published','withdrawn')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    published_at INTEGER
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_resources_listing ON resources(review_state, year, title);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS resource_editions (
+    resource_id TEXT NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+    edition TEXT NOT NULL CHECK(edition IN ('priyabhata','prithagoras')),
+    PRIMARY KEY(resource_id, edition)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_resource_editions_edition ON resource_editions(edition, resource_id);`);
+  seedResourcesSqlite(db);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

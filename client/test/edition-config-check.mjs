@@ -81,7 +81,8 @@ for (const bad of ['Prithagoras', 'pythagoras', 'au', 'constructor', '__proto__'
   ok(throws(() => ed.resolveEdition({ PRI_EDITION: bad })), `PRI_EDITION=${bad} throws`);
 }
 ok(ed.capabilityOffered('priyabhata', 'verifiedMarking') === true, 'capabilityOffered reads true');
-ok(ed.capabilityOffered('prithagoras', 'resourceLibrary') === false, 'capabilityOffered reads a pending gap as not offered');
+ok(ed.capabilityOffered('prithagoras', 'examDesk') === false, 'capabilityOffered reads a pending gap as not offered');
+ok(ed.EDITION_IDS.every(id => ed.capabilityOffered(id, 'resourceLibrary')), 'the shared resource library (plan F1) is offered by both editions');
 
 // 3. Locale agreement.
 ok(ed.EDITIONS.priyabhata.locale === locale.INDIA_LOCALE && ed.EDITIONS.priyabhata.timezone === locale.INDIA_TIMEZONE, 'Priyabhata locale/timezone equal lib/locale.js');

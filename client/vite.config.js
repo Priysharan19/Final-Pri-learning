@@ -158,6 +158,13 @@ export const ON_DEMAND = [
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
 
+  // The shared resource library's page (ADR-0002 plan F1, PRI_FEATURE_LIBRARY):
+  // behind import() in App.jsx, and online-only — every resource it lists comes
+  // from GET /v1/resources and opens on its publisher's site — so a copy kept
+  // for offline would only ever draw "needs a connection". Off in a production
+  // build, where the chunk is never reached at all.
+  [/(^|\/)Library-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
   // account, so it costs the first visit nothing.
@@ -464,13 +471,17 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
 //   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
 //   emailed confirm/stop page). Off until counsel has reviewed email about
 //   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
+//   LIBRARY — the shared resource library's page (/library, ADR-0002 plan F1).
+//   Off in a production build: a new student surface outside the frozen V1
+//   scope ships dark until the owner turns it on. The read-only server routes
+//   (/v1/resources) answer whatever the flag says.
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
@@ -489,6 +500,7 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
+    __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition)
   };

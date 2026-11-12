@@ -48,7 +48,7 @@
 import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
@@ -63,7 +63,11 @@ const BUILT = {
   // PRI_FEATURE_PARENT_REPORT=1 — the parent weekly report's screens. OFF in a
   // production build until counsel has reviewed email about minors (D22); the
   // server is off too unless PRI_PARENT_REPORT=on (server/platform/parentReport.js).
-  parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null
+  parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null,
+  // PRI_FEATURE_LIBRARY=1 — the shared resource library's page (/library,
+  // ADR-0002 plan F1). OFF in a production build: a new student surface outside
+  // the frozen V1 scope, so V1 behaviour is unchanged until the owner's GO.
+  library: typeof __PRI_FEATURE_LIBRARY__ === 'boolean' ? __PRI_FEATURE_LIBRARY__ : null
 };
 
 // The student interface as a build constant (client/interface.config.mjs).

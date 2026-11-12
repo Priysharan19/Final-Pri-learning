@@ -92,7 +92,9 @@ export async function createServerApp(db, {
   legacy = !production,
   requestLog = true,
   log,
-  parentReport = {}
+  parentReport = {},
+  // { edition } for the resource library (resources.js); default: PRI_EDITION.
+  resources = {}
 } = {}) {
   const app = express();
   // How much of X-Forwarded-For to believe is deployment configuration with no
@@ -145,7 +147,8 @@ export async function createServerApp(db, {
     billingCheckout: webBilling.checkout,
     billingNative: { ...appleBilling.native, ...googleBilling.native },
     billingLifecycle: webBilling.lifecycle,
-    parentReport
+    parentReport,
+    resources
   }));
 
   if (legacy && !production) {

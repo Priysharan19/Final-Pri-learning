@@ -38,7 +38,11 @@
 //    by email, and their unsubscribe credential) and parent_report_sends (one
 //    row per account and week: the send is idempotent), both account-scoped
 //    under RLS (supabase/migrations/20261022000000_parent_report.sql).
-export const SCHEMA_VERSION = 14;
+// 15: the shared resource library (ADR-0002 plan F1) — resources and
+//    resource_editions, global tables under the fail-closed pri_scope_required
+//    policy, seeded with the one published Prithagoras paper
+//    (supabase/migrations/20261113000000_resource_library.sql).
+export const SCHEMA_VERSION = 15;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

@@ -131,8 +131,9 @@ try {
   // tutor_cache (tutor.js), otp_challenges and account_phones (otpCore.js) are
   // built lazily by their routers, so a database that never served them has none.
   check(result.totals.rows === totalRows && result.totals.tablesAbsent.join(',') === 'tutor_cache,otp_challenges,account_phones', `totals: ${totalRows} rows, tutor_cache/otp_challenges/account_phones absent`);
-  check(result.seededNotExported.join(',') === 'platform_meta,sync_cursors' && !existsSync(join(outDir, 'platform_meta.csv')) && !existsSync(join(outDir, 'sync_cursors.csv')),
-    'platform_meta and sync_cursors are verified, never copied');
+  check(result.seededNotExported.join(',') === 'platform_meta,sync_cursors,resources,resource_editions' && !existsSync(join(outDir, 'platform_meta.csv')) && !existsSync(join(outDir, 'sync_cursors.csv'))
+    && !existsSync(join(outDir, 'resources.csv')) && !existsSync(join(outDir, 'resource_editions.csv')),
+    'platform_meta, sync_cursors and the migration-seeded resource library are verified, never copied');
   for (const f of result.files) check(sha(join(outDir, f.file)) === f.sha256, `${f.file}: SHA-256 in the manifest matches the file`);
 
   // ── CSV round-trips ───────────────────────────────────────────────────────
@@ -210,6 +211,20 @@ try {
   old.close();
   refusal(() => exportSqliteToPostgres({ dbPath: oldPath, outDir: join(scratch, 'x4') }), 'EXPORT_SCHEMA_MISMATCH', 'a source at another schema version is refused');
   check(!existsSync(join(scratch, 'x4')) || !existsSync(join(scratch, 'x4', 'manifest.json')), 'a refused export writes no manifest');
+  // The resource library (plan F1) is seeded by its migration and not copied, so
+  // a source whose library holds anything else is refused rather than dropped.
+  for (const [label, sql] of [
+    ['a library row added after the seed', "INSERT INTO resources SELECT 'added-later-row',title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at FROM resources"],
+    ['a withdrawn seed row', "UPDATE resources SET review_state='withdrawn'"],
+    ['a seed row offered to another edition', "INSERT INTO resource_editions(resource_id,edition) SELECT id,'priyabhata' FROM resources"]
+  ]) {
+    const libPath = join(scratch, `library-${label.length}.db`);
+    const lib = createPlatformDb(libPath);
+    ensureBillingSchema(lib);
+    lib.exec(sql);
+    lib.close();
+    refusal(() => exportSqliteToPostgres({ dbPath: libPath, outDir: join(scratch, `xl-${label.length}`) }), 'EXPORT_LIBRARY_NOT_SEED', `${label} is refused, never silently left behind`);
+  }
   const extraPath = join(scratch, 'extra.db');
   const extra = createPlatformDb(extraPath);
   ensureBillingSchema(extra);

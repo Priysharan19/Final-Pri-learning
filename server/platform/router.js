@@ -18,6 +18,7 @@ import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
+import { createResourceRouter } from './resources.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -64,7 +65,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -245,6 +246,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.
   router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
+  // The shared resource library (ADR-0002 plan F1): published resources of
+  // this server's edition, for signed-in accounts. Read-only.
+  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
   router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
