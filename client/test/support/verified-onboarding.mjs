@@ -48,16 +48,12 @@ export function resetOtpLimits(platform) {
 }
 
 /**
- * The card element itself, whether `scope` is it, contains it, or is the page.
- * Resolve it while the card is still on screen: once a returning address is
- * signed in the card is gone, and there is nothing left to ask.
+ * The card element itself, whether `scope` is it, contains it, or is the page:
+ * a locator, so nothing is read here. It holds while the card is briefly off
+ * the page (a remount) and once it has gone for good.
  */
-async function cardOf(scope) {
-  if (typeof scope.evaluateAll === 'function' && typeof scope.page === 'function') {
-    const own = await scope.evaluateAll(els => els[0]?.getAttribute('data-signin-card') ?? null);
-    if (own) return scope;
-  }
-  return scope.locator('[data-signin-card]').first();
+function cardOf(scope) {
+  return scope.locator('xpath=descendant-or-self::*[@data-signin-card]').first();
 }
 
 /**
@@ -80,7 +76,7 @@ const errorText = scope => scope.locator('[data-testid="signup-error"]').evaluat
 
 /** Wait until the card (its root carries the step) stands on `step`. */
 export async function waitForStep(scope, step, { timeout = 20000 } = {}) {
-  const card = await cardOf(scope);
+  const card = cardOf(scope);
   const page = typeof scope.page === 'function' ? scope.page() : scope;
   for (const deadline = Date.now() + timeout; Date.now() < deadline;) {
     if ((await cardStep(card)).step === step) return;
@@ -118,7 +114,7 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
   if (!code) throw new Error(`the real server did not send a six-digit email code to ${email}`);
   // Resolved before the code goes in: a returning address is signed in at
   // once, and the card may then be gone, replaced by the shell.
-  const card = await cardOf(scope);
+  const card = cardOf(scope);
   const page = typeof scope.page === 'function' ? scope.page() : scope;
   await typeCode(scope, code);
   // A new address is asked who it is; a returning one is signed in at once.

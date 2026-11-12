@@ -18,8 +18,12 @@
 //      (so this check can tell the defect from the fix);
 //   2  `cardStep` reads presence and step in one look that never waits;
 //   3  signInOnCard returns at once for a returning address whose card is
-//      replaced, and still walks a new address through the age step;
-//   4  waitForStep reports a card that has left the page instead of hanging.
+//      replaced — with the replacement FORCED into the gap right after the
+//      helper's first read of the card once the code is in, the exact
+//      interleaving CI hit by chance (the helper before this fix waits 30 s
+//      there and fails) — and still walks a new address through the age step;
+//   4  waitForStep reports a card that has left the page instead of hanging,
+//      and still waits for a card that is briefly off the page (remounting).
 //
 // Run:  node client/test/signin-card-step-check.mjs [--browser=webkit]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +43,8 @@ const platform = {
 
 /**
  * A stand-in for the gate's inline card: email → code → (a returning address)
- * the card is replaced by the shell, or (a new one) the age step.
+ * the card is replaced by the shell, or (a new one) the age step. 'race': a
+ * returning address whose card is replaced only when the check forces it.
  */
 const CARD_PAGE = returning => `<!doctype html><meta charset="utf-8">
 <main id="root"><section data-testid="account-activation-gate" data-activation-status="signin">
@@ -57,9 +62,11 @@ const CARD_PAGE = returning => `<!doctype html><meta charset="utf-8">
     card.querySelector('#signup-code-0').oninput = e => {
       if (e.target.value.length < 6) return;
       if (e.target.value !== '${CODE}') return;
+      // 'race': the card is replaced only when the check forces it (below).
+      if (${JSON.stringify(returning)} === 'race') return;
       // The server's answer arrives a moment later, as it does over the network.
       setTimeout(() => {
-        if (${returning}) {
+        if (${JSON.stringify(returning)}) {
           document.getElementById('root').innerHTML = '<div class="shell">signed in</div>';
         } else {
           card.dataset.signupStep = 'age';
@@ -107,6 +114,35 @@ try {
     assert(took < 1000, `the read took ${took} ms — it waited for the card`);
   });
 
+  await check('a returning address, the race forced: the shell replaces the card right after the helper reads it, and signInOnCard returns at once', async () => {
+    await page.setContent(CARD_PAGE('race'));
+    // A helper learns the card is still there through one of these (count()
+    // before this fix, evaluateAll() after it). Once the code is in, the first
+    // such answer is followed — before the helper can make its next call — by
+    // the gate replacing the card with the shell: the gap CI fell into.
+    const proto = Object.getPrototypeOf(page.locator('body'));
+    const real = { count: proto.count, evaluateAll: proto.evaluateAll };
+    let replaced = false;
+    for (const name of Object.keys(real)) {
+      proto[name] = async function (...args) {
+        const out = await real[name].apply(this, args);
+        if (!replaced && await page.evaluate(() => document.querySelector('#signup-code-0')?.value.length === 6)) {
+          replaced = true;
+          await page.evaluate(() => { document.getElementById('root').innerHTML = '<div class="shell">signed in</div>'; });
+        }
+        return out;
+      };
+    }
+    try {
+      const started = Date.now();
+      const result = await signInOnCard(page.locator(CARD), platform, { email: 'race@example.test' });
+      const took = Date.now() - started;
+      assert(replaced, 'the helper never read the card after the code went in, so the race was not forced');
+      assert(result.newAccount === false, `it returned ${JSON.stringify(result)}`);
+      assert(took < 10000, `it took ${took} ms — it waited on the card that had left`);
+    } finally { Object.assign(proto, real); }
+  });
+
   await check('a returning address: signInOnCard returns at once when the gate replaces the card with the shell', async () => {
     await page.setContent(CARD_PAGE(true));
     const started = Date.now();
@@ -122,6 +158,16 @@ try {
     const result = await signInOnCard(page.locator(CARD), platform, { email: 'new@example.test', name: 'New Student' });
     assert(result.newAccount === true, `it returned ${JSON.stringify(result)}`);
     await waitForStep(page.locator(CARD), 'class', { timeout: 5000 });
+  });
+
+  await check('waitForStep still waits for a card that is briefly off the page (a remount)', async () => {
+    await page.setContent(CARD_PAGE(true));
+    await page.evaluate(() => {
+      const root = document.getElementById('root'), gate = root.innerHTML;
+      root.innerHTML = '';
+      setTimeout(() => { root.innerHTML = gate; }, 300);
+    });
+    await waitForStep(page.locator(CARD), 'method', { timeout: 5000 });
   });
 
   await check('waitForStep names a card that has left the page, within its own timeout', async () => {
