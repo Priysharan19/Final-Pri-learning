@@ -331,7 +331,11 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
     'an early stop kills the local servers, resets the text size, prints FAIL and exits non-zero');
   ok(/stdio: 'ignore', detached: true/.test(j) && !/stdio: 'inherit'/.test(j) && !/stdio: \['ignore', 'ignore', 'inherit'\]/.test(j),
     'no child of the journey (watchdog, fixture launcher) inherits the step\'s stdout/stderr, so none can keep the step open');
-  ok(/process\.on\('exit', code => \{\n  if \(!code\) return;/.test(j) && j.includes("uptime; ps -Ao pcpu,pmem,etime,comm -r | head -15"), 'any failing exit prints the load and the busiest processes');
+  ok(/process\.on\('exit', code => \{ if \(code\) exitReport\(\); \}\)/.test(j) && /loadavg\(\)/.test(j) && /'\/bin\/ps', \['-Ao', 'pcpu,pmem,etime,comm', '-r'\]/.test(j) && /'\/usr\/bin\/top', \['-l', '1', '-n', '10', '-o', 'cpu'/.test(j) && /timeout: 8_000, killSignal: 'SIGKILL'/.test(j), 'any failing exit prints the load and the busiest processes, each probe bounded, top as the fallback');
+  ok(/process\.on\('uncaughtException'/.test(j), 'an uncaught throw goes through abortJourney, so servers stop and the exit report prints');
+  ok(/function stopServerAndProve/.test(j) && /did not exit within 10 s of SIGTERM; SIGKILL sent/.test(j) && /STILL ACCEPTS connections/.test(j) && /stopServerAndProve\(Number\(cloudServer\.PRI_CLOUD_SERVER_PID\), port\)/.test(j), 'the offline leg starts only after the server pid has exited and its port is closed, both logged');
+  ok(/slow\('launch'/.test(j) && /slow\('container lookup'/.test(j) && /slow\('report-file read'/.test(j) && /slow\('unified-log read'/.test(j) && /ms > 30_000/.test(j), 'each journey pass names any call that took longer than 30 s');
+  ok(/fetch\(`\$\{base\}\/v1\/health`, \{ signal: AbortSignal\.timeout\(3_000\) \}\)/.test(src('scripts/cloud-fixture-server.mjs')), 'every readiness probe of the fixture server has its own timeout');
   ok([...src('.github/workflows/native-journey-ios27.yml').matchAll(/journey \(simulator, iOS 27\)\n\s+timeout-minutes: 40\n/g)].length === 2, 'the iOS 27 journey steps have the same 40-minute step limit');
   ok(/end=\$\(\( \$\(date \+%s\) \+/.test(j) && /\$\(date \+%s\) -ge \$end/.test(j), 'the watchdog reads the wall clock, not a count of sleeps');
   ok(/timeout: 300_000, killSignal: 'SIGKILL', \.\.\.opts/.test(j), 'every simctl call the journey makes is bounded and killed when it overruns');

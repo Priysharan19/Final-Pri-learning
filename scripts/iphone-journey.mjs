@@ -64,8 +64,8 @@
 import { execFileSync, execSync, spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, writeSync } from 'node:fs';
+import { loadavg, tmpdir, uptime as osUptime } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
 import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
@@ -119,6 +119,24 @@ function startFixture(args) {
     if (logPath) { try { console.log(`  --- ${logPath} (last 40 lines) ---\n${readFileSync(logPath, 'utf8').split('\n').slice(-40).join('\n')}`); } catch { console.log(`  (${logPath} could not be read)`); } }
     throw new Error(`the local server did not start (${said.split('\n').pop() || String(error?.message || error).split('\n')[0]})`);
   }
+}
+
+// The offline leg must start with the server really gone: SIGTERM, wait up to
+// 10 s for the pid to exit (the server's own shutdown drains for at most
+// PRI_SHUTDOWN_DEADLINE_MS, 10 s by default, in server/index.js), then SIGKILL;
+// then the port must refuse connections. Both are logged.
+function stopServerAndProve(pid, port) {
+  const t = Date.now();
+  const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+  try { process.kill(pid); } catch { /* gone */ }
+  while (alive() && Date.now() - t < 10_000) execSync('sleep 0.25');
+  let how = 'exited on SIGTERM';
+  if (alive()) { how = 'did not exit within 10 s of SIGTERM; SIGKILL sent'; try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } execSync('sleep 0.5'); }
+  console.log(`  (cloud server ${pid} ${how} after ${((Date.now() - t) / 1000).toFixed(1)} s)`);
+  let open = true;
+  try { run('/usr/bin/nc', ['-z', '-G', '2', '127.0.0.1', String(port)], { timeout: 10_000 }); } catch { open = false; }
+  console.log(`  (port ${port} ${open ? 'STILL ACCEPTS connections' : 'is closed'})`);
+  if (open || alive()) abortJourney(`the cloud server on port ${port} is still up after it was stopped; the offline leg would not be offline`);
 }
 
 // A freshly booted simulator can refuse a launch until SpringBoard is ready
@@ -195,13 +213,14 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // `log show`). Only what THIS launch appends is read: the size is taken first,
   // so a summary left by an earlier run can never pass this one.
   let reportFile = null, offset = 0;
-  const findContainer = () => {
+  const slow = (what, f) => { const t = Date.now(); try { return f(); } finally { const ms = Date.now() - t; if (ms > 30_000) console.log(`  (${phase}: ${what} took ${Math.round(ms / 1000)} s)`); } };
+  const findContainer = () => slow('container lookup', () => {
     try {
       const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
       if (container) return join(container, 'Documents', 'PRIJOURNEY.log');
     } catch { /* no data container yet */ }
     return null;
-  };
+  });
   reportFile = findContainer();
   if (reportFile) offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0;
   // The file is the fast, complete channel. A file shorter than the size taken
@@ -219,7 +238,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     } catch { return []; }
   };
   let viaLog = 0, viaFile = 0, pass = 0;
-  launchApp(udid, bundleId, [flag], { env });
+  slow('launch', () => launchApp(udid, bundleId, [flag], { env }));
   let lines = [];
   const t0 = Date.now();
   let duringDone = !during;
@@ -245,7 +264,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
       // Poll the page's request every half second, without reading the log.
       while (!duringDone && Date.now() - t0 < duringDeadlineMs) {
         execSync('sleep 0.5');
-        if (tick) tick();
+        if (tick) slow('relay tick', tick);
         if (duringWhen()) { duringDone = true; during(); }
       }
       duringDone = true;
@@ -259,7 +278,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // No container at launch (a first launch makes it): look again.
     pass++;
     if (!reportFile && pass % 5 === 0) { reportFile = findContainer(); offset = 0; }
-    const filed = fromFile();
+    const filed = slow('report-file read', fromFile);
     let log;
     if (filed.length) { log = filed.join('\n'); viaFile++; }
     // The unified log is a fallback, not the poll: with a report file it is
@@ -269,8 +288,8 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     else if (reportFile && pass % 5 !== 0) continue;
     else try {
       viaLog++;
-      log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
-        '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
+      log = slow('unified-log read', () => run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
+        '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' }));
     } catch (e) {
       console.log(`  (log read ${i + 1} of ${phase} did not come back: ${String(e.code || e.signal || e.message).slice(0, 60)})`);
       continue;
@@ -317,10 +336,22 @@ let textSizeRaised = false;
 // Any non-zero exit (a failed step, an abort, an uncaught throw) names the
 // machine's busiest processes and its load, so a red run on a starved runner
 // says what was burning the CPU.
-process.on('exit', code => {
-  if (!code) return;
-  try { console.log(`\n  --- load and busiest processes at exit ---\n${execFileSync('/bin/sh', ['-c', 'uptime; ps -Ao pcpu,pmem,etime,comm -r | head -15'], { encoding: 'utf8', timeout: 20_000 })}`); } catch { /* best effort */ }
+// Each probe is short and bounded on its own; a starved machine whose `ps`
+// does not come back still prints the load average and `top`'s view.
+const exitReport = () => {
+  const lines = ['', '  --- load and busiest processes at exit ---'];
+  try { lines.push(`  loadavg ${loadavg().map(n => n.toFixed(2)).join(' ')}, uptime ${Math.round(osUptime() / 60)} min`); } catch { /* none */ }
+  for (const [cmd, args] of [['/bin/ps', ['-Ao', 'pcpu,pmem,etime,comm', '-r']], ['/usr/bin/top', ['-l', '1', '-n', '10', '-o', 'cpu', '-stats', 'pid,command,cpu,mem']]]) {
+    try { lines.push(execFileSync(cmd, args, { encoding: 'utf8', timeout: 8_000, killSignal: 'SIGKILL', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n').slice(0, cmd.endsWith('ps') ? 15 : 25).join('\n')); break; } catch (e) { lines.push(`  (${cmd} did not come back: ${e.code || e.signal || 'error'})`); }
+  }
+  try { writeSync(1, `${lines.join('\n')}\n`); } catch { /* stdout gone */ }
+};
+process.on('uncaughtException', error => {
+  try { writeSync(2, `${error?.stack || error}\n`); } catch { /* stderr gone */ }
+  process.exitCode = 1;
+  abortJourney(`uncaught: ${String(error?.message || error).split('\n')[0].slice(0, 160)}`);
 });
+process.on('exit', code => { if (code) exitReport(); });
 const trackServer = pid => { if (!pid) return; liveServerPids.add(pid); try { writeFileSync(serverPidFile, `${[...liveServerPids].join('\n')}\n`); } catch { /* the in-process set still covers abortJourney */ } };
 // Every early stop cleans up as the normal path's finally blocks do: local
 // servers stopped, the text size reset. CI evidence for a stopped run is the
@@ -441,8 +472,7 @@ if (WANT_CLOUD) try {
   show(cloudLines);
   if (cloudServer?.PRI_CLOUD_SERVER_PID && fixture.PRI_CLOUD_DB) {
     // Offline: the cloud server goes away (the device cannot reach it).
-    try { process.kill(Number(cloudServer.PRI_CLOUD_SERVER_PID)); } catch { /* gone */ }
-    execSync('sleep 1');
+    stopServerAndProve(Number(cloudServer.PRI_CLOUD_SERVER_PID), port);
     offlineLines = launchAndRead(udid, bundleId, '--journey-offline', 'offline', childEnv);
     show(offlineLines);
     // Reconnect: the same server and database come back.

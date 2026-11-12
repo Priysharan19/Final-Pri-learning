@@ -93,7 +93,9 @@ child.unref();
 
 const base = `http://127.0.0.1:${port}`;
 for (let i = 0; ; i++) {
-  try { if ((await fetch(`${base}/v1/health`)).ok) break; } catch { /* starting */ }
+  // Each probe has its own bound, so a half-dead listener cannot hang one fetch
+  // past the launcher's own 60 × 500 ms limit below.
+  try { if ((await fetch(`${base}/v1/health`, { signal: AbortSignal.timeout(3_000) })).ok) break; } catch { /* starting */ }
   if (i > 60) { console.error(`server did not start (log: ${join(dir, 'server.log')})`); process.exit(1); }
   await new Promise(r => setTimeout(r, 500));
 }
