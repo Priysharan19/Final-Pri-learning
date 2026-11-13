@@ -28,6 +28,7 @@ import { recordMutation } from './local/outbox.js';
 import { restoreBackupSafely } from './local/restoreGuard.js';
 import { recordProfileMutation } from './platform/profileOutbox.js';
 import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
+import { dispatchNswExam, nswExamRoute } from './local/nswExamBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
@@ -173,6 +174,11 @@ async function localDispatch(method, path, body) {
   // when an authentic format/content bank has not been released yet.
   if (activeUser?.course === 'in' && indiaExamRoute(method, path)) {
     return dispatchIndiaExam(activeUser, method, path, body);
+  }
+  // An NSW profile's list of HSC-style papers (plan G4). Answered before the
+  // generic routes, whose GET /exams/:id would otherwise read "nsw" as an id.
+  if (activeUser?.course === 'nsw' && nswExamRoute(method, path)) {
+    return dispatchNswExam(activeUser, method, path);
   }
   return dispatch(method, path, body);
 }

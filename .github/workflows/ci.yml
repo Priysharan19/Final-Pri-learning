@@ -397,6 +397,9 @@ jobs:
           # marks the final answer only with the method-mark switch on, and Priyabhata is unchanged. SQLite here; Postgres below.
           node server/test/nsw-practice-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#4
+          # Plan G4: NSW HSC-style papers over HTTP — release, reading time, final-answer marking, no band. SQLite here; Postgres below.
+          node server/test/nsw-exam-check.mjs 2>&1 | tee -a practice-http.log
+          node tools/ci-check-counts.mjs verify platform/practice-http.log#6
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
@@ -841,6 +844,9 @@ jobs:
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
             node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Lit Instrument D6: the working indicator is still under reduced
+            # motion and forced colours, and this build carries its form only.
+            node client/test/working-indicator-check.mjs --browser --dist client/dist 2>&1 | tee -a browser.log
             # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
             # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
             node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
@@ -869,6 +875,9 @@ jobs:
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
+            # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
+            # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
+            node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log

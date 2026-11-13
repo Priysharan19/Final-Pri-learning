@@ -73,6 +73,7 @@
         {"has":"INTERIM MARKING POLICY (D13, D14): PASS — 11285/11285 checks","note":"10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed."},
         {"has":"INDIA BANKS (D15): PASS — 124/124 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
         {"has":"NSW BANK QUALITY: PASS — 75 generators, 267 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
+        {"has":"NSW EXAM BLUEPRINTS (G4): PASS — 546 checks","note":"Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep."},
         {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 422837 wrong answers marked correct across 19248 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
         {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 33992 right answers over 12508 India questions (594 generator×difficulty cells × 24 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
         {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
@@ -146,7 +147,8 @@
         {"re":"INSTALL BUDGET: PASS — 72/72 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under.*previous-year archive 0 kB of it","note":"npm run test:budget measures the one production build: every build ships the Instrument from client/interface.config.mjs (D7), whose Map, Report and Scripts tabs are held in the warm pass (#658), together with every file those tabs import statically; 63 → 65: no tab carries a stylesheet of its own (they are in the boot one)."},
         {"has":"nothing emitted left uncovered; previous-year archive 0 kB","count":1,"op":"eq"},
         {"has":"INTERFACE DECISIONS: PASS — 39/39 checks","note":"The V1 interface decisions in source: one interface from one setting on web, iOS and Android (D7, D8), Classes hidden (D10), the language switch says questions stay in English (D11). 34 → 39: the Aurora skin is the default on chrome (D7) and the D8 fallback is one line of the setting, covered."},
-        {"has":"AURORA SKIN: PASS — 32/32 checks","note":"The Aurora skin stays on chrome: scope, no content tokens, glass only on chrome, pools only on Index/Map/Settings, fallbacks, AA."},
+        {"has":"AURORA SKIN: PASS — 47/47 checks","note":"The Aurora skin stays on chrome: scope, no content tokens, glass only on chrome, pools only on Index/Map/Settings, fallbacks, AA. 32 → 47 (Lit Instrument UI1, re-derived by running): violet retired, one edition pool, no glow, ink focus, contrast for both editions."},
+        {"has":"WORKING INDICATOR: PASS — 46/46 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held)."},
         {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
         {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
         {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
@@ -156,7 +158,7 @@
         {"has":"DESK UI: PASS — 191/191 checks","note":"The exam shell and the Exam Desk as drawn (plan F4b): navigator labels, shortcuts inert while typing, a clock face that computes nothing, autosave order, the save merge, no mark wording in either language."},
         {"has":"DESK CLOCK: PASS — 30/30 checks"},
         {"has":"DESK IMPORT: PASS — 18/18 checks"},
-        {"has":"EDITION CLIENT (E2): PASS — 136/136 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen)."},
+        {"has":"EDITION CLIENT (E2): PASS — 137/137 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen). 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form."},
         {"has":"SERVER DAILY CAP (CLIENT): PASS — 27/27 checks","note":"The device meets the SERVER's daily practice cap (#537): refused through the real dispatcher, no fallback, a prepared question stays unbound and unmarked, a second device is refused at zero."},
         {"has":"EDITION LIMIT CLOCK (H7): PASS — 37/37 checks","note":"Plan H7: a limit's lift time in an NSW student's own clock; device and server agree on the day in both editions."},
         {"has":"JEE ADVANCED GATE: PASS — 27/27 checks"},
@@ -347,6 +349,13 @@
         {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
       ]
     },
+    "platform/practice-http.log#6": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"NSW EXAMS (G4): PASS — 68/68 checks"}
+      ]
+    },
     "platform/practice-http.log#5": {
       "job": "platform",
       "log": "practice-http.log",
@@ -465,8 +474,9 @@
       "log": "platform-postgres.log",
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
-        {"has":"PLATFORM ON POSTGRES: PASS — 90/90 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 91/91 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
+        {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
         {"has":"✓ edition-ai-budgets-check.mjs"},
         {"has":"✓ resources-check.mjs"},
@@ -554,6 +564,7 @@
         {"has":"Cloud · late results never rewrite an attempt"},
         {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
         {"has":"India exam · the clock runs out and the paper submits itself"},
+        {"has":"NSW PAPERS TOUR (G4): PASS — 24/24 checks"},
         {"has":"Placement · onboarding → diagnostic → evidence map"},
         {"has":"Phone · every destination reachable at 390px"},
         {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},
@@ -581,6 +592,7 @@
         {"has":"Account · deletion from the public page, no sign-in, by email code","note":"Account deletion for a code-only account: in the app, and from the public page (Apple 5.1.1(v), Play \"Delete account\"). The in-app flow also proves the persisted account link is gone after the deletion and after a reload (#500). The third flow: Settings \"Sign out everywhere\" ends every session of the account, after a confirmation, and returns to the sign-in card (#481)."},
         {"has":"Account · a code-only account deletes itself in Settings with a fresh code"},
         {"has":"Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card"},
+        {"has":"still under reduced motion and forced colours, each build carries its own edition's form only."},
         {"re":"E2E SUITE.*47/47.*3 flows"},
         {"has":"Account · an adult with an unconfirmed email confirms it with a code on the card, then opens Practice","note":"An adult whose email was never confirmed signs in with a password and is taken to \"Confirm your email\" (a code to that address), not to a false guardian dead end; the server still refuses practice until it is proved."},
         {"re":"E2E SUITE.*23/23 checks across 1 flows"},

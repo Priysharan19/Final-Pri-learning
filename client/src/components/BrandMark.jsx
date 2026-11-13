@@ -11,8 +11,11 @@
 // · the wordmark is outlined paths (no font), drawn in currentColor so it
 //   follows the theme; it carries an accessible name, so it is never a
 //   letter-split string a screen reader spells out;
-// · red belongs to the prime only (--brand-prime); the edition accent
-//   (--edition-accent) belongs to the mark's cut only
+// · red belongs to the prime only (--brand-prime); in this component the
+//   edition accent (--edition-accent) belongs to the mark's cut only. Outside
+//   it, the amendment of 14 November 2026 (docs/brand/editions-decision.md,
+//   Lit Instrument D1) also lets the Aurora chrome use it for the current
+//   place, the light pool and the working indicator
 //   (client/test/brand-usage-check.mjs);
 // · "by Pri Learning" goes under the wordmark on sign-in, sign-up and the
 //   account pages, never in the header bar.
