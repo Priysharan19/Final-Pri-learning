@@ -75,6 +75,15 @@ export const CAPABILITIES = Object.freeze([
   'aiTutor'                   // explanations and tutoring; never sets a mark
 ]);
 
+/**
+ * Every payment provider the platform has an adapter for (plan E5). An
+ * edition's `billing.providers` lists the ones it sells through; an empty list
+ * means Premium is not on sale in that edition: no price, plan or checkout is
+ * shown and the server refuses every purchase route and payment event
+ * (server/platform/billingProviders.js).
+ */
+export const BILLING_PROVIDERS = Object.freeze(['razorpay', 'apple', 'google']);
+
 const pending = text => Object.freeze({ pending: text });
 
 const NSW_CONTENT = pending('No approved NSW question banks, answer specifications or certified Australian marking guidelines yet (plan G2, G3, G6).');
@@ -108,6 +117,7 @@ export const EDITIONS = Object.freeze({
     locale: 'en-IN',
     timezone: 'Asia/Kolkata',
     currency: 'INR',
+    billing: Object.freeze({ providers: Object.freeze(['razorpay', 'apple', 'google']), currency: 'INR' }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -142,6 +152,8 @@ export const EDITIONS = Object.freeze({
     locale: 'en-AU',
     timezone: 'Australia/Sydney',
     currency: 'AUD',
+    // No provider until owner decision O2 (plan H3): Premium is not on sale.
+    billing: Object.freeze({ providers: Object.freeze([]), currency: 'AUD' }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -231,6 +243,13 @@ export function editionProblems(editions = EDITIONS) {
     }
     if (!/^[A-Z]{2}$/.test(e.region || '')) problems.push(`${key}: region must be an ISO 3166 alpha-2 code`);
     if (!/^[A-Z]{3}$/.test(e.currency || '')) problems.push(`${key}: currency must be an ISO 4217 code`);
+    const providers = e.billing?.providers;
+    if (!Array.isArray(providers)) problems.push(`${key}: billing.providers must be a list (empty when Premium is not on sale)`);
+    else {
+      for (const p of providers) if (!BILLING_PROVIDERS.includes(p)) problems.push(`${key}: billing provider ${JSON.stringify(p)} is not one the platform has an adapter for`);
+      if (new Set(providers).size !== providers.length) problems.push(`${key}: billing.providers lists a provider twice`);
+    }
+    if (e.billing?.currency !== e.currency) problems.push(`${key}: billing.currency must be the edition's currency`);
     if (!e.courses?.includes(e.defaultCourse)) problems.push(`${key}: default course ${JSON.stringify(e.defaultCourse)} is not one of its courses`);
     for (const c of e.courses || []) courses.add(c);
     if (!e.languages?.length || !e.languages.every(isLanguage)) problems.push(`${key}: every language must be one the app is translated into`);

@@ -80,6 +80,20 @@ for (const cap of ['examDesk', 'resourceLibrary', 'resourcePublishing']) {
 }
 ok(Object.isFrozen(ed.EDITIONS) && Object.isFrozen(ed.EDITIONS.prithagoras.capabilities), 'the table is frozen');
 
+// 1b. Billing provider per edition (plan E5).
+{
+  const billing = id => ed.EDITIONS[id].billing;
+  ok(ed.EDITION_IDS.every(id => Array.isArray(billing(id)?.providers) && billing(id).currency === ed.EDITIONS[id].currency), 'both editions declare billing: a provider list and the edition\'s own currency');
+  ok(JSON.stringify(billing('priyabhata')) === '{"providers":["razorpay","apple","google"],"currency":"INR"}', 'Priyabhata sells through Razorpay, Apple and Google in INR');
+  ok(JSON.stringify(billing('prithagoras')) === '{"providers":[],"currency":"AUD"}', 'Prithagoras has no provider yet (owner decision O2): Premium is not on sale');
+  ok(ed.EDITION_IDS.every(id => Object.isFrozen(billing(id)) && Object.isFrozen(billing(id).providers)), 'the billing blocks are frozen');
+  const withBilling = (id, value) => { const clone = JSON.parse(JSON.stringify(ed.EDITIONS)); clone[id].billing = value; return ed.editionProblems(clone); };
+  ok(withBilling('prithagoras', { providers: ['stripe'], currency: 'AUD' }).some(p => p.includes('"stripe"')), 'an unknown provider id is a problem');
+  ok(withBilling('priyabhata', { providers: ['apple', 'apple'], currency: 'INR' }).some(p => p.includes('twice')), 'a provider listed twice is a problem');
+  ok(withBilling('prithagoras', { providers: [], currency: 'INR' }).some(p => p.includes('billing.currency')), 'a billing currency other than the edition\'s is a problem');
+  ok(withBilling('priyabhata', undefined).some(p => p.includes('billing.providers')) && withBilling('priyabhata', { currency: 'INR' }).some(p => p.includes('billing.providers')), 'a missing billing block or provider list is a problem');
+}
+
 // 2. Selection.
 ok(ed.resolveEdition({}) === 'priyabhata', 'PRI_EDITION unset → priyabhata');
 ok(ed.resolveEdition({ PRI_EDITION: '' }) === 'priyabhata' && ed.resolveEdition({ PRI_EDITION: '  ' }) === 'priyabhata', 'PRI_EDITION blank (the Dockerfile ENV of an unset ARG) → priyabhata');
@@ -107,6 +121,8 @@ ok(vite.featureStates('build', {}).edition === 'priyabhata', 'a build with no PR
 ok(vite.featureStates('build', { PRI_EDITION: 'prithagoras' }).edition === 'prithagoras', 'a Prithagoras build records prithagoras');
 ok(vite.featureDefines('build', { PRI_EDITION: 'prithagoras' }).__PRI_EDITION__ === '"prithagoras"', 'the build defines __PRI_EDITION__');
 ok(throws(() => vite.featureStates('build', { PRI_EDITION: 'typo' })), 'a build with an unknown edition stops');
+ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'true' && vite.featureDefines('build', { PRI_EDITION: 'prithagoras' }).__PRI_PREMIUM_ON_SALE__ === 'false',
+  'the build tells the bundle whether its edition sells Premium: true for Priyabhata, false for Prithagoras');
 {
   const docker = read('Dockerfile');
   const clientStage = docker.split(/^FROM /m)[1];
