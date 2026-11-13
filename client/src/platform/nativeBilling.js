@@ -10,6 +10,19 @@
 // and StoreKit itself re-delivers unfinished transactions on the next launch.
 import { priNative } from './native/index.js';
 
+/* global __PRI_PREMIUM_ON_SALE__ */
+/**
+ * False only in a build of an edition that has no payment provider (plan E5:
+ * Prithagoras until owner decision O2; the `billing` block of the edition
+ * table decides it, and the build passes the answer in as a constant).
+ * Such a build has no store to buy in: nativeBillingStore() is null, so no
+ * purchase flow starts, StoreKit and Google Play are never asked for a
+ * product or a price, and the Premium screen and the account panel say
+ * Premium is not on sale yet. The server refuses every purchase route for
+ * that edition whatever a bundle does.
+ */
+export const PREMIUM_ON_SALE = typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__;
+
 export function nativeBillingAvailable() {
   return priNative.billing.available();
 }
@@ -17,7 +30,7 @@ export function nativeBillingAvailable() {
 /** Which store sheet the shell presents: 'app-store', 'google-play' or null.
  * It selects the purchase flow and copy only — never entitlement. */
 export function nativeBillingStore() {
-  return priNative.billing.available() ? priNative.billing.store() : null;
+  return PREMIUM_ON_SALE && priNative.billing.available() ? priNative.billing.store() : null;
 }
 
 function request(action, body = {}, timeoutMs = 30_000) {

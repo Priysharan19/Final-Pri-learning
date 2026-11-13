@@ -395,7 +395,9 @@ jobs:
           grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
-          grep -Fq 'PAYWALL HONESTY: PASS — 68/68 checks' suites.log
+          # 68 → 79 (plan E5): an edition with no payment provider has no store,
+          # no price and no purchase control, and says Premium is not on sale.
+          grep -Fq 'PAYWALL HONESTY: PASS — 79/79 checks' suites.log
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
@@ -535,6 +537,10 @@ jobs:
           node server/test/billing-webhook-router-check.mjs
           node server/test/platform-db-operations-check.mjs
           node server/test/platform-http-journeys-check.mjs
+          # Plan E5: billing provider per edition. Priyabhata answers as main
+          # does; Prithagoras sells nothing and applies no payment event.
+          node server/test/billing-edition-check.mjs | tee billing-edition.log
+          grep -Fq 'BILLING PER EDITION: PASS — 123/123 checks —' billing-edition.log
       - name: Assignment targeting, syllabus snapshot and class analytics
         run: |
           node server/test/india-syllabus-snapshot-check.mjs
@@ -806,8 +812,10 @@ jobs:
           # 85 → 86 (plan F1): the shared resource library on Postgres.
           # 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16).
           # 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 88/88 suites' platform-postgres.log
+          # 88 → 89 (plan E5): billing provider per edition on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 89/89 suites' platform-postgres.log
           grep -Fq '✓ nsw-practice-check.mjs' platform-postgres.log
+          grep -Fq '✓ billing-edition-check.mjs' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
           grep -Fq '✓ desk-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
@@ -1212,6 +1220,9 @@ jobs:
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
+            # Plan E5: a built Prithagoras client on a Prithagoras server shows
+            # no price, plan or purchase control and reaches no store.
+            node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
