@@ -215,7 +215,8 @@ jobs:
           grep -Fq 'QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4742 variants verified by the marker and distinct by content hash, 2368/2376 bands filled, 1004/1184 same-band variants keep the seed' suites.log
           # 28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards).
           # 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846).
-          grep -Fq 'shape; 81 official CBSE records → 314 Pri variants on their chapter (10 bands with no serving generator).' suites.log
+          # 81/314 → 89/344 (CBSE X 30/2/2 Section A, 8 records; all 4 shards run).
+          grep -Fq 'shape; 89 official CBSE records → 344 Pri variants on their chapter (10 bands with no serving generator).' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           # L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three).
           grep -Fq 'NCERT ANSWER FORMS: PASS — 481/481 checks' suites.log
@@ -287,7 +288,7 @@ jobs:
           grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 35/35 checks' suites.log
           # 1082/45 → 2915/173, the JEE archive (#795) (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
-          grep -Fq 'INDIA PYQ: PASS — 4528/4528 checks — 251 source-cited previous-year questions' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 4647/4647 checks — 259 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           # 308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586).
           grep -Fq 'INDIA ADAPTIVE: PASS — 308/308 checks' suites.log
