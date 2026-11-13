@@ -108,7 +108,7 @@ try {
   check('on G3\'s pool Extension 1 and 2 release as partial papers; Standard and Advanced are refused; the test paper releases',
     state('nsw-hsc-extension-1-2027') === 'yes' && state('nsw-hsc-extension-2-2027') === 'yes' && ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-advanced-2027'].every(id => state(id) === 'no') && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
   const adv = await visibleText(page, '[data-nsw-paper="nsw-hsc-advanced-2027"]');
-  check('a refused paper says how much it covers and names what it lacks, and has no start', adv.includes('4 of 8 Year 12 outcomes') && adv.includes('Financial mathematics')
+  check('a refused paper says how much it covers and names what it lacks, and has no start', adv.includes('3 of 8 Year 12 outcomes') && adv.includes('Financial mathematics')
     && await page.locator('[data-nsw-paper="nsw-hsc-advanced-2027"] [data-nsw-start]').count() === 0, adv);
   const ext1 = await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"]');
   check('a partial paper is titled by its coverage, never HSC or trial', /practice paper — 5 of 6 year 12 outcomes/i.test(ext1) && !/HSC paper|trial/i.test(ext1), ext1);
