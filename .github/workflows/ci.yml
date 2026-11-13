@@ -335,7 +335,7 @@ jobs:
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           # 60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds.
-          grep -Fq 'ONBOARDING SCOPE: PASS — 62/62 checks' suites.log
+          grep -Fq 'ONBOARDING SCOPE: PASS — 69/69 checks' suites.log
           # No student-facing text says Pri learns a hand (the count follows the
           # string catalogues, so only the verdict is pinned here).
           grep -Fq 'HANDWRITING CLAIMS: PASS — ' suites.log
