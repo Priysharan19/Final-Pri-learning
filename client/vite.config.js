@@ -96,7 +96,7 @@ export const CHUNK_GROUPS = [
   // The Exam Desk and the exam shell it is built on (plan F4b): one chunk with
   // a name of its own, so the service worker can leave it out of the install
   // (see ON_DEMAND) and the budget check can prove it did.
-  { name: 'exam-desk', test: /\/src\/(desk|examShell)\/|\/src\/engine\/desk(Clock|Import)\.js$/, priority: 40 },
+  { name: 'exam-desk', test: /\/src\/(?:(?:desk|examShell)\/[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];

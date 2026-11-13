@@ -50,6 +50,7 @@ export function textOfMarkup(html) {
   return String(html || '')
     .replace(/<([a-z0-9]+)[^>]*\bdata-paper-own\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&#x27;/g, '\'').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    // `&amp;` last, so an escaped entity in the text ("&amp;lt;") is unescaped once, not twice.
+    .replace(/&#x27;/g, '\'').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
     .replace(/\s+/g, ' ').trim();
 }

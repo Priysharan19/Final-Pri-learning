@@ -234,7 +234,7 @@ try {
     // Every control character the server's note rule refuses is dropped as it is typed (a pasted vertical tab must not block every later save).
     const controls = Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)).join('') + '\u007f';
     const pasted = state.editQuestion({}, {}, '1', { note: `line one${controls}\u000bline two\ttabbed\nnext` }).questions['1'].note;
-    ok(clockEngine.validNote(pasted) && pasted === 'line one\t\n\rline two\ttabbed\nnext'.replace('\r', '\r') && !/[\u000b\u000c\u007f\u0000]/.test(pasted), `a pasted note keeps tabs and line breaks and loses every other control character (${JSON.stringify(pasted)})`);
+    ok(clockEngine.validNote(pasted) && pasted === 'line one\t\n\rline two\ttabbed\nnext' && !/[\u000b\u000c\u007f\u0000]/.test(pasted), `a pasted note keeps tabs and line breaks and loses every other control character (${JSON.stringify(pasted)})`);
     eq(state.confirmQuestions({ 1: { note: 'old' }, 2: { done: true } }, { 1: { note: 'new', noteRev: 2 }, 2: null, 5: { flagged: true } }), { 1: { note: 'new', noteRev: 2 }, 5: { flagged: true } }, 'a confirmed save becomes part of the kept copy of the attempt (so an offline reload still has it)');
     // Confirmed by the server.
     const sent = state.changesOf(s.pending);

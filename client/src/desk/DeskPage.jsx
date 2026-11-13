@@ -127,10 +127,18 @@ function Desk({ attemptId }) {
   const away = useRef(false);
   const said = useRef({ phase: null, five: false, over: false, roomy: false });
   const againKey = useRef(null);
+  // Set when the page was deliberately emptied (the attempt was deleted, or
+  // the account signed out): a reply still on its way must not bring it back
+  // on screen or into the device cache.
+  const gone = useRef(false);
+  // Set when the attempt is known to have changed elsewhere and has not been
+  // read since: every sync reads until one read succeeds.
+  const behind = useRef(false);
   const { announce, region } = useAnnounce();
 
   /** Put a new state on screen and into the device cache (the cache only under the established account). */
   const commit = useCallback((patch, { persist = true } = {}) => {
+    if (gone.current && patch.status !== 'error') return live.current;
     const next = { ...live.current, ...patch };
     live.current = next;
     if (mounted.current) setView(next);
@@ -146,13 +154,14 @@ function Desk({ attemptId }) {
    * clock, so changing the device's date or time moves nothing on screen.
    */
   const adopt = useCallback((reply, extra = {}) => {
-    if (reply?.attempt?.id !== attemptId) return live.current;
+    if (gone.current || reply?.attempt?.id !== attemptId) return live.current;
     const s = live.current;
     // A reply older than what a later reply already brought (a slow first read
     // overtaken by a save) is not put back on screen.
     if (s.synced && s.attempt && Number(reply.attempt.rev) < Number(s.attempt.rev)) return s;
     const pending = extra.pending ?? s.pending ?? {};
     if (away.current === 'returning') away.current = 'back';
+    behind.current = false;
     return commit({
       status: 'ready', checking: false, synced: true, problem: null,
       attempt: reply.attempt, offset: Number(reply.now) - tick(),
@@ -223,8 +232,11 @@ function Desk({ attemptId }) {
         talked = true;
         // The revision moved by more than this save: something else changed
         // the attempt (a clock press on another device). Read it.
-        if (reply.rev !== revBefore + 1) adopt(await deskApi.read(attemptId));
+        if (reply.rev !== revBefore + 1) behind.current = true;
       }
+      // Known to be behind (now, or from a read that failed earlier): read
+      // until a read succeeds, so the gap cannot be forgotten.
+      if (behind.current) adopt(await deskApi.read(attemptId));
       // Nothing to send: on a heartbeat, a return or a reconnect, read the
       // attempt again — that is how the page re-learns the server's time.
       if (!talked && reason !== 'change' && reason !== 'leave') adopt(await deskApi.read(attemptId));
@@ -232,7 +244,7 @@ function Desk({ attemptId }) {
       return undefined;
     } catch (err) {
       // Deleted on another device: there is nothing left to save to.
-      if (err?.code === 'DESK_ATTEMPT_NOT_FOUND') { if (live.current.accountId) void dropCache(live.current.accountId, attemptId); commit({ status: 'error', code: err.code, attempt: null }, { persist: false }); }
+      if (err?.code === 'DESK_ATTEMPT_NOT_FOUND') { gone.current = true; if (live.current.accountId) void dropCache(live.current.accountId, attemptId); commit({ status: 'error', code: err.code, attempt: null }, { persist: false }); }
       else commit({ synced: false, problem: unreachable(err) ? 'offline' : err?.status === 401 ? 'signed-out' : 'failed' }, { persist: false });
       throw err;
     }
@@ -247,18 +259,19 @@ function Desk({ attemptId }) {
   // in another tab): the device cache has been forgotten, so the page stops
   // and says to sign in, rather than claiming anything is kept.
   useEffect(() => onCloudSessionChange(event => {
-    if (event?.detail?.connected === false) { live.current = { ...live.current, attempt: null }; commit({ status: 'error', code: 'AUTH_REQUIRED', attempt: null }, { persist: false }); }
+    if (event?.detail?.connected === false) { gone.current = true; live.current = { ...live.current, attempt: null }; commit({ status: 'error', code: 'AUTH_REQUIRED', attempt: null }, { persist: false }); }
   }), [commit]);
 
   // While the server cannot be reached, try again every few seconds: unsent
   // notes and clock presses go as soon as it can, without waiting for the
   // browser to announce a connection (it does not always) or for the heartbeat.
-  const unreached = ready && view.problem === 'offline';
+  const unreached = ready && (view.problem === 'offline' || view.problem === 'failed');
   useEffect(() => {
     if (!unreached) return undefined;
-    const retry = setInterval(() => { void flush(false, 'retry').catch(() => {}); }, 5000);
+    // A refused save (a busy server, a limit) is retried too, more slowly.
+    const retry = setInterval(() => { void flush(false, 'retry').catch(() => {}); }, view.problem === 'failed' ? 15000 : 5000);
     return () => clearInterval(retry);
-  }, [unreached, flush]);
+  }, [unreached, view.problem, flush]);
   // Said once when work starts being kept on the device only, not on every save.
   useEffect(() => { if (view.problem === 'offline') announce(t('shell.unsaved')); }, [view.problem, announce, t]);
 
@@ -304,7 +317,11 @@ function Desk({ attemptId }) {
       } catch (err) {
         if (!alive) return;
         if (kept && unreachable(err)) commit({ checking: false, synced: false, problem: 'offline' }, { persist: false });
-        else commit({ status: 'error', code: err?.status === 401 ? 'AUTH_REQUIRED' : err?.code || null, attempt: null }, { persist: false });
+        else {
+          // Not this account's any more (deleted on another device): nothing of it stays on this device.
+          if (err?.code === 'DESK_ATTEMPT_NOT_FOUND') { gone.current = true; void dropCache(accountId, attemptId); }
+          commit({ status: 'error', code: err?.status === 401 ? 'AUTH_REQUIRED' : err?.code || null, attempt: null }, { persist: false });
+        }
       }
     })();
     return () => { alive = false; };
@@ -418,8 +435,10 @@ function Desk({ attemptId }) {
     try {
       await deskApi.remove(attemptId);
       // Nothing of a deleted attempt is kept or written back.
+      gone.current = true;
       live.current = { ...live.current, attempt: null, pending: {}, intents: [] };
-      if (view.accountId) await dropCache(view.accountId, attemptId);
+      // After any write already on its way has landed, so it cannot put the record back.
+      if (view.accountId) { await new Promise(done => setTimeout(done, 0)); await dropCache(view.accountId, attemptId); await dropCache(view.accountId, attemptId); }
       navigate(`/library/${attempt.resource.id}`);
     } catch (err) {
       setSheet(null);
@@ -448,8 +467,8 @@ function Desk({ attemptId }) {
   const allotted = (clock.phase === 'reading' ? paper.readingMinutes : paper.workingMinutes) * MINUTE;
   const elapsed = clock.phase === 'reading' ? clock.elapsedReadingMs : clock.phase === 'working' || finished ? clock.elapsedWorkingMs : 0;
   const clockNote = estimate ? t('desk.estimate') : paused ? t('desk.paused') : over ? t('desk.overNote') : clock.phase === 'ready' ? t('desk.readyNote') : clock.phase === 'idle' ? t('desk.idleNote') : null;
-  const saveKey = view.problem === 'signed-out' ? 'desk.signedOutKept' : view.checking ? 'desk.checking'
-    : view.problem === 'offline' || view.problem === 'failed' ? 'shell.unsaved' : saveStateKey(saveState);
+  const saveKey = view.problem === 'signed-out' ? 'desk.signedOutKept' : view.problem === 'offline' || view.problem === 'failed' ? 'shell.unsaved'
+    : view.checking ? 'desk.checking' : saveStateKey(saveState);
   const link = attempt.resource.listed ? safeExternalUrl(attempt.resource.url) : null;
   const shortcuts = [
     { keys: ['←', '→'], label: t('desk.keyMove') }, { keys: ['D'], label: t('desk.keyDone') }, { keys: ['F'], label: t('desk.keyFlag') },

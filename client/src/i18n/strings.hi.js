@@ -3490,7 +3490,7 @@ export default {
   "desk.phases": 'इस प्रश्नपत्र के चरण',
   "desk.phaseReading": 'पढ़ना {time}',
   "desk.phaseWorking": 'हल करना {time}',
-  "desk.estimate": 'ऑफ़लाइन अनुमान',
+  "desk.estimate": 'अनुमान, पुष्टि नहीं हुई',
   "desk.estimateNote": 'घड़ी तब बदलती है जब Pri को यह मिलता है, दबाने के समय नहीं। इसे भेजने के लिए फिर से कनेक्ट करें।',
   "desk.paused": 'रुका हुआ',
   "desk.overNote": 'समय से ऊपर',

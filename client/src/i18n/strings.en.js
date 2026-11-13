@@ -3436,7 +3436,7 @@ export default {
   "desk.phases": 'Phases of this paper',
   "desk.phaseReading": 'Reading {time}',
   "desk.phaseWorking": 'Working {time}',
-  "desk.estimate": 'offline estimate',
+  "desk.estimate": 'estimate, not confirmed',
   "desk.estimateNote": 'The clock changes when Pri receives it, not when you pressed. Reconnect to send it.',
   "desk.paused": 'paused',
   "desk.overNote": 'over time',
