@@ -351,7 +351,8 @@ jobs:
           # 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards).
           # 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check).
           # 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost "P" and "Pri Learning." and gained Priyabhata, Prithagoras, प्रियभट and "by Pri Learning".
-          grep -Fq 'I18N COVERAGE: PASS — 94/94 checks — 80 files scanned, 0 hard-coded strings' suites.log
+          # 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check).
+          grep -Fq 'I18N COVERAGE: PASS — 94/94 checks — 89 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -403,6 +404,10 @@ jobs:
           grep -Fq 'NOTEBOOK VIEW: PASS — 19/19 checks' suites.log
           grep -Fq 'PARENT REPORT UI: PASS — 35/35 checks' suites.log
           grep -Fq 'LIBRARY UI: PASS — 39/39 checks' suites.log
+          # The exam shell and the Exam Desk as drawn (plan F4b): navigator labels,
+          # shortcuts inert while typing, a clock face that computes nothing,
+          # autosave order, the save merge, no mark wording in either language.
+          grep -Fq 'DESK UI: PASS — 191/191 checks' suites.log
           grep -Fq 'DESK CLOCK: PASS — 30/30 checks' suites.log
           grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
           # Plan E2: the app knows its own edition from its build, declares it on
@@ -1157,6 +1162,11 @@ jobs:
             # Task 02: mounted server-authoritative method credit and stale receipt rejection.
             node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
+            # The Exam Desk (ADR-0002 §8 plan F4b): unmarked practice on a library
+            # paper. It makes its own builds (PRI_FEATURE_LIBRARY and
+            # PRI_FEATURE_EXAM_DESK are build-time: desk off, then on) and leaves
+            # this job's build behind; tour-ai-tutor.js then makes its own.
+            node client/test/tour-exam-desk.js 2>&1 | tee -a browser.log
             node client/test/tour-ai-tutor.js 2>&1 | tee -a browser.log
             node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
@@ -1210,6 +1220,10 @@ jobs:
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            # The Exam Desk in WebKit (the engine behind every Apple web view):
+            # the same sitting, import and Hindi journeys as Chromium. Last in
+            # the group: it makes its own flagged builds and restores this one.
+            node client/test/tour-exam-desk.js --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
@@ -1306,6 +1320,14 @@ jobs:
           grep -Fq 'AI tutor · dark by default in a production build' browser.log
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
+          # The Exam Desk (plan F4b), in Chromium and in WebKit: dark without
+          # its flag (5 checks), then a sitting, the import and the Hindi desk
+          # (121 more; the tour prints the running total, 126 across 4 flows).
+          grep -Fq 'Exam desk · dark without PRI_FEATURE_EXAM_DESK: no way in from a library paper, no /desk route' browser.log
+          grep -Fq 'Exam desk · a sitting: reading, working, notes, reload, stale revision, device clock, hidden, offline, time up while away, closed once — never a mark' browser.log
+          grep -Fq 'Exam desk · import from the Prithagoras website: nothing stored without the press; the same file twice is one record; tampered and other-edition files refused' browser.log
+          grep -Fq 'Exam desk · in Hindi: reading time ends while away; the closed desk says it is unmarked and carries no mark wording' browser.log
+          test "$(grep -Fc 'E2E SUITE PASSED — 126/126 checks across 4 flows' browser.log)" -ge 2
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*65/65.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log

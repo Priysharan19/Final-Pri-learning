@@ -94,6 +94,10 @@ export const CHUNK_GROUPS = [
   // small and always wanted together, so they share one chunk rather than
   // costing the boot path five requests.
   { name: 'ncert-syllabus', test: /\/src\/engine\/ncert\/[a-z0-9-]+-syllabus\.js$/, priority: 40 },
+  // The Exam Desk and the exam shell it is built on (plan F4b): one chunk with
+  // a name of its own, so the service worker can leave it out of the install
+  // (see ON_DEMAND) and the budget check can prove it did.
+  { name: 'exam-desk', test: /\/src\/(?:(?:desk|examShell)\/[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -166,7 +170,21 @@ export const ON_DEMAND = [
   // from GET /v1/resources and opens on its publisher's site — so a copy kept
   // for offline would only ever draw "needs a connection". Off in a production
   // build, where the chunk is never reached at all.
-  [/(^|\/)Library-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+  // (libraryApi: the library's calls, a chunk of their own now that the Exam
+  // Desk reads a paper through them too.)
+  [/(^|\/)(Library|libraryApi)-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+
+  // The Exam Desk (ADR-0002 §8 plan F4b, PRI_FEATURE_EXAM_DESK): the desk's
+  // pages, the shared exam shell they are built on and the desk's pure clock
+  // and import reader, in one named chunk behind import() in App.jsx and
+  // Library.jsx. Starting an attempt needs the server and every paper is a
+  // library resource, so a first visit offline could only say "needs a
+  // connection"; a student who has opened the desk once has the chunk from the
+  // runtime cache, and their attempt from the desk's own device cache. Off in
+  // a production build, where the chunk is never reached. When the marked exam
+  // room moves onto the shell (plan F4c) the shell leaves this chunk and is
+  // warmed with the room.
+  [/(^|\/)(exam-desk|Desk(Page|Import|Entry)|deskCache)-[^/]*\.(js|css)$/, 'exam desk (started online)'],
 
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
@@ -533,7 +551,7 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
@@ -544,6 +562,10 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   Off in a production build: a new student surface outside the frozen V1
 //   scope ships dark until the owner turns it on. The read-only server routes
 //   (/v1/resources) answer whatever the flag says.
+//   EXAM_DESK — the Exam Desk's screens (/desk/:attemptId, /desk/import, and
+//   "Practise at the desk" on a library paper; ADR-0002 §8 plan F4b). Off in a
+//   production build until the owner's GO; it needs LIBRARY too. The server's
+//   /v1/desk routes answer a signed-in student whatever the flag says.
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
@@ -563,6 +585,7 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
     __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
+    __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
     // Plan E5: false in a build of an edition with no payment provider, so its
