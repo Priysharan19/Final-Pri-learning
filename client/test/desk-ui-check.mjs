@@ -380,10 +380,15 @@ try {
   ok(load.indexOf('await deskApi.account()') >= 0 && load.indexOf('await deskApi.account()') < load.indexOf('readCache(') && load.indexOf('linkedAccount()') < load.indexOf('readCache(') && (load.match(/readCache\(/g) || []).length === 1 && /readCache\(accountId, attemptId\)/.test(load),
     'the load path asks who is signed in (or, unreachable, who this profile is linked to) BEFORE the one read of the device cache, which is by that account');
   ok(!/lastAccount|rememberAccount/.test(pageSrc + cacheSrc), 'there is no "whoever used the desk last" pointer');
-  ok(/if \(reply\?\.attempt\?\.id !== attemptId\) return live\.current;/.test(pageSrc) && /<Desk key=\{attemptId\} attemptId=\{attemptId\} \/>/.test(pageSrc), 'a reply for another attempt is never adopted, and each attempt is its own page');
+  ok(/if \(gone\.current \|\| reply\?\.attempt\?\.id !== attemptId\) return live\.current;/.test(pageSrc) && /<Desk key=\{attemptId\} attemptId=\{attemptId\} \/>/.test(pageSrc), 'a reply for another attempt is never adopted, and each attempt is its own page');
   ok(/adopt\(reply, \{ accountId \}\);/.test(load) && !/pending: fromCache\(mine/.test(pageSrc), 'the first server reply keeps whatever was typed or pressed while it was in flight');
   ok(api.unreachable(new TypeError('Failed to fetch')) && api.unreachable(Object.assign(new Error('x'), { code: 'CLOUD_DISABLED' })) && !api.unreachable(Object.assign(new Error('x'), { code: 'DESK_MODE_INVALID' })) && !api.unreachable(Object.assign(new Error('x'), { status: 429, code: 'RATE_LIMITED' })),
     'only a transport failure is "offline"; a refused or rate-limited reply is not retried as one');
+  ok(/if \(gone\.current && patch\.status !== 'error'\) return live\.current;/.test(pageSrc) && (pageSrc.match(/gone\.current = true;/g) || []).length >= 4,
+    'a page emptied on purpose (deleted, signed out, no longer this account\'s) is not brought back by a reply still on its way');
+  ok(/if \(reply\.rev !== revBefore \+ 1\) behind\.current = true;/.test(pageSrc) && /if \(behind\.current\) adopt\(await deskApi\.read\(attemptId\)\);/.test(pageSrc) && /behind\.current = false;\n    return commit/.test(pageSrc),
+    'a change made elsewhere is read until a read succeeds: a failed read does not forget it');
+  ok(/"&amp;lt;b&amp;gt;"/.test('"&amp;lt;b&amp;gt;"') && textOfMarkup('<p>a &amp;lt;b&amp;gt; &amp; c</p>') === 'a &lt;b&gt; & c', 'the markup reader unescapes once, never twice');
   ok(!/role="status"/.test(pageSrc.slice(pageSrc.indexOf('className="dk-status"') - 4, pageSrc.indexOf('className="dk-status"') + 60)), 'the save-state line is not a live region (a screen reader is not told "saved" every thirty seconds)');
   ok(/clearDeskCache\(\)/.test(read('src/App.jsx')) && /connected === false/.test(read('src/App.jsx')) && /forgotten = true;/.test(cacheSrc) && /if \(forgotten \|\|/.test(cacheSrc), 'signing out of the account on this device forgets the desk\'s cache, and a save still in flight cannot write it back');
   const app = read('src/App.jsx');
