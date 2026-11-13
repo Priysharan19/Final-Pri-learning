@@ -13,7 +13,7 @@ import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { SYNC_EVENT, autoSyncStatus, noteManualSync } from '../platform/cloudSyncScheduler.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
-  finishNativeTransaction, getNativeProducts, nativeBillingStore,
+  finishNativeTransaction, getNativeProducts, nativeBillingStore, PREMIUM_ON_SALE,
   acceptEachTransaction, onNativeBillingUpdate, purchaseNativeProduct, restoreNativePurchases
 } from '../platform/nativeBilling.js';
 import GooglePlayBilling from './GooglePlayBilling.jsx';
@@ -178,7 +178,9 @@ export default function CloudAccountPanel() {
 
   useEffect(() => {
     let live = true;
-    if (!enabled) {
+    // Where the build's edition has nothing to sell (plan E5) there is no
+    // price or checkout to ask the server about.
+    if (!enabled || !PREMIUM_ON_SALE) {
       setPricing(null);
       setWebCheckout(false);
       return () => { live = false; };
@@ -834,6 +836,10 @@ export default function CloudAccountPanel() {
             )}
           </div>}
 
+          {!PREMIUM_ON_SALE && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
+            {t('paywall.notOnSale')}
+          </div>}
+
           {nativeShell && nativeStoreKit && appleNotOnSale && <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
             {t('cloud.appleNotOnSale')}
           </div>}
@@ -859,7 +865,7 @@ export default function CloudAccountPanel() {
           {nativeShell && googlePlay && <GooglePlayBilling user={user} canSync={canSync} premium={premium}
             onChanged={() => reload({ verify: false })} />}
 
-          {nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          {PREMIUM_ON_SALE && nativeShell && !nativeStore && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             {t('cloud.noStoreBilling')}
           </div>}
         </div>
@@ -900,7 +906,7 @@ export default function CloudAccountPanel() {
       {(() => {
         const note = nativeStoreKit && appleProducts.length
           ? t('cloud.appleAuthorityNote')
-          : pricingText(pricing, t);
+          : PREMIUM_ON_SALE ? pricingText(pricing, t) : '';
         return note ? <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>{note}</div> : null;
       })()}
 
