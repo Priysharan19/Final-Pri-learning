@@ -125,6 +125,29 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]] }]);
   check(ordered.map(f => f.generator).join() === 'b,a', 'a slot lists its preferred difficulties first, and still counts the others');
 }
+// PINNED against the current pool (G3, 267 forms; CTO decision 13 Nov 2026).
+// A content change that moves any of these must update this table on purpose.
+const PINNED = {
+  'nsw-hsc-standard-1-2027': { released: false, covered: 1, total: 7 },
+  'nsw-hsc-standard-2-2027': { released: false, covered: 2, total: 10 },
+  'nsw-hsc-advanced-2027': { released: false, covered: 4, total: 8 },
+  'nsw-hsc-extension-1-2027': { released: true, full: false, covered: 5, total: 6, omitted: ['ME1-11-05', 'ME1-12-04'], title: 'Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes', marks: 58, workingMin: 100 },
+  'nsw-hsc-extension-2-2027': { released: true, full: false, covered: 4, total: 5, omitted: ['ME2-12-02'], title: 'Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes', marks: 81, workingMin: 145 }
+};
+for (const b of NSW_EXAM_BLUEPRINTS) {
+  const r = releaseOf(b), pin = PINNED[b.id];
+  const got = { released: r.released, covered: r.year12.covered, total: r.year12.total };
+  const want = { released: pin.released, covered: pin.covered, total: pin.total };
+  check(JSON.stringify(got) === JSON.stringify(want), `pinned: ${b.id} ${pin.released ? 'releases' : 'is refused'} at ${pin.covered}/${pin.total} (got ${JSON.stringify(got)})`);
+  if (pin.released) {
+    check(r.full === pin.full && JSON.stringify(r.omittedOutcomes) === JSON.stringify(pin.omitted) && nswPaperTitle(b, r) === pin.title && r.marks === pin.marks && r.workingMin === pin.workingMin,
+      `pinned: ${b.id} omits ${pin.omitted.join(', ')}, "${pin.title}", ${pin.marks} marks, ${pin.workingMin} min (got ${r.omittedOutcomes.join(', ')}, "${nswPaperTitle(b, r)}", ${r.marks}, ${r.workingMin})`);
+  } else {
+    check(r.included.length === 0 && r.omittedOutcomes.length > 0, `pinned: ${b.id} sets nothing and lists its gaps (${r.omittedOutcomes.length})`);
+  }
+}
+check(NSW_EXAM_POOL.length === 267, `the pool the pins were taken on: 267 approved forms (got ${NSW_EXAM_POOL.length})`);
+
 // On G3's pool, released exactly above the floor (no hand-entered list).
 for (const b of NSW_EXAM_BLUEPRINTS) {
   const r = releaseOf(b);
