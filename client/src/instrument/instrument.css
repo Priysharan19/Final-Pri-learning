@@ -1345,13 +1345,15 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
    workingClock.js (400 ms in; 480 ms held and a 120 ms fade where its host
    stays on screen; where the finished work replaces the host, the result
    replaces it). The status line keeps one 16 px slot for the dot or the
-   indicator, so neither shifts the line. */
+   indicator while it is not idle, so neither shifts the line; work that ends
+   straight into idle takes the slot away with it. */
 .pri-working { --in-dur-work: 2400ms; display: inline-flex; align-items: center; gap: 8px; color: var(--in-tx-2); animation: pri-w-in 120ms; }
 .pri-working[data-out] { opacity: 0; transition: opacity 120ms; }
 .pri-working { margin-right: 8px; }
+.skeleton > .pri-working, p[role="status"] > .pri-working { margin-right: 0; }
 .status-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; }
 .status-mark > * { grid-area: 1 / 1; margin: 0; }
-.status-mark:has(.pri-working) .dot { visibility: hidden; }
+.status-mark .pri-working + .dot { visibility: hidden; }
 .pri-working svg { flex: none; overflow: visible; }
 .pri-working path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: pri-w-ln var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
 .pri-working circle { fill: currentColor; animation: pri-w-pt var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }

@@ -403,7 +403,7 @@ jobs:
           grep -Fq 'AURORA SKIN: PASS — 47/47 checks' suites.log
           # Lit Instrument D6: the working indicator is one component, shown
           # only while real work is pending (400 ms in, 480 ms held).
-          grep -Fq 'WORKING INDICATOR: PASS — 45/45 checks' suites.log
+          grep -Fq 'WORKING INDICATOR: PASS — 46/46 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           # 68 → 79 (plan E5): an edition with no payment provider has no store,

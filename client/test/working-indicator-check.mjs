@@ -98,10 +98,11 @@ for (const s of sites) {
 ok((app.match(/<RouteLoading \/>/g) || []).length >= 1 && (app.match(/<RouteLoading \/>/g) || []).length === (app.match(/fallback=\{<RouteLoading \/>\}/g) || []).length, 'RouteLoading is only ever a Suspense fallback');
 const qc = read('client/src/components/QuestionCard.jsx');
 ok(/<span className="status-mark" aria-hidden="true"><Working pending=\{statusState === 'working'\} \/>\{statusState !== 'working' && <span className="dot" \/>\}<\/span>/.test(qc), 'the status line shows the indicator, not the pulsing dot, while a check, a cloud read or a save is in flight, in one slot shared with the dot');
-ok(/\.status-mark \{[^}]*width: 16px; height: 16px; flex: none;/.test(instrument) && /\.status-mark:has\(\.pri-working\) \.dot \{ visibility: hidden; \}/.test(instrument), 'that slot is a fixed 16 px, so the line never shifts, and the dot hides while the indicator holds or fades');
+ok(/\.status-mark \{[^}]*width: 16px; height: 16px; flex: none;/.test(instrument) && /\.status-mark \.pri-working \+ \.dot \{ visibility: hidden; \}/.test(instrument) && !/:has\(/.test(ind), 'that slot is a fixed 16 px, so the line never shifts, and the dot hides while the indicator holds or fades (a sibling rule every build target reads, not :has())');
+ok(/\.skeleton > \.pri-working, p\[role="status"\] > \.pri-working \{ margin-right: 0; \}/.test(ind), 'a lone indicator (a skeleton, RouteLoading) carries no trailing gap, so it sits centred');
 // Where the host stays on screen, the indicator is held and fades: those sites take a changing pending flag.
 const HELD = sites.filter(x => /pending=\{(statusState === 'working'|lineCheckBusy)\}/.test(x.attrs));
-ok(HELD.length === 2, `the status line and the line-check button keep the indicator mounted with a changing pending flag, so its hold and fade apply (${HELD.length})`);
+ok(HELD.length === 2, `the status line and the line-check button keep the indicator mounted with a changing pending flag, so its hold and fade apply while the line is not idle (${HELD.length})`);
 ok(!/fallback=\{<div className="hintbox"[^>]*><Working[^/]*label=/.test(qc), 'the tutor fallbacks show their text at once (no empty box for the first 400 ms)');
 ok(!/@keyframes in-sh\b/.test(instrument) && /html\.ui-instrument \.skeleton \{[^}]*animation: none/.test(instrument), 'the Instrument skeleton no longer shimmers: it is a still placeholder and the indicator is the one moving thing');
 

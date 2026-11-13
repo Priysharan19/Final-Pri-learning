@@ -42,7 +42,7 @@ export function editionRecord(id) {
       brandHi: e.identity.brandHi,
       cut: e.identity.cut,
       cutPath: CUT_PATHS[e.identity.cut],
-      working: Object.freeze({ ...WORKING_FORMS[e.identity.cut] }),
+      working: Object.freeze({ line: WORKING_FORMS[e.identity.cut].line, points: Object.freeze(WORKING_FORMS[e.identity.cut].points.map(p => Object.freeze([...p]))) }),
       wordmark: Object.freeze({ ...WORDMARKS[e.identity.wordmark] }),
       company: COMPANY,
       companyLine: COMPANY_LINE
