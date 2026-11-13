@@ -13,7 +13,8 @@ import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
-import { BrandWordmark } from './components/BrandMark.jsx';
+import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
+import { BRAND } from './brand/edition.js';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -203,7 +204,8 @@ function RouteLoading() {
   return <p className="muted" role="status" aria-live="polite">{t('common.loading')}</p>;
 }
 
-export function Logo({ large = false, onClick }) {
+// byline: "by Pri Learning" under the wordmark — sign-in and sign-up only, never the header bar.
+export function Logo({ large = false, onClick, byline = false }) {
   const t = useT();
   // With an onClick this is a control, so it has to be one: a bare <span> takes
   // the click and gives a keyboard no way to follow it.
@@ -211,11 +213,12 @@ export function Logo({ large = false, onClick }) {
   const controlProps = onClick
     ? { type: 'button', onClick, 'aria-label': t('app.logoHome') }
     : {};
-  return (
+  const mark = (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
       <BrandWordmark height={large ? 44 : 22} />
     </Tag>
   );
+  return byline ? <>{mark}<EditionByline /></> : mark;
 }
 
 export default function App() {
@@ -429,7 +432,7 @@ export default function App() {
     // Before a profile is chosen the route is still "/", but the screen is the
     // welcome and sign-in page, not Home. Naming the tab after a page the
     // visitor cannot see yet is worse than naming the product.
-    document.title = user && pageTitle ? `${pageTitle} · Pri Learning` : 'Pri Learning';
+    document.title = user && pageTitle ? `${pageTitle} · ${BRAND}` : BRAND;
   }, [pageTitle, user]);
 
   // <main> is keyed on the path, so every navigation replaces the node and focus
@@ -645,7 +648,7 @@ export default function App() {
               </p>
             )}
             <main className="content fade-in" id="main" tabIndex={-1} ref={mainRef}
-              aria-label={pageTitle || 'Pri Learning'} key={loc.pathname}>
+              aria-label={pageTitle || BRAND} key={loc.pathname}>
               <ErrorBoundary scope="route" resetKey={loc.pathname} onHome={() => nav('/')}>
                 {/* Inside the boundary, so a route chunk that will not load is
                     reported as a broken route rather than blanking the shell. */}

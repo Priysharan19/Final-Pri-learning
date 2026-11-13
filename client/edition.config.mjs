@@ -26,10 +26,13 @@
 // capability that is missing from either edition, a gap with no mission, and
 // prints the open gaps of both editions on every run.
 //
-// E1 changes no behaviour: nothing in the student app reads the edition yet.
-// The Priyabhata build is the build `main` made before this file existed.
-// Brand text (E4), sign-up course defaults (E2/E3), billing (E5) and the
-// retirement of PRI_FEATURE_AUSTRALIA (E3) read from here in later missions.
+// E4 (brand): the student app reads the edition through one module,
+// client/src/platform/edition-record.js (plan E2), which the build replaces with its own
+// edition's record — the wordmark, the icon cut, and the {brand} every
+// catalogue string uses. The build reads it in vite.config.js
+// (index.html, the web manifest, icons). Sign-up course defaults (E2/E3),
+// billing (E5) and the retirement of PRI_FEATURE_AUSTRALIA (E3) read from here
+// in later missions.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // The server imports this file at run time, and the production image admits
@@ -41,6 +44,16 @@ import { isLanguage } from './src/i18n/languages.js';
 
 /** The company line shown beside either edition's brand. */
 export const COMPANY = 'Pri Learning';
+
+/**
+ * The company line as it is written under an edition wordmark (sign-in,
+ * sign-up, About, account pages, the email footer) — never in the header bar.
+ * Brand decision record: docs/brand/editions-decision.md (mission E4).
+ */
+export const COMPANY_LINE = 'by Pri Learning';
+
+/** The icon counter cuts an edition's mark may carry (docs/brand/editions-decision.md §2). */
+export const CUTS = Object.freeze(['jya', 'square']);
 
 /**
  * The capabilities both editions are built to offer (ADR-0002, "Exactly what
@@ -91,6 +104,17 @@ export const EDITIONS = Object.freeze({
   priyabhata: Object.freeze({
     id: 'priyabhata',
     brand: 'Priyabhata',
+    // E4, brand Direction A "Prime" (owner, 2026-11-13). Accents are the
+    // approved values; edition-config-check computes their contrast.
+    identity: Object.freeze({
+      brandHi: 'प्रियभट',                    // Hindi running text: one ट, following आर्यभट
+      wordmark: 'priyabhata',                // key into BrandMark's WORDMARKS
+      wordmarkHi: 'priyabhata-hi',           // the Devanagari lockup (About)
+      cut: 'jya',                            // icon counter cut: the bow and string
+      accent: Object.freeze({ light: '#0a6670', dark: '#6cc3c9' }),
+      onAccent: Object.freeze({ light: '#f4f3ef', dark: '#1a1a1b' }),
+      description: 'Maths practice for Indian students — NCERT Classes 7–12 and JEE Main & Advanced. Handwriting read line by line, worked solutions. Answers are checked by our server with a Priyabhata account.'
+    }),
     region: 'IN',
     defaultCourse: 'in',
     courses: Object.freeze(['in']),
@@ -117,6 +141,15 @@ export const EDITIONS = Object.freeze({
   prithagoras: Object.freeze({
     id: 'prithagoras',
     brand: 'Prithagoras',
+    identity: Object.freeze({
+      brandHi: null,                         // Prithagoras offers English only
+      wordmark: 'prithagoras',
+      wordmarkHi: null,
+      cut: 'square',                         // icon counter cut: the right-angle box
+      accent: Object.freeze({ light: '#7d5a00', dark: '#e0b44a' }),
+      onAccent: Object.freeze({ light: '#f4f3ef', dark: '#1a1a1b' }),
+      description: 'Maths practice for NSW students, Years 7–12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
+    }),
     region: 'AU',
     defaultCourse: 'nsw',
     courses: Object.freeze(['nsw']),
@@ -191,9 +224,28 @@ export function parityGaps(editions = EDITIONS) {
 export function editionProblems(editions = EDITIONS) {
   const problems = [];
   const courses = new Set();
+  const cuts = new Set();
   for (const [key, e] of Object.entries(editions)) {
+    if (e.identity?.cut) {
+      if (cuts.has(e.identity.cut)) problems.push(`${key}: identity.cut ${e.identity.cut} is already another edition's`);
+      cuts.add(e.identity.cut);
+    }
     if (e.id !== key) problems.push(`${key}: id ${JSON.stringify(e.id)} does not match its key`);
     if (!e.brand || e.brand === COMPANY) problems.push(`${key}: needs its own brand, not the company name`);
+    const id = e.identity;
+    if (!id || typeof id !== 'object') problems.push(`${key}: needs an identity record (brand mark, accent, wordmark)`);
+    else {
+      if (!CUTS.includes(id.cut)) problems.push(`${key}: identity.cut must be one of ${CUTS.join(', ')}`);
+      if (!id.wordmark) problems.push(`${key}: identity.wordmark is required`);
+      if (Boolean(id.brandHi) !== Boolean(e.languages?.includes('hi'))) problems.push(`${key}: identity.brandHi is required exactly when the edition offers Hindi`);
+      if (Boolean(id.wordmarkHi) !== Boolean(id.brandHi)) problems.push(`${key}: identity.wordmarkHi goes with identity.brandHi`);
+      for (const field of ['accent', 'onAccent']) {
+        for (const mode of ['light', 'dark']) {
+          if (!/^#[0-9a-f]{6}$/.test(id[field]?.[mode] || '')) problems.push(`${key}: identity.${field}.${mode} must be a lower-case #rrggbb colour`);
+        }
+      }
+      if (!id.description || id.description.includes(COMPANY)) problems.push(`${key}: identity.description must describe the edition by its own brand`);
+    }
     if (!/^[A-Z]{2}$/.test(e.region || '')) problems.push(`${key}: region must be an ISO 3166 alpha-2 code`);
     if (!/^[A-Z]{3}$/.test(e.currency || '')) problems.push(`${key}: currency must be an ISO 4217 code`);
     const providers = e.billing?.providers;

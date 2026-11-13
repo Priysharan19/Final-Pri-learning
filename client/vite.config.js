@@ -8,6 +8,7 @@ import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/re
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
 import { editionOf, resolveEdition } from './edition.config.mjs';
+import { WEB_FILES, brandFile, brandIndexHtml, webManifest } from './brand/edition-brand.mjs';
 import { editionRecordModule } from './src/platform/edition-record.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -467,6 +468,41 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// The edition's brand (plan E4, docs/brand/editions-decision.md): index.html's
+// %PRI_…% placeholders, manifest.webmanifest, the favicon, the splash and the
+// app icons all come from the edition this build resolved (PRI_EDITION), from
+// client/brand/<edition>/, and the build carries no other edition's files.
+// The app reads its own name, cut and wordmark from the edition record
+// (editionRecordPlugin below, plan E2), which carries them for this edition
+// alone, so no bundle holds the other edition's name, accent or wordmark.
+// The assets are emitted in generateBundle, before pri-precache's writeBundle
+// lists dist/, so the service worker installs them. The development server
+// serves the same files from the same place.
+const BRAND_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png' };
+export function editionBrand(edition) {
+  const manifest = `${JSON.stringify(webManifest(edition), null, 2)}\n`;
+  return {
+    name: 'pri-edition-brand',
+    transformIndexHtml: { order: 'pre', handler: html => brandIndexHtml(html, edition) },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
+      for (const rel of WEB_FILES) this.emitFile({ type: 'asset', fileName: rel, source: readFileSync(brandFile(edition, rel)) });
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url || '').split('?')[0].slice(1);
+        if (path === 'manifest.webmanifest') {
+          res.setHeader('Content-Type', 'application/manifest+json');
+          return res.end(manifest);
+        }
+        if (!WEB_FILES.includes(path)) return next();
+        res.setHeader('Content-Type', BRAND_TYPES[path.slice(path.lastIndexOf('.'))]);
+        return res.end(readFileSync(brandFile(edition, path)));
+      });
+    }
+  };
+}
+
 // The app's own edition record (plan E2). client/src/platform/edition-record.js
 // is the one module that reads the edition table; a build or dev server loads
 // this edition's record in its place, so a bundle knows its own edition's
@@ -584,7 +620,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',
