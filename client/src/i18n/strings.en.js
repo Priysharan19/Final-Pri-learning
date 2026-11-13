@@ -3400,4 +3400,18 @@ export default {
   "library.disclaimerLabel": 'Disclaimer',
   // The app and the server are different regional editions (plan E2); {app} and {service} are brand names.
   'edition.mismatchBody': 'This app is {app}. It cannot sign in to {service}\'s service.',
+  // Prithagoras HSC-style papers (plan G4). An "answer-checked practice paper" is never an HSC mark, band or prediction.
+  'exams.nsw.heading': 'HSC-style papers',
+  'exams.nsw.intro': 'Timed papers shaped like an HSC examination: reading time first, then working time. Each is an answer-checked practice paper: every question is checked on its final answer only, so it is not an HSC mark and predicts no band.',
+  'exams.nsw.time': '{reading} min reading + {working} min working',
+  'exams.nsw.size': '{marks} marks · {count} questions',
+  'exams.nsw.start': 'Start paper',
+  'exams.nsw.notYet': 'Not available yet: there are not enough approved questions for {outcomes}.',
+  'exams.nsw.testPaper': 'Test paper',
+  'exams.nsw.loading': 'Loading papers…',
+  'exams.nsw.none': 'HSC-style papers are not available yet.',
+  'examRoom.readingTitle': 'Reading time · {time}',
+  'examRoom.readingBody': 'Read the paper. Answers open when working time starts.',
+  'examRoom.readingOver': 'Working time has started. You can write your answers now.',
+  'examRoom.nswMarkingNote': 'Answer-checked practice paper. Each question was checked on its final answer only: a question worth n marks earned n or 0. HSC markers also give marks for working, so this is not an HSC mark and predicts no band.',
 };

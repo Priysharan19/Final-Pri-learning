@@ -12,6 +12,7 @@ import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
+import { featureEnabled } from '../platform/features.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -61,18 +62,20 @@ export default function Exams() {
   // button on the page is the mock's.)
   // `targeted`: a targeted paper (Premium, engine/targetedMock.js) — the same
   // board mock, its questions leaning toward weak and due subtopics.
-  const lastStart = useRef({ mock: false, targeted: false });
+  // `nsw`: an NSW HSC-style paper (plan G4), named by its blueprint id.
+  const lastStart = useRef({ mock: false, targeted: false, nsw: null });
   async function start(options) {
-    const repeat = options?.mock === undefined && refusal !== null;
+    const repeat = options?.mock === undefined && options?.nsw === undefined && refusal !== null;
     const mock = options?.mock === true || (repeat && lastStart.current.mock);
     const targeted = mock && (options?.targeted === true || (repeat && lastStart.current.targeted));
-    lastStart.current = { mock, targeted };
+    const nsw = typeof options?.nsw === 'string' ? options.nsw : (repeat ? lastStart.current.nsw : null);
+    lastStart.current = { mock, targeted, nsw };
     setBusy(true);
     setError('');
     setRefusal(null);
     setStillOpen(null);
     try {
-      const body = user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}), ...(targeted ? { targeted: true } : {}) } : cfg;
+      const body = nsw ? { nsw } : user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}), ...(targeted ? { targeted: true } : {}) } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
@@ -103,6 +106,7 @@ export default function Exams() {
   return (
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
+      {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
       <div className="card">
         <div className="card-title">{t('exams.sitPaperTitle')}</div>
         <p className="sub" style={{ marginBottom: 18 }}>
@@ -142,6 +146,39 @@ export default function Exams() {
       </div>}
       {paper && <PrintPaper paper={paper} onClose={() => setPaper(null)} />}
     </div>
+  );
+}
+
+// Prithagoras's HSC-style papers (plan G4): the server's list, released or
+// not. A paper that is not released says what it lacks; it has no start.
+function NswPapers({ busy, start }) {
+  const t = useT();
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.get('/exams/nsw').then(r => { if (live) setList(r); }).catch(() => { if (live) setList({ available: false, papers: [] }); });
+    return () => { live = false; };
+  }, []);
+  return (
+    <section className="card" style={{ gridColumn: '1 / -1' }} data-nsw-papers aria-labelledby="nsw-papers-title">
+      <h2 className="card-title" id="nsw-papers-title">{t('exams.nsw.heading')}</h2>
+      <p className="sub" style={{ marginBottom: 14 }}>{t('exams.nsw.intro')}</p>
+      {list === null && <p className="muted">{t('exams.nsw.loading')}</p>}
+      {list && !list.papers.length && <p className="muted" data-nsw-papers-none>{t('exams.nsw.none')}</p>}
+      {list && list.papers.length > 0 && <ul className="nsw-papers" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+        {list.papers.map(p => (
+          <li key={p.id} className="stat-tile" data-nsw-paper={p.id} data-released={p.released ? 'yes' : 'no'}>
+            <div className="sc-label">{p.label}{p.test ? ` · ${t('exams.nsw.testPaper')}` : ''}</div>
+            <div className="muted">{t('exams.nsw.time', { reading: p.readingMin, working: p.workingMin })} · {t('exams.nsw.size', { marks: p.totalMarks, count: p.questions })}</div>
+            {p.released
+              ? <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={() => start({ nsw: p.id })} disabled={busy} data-nsw-start={p.id}>
+                {busy ? t('exams.building') : t('exams.nsw.start')}
+              </button>
+              : <p className="muted" style={{ marginTop: 8 }} data-nsw-not-released>{t('exams.nsw.notYet', { outcomes: [...p.missingOutcomes, ...p.thinOutcomes].join(', ') })}</p>}
+          </li>
+        ))}
+      </ul>}
+    </section>
   );
 }
 

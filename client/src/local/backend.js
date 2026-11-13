@@ -74,6 +74,7 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
+import { nswExamsFor, nswExamSpec } from './nswExamBackend.js';
 import { pendingSummary } from './examPages.js';
 import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
@@ -4311,6 +4312,13 @@ const routes = {
   // their answers until it has marked the paper. Nothing here marks an answer.
   'POST /exams': async (body) => {
     const p = await requireProfile();
+    // An NSW HSC-style paper (plan G4): named by its blueprint, composed and
+    // marked by the server. Stored like any other server paper below.
+    if (body?.nsw !== undefined) {
+      if (!nswExamsFor(p)) throw Object.assign(new Error('These papers are not available here.'), { status: 404, code: 'EXAM_KIND_UNAVAILABLE' });
+      const issued = await issueServerExam(p.id, nswExamSpec(body.nsw), `nsw:${body.nsw}`);
+      return storeServerPaper(p, issued, { year: 12, pathway: null, title: issued.title, readingMin: issued.readingMin, nsw: issued.nsw });
+    }
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
@@ -4339,30 +4347,7 @@ const routes = {
     const issued = await issueServerExam(p.id, {
       kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
     }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
-
-    const examId = String(issued.id);
-    const now = Date.now();
-    const qids = [];
-    try {
-      for (const sq of issued.questions) {
-        const row = paperRowOf(p.id, examId, sq, now);
-        await put('questions', row);
-        qids.push(row.id);
-      }
-    } catch (err) {
-      await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
-      throw err;
-    }
-    const exam = {
-      id: examId, pid: p.id, year, pathway: examPw, title, durationMin: issued.durationMin, questionIds: qids,
-      createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
-      paperVersion: issued.paperVersion,
-      server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
-    };
-    startExamClock(exam, localStartOf(issued, now));
-    await put('exams', exam);
-    noteReconciled(exam.id);
-    return { exam: await examFor(p.id, examId) };
+    return storeServerPaper(p, issued, { year, pathway: examPw, title });
   },
   'GET /exams': async () => {
     const p = await requireProfile();
@@ -5744,7 +5729,40 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}) };
+}
+
+/**
+ * Store a paper the server has just issued — a practice paper or an NSW
+ * paper (plan G4) — as this profile's open paper: its public questions, the
+ * server's clock, and for an NSW paper its reading time and what it is.
+ */
+async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null }) {
+  const examId = String(issued.id);
+  const now = Date.now();
+  const qids = [];
+  try {
+    for (const sq of issued.questions) {
+      const row = paperRowOf(p.id, examId, sq, now);
+      await put('questions', row);
+      qids.push(row.id);
+    }
+  } catch (err) {
+    await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
+    throw err;
+  }
+  const exam = {
+    id: examId, pid: p.id, year, pathway, title, durationMin: issued.durationMin, questionIds: qids,
+    createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
+    paperVersion: issued.paperVersion,
+    ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
+    ...(nsw && typeof nsw === 'object' ? { nsw: { label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || '') } } : {}),
+    server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
+  };
+  startExamClock(exam, localStartOf(issued, now));
+  await put('exams', exam);
+  noteReconciled(exam.id);
+  return { exam: await examFor(p.id, examId) };
 }
 
 /** The device's row for one server-issued practice-paper question: the public payload only. */

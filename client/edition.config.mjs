@@ -128,7 +128,7 @@ export const EDITIONS = Object.freeze({
       stepFeedback: NSW_CONTENT,
       notesAndWorkedExamples: pending('NSW notes and worked examples are not yet authored to the current syllabus (plan G2, G3).'),
       adaptivePractice: NSW_ADAPTIVE,
-      timedExams: pending('No HSC-style blueprints built from approved NSW questions yet (plan G4).'),
+      timedExams: pending('HSC-style blueprints exist (plan G4) but none is released: each needs at least three approved question forms on every slot outcome (docs/content/nsw-papers-released.md), and method marks wait on certified rubrics (plan G6).'),
       examDesk: EXAM_DESK,
       resourceLibrary: true,
       resourcePublishing: PUBLISHING,
