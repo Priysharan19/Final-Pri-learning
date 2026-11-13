@@ -22,7 +22,11 @@ import { fileURLToPath } from 'node:url';
 if (!globalThis.document) globalThis.document = { documentElement: { lang: 'en' }, cookie: '' };
 
 const { parseAccountActionFragment } = await import('../src/platform/accountAction.js');
-const en = (await import('../src/i18n/strings.en.js')).default;
+// The English the page shows: catalogue templates with the ambient {brand} and
+// {company} filled by the real lookup (plan E4); other placeholders unchanged.
+const { translateEnglish } = await import('../src/i18n/index.js');
+const en = Object.fromEntries(Object.entries((await import('../src/i18n/strings.en.js')).default)
+  .map(([key, value]) => [key, typeof value === 'string' ? translateEnglish(key) : value]));
 const hi = (await import('../src/i18n/strings.hi.js')).default;
 
 let pass = 0;

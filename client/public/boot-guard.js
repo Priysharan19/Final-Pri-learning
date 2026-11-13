@@ -41,7 +41,9 @@
 // The words are copies of catalogue entries (boot.* and errorScreen.reload in
 // src/i18n/strings.en.js and strings.hi.js): the catalogue lives in the bundle
 // this file exists to outlive, so it cannot be read from here. The boot suite
-// (client/test/boot-resilience-check.mjs) fails if a copy drifts.
+// (client/test/boot-resilience-check.mjs) fails if a copy drifts. {brand} is the
+// edition's name, read from <html data-brand data-brand-hi>, which the build
+// writes from PRI_EDITION (client/brand/edition-brand.mjs, plan E4).
 (function () {
   var win = window, doc = document;
   // This file is itself a request, and the fault it was written for — the
@@ -83,18 +85,25 @@
 
   var COPY = {
     en: {
-      load: ['Pri Learning could not load', 'Part of the app did not download. Check your connection, then reload.'],
-      start: ['Pri Learning did not start', 'The app loaded but did not open. Reloading keeps every profile and everything saved on this device.'],
-      slow: ['Still loading Pri Learning', 'This is taking longer than it should. You can keep waiting, or reload.'],
-      reload: 'Reload Pri Learning'
+      load: ['{brand} could not load', 'Part of the app did not download. Check your connection, then reload.'],
+      start: ['{brand} did not start', 'The app loaded but did not open. Reloading keeps every profile and everything saved on this device.'],
+      slow: ['Still loading {brand}', 'This is taking longer than it should. You can keep waiting, or reload.'],
+      reload: 'Reload {brand}'
     },
     hi: {
-      load: ['Pri Learning लोड नहीं हो सका', 'ऐप का एक हिस्सा डाउनलोड नहीं हुआ। अपना कनेक्शन जाँचें, फिर दोबारा लोड करें।'],
-      start: ['Pri Learning शुरू नहीं हुआ', 'ऐप लोड हो गया, लेकिन खुला नहीं। दोबारा लोड करने पर हर प्रोफ़ाइल और इस डिवाइस पर सहेजा हुआ सब कुछ सुरक्षित रहता है।'],
-      slow: ['Pri Learning अभी लोड हो रहा है', 'इसमें जितना लगना चाहिए उससे ज़्यादा समय लग रहा है। आप इंतज़ार कर सकते हैं, या दोबारा लोड कर सकते हैं।'],
-      reload: 'Pri Learning फिर से लोड करें'
+      load: ['{brand} लोड नहीं हो सका', 'ऐप का एक हिस्सा डाउनलोड नहीं हुआ। अपना कनेक्शन जाँचें, फिर दोबारा लोड करें।'],
+      start: ['{brand} शुरू नहीं हुआ', 'ऐप लोड हो गया, लेकिन खुला नहीं। दोबारा लोड करने पर हर प्रोफ़ाइल और इस डिवाइस पर सहेजा हुआ सब कुछ सुरक्षित रहता है।'],
+      slow: ['{brand} अभी लोड हो रहा है', 'इसमें जितना लगना चाहिए उससे ज़्यादा समय लग रहा है। आप इंतज़ार कर सकते हैं, या दोबारा लोड कर सकते हैं।'],
+      reload: '{brand} फिर से लोड करें'
     }
   };
+
+  // The edition's name in a language: the Hindi spelling where the edition has one.
+  function brandIn(lang) {
+    var r = doc.documentElement;
+    return (lang === 'hi' && r.getAttribute('data-brand-hi')) || r.getAttribute('data-brand') || '';
+  }
+  function words(text, lang) { return text.replace('{brand}', function () { return brandIn(lang); }); }
 
   // The language chosen on the sign-in screen is the only one readable before
   // the app runs (a profile's own language is in its database record).
@@ -128,7 +137,7 @@
   function show(kind) {
     var host = splash();
     if (!host) return;
-    var lang = language(), copy = COPY[lang], words = copy[kind];
+    var lang = language(), copy = COPY[lang], said = copy[kind];
     var box = doc.getElementById('bs-notice');
     if (!box) {
       host.style.gridAutoFlow = 'row';
@@ -156,9 +165,9 @@
     }
     box.setAttribute('lang', lang);
     box.setAttribute('data-boot-failure', kind);
-    box.children[0].textContent = words[0];
-    box.children[1].textContent = words[1];
-    box.children[2].textContent = copy.reload;
+    box.children[0].textContent = words(said[0], lang);
+    box.children[1].textContent = words(said[1], lang);
+    box.children[2].textContent = words(copy.reload, lang);
     boot.notice = kind;
   }
 

@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-edition="%PRI_EDITION%" data-brand="%PRI_BRAND%" data-brand-hi="%PRI_BRAND_HI%">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Pri Learning — maths practice for Indian students: NCERT Classes 7–12 and JEE Main & Advanced. Handwriting read line by line, worked solutions. Answers are checked by Pri’s server with a Pri account.">
+<meta name="description" content="%PRI_DESCRIPTION%">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Pri Learning">
+<meta name="apple-mobile-web-app-title" content="%PRI_BRAND%">
 <meta name="theme-color" content="#f2f0ea">
 <meta name="pri-cloud-origin" content="">
-<title>Pri Learning</title>
+<title>%PRI_BRAND%</title>
 <!-- The last resort, and the only part of the boot that needs no script at all:
      if the splash is still up after twelve seconds and boot-guard.js is not
      there to say something better (it marks <html data-boot-guard> when it
@@ -22,15 +22,17 @@
 #bs-late a{color:var(--ink,CanvasText)}
 html[data-boot-guard] #bs-late{display:none}
 @keyframes bs-late{to{visibility:visible}}
+%PRI_EDITION_TOKENS%
 </style>
 <script src="/theme-boot.js"></script>
 <script src="/boot-guard.js"></script>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="mask-icon" href="/mask-icon.svg" color="%PRI_ACCENT%">
 <link rel="apple-touch-icon" href="/icons/icon-180.png">
 <link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
-<div id="root"><div id="bs" style="position:fixed;inset:0;display:grid;place-items:center;background:var(--page)"><img src="/splash.svg" width="96" height="96" alt=""><div id="bs-late"><p lang="en">Still loading Pri Learning. This is taking longer than it should. You can keep waiting, or reload.</p><p lang="hi">Pri Learning अभी लोड हो रहा है। इसमें जितना लगना चाहिए उससे ज़्यादा समय लग रहा है। आप इंतज़ार कर सकते हैं, या दोबारा लोड कर सकते हैं।</p><p><a href="">Reload Pri Learning · Pri Learning फिर से लोड करें</a></p></div></div></div>
+<div id="root"><div id="bs" style="position:fixed;inset:0;display:grid;place-items:center;background:var(--page)"><img src="/splash.svg" width="96" height="96" alt=""><div id="bs-late"><p lang="en">Still loading %PRI_BRAND%. This is taking longer than it should. You can keep waiting, or reload.</p>%PRI_BOOT_SLOW_HI%<p><a href="">%PRI_BOOT_RELOAD%</a></p></div></div></div>
 <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

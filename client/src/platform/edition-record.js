@@ -11,13 +11,20 @@
 //
 // Read it through client/src/platform/edition.js, never directly.
 // ─────────────────────────────────────────────────────────────────────────────
-import { DEFAULT_EDITION, editionOf } from '../../edition.config.mjs';
+import { COMPANY, COMPANY_LINE, DEFAULT_EDITION, editionOf } from '../../edition.config.mjs';
+import { CUT_PATHS, PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from '../brand/paths.js';
+
+const WORDMARKS = { priyabhata: PRIYABHATA_WORDMARK, prithagoras: PRITHAGORAS_WORDMARK };
 
 /**
  * What the app may know about its own edition: identity and defaults. The
  * capability table stays out (it is planning debt, not runtime behaviour), and
  * so do locale and timezone: the app formats by the profile's course
  * (client/src/lib/locale.js), which edition-config-check holds equal to the table.
+ * `identity` is what the app draws of its brand (plan E4): the Hindi name, the
+ * mark's counter cut and its path, this edition's outlined wordmark only, and
+ * the company line. Accent colours stay out: the build writes them into
+ * index.html (client/brand/edition-brand.mjs).
  */
 export function editionRecord(id) {
   const e = editionOf(id);
@@ -28,7 +35,15 @@ export function editionRecord(id) {
     defaultCourse: e.defaultCourse,
     courses: Object.freeze([...e.courses]),
     languages: Object.freeze([...e.languages]),
-    currency: e.currency
+    currency: e.currency,
+    identity: Object.freeze({
+      brandHi: e.identity.brandHi,
+      cut: e.identity.cut,
+      cutPath: CUT_PATHS[e.identity.cut],
+      wordmark: Object.freeze({ ...WORDMARKS[e.identity.wordmark] }),
+      company: COMPANY,
+      companyLine: COMPANY_LINE
+    })
   });
 }
 

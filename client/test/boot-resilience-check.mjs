@@ -111,11 +111,15 @@ ok(PRECACHE.includes('/boot-guard.js'), 'boot-guard.js is in the service worker 
 // to choose), the catalogue's words, a plain link that reloads, hidden until a
 // CSS delay elapses, and switched off as soon as the guard is running.
 const late = shell.match(/<div id="bs-late">(.*?)<\/div>/s)?.[1] || '';
+// {brand} is the built edition's name (plan E4); this suite builds the default, Priyabhata.
+const BRAND_OF = { en: 'Priyabhata', hi: 'प्रियभट' };
+const branded = (text, lang) => text.replace('{brand}', BRAND_OF[lang]);
 for (const [lang, table] of [['en', en], ['hi', hi]]) {
-  ok(late.includes(`<p lang="${lang}">${table['boot.slowTitle']}${lang === 'hi' ? '।' : '.'} ${table['boot.slowBody']}</p>`),
+  ok(late.includes(`<p lang="${lang}">${branded(table['boot.slowTitle'], lang)}${lang === 'hi' ? '।' : '.'} ${table['boot.slowBody']}</p>`),
     `the shell's script-free fallback says the ${lang} catalogue's still-loading sentence`, late.slice(0, 300));
-  ok(late.includes(table[BOOT_NOTICE_KEYS.reload]), `and its link carries the ${lang} catalogue's reload label`);
+  ok(late.includes(branded(table[BOOT_NOTICE_KEYS.reload], lang)), `and its link carries the ${lang} catalogue's reload label`);
 }
+ok(/<html [^>]*data-brand="Priyabhata" data-brand-hi="प्रियभट"/.test(shell), 'the shell tells boot-guard.js the edition\'s name in both languages');
 ok(/<a href="">/.test(late), 'the fallback\'s reload control is a plain link to the current address — it works with no script');
 // (The build minifies and reorders the shell's inline style, so this reads
 // declarations, not a literal string; case 2c measures the delay itself.)
@@ -194,7 +198,7 @@ try {
     eq({ kind: n.kind, role: n.role, lang: n.lang, tag: n.buttonTag, visible: n.visible },
       { kind: 'load', role: 'alert', lang: 'en', tag: 'BUTTON', visible: true },
       'a chunk that fails to download: a visible alert with a real button replaces the silent splash');
-    eq([n.title, n.body, n.button], [...BOOT_NOTICE_KEYS.load.map(k => en[k]), en[BOOT_NOTICE_KEYS.reload]],
+    eq([n.title, n.body, n.button], [...BOOT_NOTICE_KEYS.load.map(k => branded(en[k], 'en')), branded(en[BOOT_NOTICE_KEYS.reload], 'en')],
       'the notice says the app could not load, in the catalogue\'s English words');
     ok(n.boot.phase === 'load-failed' && n.boot.failed.includes(APP_CHUNK), 'the boot record names the chunk that failed', JSON.stringify(n.boot));
     ok(await page.locator(APP).count() === 0, 'and the app is not pretending to be up behind it');
@@ -260,7 +264,7 @@ try {
     await page.goto(server.origin + '/', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector(NOTICE, { timeout: 10000 });
     const n = await noticeOf(page);
-    eq([n.lang, n.title, n.body, n.button], ['hi', ...BOOT_NOTICE_KEYS.load.map(k => hi[k]), hi[BOOT_NOTICE_KEYS.reload]],
+    eq([n.lang, n.title, n.body, n.button], ['hi', ...BOOT_NOTICE_KEYS.load.map(k => branded(hi[k], 'hi')), branded(hi[BOOT_NOTICE_KEYS.reload], 'hi')],
       'on a device whose sign-in language is Hindi the notice is the catalogue\'s Hindi, marked lang="hi"');
   });
 
@@ -284,7 +288,7 @@ try {
     ok(await page.locator(NOTICE).count() === 0, 'an entry module that throws: nothing is claimed the instant the page finishes loading');
     await page.waitForSelector(NOTICE, { timeout: 15000 });
     const n = await noticeOf(page);
-    eq([n.kind, n.title, n.body, n.button], ['start', ...BOOT_NOTICE_KEYS.start.map(k => en[k]), en[BOOT_NOTICE_KEYS.reload]],
+    eq([n.kind, n.title, n.body, n.button], ['start', ...BOOT_NOTICE_KEYS.start.map(k => branded(en[k], 'en')), branded(en[BOOT_NOTICE_KEYS.reload], 'en')],
       'after the page has loaded and the app still has not rendered, the notice says it did not start');
     ok(n.boot.phase === 'document' && n.boot.errors >= 1 && n.boot.failed.length === 0,
       'the boot record shows the module never got going and that an error was raised, not a failed download', JSON.stringify(n.boot));
