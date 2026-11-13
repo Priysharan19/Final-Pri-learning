@@ -51,6 +51,7 @@ const server = await createServer({
   plugins: [react()], define: { __PRI_FEATURE_TUTOR__: 'false', __PRI_PRODUCTION_BUILD__: 'false' }
 });
 const h = React.createElement;
+const deskKeys0 = cat => Object.keys(cat).filter(k => k.startsWith('desk.') || k.startsWith('shell.'));
 // React's note that a router's layout effect does not run in a server render is true and beside the point here.
 const realError = console.error;
 console.error = (...args) => { if (!String(args[0]).includes('useLayoutEffect does nothing on the server')) realError(...args); };
@@ -301,11 +302,13 @@ try {
     ok(closed.includes('03:04:00') && closed.includes('03:00:00') && closed.includes('+00:04:00') && closed.includes('00:14:00'), `${lang}: the closed paper states time used, the allotment, overtime and the pause, as figures`);
     ok(closed.includes(tr('desk.tallies', { done: 1, flagged: 1, notes: 1 })) && screens['the closed paper'].includes('data-desk-next-flagged'), `${lang}: and the student's own done, flagged and note counts, with a way through the flags`);
     const imported = textOfMarkup(screens['an imported attempt']);
-    ok(imported.includes(tr('desk.importedOn', { date: new Date(Date.parse(FIXTURE.createdAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })) && !imported.includes('03:00:00'), `${lang}: an imported attempt says the timer was not brought across, and shows no sitting time`);
+    ok(imported.includes(tr('desk.importedOn', { site: 'Prithagoras', date: new Date(Date.parse(FIXTURE.createdAt)).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) })) && !imported.includes('03:00:00'), `${lang}: an imported attempt says the timer was not brought across, and shows no sitting time`);
     ok(/data-desk-continue/.test(draw(h(entry.DeskEntryView, { t: tr, attempts: [{ id: 'open-one', state: 'working', tallies: {} }], onStart() {} }))) && /data-desk-start/.test(screens['the way in from a library paper']),
       `${lang}: an open attempt offers Continue; otherwise Practise at the desk`);
   }
   await i18n.setLanguage('en');
+  eq([api.IMPORT_SITE, t('desk.importTitle', { site: api.IMPORT_SITE })], ['Prithagoras', 'Bring in practice from the Prithagoras website'], 'the import names the website it reads from, from the edition config (the catalogue spells no edition name)');
+  ok(deskKeys0(en).every(k => !/Priyabhata|Prithagoras/.test(JSON.stringify(en[k]))), 'no desk or shell string spells an edition\'s name');
   eq([t('desk.unmarked'), t('desk.close'), t('desk.closeBody')], ['Practice · not marked', 'Close paper', 'Nothing is marked or sent for checking. Your notes stay with this attempt.'], 'the spec\'s wording, exactly: the plate, "Close paper" (never Submit), and the confirm text');
   const deskKeys = Object.keys(en).filter(k => k.startsWith('desk.') || k.startsWith('shell.'));
   const wording = deskKeys.flatMap(k => (typeof en[k] === 'string' ? [en[k]] : Object.values(en[k]))).join('\n');

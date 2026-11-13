@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { useT } from '../i18n/index.js';
 import { formatClock } from '../engine/deskClock.js';
-import { deskApi, newKey, unreachable } from './deskApi.js';
+import { IMPORT_SITE, deskApi, newKey, unreachable } from './deskApi.js';
 import './desk.css';
 
 /** Whether a library resource can be sat at the desk: a paper with 1–200 questions. */
@@ -36,7 +36,7 @@ export function DeskEntryView({ t, attempts, error, busy, onStart }) {
         {open
           ? <PageLink to={`/desk/${open.id}`} className="btn btn-primary" data-desk-continue>{t('desk.continue')}</PageLink>
           : <button type="button" className="btn btn-primary" onClick={onStart} disabled={busy} data-desk-start>{t('desk.start')}</button>}
-        <PageLink to="/desk/import" className="btn btn-ghost" data-desk-import-link>{t('desk.importLink')}</PageLink>
+        <PageLink to="/desk/import" className="btn btn-ghost" data-desk-import-link>{t('desk.importLink', { site: IMPORT_SITE })}</PageLink>
       </div>
       {error && <p className="dk-honest" role="alert" data-desk-start-error>{t(error)}</p>}
       {closed.length > 0 && (

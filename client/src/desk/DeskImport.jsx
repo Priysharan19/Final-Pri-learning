@@ -21,7 +21,7 @@ import PageLink from '../components/PageLink.jsx';
 import { useT } from '../i18n/index.js';
 import { MAX_EXPORT_BYTES, exportResourceId, readDeskExport } from '../engine/deskImport.js';
 import { libraryApi } from '../library/libraryApi.js';
-import { deskApi, newKey, unreachable } from './deskApi.js';
+import { IMPORT_SITE, deskApi, newKey, unreachable } from './deskApi.js';
 import { UnmarkedPlate } from './DeskPage.jsx';
 import './desk.css';
 
@@ -115,7 +115,7 @@ export default function DeskImport() {
     <div className="dk-page dk-import" data-desk-import={state.step}>
       <PageLink to="/library" className="btn btn-ghost dk-back">{t('library.back')}</PageLink>
       <UnmarkedPlate t={t} />
-      <h1>{t('desk.importTitle')}</h1>
+      <h1>{t('desk.importTitle', { site: IMPORT_SITE })}</h1>
       <p className="in-note">{t('desk.importLead')}</p>
       {state.step !== 'preview' && (
         <div className="dk-choose">

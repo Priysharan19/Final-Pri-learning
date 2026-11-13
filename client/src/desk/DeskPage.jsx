@@ -37,7 +37,7 @@ import PaperHeader from '../examShell/PaperHeader.jsx';
 import { saveStateKey, useAutosave } from '../examShell/useAutosave.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import { useAnnounce } from '../examShell/useAnnounce.js';
-import { deskApi, isAttemptId, newKey, unreachable } from './deskApi.js';
+import { IMPORT_SITE, deskApi, isAttemptId, newKey, unreachable } from './deskApi.js';
 import { dropCache, dropOtherAccounts, linkedAccount, openDeskCache, readCache, sweepCache, writeCache } from './deskCache.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { changesOf, confirmQuestions, editQuestion, entryOf, fromCache, groupsOf, nextFlagged, overlay, projectEvents, sectionOf, settleSave, timeLedger } from './deskState.js';
@@ -77,7 +77,7 @@ export function ClosedSummary({ t, attempt, clock, questions, groups, estimate, 
       <h2 id="dk-closed-title">{t('desk.closedTitle')}</h2>
       <p>{t('desk.closedLead')}</p>
       {estimate && <p className="in-note" data-desk-estimate>{t('desk.closeQueued')}</p>}
-      {imported && <p className="in-note" data-desk-imported>{exportedOn ? t('desk.importedOn', { date: exportedOn }) : t('desk.imported')}</p>}
+      {imported && <p className="in-note" data-desk-imported>{exportedOn ? t('desk.importedOn', { date: exportedOn, site: IMPORT_SITE }) : t('desk.imported', { site: IMPORT_SITE })}</p>}
       <dl className="dk-ledger">
         <div><dt>{t('desk.tallyLabel')}</dt><dd data-desk-tallies>{t('desk.tallies', { done: tallies.done, flagged: tallies.flagged, notes: tallies.notes })}</dd></div>
         {!imported && <div><dt>{t('desk.ledgerWorking')}</dt><dd>{t('desk.ledgerOf', { used: formatClock(ledger.workingMs), allotted: formatClock(ledger.allottedMs) })}</dd></div>}

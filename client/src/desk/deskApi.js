@@ -13,6 +13,15 @@
 // A clock call carries an intent and the attempt's revision. Never a time.
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloudRequest } from '../platform/cloudTransport.js';
+import { EDITIONS } from '../../edition.config.mjs';
+
+/**
+ * The public practice-desk website an attempt can be brought in from
+ * (engine/deskImport.js), named as its edition is named in
+ * client/edition.config.mjs: the string catalogue never spells an edition's
+ * name. It is the same site whichever edition this build is.
+ */
+export const IMPORT_SITE = EDITIONS.prithagoras.brand;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const RESOURCE_ID = /^[a-z0-9][a-z0-9-]{2,119}$/;
