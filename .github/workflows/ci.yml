@@ -1492,7 +1492,8 @@ jobs:
           node client/test/ios-bundle-features-check.mjs | tee ios-bundle-features.log
           # 20 → 24: each bundle also records the one student interface and its
           # skin from client/interface.config.mjs (V1 decision D7).
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 24/24 checks' ios-bundle-features.log
+          # 24 → 20: PRI_FEATURE_AUSTRALIA retired (E3), two checks per bundle fewer.
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' ios-bundle-features.log
       - name: Generated iOS bundle pages need no inline script under the shell CSP
         run: node client/test/native-shell-csp-check.mjs --require-generated
       # After the build, so the scan reads the bytes that ship: every tracked
