@@ -1,5 +1,6 @@
 import { featureEnabled, INTERFACE_SKIN_UI } from './platform/features.js';
 import Aurora from './instrument/Aurora.jsx';
+import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import PageLink from './components/PageLink.jsx';
@@ -196,12 +197,14 @@ const TITLE_KEYS = {
   '/notes': 'nav.notes', '/library': 'nav.library', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
-// Shown for the moment a route's own chunk is arriving. It is announced rather
-// than silent because on a slow connection that moment is long enough for a
-// student to wonder whether the tap registered.
+// Shown for the moment a route's own chunk is arriving (it is only ever a
+// Suspense fallback, so it is mounted exactly while that chunk is in flight).
+// It is announced rather than silent because on a slow connection that moment
+// is long enough for a student to wonder whether the tap registered; fast
+// arrivals show nothing (Working: 400 ms in, Lit Instrument D6).
 function RouteLoading() {
   const t = useT();
-  return <p className="muted" role="status" aria-live="polite">{t('common.loading')}</p>;
+  return <p className="muted" role="status" aria-live="polite" style={{ textAlign: 'center' }}><Working pending size={24} label={t('common.loading')} /></p>;
 }
 
 // byline: "by Pri Learning" under the wordmark — sign-in and sign-up only, never the header bar.

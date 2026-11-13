@@ -241,6 +241,8 @@ jobs:
           grep -Fq 'INDIA BANKS (D15): PASS — 124/124 checks' suites.log
           # Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render.
           grep -Fq 'NSW BANK QUALITY: PASS — 75 generators, 267 cells issued' suites.log
+          # Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep.
+          grep -Fq 'NSW EXAM BLUEPRINTS (G4): PASS — 546 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
@@ -398,7 +400,12 @@ jobs:
           grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
           # The Aurora skin stays on chrome: scope, no content tokens, glass
           # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
-          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
+          # 32 → 47 (Lit Instrument UI1, re-derived by running): violet retired,
+          # one edition pool, no glow, ink focus, contrast for both editions.
+          grep -Fq 'AURORA SKIN: PASS — 47/47 checks' suites.log
+          # Lit Instrument D6: the working indicator is one component, shown
+          # only while real work is pending (400 ms in, 480 ms held).
+          grep -Fq 'WORKING INDICATOR: PASS — 46/46 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           # 68 → 79 (plan E5): an edition with no payment provider has no store,
@@ -416,7 +423,8 @@ jobs:
           # Plan E2: the app knows its own edition from its build, declares it on
           # every /v1 request, and shows a blocking screen at the other's server.
           # 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen).
-          grep -Fq 'EDITION CLIENT (E2): PASS — 136/136 checks' suites.log
+          # 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form.
+          grep -Fq 'EDITION CLIENT (E2): PASS — 137/137 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -660,6 +668,9 @@ jobs:
           # marks the final answer only with the method-mark switch on, and Priyabhata is unchanged. SQLite here; Postgres below.
           node server/test/nsw-practice-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'NSW PRACTICE (G3): PASS — 164/164 checks' practice-http.log
+          # Plan G4: NSW HSC-style papers over HTTP — release, reading time, final-answer marking, no band. SQLite here; Postgres below.
+          node server/test/nsw-exam-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'NSW EXAMS (G4): PASS — 68/68 checks' practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
@@ -829,8 +840,10 @@ jobs:
           # 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres.
           # 88 → 89 (plan E5): billing provider per edition on Postgres.
           # 89 → 90 (plan H7): edition-ai-budgets-check on Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 90/90 suites' platform-postgres.log
+          # 90 → 91 (plan G4): NSW HSC-style papers on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 91/91 suites' platform-postgres.log
           grep -Fq '✓ nsw-practice-check.mjs' platform-postgres.log
+          grep -Fq '✓ nsw-exam-check.mjs' platform-postgres.log
           grep -Fq '✓ billing-edition-check.mjs' platform-postgres.log
           grep -Fq '✓ edition-ai-budgets-check.mjs' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
@@ -1215,6 +1228,9 @@ jobs:
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
             node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Lit Instrument D6: the working indicator is still under reduced
+            # motion and forced colours, and this build carries its form only.
+            node client/test/working-indicator-check.mjs --browser --dist client/dist 2>&1 | tee -a browser.log
             # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
             # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
             node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
@@ -1243,6 +1259,9 @@ jobs:
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
+            # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
+            # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
+            node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
@@ -1315,6 +1334,7 @@ jobs:
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
           grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
+          grep -Fq 'NSW PAPERS TOUR (G4): PASS — 24/24 checks' browser.log
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
@@ -1354,6 +1374,7 @@ jobs:
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
+          grep -Fq "still under reduced motion and forced colours, each build carries its own edition's form only." browser.log
           grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
           # An adult whose email was never confirmed signs in with a password and is
           # taken to "Confirm your email" (a code to that address), not to a false

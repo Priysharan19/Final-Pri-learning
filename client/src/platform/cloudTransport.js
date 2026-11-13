@@ -538,6 +538,8 @@ export const cloud = Object.freeze({
   // the seed, composes for it, and a create under any other seed is refused.
   examLayout: body => cloudRequest('/v1/exams/layout', { method: 'POST', body }),
   examTargets: () => cloudRequest('/v1/exams/targets'),
+  // The NSW papers this server lists (Prithagoras, plan G4): released or not, and why.
+  nswExams: () => cloudRequest('/v1/exams/nsw'),
   createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
   // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
   saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),
