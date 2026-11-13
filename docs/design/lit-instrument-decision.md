@@ -3,7 +3,7 @@
 
 **Status:** approved by the owner on 13 November 2026 (D1–D5 below, each exactly as recommended; D6 added the same day at the owner's request).
 **Proposal:** https://claude.ai/artifact/B8F6J64sBGuNZQDau33Acz (private design board: audit, eight mockups in both editions and both themes, motion spec, accessibility check, self-critique, PR plan).
-**Implemented by:** UI1 and UI-IND-1 together in PR #UIPR (D1, D2, D3, D6); D4 and D5 follow in later UI PRs.
+**Implemented by:** UI1 and UI-IND-1 together in PR #883 (D1, D2, D3, D6); D4 and D5 follow in later UI PRs.
 **Builds on:** V1 decisions D7–D9 (`client/interface.config.mjs`: Instrument structure, Aurora on chrome only) and the edition brand decision Direction A, "Prime" (`docs/brand/editions-decision.md`, PR #869).
 
 ## The direction in one paragraph
