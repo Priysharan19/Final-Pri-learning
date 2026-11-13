@@ -45,7 +45,17 @@ try {
 }
 console.log('platform_db_open', { engine: platformDb.dialect });
 
-const app = await createServerApp(platformDb);
+// createServerApp also binds the database to this edition (plan H2): a
+// database bound to the other edition stops the process with one line.
+let app;
+try {
+  app = await createServerApp(platformDb);
+} catch (error) {
+  if (!String(error?.code || '').startsWith('EDITION_')) throw error;
+  writeSync(2, `${error.message}\n`);
+  await platformDb.close?.().catch?.(() => {});
+  process.exit(1);
+}
 
 // The legacy /api store is development-only and is not shipped in the
 // production image (see the Dockerfile and production-runtime-image-check),

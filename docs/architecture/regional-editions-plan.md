@@ -81,4 +81,4 @@ examination (ADR-0002 §7). Resource-library items (F1) record their state, and 
 
 E1 first (everything reads it). Then E2–E6 can run as the writer pool allows (E2 and E5 are R4 and touch server
 auth/billing, so they do not run concurrently with each other). Phase 2 starts after E1+E3; F4 after F1. Phase 3's
-G1 can start now (docs only). Phase 4 waits on owner decisions; software for H2 and H5 can be prepared ahead.
+G1 can start now (docs only). Phase 4 waits on owner decisions; software for H2 and H5 can be prepared ahead. **H2 status (14 November 2026):** software ready — database-to-edition binding, two-instance isolation suite, `tools/verify-region-isolation.mjs` and the checklist in `docs/operations/region-isolation-verification.md`; live verification blocked on H1 (no Australian deployment exists).
