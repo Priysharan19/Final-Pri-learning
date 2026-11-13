@@ -27,9 +27,6 @@
 //                             build still records it here as a constant so
 //                             code can branch on it, and it is true wherever
 //                             Vite builds or serves the app.
-//   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
-//                             (V1 is India-only; existing Australian profiles
-//                             keep working either way)
 //
 // client/vite.config.js turns each PRI_FEATURE_* environment variable into a
 // compile-time boolean (`__PRI_FEATURE_PLACEMENT__`). `vite build` without the
@@ -48,11 +45,10 @@
 import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
-  australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null,
   // PRI_FEATURE_EXAM_HANDWRITING=1 — handwriting input in timed exams. OFF by
   // default in a production build: a paper then offers Type only.
   examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null,

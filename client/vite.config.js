@@ -530,7 +530,7 @@ export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
 // The FEATURE_FLAGS a shipping build may turn on at an owner's GO, by building
 // with PRI_FEATURE_<NAME>=1. The generated iPad bundles must then carry exactly
 // what that build asked for: on only when the release environment says =1, off
@@ -579,7 +579,6 @@ export function featureDefines(command, env = process.env) {
   return {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
-    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
