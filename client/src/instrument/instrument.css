@@ -137,8 +137,6 @@ html.ui-instrument :focus-visible { outline: 2px solid var(--in-tx); outline-off
   background: var(--in-base); border-bottom: 1px solid var(--in-edge);
 }
 .in-mark { display: inline-flex; align-items: center; gap: 9px; font: 600 16px var(--in-ui); letter-spacing: -0.02em; color: var(--in-tx); background: none; border: 0; padding: 0; cursor: pointer; }
-.in-mark-glyph { width: 24px; height: 24px; border-radius: 3px; background: var(--in-tx); color: var(--in-base); display: grid; place-items: center; font: 400 15px 'KaTeX_Main', Georgia, serif; }
-.in-mark-glyph em { color: var(--in-c4); font-style: normal; }
 .in-tabs { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 4px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
 .in-tab { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 3px; color: var(--in-tx-3); font: 500 13.5px var(--in-ui); text-decoration: none; white-space: nowrap; }
 .in-tab:hover { color: var(--in-tx-2); }

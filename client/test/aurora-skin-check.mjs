@@ -109,7 +109,7 @@ ok(!all.some(r => /\.in-btn\.is-primary:hover/.test(r.selector)), 'and no hover 
 ok(/^html\.ui-instrument :focus-visible \{ outline: 2px solid var\(--in-tx\); outline-offset: 2px; \}$/m.test(instrument), 'the focus ring is var(--in-tx) (D2)');
 ok(!all.some(r => /:focus/.test(r.selector) || /outline/.test(r.body)), 'the skin draws no focus ring of its own (D2: ink everywhere)');
 const gradients = all.filter(r => /gradient\(/.test(r.body));
-ok(gradients.every(r => /\.a-aurora i|\.in-mark-glyph/.test(r.selector)), `gradients only in the light pools and the P′ tile: ${JSON.stringify(gradients.map(r => r.selector))}`);
+ok(gradients.every(r => /\.a-aurora i$/.test(r.selector)), `the only gradient is the light pool (the P′ tile is E4's BrandMark, drawn flat): ${JSON.stringify(gradients.map(r => r.selector))}`);
 const radii = [...stripComments(css).matchAll(/border-radius:\s*(\d+)px/g)].map(m => Number(m[1]));
 ok(radii.every(n => n <= 6), `radii stay 2–6 px on chrome (${radii.join(',')})`);
 ok(!/✨|sparkle|robot|brain|magic/i.test(stripComments(css)) && !/✨|sparkle/i.test(pools), 'no sparkle or AI motif');
