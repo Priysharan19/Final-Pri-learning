@@ -22,9 +22,7 @@ import { cloud } from '../platform/cloudTransport.js';
 import { LANGUAGES, tLater, useLanguage } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import '../components/SignUpFlow.css';
-
-// The wordmark after the P mark (allowlisted literal, as in App.jsx's Logo).
-const WORDMARK = 'ri Learning';
+import { Wordmark } from '../components/BrandMark.jsx';
 
 export default function AccountDeleteRequest() {
   const { language, setLanguage: chooseLanguage, t } = useLanguage();
@@ -68,9 +66,7 @@ export default function AccountDeleteRequest() {
   return (
     <div className="auth-wrap">
       <main className="auth-col signup-flow guardian-page" lang={language}>
-        <div className="logo logo-lg" aria-label="Pri Learning">
-          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">{WORDMARK}<span className="logo-dot">.</span></span>
-        </div>
+        <Wordmark large byline />
 
         <div className="seg-tabs" role="group" aria-label={t('deleteRequest.languageLabel')} style={{ marginTop: 18 }}>
           {LANGUAGES.map(({ id, label }) => (

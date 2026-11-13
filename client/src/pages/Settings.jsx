@@ -8,6 +8,9 @@ import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { featureEnabled } from '../platform/features.js';
 import { useApp } from '../App.jsx';
+import { useT } from '../i18n/index.js';
+import { BrandMark } from '../components/BrandMark.jsx';
+import { CUT } from '../brand/edition.js';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -44,6 +47,24 @@ function StaffOperations() {
   );
 }
 
+// Which edition this is and whose: "{brand} is an edition of {company}", and
+// what the cut in its mark stands for (docs/brand/editions-decision.md). The
+// mark is drawn alone here, a compact space, never beside the wordmark.
+function AboutEdition() {
+  const t = useT();
+  return (
+    <div className="card" data-about-edition style={{ marginTop: 18 }}>
+      <h2 style={{ marginBottom: 8 }}>{t('about.title')}</h2>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <BrandMark size={32} />
+        <p className="muted" style={{ margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+          {t('about.edition')} {CUT === 'jya' ? t('about.cutJya') : t('about.cutSquare')}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -58,6 +79,7 @@ export default function Settings() {
       <RemindersPanel />
       {classroom && <AssignmentInboxPanel />}
       {classroom && <ClassroomPanel />}
+      <AboutEdition />
       <StaffOperations />
     </>
   );

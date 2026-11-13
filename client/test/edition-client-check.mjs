@@ -41,11 +41,16 @@ const vite = await import('../vite.config.js');
   const india = table.EDITIONS.priyabhata;
   ok(helper.EDITION === table.DEFAULT_EDITION && helper.EDITION === 'priyabhata', 'outside a build the app is the default edition, Priyabhata');
   const e = helper.edition();
-  eq(e, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR' }, 'edition() is the record: identity and defaults');
+  const { identity, ...defaults } = e;
+  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR' }, 'edition() is the record: identity and defaults');
+  // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more.
+  eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark'].sort(), 'record.identity holds exactly the brand the app draws');
+  ok(identity.brandHi === india.identity.brandHi && identity.cut === india.identity.cut && identity.companyLine === table.COMPANY_LINE && identity.company === table.COMPANY, 'record.identity is the table\'s');
+  ok(Object.isFrozen(identity) && Object.isFrozen(identity.wordmark), 'and is frozen');
   ok(Object.isFrozen(e) && Object.isFrozen(e.courses) && Object.isFrozen(e.languages), 'the record is frozen, with its lists');
   ok(helper.edition() === e, 'and is the same object every time');
   ok(!('capabilities' in e), 'the capability table (planning debt) is not part of what the app knows about itself');
-  for (const key of Object.keys(e)) eq(e[key], india[key], `record.${key} is the table's`);
+  for (const key of Object.keys(defaults)) eq(e[key], india[key], `record.${key} is the table's`);
   ok(helper.defaultCourse() === 'in', 'a new Priyabhata profile starts on the India course');
   ok(helper.offersCourse('in') && !helper.offersCourse('nsw') && !helper.offersCourse(undefined) && !helper.offersCourse('IN'), 'Priyabhata offers the India course and no other');
   ok(helper.EDITION_HEADER === 'X-Pri-Edition', 'the header the build declares itself in');
