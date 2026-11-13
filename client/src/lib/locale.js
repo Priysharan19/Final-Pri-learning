@@ -53,6 +53,18 @@ export function localeOf(profileOrCourse) {
   return courseOf(profileOrCourse) === 'in' ? INDIA_LOCALE : AUSTRALIA_LOCALE;
 }
 
+/**
+ * The clock a limit's lift time is written in for a profile (plan H7): for a
+ * profile outside the India course (an NSW student of Prithagoras) its own
+ * locale and timezone, so a limit that lifts at a Sydney midnight reads as
+ * midnight. Null for an India profile and for no profile: those messages are
+ * written exactly as they were before editions existed.
+ */
+export function limitClock(profile) {
+  const regional = !!profile && typeof profile === 'object' && typeof profile.course === 'string' && profile.course !== 'in';
+  return regional ? Object.freeze({ locale: localeOf(profile), timeZone: timezoneOf(profile) }) : null;
+}
+
 /** The currency a profile pays in. */
 export function currencyOf(profileOrCourse) {
   return courseOf(profileOrCourse) === 'in' ? 'INR' : 'AUD';

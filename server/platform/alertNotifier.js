@@ -12,13 +12,14 @@
 // PRI_ALERT_EMAIL; unset or invalid means disabled — a counted no-op.
 //
 // The email body is built ONLY from: rule id, severity, thresholds, window
-// counts (numbers from the registry), release SHA (hex) and environment name
-// (a sanitized slug). There is no field for an account id, an email of a
+// counts (numbers from the registry), release SHA (hex), environment name
+// (a sanitized slug) and the deployment's edition and region (values from the
+// edition table, plan H7). There is no field for an account id, an email of a
 // user, a path, a request body or a secret.
 //
 // Nothing here runs on a request path, and every failure is caught: a send
 // failure can never affect request handling.
-import { ALERT_RULES, metrics as defaultMetrics } from './metrics.js';
+import { ALERT_RULES, deploymentLabel, metrics as defaultMetrics } from './metrics.js';
 import { postResendEmail } from './authDelivery.js';
 import { releaseShaForLogs } from './releaseIdentity.js';
 
@@ -101,15 +102,27 @@ export function alertWindowCounts(registry, rule) {
 }
 
 /** Subject and text of one alert email, built only from allowlisted values. */
-export function alertEmailMessage({ kind, ruleId, severity, thresholds, counts, releaseSha, environment, at }) {
+// Only an edition from the table is ever named; anything else reads 'unknown'.
+function editionLine(deployment) {
+  const edition = /^[a-z]{1,32}$/.test(String(deployment?.edition || '')) ? deployment.edition : 'unknown';
+  const brand = /^[A-Za-z]{1,32}$/.test(String(deployment?.brand || '')) ? deployment.brand : null;
+  const region = /^[A-Z]{2}$/.test(String(deployment?.region || '')) ? deployment.region : null;
+  return { edition, brand, region };
+}
+
+export function alertEmailMessage({ kind, ruleId, severity, thresholds, counts, releaseSha, environment, at, deployment = null }) {
   const state = kind === 'resolved' ? 'RESOLVED' : 'FIRING';
   const fmt = obj => Object.keys(obj).sort().map(k => `  ${k}: ${obj[k] === null ? 'n/a' : Number(obj[k])}`).join('\n') || '  (none)';
-  const subject = `[Pri ${environment}] ${state} ${ruleId} (${severity})`;
+  const named = deployment ? editionLine(deployment) : null;
+  const where = named ? `${named.brand || named.edition}${named.region ? `, region ${named.region}` : ''}` : null;
+  // The paid-call ceiling is a regional budget (plan H7): its subject says whose.
+  const subject = `[Pri ${environment}] ${state} ${ruleId} (${severity})${ruleId === 'PAID_CEILING_HIGH' && where ? ` · ${where}` : ''}`;
   const text = [
     `Alert: ${ruleId}`,
     `State: ${state}`,
     `Severity: ${severity}`,
     `Environment: ${environment}`,
+    ...(named ? [`Edition: ${named.edition}${where ? ` (${where})` : ''}`] : []),
     `Release: ${releaseSha}`,
     `Evaluated at: ${new Date(at).toISOString()}`,
     'Thresholds:',
@@ -157,6 +170,7 @@ export function createAlertNotifier({
   const sender = send === undefined ? createResendAlertSender({ env }) : send;
   const enabled = !!recipient && typeof sender === 'function';
   const environment = alertEnvironmentName(env);
+  const deployment = deploymentLabel(env);
   // rule id → { firing, episodeAt, notified, lastFiringSentAt, retryAfter }
   const state = new Map(rules.map(rule => [rule.id, { firing: false, episodeAt: 0, notified: false, lastFiringSentAt: -Infinity, retryAfter: 0, resolvePending: false }]));
   let running = false;
@@ -173,7 +187,7 @@ export function createAlertNotifier({
     try { sha = safeSha(releaseSha()); } catch { sha = 'unknown'; }
     const message = alertEmailMessage({
       kind, ruleId: rule.id, severity: ALERT_SEVERITY[rule.id] || 'warning',
-      thresholds: rule.thresholds, counts, releaseSha: sha, environment, at
+      thresholds: rule.thresholds, counts, releaseSha: sha, environment, at, deployment
     });
     try {
       await sender({ to: recipient, ...message, idempotencyKey: `pri-alert/${environment}/${rule.id}/${s.episodeAt}/${kind}` });

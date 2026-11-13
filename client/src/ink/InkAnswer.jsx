@@ -542,9 +542,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
-        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language) })
+        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
         : shownStatus?.kind === 'waiting'
-          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language) })
+          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
           : checkingEarlier
             // An earlier submission of this question is being checked again
             // (after the app was closed mid-check). The page stays writable;
