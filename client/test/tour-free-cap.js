@@ -55,8 +55,17 @@ const resultOnCard = page => page.evaluate(() => {
 });
 const nothingMarked = r => r.evaluation === 0 && r.verdict === 0 && r.marks === 0 && r.xp === 0 && r.solution === 0;
 
-/** Open practice on a question with one typed answer box (skipping others). */
-async function openTypedQuestion({ page, base, settle }) {
+/**
+ * Open practice on a question with one typed answer box (skipping others) that
+ * `accept` also takes — by default any. The first question right after sign-in
+ * may be one the server already issued (the card opens on a practice question,
+ * #477, from a generator drawn at random for the class); when that generator
+ * is in TOPIC's chapter, Practice rightly resumes it instead of spending another
+ * of the day's twenty (POST /practice/next, client/src/local/backend.js). A
+ * flow that needs a particular kind of question says so through `accept`
+ * rather than assuming a fresh one.
+ */
+async function openTypedQuestion({ page, base, settle, accept = async () => true }) {
   await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const typeTab = page.getByRole('button', { name: 'Answer by typing' });
@@ -64,7 +73,7 @@ async function openTypedQuestion({ page, base, settle }) {
   for (let skips = 0; skips <= MAX_SKIPS; skips++) {
     if (await typeTab.count()) await typeTab.click();
     await settle();
-    if (await answerBox.count() === 1) return true;
+    if (await answerBox.count() === 1 && await accept()) return true;
     const leaving = await shownId(page);
     await page.locator('.ctx-next').click();
     await page.waitForFunction(id => {
@@ -128,7 +137,8 @@ export const capScreen = {
     await createProfile({ name: 'Capped Student', year: 7 });
     const account = await online.signIn({ name: 'Capped Student' });
     // The card opens on the first practice question (#477), so the account may
-    // already have been issued one before this flow asks for its own.
+    // already have been issued one before this flow asks for its own — and
+    // Practice resumes it when it is in this chapter, issuing nothing new.
     const countBefore = serverCount(platform, account.id);
     const issuesBefore = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).length;
 
@@ -137,10 +147,12 @@ export const capScreen = {
     const opened = await openTypedQuestion({ page, base, settle });
     if (!await check('signed in, Practice serves a server-issued question with a box to type in', opened)) return;
     const issues = (await online.practiceCalls(/^\/v1\/practice\/issue$/)).slice(issuesBefore);
-    const generator = issues.find(c => c.status === 201)?.body?.generator;
     const usedHere = issues.filter(c => c.status === 201).length;
-    if (!await check('the browser\'s questions were issued by the server under this account', !!generator && usedHere >= 1 && serverCount(platform, account.id) === countBefore + usedHere,
-      `generator ${generator}; ${usedHere} issued here; server count ${serverCount(platform, account.id)} (was ${countBefore})`)) return;
+    const sealed = await online.issuedShown();
+    const generator = sealed?.generator;
+    if (!await check('the browser\'s question was issued by the server under this account, and the server counted every issue',
+      sealed?.accountId === String(account.id) && !!generator && serverCount(platform, account.id) === countBefore + usedHere,
+      `sealed ${JSON.stringify(sealed)} (account ${account.id}); ${usedHere} issued here; server count ${serverCount(platform, account.id)} (was ${countBefore})`)) return;
 
     // The student's iPad, earlier today: the rest of the twenty.
     const remaining = FREE_PER_DAY - serverCount(platform, account.id);
@@ -207,7 +219,10 @@ export const capAtCheck = {
     await page.route(issueRoute, route => issueDown
       ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'synthetic: issue briefly unavailable' } }) })
       : route.continue());
-    const opened = await openTypedQuestion({ page, base, settle });
+    // A question the server already issued (the first one, resumed) is not
+    // what this journey is about: it is skipped, and with the issue route down
+    // the next one is prepared.
+    const opened = await openTypedQuestion({ page, base, settle, accept: async () => (await online.shownRow())?.checkState === 'prepared' });
     if (!await check('with the issue route briefly down, Practice serves a prepared question to read and a box to type in', opened)) return;
     const qid = await shownId(page);
     const answerBox = page.locator('.editor-body input.answer-input');

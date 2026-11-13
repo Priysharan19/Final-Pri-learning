@@ -1127,6 +1127,9 @@ jobs:
             node client/test/signin-card-step-check.mjs 2>&1 | tee -a browser.log
             node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
+            # A request cancelled by leaving the page is not "no connection":
+            # no unmarkable offline draft is stored (WebKit runs on first).
+            node client/test/page-leaving-draft-check.mjs 2>&1 | tee -a browser.log
             node client/test/tour-explain-v2.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-hindi.js --no-build 2>&1 | tee -a browser.log
               ;;

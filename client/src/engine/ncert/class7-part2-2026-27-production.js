@@ -255,9 +255,17 @@ const findingUnknown = (rng, diff) => {
     const x = ri(rng, -6, 12), a = ri(rng, 3, 8), c = ri(rng, 1, a - 1), b = ri(rng, -8, 8), d = (a - c) * x + b;
     // "x" not "1x", and no "+0" constant.
     const side = (k, m) => `${k === 1 ? '' : k}x${m === 0 ? '' : m > 0 ? `+${m}` : m}`;
+    // When the x terms collect to a single x there is nothing to divide by:
+    // the worked solution shows the collecting move itself, then its result,
+    // rather than a "Divide" step that repeats x = … unchanged. Two steps
+    // either way, so the marks the steps define (markerOps.marksPossibleFor)
+    // are the same. (a ≥ 3, so c = a − 1 is never 1 here.)
+    const steps = a - c === 1
+      ? [{ h: 'Collect x terms', d: `$${a}x-${c}x=${d}${b === 0 ? '' : b > 0 ? `-${b}` : `+${-b}`}$` }, { h: 'Simplify', d: `$x=${x}$` }]
+      : [{ h: 'Collect x terms', d: `$${a - c}x=${d - b}$` }, { h: 'Divide', d: `$x=${x}$` }];
     return numeric(`Solve $${side(a, b)}=${side(c, d)}$.`, x, 2,
       ['Collect the unknown terms on one side and constants on the other.'],
-      [{ h: 'Collect x terms', d: `$${a - c === 1 ? '' : a - c}x=${d - b}$` }, { h: 'Divide', d: `$x=${x}$` }]);
+      steps);
   }
   const n = ri(rng, 5, 45), target = 2 * n + 1;
   return numeric(`A matchstick pattern uses $2n+1$ sticks at position $n$. Which position uses exactly $${target}$ sticks?`, n, 3,
