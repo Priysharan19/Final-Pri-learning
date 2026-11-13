@@ -46,7 +46,7 @@ const CLAIMS = [
   // "never leaves India", "does not leave Australia", "never leaves the country"
   new RegExp(`\\b(?:never\\s+(?:leaves?|leaving|left|goes\\s+outside(?:\\s+of)?|goes\\s+beyond)|(?:does\\s+not|doesn't|do\\s+not|don't|will\\s+not|won't|cannot|can't)\\s+leave)\\s+(?:${PLACE}|the\\s+country\\b)`, 'i'),
   // "is processed in India", "processed in Australian data centres", "read on servers in Sydney"
-  new RegExp(`\\b(?:processed|processing|analy[sz]ed|read|transcribed|handled|marked)\\s+${ADVERB}${WHERE}${PLACE}`, 'i'),
+  new RegExp(`\\b(?:processed|processing|analy[sz]ed|read|transcribed|handled)\\s+${ADVERB}${WHERE}${PLACE}`, 'i'),
   // "AI hosted in Australia", "the model is located in India"
   new RegExp(`\\b(?:AI|models?|reader|reading|servers?)\\s+(?:is\\s+|are\\s+)?(?:hosted|located|running|run|based)\\s+${WHERE}${PLACE}`, 'i'),
   // "in-country processing", "stays in-country", "onshore AI"
@@ -61,17 +61,24 @@ const CLAIMS = [
 // An honest negation names the claim in order to deny it. Only these phrases
 // count, and only before the claim in the same sentence: a bare "not" ("Not
 // only is it fast, …", "whether or not …") does not excuse a claim.
-const NEGATED = /\b(?:do\s+not\s+read\s+it\s+as|never\s+read\s+it\s+as|does\s+not\s+mean|doesn't\s+mean|nothing\s+here\s+says|we\s+do\s+not\s+(?:say|claim)|we\s+don't\s+(?:say|claim)|cannot\s+promise|can't\s+promise|no\s+promise)\b[^.!?\n]*$/i;
+// Each phrase must lead straight into the claim it denies: "… read it as
+// saying (that) …", "does not mean (that) your …", "we do not claim that …".
+const NEGATED = /\b(?:(?:do\s+not|never)\s+read\s+it\s+as(?:\s+saying)?(?:\s+that)?|(?:does\s+not|doesn't)\s+mean\s+(?:that\s+)?(?:your|the|our|any)|nothing\s+here\s+says(?:\s+that)?|we\s+(?:do\s+not|don't)\s+(?:say|claim)\s+that|(?:cannot|can't)\s+promise\s+that)\s+[^.!?;\n]*$/i;
 // The same in Hindi: "इस रूप में न पढ़ें कि …" (do not read it as), "इसका अर्थ यह नहीं कि …".
 const NEGATED_HI = /(?:न\s+पढ़ें|मत\s+पढ़ें|मत\s+समझें|अर्थ\s+यह\s+नहीं)[^।!?\n]*$/;
 
 // A hard-wrapped line is one sentence: single line breaks become spaces, and
 // only a blank line (a paragraph) or sentence punctuation ends a sentence.
-const unwrap = text => String(text).replace(/\r\n?/g, '\n').replace(/([^\n])\n(?!\n)\s*/g, '$1 ');
+// Only prose is hard-wrapped: in a catalogue or page each line is its own
+// string, and joining them would let one entry excuse the next.
+const unwrap = (text, prose) => {
+  const lf = String(text).replace(/\r\n?/g, '\n');
+  return prose ? lf.replace(/([^\n])\n(?!\n)\s*/g, '$1 ') : lf;
+};
 
 /** Every residency claim in `text`, as the sentence it sits in. */
-export function residencyClaims(raw) {
-  const text = unwrap(raw);
+export function residencyClaims(raw, { prose = true } = {}) {
+  const text = unwrap(raw, prose);
   const found = [];
   for (const pattern of CLAIMS) {
     const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
@@ -109,8 +116,13 @@ const PLANTED = [
   'Your handwriting stays in-country.',
   'Read by AI hosted in Australia.',
   'Data residency: Australia.',
-  'Your work\nstays in\nIndia, always.'
+  'Your work\nstays in\nIndia, always.',
+  'We cannot promise much, but your work stays in India.',
+  'This does not mean much to us; your handwriting stays in India.'
 ];
+for (const text of PLANTED) ok(residencyClaims(text, { prose: false }).length > 0 || /\n/.test(text), `and as catalogue text too ${JSON.stringify(text)}`);
+// In a catalogue one entry's words never excuse the next entry's claim.
+ok(residencyClaims("  t1: 'This does not mean you lose anything',\n  t2: 'Your handwriting stays in India.',", { prose: false }).length > 0, 'one catalogue entry cannot excuse the claim in the next');
 for (const text of PLANTED) ok(residencyClaims(text).length > 0, `the guard fails the planted claim ${JSON.stringify(text)}`);
 const HONEST = [
   'OpenAI reads handwriting, photos and (if you turn it on) your working outside India.',
@@ -123,7 +135,9 @@ const HONEST = [
   'तब तक इसे इस रूप में न पढ़ें कि आपका डेटा भारत में रखा जाता है।',
   'तब तक इसे इस रूप में न\nपढ़ें कि आपका डेटा भारत में रखा जाता है।',
   'Until then, do not read it as saying\nyour data is stored in India.',
-  'Our team is based in Australia and India.'
+  'Our team is based in Australia and India.',
+  'Answers are marked in NSW style.',
+  'This does not mean that your work is processed in India.'
 ];
 for (const text of HONEST) ok(residencyClaims(text).length === 0, `the guard passes the honest sentence ${JSON.stringify(text)} (${residencyClaims(text).join(' | ')})`);
 
@@ -143,7 +157,7 @@ ok(tracked.some(p => p.startsWith('marketing/')) && tracked.some(p => p.startsWi
 ok(tracked.includes('docs/legal/privacy.md') && tracked.includes('docs/legal/privacy.hi.md') && tracked.some(p => p.startsWith('docs/release/store/')), 'the legal notices the app shows and the store copy are read');
 let claims = 0;
 for (const path of tracked) {
-  const found = residencyClaims(readFileSync(join(ROOT, path), 'utf8'));
+  const found = residencyClaims(readFileSync(join(ROOT, path), 'utf8'), { prose: /\.md$/i.test(path) });
   claims += found.length;
   ok(found.length === 0, `${path} makes no residency claim (${found.join(' | ')})`);
 }
