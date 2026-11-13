@@ -43,8 +43,11 @@ const vite = await import('../vite.config.js');
   const e = helper.edition();
   const { identity, ...defaults } = e;
   eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR' }, 'edition() is the record: identity and defaults');
-  // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more.
-  eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark'].sort(), 'record.identity holds exactly the brand the app draws');
+  // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more;
+  // Lit Instrument D6 adds the working indicator's form for that same cut.
+  eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark', 'working'].sort(), 'record.identity holds exactly the brand the app draws');
+  const { WORKING_FORMS } = await import('../src/instrument/workingForms.js');
+  eq(identity.working, WORKING_FORMS[identity.cut], 'record.identity.working is the working indicator form of this edition\'s own cut');
   ok(identity.brandHi === india.identity.brandHi && identity.cut === india.identity.cut && identity.companyLine === table.COMPANY_LINE && identity.company === table.COMPANY, 'record.identity is the table\'s');
   ok(Object.isFrozen(identity) && Object.isFrozen(identity.wordmark), 'and is frozen');
   ok(Object.isFrozen(e) && Object.isFrozen(e.courses) && Object.isFrozen(e.languages), 'the record is frozen, with its lists');

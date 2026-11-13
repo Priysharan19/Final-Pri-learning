@@ -5,6 +5,7 @@ import { useT } from '../i18n/index.js';
 import { colourFor, scopeFor } from './chapters.js';
 import { dayKey, localeOf, timezoneOf } from '../lib/locale.js';
 import TermGloss from '../components/TermGloss.jsx';
+import Working from './Working.jsx';
 import BarSlot from './BarSlot.jsx';
 // report.css is part of the boot stylesheet (main.jsx; #658).
 import PageLink from '../components/PageLink.jsx';
@@ -172,7 +173,7 @@ export default function ReportHead() {
     return { cells, heatDays, max, lost, lostReady: marks != null, colourOf };
   }, [stats, marks, curriculum, user]);
 
-  if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true" />;
+  if (!view) return <div className="skeleton" style={{ height: 220, marginBottom: 24 }} aria-hidden="true"><Working pending={!view} size={24} /></div>;
 
   // Only the series for the period on screen is ever shown.
   const shown = report?.period === period ? report : null;

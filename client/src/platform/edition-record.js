@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { COMPANY, COMPANY_LINE, DEFAULT_EDITION, editionOf } from '../../edition.config.mjs';
 import { CUT_PATHS, PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from '../brand/paths.js';
+import { WORKING_FORMS } from '../instrument/workingForms.js';
 
 const WORDMARKS = { priyabhata: PRIYABHATA_WORDMARK, prithagoras: PRITHAGORAS_WORDMARK };
 
@@ -22,8 +23,9 @@ const WORDMARKS = { priyabhata: PRIYABHATA_WORDMARK, prithagoras: PRITHAGORAS_WO
  * so do locale and timezone: the app formats by the profile's course
  * (client/src/lib/locale.js), which edition-config-check holds equal to the table.
  * `identity` is what the app draws of its brand (plan E4): the Hindi name, the
- * mark's counter cut and its path, this edition's outlined wordmark only, and
- * the company line. Accent colours stay out: the build writes them into
+ * mark's counter cut and its path, the working indicator's form for that cut
+ * (Lit Instrument D6), this edition's outlined wordmark only, and the company
+ * line. Accent colours stay out: the build writes them into
  * index.html (client/brand/edition-brand.mjs).
  */
 export function editionRecord(id) {
@@ -40,6 +42,7 @@ export function editionRecord(id) {
       brandHi: e.identity.brandHi,
       cut: e.identity.cut,
       cutPath: CUT_PATHS[e.identity.cut],
+      working: Object.freeze({ line: WORKING_FORMS[e.identity.cut].line, points: Object.freeze(WORKING_FORMS[e.identity.cut].points.map(p => Object.freeze([...p]))) }),
       wordmark: Object.freeze({ ...WORDMARKS[e.identity.wordmark] }),
       company: COMPANY,
       companyLine: COMPANY_LINE
