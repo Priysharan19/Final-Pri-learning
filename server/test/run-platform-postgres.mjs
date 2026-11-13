@@ -166,6 +166,9 @@ export const ENGINE_SUITES = [
   'apple-billing-check.mjs',
   'google-billing-check.mjs',
   'storekit-entitlement-state-machine-check.mjs',
+  // Plan E5: billing provider per edition — the same requests to a Priyabhata
+  // and a Prithagoras router, each on its own database as pri_server.
+  'billing-edition-check.mjs',
   'tutor-help-check.mjs',
   'tutor-device-journey-check.mjs',
   // The tutor grounded in the server's own escrowed question: the escrow read

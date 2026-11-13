@@ -3,6 +3,8 @@ import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
 import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { recordWebhook } from './metrics.js';
+import { serverEdition } from './edition.js';
+import { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, billingNotAvailable, editionBilling, providerAllowed } from './billingProviders.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 // Lifecycle states in which a web (Razorpay) subscription still has a mandate
@@ -16,7 +18,7 @@ const APPLE_MANAGE_URL = 'https://apps.apple.com/account/subscriptions';
  * provider 'web' in a chargeable state and the bound Razorpay subscription has
  * no pending cancellation. Nothing here trusts client state.
  */
-export async function webSubscriptionManageState(db, accountId, { adapterAvailable = false } = {}) {
+export async function webSubscriptionManageState(db, accountId, { adapterAvailable = false, provider = 'razorpay' } = {}) {
   db = asStore(db);
   const snapshot = await db.get('SELECT plan,status,provider,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const binding = await db.get(`SELECT provider_subscription_id,cancel_requested_at,cancel_mode FROM billing_subscriptions
@@ -25,7 +27,8 @@ export async function webSubscriptionManageState(db, accountId, { adapterAvailab
   const periodEnd = live ? (snapshot.status === 'grace' ? snapshot.grace_until : snapshot.current_period_end) || null : null;
   const cancelling = live && !!binding?.cancel_requested_at;
   return {
-    provider: 'razorpay',
+    // null on an edition that does not sell through a web provider (plan E5).
+    provider,
     cancellable: adapterAvailable && live && !!binding && !binding.cancel_requested_at,
     cancelling,
     status: live ? snapshot.status : 'none',
@@ -41,10 +44,29 @@ function positiveInt(name, fallback) {
   return Number.isSafeInteger(value) && value > 0 ? value : fallback;
 }
 
-export function commercialConfig() {
+/**
+ * What this deployment sells, for the edition it serves (plan E5). An edition
+ * with a payment provider answers exactly as before. An edition with none
+ * (Prithagoras until owner decision O2) answers `available: false` in its own
+ * currency with every price, product id and checkout absent, whatever the
+ * deployment variables say: nothing there can be shown or bought.
+ */
+export function commercialConfig(edition = serverEdition()) {
+  const billing = editionBilling(edition);
+  if (!billing.available) {
+    return Object.freeze({
+      available: false,
+      display: Object.freeze({ currency: billing.currency, monthly: null, annual: null, trialDays: null, advisoryOnly: true }),
+      products: Object.freeze({ appleMonthly: null, appleAnnual: null, googleMonthly: null, googleAnnual: null, webMonthly: null, webAnnual: null }),
+      webCheckout: Object.freeze({ provider: null, configured: false }),
+      platformRule: 'Premium is not on sale in this edition yet. The server consumes verified provider events and never trusts client premium flags.'
+    });
+  }
+  const sells = provider => billing.providers.includes(provider);
+  const product = (provider, ...names) => (sells(provider) ? names.map(name => process.env[name]).find(Boolean) || null : null);
   return Object.freeze({
     display: Object.freeze({
-      currency: String(process.env.PRI_DISPLAY_CURRENCY || 'INR').trim().toUpperCase().slice(0, 8) || 'INR',
+      currency: String(process.env.PRI_DISPLAY_CURRENCY || billing.currency).trim().toUpperCase().slice(0, 8) || billing.currency,
       monthly: positiveInt('PRI_DISPLAY_MONTHLY_PRICE', null),
       annual: positiveInt('PRI_DISPLAY_ANNUAL_PRICE', null),
       trialDays: positiveInt('PRI_DISPLAY_TRIAL_DAYS', null),
@@ -53,16 +75,16 @@ export function commercialConfig() {
     // Storefront identifiers are deployment configuration because Apple/Google/
     // web products can differ by legal entity, region and launch configuration.
     products: Object.freeze({
-      appleMonthly: process.env.PRI_APPLE_MONTHLY_PRODUCT_ID || null,
-      appleAnnual: process.env.PRI_APPLE_ANNUAL_PRODUCT_ID || null,
-      googleMonthly: process.env.PRI_GOOGLE_MONTHLY_PRODUCT_ID || null,
-      googleAnnual: process.env.PRI_GOOGLE_ANNUAL_PRODUCT_ID || null,
-      webMonthly: process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || null,
-      webAnnual: process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID || null
+      appleMonthly: product('apple', 'PRI_APPLE_MONTHLY_PRODUCT_ID'),
+      appleAnnual: product('apple', 'PRI_APPLE_ANNUAL_PRODUCT_ID'),
+      googleMonthly: product('google', 'PRI_GOOGLE_MONTHLY_PRODUCT_ID'),
+      googleAnnual: product('google', 'PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
+      webMonthly: product('razorpay', 'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID'),
+      webAnnual: product('razorpay', 'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID')
     }),
     webCheckout: Object.freeze({
-      provider: 'razorpay',
-      configured: !!(
+      provider: sells('razorpay') ? 'razorpay' : null,
+      configured: sells('razorpay') && !!(
         process.env.PRI_RAZORPAY_KEY_ID && process.env.PRI_RAZORPAY_KEY_SECRET && process.env.PRI_RAZORPAY_WEBHOOK_SECRET &&
         (process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID)
       )
@@ -83,15 +105,34 @@ function validateVerifiedResult(result, provider) {
   return result;
 }
 
-export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {}, lifecycle = {} } = {}) {
+export function createBillingRouter(db, { verifiers = {}, checkout = {}, native = {}, lifecycle = {}, edition = serverEdition() } = {}) {
   db = asStore(db);
   const router = asyncRouter();
+
+  // THE EDITION GATE (plan E5). A route family whose provider this server's
+  // edition does not sell through answers 404 before anything else on the
+  // route runs: this router's own session check, rate limit and adapter are
+  // never reached, so nothing can be bought, restored or cancelled there.
+  // (What is mounted in front of this router still runs first: a child
+  // account awaiting its guardian is refused there with the consent code.)
+  // Resolved once, when the router is built; on an edition that lists the
+  // provider it is a pass-through and the route is what it always was.
+  const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family)])));
+  const soldHere = family => (req, res, next) => (sold[family] ? next() : billingNotAvailable(res));
+  // /restore/:provider and /webhook/:provider name the family in the path. An
+  // unknown name falls through to the route's own BILLING_PROVIDER_UNSUPPORTED.
+  const pathFamilySoldHere = (req, res, next) => {
+    const family = safeProvider(String(req.params.provider || ''));
+    if (!family || sold[family]) return next();
+    if (req.route?.path === '/webhook/:provider') recordWebhook(family, 'rejected', BILLING_NOT_AVAILABLE);
+    return billingNotAvailable(res);
+  };
 
   // A native shell is told web checkout does not exist: on the iPad the App
   // Store is the only purchase path V1 permits (PRI_V1_RELEASE_SCOPE §12).
   router.get('/config', (req, res) => {
-    const config = commercialConfig();
-    if (!declaredNativeClient(req)) return res.json(config);
+    const config = commercialConfig(edition);
+    if (!config.webCheckout.provider || !declaredNativeClient(req)) return res.json(config);
     res.json({ ...config, webCheckout: { ...config.webCheckout, configured: false, refusedForNativeClient: true } });
   });
 
@@ -99,16 +140,17 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // are managed only through the App Store; web subscriptions cancel here.
   router.get('/manage', requireSession(db), async (req, res) => {
     const web = await webSubscriptionManageState(db, req.platformSession.account_id, {
-      adapterAvailable: typeof lifecycle.web?.cancel === 'function'
+      adapterAvailable: sold.web && typeof lifecycle.web?.cancel === 'function',
+      provider: sold.web ? 'razorpay' : null
     });
     res.set('Cache-Control', 'no-store');
-    res.json({ web, apple: { manageUrl: APPLE_MANAGE_URL } });
+    res.json(sold.apple ? { web, apple: { manageUrl: APPLE_MANAGE_URL } } : { web });
   });
 
   // Cancel at the end of the current billing cycle. The entitlement snapshot is
   // untouched here: Premium stays active until currentPeriodEnd and the verified
   // subscription.cancelled/completed webhook is what expires it.
-  router.post('/web/cancel', requireSession(db), rateLimit(db, 'billing-cancel-web', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/web/cancel', soldHere('web'), requireSession(db), rateLimit(db, 'billing-cancel-web', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const cancel = lifecycle.web?.cancel;
     if (typeof cancel !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription management is not configured on this deployment.' } });
     try {
@@ -134,7 +176,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // random UUID rather than a Pri account id/email. StoreKit echoes it inside
   // the Apple-signed transaction so the server can bind purchases to accounts
   // without trusting anything the web view says after checkout.
-  router.get('/apple/bootstrap', requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.get('/apple/bootstrap', soldHere('apple'), requireSession(db), rateLimit(db, 'billing-apple-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const bootstrap = native.apple?.bootstrap;
     if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store billing is not configured on this deployment.' } });
     try {
@@ -146,7 +188,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // entitlement authority. The native shell sends the JWS representation here;
   // only after the server re-verifies Apple's certificate chain, app identity,
   // product id and appAccountToken does Premium change.
-  router.post('/apple/transaction', requireSession(db), rateLimit(db, 'billing-apple-transaction', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/apple/transaction', soldHere('apple'), requireSession(db), rateLimit(db, 'billing-apple-transaction', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const verify = native.apple?.transaction;
     if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store transaction verification is not configured on this deployment.' } });
     try {
@@ -166,7 +208,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // Google Play: the server issues an opaque obfuscatedAccountId per account;
   // the Android shell passes it to Play Billing, and Google echoes it back in
   // the purchase the server re-fetches. Nothing the device says is trusted.
-  router.get('/google/bootstrap', requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.get('/google/bootstrap', soldHere('google'), requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const bootstrap = native.google?.bootstrap;
     if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play billing is not configured on this deployment.' } });
     try {
@@ -178,7 +220,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // the Play Developer API (never inside a transaction), checks package,
   // product, obfuscatedAccountId and one-account token binding, applies Google's
   // answer, then acknowledges it. A pending purchase changes nothing.
-  router.post('/google/purchase', requireSession(db), rateLimit(db, 'billing-google-purchase', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/google/purchase', soldHere('google'), requireSession(db), rateLimit(db, 'billing-google-purchase', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const verify = native.google?.purchase;
     if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play purchase verification is not configured on this deployment.' } });
     try {
@@ -200,7 +242,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // enter the browser. The returned URL is a provider-hosted authorization page;
   // Premium still unlocks only after a verified webhook/restore updates the
   // server entitlement snapshot.
-  router.post('/checkout/web', requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/checkout/web', soldHere('web'), requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     // Web (Razorpay) checkout is never reachable from a native app. The
     // client hides it there too; this is the server half of the same rule, so
     // an old or modified bundle cannot open a web purchase inside the iPad app.
@@ -218,7 +260,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     } catch (err) { next(err); }
   });
 
-  router.post('/restore/:provider', requireSession(db), rateLimit(db, 'billing-restore', { limit: 12, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+  router.post('/restore/:provider', pathFamilySoldHere, requireSession(db), rateLimit(db, 'billing-restore', { limit: 12, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
     const provider = safeProvider(String(req.params.provider || ''));
     if (!provider) return res.status(404).json({ error: { code: 'BILLING_PROVIDER_UNSUPPORTED', message: 'Billing provider is not supported.' } });
     const verifier = verifiers[provider]?.restore;
@@ -239,8 +281,9 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
 
   // Webhook authentication is wholly delegated to provider-specific verifiers.
   // The default deployment deliberately returns 503: an unverified webhook can
-  // never activate Premium.
-  router.post('/webhook/:provider', rateLimit(db, 'billing-webhook', { limit: 600, windowMs: 60 * 1000 }), async (req, res, next) => {
+  // never activate Premium. A provider this edition does not sell through is
+  // refused first, signed or not, and counted as rejected (plan E5).
+  router.post('/webhook/:provider', pathFamilySoldHere, rateLimit(db, 'billing-webhook', { limit: 600, windowMs: 60 * 1000 }), async (req, res, next) => {
     const provider = safeProvider(String(req.params.provider || ''));
     if (!provider) {
       recordWebhook('unsupported', 'rejected', 'BILLING_PROVIDER_UNSUPPORTED');
