@@ -10,11 +10,16 @@
 // courtesy to the student (local/entitlementGate.js), not the limit. Premium's
 // `unlimited-practice` lifts it; nothing the device sends is read here.
 //
-// THE DAY is the Indian calendar day — Asia/Kolkata, UTC+05:30, no daylight
-// saving — because the practice route serves only the India curriculum and the
-// device's own gate uses the same calendar for every India profile by default.
-// A fixed offset, not Intl: deterministic on every runtime, and the instant a
-// cap lifts is exactly local midnight, which is what the student is told.
+// THE DAY is the calendar day of the deployment's edition (plan H7, ADR-0002):
+// Priyabhata counts the Indian day — Asia/Kolkata, UTC+05:30, no daylight
+// saving — and Prithagoras the Sydney day, daylight saving included. Each
+// matches the device's own gate for that edition's profiles by default
+// (local/entitlementGate.js profileTimeZone). Priyabhata's day is computed as
+// it always was, from a fixed offset, not Intl: deterministic on every runtime,
+// and the instant a cap lifts is exactly local midnight, which is what the
+// student is told. A zone with daylight saving has no fixed offset, so its day
+// is found with Intl, bounded by its two real local midnights (a 23- or
+// 25-hour day when the clocks change).
 //
 // THE COUNT is one row per account and day in idempotency_keys (scope
 // 'practice-daily', key the day), written in the SAME transaction as the
@@ -26,10 +31,12 @@
 // free plan's copy is "20 practice questions a day, and everything else
 // unlimited" (CAPPED_PRACTICE_MODES).
 // ─────────────────────────────────────────────────────────────────────────────
-import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE, premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
+import { CAPPED_PRACTICE_MODES, FREE_PRACTICE_ALLOWANCE, practiceDayTimeZone, premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
+import { serverEdition } from './edition.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { asStore } from './store.js';
 
+/** Priyabhata's practice day (the default edition); practiceDayTimeZone(edition) for any other. */
 export const PRACTICE_DAY_TIME_ZONE = FREE_PRACTICE_ALLOWANCE.timeZone;
 export const PRACTICE_DAILY_SCOPE = 'practice-daily';
 const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
@@ -41,8 +48,18 @@ const COUNTER_TTL_MS = DAY_MS;
 
 const pad = n => String(n).padStart(2, '0');
 
-/** The Indian calendar day `now` falls in: its key and its exact bounds. */
-export function practiceDay(now = Date.now()) {
+/**
+ * The edition's calendar day `now` falls in: its key and its exact bounds.
+ * `edition` is the deployment's (serverEdition()); nothing a request carries
+ * chooses it.
+ */
+export function practiceDay(now = Date.now(), edition = serverEdition()) {
+  const timeZone = practiceDayTimeZone(edition);
+  return timeZone === PRACTICE_DAY_TIME_ZONE ? indianDay(now) : zonedDay(now, timeZone);
+}
+
+// Priyabhata's day, exactly as it was computed before editions existed.
+function indianDay(now) {
   const start = Math.floor((now + IST_OFFSET_MS) / DAY_MS) * DAY_MS - IST_OFFSET_MS;
   const local = new Date(start + IST_OFFSET_MS);
   return {
@@ -51,6 +68,47 @@ export function practiceDay(now = Date.now()) {
     end: start + DAY_MS,
     timeZone: PRACTICE_DAY_TIME_ZONE
   };
+}
+
+const wallClocks = new Map();
+function wallClock(timeZone) {
+  let format = wallClocks.get(timeZone);
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric'
+    });
+    wallClocks.set(timeZone, format);
+  }
+  return format;
+}
+
+// The wall clock in `timeZone` at instant `ms`, to the second.
+function wallAt(ms, timeZone) {
+  const parts = Object.fromEntries(wallClock(timeZone).formatToParts(new Date(ms)).filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+  return { y: parts.year, m: parts.month, d: parts.day, h: parts.hour % 24, mi: parts.minute, s: parts.second };
+}
+
+// How far `timeZone`'s wall clock is ahead of UTC at instant `ms`.
+function offsetAt(ms, timeZone) {
+  const w = wallAt(ms, timeZone);
+  return Date.UTC(w.y, w.m - 1, w.d, w.h, w.mi, w.s) - (ms - (((ms % 1000) + 1000) % 1000));
+}
+
+// The instant the local date y-m-d begins in `timeZone`. Two passes settle
+// the offset on either side of a daylight-saving change; every zone an
+// edition uses changes its clocks away from midnight, so midnight exists.
+function localMidnight(y, m, d, timeZone) {
+  const wall = Date.UTC(y, m - 1, d);
+  const guess = wall - offsetAt(wall, timeZone);
+  return wall - offsetAt(guess, timeZone);
+}
+
+function zonedDay(now, timeZone) {
+  const w = wallAt(now, timeZone);
+  const start = localMidnight(w.y, w.m, w.d, timeZone);
+  const next = new Date(Date.UTC(w.y, w.m - 1, w.d + 1));
+  const end = localMidnight(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), timeZone);
+  return { key: `${w.y}-${pad(w.m)}-${pad(w.d)}`, start, end, timeZone };
 }
 
 function parse(raw) {
@@ -88,9 +146,9 @@ const COUNTER = 'SELECT response_json FROM idempotency_keys WHERE account_id=? A
  * verdict and the count it leads to cannot be split by a concurrent issue
  * from another device.
  */
-export async function practiceAllowanceVerdict(db, { accountId, now = Date.now(), env = process.env }) {
+export async function practiceAllowanceVerdict(db, { accountId, now = Date.now(), env = process.env, edition = serverEdition(env) }) {
   db = asStore(db);
-  const day = practiceDay(now);
+  const day = practiceDay(now, edition);
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const premium = serverEntitlementCapabilities(snapshot, now).includes('unlimited-practice');
   const used = issuedOf(await db.get(COUNTER, [accountId, PRACTICE_DAILY_SCOPE, day.key]));
@@ -106,9 +164,9 @@ export async function practiceAllowanceVerdict(db, { accountId, now = Date.now()
  * returned, so a counted question is one the account was really issued now.
  * Returns the day's count including this one.
  */
-export async function recordPracticeIssue(db, { accountId, now = Date.now() }) {
+export async function recordPracticeIssue(db, { accountId, now = Date.now(), env = process.env, edition = serverEdition(env) }) {
   db = asStore(db);
-  const day = practiceDay(now);
+  const day = practiceDay(now, edition);
   const issued = issuedOf(await db.get(COUNTER, [accountId, PRACTICE_DAILY_SCOPE, day.key])) + 1;
   await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)
     ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json`,
@@ -119,7 +177,9 @@ export async function recordPracticeIssue(db, { accountId, now = Date.now() }) {
 /**
  * The refusal, in the code and fields the device's own gate uses (402
  * FREE_CAP_REACHED, local/entitlementGate.js) so the same paywall copy
- * applies, plus RFC 9110 Retry-After at the day's end. `resetAt` is the
+ * applies, plus RFC 9110 Retry-After at the day's end. The reset instant is
+ * the end of the edition's day, so the device can name it in the student's
+ * own clock; `timeZone` says which calendar the server counted in. `resetAt` is the
  * transport's name for "when a refusal lifts" (cloudTransport.js copies it);
  * the device maps it onto its gate's `resetsAt`.
  */

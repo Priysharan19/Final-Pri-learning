@@ -339,6 +339,9 @@ jobs:
           # No student-facing text says Pri learns a hand (the count follows the
           # string catalogues, so only the verdict is pinned here).
           grep -Fq 'HANDWRITING CLAIMS: PASS — ' suites.log
+          # Plan H7: nothing says work stays in, never leaves or is processed in
+          # India or Australia (the count follows the files read).
+          grep -Fq 'RESIDENCY CLAIMS (H7): PASS — ' suites.log
           # 211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
           grep -Fq 'STUDY PLAN: PASS — 215/215 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
@@ -418,6 +421,9 @@ jobs:
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
           grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 27/27 checks' suites.log
+          # Plan H7: a limit's lift time in an NSW student's own clock; device and
+          # server agree on the day in both editions.
+          grep -Fq 'EDITION LIMIT CLOCK (H7): PASS — 37/37 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
@@ -572,6 +578,11 @@ jobs:
           node server/test/final-attempt-oracle-sweep-check.mjs | tee final-attempt-sweep.log
           grep -Fq 'FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes' final-attempt-sweep.log
           node server/test/spend-ceiling-check.mjs
+          # Plan H7: the practice day is the edition's (Priyabhata equal to main
+          # over a year of instants, Sydney across daylight saving); the ceiling
+          # is required, refuses, refunds and alerts under each edition.
+          node server/test/edition-ai-budgets-check.mjs 2>&1 | tee edition-ai-budgets.log
+          grep -Fq 'EDITION AI BUDGETS (H7): PASS — 100/100 checks' edition-ai-budgets.log
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
@@ -817,9 +828,11 @@ jobs:
           # 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16).
           # 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres.
           # 88 → 89 (plan E5): billing provider per edition on Postgres.
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 89/89 suites' platform-postgres.log
+          # 89 → 90 (plan H7): edition-ai-budgets-check on Postgres.
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 90/90 suites' platform-postgres.log
           grep -Fq '✓ nsw-practice-check.mjs' platform-postgres.log
           grep -Fq '✓ billing-edition-check.mjs' platform-postgres.log
+          grep -Fq '✓ edition-ai-budgets-check.mjs' platform-postgres.log
           grep -Fq '✓ resources-check.mjs' platform-postgres.log
           grep -Fq '✓ desk-check.mjs' platform-postgres.log
           grep -Fq '✓ guardian-code-approval-withdraw-check.mjs' platform-postgres.log
