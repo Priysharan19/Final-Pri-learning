@@ -116,7 +116,8 @@ export function alertEmailMessage({ kind, ruleId, severity, thresholds, counts, 
   const named = deployment ? editionLine(deployment) : null;
   const where = named ? `${named.brand || named.edition}${named.region ? `, region ${named.region}` : ''}` : null;
   // The paid-call ceiling is a regional budget (plan H7): its subject says whose.
-  const subject = `[Pri ${environment}] ${state} ${ruleId} (${severity})${ruleId === 'PAID_CEILING_HIGH' && where ? ` · ${where}` : ''}`;
+  const base = `[Pri ${environment}] ${state} ${ruleId} (${severity})`;
+  const subject = ruleId === 'PAID_CEILING_HIGH' && where ? `${base} · ${where}` : base;
   const text = [
     `Alert: ${ruleId}`,
     `State: ${state}`,

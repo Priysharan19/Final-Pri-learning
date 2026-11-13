@@ -24,10 +24,10 @@ export const FREE_PRACTICE_ALLOWANCE = Object.freeze({ perDay: 20, timeZone: 'As
  * Priyabhata's is FREE_PRACTICE_ALLOWANCE.timeZone above, unchanged.
  *
  * A copy, not an import: the engine folder may not read the edition table
- * (client/test/edition-config-check.mjs §5 allows one reader under
- * client/src), so server/test/edition-ai-budgets-check.mjs holds every entry
- * here equal to client/edition.config.mjs `timezone`, and fails an edition
- * that is missing.
+ * (edition-config-check §5 allows one reader under client/src), so
+ * server/test/edition-ai-budgets-check.mjs holds every entry here equal to
+ * each edition's `timezone` in that table, and fails an edition that is
+ * missing.
  */
 export const PRACTICE_DAY_TIME_ZONES = Object.freeze({
   priyabhata: FREE_PRACTICE_ALLOWANCE.timeZone,
