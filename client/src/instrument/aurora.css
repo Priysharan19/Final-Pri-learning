@@ -56,11 +56,12 @@ html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-p
    is never text on content, a fill, a verdict or a focus ring (focus is ink,
    instrument.css, D2). client/test/brand-usage-check.mjs holds the selectors. */
 html.ui-instrument.skin-aurora .in-tab[aria-current="page"] { position: relative; color: var(--in-tx); background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
-html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -4px; height: 2px; border-radius: 2px; background: var(--au-light); }
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after, html.ui-instrument.skin-aurora .mnav-item.active::before { content: ""; position: absolute; height: 2px; border-radius: 2px; background: var(--au-light); }
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after { left: 10px; right: 10px; bottom: -4px; }
+html.ui-instrument.skin-aurora .mnav-item.active::before { left: calc(50% - 11px); top: 0; width: 22px; }
 html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--in-tx); box-shadow: inset 2px 0 0 var(--au-light); }
 html.ui-instrument.skin-aurora :is(.mnav-item.active, .mnav-item.active .nav-ico) { color: var(--in-tx); }
 html.ui-instrument.skin-aurora .mnav-item.active { position: relative; }
-html.ui-instrument.skin-aurora .mnav-item.active::before { content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px; margin-left: -11px; border-radius: 2px; background: var(--au-light); }
 html.ui-instrument.skin-aurora .in-pal-item[aria-selected="true"] { background: var(--au-light-soft); box-shadow: inset 2px 0 0 var(--au-light); }
 /* The working indicator (D6, instrument/Working.jsx): what is live. */
 html.ui-instrument.skin-aurora .pri-working { color: var(--au-light); }

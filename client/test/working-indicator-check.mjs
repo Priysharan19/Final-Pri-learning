@@ -135,25 +135,25 @@ if (BROWSER) {
   const browser = await chromium.launch();
   try {
     const form = WORKING_FORMS.jya;
-    const markup = `<span class="pri-working"><svg width="40" height="40" viewBox="0 0 24 24"><path class="pri-working-ln" pathLength="1" stroke-width="0.9" d="${form.line}"/>${form.points.map(([x, y, dx, dy]) => `<circle class="pri-working-p" cx="${x}" cy="${y}" r="2" style="--dx:${dx}px;--dy:${dy}px"/>`).join('')}</svg></span>`;
+    const markup = `<span class="pri-working"><svg width="40" height="40" viewBox="0 0 24 24"><path pathLength="1" stroke-width="0.9" d="${form.line}"/>${form.points.map(([x, y, dx, dy]) => `<circle cx="${x}" cy="${y}" r="2" style="--dx:${dx}px;--dy:${dy}px"/>`).join('')}</svg></span>`;
     const probe = async (opts) => {
       const page = await browser.newPage(opts);
       await page.setContent(`<!doctype html><html class="ui-instrument"><head><style>${instrument}</style></head><body>${markup}</body></html>`);
       const r = await page.evaluate(() => {
-        const anims = document.getAnimations().map(a => ({ target: a.effect.target.getAttribute('class'), props: a.effect.getKeyframes().flatMap(k => Object.keys(k)).filter(k => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)) }));
-        const p = document.querySelector('.pri-working-p');
+        const anims = document.getAnimations().map(a => ({ target: a.effect.target.localName, props: a.effect.getKeyframes().flatMap(k => Object.keys(k)).filter(k => !['offset', 'easing', 'composite', 'computedOffset'].includes(k)) }));
+        const p = document.querySelector('.pri-working circle');
         return { anims, transform: getComputedStyle(p).transform, color: getComputedStyle(document.querySelector('.pri-working')).color };
       });
       await page.close();
       return r;
     };
     const full = await probe({});
-    ok(full.anims.some(a => a.target === 'pri-working-p' && a.props.includes('transform')) && full.anims.some(a => a.target === 'pri-working-ln' && a.props.includes('strokeDashoffset')), `full motion: the points gather (transform) and the line draws (dash offset): ${JSON.stringify(full.anims)}`);
+    ok(full.anims.some(a => a.target === 'circle' && a.props.includes('transform')) && full.anims.some(a => a.target === 'path' && a.props.includes('strokeDashoffset')), `full motion: the points gather (transform) and the line draws (dash offset): ${JSON.stringify(full.anims)}`);
     const reduced = await probe({ reducedMotion: 'reduce' });
     ok(!reduced.anims.some(a => a.props.includes('transform')) && reduced.transform === 'none', `reduced motion: nothing transforms (${JSON.stringify(reduced)})`);
-    ok(reduced.anims.length >= 1 && reduced.anims.every(a => a.target === 'pri-working' || (a.target === 'pri-working-ln' && a.props.every(k => k === 'opacity'))), 'reduced motion: only the line\'s opacity breathes (beside the 120 ms fade in)');
+    ok(reduced.anims.length >= 1 && reduced.anims.every(a => a.target === 'span' || (a.target === 'path' && a.props.every(k => k === 'opacity'))), 'reduced motion: only the line\'s opacity breathes (beside the 120 ms fade in)');
     const forced = await probe({ forcedColors: 'active' });
-    ok(!forced.anims.some(a => a.target !== 'pri-working'), `forced colours: nothing moves (${JSON.stringify(forced.anims)})`);
+    ok(!forced.anims.some(a => a.target !== 'span'), `forced colours: nothing moves (${JSON.stringify(forced.anims)})`);
   } finally {
     await browser.close();
   }

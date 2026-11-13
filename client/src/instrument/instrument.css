@@ -1343,24 +1343,22 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
    the line draws (36–62%), holds (to 80%), then lets go. Transform, opacity and
    one dash offset only. Ink here; the edition light under Aurora (aurora.css).
    Reduced motion: the settled form, only the line breathes. Forced colours:
-   CanvasText, still. When it shows is workingClock.js (400 ms in, 480 ms held). */
-.pri-working { --in-dur-work: 2400ms; display: inline-flex; align-items: center; gap: 8px; color: var(--in-tx-2); animation: pri-w-in 120ms both; }
+   still (currentColor is already the system text colour). When it shows is
+   workingClock.js (400 ms in, 480 ms held, 120 ms out). */
+.pri-working { --in-dur-work: 2400ms; display: inline-flex; align-items: center; gap: 8px; color: var(--in-tx-2); animation: pri-w-in 120ms; }
 .pri-working[data-out] { opacity: 0; transition: opacity 120ms; }
-.pri-working svg { flex: none; overflow: visible; }
 .pri-working:not(:last-child) { margin-right: 8px; }
-.pri-working-ln { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: pri-w-ln var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
-.pri-working-p { fill: currentColor; animation: pri-w-pt var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
-.pri-working-p:nth-of-type(2) { animation-delay: 80ms; }
-.pri-working-p:nth-of-type(3) { animation-delay: 160ms; }
+.pri-working svg { flex: none; overflow: visible; }
+.pri-working path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: pri-w-ln var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
+.pri-working circle { fill: currentColor; animation: pri-w-pt var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
+.pri-working circle:nth-of-type(2) { animation-delay: 80ms; }
+.pri-working circle:nth-of-type(3) { animation-delay: 160ms; }
 @keyframes pri-w-in { from { opacity: 0; } }
 @keyframes pri-w-pt { 0%, 100% { transform: translate(var(--dx), var(--dy)); opacity: .4; } 34%, 80% { transform: none; opacity: 1; } }
 @keyframes pri-w-ln { 0%, 36% { stroke-dashoffset: 1; opacity: 1; } 62%, 80% { stroke-dashoffset: 0; opacity: 1; } 96%, 100% { stroke-dashoffset: 0; opacity: 0; } }
 @keyframes pri-w-br { 50% { opacity: 1; } 0%, 100% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) {
-  .pri-working-p { animation: none; }
-  .pri-working-ln { stroke-dashoffset: 0; animation: pri-w-br var(--in-dur-work) ease-in-out infinite; }
+  .pri-working circle { animation: none; }
+  .pri-working path { stroke-dashoffset: 0; animation: pri-w-br var(--in-dur-work) ease-in-out infinite; }
 }
-@media (forced-colors: active) {
-  .pri-working { color: CanvasText; }
-  .pri-working-p, .pri-working-ln { animation: none; stroke-dashoffset: 0; }
-}
+@media (forced-colors: active) { .pri-working * { animation: none !important; stroke-dashoffset: 0; } }

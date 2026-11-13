@@ -20,9 +20,9 @@ export default function Working({ pending, size = 16, label = null }) {
   if (!shown) return null;
   return (
     <span className="pri-working" data-out={shown === 'out' ? '' : undefined}>
-      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path className="pri-working-ln" pathLength="1" strokeWidth={STROKE[size]} d={line} />
-        {points.map(([x, y, dx, dy]) => <circle key={x * 99 + y} className="pri-working-p" cx={x} cy={y} r="2" style={{ '--dx': `${dx}px`, '--dy': `${dy}px` }} />)}
+      <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+        <path pathLength="1" strokeWidth={STROKE[size]} d={line} />
+        {points.map(([x, y, dx, dy], i) => <circle key={i} cx={x} cy={y} r="2" style={{ '--dx': `${dx}px`, '--dy': `${dy}px` }} />)}
       </svg>
       {label}
     </span>
