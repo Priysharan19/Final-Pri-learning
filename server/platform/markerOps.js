@@ -330,7 +330,10 @@ export const MARKER_OPS = Object.freeze({
     const stage = examAnswerStage(q, given, working, grid);
     // Final answer only: the answer stage's response is the whole mark, so it
     // is reported as final and no working stage runs.
-    const final = stage.final || !policyOf({ policy }).methodMarks;
+    // A question sealed final-answer-only (editionBanks.js: every Prithagoras
+    // question) is marked on its answer whatever the policy says, as practice
+    // honours the same seal at commit (practice.js). India questions carry no seal.
+    const final = stage.final || q?._marking === 'final-answer-only' || !policyOf({ policy }).methodMarks;
     emit({ response: stage.response, final });
     return { response: final ? stage.response : examWorkingStage(q, working, grid, stage) };
   },
