@@ -178,7 +178,7 @@ async function localDispatch(method, path, body) {
   // An NSW profile's list of HSC-style papers (plan G4). Answered before the
   // generic routes, whose GET /exams/:id would otherwise read "nsw" as an id.
   if (activeUser?.course === 'nsw' && nswExamRoute(method, path)) {
-    return dispatchNswExam(activeUser, method, path, body);
+    return dispatchNswExam(activeUser, method, path);
   }
   return dispatch(method, path, body);
 }

@@ -18,6 +18,24 @@ on:
       - 'client/test/support/**'
       - 'docs/design/KALP-03-onboarding-profile.md'
       - '.github/workflows/kalp-03-onboarding-profile.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/pages/Login.jsx'
+      - 'client/src/local/backend.js'
+      - 'client/src/i18n/**'
+      - 'client/test/e2e.mjs'
+      - 'client/test/a11y-check.mjs'
+      - 'client/test/tour-login.js'
+      - 'client/test/tour-india.js'
+      - 'client/test/tour-kalp01-design.js'
+      - 'client/test/tour-kalp02-navigation.js'
+      - 'client/test/golden-student-journey.mjs'
+      - 'client/test/kalp03-onboarding-check.mjs'
+      - 'client/test/tour-kalp03-onboarding.js'
+      - 'client/test/support/**'
+      - 'docs/design/KALP-03-onboarding-profile.md'
+      - '.github/workflows/kalp-03-onboarding-profile.yml'
   workflow_dispatch:
 
 concurrency:
@@ -42,6 +60,8 @@ env:
 
 jobs:
   verify:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: First-run, profile authority and real learning journey
     runs-on: ubuntu-latest
     timeout-minutes: 40

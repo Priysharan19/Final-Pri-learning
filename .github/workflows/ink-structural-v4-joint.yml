@@ -1,7 +1,9 @@
 name: Ink Structural V4 Joint Decoder
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/structural_joint_decode.py'
       - 'tools/ink-foundation/test_structural_joint_decode.py'
@@ -33,6 +35,8 @@ concurrency:
 
 jobs:
   joint-decoder-contract:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Exact joint grouping and glyph search contract
     runs-on: ubuntu-latest
     timeout-minutes: 15
