@@ -89,8 +89,11 @@ jobs:
           runs="$(curl --fail --silent --show-error "${auth[@]}" \
             "${API}/repos/${REPO}/actions/runs?head_sha=${head_sha}&event=pull_request&per_page=100")"
 
-          latest="$(printf '%s' "$runs" | jq -c '
-            [ .workflow_runs[] ]
+          # Only runs of the merged PR's own branch count: a train of one shares
+          # its head SHA with the lane PR, whose lane-gated (skipped) runs must
+          # never stand in for the train's runs of the same workflow.
+          latest="$(printf '%s' "$runs" | jq -c --arg ref "$head_ref" '
+            [ .workflow_runs[] | select(.head_branch == $ref) ]
             | sort_by(.workflow_id, .updated_at)
             | group_by(.workflow_id)
             | map(max_by(.updated_at))

@@ -29,7 +29,8 @@ permissions:
 
 concurrency:
   group: ink-structural-v4-live-lan-${{ github.ref }}
-  cancel-in-progress: true
+  # Main's runs are evidence; only a superseded pull-request head is cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   live-lan-contract:

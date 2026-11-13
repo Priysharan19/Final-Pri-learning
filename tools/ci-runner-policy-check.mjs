@@ -607,7 +607,17 @@ const triggerBlock = (source, key) => {
   const m = on.match(new RegExp(`(^|\\n)  ${key}:[^\\n]*\\n((?:    [^\\n]*\\n|\\s*\\n)*)`));
   return m ? m[2] : null;
 };
-const hasPullRequest = source => /\non:\n(?:  [^\n]*\n|\s*\n|    [^\n]*\n|      [^\n]*\n)*?  pull_request:/.test(source) || /^on:\s*\[[^\]]*\bpull_request\b/m.test(source);
+const hasPullRequest = source => {
+  // Line by line (no backtracking regex): a pull_request key directly under on:, or on: [.., pull_request, ..].
+  const lines = source.split('\n');
+  const at = lines.indexOf('on:');
+  if (at < 0) return lines.some(l => /^on:\s*\[/.test(l) && /\bpull_request\b/.test(l));
+  for (const line of lines.slice(at + 1)) {
+    if (/^\S/.test(line)) break;
+    if (/^  pull_request:/.test(line)) return true;
+  }
+  return false;
+};
 
 /** Why the lane split does not hold for this set of workflow sources ({ file: text }). */
 export function laneProblems(sources) {
@@ -674,6 +684,16 @@ export function laneProblems(sources) {
 }
 
 // ── Check-count manifest (ci/check-counts.json) ──────────────────────────────
+/** Why a verify step could pass without verifying (empty when it cannot). */
+export function stepProblems(stepLines) {
+  const out = [];
+  for (const line of stepLines) {
+    if (/^ {6,8}(?:- )?continue-on-error:/.test(line)) out.push('continue-on-error');
+    const cond = line.match(/^ {6,8}(?:- )?if:\s*(.*)$/);
+    if (cond && cond[1].trim() !== 'always()') out.push(`a step condition (${cond[1].trim()})`);
+  }
+  return out;
+}
 // The exact output pins moved out of ci.yml into one manifest. Every group is
 // verified exactly once, inside its own job, by a bare command line (no `|| true`,
 // no `if`, never under continue-on-error), and ci.yml keeps no inline pin against
@@ -688,7 +708,6 @@ export function laneProblems(sources) {
     const header = inJobs && line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
     if (header) { jobId = header[1]; step = null; continue; }
     if (/^      - /.test(line)) step = { start: i };
-    if (step && /^        continue-on-error:/.test(line)) step.continueOnError = true;
     const m = line.match(/node tools\/ci-check-counts\.mjs verify (\S+)/);
     if (!m) continue;
     assert.match(line, /^ +node tools\/ci-check-counts\.mjs verify \S+$/, `ci.yml:${i + 1}: a verify call stands alone on its line (no || true, no condition)`);
@@ -699,12 +718,24 @@ export function laneProblems(sources) {
     assert.equal(at.length, 1, `ci/check-counts.json group ${id} is verified exactly once in ci.yml (found ${at.length})`);
     assert.equal(at[0].job, group.job, `group ${id} is verified in its own job ${group.job}`);
   }
-  // continue-on-error on the step would turn a failed verify into a pass; checked over the whole step text.
+  // The whole step (from its "- " to the next step or job): continue-on-error anywhere in it would turn a
+  // failed verify into a pass, and a condition could skip it. Only if: always() (run even after a failure) is allowed.
+  const stepOf = at => {
+    let end = at.line;
+    while (end < lines.length && !/^      - /.test(lines[end]) && !/^  \S/.test(lines[end]) && !/^\S/.test(lines[end])) end += 1;
+    return lines.slice(at.step.start, end);
+  };
   for (const [id, at] of calls) {
     assert.ok(id in manifest.groups, `ci.yml verifies ${id}, which ci/check-counts.json does not have`);
-    const stepText = lines.slice(at[0].step.start, at[0].line).join('\n');
-    assert.doesNotMatch(stepText, /continue-on-error:\s*true/, `the step verifying ${id} is not continue-on-error`);
+    assert.equal(stepProblems(stepOf(at[0])).length, 0, `the step verifying ${id}: ${stepProblems(stepOf(at[0])).join('; ')}`);
   }
+  // Negative controls on a real verify step.
+  const sample = stepOf(calls.get('platform/storekit.log')[0]);
+  for (const [name, mutated] of [
+    ['continue-on-error before run:', [sample[0], '        continue-on-error: true', ...sample.slice(1)]],
+    ['continue-on-error after the run: block', [...sample, '        continue-on-error: true']],
+    ['a step-level condition', [sample[0], "        if: github.event_name == 'push'", ...sample.slice(1)]]
+  ]) assert.ok(stepProblems(mutated).length > 0, `a verify step with ${name} is refused`);
   const inline = lines.filter(l => /^\s*(?:grep -[EF]q|test "\$\(grep -[EF]?c) .*\.log\)?"?(?: -(?:eq|ge) [0-9]+)?$/.test(l));
   assert.deepEqual(inline, [], 'ci.yml keeps no inline output pin against a log: pins live in ci/check-counts.json');
   const contracts = job('suites-contracts');

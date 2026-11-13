@@ -53,7 +53,7 @@ export function pinProblems(pin) {
   if (typeof value !== 'string' || !value.trim() || value.includes('\n')) out.push(`a pin's text is one non-empty line: ${JSON.stringify(pin)}`);
   if ('re' in pin) { try { new RegExp(pin.re); } catch (e) { out.push(`bad regular expression ${JSON.stringify(pin.re)}: ${e.message}`); } }
   if ('count' in pin || 'op' in pin) {
-    if (!Number.isInteger(pin.count) || pin.count < 0) out.push(`count is a whole number: ${JSON.stringify(pin)}`);
+    if (!Number.isInteger(pin.count) || pin.count < 1) out.push(`count is a whole number of at least 1 (a floor of 0 checks nothing): ${JSON.stringify(pin)}`);
     if (!['eq', 'ge'].includes(pin.op)) out.push(`op is "eq" or "ge": ${JSON.stringify(pin)}`);
   }
   if ('note' in pin && typeof pin.note !== 'string') out.push('a note is text');
@@ -63,7 +63,7 @@ export function pinProblems(pin) {
 /** Lines of `text` the pin's pattern matches (grep's line semantics). */
 export function matchingLines(pin, text) {
   if ('has' in pin) return lines(text).filter(line => line.includes(pin.has));
-  const re = new RegExp(pin.re);
+  const re = new RegExp(pin.re, 's'); // grep's "." matches any byte of the line, \r included
   return lines(text).filter(line => re.test(line));
 }
 
@@ -325,6 +325,30 @@ export function unannouncedRemovals(base, head) {
     const [group, shape] = key.split('\u0000');
     for (let i = 0; i < short; i += 1) missing.push({ group, shape });
   }
+  // A count pin that keeps its shape but checks less (eq → ge, or a lower floor/count, or no count at all)
+  // is a weakening too; it needs the same retired record as a removal.
+  const countsOf = manifest => {
+    const t = new Map();
+    for (const [id, g] of Object.entries(manifest.groups)) for (const pin of g.pins) {
+      if (!('count' in pin)) continue;
+      const key = `${id}\u0000${shapeOf(pin)}`;
+      (t.get(key) || t.set(key, []).get(key)).push(pin);
+    }
+    return t;
+  };
+  const nowCounts = countsOf(head);
+  for (const [key, basePins] of countsOf(base)) {
+    const headPins = nowCounts.get(key) || [];
+    const newlyRetired = (retired.get(key) || 0) - (baseRetired.get(key) || 0);
+    const [group, shape] = key.split('\u0000');
+    let weakened = 0;
+    for (const [k, b] of basePins.entries()) {
+      const h = headPins[k];
+      if (!h) continue; // a missing pin is counted as a removal above
+      if (h.count < b.count || (b.op === 'eq' && h.op !== 'eq')) weakened += 1;
+    }
+    for (let i = Math.max(0, newlyRetired); i < weakened; i += 1) missing.push({ group, shape, weakened: true });
+  }
   // A retired record is never removed either: the history of what stopped being pinned stays.
   for (const [key, n] of baseRetired) {
     const [group, shape] = key.split('\u0000');
@@ -466,7 +490,7 @@ function main(argv) {
     const base = JSON.parse(baseText);
     const missing = unannouncedRemovals(base, head);
     if (missing.length) {
-      for (const r of missing) console.error(`  ✗ ${r.retiredRecord ? 'retired record removed' : 'pin removed without a retired record'}: ${r.group} ${r.shape}`);
+      for (const r of missing) console.error(`  ✗ ${r.retiredRecord ? 'retired record removed' : r.weakened ? 'count pin weakened (lower count or eq → ge) without a retired record' : 'pin removed without a retired record'}: ${r.group} ${r.shape}`);
       console.error(`CHECK COUNTS RETIRE: FAIL — ${missing.length} pin(s) left the manifest unannounced. A pin that stops being checked needs { "group", "shape", "reason" } in "retired".`);
       return 1;
     }

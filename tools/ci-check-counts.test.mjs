@@ -119,6 +119,21 @@ for (const [what, log] of [
   bumped.groups['platform/edition.log'].pins[0].has = 'EDITION AGREEMENT (E2): PASS — 160/160 checks';
   ok(unannouncedRemovals(fixture, bumped).length === 0, 'a changed count keeps the pin (same shape)');
 }
+{
+  // A count pin kept in place but made to check less is a weakening (review finding 4 on #882).
+  for (const [what, change] of [
+    ['a floor lowered (ge 2 → ge 1)', pin => { pin.count = 1; }],
+    ['eq turned into ge', pin => { pin.op = 'ge'; }]
+  ]) {
+    const head = JSON.parse(JSON.stringify(fixture));
+    change(head.groups['platform/edition.log'].pins[4]);
+    if (what.startsWith('eq')) { head.groups['platform/edition.log'].pins[4].op = 'ge'; }
+    const base = JSON.parse(JSON.stringify(fixture)); if (what.startsWith('eq')) base.groups['platform/edition.log'].pins[4].op = 'eq';
+    ok(unannouncedRemovals(base, head).some(m => m.weakened), `retire-check catches ${what}`);
+  }
+  const zero = JSON.parse(JSON.stringify(fixture)); zero.groups['platform/edition.log'].pins[4].count = 0;
+  ok(manifestProblems(zero).length > 0, 'a count of 0 is malformed: it checks nothing');
+}
 // ── regen re-reads numbers, and only numbers ──────────────────────────────────
 {
   const up = GOOD.replace('155/155', '160/160').replace('25/25', '26/26');
@@ -162,6 +177,7 @@ for (const [what, log] of [
 }
 // ── count pins keep grep -c semantics ─────────────────────────────────────────
 ok(pinHolds({ has: 'x', count: 1, op: 'eq' }, 'a x\nb') && !pinHolds({ has: 'x', count: 1, op: 'eq' }, 'x\nx x'), 'eq counts lines, as grep -c does');
+ok(pinHolds({ re: 'A.*B' }, 'A\rB'), 'a regex "." matches a carriage return, as grep\'s does');
 ok(pinHolds({ re: 'E2E SUITE PASSED.*65/65.*1 flows', count: 2, op: 'ge' }, 'E2E SUITE PASSED — 65/65 checks across 1 flows\nE2E SUITE PASSED — 65/65 checks across 1 flows'), 'ge is a floor');
 // ── the merge driver resolves neighbouring count changes, one pin at a time ───
 {

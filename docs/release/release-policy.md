@@ -19,7 +19,7 @@ Production branch: `main`
 
 Lane pull requests (any head that is not `task/train-*`) run the required contexts and the always-on
 security, marking, data, evidence and governance gates; the heavy workflows run on `task/train-*`
-pull requests, on `main` and on dispatch, so `main` accepts only trains (`docs/release/ci-lanes.md`).
+pull requests, on `main` and on dispatch, so only trains merge into `main` (`docs/release/ci-lanes.md`). Branch protection cannot see the head branch, so this is detected, not prevented: Main Integrity fails a `main` commit that did not come from a train, and that stops its staging promotion.
 The exact output pins of `ci.yml` live in `ci/check-counts.json`; regenerate them, never hand-merge.
 
 `Main Integrity` remains a post-merge provenance alarm. It is intentionally not a required pre-merge context because it runs on pushes to `main`, not on the pull-request head.

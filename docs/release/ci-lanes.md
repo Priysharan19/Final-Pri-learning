@@ -26,10 +26,17 @@ if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/tra
 (or `(<that>) && (<the job's own condition>)`). Path filters are unchanged, so a train runs the same
 heavy workflows a lane would have run for the same files.
 
-**Every workflow still runs on the exact head that merges**, because `main` only accepts trains:
+**Every workflow runs on the exact head that merges, provided merges go through trains.** Branch
+protection cannot see a pull request's head branch: a lane pull request with its four required
+contexts green can still be merged. The rule is therefore *detected, not prevented*:
 `Main Integrity` (`.github/workflows/main-integrity.yml`) fails a `main` commit whose merged pull
-request head is not `task/train-*`, and that failure stops `Release Staging Proof`. To merge a single
-lane pull request, open a train of one: a `task/train-*` branch at the lane head.
+request head is not `task/train-*`, and that failure stops `Release Staging Proof`, so such a commit
+never reaches staging or production; the push to `main` also runs every heavy workflow on the merged
+tree. Main Integrity reads only the runs of the merged pull request's own branch, so a lane pull
+request on the same SHA (a train of one) can never stand in for the train's runs. To merge a single
+lane pull request, open a train of one: a `task/train-*` branch at the lane head. Making it a
+pre-merge rule needs an owner change to branch protection (for example a required check that
+fails on lane heads); that is outside this change.
 
 ### Why a skipped job cannot falsely pass or block
 
@@ -102,9 +109,12 @@ a suite that does not run prints nothing and its pin fails. In addition:
 - the policy check proves every group is verified exactly once, in its own job, by a bare line
   (no `|| true`, never under `continue-on-error`), and that `ci.yml` keeps no inline pin;
 - `retire-check` (in `Suites policy and contracts`) compares the manifest with the pull request's
-  base and fails if any pin, or any `retired` record, disappeared. A pin that stops being checked
-  needs `{ "group", "shape", "reason" }` in `retired` — stronger than before, when deleting a grep
-  line passed silently.
+  base and fails if any pin, or any `retired` record, disappeared, or a count pin now checks less
+  (a lower count or floor, or `eq` turned into `ge`). Each needs `{ "group", "shape", "reason" }` in
+  `retired` — stronger than before, when deleting a grep line passed silently. A lower number inside
+  a pin's text (`155/155` → `154/154`) is not blocked by `retire-check` — exactly as editing a grep
+  was not — but it is a visible one-line diff, and `regen` refuses to write it without
+  `--allow-decrease`.
 
 ### Updating counts (and resolving trains)
 
