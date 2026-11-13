@@ -17,6 +17,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { safeCode } from './observability.js';
+import { EDITIONS } from '../../client/edition.config.mjs';
+import { serverEdition } from './edition.js';
 
 const MINUTE = 60_000;
 const RING_MINUTES = 15;
@@ -142,6 +144,9 @@ export function createMetrics({ now = () => Date.now() } = {}) {
     }
     const alerts = evaluateAlerts({ sum, p95 });
     return {
+      // Whose numbers these are (plan H7): a deployment serves one edition,
+      // so every series in this snapshot is that edition's and region's.
+      deployment: deploymentLabel(),
       startedAt,
       uptimeSeconds: Math.floor((now() - startedAt) / 1000),
       counters: outCounters,
@@ -249,6 +254,19 @@ function evaluateAlerts(context) {
   });
 }
 
+/**
+ * The edition and region this process serves, for metrics and alerts (plan
+ * H7). Drawn from the edition table, so its values are a fixed alphabet.
+ */
+export function deploymentLabel(env = process.env) {
+  try {
+    const edition = serverEdition(env);
+    return { edition, brand: EDITIONS[edition].brand, region: EDITIONS[edition].region };
+  } catch {
+    return { edition: 'unknown', brand: null, region: null };
+  }
+}
+
 // ── The process registry and the recorders the server calls ────────────────
 export const metrics = createMetrics();
 
@@ -259,6 +277,18 @@ function statusClass(status) {
 /** One paid call that took the hour or day ceiling window to 80% or more. */
 export function recordPaidCeilingHigh(window) {
   metrics.inc('paid_ceiling_high_total', { window: window === 'day' ? 'day' : 'hour' });
+}
+
+const PAID_CALL_OUTCOMES = new Set(['spent', 'refused', 'refunded']);
+/**
+ * One unit of the paid-call ceiling spent, refused at the ceiling, or given
+ * back (spendCeiling.js), under the edition whose ceiling it is (plan H7).
+ */
+export function recordPaidCall(edition, outcome) {
+  metrics.inc('paid_calls_total', {
+    edition: Object.hasOwn(EDITIONS, edition) ? edition : 'unknown',
+    outcome: PAID_CALL_OUTCOMES.has(outcome) ? outcome : 'other'
+  });
 }
 
 export function recordHttpResponse(status, ms) {

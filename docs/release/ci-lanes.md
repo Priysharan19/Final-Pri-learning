@@ -77,8 +77,8 @@ So the split is safe only if no lane-gated job is ever a required context. The p
 | `kalp-02-information-architecture.yml` | trains, main, dispatch | navigation browser regression |
 | `kalp-03-onboarding-profile.yml` | trains, main, dispatch | onboarding browser journey (the account gate is in the required browser suites) |
 | `kalp-04-home-command-centre.yml` | trains, main, dispatch | home browser journey |
-| `native-ink.yml` | trains, main, dispatch | macOS iOS 26 simulator lane (40–60 min) |
-| `native-journey-ios27.yml` | trains, main, dispatch | macOS iOS 27 simulator lane (45–60 min) |
+| `native-ink.yml` | trains, main, dispatch | macOS iOS 26 simulator lane (40–60 min). **Known state (13 Nov 2026):** times out at about 65 min and ends `cancelled` on every branch, `main` included, since 12 Nov; #850 aims to fix it. Lane gating does not hide it: it still runs on every train and every `main` push whose paths match, and Main Integrity still counts a `cancelled` train run as failing |
+| `native-journey-ios27.yml` | trains, main, dispatch | macOS iOS 27 simulator lane (45–60 min). Same known timeout as Native Ink (about 65 min, `cancelled`, every branch since 12 Nov; #850) and the same visibility on trains and `main` |
 | `ink-hybrid.yml` | trains, main, dispatch | on-device recognizer metrics (answer-blindness is pinned in the required platform job) |
 | `ink-foundation.yml` | trains, main, dispatch | ink model tooling and training contract |
 | `ink-corpus-evidence.yml` | trains, main, dispatch | corpus campaign planning |

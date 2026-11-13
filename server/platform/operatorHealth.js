@@ -11,6 +11,8 @@ import { compatibilityStatus } from './clientCompatibility.js';
 import { googleNotificationBacklog } from './googleBilling.js';
 import { platformConfigStatus } from './config.js';
 import { housekeepingStatus } from './housekeeping.js';
+import { deploymentLabel } from './metrics.js';
+import { PAID_ALERT_RATIO, spendCeiling } from './spendCeiling.js';
 
 /**
  * The operator's view of the deployment: configuration flags (never values),
@@ -19,7 +21,19 @@ import { housekeepingStatus } from './housekeeping.js';
  */
 export async function operatorHealthDetail(db, { reachable = true, housekeeping = undefined } = {}) {
   const config = platformConfigStatus();
+  const ceiling = spendCeiling();
+  const { edition, region } = deploymentLabel();
   return {
+    // This deployment's paid-call ceiling is its region's AI budget (plan H7):
+    // whose it is, whether a key makes it required, and its numbers.
+    paidCeiling: {
+      edition,
+      region,
+      required: ceiling.required,
+      perHour: ceiling.perHour,
+      perDay: ceiling.perDay,
+      alertRatio: PAID_ALERT_RATIO
+    },
     // The active shell floors and how many requests they turned away (CP-11).
     clientCompatibility: compatibilityStatus(),
     storage: { persistentDatabase: config.persistentDatabaseConfigured },

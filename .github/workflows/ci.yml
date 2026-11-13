@@ -318,6 +318,11 @@ jobs:
           node server/test/final-attempt-oracle-sweep-check.mjs | tee final-attempt-sweep.log
           node tools/ci-check-counts.mjs verify platform/final-attempt-sweep.log
           node server/test/spend-ceiling-check.mjs
+          # Plan H7: the practice day is the edition's (Priyabhata equal to main
+          # over a year of instants, Sydney across daylight saving); the ceiling
+          # is required, refuses, refunds and alerts under each edition.
+          node server/test/edition-ai-budgets-check.mjs 2>&1 | tee edition-ai-budgets.log
+          node tools/ci-check-counts.mjs verify platform/edition-ai-budgets.log
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
@@ -796,6 +801,11 @@ jobs:
             # Task 02: mounted server-authoritative method credit and stale receipt rejection.
             node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
+            # The Exam Desk (ADR-0002 §8 plan F4b): unmarked practice on a library
+            # paper. It makes its own builds (PRI_FEATURE_LIBRARY and
+            # PRI_FEATURE_EXAM_DESK are build-time: desk off, then on) and leaves
+            # this job's build behind; tour-ai-tutor.js then makes its own.
+            node client/test/tour-exam-desk.js 2>&1 | tee -a browser.log
             node client/test/tour-ai-tutor.js 2>&1 | tee -a browser.log
             node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
@@ -849,6 +859,10 @@ jobs:
             node client/test/tour-interface-quality.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
             node client/test/tour-math-reflow.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+            # The Exam Desk in WebKit (the engine behind every Apple web view):
+            # the same sitting, import and Hindi journeys as Chromium. Last in
+            # the group: it makes its own flagged builds and restores this one.
+            node client/test/tour-exam-desk.js --browser=webkit 2>&1 | tee -a browser.log
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log

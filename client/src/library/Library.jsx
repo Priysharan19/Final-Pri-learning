@@ -22,6 +22,11 @@ import {
 } from './libraryApi.js';
 import './library.css';
 
+// The Exam Desk's way in (plan F4b): its own chunk, drawn only where
+// PRI_FEATURE_EXAM_DESK is on (App.jsx passes `desk`), under a paper that has
+// a question count.
+const DeskEntry = React.lazy(() => import('../desk/DeskEntry.jsx'));
+
 const ERROR_KEYS = {
   AUTH_REQUIRED: 'library.signedOut',
   CLOUD_DISABLED: 'library.offline',
@@ -54,7 +59,7 @@ function Facts({ r, t }) {
   );
 }
 
-function Detail({ id, t }) {
+function Detail({ id, t, desk }) {
   const [state, setState] = useState({ status: 'loading' });
   useEffect(() => {
     let live = true;
@@ -74,6 +79,9 @@ function Detail({ id, t }) {
     <div className="lib-page" data-library-detail={state.resource.id}>
       {back}
       <ResourceView r={state.resource} t={t} />
+      {desk && state.resource.type === 'paper' && Number.isInteger(state.resource.questionCount) && (
+        <React.Suspense fallback={null}><DeskEntry resource={state.resource} /></React.Suspense>
+      )}
     </div>
   );
 }
@@ -206,8 +214,8 @@ function Browse({ t }) {
   );
 }
 
-export default function Library() {
+export default function Library({ desk = false }) {
   const t = useT();
   const { id } = useParams();
-  return id ? <Detail id={id} t={t} /> : <Browse t={t} />;
+  return id ? <Detail id={id} t={t} desk={desk} /> : <Browse t={t} />;
 }

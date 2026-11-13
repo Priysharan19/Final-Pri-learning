@@ -514,6 +514,7 @@ for (const cmd of [
   'node client/test/tour-iphone-layout.js --no-build',
   'node client/test/tour-iphone-layout.js --no-build --browser=webkit',
   'node client/test/tour-activation-gate.js --no-build --browser=webkit',
+  'node client/test/tour-exam-desk.js --browser=webkit',
   'node client/test/tour-photo-answer.js --no-build',
   'node client/test/ink-canvas-loss-browser-check.mjs'
 ]) {
