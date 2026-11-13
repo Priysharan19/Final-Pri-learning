@@ -121,8 +121,8 @@ export function stoppedKey(key) {
  * "at about 4:35 pm", in the student's language; '' when there is no time to
  * give. `profile` (optional) is the signed-in student: for a profile outside
  * the India course (an NSW student of Prithagoras, plan H7) the time is
- * written in that profile's locale and in its own timezone (lib/locale.js),
- * so a limit that lifts at a Sydney midnight reads as midnight. An India
+ * written in that profile's locale (en-AU), on the timezone the profile has
+ * set or else the device's clock (lib/locale.js limitClock). An India
  * profile, and a call with no profile, are written exactly as before: en-IN
  * or hi-IN, on the device's clock.
  */
@@ -132,7 +132,7 @@ export function retryClock(retryAt, language = 'en', profile = null) {
   const regional = hindi ? null : limitClock(profile);
   try {
     if (regional) {
-      return new Intl.DateTimeFormat(regional.locale, { hour: 'numeric', minute: '2-digit', timeZone: regional.timeZone }).format(new Date(Number(retryAt)));
+      return new Intl.DateTimeFormat(regional.locale, { hour: 'numeric', minute: '2-digit', ...(regional.timeZone ? { timeZone: regional.timeZone } : {}) }).format(new Date(Number(retryAt)));
     }
     return new Intl.DateTimeFormat(hindi ? 'hi-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(Number(retryAt)));
   } catch { return ''; }

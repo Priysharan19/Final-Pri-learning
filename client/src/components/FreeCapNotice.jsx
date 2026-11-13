@@ -14,15 +14,8 @@ import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
-import { limitClock } from '../lib/locale.js';
-
-// Where and how the reset is written. An India profile (or none) reads it as
-// it always has: en-IN, in the calendar the refusal names. A profile outside
-// the India course (an NSW student of Prithagoras, plan H7) reads it in its
-// own locale and timezone (lib/locale.js limitClock).
-function resetClock(gateTimeZone, profile) {
-  return limitClock(profile) || { locale: 'en-IN', timeZone: gateTimeZone || null };
-}
+// Where and how the reset is written (plan H7): lib/locale.js capResetClock.
+import { capResetClock as resetClock } from '../lib/locale.js';
 
 function whenItResets(resetsAt, timeZone, profile = null) {
   if (!Number.isFinite(resetsAt)) return null;

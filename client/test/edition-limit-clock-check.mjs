@@ -27,7 +27,7 @@ process.env.TZ = 'UTC';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const src = path => readFileSync(join(ROOT, path), 'utf8');
-const { limitClock, timezoneOf } = await import('../src/lib/locale.js');
+const { limitClock, capResetClock, timezoneOf } = await import('../src/lib/locale.js');
 const { retryClock } = await import('../src/ink/readerFailure.js');
 const gate = await import('../src/local/entitlementGate.js');
 const { practiceDay } = await import('../../server/platform/practiceAllowance.js');
@@ -49,7 +49,8 @@ const NSW = { course: 'nsw' };
 const INDIA = { course: 'in' };
 
 // ── 1 · limitClock ───────────────────────────────────────────────────────────
-same('an NSW profile writes limits in en-AU on the Sydney clock', limitClock(NSW), { locale: 'en-AU', timeZone: 'Australia/Sydney' });
+same('an NSW profile writes limits in en-AU, and with no zone of its own names none (the caller keeps its clock)', limitClock(NSW), { locale: 'en-AU', timeZone: null });
+same('an NSW profile with an invalid zone names none either', limitClock({ course: 'nsw', timezone: 'Mars/Olympus' }), { locale: 'en-AU', timeZone: null });
 same('an NSW profile with its own zone uses that zone', limitClock({ course: 'nsw', timezone: 'Australia/Perth' }), { locale: 'en-AU', timeZone: 'Australia/Perth' });
 same('an India profile is unchanged (no regional clock)', limitClock(INDIA), null);
 same('an India profile with its own zone is unchanged too', limitClock({ course: 'in', timezone: 'Asia/Dubai' }), null);
@@ -57,8 +58,10 @@ same('no profile is unchanged', [limitClock(null), limitClock(undefined), limitC
 
 // ── 2 · retryClock ───────────────────────────────────────────────────────────
 const sydneyMidnight = Date.UTC(2026, 9, 4, 13, 0, 0); // 00:00 AEDT, 13:00 UTC
-same('an NSW student is told the Sydney midnight a limit lifts at', retryClock(sydneyMidnight, 'en', NSW), new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' }).format(new Date(sydneyMidnight)));
-ok('which reads as midnight, not the device\'s 1 pm', /^12:00\s?am$/i.test(retryClock(sydneyMidnight, 'en', NSW)), retryClock(sydneyMidnight, 'en', NSW));
+const SYDNEY = { course: 'nsw', timezone: 'Australia/Sydney' };
+same('an NSW student in Sydney is told the time in en-AU on the Sydney clock', retryClock(sydneyMidnight, 'en', SYDNEY), new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit', timeZone: 'Australia/Sydney' }).format(new Date(sydneyMidnight)));
+ok('which reads as midnight, not the device\'s 1 pm', /^12:00\s?am$/i.test(retryClock(sydneyMidnight, 'en', SYDNEY)), retryClock(sydneyMidnight, 'en', SYDNEY));
+same('an NSW student with no zone set reads it in en-AU on the device\'s own clock (a rolling window)', retryClock(sydneyMidnight, 'en', NSW), new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(sydneyMidnight)));
 ok('a Perth student reads the same instant on the Perth clock', /^9:00\s?pm$/i.test(retryClock(sydneyMidnight, 'en', { course: 'nsw', timezone: 'Australia/Perth' })), retryClock(sydneyMidnight, 'en', { course: 'nsw', timezone: 'Australia/Perth' }));
 same('nothing to say is still nothing', [retryClock(null, 'en', NSW), retryClock(0, 'en', NSW), retryClock('soon', 'en', NSW)], ['', '', '']);
 {
@@ -82,7 +85,17 @@ ok('the photo reading limit passes the profile', /retryClock\(photoOCR\.block\?\
 ok('the submitted-page reading limit passes the profile', /retryClock\(state\.res\.readerBlock\.retryAt, language, user\)/.test(card));
 same('and the card reads no time without it', (card.match(/retryClock\(/g) || []).length, 2);
 const notice = src('client/src/components/FreeCapNotice.jsx');
-ok('the daily-cap notice writes its reset in the profile\'s clock', /limitClock\(profile\) \|\| \{ locale: 'en-IN', timeZone: gateTimeZone \|\| null \}/.test(notice) && /export default function FreeCapNotice\(\{ gate, onRetry, profile = null \}\)/.test(notice));
+ok('the daily-cap notice takes the profile and writes its reset with capResetClock', /import \{ capResetClock as resetClock \} from '\.\.\/lib\/locale\.js'/.test(notice) && /export default function FreeCapNotice\(\{ gate, onRetry, profile = null \}\)/.test(notice)
+  && /resetClock\(timeZone, profile\)/.test(notice) && /const zone = resetClock\(gate\.timeZone, profile\)\.timeZone;/.test(notice) && !/'en-IN'/.test(notice));
+// The cap's clock: India and no profile exactly as main (en-IN, the refusal's calendar).
+for (const zone of ['Asia/Kolkata', 'Australia/Sydney', null]) {
+  for (const profile of [INDIA, { course: 'in', timezone: 'Asia/Dubai' }, null]) {
+    same(`the cap's clock for ${JSON.stringify(profile)} with the refusal's calendar ${zone} is main's`, capResetClock(zone, profile), { locale: 'en-IN', timeZone: zone });
+  }
+}
+same('an NSW profile with no zone reads the cap in en-AU in the refusal\'s calendar', capResetClock('Australia/Sydney', NSW), { locale: 'en-AU', timeZone: 'Australia/Sydney' });
+same('an NSW profile on the Priyabhata server still names the Indian calendar it counts in', capResetClock('Asia/Kolkata', NSW), { locale: 'en-AU', timeZone: 'Asia/Kolkata' });
+same('an NSW profile with its own zone reads the cap on its own clock', capResetClock('Australia/Sydney', { course: 'nsw', timezone: 'Australia/Perth' }), { locale: 'en-AU', timeZone: 'Australia/Perth' });
 ok('practice gives it the signed-in profile', /<FreeCapNotice gate=\{capped\} onRetry=\{load\} profile=\{user\} \/>/.test(src('client/src/pages/PracticeBase.jsx')));
 
 // ── 4 · the device's day and the server's day agree, per edition ─────────────

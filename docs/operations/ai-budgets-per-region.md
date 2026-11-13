@@ -1,13 +1,19 @@
 # AI budgets and the allowance day, per region (plan H7)
 
 Pri Learning runs one deployment per regional edition (ADR-0002 §9): Priyabhata
-(India) and Prithagoras (Australia) each have their own server, database, model
-key and bill. This page is for the operator of either deployment. It says what
+(India) and Prithagoras (Australia) each have their own server and database,
+and each deployment has its own paid-call ceiling. **A separate model provider
+account and key for Australia does not exist yet** (owner, with H1, §6): until
+it does, two deployments holding the same key share one provider-side rate
+limit and one bill, and each ceiling bounds only its own deployment's share of
+it. This page is for the operator of either deployment. It says what
 bounds the money a deployment can spend on model calls, what a student sees when
 a bound is reached, how a student's "day" is counted, and which routes send
 student content to a model provider.
 
-Proven by `server/test/edition-ai-budgets-check.mjs` (SQLite and Postgres),
+Proven by `server/test/edition-ai-budgets-check.mjs` (its HTTP part also runs
+on Postgres in `run-platform-postgres.mjs`; its pure and router parts use
+in-memory SQLite),
 `client/test/edition-limit-clock-check.mjs` and
 `client/test/residency-claims-check.mjs`.
 
@@ -22,7 +28,7 @@ and nothing has a regional default.
 | `PRI_HANDWRITING_API_KEY` | The model provider key. Setting it is what makes the two ceilings below **required**. | none |
 | `PRI_PAID_CALLS_PER_HOUR` | Model calls this deployment may make in an hour, across every student and every paid route. | **none: required with a key** |
 | `PRI_PAID_CALLS_PER_DAY` | The same, per rolling 24 hours. | **none: required with a key** |
-| `PRI_AI_DAILY_FREE_*`, `PRI_AI_DAILY_PREMIUM_*` (and `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`) | Per-account daily reads of handwriting, working and question photos (`server/platform/aiAllowance.js`). | Free 5, Premium 25, per kind |
+| `PRI_AI_DAILY_FREE_*`, `PRI_AI_DAILY_PREMIUM_*` (and `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`) | Per-account daily reads of handwriting, working and question photos (`server/platform/aiAllowance.js`). | Handwriting and question photos: Free 5, Premium 25 a day each (D20). Working checks: Free 120, Premium 1,200 a day |
 | `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY` | Per-account daily tutor calls (`server/platform/tutor.js`). | see `docs/product/tutor.md` |
 | `PRI_FREE_PRACTICE_PER_DAY` | Free practice questions per account per **edition day** (§4). Not a model cost; listed because it uses the same day. | 20 |
 
@@ -67,7 +73,9 @@ before anything is marked (503 `PAID_CAPACITY_REACHED`, `RateLimit-Reset`,
 that the page was **not read or marked**, when the limit lifts, and that typing
 the answer stays open; the page stops re-sending until then. The lift time is
 written in the student's own clock: an NSW profile reads it in en-AU on its own
-timezone (`client/src/lib/locale.js` `limitClock`); an India profile reads it
+clock (`client/src/lib/locale.js` `limitClock`): en-AU, on the profile's own
+timezone when it has set one, otherwise on the device's clock, because these
+limits are rolling windows rather than calendar days. An India profile reads it
 exactly as before. There is **no fallback** to another region's key, model or
 deployment.
 
@@ -99,6 +107,10 @@ The timezone is taken from the edition table (`client/edition.config.mjs`
 test holds the two equal. The device's own courtesy gate counts in the
 profile's timezone, which for an India or NSW profile is the same calendar by
 default; where they differ the server's answer stands.
+
+The day computation assumes the zone never changes its clocks at midnight
+(true of both editions' zones; Sydney changes at 02:00 and 03:00). A future
+edition in a zone that does must add its own cases to the suite.
 
 The rolling AI windows (the per-account allowances, the tutor's day, the paid
 ceilings) are **24-hour windows, not calendar days**, and are unchanged.

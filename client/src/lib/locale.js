@@ -56,13 +56,28 @@ export function localeOf(profileOrCourse) {
 /**
  * The clock a limit's lift time is written in for a profile (plan H7): for a
  * profile outside the India course (an NSW student of Prithagoras) its own
- * locale and timezone, so a limit that lifts at a Sydney midnight reads as
- * midnight. Null for an India profile and for no profile: those messages are
- * written exactly as they were before editions existed.
+ * locale, and the timezone the profile has SET, or null when it has set none.
+ * With null the caller keeps the clock it used before: the device's for a
+ * reading limit (a rolling window, best told on the student's own clock), the
+ * server's named calendar for the daily cap. Null altogether for an India
+ * profile and for no profile: those messages are written exactly as they were
+ * before editions existed.
  */
 export function limitClock(profile) {
   const regional = !!profile && typeof profile === 'object' && typeof profile.course === 'string' && profile.course !== 'in';
-  return regional ? Object.freeze({ locale: localeOf(profile), timeZone: timezoneOf(profile) }) : null;
+  return regional ? Object.freeze({ locale: localeOf(profile), timeZone: cleanTimezone(profile.timezone) }) : null;
+}
+
+/**
+ * The clock the daily cap's reset is written in (components/FreeCapNotice.jsx):
+ * en-IN in the calendar the refusal names for an India profile or none, exactly
+ * as before editions; for an NSW profile its locale, on the timezone it has
+ * set, else the refusal's calendar. The zone is always shown beside the time.
+ */
+export function capResetClock(gateTimeZone, profile) {
+  const regional = limitClock(profile);
+  const gate = gateTimeZone || null;
+  return regional ? { locale: regional.locale, timeZone: regional.timeZone || gate } : { locale: 'en-IN', timeZone: gate };
 }
 
 /** The currency a profile pays in. */

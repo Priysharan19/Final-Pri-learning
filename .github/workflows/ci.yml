@@ -414,7 +414,7 @@ jobs:
           grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 27/27 checks' suites.log
           # Plan H7: a limit's lift time in an NSW student's own clock; device and
           # server agree on the day in both editions.
-          grep -Fq 'EDITION LIMIT CLOCK (H7): PASS — 23/23 checks' suites.log
+          grep -Fq 'EDITION LIMIT CLOCK (H7): PASS — 37/37 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log

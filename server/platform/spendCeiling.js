@@ -20,8 +20,10 @@
 // failure shows up in a response, which is the same argument the proxy-hops
 // setting makes, so the server refuses to start rather than guess.
 //
-// PER REGION (plan H7, ADR-0002 §9–10). Deployments are siloed: one edition,
-// one key, one bill, so this deployment's ceiling IS its region's ceiling. The
+// PER REGION (plan H7, ADR-0002 §9–10). Deployments are siloed: one edition
+// per deployment, so this deployment's ceiling IS its region's ceiling (while
+// two deployments share a provider key they still share that provider's own
+// limits and bill; a separate Australian key is the owner's, with H1). The
 // rule above holds in every edition: a Prithagoras deployment with a key and
 // no ceiling refuses to start exactly as a Priyabhata one does, and no edition
 // has a default. What the edition adds is a label: every unit spent, refused
@@ -110,6 +112,7 @@ export async function reservePaidCall(db, { env = process.env, now = Date.now() 
   // these, so arriving here without them means something is wrong, and refusing
   // to spend is the only safe reading of that.
   if (ceiling.perHour === null || ceiling.perDay === null) {
+    recordPaidCall(ceiling.edition, 'refused');
     return { verdict: { status: 503, code: 'PAID_CAPACITY_NOT_CONFIGURED', message: 'Server reading is unavailable on this deployment.' }, units: [] };
   }
 
