@@ -31,7 +31,7 @@ protection cannot see a pull request's head branch: a lane pull request with its
 contexts green can still be merged. The rule is therefore *detected, not prevented*:
 `Main Integrity` (`.github/workflows/main-integrity.yml`) fails a `main` commit whose merged pull
 request head is not `task/train-*`, and that failure stops `Release Staging Proof`, so such a commit
-never reaches staging or production; the push to `main` also runs every heavy workflow on the merged
+never gets the staging proof the owner needs before promoting it to production (staging itself deploys every `main` push); the push to `main` also runs every heavy workflow on the merged
 tree. Main Integrity reads only the runs of the merged pull request's own branch, so a lane pull
 request on the same SHA (a train of one) can never stand in for the train's runs. To merge a single
 lane pull request, open a train of one: a `task/train-*` branch at the lane head. Making it a

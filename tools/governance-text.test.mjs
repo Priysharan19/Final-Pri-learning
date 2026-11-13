@@ -95,7 +95,7 @@ ok(/directory: \/ad[\s\S]*?dependency-name: '\*'\n\s+update-types: \['version-up
 ok(!/dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\][\s\S]*directory: \/(client|server)/.test(dependabot.split('directory: /ad')[0]), 'client and server still receive their non-React, non-Express majors');
 
 // ── lane CI: AGENTS.md, the release policy and Main Integrity say the same thing ──
-ok(agents.includes('the heavy workflows run on `task/train-*` pull requests, so only trains merge into `main`; Main Integrity fails any other merge after the fact and stops its staging promotion — `docs/release/ci-lanes.md`'), 'AGENTS.md states the lane split and how the train-only rule is enforced (after the merge)');
+ok(agents.includes('the heavy workflows run on `task/train-*` pull requests, so only trains merge into `main`; Main Integrity fails any other merge after the fact, which withholds its staging proof and so its production promotion — `docs/release/ci-lanes.md`'), 'AGENTS.md states the lane split and how the train-only rule is enforced (after the merge)');
 ok(/so only trains merge into `main` \(`docs\/release\/ci-lanes\.md`\)\. Branch protection cannot see the head branch, so this is detected, not prevented/.test(read('docs/release/release-policy.md')), 'the release policy states the train-only merge rule and that it is detected after the merge');
 ok(/if \[\[ "\$head_ref" != task\/train-\* \]\]/.test(read('.github/workflows/main-integrity.yml')), 'Main Integrity enforces the train-only merge rule AGENTS.md states');
 ok(existsSync(join(ROOT, 'docs/release/ci-lanes.md')) && existsSync(join(ROOT, 'ci/check-counts.json')), 'the lane document and the check-count manifest exist');

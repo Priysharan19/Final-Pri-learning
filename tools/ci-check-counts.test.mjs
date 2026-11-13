@@ -131,6 +131,20 @@ for (const [what, log] of [
     const base = JSON.parse(JSON.stringify(fixture)); if (what.startsWith('eq')) base.groups['platform/edition.log'].pins[4].op = 'eq';
     ok(unannouncedRemovals(base, head).some(m => m.weakened), `retire-check catches ${what}`);
   }
+  {
+    const head = JSON.parse(JSON.stringify(fixture));
+    delete head.groups['platform/edition.log'].pins[4].count; delete head.groups['platform/edition.log'].pins[4].op;
+    ok(unannouncedRemovals(fixture, head).some(m => m.weakened), 'retire-check catches a count pin whose count was removed');
+    const both = JSON.parse(JSON.stringify(head)); both.groups['platform/edition.log'].pins.splice(1, 1);
+    both.retired.push({ group: 'platform/edition.log', shape: shapeOf({ has: 'BILLING PER EDITION: PASS — 123/123 checks —' }), reason: 'billing moved to its own group (#900)' });
+    ok(unannouncedRemovals(fixture, both).filter(m => m.weakened).length === 1, 'a retired record for one pin does not excuse a weakening of another');
+    const twice = JSON.parse(JSON.stringify(fixture));
+    twice.groups['platform/edition.log'].pins.push({ has: 'Responsive matrix · 6 viewports', count: 1, op: 'eq' });
+    const twiceHead = JSON.parse(JSON.stringify(twice));
+    twiceHead.groups['platform/edition.log'].pins.pop(); twiceHead.groups['platform/edition.log'].pins[4].count = 1;
+    twiceHead.retired.push({ group: 'platform/edition.log', shape: shapeOf({ has: 'Responsive matrix · 6 viewports' }), reason: 'one engine retired from the tour (#901)' });
+    ok(unannouncedRemovals(twice, twiceHead).length === 1, 'one retired record excuses one removal or one weakening, never both');
+  }
   const zero = JSON.parse(JSON.stringify(fixture)); zero.groups['platform/edition.log'].pins[4].count = 0;
   ok(manifestProblems(zero).length > 0, 'a count of 0 is malformed: it checks nothing');
 }

@@ -729,6 +729,14 @@ export function stepProblems(stepLines) {
     assert.ok(id in manifest.groups, `ci.yml verifies ${id}, which ci/check-counts.json does not have`);
     assert.equal(stepProblems(stepOf(at[0])).length, 0, `the step verifying ${id}: ${stepProblems(stepOf(at[0])).join('; ')}`);
   }
+  // A job-level condition would skip every verify in the job, and a skipped job reads as passing:
+  // the jobs that verify groups, and the four required jobs, carry no if: other than always().
+  const jobIf = id => (job(id).match(/^    if:\s*(.*)$/m) || [])[1]?.trim();
+  for (const id of new Set([...Object.values(manifest.groups).map(g => g.job), 'suites', 'platform', 'browser', 'build'])) {
+    const cond = jobIf(id);
+    assert.ok(cond === undefined || cond === 'always()', `ci.yml job ${id} verifies output pins or is a required context, so it carries no condition other than always() (found ${cond})`);
+  }
+  assert.ok((ci.replace(/\n  platform:\n/, "\n  platform:\n    if: github.event_name == 'push'\n").match(/\n  platform:\n([\s\S]*?)(?=\n  [a-z][a-z0-9-]*:\n|$)/)[1].match(/^    if:\s*(.*)$/m) || [])[1] === "github.event_name == 'push'", 'the job-condition control applies');
   // Negative controls on a real verify step.
   const sample = stepOf(calls.get('platform/storekit.log')[0]);
   for (const [name, mutated] of [

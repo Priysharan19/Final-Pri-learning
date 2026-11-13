@@ -318,36 +318,36 @@ export function unannouncedRemovals(base, head) {
   for (const r of head.retired || []) { const key = `${r.group}\u0000${r.shape}`; retired.set(key, (retired.get(key) || 0) + 1); }
   const baseRetired = new Map();
   for (const r of base.retired || []) { const key = `${r.group}\u0000${r.shape}`; baseRetired.set(key, (baseRetired.get(key) || 0) + 1); }
+  // One retired record excuses one removal or one weakening, never both.
+  const budget = new Map();
+  for (const [key, n] of retired) budget.set(key, n - (baseRetired.get(key) || 0));
+  const spend = key => { const left = budget.get(key) || 0; if (left > 0) { budget.set(key, left - 1); return true; } return false; };
   const missing = [];
   for (const [key, n] of before) {
-    const newlyRetired = (retired.get(key) || 0) - (baseRetired.get(key) || 0);
-    const short = n - (now.get(key) || 0) - Math.max(0, newlyRetired);
+    const short = n - (now.get(key) || 0);
     const [group, shape] = key.split('\u0000');
-    for (let i = 0; i < short; i += 1) missing.push({ group, shape });
+    for (let i = 0; i < short; i += 1) if (!spend(key)) missing.push({ group, shape });
   }
-  // A count pin that keeps its shape but checks less (eq → ge, or a lower floor/count, or no count at all)
-  // is a weakening too; it needs the same retired record as a removal.
-  const countsOf = manifest => {
+  // A count pin that keeps its shape but checks less (count or op removed, a lower count or floor,
+  // eq → ge) is a weakening too; it needs the same retired record as a removal.
+  const byShape = manifest => {
     const t = new Map();
     for (const [id, g] of Object.entries(manifest.groups)) for (const pin of g.pins) {
-      if (!('count' in pin)) continue;
       const key = `${id}\u0000${shapeOf(pin)}`;
       (t.get(key) || t.set(key, []).get(key)).push(pin);
     }
     return t;
   };
-  const nowCounts = countsOf(head);
-  for (const [key, basePins] of countsOf(base)) {
-    const headPins = nowCounts.get(key) || [];
-    const newlyRetired = (retired.get(key) || 0) - (baseRetired.get(key) || 0);
+  const headPinsByShape = byShape(head);
+  for (const [key, basePins] of byShape(base)) {
+    const headPins = headPinsByShape.get(key) || [];
     const [group, shape] = key.split('\u0000');
-    let weakened = 0;
     for (const [k, b] of basePins.entries()) {
       const h = headPins[k];
-      if (!h) continue; // a missing pin is counted as a removal above
-      if (h.count < b.count || (b.op === 'eq' && h.op !== 'eq')) weakened += 1;
+      if (!h || !('count' in b)) continue; // a missing pin is counted as a removal above
+      const weaker = !('count' in h) || h.count < b.count || (b.op === 'eq' && h.op !== 'eq');
+      if (weaker && !spend(key)) missing.push({ group, shape, weakened: true });
     }
-    for (let i = Math.max(0, newlyRetired); i < weakened; i += 1) missing.push({ group, shape, weakened: true });
   }
   // A retired record is never removed either: the history of what stopped being pinned stays.
   for (const [key, n] of baseRetired) {
